@@ -1,3 +1,27 @@
+## 2026-10-19 - Retry infrastructure-failed DAG nodes before cascading skips (#10605)
+
+The shared DAG scheduler retries an infrastructure-failed node at most twice, with
+1 s and 2 s backoff. Both automatic and manual retries use the node-retry journal
+reset, including its execution-owner fingerprint bump and descendant restoration.
+The automatic attempt count and delay are journaled on `dag.node.retried`; a node
+diagnostic reports `retried after infra failure (n/2)`. A fresh scheduler restores
+the count and any outstanding backoff from those events.
+
+Classification uses typed task failure fields: `child-unresponsive`,
+`host_unavailable`, `suspended_unresumable`, and `session_unavailable` with
+`host_draining` or `host_memory_pressure`. Untyped transport losses retain their
+existing behavior. Task failures, user-cancelled tasks, and pending cancellation
+requests are not retried. After exhaustion the existing quiescent cascade skips
+only descendants of the failed node; independent branches continue.
+
+The scheduler is split by admission, task attachment, projection, cancellation,
+frontier execution, and shared context to keep each touched source file below
+250 pure LOC. Scheduler tests cover the seven-root/54-dependent incident,
+exhaustion, misleading task error text, cancellation, typed host refusal, and
+budget/backoff restoration across scheduler re-entry. Manual retry after
+exhaustion still accepts a prompt override, journals the amendment before the
+retry, and rejects already-completed work before applying an amendment.
+
 ## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
 
 - `agents/builtin/fallback-chains.ts` (mirrored from `model-core/src/agent-model-requirements.ts`, where `oracle` and `momus` get the same rung): a `{google, google-vertex, opencode}/gemini-4-argon` rung at `high` goes directly before the `gemini-3.1-pro` rung of `plan-reviewer`. The previous rung stays for Copilot (off the Argon rung until code-yeongyu/senpi#3379) and for engine pins without the Argon row. The GPT heads are unchanged: a blind eval put Argon ahead of the previous pro model in 16/16 judgments but behind the GPT heads on correctness, with a median latency of 57 s vs 15 s.

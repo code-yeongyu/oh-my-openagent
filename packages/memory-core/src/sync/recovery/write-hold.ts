@@ -1,7 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
-import { mkdir, readFile, rename, rm, writeFile } from "../../fs/resilient";
+import {
+	lstat,
+	mkdir,
+	readFile,
+	rename,
+	rm,
+	writeFile,
+} from "../../fs/resilient";
+import { syncJournalDirectory, syncJournalFile } from "../../journal/fsync";
 
 /**
  * The persisted read-only state of a recovered device (#10412 review M3). Recovery writes it before
@@ -54,17 +62,57 @@ export const loadWriteHold = async (
 	};
 };
 
-/** Records that writes are held for `account`; written atomically, mode 0600. */
+/**
+ * The topmost missing directory on the way to `stateDir`, or undefined when it exists. It is read
+ * before `mkdir`, not from `mkdir`'s return value: an EINTR retry of a `mkdir` whose first attempt
+ * created the directories returns undefined, which would skip the parent fsync (#10611 review).
+ */
+const topmostMissing = async (stateDir: string): Promise<string | undefined> => {
+	let missing: string | undefined;
+	for (let dir = resolve(stateDir); ; dir = dirname(dir)) {
+		try {
+			await lstat(dir);
+			return missing;
+		} catch (error) {
+			if (!isMissing(error)) throw error;
+		}
+		missing = dir;
+		if (dirname(dir) === dir) return missing;
+	}
+};
+
+/**
+ * The directories to fsync so `stateDir` and its `recovery-hold` entry are durable (#10611): when
+ * `stateDir` or an ancestor was missing (`created`, the topmost one), each new entry is fsynced in
+ * the directory that holds it, from the parent of `created` down to `stateDir`.
+ */
+const entriesToSync = (stateDir: string, created: string | undefined): string[] => {
+	const state = resolve(stateDir);
+	const dirs = [state];
+	if (created === undefined) return dirs;
+	const top = resolve(created);
+	if (state !== top && !state.startsWith(`${top}${sep}`)) return dirs;
+	for (let dir = state; dir !== top; dir = dirname(dir)) dirs.unshift(dirname(dir));
+	dirs.unshift(dirname(top));
+	return dirs;
+};
+
+/**
+ * Records that writes are held for `account`, mode 0600, durably (#10450): the staged file is
+ * fsynced before the rename and the directories after it, so a power loss right after the join
+ * cannot lose the hold. Directories the call creates are fsynced into their parents first (#10611).
+ */
 export const holdWrites = async (
 	stateDir: string,
 	account: string,
 	credentialId: string,
 ): Promise<void> => {
 	const target = holdPath(stateDir, account);
-	await mkdir(join(stateDir, "recovery-hold"), {
-		recursive: true,
-		mode: 0o700,
-	});
+	const dir = join(stateDir, "recovery-hold");
+	const created = await topmostMissing(stateDir);
+	await mkdir(dir, { recursive: true, mode: 0o700 });
+	for (const entry of entriesToSync(stateDir, created))
+		await syncJournalDirectory(entry);
 	const staging = `${target}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
 	const body = { version: 1, account, credential_id: credentialId };
 	try {
@@ -72,10 +120,12 @@ export const holdWrites = async (
 			flag: "wx",
 			mode: 0o600,
 		});
+		await syncJournalFile(staging);
 		await rename(staging, target);
 	} finally {
 		await rm(staging, { force: true });
 	}
+	await syncJournalDirectory(dir);
 };
 
 /** Releases the hold once a rotation is stored and verified; a missing hold is already released. */
@@ -84,4 +134,5 @@ export const releaseWriteHold = async (
 	account: string,
 ): Promise<void> => {
 	await rm(holdPath(stateDir, account), { force: true });
+	await syncJournalDirectory(join(stateDir, "recovery-hold"));
 };

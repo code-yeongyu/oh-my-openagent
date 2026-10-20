@@ -7,6 +7,7 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
+import type { MemoryFactsApplier } from "./facts-apply-rpc"
 import { createMemoryRpcBridge, type MemoryRpcBridge } from "./memory-rpc-bridge"
 import { resolveAgentReflectionSettings } from "./reflection-settings"
 import { isStaleExtensionContextError } from "./stale-extension-context"
@@ -26,7 +27,7 @@ import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
 export interface MemoryReflectionLiveWiring {
   currentSession(): ReflectionLiveSession | undefined
-  registerRpc(pi: SenpiExtensionAPI, resolveContext: (sessionId: string) => MemoryIdentityContext | undefined): void
+  registerRpc(pi: SenpiExtensionAPI, resolveContext: (sessionId: string) => MemoryIdentityContext | undefined, applyFacts?: MemoryFactsApplier): void
   attach(sessionId: string): void
   bind(
     pi: SenpiExtensionAPI,
@@ -106,10 +107,11 @@ export function createMemoryReflectionLiveWiring(
 
   return {
     currentSession: () => liveSession.current,
-    registerRpc(pi, resolveContext): void {
+    registerRpc(pi, resolveContext, applyFacts): void {
       rpcBridge.current = createMemoryRpcBridge(pi, {
         resolveContext,
         activeRun: (identity) => activeRuns.current(identity),
+        ...(applyFacts === undefined ? {} : { applyFacts }),
       })
     },
     attach(sessionId): void {

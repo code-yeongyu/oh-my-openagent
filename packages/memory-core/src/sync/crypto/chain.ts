@@ -6,7 +6,7 @@ import { type Authority, applyRecord, type FoldedRecord, isCancelledAdmission, i
 import { expectedEpoch, forcedRotationRefusal, keyWithinEpoch, type LinkMode, linksHold, signerKey } from "./chain-checks.ts"
 import { type ParsedBody, parseBody } from "./parse.ts"
 import type { RejectionCounter } from "./rejection.ts"
-import { type ReceiverCheck, receiverRefusal } from "./receiver.ts"
+import { type ReceiverCheck, type ReceiverPass, receiverPass } from "./receiver.ts"
 import { checkRecordRules, type RuleRejection } from "./rules.ts"
 import { authorSigningKey, verifyRecordSig } from "./signatures.ts"
 
@@ -127,11 +127,13 @@ export const emptyChain = (account: string, anchor: ChainAnchor): ChainState =>
 
 /**
  * Moves an anchored state's head forward to a snapshot position whose keyring head is the one this
- * state verified (snapshot import only); any other position, or an unanchored state, gets null.
+ * state verified (snapshot import only); any other position, or an unanchored state, gets null. At
+ * the same seq the head may not move sideways: only the verified link itself is accepted there.
  */
 export const atVerifiedHead = (state: ChainState, head: Head): ChainState | null => {
   if (!isChainState(state) || !state.anchored || state.head === null) return null
   if (head.keyring_link !== state.head.keyring_link || head.seq < state.head.seq) return null
+  if (head.seq === state.head.seq && head.link !== state.head.link) return null
   return mintState({ ...state, head })
 }
 
@@ -148,13 +150,18 @@ type StepResult =
  * finally the content hash. Right after the link, the merged receiver's own refusals apply, so a
  * record it refuses is never folded here either.
  */
-export const verifyKeyringEntry = async (state: ChainState, entry: KeyringEntry, mode: LinkMode): Promise<StepResult> => {
+export const verifyKeyringEntry = async (
+  state: ChainState,
+  entry: KeyringEntry,
+  mode: LinkMode,
+  pass?: ReceiverPass,
+): Promise<StepResult> => {
   const malformed = envelopeRefusal(entry)
   if (malformed !== null) return { ok: false, reason: malformed }
   if (!isChainState(state)) return { ok: false, reason: "untrusted_state" }
   if (state.anchor.account !== state.account) return { ok: false, reason: "untrusted_root" }
   if (!(await linksHold(state.head, entry, mode))) return { ok: false, reason: "link_mismatch" }
-  const refused = await receiverRefusal(seenKeyring(state), entry)
+  const refused = (pass ?? (await receiverPass(seenKeyring(state), [entry])))(entry)
   if (refused !== null) return { ok: false, reason: refused }
   const body = parseBody(entry.body)
   if (body === null) return { ok: false, reason: "bad_record" }
@@ -199,12 +206,12 @@ export const verifyKeyringEntry = async (state: ChainState, entry: KeyringEntry,
   }
 }
 
-const verifyBatchEntry = async (state: ChainState, entry: BatchEntry): Promise<StepResult> => {
+const verifyBatchEntry = async (state: ChainState, entry: BatchEntry, pass: ReceiverPass): Promise<StepResult> => {
   const malformed = envelopeRefusal(entry)
   if (malformed !== null) return { ok: false, reason: malformed }
   if (!isChainState(state)) return { ok: false, reason: "untrusted_state" }
   if (!(await linksHold(state.head, entry, "main"))) return { ok: false, reason: "link_mismatch" }
-  const refused = await receiverRefusal(seenKeyring(state), entry)
+  const refused = pass(entry)
   if (refused !== null) return { ok: false, reason: refused }
   const forced = forcedRotationRefusal(state.forcedRotationAfter, null)
   if (forced !== null) return { ok: false, reason: forced }
@@ -242,14 +249,15 @@ export const appendEntries = async (
     return { ok: false, state, steps, seq: 0, reason: "untrusted_state" }
   }
   let current = state
+  const pass = await receiverPass(seenKeyring(state), entries)
   for (const entry of entries) {
     const malformed = envelopeRefusal(entry)
     const result: StepResult =
       malformed !== null
         ? { ok: false, reason: malformed }
         : entry.kind === "keyring"
-          ? await verifyKeyringEntry(current, entry, "main")
-          : await verifyBatchEntry(current, entry)
+          ? await verifyKeyringEntry(current, entry, "main", pass)
+          : await verifyBatchEntry(current, entry, pass)
     if (!result.ok) {
       rejections.record(result.reason)
       const seq = malformed === null && Number.isSafeInteger(entry.seq) ? entry.seq : (current.head?.seq ?? 0) + 1

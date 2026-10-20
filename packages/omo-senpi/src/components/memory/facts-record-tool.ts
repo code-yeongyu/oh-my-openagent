@@ -31,6 +31,9 @@ type FactsRecordToolInput = {
   readonly extractionPath: string
   readonly maxRecords?: number
   readonly maxBytes?: number
+  /** Every call counts, rejected ones too: it bounds the model's tool turns, not only the records kept. */
+  readonly maxCalls?: number
+  readonly onCall?: () => void
   readonly onFailure?: (reason: string) => void
   readonly state?: { readonly cancelled: boolean }
 }
@@ -39,6 +42,7 @@ export function createFactsRecordTool(input: FactsRecordToolInput): FactsRecordT
   let active = true
   let count = 0
   let bytes = 0
+  let calls = 0
   const reject = (reason: string): FactsRecordToolResult => {
     input.onFailure?.(reason)
     return errorResult(reason)
@@ -49,6 +53,11 @@ export function createFactsRecordTool(input: FactsRecordToolInput): FactsRecordT
     deactivate: () => { active = false },
     execute: async (_toolCallId, params) => {
       if (!active || input.state?.cancelled === true) return errorResult("the facts run is no longer active")
+      if (input.maxCalls !== undefined && calls >= input.maxCalls) {
+        return reject(`the facts tool-call limit (${input.maxCalls}) has been reached`)
+      }
+      calls += 1
+      input.onCall?.()
       if (input.maxRecords !== undefined && count >= input.maxRecords) {
         return reject(`the facts run limit (${input.maxRecords}) has been reached`)
       }

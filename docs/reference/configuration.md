@@ -841,8 +841,8 @@ Records about individuals, stored as cards with an observation ledger.
 
 | Option           | Default | Description                                    |
 | ---------------- | ------- | ---------------------------------------------- |
-| `sync.enabled`   | `true`  | Sync the memory repository                      |
-| `sync.remote`    | -       | Optional git remote for the memory repository   |
+| `sync.enabled`   | `true`  | End-to-end encrypted memory sync on this device (needs sign-in and sync on for the account) |
+| `sync.remote`    | -       | Deprecated, ignored; the git mirror is set with `/memfs`  |
 | `search.enabled` | `true`  | Enable memory search                            |
 
 In Senpi, run `/sleeptime` to see every resolved memory value, including which ones a per-agent

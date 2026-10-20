@@ -1542,20 +1542,19 @@ jobs:
           # "+ oh-my-openagent@5.1.38" at 10:09Z and was served only from 10:34Z, while this job only
           # waited on omo-ai. Read EVERY main and platform package back at its exact version (no-cache),
           # or fail naming what is missing and why.
-          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64)
+          # Platform packages come from package.json optionalDependencies (--platform-packages), the
+          # one list the release-platform test holds equal to build-binaries PLATFORMS, so this step
+          # cannot drift from the platforms that are built and published.
           if [ "${LAZYCODEX_ONLY}" = "true" ]; then
-            SPECS=("lazycodex-ai@$VERSION")
+            node script/wait-registry-versions.mjs "lazycodex-ai@$VERSION"
           else
             # omo-ai carries its own version (a prerelease spells it differently from the wrappers).
             SPECS=("oh-my-opencode@$VERSION" "oh-my-openagent@$VERSION" "omo-ai@$OMO_AI_VERSION")
             if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
               SPECS+=("lazycodex-ai@$VERSION")
             fi
-            for plat in "${PLATFORMS[@]}"; do
-              SPECS+=("oh-my-opencode-${plat}@$VERSION" "oh-my-openagent-${plat}@$VERSION")
-            done
+            node script/wait-registry-versions.mjs --platform-packages "$VERSION" "${SPECS[@]}"
           fi
-          node script/wait-registry-versions.mjs "${SPECS[@]}"
 
       - name: Wait for omo-ai registry readiness
         if: inputs.lazycodex_only != true

@@ -1,12 +1,15 @@
-import { describe, expect, test } from "bun:test"
+import { beforeAll, describe, expect, mock, spyOn, test } from "bun:test"
 import { type AppendOutcome, appendEntries, type ChainState, emptyChain } from "./chain.ts"
 import type { KeyringEntry, SyncEntry } from "./entry.ts"
 import { createRejectionCounter } from "./rejection.ts"
 import { importSnapshot, type SnapshotRecord } from "./snapshot.ts"
-import { buildFork } from "./testing/fork.ts"
+import { buildFork, rotation } from "./testing/fork.ts"
+import { envelopeRefusal } from "./envelope.ts"
+import { receiverPass, receiverRefusal, wire } from "./receiver.ts"
 import { ACCOUNT, appendBatch, appendKeyring, chain, deviceId, epochKey, keyringFor, keys, mainChain, objects, principalKeys, readBytes, record, fixtureAnchor } from "./testing/sync-v1.test-support.ts"
 import { buildBatch } from "./build.ts"
 import { b64urlDecode, sha256B64 } from "./vendor/sync-format/jcs.ts"
+import * as vendorFold from "./vendor/sync-format/fold.ts"
 import { signFramed } from "./vendor/sync-format/keys.ts"
 import { snapshotPreimage } from "./vendor/sync-format/snapshot.ts"
 
@@ -142,5 +145,142 @@ describe("snapshot import matches the merged receiver", () => {
     }
     expect((await sealedAt(1)).ok).toBe(true)
     expect((await sealedAt(2)).ok).toBe(false)
+  })
+})
+
+describe("the receiver check does not re-read the verified chain for every new entry", () => {
+  test("a long chain is serialized for the receiver about once, not once per later entry", async () => {
+    let state = await verified(mainUntil("post_join_rotation").concat(record("post_join_rotation")))
+    const entries: KeyringEntry[] = []
+    for (let i = 0; i < 48; i++) {
+      const next = await rotation(state, "A")
+      const { outcome } = await run([next], state)
+      if (!outcome.ok) throw new Error(`rotation ${i} refused: ${outcome.reason}`)
+      state = outcome.state
+      entries.push(next)
+    }
+    const walked = [...mainUntil("post_join_rotation"), record("post_join_rotation"), ...entries]
+    const stringify = spyOn(JSON, "stringify")
+    try {
+      expect((await run(walked)).outcome.ok).toBe(true)
+      const serialized = stringify.mock.results.reduce((sum, result) => sum + (typeof result.value === "string" ? result.value.length : 0), 0)
+      const chainBytes = JSON.stringify(walked).length
+      expect(serialized).toBeLessThan(3 * chainBytes)
+    } finally {
+      mock.restore()
+    }
+  })
+})
+
+describe("the receiver walks the chain once per pull, not once per entry", () => {
+  const ROTATIONS = 1000
+  const BATCHES = 500
+  const recoveredPrefix = (): KeyringEntry[] => [...mainUntil("post_join_rotation"), record("post_join_rotation")]
+  const rotations = async (count: number): Promise<{ readonly entries: KeyringEntry[]; readonly state: ChainState }> => {
+    let state = await verified(recoveredPrefix())
+    const entries: KeyringEntry[] = []
+    for (let i = 0; i < count; i++) {
+      const next = await rotation(state, "A")
+      const { outcome } = await run([next], state)
+      if (!outcome.ok) throw new Error(`rotation ${i} refused: ${outcome.reason}`)
+      state = outcome.state
+      entries.push(next)
+    }
+    return { entries, state }
+  }
+  let built: { readonly entries: KeyringEntry[]; readonly state: ChainState } | null = null
+  const thousand = async () => (built ??= await rotations(ROTATIONS))
+  beforeAll(async () => {
+    await thousand()
+  }, 60000)
+  const walkedDuring = async (work: () => Promise<void>): Promise<number> => {
+    const fold = spyOn(vendorFold, "foldRefusal")
+    try {
+      await work()
+      return fold.mock.calls.reduce((sum, [entries]) => sum + entries.length, 0)
+    } finally {
+      mock.restore()
+    }
+  }
+
+  test("a 1,000-rotation pull folds each entry a bounded number of times", async () => {
+    const { entries } = await thousand()
+    const pull = [...recoveredPrefix(), ...entries]
+    const walked = await walkedDuring(async () => {
+      expect((await run(pull)).outcome.ok).toBe(true)
+    })
+    expect(walked).toBeLessThanOrEqual(2 * pull.length)
+  })
+
+  test("a 500-batch pull after a long keyring chain does not re-fold the keyring for each batch", async () => {
+    const { entries: all } = await thousand()
+    const entries = all.slice(0, 200)
+    const state = await verified([...recoveredPrefix(), ...entries])
+    const epoch = state.authority?.epoch ?? 0
+    let head = headOf(state)
+    const batches: SyncEntry[] = []
+    for (let i = 0; i < BATCHES; i++) {
+      const batch = await appendBatch(head, objects.objects[0]?.sha256 ?? "", epoch, keyringFor("recovered"))
+      batches.push(batch)
+      head = { seq: batch.seq, link: batch.link, keyring_link: head.keyring_link }
+    }
+    const walked = await walkedDuring(async () => {
+      const { outcome } = await run(batches, state)
+      expect(outcome.ok ? outcome.steps.filter((step) => step.kind === "batch").length : outcome.reason).toBe(BATCHES)
+    })
+    expect(walked).toBeLessThanOrEqual(2 * (recoveredPrefix().length + entries.length + BATCHES))
+  })
+
+  test("a snapshot import over a 1,000-rotation keyring prefix folds the prefix a bounded number of times", async () => {
+    const { entries } = await thousand()
+    const covered = [...recoveredPrefix(), ...entries]
+    const last = covered.at(-1)
+    if (last === undefined) throw new Error("empty prefix")
+    const golden: SnapshotRecord = JSON.parse(new TextDecoder().decode(readBytes("snapshot.json")))
+    const record = { ...golden, covers_seq: last.seq, link: last.link, keyring_head: last.keyring_link }
+    const walked = await walkedDuring(async () => {
+      const imported = await importSnapshot(ACCOUNT, fixtureAnchor(), covered, record, [], epochKey, createRejectionCounter())
+      expect(imported.ok ? "imported" : imported.reason).not.toBe("keyring_prefix_refused")
+    })
+    expect(walked).toBeLessThanOrEqual(2 * covered.length)
+  })
+
+  test("a batch checked alone gets the same verdict as the receiver over the whole verified history", async () => {
+    const history = mainChain()
+    const state = await verified(history)
+    const fresh = await appendBatch(headOf(state), objects.objects[0]?.sha256 ?? "", 3, keyringFor("owner"))
+    const variants: ReadonlyArray<SyncEntry> = [
+      fresh,
+      { ...fresh, seq: headOf(state).seq },
+      { ...fresh, seq: 1 },
+      JSON.parse(JSON.stringify({ ...fresh, author: { kind: "recovery", credential_id: "c" } })),
+    ]
+    for (const batch of variants) {
+      expect(envelopeRefusal(batch)).toBeNull()
+      const whole = vendorFold.foldRefusal(wire([...history, batch]))
+      expect((await receiverPass(history, [batch]))(batch)).toBe(whole.ok ? null : whole.reason)
+      expect(await receiverRefusal(history, batch)).toBe(whole.ok ? null : whole.reason)
+    }
+  })
+})
+
+describe("an entry later in a pull never changes the verdict of an earlier one", () => {
+  test.each([
+    ["a replay after two new rotations", (r1: KeyringEntry, r2: KeyringEntry) => [r1, r2, r1], 2],
+    ["a replay right after one new rotation", (r1: KeyringEntry, _r2: KeyringEntry) => [r1, r1], 1],
+    ["an older rotation after two new ones", (r1: KeyringEntry, r2: KeyringEntry) => [r1, r2, r1, r2], 2],
+  ] as const)("%s keeps the valid prefix and refuses only the bad entry", async (_name, shape, accepted) => {
+    const start = await verified([...mainUntil("post_join_rotation"), record("post_join_rotation")])
+    const r1 = await rotation(start, "A")
+    const after1 = (await run([r1], start)).outcome
+    if (!after1.ok) throw new Error("r1 refused")
+    const r2 = await rotation(after1.state, "B")
+    const pull = shape(r1, r2)
+    const { outcome, rejections } = await run(pull, start)
+    expect(outcome.ok).toBe(false)
+    expect(outcome.steps.length).toBe(accepted)
+    expect(outcome.state.head?.seq).toBe(headOf(start).seq + accepted)
+    expect(outcome.ok ? null : outcome.reason).toBe("link_mismatch")
+    expect(rejections.count()).toBe(1)
   })
 })

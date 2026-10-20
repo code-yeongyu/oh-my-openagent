@@ -57,6 +57,8 @@ Senpi telemetry adapter over `@oh-my-opencode/telemetry-core` PostHog primitives
 
 ## Conventions
 
+- `lazy-posthog.ts` supplies the default transport factory through telemetry-core's SDK-free `./injected` entry. `posthog-runtime.ts` alone imports the SDK-bearing transport entry and ships as `omo-telemetry-posthog.js`. Captures start the import without awaiting it and retain the newest 256 in order; overflow drops oldest and reports once at flush/shutdown. Unused transports do not load the SDK on exit. A factory shares one import; import failures report once with the caller's diagnostic source and back off for 60 seconds before another call can retry.
+
 - Fire-and-forget everywhere: capture failures surface once through the diagnostics callback or debug log, never to the user, never as a thrown error.
 - New events require a schema entry + allowlist in `product-identity.ts`, a doc regeneration (`schema-doc.test.ts` fails otherwise), and bucketing for any unbounded value.
 - Tests inject `env`, `now`, `osProvider`, `stateDir`, and `transportFactory`; no test touches the network or the real agent home.

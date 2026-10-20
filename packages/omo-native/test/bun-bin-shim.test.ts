@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, lstatSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { spawnSync } from "node:child_process"
-import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
+import { join } from "node:path"
 import { bunBinShimScript, ensureBunBinShim } from "../bin/lib/bun-bin-shim.js"
 import {
   baseInput,
@@ -13,165 +11,10 @@ import {
   recorder,
   stockLinkTarget,
 } from "./bun-bin-shim.test-support"
+import { POSIX_ONLY, createFixture, launchViaNode, launchShim, launchEntry, capture, removeFixtureRoots } from "./bun-bin-shim.fixture"
 
-const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
-const roots: string[] = []
+afterEach(removeFixtureRoots)
 
-/** bun test runs on bun; node ships as its sibling on CI and dev machines, and its absence skips. */
-function nodeInterpreter(): string | undefined {
-  if (!process.versions.bun) return process.execPath
-  const sibling = join(dirname(process.execPath), "node")
-  if (existsSync(sibling)) return sibling
-  const located = spawnSync("which", ["node"], { encoding: "utf8" })
-  return located.status === 0 ? (located.stdout.split(/\r?\n/)[0]?.trim() || undefined) : undefined
-}
-
-const NODE = nodeInterpreter()
-const POSIX_ONLY = process.platform === "win32" || !NODE
-
-// The system dirs a node-less PATH keeps (`sh` lives there). A host that ships node in them cannot
-// stage a machine without node, so that case skips instead of passing on the wrong runtime.
-const NODELESS_SYSTEM_DIRS = "/bin"
-const NODELESS_UNAVAILABLE = process.platform === "win32"
-  || !process.versions.bun
-  || spawnSync("/usr/bin/env", ["node", "--version"], { env: { PATH: NODELESS_SYSTEM_DIRS } }).status === 0
-
-type Fixture = {
-  root: string
-  bunInstall: string
-  packageRoot: string
-  launcher: string
-  binPath: string
-  bunBinary: string
-  captureFile: string
-  markerFile: string
-}
-
-function fixtureEnv(fixture: Fixture, env: Record<string, string> = {}): NodeJS.ProcessEnv {
-  const inherited: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: join(fixture.root, "home"),
-    BUN_INSTALL: fixture.bunInstall,
-    // node's directory stays on PATH because the shim's fallbacks exec the entrypoint, whose
-    // `#!/usr/bin/env node` line resolves node through PATH exactly as a real install would.
-    PATH: `${dirname(NODE ?? process.execPath)}:/usr/bin:/bin`,
-    CAPTURE_FILE: fixture.captureFile,
-  }
-  delete inherited.OMO_RUNTIME
-  delete inherited.OMO_DEBUG
-  delete inherited.OMO_CODING_AGENT_DIR
-  delete inherited.SENPI_CODING_AGENT_DIR
-  delete inherited.PI_CODING_AGENT_DIR
-  return { ...inherited, ...env }
-}
-
-function createFixture(): Fixture {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-bin-shim-")))
-  roots.push(root)
-  const bunInstall = join(root, "buninstall")
-  const packageRoot = join(bunInstall, "install", "global", "node_modules", "omo-ai")
-  mkdirSync(join(packageRoot, "bin"), { recursive: true })
-  cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  writeFileSync(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai",
-    version: "9.9.9-test.0",
-    type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
-  const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  mkdirSync(join(senpiRoot, "dist"), { recursive: true })
-  writeFileSync(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi",
-    version: "2026.8.9",
-    type: "module",
-    exports: { ".": "./dist/index.js" },
-  }))
-  writeFileSync(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
-  const captureFile = join(root, "capture.json")
-  writeFileSync(join(senpiRoot, "dist", "cli.js"), `
-import { writeFileSync } from "node:fs"
-writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ argv: process.argv.slice(2), env: process.env, versions: process.versions }))
-process.exit(Number(process.env.FAKE_EXIT ?? 0))
-`)
-  mkdirSync(join(senpiRoot, "dist", "core"), { recursive: true })
-  writeFileSync(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-  // A stand-in bun that proves it ran; the real bun end to end is QA's job against the real install.
-  // It answers `--version` like a real bun at the engine's floor, because the launcher probes the
-  // bun a bun-global install chose before trusting it (#9563).
-  const markerFile = join(root, "fake-bun.marker")
-  const bunBinary = join(bunInstall, "bin", "bun")
-  mkdirSync(join(bunInstall, "bin"), { recursive: true })
-  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
-  symlinkSync(stockLinkTarget(), join(bunInstall, "bin", "omo"))
-  mkdirSync(join(root, "home"), { recursive: true })
-  return {
-    root,
-    bunInstall,
-    packageRoot,
-    launcher: join(packageRoot, "bin", "omo.js"),
-    binPath: join(bunInstall, "bin", "omo"),
-    bunBinary,
-    captureFile,
-    markerFile,
-  }
-}
-
-/** The pre-repair surface: node boots through the stock symlink, as the kernel does for `omo`. */
-function launchViaNode(fixture: Fixture, args: string[], env: Record<string, string> = {}) {
-  return spawnSync(NODE ?? process.execPath, [fixture.binPath, ...args], {
-    encoding: "utf8",
-    env: fixtureEnv(fixture, env),
-  })
-}
-
-/** The post-repair surface: the kernel execs the shim's `#!/bin/sh` line; node is not involved. */
-function launchShim(fixture: Fixture, args: string[], env: Record<string, string> = {}) {
-  return spawnSync(fixture.binPath, args, { encoding: "utf8", env: fixtureEnv(fixture, env) })
-}
-
-/** A node boot of the entrypoint itself - the surface `OMO_RUNTIME=node` and updates land on. */
-function launchEntry(fixture: Fixture, args: string[], env: Record<string, string> = {}) {
-  return spawnSync(NODE ?? process.execPath, [fixture.launcher, ...args], {
-    encoding: "utf8",
-    env: fixtureEnv(fixture, env),
-  })
-}
-
-/**
- * Turns the fixture into what `bun add -g` leaves behind before it runs the package's own scripts:
- * the real postinstall line, and an engine tree that postinstall can prepare (the RPC serializer it
- * patches comes from the installed engine and the pi-ai file it floors is bundled, as in
- * senpi-patch.test.ts).
- */
-function stageInstalledPackage(fixture: Fixture): void {
-  const manifestPath = join(fixture.packageRoot, "package.json")
-  const shipped = JSON.parse(readFileSync(join(SOURCE_ROOT, "package.json"), "utf8"))
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
-  writeFileSync(manifestPath, JSON.stringify({ ...manifest, scripts: { postinstall: shipped.scripts.postinstall } }))
-  const senpiRoot = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  const rpcMode = join(senpiRoot, "dist", "modes", "rpc", "rpc-mode.js")
-  mkdirSync(dirname(rpcMode), { recursive: true })
-  writeFileSync(rpcMode, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
-  const anthropicMessages = join(senpiRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js")
-  mkdirSync(dirname(anthropicMessages), { recursive: true })
-  writeFileSync(anthropicMessages, 'const claudeCodeVersion = "2.1.75";\nexport { claudeCodeVersion }\n')
-}
-
-/** A PATH that reaches bun and the system shell but no node, like a launchd job or a bun-only box. */
-function nodelessEnv(fixture: Fixture): NodeJS.ProcessEnv {
-  const pathDir = join(fixture.root, "nodeless-path")
-  mkdirSync(pathDir, { recursive: true })
-  symlinkSync(process.execPath, join(pathDir, "bun"))
-  return fixtureEnv(fixture, { PATH: `${pathDir}:${NODELESS_SYSTEM_DIRS}` })
-}
-
-function capture(fixture: Fixture): { argv: string[]; env: NodeJS.ProcessEnv; versions: Record<string, string | undefined> } {
-  return JSON.parse(readFileSync(fixture.captureFile, "utf8"))
-}
-
-afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-})
 
 describe("bun launcher bin shim", () => {
   describe("#given the generated shim script", () => {
@@ -485,31 +328,4 @@ describe("bun launcher bin shim", () => {
     })
   })
 
-  describe("#given a bun add -g update on a machine without node (#9293)", () => {
-    test.skipIf(NODELESS_UNAVAILABLE)("#then bun's postinstall leaves an omo that starts without node", () => {
-      // given: the tree `bun add -g` just linked - its bin is the stock symlink to the entrypoint,
-      // whose `#!/usr/bin/env node` cannot start where node is not on PATH
-      const fixture = createFixture()
-      stageInstalledPackage(fixture)
-      const env = nodelessEnv(fixture)
-      const stock = spawnSync(fixture.binPath, ["--version"], { encoding: "utf8", env })
-      expect(stock.status).toBe(127)
-
-      // when: bun runs the package's postinstall right after linking; with no node on PATH, bun
-      // runs the script's `node` itself
-      const postinstall = spawnSync(process.execPath, ["run", "postinstall"], {
-        cwd: fixture.packageRoot,
-        encoding: "utf8",
-        env,
-      })
-
-      // then: the bin is the shim again, and `omo` starts on bun with the same node-less PATH
-      expect(postinstall.status).toBe(0)
-      expect(lstatSync(fixture.binPath).isSymbolicLink()).toBe(false)
-      expect(readFileSync(fixture.binPath, "utf8")).toBe(bunBinShimScript(fixture.launcher, fixture.bunBinary))
-      const launched = spawnSync(fixture.binPath, ["--version"], { encoding: "utf8", env })
-      expect(launched.status).toBe(42)
-      expect(readFileSync(fixture.markerFile, "utf8")).toBe("fake-bun-ran")
-    })
-  })
 })

@@ -8,7 +8,9 @@
 // plan carries the working text a §5 capture applies (each register with the values the space
 // already holds, or a new key's first value) and extraRegisterValues, the differing whole
 // values, each a register entry superseding nothing. The caller commits both as ONE update
-// (commitAdoption). `rendered` is the predicted item text. No marker or conflict text is ever
+// through the capture entry point, captureOnDevice(device, itemKey, doc, base, frontier,
+// plan.workingText, plan.extraRegisterValues): its optional registerValues argument is the only
+// way to commit a plan, under the capture's receipts and replay guard. `rendered` is the predicted item text. No marker or conflict text is ever
 // written into the body (§10).
 //
 // Every file is read as LF text without a leading UTF-8 BOM (normalizeInput). The body shortcut is a

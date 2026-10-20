@@ -9,7 +9,8 @@ import {
   type TelemetryEnv,
   type TelemetryOsProvider,
   type TelemetryTransportFactory,
-} from "@oh-my-opencode/telemetry-core"
+} from "@oh-my-opencode/telemetry-core/injected"
+import { createLazyPostHogTransportFactory } from "./lazy-posthog"
 import { isOmoTelemetryEnabled, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
@@ -78,7 +79,10 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
           setTimeoutFn: options.setTimeoutFn,
           source: SOURCE,
-          transportFactory: options.transportFactory,
+          transportFactory: options.transportFactory ?? createLazyPostHogTransportFactory({
+            diagnostics: options.diagnostics,
+            source: SOURCE,
+          }),
         })
         if (!client.enabled) return
 

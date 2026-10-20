@@ -79,6 +79,16 @@ export interface SenpiExtensionAPI {
   /** `options.startupBookkeeping` (senpi#3329): older hosts ignore the third argument. */
   appendEntry?(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /** The running senpi version (code-yeongyu/senpi#3674); hosts before it report none. */
+  readonly hostVersion?: string
+  /**
+   * senpi's one upload redactor (code-yeongyu/senpi#3674), the same path `/share` uses. Feature-detected: hosts older
+   * than the release that added it expose nothing, and nothing may be uploaded without it.
+   */
+  redactForUpload?(
+    text: string,
+    options?: { readonly extraLiterals?: readonly string[] },
+  ): { readonly text: string; readonly counts: Readonly<Record<string, number>> }
   /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
   exec?(
     command: string,

@@ -8,7 +8,7 @@ import {
   type TelemetryEnv,
   type TelemetryOsProvider,
   type TelemetryProductConfig,
-} from "@oh-my-opencode/telemetry-core"
+} from "@oh-my-opencode/telemetry-core/injected"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { ALL_KNOWN_MODEL_IDS, KNOWN_MODELS, KNOWN_PROVIDERS, type KnownProvider } from "./model-vocabulary"
 

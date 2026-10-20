@@ -84,7 +84,7 @@ export function registerMemoryStatic(input: {
     nudgeWiring.register(pi)
     noticeWiring.register(pi)
   }
-  const projectionPins = createProjectionPins()
+  const projectionPins = createProjectionPins(options.deviceName === undefined ? {} : { deviceName: options.deviceName })
   const entryApi = hasMemoryCapabilities(pi) ? pi : undefined
   const promptHandler = createPromptHandler({
     resolveContext,

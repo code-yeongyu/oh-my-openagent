@@ -19,11 +19,14 @@ type ResolvedChildModel = NonNullable<StartChildInput["model"]>
 type FactsInProcessLaunchInput = {
   readonly runId: string
   readonly runDir: string
-  readonly payload: FactsPayload
+  /** A conversation batch, or text that is already the extractor's input (onboarding's session digests). */
+  readonly payload: FactsPayload | string
   readonly oversized?: boolean
+  /** Caps on this run's `record_fact` tool calls; `onCall` sees every call. */
+  readonly recordLimits?: { readonly maxCalls: number; readonly onCall: () => void }
   readonly resolution: Extract<ReflectionModelResolution, { readonly kind: "resolved" }>
   readonly modelRegistry?: ReturnType<FactsExtractorRunnerOptions["resolveModelRegistry"]>
-  readonly options: FactsExtractorRunnerOptions
+  readonly options: Pick<FactsExtractorRunnerOptions, "createRunner" | "createSession" | "logger">
   readonly env: NodeJS.ProcessEnv
   readonly configSources: readonly { readonly path: string; readonly exists: boolean }[]
   readonly batchId: string
@@ -69,11 +72,11 @@ async function launchCandidate(
   attempt: number,
   fallbacks: readonly ReflectionModelCandidate[],
 ): Promise<MemoryChildResult> {
-  const payloadText = serializeFactsPayload(input.payload)
+  const payloadText = typeof input.payload === "string" ? input.payload : serializeFactsPayload(input.payload)
   const payloadPath = join(input.runDir, "facts-payload.json")
   const extractionPath = join(input.runDir, "extraction.jsonl")
   const state: InProcessMemoryChildState = { cancelled: false }
-  if (input.oversized === true && !admitOversizedFacts(input.payload, model)) {
+  if (input.oversized === true && (typeof input.payload === "string" || !admitOversizedFacts(input.payload, model))) {
     throw new Error("oversized facts input does not fit the pinned model budget")
   }
   const guard = input.oversized !== true ? undefined : createOversizedFactsGuard({
@@ -87,6 +90,7 @@ async function launchCandidate(
   const tool = createFactsRecordTool({
     extractionPath, state,
     ...(guard === undefined ? {} : { maxBytes: FACTS_RECORD_BYTES, maxRecords: FACTS_RECORD_LIMIT, onFailure: guard.fail }),
+    ...(input.recordLimits === undefined ? {} : input.recordLimits),
   })
   const createSession = guard?.createSession ?? input.options.createSession
   input.onState?.(state)

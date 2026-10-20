@@ -59,10 +59,36 @@ export async function waitForRegistryVersions({ specs, deadlineMs, delayMs, fetc
   }
 }
 
+/** Every platform package the release publishes, from the root manifest's optionalDependencies: the
+ * one list `publish-release-platform-workflow.test.ts` holds equal to build-binaries PLATFORMS, in both
+ * the oh-my-opencode-<platform> and oh-my-openagent-<platform> families. */
+export function platformPackageNames(rootManifest) {
+  const prefix = "oh-my-opencode-"
+  const platforms = Object.keys(rootManifest.optionalDependencies ?? {})
+    .filter((name) => name.startsWith(prefix))
+    .map((name) => name.slice(prefix.length))
+  if (platforms.length === 0) throw new Error("root package.json optionalDependencies lists no oh-my-opencode-<platform> package")
+  return platforms.flatMap((platform) => [`oh-my-opencode-${platform}`, `oh-my-openagent-${platform}`])
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const specs = process.argv.slice(2)
+  // --platform-packages <version> adds every platform package from ./package.json at that version.
+  const argv = process.argv.slice(2)
+  const specs = []
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--platform-packages") {
+      const version = argv[++i]
+      if (!version) {
+        console.error("--platform-packages needs a version")
+        process.exit(2)
+      }
+      const { readFileSync } = await import("node:fs")
+      const manifest = JSON.parse(readFileSync("package.json", "utf8"))
+      for (const name of platformPackageNames(manifest)) specs.push(`${name}@${version}`)
+    } else specs.push(argv[i])
+  }
   if (specs.length === 0) {
-    console.error("usage: node script/wait-registry-versions.mjs <name@version...>")
+    console.error("usage: node script/wait-registry-versions.mjs [--platform-packages <version>] <name@version...>")
     process.exit(2)
   }
   const deadlineMs = Number(process.env.REGISTRY_WAIT_DEADLINE_SECONDS ?? 3600) * 1000

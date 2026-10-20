@@ -257,5 +257,6 @@ export type RecoveryEvent =
 	| "sync.recovery.enrolled"
 	| "sync.recovery.enroll_refused"
 	| "sync.recovery.recovered"
+	| "sync.recovery.joined_read_only"
 	| "sync.recovery.recover_refused"
 	| "sync.recovery.removed";

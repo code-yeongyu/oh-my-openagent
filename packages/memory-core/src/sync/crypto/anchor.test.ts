@@ -210,6 +210,8 @@ describe("every value the verifier trusts is minted by the verifier: a hand-buil
     const { outcome } = await walk(fixtureAnchor(), mainChain())
     if (!outcome.ok || outcome.state.head === null) throw new Error("fixture refused")
     const head = outcome.state.head
+    expect(atVerifiedHead(outcome.state, head)?.head).toEqual(head)
+    expect(atVerifiedHead(outcome.state, { ...head, link: "L".repeat(43) })).toBeNull()
     expect(atVerifiedHead(outcome.state, { ...head, seq: head.seq + 5, link: "L".repeat(43) })?.head?.seq).toBe(head.seq + 5)
     expect(atVerifiedHead(outcome.state, { ...head, keyring_link: "K".repeat(43) })).toBeNull()
     expect(atVerifiedHead(outcome.state, { ...head, seq: head.seq - 1 })).toBeNull()

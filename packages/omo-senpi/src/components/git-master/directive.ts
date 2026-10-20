@@ -9,7 +9,10 @@ export const DEFAULT_COMMIT_FOOTER =
  * directive therefore only ever describes the opt-in body footer; `include_co_authored_by`
  * is accepted for backward compatibility but no longer emits a `Co-authored-by` trailer.
  */
-export function buildGitMasterAttributionDirective(settings: OmoGitMasterSettings): string | undefined {
+export function buildGitMasterAttributionDirective(
+  settings: OmoGitMasterSettings,
+  gitCommandPrefix = "",
+): string | undefined {
   const footerText = resolveFooterText(settings.commit_footer)
   if (footerText === undefined) return undefined
 
@@ -25,7 +28,7 @@ export function buildGitMasterAttributionDirective(settings: OmoGitMasterSetting
     "",
     "**Example:**",
     "```bash",
-    `git commit -m "{Commit Message}" -m "${footerText}"`,
+    `${gitCommandPrefix === "" ? "" : `${gitCommandPrefix} `}git commit -m "{Commit Message}" -m "${footerText}"`,
     "```",
     "</commit_attribution>",
   ].join("\n")

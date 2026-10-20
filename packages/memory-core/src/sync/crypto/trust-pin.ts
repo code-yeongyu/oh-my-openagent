@@ -2,15 +2,18 @@
 // account under `<stateDir>/trust-anchor/`, named from the account's hash and holding `pin.json`. It is
 // written once, only from a pin candidate a fully verified bootstrap walk minted, through the
 // device-peer pattern: a private candidate directory published by an atomic rename that fails when
-// the target exists, so a pin is never partial and never overwritten. A crash before the rename
-// leaves only a candidate directory, removed by the next load. A missing, corrupt or mismatching pin
-// is NO anchor: the caller refuses and tells the user to re-pair or recover, never trusting the
+// the target exists, so a pin is never partial and never overwritten. The pin file and the candidate
+// directory are fsynced before the rename and the parent after it, so a published pin survives a crash.
+// A crash before the rename leaves only a candidate directory, removed by the next load. A writer that
+// loses the rename to another gets that writer's pin, or a typed conflict when it holds another root.
+// A missing, corrupt or mismatching pin, or an account directory without its pin file, is NO anchor: the caller refuses and tells the user to re-pair or recover, never trusting the
 // server or a fresh bootstrap walk on its own.
 
 import { createHash, randomBytes } from "node:crypto"
 import { join } from "node:path"
 
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "../../fs/resilient"
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "../../fs/resilient"
+import { syncJournalDirectory, syncJournalFile } from "../../journal/fsync"
 import { ANCHOR_NEXT_STEP, isPinCandidate, mintTrustAnchor, type PinCandidate, type TrustAnchor } from "./anchor.ts"
 import { decodeB64 } from "./signatures.ts"
 
@@ -34,6 +37,8 @@ const SOURCES = new Set(["pairing", "recovery", "creator"])
 const accountKey = (account: string): string => createHash("sha256").update(account, "utf8").digest("base64url")
 const rootDir = (stateDir: string): string => join(stateDir, "trust-anchor")
 const pinDir = (stateDir: string, account: string): string => join(rootDir(stateDir), accountKey(account))
+
+const isMissing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT"
 
 const alive = (pid: number): boolean => {
   try {
@@ -90,8 +95,14 @@ export const loadTrustAnchor = async (stateDir: string, account: string): Promis
   try {
     raw = await readFile(join(pinDir(stateDir, account), PIN_FILE), "utf8")
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return { ok: false, reason: "no_pin", next: ANCHOR_NEXT_STEP }
-    throw error
+    if (!isMissing(error)) throw error
+    try {
+      await stat(pinDir(stateDir, account))
+    } catch (dirError) {
+      if (isMissing(dirError)) return { ok: false, reason: "no_pin", next: ANCHOR_NEXT_STEP }
+      throw dirError
+    }
+    return { ok: false, reason: "corrupt_pin", next: ANCHOR_NEXT_STEP }
   }
   const anchor = parsePin(raw, account)
   return anchor === null ? { ok: false, reason: "corrupt_pin", next: ANCHOR_NEXT_STEP } : { ok: true, anchor }
@@ -99,7 +110,8 @@ export const loadTrustAnchor = async (stateDir: string, account: string): Promis
 
 /**
  * Persists the root a verified bootstrap walk proved, once. The same root again returns the existing
- * pin; a different root, or a pin file that does not parse, throws and changes nothing.
+ * pin; a different root, or a pin file that does not parse, throws and changes nothing. Losing the
+ * publishing rename to a concurrent writer is decided the same way, by the pin that writer published.
  */
 export const pinTrustAnchor = async (stateDir: string, account: string, candidate: PinCandidate): Promise<TrustAnchor> => {
   if (!isPinCandidate(candidate) || candidate.account !== account) throw new TrustPinError("not_verified")
@@ -116,10 +128,17 @@ export const pinTrustAnchor = async (stateDir: string, account: string, candidat
   const pin = { version: 1, account, genesis_digest: candidate.genesisDigest, pinned_by: candidate.pinnedBy, pinned_at: { ...candidate.at } }
   try {
     await writeFile(join(staging, PIN_FILE), `${JSON.stringify(pin)}\n`, { flag: "wx", mode: 0o600 })
-    await rename(staging, target)
+    await syncJournalFile(join(staging, PIN_FILE))
+    await syncJournalDirectory(staging)
+    try {
+      await rename(staging, target)
+    } catch (error) {
+      if (!(await loadTrustAnchor(stateDir, account)).ok) throw error
+    }
   } finally {
     await rm(staging, { recursive: true, force: true })
   }
+  await syncJournalDirectory(rootDir(stateDir))
   const written = await loadTrustAnchor(stateDir, account)
   if (!written.ok || written.anchor.genesisDigest !== candidate.genesisDigest) throw new TrustPinError("pin_conflict")
   return written.anchor

@@ -105,7 +105,11 @@ describe("omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.git_master).toEqual({ commit_footer: false, include_co_authored_by: false })
+    expect(result.data.git_master).toEqual({
+      commit_footer: false,
+      include_co_authored_by: false,
+      git_env_prefix: "GIT_MASTER=1",
+    })
   })
 
   test("#given an unknown root key #when parsed #then the schema rejects the config", () => {

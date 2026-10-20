@@ -25,6 +25,8 @@ The single Pi package `@code-yeongyu/omo-senpi`: one generated extension entry, 
 
 ## CONVENTIONS
 
+- `#omo-telemetry-posthog-runtime` maps to `extensions/omo-telemetry-posthog.js`: the PostHog SDK stays outside `omo.js` and loads only after a capture. The 256-event buffer preserves order, reports oldest-event drops once at flush/shutdown, and failed imports back off for 60 seconds. Freshness checks and required-artifact/install fixtures cover the sidecar; the packed-install test proves that the published omo-ai layout resolves it.
+
 - Dag RPC wire payloads are snake_case (`run_id`, `node_id`); the JavaScript API is camelCase (`runId`, `nodeIds`). Deliberate wire/API boundary.
 - Bundles carry `// omo:<fingerprint>` build markers; freshness checks compare markers and source digests, and paths inside artifacts are made portable at build time.
 
@@ -45,4 +47,8 @@ The `/memfs` registrar remains synchronous; its handlers are loaded on first inv
 
 The `/palace` and `/people` registrars remain synchronous (same names, descriptions and argument hints); the palace HTML generator, its collectors and the `/people` runtime load on the first invocation of either command from `src/components/memory/palace/runtime.ts` via `#omo-memory-palace-runtime`, mapped to `extensions/omo-memory-palace.js` in the published plugin. One import is shared per process; a failed load is not cached and is reported as an actionable error (reinstall omo, then start a new session) instead of an unhandled rejection. Build freshness, required artifacts and bundle audits include this sidecar.
 
+The onboarding session-history scan (transcript discovery, parsing, digests) loads on the first `omo.onboarding.projects`/`omo.onboarding.sessions` call or `onboarding_session_history` tool run from `src/components/onboarding/session-history/runtime.ts` via `#omo-session-history-runtime`, mapped to `extensions/omo-session-history.js` in the published plugin. The RPC methods and the tool still register synchronously; one import is shared per process, and a failed load is not cached and is reported as an actionable error (reinstall omo, then start a new session). Build freshness, required artifacts and bundle audits include this sidecar.
+
 The live thread RPC client is loaded on the first asynchronous thread/gateway operation via `#omo-thread-client-runtime` (`src/components/thread/live-surface.ts` in source, `extensions/omo-thread-client.js` in the plugin). The component still registers tools, the store and lifecycle handlers synchronously; the registrar captures the operator socket before loading. One runtime promise/client is shared per facade, including concurrent operations and load failures. Build freshness, required installation artifacts and bundle purity include this sidecar.
+
+The persisted recall terms (store codec, persistence, save gate, term transfer) load on the first corpus load from `src/components/memory/recall-store-runtime.ts` via `#omo-recall-store-runtime`, mapped to `extensions/omo-recall-store.js` in the published plugin (memory-core `termStore` loader, `recall-store-runtime-loader.ts`). The entry bundle keeps only the index accessors it hands the store. One import is shared per process; a failed load is not cached and recall falls back to tokenizing. Build freshness, required artifacts and bundle audits include this sidecar.

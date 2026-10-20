@@ -165,7 +165,13 @@ export async function planCredentials(runtime, target, customProviderIds) {
   }
 }
 
-export function applyCredentials(plan) {
+/**
+ * The stage's one writer. With `options.writeAuth` (the engine's locked credential store) the
+ * additions merge into whatever the store holds under its lock; the CLI path keeps its direct
+ * backup-and-write.
+ */
+export function applyCredentials(plan, options = {}) {
+  if (options.writeAuth !== undefined) return options.writeAuth(plan.target, plan.result.additions)
   writeAuthStore(plan.target, plan.current, plan.result.additions)
 }
 

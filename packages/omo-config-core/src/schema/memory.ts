@@ -19,11 +19,13 @@ export const OmoMemoryReflectionSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
-// Sync + Search (unchanged)
+// Sync + Search
 // ---------------------------------------------------------------------------
 
 export const OmoMemorySyncSchema = z.object({
+  /** @deprecated No-op kept so existing configs load; the git mirror reads its URL from git config, not here. */
   remote: z.string().min(1).optional(),
+  /** Run end-to-end encrypted memory sync on this device while signed in and sync is on for the account. */
   enabled: z.boolean().default(true),
 }).strict()
 
@@ -130,6 +132,7 @@ export const OmoMemoryReflectionLayerSchema = z.object({
 }).strict()
 
 export const OmoMemorySyncLayerSchema = z.object({
+  /** @deprecated No-op; see OmoMemorySyncSchema. */
   remote: z.string().min(1).optional(),
   enabled: z.boolean().optional(),
 }).strict()

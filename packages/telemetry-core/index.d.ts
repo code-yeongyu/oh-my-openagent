@@ -17,6 +17,7 @@ export type UuidV7Source = {
 };
 
 export type TelemetryDiagnosticEvent =
+  | "telemetry_buffer_overflow"
   | "telemetry_activity_state_read_failed"
   | "telemetry_activity_state_write_failed"
   | "telemetry_capture_failed"

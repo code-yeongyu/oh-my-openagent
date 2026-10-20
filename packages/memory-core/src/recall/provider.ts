@@ -14,6 +14,9 @@ import { join } from "node:path"
 import { readFile, realpathSync, stat } from "../fs/resilient"
 import type { GitMemoryRepo } from "../git"
 import { parseMemoryFile } from "../memfs"
+import { recallDocumentTerms } from "./bm25"
+import { onRecallDocumentsEncoded, recallTermAccess } from "./bm25-index"
+import type { RecallTermIndex, RecallTermPersistence } from "./bm25-persist"
 
 export interface RecallDocument {
   readonly path: string
@@ -112,6 +115,24 @@ export interface RecallCorpusCacheOptions {
    * cache that loaded the repository is alive.
    */
   readonly shared?: boolean
+  /** Told when the persisted recall terms cannot be read or saved; recall itself is unaffected. */
+  readonly onTermStoreError?: (error: unknown) => void
+  /**
+   * Loads the persisted-terms store (`@oh-my-opencode/memory-core/recall-store`) on the first corpus load, so
+   * its codec stays out of a host's startup bundle. Without it every new process tokenizes the corpus.
+   */
+  readonly termStore?: () => Promise<RecallTermStoreModule>
+}
+
+export interface RecallTermStoreModule {
+  readonly RecallTermPersistence: typeof RecallTermPersistence
+}
+
+/** The live index a persisted store reads and seeds. */
+export const recallTermIndex: RecallTermIndex = {
+  onEncoded: onRecallDocumentsEncoded,
+  access: recallTermAccess,
+  terms: recallDocumentTerms,
 }
 
 const sharedCaches = new Map<string, WeakRef<RecallCorpusCache>>()
@@ -134,7 +155,7 @@ function sharedKey(dir: string): string {
 function acquireSharedCache(dir: string, options: RecallCorpusCacheOptions): RecallCorpusCache {
   const live = sharedCaches.get(dir)?.deref()
   if (live !== undefined) return live
-  const cache = new RecallCorpusCache(options.head === undefined ? {} : { head: options.head })
+  const cache = new RecallCorpusCache({ ...options, shared: false })
   const ref = new WeakRef(cache)
   sharedCaches.set(dir, ref)
   releaseSharedCache.register(cache, { dir, ref })
@@ -189,6 +210,9 @@ export class RecallCorpusCache {
   private entry: RecallCorpusCacheEntry | undefined
   private probe: HeadProbe | undefined
   private blobs: { readonly dir: string; readonly loaded: LoadedBlobs } | undefined
+  private terms: RecallTermPersistence | undefined
+  /** Every repository's persisted terms this cache attached, so `settled()` covers a save started before a switch. */
+  private readonly attached = new Set<RecallTermPersistence>()
   private readonly resolveHead: (repo: GitMemoryRepo) => Promise<string | null>
   private readonly options: RecallCorpusCacheOptions
   /** Shared mode only: the process-wide caches this instance keeps alive, one per repository. */
@@ -236,6 +260,14 @@ export class RecallCorpusCache {
     }
   }
 
+  /** Settles once no persisted-terms save started by this cache, or a shared cache it holds, is running. */
+  async settled(): Promise<void> {
+    await Promise.all([
+      ...[...this.attached].map((terms) => terms.settled()),
+      ...[...this.held.values()].map((cache) => cache.settled()),
+    ])
+  }
+
   clear(): void {
     this.held.clear()
     this.entry = undefined
@@ -257,6 +289,22 @@ export class RecallCorpusCache {
     const previous = this.blobs?.dir === repo.dir ? this.blobs.loaded : new Map<string, LoadedBlob>()
     const { corpus, loaded } = await loadCorpusAtRevision(repo, revision, previous)
     this.blobs = { dir: repo.dir, loaded }
+    if (this.terms?.dir !== repo.dir) this.terms = await this.persistenceFor(repo.dir)
+    await this.terms?.attach(corpus.documents)
     return corpus
+  }
+
+  private async persistenceFor(dir: string): Promise<RecallTermPersistence | undefined> {
+    if (this.options.termStore === undefined) return undefined
+    const onError = this.options.onTermStoreError ?? (() => undefined)
+    try {
+      const store = await this.options.termStore()
+      const persistence = new store.RecallTermPersistence(dir, onError, recallTermIndex)
+      this.attached.add(persistence)
+      return persistence
+    } catch (error) {
+      onError(error)
+      return undefined
+    }
   }
 }

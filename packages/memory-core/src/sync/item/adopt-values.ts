@@ -20,6 +20,10 @@ export interface RegisterValue {
  * plus every register value no entry ever held, active or superseded (an entry superseding nothing), committed under
  * `commitMessage`. Internal to captureOnDevice (device-capture.ts), the only capture entry point:
  * adoption's capture and its register values land together and replay under the same receipts.
+ * A production caller anywhere else would build an update with no receipt, no replay guard and no
+ * device check (#10321).
+ *
+ * @internal
  */
 export function withRegisterValues(doc: LoroDoc, captured: Uint8Array | null, values: readonly RegisterValue[], commitMessage?: string): Uint8Array | null {
   if (values.length === 0) return captured
