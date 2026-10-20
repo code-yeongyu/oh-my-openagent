@@ -27,6 +27,7 @@ coding-agent-sessions/
 | `scanners.py` | `scan`, `DEFAULT_PLATFORMS`, `PLATFORM_SCANNERS`, per-platform `scan_*` (codex, claude, opencode, senpi, oh_my_pi, gajae_code, …) |
 | `types.py` | `Session`, `Options`, `Json`, `JsonMap` — imported by nearly every module and test |
 | `transcript.py` | parallel file reads, normalization, timestamps, session ids; `recent`, `MAX_PLATFORM_FILES` |
+| `body_search.py` | `fold` (NFC + lowercase), `snippet`, `body_snippet` — lazy full-text fallback over `.json`/`.jsonl` transcripts for sessions the metadata/user-prompt fields missed |
 | `cli.py` | command parsing, filtering, payload construction, JSON emission (283 LOC — behavioral hotspot) |
 | platform adapters | `file_scanners.py` (file-backed providers), `opencode.py` (CLI/SQLite/storage fallbacks), `sqlite_scanners.py`, `sqlite_optional_scanners.py`, `pi_family.py`, `aside_scanner.py`, `kiro_scanner.py` |
 
