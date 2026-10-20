@@ -17,7 +17,14 @@ conversation. The skill is written in English; your output is not. Match them ex
 tone.
 
 Use Senpi-native tools only: `read`, `bash`, `edit`, `write`, the `memory` tools, the
-`onboarding_session_history` tool, and skill invocations. Never assume a tool from another agent product exists here.
+`onboarding_session_history`, `onboarding_understand` and `onboarding_memory_apply` tools, and skill invocations.
+
+Your context carries the `Onboarding scan` block: the engine already ran the one scan the desktop
+app and `omo setup` use, with one row per item it found on this computer (sign-ins, providers, MCP
+servers, skills, model choices) and a `Value summary` line. Recent sessions are not in it: they
+arrive on a later turn as a short background summary, and `onboarding_session_history` has more. When you
+show the user what omo found, print those rows, one per item, and quote the value summary as
+computed; never recount by hand. Never assume a tool from another agent product exists here.
 
 Be concrete, never generic. "omo caches your context" is a failure of this skill. "Your last week
 of Claude Code sessions read 4.7M tokens from cache at a 78% hit rate; here is what that would
@@ -141,8 +148,15 @@ Ask the user, in your own voice and their language, a question that means: "may 
 your previous coding-agent sessions?" Phrase it naturally; do not read that sentence out like a
 script. This lane is opt-in. If they say no, skip to lane 4 and base it on nothing.
 
-If they say yes, call the `onboarding_session_history` tool (find it through `tool_search` if it is
-not in your tool list). It is the engine's one session-history scan, the same one the desktop app
+If they say yes, call `onboarding_understand` with `consent: true` (find it through `tool_search`
+if it is not in your tool list). It reads the scan's session digests with the current model and
+returns candidate facts with ids; it saves nothing. Show every candidate as a numbered list and ask
+which ones to remember. Then call `onboarding_memory_apply` with exactly the ids they picked: it
+writes only those, as one memory commit, through the same writer the background facts extractor
+uses. Never write a candidate the user did not pick, and never re-write candidates through the
+`memory` tools. If the understanding falls back to the scan only, say so and continue.
+
+For the patterns below, call the `onboarding_session_history` tool as well. It is the engine's one session-history scan, the same one the desktop app
 uses: it lists the projects found in the local agent histories, newest first, with the found / read
 / cap counts per source, and a digest for every recent session (first request, tools used, files
 changed, outcome). Digests stay on this machine; the tool output names the file holding all of
@@ -169,7 +183,8 @@ durable finding about the user through the memory tools as you go.
 
 ## 4. Value mapping + savings
 
-From the session data gathered in lane 3, give the user quantified estimates of what omo's caching
+Open with the scan's `Value summary` line as it was computed. Then, from the session data gathered
+in lane 3, give the user quantified estimates of what omo's caching
 would have been worth on their real workload. Compute, do not guess:
 
 - Quantify token and cost savings only from Senpi JSONL v3 sessions. Use other agent stores for
@@ -217,9 +232,10 @@ If the user skipped lane 3, skip this lane too; there is no data to map.
 
 ## 5. Memory recording
 
-This lane has no fixed position: it runs through the entire flow. Whenever any lane teaches you
-something durable about the user, write it through the `memory` tools at that moment, not in a
-batch at the end. Worth recording:
+This lane has no fixed position: it runs through the entire flow. Nothing is written before the
+user chooses it: facts from the session history go through the lane 3 selection, and anything
+else you learn is proposed in one line and written through the `memory` tools only after the user
+agrees. Worth recording:
 
 - their host and machine facts relevant to future work,
 - their language and communication style,

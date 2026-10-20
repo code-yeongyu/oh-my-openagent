@@ -5,7 +5,21 @@ import { join, resolve } from "node:path"
 
 import { createOnboardingHarness, hermeticScanEnvironment } from "./test-harness"
 import { claimOnboarding, isOnboardingComplete, releaseOnboarding } from "./state"
-import { createOnboardingComponent } from "./component"
+import { createOnboardingComponent, type TuiScanResult } from "./component"
+import { registrySnapshot } from "../memory/facts-runner.test-support"
+import { fakeModel } from "./understand.test-support"
+
+// A scan that rejects on its first call and succeeds after, counting every start.
+function flakyScan(context: string, gate: Promise<void> = Promise.resolve()) {
+  let calls = 0
+  const scan = async (): Promise<TuiScanResult> => {
+    calls += 1
+    if (calls === 1) throw new Error("transient scan failure")
+    await gate
+    return { scanId: "scan-retry", digests: [], projectRoots: new Set<string>(), context }
+  }
+  return { scan, calls: () => calls }
+}
 
 const dirs: string[] = []
 function freshDir(): string {
@@ -161,6 +175,7 @@ describe("onboarding entry", () => {
           claimOnboarding: () => claimOnboarding(dir),
           isOnboardingComplete: () => isOnboardingComplete(dir),
           releaseOnboarding: () => releaseOnboarding(dir),
+          scan: async () => undefined,
           scanEnvironment: hermeticScanEnvironment(dir),
         })
         const h = createOnboardingHarness(dir, reason, mode, component)
@@ -175,6 +190,56 @@ describe("onboarding entry", () => {
       expect(tours).toEqual([1, 0, 0, 0])
     })
   }
+
+  test("#given the first setup scan fails #when onboarding claims again in this process #then the scan retries and its result reaches the context", async () => {
+    const dir = freshDir()
+    const flaky = flakyScan("Onboarding scan scan-retry: SCAN-RETRY-OK")
+    const component = createOnboardingComponent({
+      claimOnboarding: () => claimOnboarding(dir),
+      isOnboardingComplete: () => isOnboardingComplete(dir),
+      releaseOnboarding: () => releaseOnboarding(dir),
+      scan: flaky.scan,
+      scanEnvironment: hermeticScanEnvironment(dir),
+      sessionHistory: async () => undefined,
+    })
+    const h = createOnboardingHarness(dir, "retry", "rpc", component)
+    const contentOf = (results: unknown[]) => String((results.find(Boolean) as { message: { content: unknown } }).message.content)
+
+    expect(contentOf(await h.prompt())).not.toContain("SCAN-RETRY-OK")
+    await h.pi.dispatch("input_disposition", { disposition: "rejected" }, h.ctx)
+    expect(contentOf(await h.prompt())).toContain("SCAN-RETRY-OK")
+    expect(flaky.calls()).toBe(2)
+  })
+
+  test("#given the first understanding scan fails #when onboarding_understand runs again, twice at once #then one retried scan serves both", async () => {
+    const dir = freshDir()
+    let open = (): void => undefined
+    const flaky = flakyScan("unused", new Promise<void>((resolve) => { open = resolve }))
+    const component = createOnboardingComponent({
+      claimOnboarding: () => claimOnboarding(dir),
+      isOnboardingComplete: () => isOnboardingComplete(dir),
+      releaseOnboarding: () => releaseOnboarding(dir),
+      scan: flaky.scan,
+      scanEnvironment: hermeticScanEnvironment(dir),
+      understanding: { createRunner: fakeModel(async () => "completed").createRunner },
+    })
+    const h = createOnboardingHarness(dir, "understand", "tui", component)
+    const understand = h.pi.tools.find((tool) => tool["name"] === "onboarding_understand") as unknown as {
+      execute(id: string, params: unknown, signal?: AbortSignal, onUpdate?: unknown, ctx?: unknown): Promise<{ content: Array<{ text?: string }>; isError?: boolean }>
+    }
+    const toolCtx = { model: { provider: "omo-mock", id: "mock-1" }, modelRegistry: registrySnapshot() }
+    const text = (result: { content: Array<{ text?: string }> }) => result.content.map((part) => part.text ?? "").join("")
+
+    const failed = await understand.execute("u1", { consent: true }, undefined, undefined, toolCtx)
+    expect(text(failed)).toContain("scan did not run")
+    const retried = [
+      understand.execute("u2", { consent: true }, undefined, undefined, toolCtx),
+      understand.execute("u3", { consent: true }, undefined, undefined, toolCtx),
+    ]
+    open()
+    for (const result of await Promise.all(retried)) expect(text(result)).not.toContain("scan did not run")
+    expect(flaky.calls()).toBe(2)
+  })
 
   for (const entry of ["context", "forced-rpc", "bootstrap"]) {
     test(`#given ${entry} onboarding #when its skill pointer is resolved #then the actual skill file exists`, async () => {

@@ -29,6 +29,12 @@ import { newestSessionDigests } from "./session-history/newest-sessions"
 import { createProjectPathRules } from "./session-history/project-paths"
 
 export { createOnboardingUnderstandingHandlers } from "./understand-component"
+export { runTuiOnboardingScan } from "./tui-scan-runtime"
+export { executeOnboardingSessionHistory } from "./session-history-tool-runtime"
+export { applyMemoryFacts } from "../memory/facts-apply-runtime"
+export { reconcileAppliedFactsBatches } from "../memory/facts-applied-reconcile"
+export { executeOnboardingMemoryApply, executeOnboardingUnderstand } from "./tui-memory-runtime"
+export { claimOnboardingOwned, readOnboardingState } from "./claim-owner"
 
 /** Where the scan reads and the apply writes; every field defaults to what `omo setup` uses. */
 export interface OnboardingScanEnvironment {
@@ -292,6 +298,58 @@ async function writeAuthThrough(
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+const ROWS_PER_SOURCE = 40
+
+const SUMMARY_KINDS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = [
+  ["sign-ins", new Set(["api-key", "oauth"])],
+  ["providers", new Set(["provider"])],
+  ["MCP servers", new Set(["mcp"])],
+  ["skills", new Set(["skill"])],
+]
+
+/**
+ * The first-prompt context of one scan, computed from its events every time: one row per found item
+ * (ids and states, never a key; capped per source with the remainder counted), failed sources, and
+ * the value summary the onboarding reports.
+ */
+export function onboardingScanContext(scanId: string, events: readonly OnboardingScanEvent[]): string {
+  const items = events.filter((event) => event.kind === "item" && event.item !== undefined)
+  const lines = [`Onboarding scan ${scanId} (the same scan omo setup and the desktop app run; one row per found item):`]
+  for (const source of [...new Set(items.map((event) => event.source))]) {
+    const own = items.filter((event) => event.source === source)
+    for (const { item } of own.slice(0, ROWS_PER_SOURCE)) {
+      if (item === undefined) continue
+      const detail = item.detail === undefined ? "" : ` - ${item.detail}`
+      const project = item.project === undefined ? "" : ` (project ${item.project})`
+      lines.push(`- ${source} ${item.id} [${item.kind}: ${item.state}]${detail}${project}`)
+    }
+    if (own.length > ROWS_PER_SOURCE) lines.push(`- ${source}: ${own.length - ROWS_PER_SOURCE} more`)
+  }
+  for (const failed of events.filter((event) => event.kind === "source_failed")) {
+    lines.push(`! ${failed.source} could not be read: ${failed.reason ?? "unknown error"}`)
+  }
+  // A setup-only scan (sessions: false) never read session history, so it states no session count.
+  const readSessions = events.some((event) => event.source === "sessions" || event.source === "projects")
+  lines.push(`Value summary: ${valueSummary(items.flatMap((event) => (event.item === undefined ? [] : [event.item])), readSessions)}`)
+  return lines.join("\n")
+}
+
+function valueSummary(rows: readonly OnboardingScanItem[], readSessions: boolean): string {
+  const count = (kind: string): number => rows.filter((row) => row.kind === kind).length
+  const sessions = count("session")
+  const projects = count("project")
+  const parts = readSessions
+    ? [`${sessions} recent ${sessions === 1 ? "session" : "sessions"} across ${projects} ${projects === 1 ? "project" : "projects"}`]
+    : []
+  for (const [label, kinds] of SUMMARY_KINDS) {
+    const found = rows.filter((row) => kinds.has(row.kind))
+    if (found.length === 0) continue
+    const carried = found.filter((row) => row.state === "import" || row.state === "login").length
+    parts.push(`${found.length} ${label} (${carried} to carry over)`)
+  }
+  return parts.length === 0 ? "nothing found to carry over." : `${parts.join("; ")}.`
 }
 
 const FACT_GROUPS: ReadonlyArray<readonly [string, ReadonlySet<string>]> = [

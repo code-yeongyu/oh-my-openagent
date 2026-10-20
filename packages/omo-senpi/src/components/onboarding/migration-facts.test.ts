@@ -98,6 +98,7 @@ describe("onboarding migration inventory", () => {
       isOnboardingComplete: () => state.isOnboardingComplete(dir),
       releaseOnboarding: () => state.releaseOnboarding(dir),
       migrationFacts: () => Promise.reject(new Error("scan unavailable")),
+      scan: () => Promise.reject(new Error("scan unavailable")),
     })
     const h = createOnboardingHarness(dir, "s", "rpc", component)
     await h.start()
@@ -147,11 +148,18 @@ describe("onboarding migration inventory", () => {
     const dir = mkdtempSync(join(tmpdir(), "omo-onboarding-state-"))
     roots.push(dir)
     let scans = 0
+    let defaultScans = 0
     const component = createOnboardingComponent({
       claimOnboarding: () => true,
       isOnboardingComplete: () => false,
       releaseOnboarding: () => {},
+      stateDir: dir,
+      // Hermetic: the default scan would read this environment; an injected inventory must never start it.
+      scanEnvironment: () => { defaultScans++; return { home: dir, env: { HOME: dir }, agentDir: join(dir, "agent") } },
       migrationFacts: () => { scans++; return Promise.resolve("facts") },
+      // #10480's background history summary reads the scan environment on its own; injected here so
+      // defaultScans counts only the inventory scan.
+      sessionHistory: async () => undefined,
     })
     const h = createOnboardingHarness(dir, "s", "rpc", component)
     await h.start()
@@ -164,5 +172,6 @@ describe("onboarding migration inventory", () => {
     await h.prompt()
 
     expect(scans).toBe(1)
+    expect(defaultScans).toBe(0)
   })
 })

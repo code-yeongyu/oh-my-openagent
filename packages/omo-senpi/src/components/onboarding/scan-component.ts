@@ -11,11 +11,17 @@ import {
   type OnboardingApplyStage,
   type OnboardingScanResponse,
 } from "./scan-contract"
+import type { applyMemoryFacts } from "../memory/facts-apply-runtime"
+import type { reconcileAppliedFactsBatches } from "../memory/facts-applied-reconcile"
+import type { TuiMemoryToolsRuntime } from "./tui-memory-tools"
 import type {
   applyRetainedScan,
+  claimOnboardingOwned,
   migrationFactsFromScan,
+  onboardingScanContext,
   OnboardingScanEnvironment,
   onboardingHistorySummary,
+  readOnboardingState,
   runOnboardingScan,
 } from "./scan-runtime"
 import type { createOnboardingUnderstandingHandlers, OnboardingUnderstandingHandlers } from "./understand-component"
@@ -25,6 +31,8 @@ import {
   ONBOARDING_UNDERSTAND_STOP_RPC_METHOD,
 } from "./understand-contract"
 import type { OnboardingUnderstandingSeams } from "./understand-start"
+import type { runTuiOnboardingScan } from "./tui-scan-runtime"
+import type { executeOnboardingSessionHistory } from "./session-history-tool-runtime"
 
 export * from "./scan-contract"
 export * from "./understand-contract"
@@ -38,12 +46,19 @@ const RETAINED_SCANS = 8
 /** A scan describes the machine only briefly; after this, an apply answers stale instead of writing. */
 export const ONBOARDING_SCAN_TTL_MS = 10 * 60_000
 
-export interface OnboardingScanRuntime {
+export interface OnboardingScanRuntime extends TuiMemoryToolsRuntime {
   readonly runOnboardingScan: typeof runOnboardingScan
-  readonly migrationFactsFromScan: typeof migrationFactsFromScan
   readonly applyRetainedScan: typeof applyRetainedScan
+  readonly readOnboardingState: typeof readOnboardingState
+  readonly claimOnboardingOwned: typeof claimOnboardingOwned
+  readonly migrationFactsFromScan: typeof migrationFactsFromScan
+  readonly onboardingScanContext: typeof onboardingScanContext
   readonly createOnboardingUnderstandingHandlers: typeof createOnboardingUnderstandingHandlers
   readonly onboardingHistorySummary: typeof onboardingHistorySummary
+  readonly runTuiOnboardingScan: typeof runTuiOnboardingScan
+  readonly executeOnboardingSessionHistory: typeof executeOnboardingSessionHistory
+  readonly applyMemoryFacts: typeof applyMemoryFacts
+  readonly reconcileAppliedFactsBatches: typeof reconcileAppliedFactsBatches
 }
 
 /** The engine's own credential store (senpi `AuthStorage`), narrowed to the surface an apply uses. */
@@ -203,6 +218,7 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
           return { kind: "stale", reason: "The scan expired; retained scans live ten minutes. Run omo.onboarding.scan again.", paths: [] }
         }
         // Everything past the expiry check needs the runtime, so it ships there: the auth checks and the writers.
+        // The scan was taken out of the store above, synchronously, so two applies racing on one scan never both run.
         return await (await loadRuntime()).applyRetainedScan(scanId, plans.plans, stages.filter(isApplyStage), authStore)
       })
     },
@@ -232,4 +248,13 @@ const RUNTIME_EXPORTS: readonly (keyof OnboardingScanRuntime)[] = [
   "applyRetainedScan",
   "createOnboardingUnderstandingHandlers",
   "onboardingHistorySummary",
+  "onboardingScanContext",
+  "readOnboardingState",
+  "claimOnboardingOwned",
+  "runTuiOnboardingScan",
+  "executeOnboardingSessionHistory",
+  "applyMemoryFacts",
+  "reconcileAppliedFactsBatches",
+  "executeOnboardingUnderstand",
+  "executeOnboardingMemoryApply",
 ]
