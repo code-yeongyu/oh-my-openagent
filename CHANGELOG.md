@@ -438,6 +438,8 @@ Runs on senpi 2026.10.27-1, which tightens shell permission checks. ([#11364](ht
 
 **Held packaging-test directories are recorded without failing cleanup.** The packed memory-sync probe and abandoned-root sweep share one best-effort removal guard, with no retries. Every held root is printed in the test log; Windows diagnostics are bounded to 30 seconds and include the holder's pid, image and parent pid when identified, or the diagnostic failure. Unrelated filesystem errors and unrecorded leaks still fail. ([#11218](https://github.com/code-yeongyu/oh-my-openagent/pull/11218), part of [#11135](https://github.com/code-yeongyu/oh-my-openagent/issues/11135))
 
+**Teammode explains how to get MultiAgentV2 on a v1-only Codex session.** Instead of only reporting that teammode is unavailable, it says once that a new session gets the V2 transport after the model's catalog entry is pinned to `multi_agent_version = "v2"` or `codex features enable multi_agent_v2` runs. ([#10717](https://github.com/code-yeongyu/oh-my-openagent/pull/10717))
+
 ## [5.1.45] - 2026-10-24
 
 **Reading the end of a long session takes 42 ms and 68 MB instead of 40 s and 1.8 GB.** `session_read`, `session_search` and `session_info` page through OpenCode's message API instead of loading the whole session: on a 23,000-message session, `session_read` with `limit: 2, from_end: true` dropped from 39.6 s and 1,848 MB peak memory to 42 ms and 68 MB, and a search that runs out its 60-second timeout now stops reading when it returns, where it used to read another 228 MB in the background ([#10738](https://github.com/code-yeongyu/oh-my-openagent/issues/10738), [#10741](https://github.com/code-yeongyu/oh-my-openagent/pull/10741)).
