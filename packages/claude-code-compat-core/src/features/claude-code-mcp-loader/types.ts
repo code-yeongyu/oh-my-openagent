@@ -16,6 +16,7 @@ export interface ClaudeCodeMcpServer {
   scope?: McpScope
   projectPath?: string
   disabled?: boolean
+  timeout?: number
 }
 
 export interface ClaudeCodeMcpConfig {
