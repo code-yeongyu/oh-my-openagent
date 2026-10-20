@@ -53,6 +53,14 @@ Verify with a fresh snapshot that the challenge is gone. Verification is part of
 separate optimistic assumption. When every technique fails on a page a real browser passes, the
 engine is the variable: relaunch through `connectCloakProfile()`.
 
+**A correct click that keeps failing is a trajectory problem, and the answer is the human.** reCAPTCHA
+scores the pointer path, not the click: it reads whether the cursor arrived straight, jittered,
+accelerating, or the way people actually move. Do not answer that with a synthetic motion model —
+detection-evasion code raises the account risk this skill exists to avoid, and the real session
+already carries a human's own trajectory, so faking the one input a human did for free makes the
+run look less human, not more. Name the cause in the diagnosis and hand the page over with
+`requestHuman`.
+
 ## Delegating the pixel loop
 
 Coordinate work and challenge solving are iterative: screenshot, reason, act, verify. When that
