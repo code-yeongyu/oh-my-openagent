@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { OmoConfigLayerSchema, OmoConfigSchema } from "../index"
+import {
+  GIT_MASTER_HARNESS_SUPPORT,
+  OmoConfigLayerSchema,
+  OmoConfigSchema,
+  OmoGitMasterSettingsSchema,
+} from "../index"
 
 describe("omo config git_master section", () => {
   test("#given an empty git_master section #when parsed #then attribution defaults are off", () => {
@@ -91,5 +96,77 @@ describe("omo config git_master section", () => {
 
     // then
     expect(result.success).toBe(false)
+  })
+
+  test("#given an empty git_master section #when parsed #then git_env_prefix defaults to GIT_MASTER=1", () => {
+    // given
+    const config = { git_master: {} }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.git_master?.git_env_prefix).toBe("GIT_MASTER=1")
+  })
+
+  test("#given git_env_prefix set to an empty string #when parsed #then the empty string is preserved as the disabled state", () => {
+    // given
+    const config = { git_master: { git_env_prefix: "" } }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.git_master?.git_env_prefix).toBe("")
+  })
+
+  test("#given git_env_prefix with a shell-unsafe value #when parsed #then the config is rejected", () => {
+    // given
+    const config = { git_master: { git_env_prefix: "GIT_MASTER=1; rm -rf /" } }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("#given git_env_prefix with multiple assignments #when parsed #then the value is accepted", () => {
+    // given
+    const config = { git_master: { git_env_prefix: "GIT_MASTER=1 OMO_AGENT=x" } }
+
+    // when
+    const result = OmoConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.git_master?.git_env_prefix).toBe("GIT_MASTER=1 OMO_AGENT=x")
+  })
+
+  test("#given a git_master layer without git_env_prefix #when parsed as a layer #then no default is injected", () => {
+    // given
+    const config = { git_master: {} }
+
+    // when
+    const result = OmoConfigLayerSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.git_master?.git_env_prefix).toBeUndefined()
+  })
+
+  test("#given the resolved settings schema #when defaults are applied #then git_env_prefix and the harness support map agree", () => {
+    // given
+    const settings = OmoGitMasterSettingsSchema.parse({})
+
+    // when / then
+    expect(settings.git_env_prefix).toBe("GIT_MASTER=1")
+    expect(GIT_MASTER_HARNESS_SUPPORT["git_master.git_env_prefix"]).toContain("native")
   })
 })
