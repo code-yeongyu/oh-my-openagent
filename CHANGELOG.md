@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**OpenCode runtime fallback hops when a provider failure arrives as `UnknownError`.** `retry_on_errors` used to match only numeric HTTP codes, so an expired-auth or unexpected-server-error wrapped as `UnknownError` never switched models. The scoped classifier now treats those wrapped messages as retryable, so configured `models[]` still hop. ([#7702](https://github.com/code-yeongyu/oh-my-openagent/issues/7702), [#7706](https://github.com/code-yeongyu/oh-my-openagent/pull/7706))
+
 **A DAG node whose child dies on infrastructure is retried instead of taking its whole branch down.** When a mass-ulw node's child stops answering its heartbeats or loses its host session, the node is now retried automatically, at most twice, with a backoff. Its dependents are skipped only if the retries fail too. Before, one starved wave failed and every later node was skipped (an overloaded machine skipped 54 of 61 nodes). Task failures and cancelled nodes behave as before, and the TUI and the desktop app share this behaviour ([#10605](https://github.com/code-yeongyu/oh-my-openagent/issues/10605), [#10616](https://github.com/code-yeongyu/oh-my-openagent/pull/10616)).
 
 ## [5.1.40] - 2026-10-20
