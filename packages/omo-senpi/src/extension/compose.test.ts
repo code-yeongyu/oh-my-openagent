@@ -47,6 +47,42 @@ function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: st
 }
 
 describe("composeOmoSenpiExtension", () => {
+  it("#given engine pause #when a wake is persisted #then the receipt is notice custody and resume is read live", async () => {
+    const pi = new FakeExtensionAPI()
+    let coordinator: IdleInjectionCoordinator | undefined
+    let paused = true
+    let acknowledge: ((receipt: unknown) => void) | undefined
+    const triggerTurns: unknown[] = []
+    const send = spyOn(pi, "sendMessage").mockImplementation((_message, options) => {
+      triggerTurns.push(options?.triggerTurn)
+      const callback = options?.onPersisted
+      if (typeof callback !== "function") throw new Error("Missing engine persistence receipt")
+      acknowledge = (receipt) => callback(receipt)
+    })
+    try {
+      await composeOmoSenpiExtension([{
+        name: "pause-proof",
+        register(_api, context) { coordinator = context.idleCoordinator },
+      }], { logger: createRecordingLogger() })(pi)
+      await pi.dispatch("session_start", {}, { isPaused: () => paused })
+      if (!coordinator) throw new Error("Missing coordinator")
+      const receipt = Promise.withResolvers<unknown>()
+      coordinator.enqueue({ key: "late", source: "task-completion", content: "done", onFlushed: receipt.resolve })
+      coordinator.flushOnIdle()
+      expect(triggerTurns).toEqual([false])
+      if (!acknowledge) throw new Error("Missing acknowledgment")
+      acknowledge({ disposition: "notice_persisted", entryId: "notice-1" })
+      expect(await receipt.promise).toEqual({ disposition: "notice_persisted", entryId: "notice-1" })
+      paused = false
+      coordinator.enqueue({ key: "next", source: "team-message", content: "next" })
+      coordinator.flushOnIdle()
+      expect(triggerTurns).toEqual([false, true])
+      acknowledge({ disposition: "message_persisted", entryId: "message-2" })
+    } finally {
+      send.mockRestore()
+    }
+  })
+
   it("#given enabled components #when composed and an event dispatches #then registers flags components and drives fake handlers", async () => {
     // given
     const pi = new FakeExtensionAPI()

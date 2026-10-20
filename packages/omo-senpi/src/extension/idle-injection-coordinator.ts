@@ -1,5 +1,10 @@
 export type IdleInjectionSource = "task-completion" | "workpool-aggregate" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "kibitzer"
 
+export interface IdleInjectionReceipt {
+  readonly disposition: "notice_persisted" | "message_persisted"
+  readonly entryId: string
+}
+
 export interface IdleInjection {
   // Dedupe/order key. Task completions key on their task id; the ulw continuation keys on its source
   // so repeated continuation enqueues on one idle edge collapse to a single injection.
@@ -13,7 +18,7 @@ export interface IdleInjection {
   readonly details?: unknown
   /** Preserve this segment's boundary for model-specific context transforms. */
   readonly contextScoped?: boolean
-  readonly onFlushed?: () => void
+  readonly onFlushed?: (receipt?: IdleInjectionReceipt) => void
   readonly onDeliveryFailed?: (error: unknown) => void
 }
 
@@ -208,8 +213,8 @@ export class IdleInjectionCoordinator {
       for (const injection of ordered) injection.onFlushed?.()
     } else {
       void delivery.then(
-        () => {
-          for (const injection of ordered) injection.onFlushed?.()
+        (receipt: unknown) => {
+          for (const injection of ordered) injection.onFlushed?.(persistenceReceipt(receipt))
         },
         (error: unknown) => {
           for (const injection of ordered) injection.onDeliveryFailed?.(error)
@@ -218,6 +223,13 @@ export class IdleInjectionCoordinator {
     }
     return collapsed
   }
+}
+
+function persistenceReceipt(value: unknown): IdleInjectionReceipt | undefined {
+  if (typeof value !== "object" || value === null || !("disposition" in value) || !("entryId" in value)) return undefined
+  if (value.disposition !== "notice_persisted" && value.disposition !== "message_persisted") return undefined
+  if (typeof value.entryId !== "string") return undefined
+  return { disposition: value.disposition, entryId: value.entryId }
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {

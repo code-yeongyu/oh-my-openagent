@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { enginePauseReader } from "../../extension/session-pause"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { readAgentEndOutcome } from "./agent-end-eligibility"
@@ -72,9 +73,10 @@ export function createUlwExecuteContinuationComponent(
         state.pendingRun = { payload, sessionId: extractSessionId(eventCtx), cwd: extractCwd(eventCtx) }
       })
 
-      pi.on("agent_settled", () => {
+      pi.on("agent_settled", (_payload, eventCtx) => {
         const run = state.pendingRun
         state.pendingRun = undefined
+        if (enginePauseReader(eventCtx)?.()) return
         if (run === undefined) return
 
         const outcome = readAgentEndOutcome(run.payload)

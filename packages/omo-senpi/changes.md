@@ -1,3 +1,7 @@
+## 2026-10-20 - Native continuations respect the engine-owned Stop pause (#6752)
+
+The idle-injection coordinator reads the bound engine context's `isPaused()` for each delivery and acknowledges `notice_persisted` separately from normal transcript persistence. `ulw-loop` and `ulw-execute` stop before spending continuation counters or dedupe signatures when that same engine is paused. No adapter pause latch is introduced. This depends on senpi#3811; Codex and OpenCode continuation paths are outside this change.
+
 ## 2026-10-20 - A failed onboarding scan is retried instead of being kept for the whole process (#10481)
 
 The TUI onboarding's once-per-process memos (the setup scan behind the first onboarding turn, the understanding scan `onboarding_understand` reads, an injected migration inventory, and the background session-history summary) kept a failed run as their answer, so one transient failure made onboarding report "the scan did not run" for the rest of the process. They now keep only a success: callers that arrive while a run is in flight still share it, a rejected run answers `undefined` to them (onboarding stays fail-open) and is dropped, and the next call starts a fresh run.

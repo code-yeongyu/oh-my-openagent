@@ -59,6 +59,29 @@ function makeCoordinator(): {
 }
 
 describe("omo-senpi ulw-execute-continuation", () => {
+  it("#given engine pause #when a continuable plan settles #then the engine alone controls resumption", async () => {
+    const root = createTempWorkspace()
+    writePlan(root, "paused", "## TODOs\n- [ ] 1. Pending work\n")
+    writeBoulderJson(root, {
+      schema_version: 2,
+      active_work_id: "pause-proof",
+      works: { "pause-proof": {
+        work_id: "pause-proof", active_plan: ".omo/plans/paused.md", plan_name: "paused",
+        session_ids: ["senpi:pause-proof"], status: "active", started_at: "2026-10-20T00:00:00Z",
+      } },
+    })
+    const pi = new FakeExtensionAPI()
+    await createUlwExecuteContinuationComponent().register(pi, {
+      logger: createLogger(), config: { getFlag: () => false },
+    })
+    const outcome = { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }
+    const context = { cwd: root, sessionManager: { getSessionId: () => "pause-proof" } }
+    await dispatchRunEnd(pi, outcome, { ...context, isPaused: () => true })
+    expect(pi.messages).toHaveLength(0)
+    await dispatchRunEnd(pi, outcome, { ...context, isPaused: () => false })
+    expect(pi.messages).toHaveLength(1)
+  })
+
   it("#given no boulder state #when agent_end fires #then stays quiet", async () => {
     const root = createTempWorkspace()
     const pi = new FakeExtensionAPI()

@@ -42,6 +42,15 @@ describe("omo-senpi ulw-loop continuation session isolation", () => {
 })
 
 describe("omo-senpi ulw-loop continuation", () => {
+  it("#given engine pause #when a clean run settles #then no continuation slot or dedupe signature is spent", async () => {
+    const { pi } = await registerWithRunner([activeStatus(), activeStatus()])
+    const outcome = { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }
+    await dispatchRunEnd(pi, outcome, sessionEventCtx("/repo", { isPaused: () => true }))
+    expect(pi.messages).toHaveLength(0)
+    await dispatchRunEnd(pi, outcome, sessionEventCtx("/repo", { isPaused: () => false }))
+    expect(pi.messages).toHaveLength(1)
+  })
+
   it("#given no toolkit CLI on this host #when input and agent_end fire #then the component still runs and never reports itself inactive", async () => {
     const pi = new FakeExtensionAPI()
     const logger = createLogger()

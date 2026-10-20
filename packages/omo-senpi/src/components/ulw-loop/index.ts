@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { enginePauseReader } from "../../extension/session-pause"
 
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { findContinuableBoulderWork } from "../ulw-execute-continuation/boulder-eligibility"
@@ -120,9 +121,10 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
       // recorded agent_end event until this boundary closes. Deciding here is what makes a mid-probe
       // abort and a compaction-owned turn observable, and no continuation budget or dedupe signature
       // is consumed before the decision is made.
-      pi.on("agent_settled", () => {
+      pi.on("agent_settled", (_payload, eventCtx) => {
         const run = state.pendingRun
         state.pendingRun = undefined
+        if (enginePauseReader(eventCtx)?.()) return
         if (run === undefined) return
 
         const outcome = readAgentEndOutcome(run.payload)

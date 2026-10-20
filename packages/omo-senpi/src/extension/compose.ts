@@ -4,6 +4,7 @@ import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
 import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { enginePauseReader } from "./session-pause"
 import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
@@ -121,9 +122,25 @@ export function composeOmoSenpiExtension(
     // cancellable like every sibling scheduler in this codebase (lead-poller-lifecycle's interval,
     // senpi-task's completion retry): retirement cancels the armed handle instead of leaving a live
     // 200ms timer behind after a `quit` shutdown.
+    let sessionContext: unknown
+    pi.on("session_start", (_event, context) => { sessionContext = context })
     const idleCoordinator = new IdleInjectionCoordinator(
-      (message, options) =>
-        pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
+      (message, options) => {
+        const readPause = enginePauseReader(sessionContext)
+        if (readPause === undefined) {
+          return pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs })
+        }
+        // onPersisted acknowledges transcript custody, including a held notice, not model consumption.
+        // A Stop racing this call is still caught by the engine's common admission gate.
+        return new Promise((resolve, reject) => {
+          pi.sendMessage(message, {
+            triggerTurn: !readPause(),
+            deliverAs: options.deliverAs,
+            onPersisted: resolve,
+            onPersistenceFailed: reject,
+          })
+        })
+      },
       {
         scheduleFlush: (flush) => {
           const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)
