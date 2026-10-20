@@ -12,6 +12,14 @@ function clock(start = 1_000): () => number {
 }
 
 describe("panel store children", () => {
+  test("partial activity updates retain fallback, while a reverted record clears it", () => {
+    const store = createPanelStore(clock())
+    store.upsertChild({ id: "c1", model: "openai/actual", fallback: "fell back from vendor/primary: limit" })
+    store.upsertChild({ id: "c1", activity: "reading" })
+    expect(store.state().children[0]?.fallback).toBe("fell back from vendor/primary: limit")
+    store.upsertChild({ id: "c1", fallback: undefined })
+    expect(store.state().children[0]?.fallback).toBeUndefined()
+  })
   test("#given a spawn then a finish #when upserted #then the row keeps the fields the finish omits", () => {
     // given
     const store = createPanelStore(clock())

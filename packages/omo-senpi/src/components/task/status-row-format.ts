@@ -62,6 +62,7 @@ function recordStatusTarget(record: TaskRecord): string {
     agentType: record.agent_type,
     resolvedModel: record.resolved_model,
     effectiveModel: record.effective_model,
+    modelFallback: record.model_fallback,
     model: record.model,
     fallbackCount: record.fallback_attempts?.length,
   }) ?? "task"

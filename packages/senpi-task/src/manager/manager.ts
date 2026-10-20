@@ -20,6 +20,7 @@ import { discardManagedHandle, releaseOnDispose, releaseSupersededHandle, type M
 import { TaskConcurrency } from "./concurrency"
 import { failOwnedRun, launchRunOf, ownsRun } from "./launch-fence"
 import { runtimeFallbackCandidates } from "./credential-failure"
+import { runtimeFallbackNotice } from "./model-fallback-facts"
 import { createWorkpoolAdmission } from "./workpool-admission"
 import { withResidentStart } from "./resident-start"
 import { createWorkpoolEngine, type WorkpoolEngine } from "../workpool/engine"
@@ -1144,6 +1145,7 @@ class TaskManagerImpl implements TaskManager {
       ...record,
       model: nextModel.display,
       resolved_model: nextModel,
+      model_fallback: runtimeFallbackNotice(record, describeStartFailure(error).errorMessage),
       fallback_models: record.fallback_models?.slice(1) ?? [],
       fallback_attempts: [
         ...(record.fallback_attempts ?? (record.resolved_model === undefined ? [] : [record.resolved_model])),
@@ -1375,6 +1377,7 @@ class TaskManagerImpl implements TaskManager {
     }
     const managedSpec = live.managedSpec
     const runner = live.runner
+    const modelFallback = runtimeFallbackNotice(record, input.outcome.failure.message, candidates.limit)
 
     // Committed BEFORE the failed rung's teardown can yield: while the daemon closes that session, a
     // reconciler must already see a handoff owned by this live pid, never a vanished session it could
@@ -1388,7 +1391,7 @@ class TaskManagerImpl implements TaskManager {
         return fresh
       }
       handoff.closed = childIdentityOf(fresh)
-      handoff.record = handOffToNextRung(fresh, { model: nextModel, remaining: candidates.remaining.slice(1), timestamp: input.timestamp })
+      handoff.record = handOffToNextRung(fresh, { model: nextModel, remaining: candidates.remaining.slice(1), timestamp: input.timestamp, modelFallback })
       return handoff.record
     })
     const nextRecord = handoff.record

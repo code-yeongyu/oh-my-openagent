@@ -1,5 +1,6 @@
 import { excerptRendererText, optionalRendererText } from "./renderer-text"
 import type { EffectiveModelRecord, ResolvedModelRecord, TaskRunStats } from "./state"
+import { formatModelFallback, type ModelFallbackRecord } from "./state/model-fallback"
 
 // One status row must survive next to a spinner, elapsed clock and the terminal edge, so the human
 // label is bounded here rather than at each call site.
@@ -22,6 +23,7 @@ export type StatusTargetInput = {
   // Raw model string used when no resolved model metadata exists (live/legacy tasks).
   readonly model?: string
   readonly fallbackCount?: number
+  readonly modelFallback?: ModelFallbackRecord
 }
 
 export type StatusLineStats = Pick<TaskRunStats, "turns" | "tool_calls" | "failed_turns"> & {
@@ -74,7 +76,9 @@ export function formatTargetWithModel(input: StatusTargetInput): string | undefi
     ? (model === undefined ? identity : `${identity}(${model})`)
     : (model !== undefined ? `model:${model}` : undefined)
   if (target === undefined) return undefined
-  return input.effectiveModel?.switched_by_operator === true ? `${target} (switched by operator)` : target
+  const marked = input.effectiveModel?.switched_by_operator === true ? `${target} (switched by operator)` : target
+  const fallback = formatModelFallback(input.modelFallback)
+  return fallback === undefined ? marked : `${marked} · ${fallback}`
 }
 
 // WHERE it runs: the routing target plus the model actually resolved for it.

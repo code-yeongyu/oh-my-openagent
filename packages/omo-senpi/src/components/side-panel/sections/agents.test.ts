@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { PanelChild } from "../store"
 import { buildAgentCardRows, buildAgentRows } from "./agents"
+import { panelChildFromRecord } from "../data/task-records"
 
 const child = (overrides: Partial<PanelChild> = {}): PanelChild => ({
   id: "c1",
@@ -14,6 +15,23 @@ const child = (overrides: Partial<PanelChild> = {}): PanelChild => ({
 const texts = (rows: readonly { text: string }[]): string[] => rows.map((row) => row.text)
 
 describe("buildAgentRows", () => {
+  test("a fallen-back child names its actual route and reset in its row and card", () => {
+    const update = panelChildFromRecord({
+      task_id: "st_fb", status: "running", created_at: "2026-10-20T00:00:00Z",
+      ...{
+        model: "anthropic/limited",
+        effective_model: { display: "openai/actual" },
+        model_fallback: { from: "anthropic/limited", reason: "quota", limit: "account" as const, resets_at: "2026-10-21T00:00:00Z" },
+      },
+    })
+    const projected = child(update)
+    const rows = texts(buildAgentRows([projected], 0, 140)).join("\n")
+    const card = texts(buildAgentCardRows(projected, 0)).join("\n")
+    for (const rendered of [rows, card]) {
+      expect(rendered).toContain("openai/actual")
+      expect(rendered).toContain("fell back from anthropic/limited: limit, resets 2026-10-21T00:00:00Z")
+    }
+  })
   test("#given no children #when built #then the section stays empty", () => {
     // given
     const children: readonly PanelChild[] = []

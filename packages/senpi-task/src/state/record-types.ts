@@ -14,6 +14,7 @@ import type {
   TaskStatus,
 } from "./types"
 import type { TaskRunStats } from "./run-stats-types"
+import type { ModelFallbackRecord } from "./model-fallback"
 
 /** An interrupt the parent did not request: the host replaced the child's session mid-turn. */
 export type TaskInterruptCause = "session_replaced"
@@ -93,6 +94,9 @@ export type TaskRecordInput = {
    * effective model could not be observed.
    */
   readonly effective_model?: EffectiveModelRecord
+  readonly model_fallback?: ModelFallbackRecord
+  /** Last provider diagnostic, retained until a fallback can attach it to its origin. */
+  readonly model_failure?: ModelFallbackRecord
   readonly tool_allow?: readonly string[]
   readonly tool_deny?: readonly string[]
   readonly notify_on_terminal: boolean

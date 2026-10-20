@@ -12,6 +12,7 @@ import {
 import { runStatsSuffix } from "../run-stats-format"
 import type { TaskOutputInput } from "./output"
 import type { TaskOutputDetails, TaskSnapshot } from "./types"
+import { formatModelFallback } from "../../state/model-fallback"
 
 export type OutputRenderTheme = Pick<Theme, "fg">
 
@@ -65,6 +66,7 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
           agentType: details.snapshot.agent_type,
           resolvedModel: details.snapshot.resolved_model,
           effectiveModel: details.snapshot.effective_model,
+          modelFallback: details.snapshot.model_fallback,
         }) ?? `model:${normalizeRendererText(details.snapshot.model)}`
       const statusLabel = details.snapshot.suspended?.explanation ?? normalizeRendererText(details.snapshot.status)
       return {
@@ -100,6 +102,8 @@ function notFoundRow(details: Extract<TaskOutputDetails, { readonly kind: "not_f
 // The effective route is what the child actually ran (#9722); when it differs from the plan the
 // plan is shown alongside, never instead of it.
 export function taskOutputModelText(snapshot: TaskSnapshot): string {
+  const fallback = formatModelFallback(snapshot.model_fallback)
+  const suffix = fallback === undefined ? "" : ` · ${fallback}`
   const display = nonEmpty(snapshot.resolved_model?.display)
   const model = normalizeRendererText(snapshot.model)
   const reasoning = nonEmpty(snapshot.resolved_model?.reasoning) ?? nonEmpty(snapshot.resolved_model?.reasoning_effort)
@@ -116,8 +120,8 @@ export function taskOutputModelText(snapshot: TaskSnapshot): string {
     snapshot.effective_model.provider === snapshot.resolved_model.provider &&
     snapshot.effective_model.model_id === snapshot.resolved_model.model_id
   const operatorMark = snapshot.effective_model?.switched_by_operator === true ? " (switched by operator)" : ""
-  if (effective === undefined || sameModel) return `model ${planned}${operatorMark}`
-  return `model ${effective}${operatorMark} (planned ${planned})`
+  if (effective === undefined || sameModel) return `model ${planned}${operatorMark}${suffix}`
+  return `model ${effective}${operatorMark} (planned ${planned})${suffix}`
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

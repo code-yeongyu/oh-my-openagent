@@ -1,5 +1,6 @@
 import { nextRunEpoch, type ResolvedModelRecord, type TaskRecord } from "../state"
 import { isHostSessionRecord } from "./host-session"
+import type { ModelFallbackRecord } from "../state/model-fallback"
 
 /**
  * Runtime fallback's handoff between two rungs. The failed rung's child is closed and the next rung
@@ -24,6 +25,7 @@ export type FallbackRung = {
   readonly model: ResolvedModelRecord
   readonly remaining: readonly ResolvedModelRecord[]
   readonly timestamp: string
+  readonly modelFallback?: ModelFallbackRecord
 }
 
 /**
@@ -45,6 +47,7 @@ export function handOffToNextRung(record: TaskRecord, rung: FallbackRung): TaskR
     model: rung.model.display,
     resolved_model: rung.model,
     fallback_models: rung.remaining,
+    ...(rung.modelFallback === undefined ? {} : { model_fallback: rung.modelFallback }),
     fallback_attempts: [
       ...(record.fallback_attempts ?? (record.resolved_model === undefined ? [] : [record.resolved_model])),
       rung.model,

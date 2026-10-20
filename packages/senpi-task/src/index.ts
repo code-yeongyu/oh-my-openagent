@@ -91,6 +91,8 @@ export {
   toolCountSuffix,
 } from "./status-line"
 export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
+export { formatModelFallback } from "./state/model-fallback"
+export type { ModelFallbackRecord } from "./state/model-fallback"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,

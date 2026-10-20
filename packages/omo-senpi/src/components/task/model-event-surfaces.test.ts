@@ -5,11 +5,23 @@ import { wireHarness } from "./event-bridge.test-harness"
 import { formatTaskRow } from "./status-row-format"
 
 describe("effective model surfaces (F12)", () => {
+  it("shows the actual route and limit reset on the task row", () => {
+    const record = taskRecord({
+      task_id: "st_limit_fallback",
+      status: "running",
+      effective_model: { provider: "openai", model_id: "actual", display: "openai/actual", source: "fallback" },
+      ...{ model_fallback: { from: "anthropic/limited", reason: "weekly limit", limit: "account" as const, resets_at: "2026-10-21T00:00:00Z" } },
+    })
+    const row = formatTaskRow(record)
+    expect(row).toContain("openai/actual")
+    expect(row).toContain("fell back from anthropic/limited: limit, resets 2026-10-21T00:00:00Z")
+  })
   it("#given a child switched by an operator #when /tasks renders #then the row names the live model with the operator mark", () => {
     const record = taskRecord({
       task_id: "st_operator_switch",
       status: "running",
       effective_model: { provider: "anthropic", model_id: "claude-opus-5-5", display: "anthropic/claude-opus-5-5", reasoning: "high", source: "set", switched_by_operator: true },
+      model_fallback: { from: "anthropic/limited", reason: "weekly limit", limit: "account", resets_at: "2026-10-21T00:00:00Z" },
     })
     const row = formatTaskRow(record)
     expect(row).toContain("anthropic/claude-opus-5-5:high")
@@ -32,6 +44,7 @@ describe("effective model surfaces (F12)", () => {
     const record = taskRecord({
       task_id: "st_effective_payload",
       status: "running",
+      model_fallback: { from: "anthropic/limited", reason: "weekly limit", limit: "account", resets_at: "2026-10-21T00:00:00Z" },
       effective_model: { provider: "anthropic", model_id: "claude-opus-5-5", display: "anthropic/claude-opus-5-5", reasoning: "high", source: "set", switched_by_operator: true },
     })
     const { pi } = wireHarness("parent-session", { records: { [record.task_id]: record }, withRpc: true })
@@ -48,5 +61,6 @@ describe("effective model surfaces (F12)", () => {
       source: "set",
       switched_by_operator: true,
     })
+    expect(row?.model_fallback).toMatchObject({ from: "anthropic/limited", limit: "account", resets_at: "2026-10-21T00:00:00Z" })
   })
 })

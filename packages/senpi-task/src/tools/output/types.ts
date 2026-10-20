@@ -4,6 +4,7 @@ import type { IsolationDetails } from "../../isolation/details"
 import type { TaskManager } from "../../manager"
 import type { StartQueued, EffectiveModelRecord, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus, AwaitingInputReason } from "../../state"
 import type { CallerSessionResolver } from "../control"
+import type { ModelFallbackRecord } from "../../state/model-fallback"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "concurrency">
 
@@ -57,6 +58,7 @@ export type TaskSnapshot = {
   readonly model: string
   readonly resolved_model?: ResolvedModelRecord
   readonly effective_model?: EffectiveModelRecord
+  readonly model_fallback?: ModelFallbackRecord
   readonly agent_type?: string
   readonly category?: string
   readonly parent_session_id: string
