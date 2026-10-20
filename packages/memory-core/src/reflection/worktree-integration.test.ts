@@ -240,6 +240,26 @@ describe("reflection worktree integration", () => {
     expect((await git(parentDir, ["write-tree"])).stdout.trim()).toBe(beforeTree)
   }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
+  it("#given an untracked file in the parent #when auto integration runs #then the detail names the blocking path", async () => {
+    const { parentDir, worktree } = await fixture("dirty-detail")
+    await commit(worktree, "target.md", "target\n")
+    const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+    if (validation.status !== "valid") throw new Error("expected valid reflection")
+    await writeFile(join(parentDir, "foreign-draft.md"), "foreign draft\n")
+
+    const result = await integrateValidatedReflection(worktree, {
+      mode: "auto",
+      runId: "dirty-detail",
+      summary: "must name the path",
+      validated: validation,
+      withWriterLock: unlocked,
+    })
+
+    expect(result.outcome).toBe("parent_dirty")
+    if (result.outcome !== "parent_dirty") throw new Error("expected parent_dirty")
+    expect(result.detail).toContain("foreign-draft.md")
+  })
+
   it("#given present then absent resources #when cleanup repeats #then both receipts confirm absence", async () => {
     const { parentDir, worktree } = await fixture("cleanup")
 

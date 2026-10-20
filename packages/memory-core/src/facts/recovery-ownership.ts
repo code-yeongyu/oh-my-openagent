@@ -24,6 +24,24 @@ export async function captureOwnedFactsState(
   }) ? current : undefined
 }
 
+/**
+ * Names why `captureOwnedFactsState` returned undefined, so a `parent_dirty`
+ * outcome can point the operator at the blocking state instead of a bare reason.
+ */
+export async function describeForeignParentState(
+  repo: GitMemoryRepo,
+  recovery: FactsApplyRecovery,
+): Promise<string[]> {
+  if (await repo.head() !== recovery.headBeforeApply) return ["parent HEAD moved"]
+  const allowed = new Set(recovery.paths.map((entry) => entry.path))
+  const dirty = (await repo.status()).split(/\r?\n/).filter(Boolean)
+  const foreign = dirty.filter((line) => {
+    const path = parsePorcelainPath(line)
+    return path === null || !allowed.has(path)
+  })
+  return foreign.length > 0 ? foreign : ["owned paths drifted from their pre state"]
+}
+
 export function sameFactsOwnedState(left: FactsOwnedState, right: FactsOwnedState): boolean {
   if (left.size !== right.size) return false
   return [...left].every(([path, state]) => sameIdentity(state, right.get(path)))

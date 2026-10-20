@@ -8,6 +8,16 @@ import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
 
+const PARENT_DIRTY_DETAIL_MAX_LINES = 5
+
+function describeForeignStatus(status: string): string {
+  const lines = status.split(/\r?\n/).filter(Boolean)
+  const shown = lines.slice(0, PARENT_DIRTY_DETAIL_MAX_LINES).join("; ")
+  return lines.length > PARENT_DIRTY_DETAIL_MAX_LINES
+    ? `${shown}; +${lines.length - PARENT_DIRTY_DETAIL_MAX_LINES} more`
+    : shown
+}
+
 export interface ValidatedReflectionTip {
   readonly tipSha: string
   readonly changedPaths: readonly string[]
@@ -105,8 +115,9 @@ export async function integrateValidatedReflection(
       return { outcome: "parent_dirty", detail: "Parent repository contains another interrupted merge" }
     }
 
-    if ((await worktree.parent.status()).trim()) {
-      return { outcome: "parent_dirty" }
+    const parentStatus = await worktree.parent.status()
+    if (parentStatus.trim()) {
+      return { outcome: "parent_dirty", detail: describeForeignStatus(parentStatus) }
     }
 
     const merge = await run(worktree.exec, worktree.parent.dir, [

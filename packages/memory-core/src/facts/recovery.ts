@@ -7,8 +7,18 @@ import type { GitCommitAuthor, GitMemoryRepo, MemoryCommit } from "../git"
 import { PROVENANCE_STRIPPED_TRAILER, strippedLegacyUserHeader } from "../tools/claim-frontmatter"
 import type { FactsApplyRecovery } from "./mutation-plan"
 import { FactsMutationTransaction, FactsOwnershipLostError } from "./recovery-mutation"
-import { captureOwnedFactsState, sameFactsOwnedState } from "./recovery-ownership"
+import { captureOwnedFactsState, describeForeignParentState, sameFactsOwnedState } from "./recovery-ownership"
 import { upgradeAgreementRecovery, type AgreementRecoveryInput } from "./agreement-recovery"
+
+const PARENT_DIRTY_DETAIL_MAX_LINES = 5
+
+async function describeParentDirty(repo: GitMemoryRepo, recovery: FactsApplyRecovery): Promise<string> {
+  const lines = await describeForeignParentState(repo, recovery)
+  const shown = lines.slice(0, PARENT_DIRTY_DETAIL_MAX_LINES).join("; ")
+  return lines.length > PARENT_DIRTY_DETAIL_MAX_LINES
+    ? `${shown}; +${lines.length - PARENT_DIRTY_DETAIL_MAX_LINES} more`
+    : shown
+}
 
 export type FactsRecoveryResult =
   | { readonly outcome: "committed"; readonly sha: string; readonly affectedPaths: readonly string[] }
@@ -29,9 +39,13 @@ export async function applyFactsRecovery(
   agreementInput?: AgreementRecoveryInput,
 ): Promise<FactsRecoveryResult> {
   const observed = await captureOwnedFactsState(repo, recovery)
-  if (observed === undefined) return { outcome: "parent_dirty" }
+  if (observed === undefined) {
+    return { outcome: "parent_dirty", detail: await describeParentDirty(repo, recovery) }
+  }
   const boundary = await captureOwnedFactsState(repo, recovery)
-  if (boundary === undefined || !sameFactsOwnedState(observed, boundary)) return { outcome: "parent_dirty" }
+  if (boundary === undefined || !sameFactsOwnedState(observed, boundary)) {
+    return { outcome: "parent_dirty", detail: await describeParentDirty(repo, recovery) }
+  }
   const effective = await upgradeAgreementRecovery(repo, recovery, agreementInput)
   let transaction = new FactsMutationTransaction(repo, recovery, boundary)
   try {
@@ -90,3 +104,4 @@ async function strippedHeaderPaths(repo: GitMemoryRepo, recovery: FactsApplyReco
   }
   return stripped
 }
+EOF
