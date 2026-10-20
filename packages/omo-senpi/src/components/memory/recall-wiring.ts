@@ -30,6 +30,7 @@ import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createRecallDrain, type PendingNudgesPort } from "./recall-drain"
+import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
 import { createTranscriptMentionIndex } from "./recall-transcript-mentions"
 import {
   judgeTranscript,
@@ -233,4 +234,17 @@ function defaultCreateRepo(context: MemoryIdentityContext): GitMemoryRepo {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * The corpus cache recall and the Kibitzer memory tool share. Shared: every session on a multi-session host
+ * registers this component, and a private cache per session held one parsed corpus and BM25 index per live
+ * session (senpi#3110). A term-store save that fails is logged and never fails recall.
+ */
+export function createSharedRecallCorpusCache(logger: ComponentLogger | undefined): RecallCorpusCache {
+  return new RecallCorpusCache({
+    shared: true,
+    onTermStoreError: (error) => logger?.warn("omo-senpi memory recall term store skipped", { error: String(error) }),
+    termStore: loadRecallStoreRuntime,
+  })
 }
