@@ -122,7 +122,10 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // dependency manifests are unchanged. Committed dev measures 1,539,513 bytes; the #10184 branch measures
 // 1,547,296 (+7,783) after minification (linux/arm64, node 24 + bun 1.4.2). 1,550,000 is the measured need
 // plus a 2,704-byte margin, so later growth still has to justify itself rather than ride on slack.
-const BUDGET_BYTES = 1_550_000
+// Reduced for #9915: the PostHog SDK now lives in a lazy sidecar.
+// Canonical linux/amd64, Bun 1.4.3 after merging dev: 1,553,891 -> 1,396,636 bytes (-157,255).
+// 1,424,569 = ceil(1,396,636 * 1.02), locking in the saving with 2% headroom.
+const BUDGET_BYTES = 1_424_569
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

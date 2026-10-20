@@ -369,7 +369,7 @@ Reader
     expect(result.diagnostics).toContainEqual({
       kind: "category_shadows_agent",
       path: "(merged omo config)",
-      message: 'categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": [{"model":"provider/sonnet"}] } }',
+      message: 'categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": [{"model":"provider/sonnet"}] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning',
       issuePaths: ["categories.plan-consultant"],
     })
   })
@@ -386,7 +386,22 @@ Reader
     expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "category_shadows_agent")).toEqual([])
   })
 
-  test("#given a category named after a user-defined markdown agent #when loading #then the category-shadow diagnostic names that agent", () => {
+  test("#given a category named after a user-defined markdown agent without its own model #when loading #then the category-shadow diagnostic names that agent", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(join(fixture.project, ".senpi", "agents", "agents", "finder.md"), "---\ndescription: finder agent\n---\nfind things\n")
+    writeText(join(fixture.project, ".omo", "omo.json"), JSON.stringify({ categories: { finder: { model: "provider/other" } } }))
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "category_shadows_agent").map((diagnostic) => diagnostic.message)).toEqual([
+      'categories."finder" is not read for subagent_type "finder" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "finder": { "models": ["provider/other"] } }. If you also use task(category: "finder") on purpose, the key keeps working there; giving the agent its own models silences this warning',
+    ])
+  })
+
+  test("#given a category named after a markdown agent that declares its own model #when loading #then no category-shadow diagnostic is produced", () => {
     // given
     const fixture = makeFixture()
     writeText(join(fixture.project, ".senpi", "agents", "agents", "finder.md"), agentMarkdown("provider/finder", "find things"))
@@ -396,8 +411,6 @@ Reader
     const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
 
     // then
-    expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "category_shadows_agent").map((diagnostic) => diagnostic.message)).toEqual([
-      'categories."finder" is not read for subagent_type "finder" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "finder": { "models": ["provider/other"] } }',
-    ])
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "category_shadows_agent")).toEqual([])
   })
 })
