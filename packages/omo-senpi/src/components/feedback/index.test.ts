@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { FeedbackDraft } from "./draft"
-import { createFeedbackComponent, FEEDBACK_PREPARE_RPC_METHOD, FEEDBACK_SUBMIT_RPC_METHOD } from "./index"
+import { createFeedbackComponent, FEEDBACK_PREPARE_RPC_METHOD, FEEDBACK_SUBMIT_RPC_METHOD, type FeedbackComponentOptions } from "./index"
 import { noticeFor } from "./runtime"
 import { expectUserOnly } from "./report-file.test-support"
 
@@ -18,7 +18,13 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-function host(options: { withRedactor: boolean; extraEnv?: Record<string, string>; noStateDir?: boolean }) {
+function host(options: {
+  withRedactor: boolean
+  extraEnv?: Record<string, string>
+  noStateDir?: boolean
+  stateDir?: string
+  component?: Partial<FeedbackComponentOptions>
+}) {
   const pi = new FakeExtensionAPI()
   const handlers = new Map<string, Handler>()
   const api = pi as unknown as SenpiExtensionAPI
@@ -37,8 +43,8 @@ function host(options: { withRedactor: boolean; extraEnv?: Record<string, string
         }
       : {}),
   })
-  const stateDir = mkdtempSync(join(tmpdir(), "omo-feedback-component-"))
-  dirs.push(stateDir)
+  const stateDir = options.stateDir ?? mkdtempSync(join(tmpdir(), "omo-feedback-component-"))
+  if (options.stateDir === undefined) dirs.push(stateDir)
   const homeDir = mkdtempSync(join(tmpdir(), "omo-feedback-home-"))
   dirs.push(homeDir)
   const sent: string[] = []
@@ -54,6 +60,7 @@ function host(options: { withRedactor: boolean; extraEnv?: Record<string, string
       requests.push(init)
       return new Response(JSON.stringify({ id: "rpt_9" }), { status: 201 })
     },
+    ...options.component,
   })
   return { pi, api, handlers, component, sent, requests, stateDir, homeDir }
 }
@@ -388,3 +395,131 @@ describe("feedback component", () => {
   })
 })
 
+describe("report prompt after OmO stopped unexpectedly", () => {
+  const leaveMarker = (stateDir: string, pid: number, startedAt = "2026-10-20T01:00:00.000Z") => {
+    mkdirSync(join(stateDir, "feedback", "running"), { recursive: true })
+    writeFileSync(join(stateDir, "feedback", "running", `${pid}.json`), JSON.stringify({ pid, startedAt }))
+  }
+  const markers = (stateDir: string) => {
+    try {
+      return readdirSync(join(stateDir, "feedback", "running")).sort()
+    } catch {
+      return []
+    }
+  }
+  const launch = async (options: { stateDir?: string; pid: number; alive?: (pid: number) => boolean; choices?: string[]; hasUI?: boolean; extraEnv?: Record<string, string> }) => {
+    const stops: (() => void)[] = []
+    const made = host({
+      withRedactor: true,
+      ...(options.stateDir === undefined ? {} : { stateDir: options.stateDir }),
+      ...(options.extraEnv === undefined ? {} : { extraEnv: options.extraEnv }),
+      component: {
+        crashMarker: { pid: options.pid, isAlive: options.alive ?? (() => false) },
+        watchStopSignals: (stop) => stops.push(stop),
+      },
+    })
+    const deferred: (() => void | Promise<void>)[] = []
+    await made.component.register(made.api, {
+      logger: console,
+      config: { getFlag: () => undefined },
+      deferStartupWork: (_label, work) => deferred.push(work),
+    })
+    const selects: string[] = []
+    const notices: string[] = []
+    const choices = [...(options.choices ?? [])]
+    const ctx = {
+      ...sessionCtx,
+      hasUI: options.hasUI ?? true,
+      ui: {
+        input: async () => "it stopped while answering",
+        select: async (title: string) => {
+          selects.push(title)
+          return choices.shift()
+        },
+        notify: (message: string) => notices.push(message),
+      },
+    }
+    await made.pi.dispatch("session_start", {}, ctx)
+    return { ...made, ctx, deferred, selects, notices, stops }
+  }
+
+  test("#given an earlier OmO process left its marker #when the next interactive session starts and the user sends the report #then it carries the crash section and goes through the usual preview", async () => {
+    const first = await launch({ pid: 1000, choices: [] })
+    leaveMarker(first.stateDir, 4242, "2026-10-20T01:00:00.000Z")
+    const next = await launch({ stateDir: first.stateDir, pid: 1001, alive: (pid) => pid === 1000, choices: ["Send a report", "Send report"] })
+
+    expect(next.deferred).toHaveLength(1)
+    await next.deferred[0]?.()
+
+    expect(next.selects[0]).toContain("OmO stopped unexpectedly")
+    expect(next.selects[1]).toStartWith("Sending also includes")
+    expect(next.sent).toHaveLength(1)
+    const crash = JSON.parse(next.sent[0] ?? "{}").sections.find((section: { id: string }) => section.id === "crash")
+    expect(crash.text).toContain("2026-10-20T01:00:00.000Z")
+    expect(markers(next.stateDir)).toEqual(["1000.json", "1001.json"])
+  })
+
+  test("#given the user answered once #when OmO launches again #then the same stopped run is never asked about twice", async () => {
+    const seeded = await launch({ pid: 2000 })
+    leaveMarker(seeded.stateDir, 4343)
+    const asked = await launch({ stateDir: seeded.stateDir, pid: 2001, alive: (pid) => pid === 2000, choices: ["Not now"] })
+    expect(asked.deferred).toHaveLength(1)
+    await asked.deferred[0]?.()
+    expect(asked.selects).toHaveLength(1)
+    expect(asked.sent).toHaveLength(0)
+
+    const again = await launch({ stateDir: seeded.stateDir, pid: 2002, alive: (pid) => pid === 2000 || pid === 2001 })
+    expect(again.deferred).toHaveLength(0)
+  })
+
+  test("#given the user chose Don't ask again #when a later run also stops unexpectedly #then OmO does not ask", async () => {
+    const seeded = await launch({ pid: 3000 })
+    leaveMarker(seeded.stateDir, 4444)
+    const asked = await launch({ stateDir: seeded.stateDir, pid: 3001, alive: (pid) => pid === 3000, choices: ["Don't ask again"] })
+    await asked.deferred[0]?.()
+    expect(asked.sent).toHaveLength(0)
+    expect(asked.notices.at(-1)).toContain("/bug")
+
+    leaveMarker(seeded.stateDir, 4545)
+    const later = await launch({ stateDir: seeded.stateDir, pid: 3002, alive: (pid) => pid === 3000 || pid === 3001 })
+    expect(later.deferred).toHaveLength(0)
+  })
+
+  test("#given a session that quits cleanly or is stopped by a signal #when it ends #then it leaves no marker, while a reload keeps it", async () => {
+    const quitting = await launch({ pid: 5000 })
+    expect(markers(quitting.stateDir)).toEqual(["5000.json"])
+    await quitting.pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" }, quitting.ctx)
+    expect(markers(quitting.stateDir)).toEqual(["5000.json"])
+    await quitting.pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, quitting.ctx)
+    expect(markers(quitting.stateDir)).toEqual([])
+
+    const signalled = await launch({ pid: 6000 })
+    expect(signalled.stops).toHaveLength(1)
+    signalled.stops[0]?.()
+    expect(markers(signalled.stateDir)).toEqual([])
+  })
+
+  test("#given another OmO is still running #when a session starts #then its marker is neither reported nor removed", async () => {
+    const seeded = await launch({ pid: 7000 })
+    leaveMarker(seeded.stateDir, 7777)
+    const next = await launch({ stateDir: seeded.stateDir, pid: 7001, alive: (pid) => pid === 7000 || pid === 7777 })
+    expect(next.deferred).toHaveLength(0)
+    expect(markers(seeded.stateDir)).toEqual(["7000.json", "7001.json", "7777.json"])
+  })
+
+  test("#given a session without an interactive UI or inside the desktop app #when it starts #then it neither records a marker nor asks", async () => {
+    const seeded = await launch({ pid: 8000, hasUI: false })
+    expect(markers(seeded.stateDir)).toEqual([])
+    leaveMarker(seeded.stateDir, 8888)
+
+    const headless = await launch({ stateDir: seeded.stateDir, pid: 8001, hasUI: false })
+    const desktop = await launch({ stateDir: seeded.stateDir, pid: 8002, extraEnv: { OMO_NATIVE_SURFACE: "desktop" } })
+    expect(headless.deferred).toHaveLength(0)
+    expect(desktop.deferred).toHaveLength(0)
+    expect(markers(seeded.stateDir)).toEqual(["8888.json"])
+
+    const interactive = await launch({ stateDir: seeded.stateDir, pid: 8003 })
+    expect(interactive.deferred).toHaveLength(1)
+    expect(markers(seeded.stateDir)).toEqual(["8003.json"])
+  })
+})
