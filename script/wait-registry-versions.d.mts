@@ -12,3 +12,4 @@ export declare function waitForRegistryVersions(options: {
   readonly sleep?: (ms: number) => Promise<void>
   readonly log?: (line: string) => void
 }): Promise<{ ok: boolean; pending: PendingSpec[] }>
+export declare function platformPackageNames(rootManifest: { optionalDependencies?: Record<string, string> }): string[]

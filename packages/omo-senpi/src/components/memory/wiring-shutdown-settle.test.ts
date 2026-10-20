@@ -4,7 +4,7 @@ import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, RecallCorpusCache } from "@oh-my-opencode/memory-core"
 import { createMemoryIdentityContext } from "./context"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import type { MemoryMaintenance } from "./memory-maintenance"
@@ -23,7 +23,7 @@ type Warning = { readonly message: string; readonly data?: Record<string, unknow
 // Work that never settles: the only way shutdown can account for it is to race it against the drain budget.
 const never = (): Promise<never> => new Promise<never>(() => {})
 
-async function bindAndShutDown(overrides: { maintenance?: MemoryMaintenance; runtime?: MemoryIdentityRuntime; budgetMs?: number; whileShuttingDown?: (shutdown: { readonly returned: () => boolean }) => Promise<void> }) {
+async function bindAndShutDown(overrides: { maintenance?: MemoryMaintenance; runtime?: MemoryIdentityRuntime; corpusCache?: RecallCorpusCache; budgetMs?: number; whileShuttingDown?: (shutdown: { readonly returned: () => boolean }) => Promise<void> }) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-settle-")))
   roots.push(root)
   const identityName = "shutdown-settle-agent"
@@ -48,6 +48,7 @@ async function bindAndShutDown(overrides: { maintenance?: MemoryMaintenance; run
     logger,
     ...(overrides.maintenance === undefined ? {} : { createMaintenance: () => overrides.maintenance! }),
     ...(overrides.runtime === undefined ? {} : { createRuntime: () => overrides.runtime! }),
+    ...(overrides.corpusCache === undefined ? {} : { createCorpusCache: () => overrides.corpusCache! }),
   })
   const pi = new MemoryFakeExtensionAPI()
   wiring.registerStatic(pi, componentContext())
@@ -81,6 +82,21 @@ describe("memory wiring shutdown settles maintenance running in the identity dir
 
     // then
     expect(overBudget).toContain("maintenance-settle")
+  })
+
+  test("#given a recall term-store save is still writing into .git #when the session shuts down #then shutdown races it against the drain budget", async () => {
+    // given
+    class SavingCorpusCache extends RecallCorpusCache {
+      override settled(): Promise<void> {
+        return never()
+      }
+    }
+
+    // when
+    const overBudget = await bindAndShutDown({ corpusCache: new SavingCorpusCache({ shared: true }) })
+
+    // then
+    expect(overBudget).toContain("recall-store-settle")
   })
 
   test("#given a reflection launch is still in flight #when the session shuts down #then shutdown races it after the drain", async () => {
