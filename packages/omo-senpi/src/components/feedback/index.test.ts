@@ -300,6 +300,40 @@ describe("feedback component", () => {
     expect(sent.map((body) => JSON.parse(body).kind)).toEqual(["bug", "feedback"])
   })
 
+  test("#given the TUI #when the user runs /report and looks at what is sent before choosing Send #then the preview comes first and one bug report follows", async () => {
+    const { pi, api, component, sent } = host({ withRedactor: true })
+    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+    const steps: string[] = []
+    const choices = ["See exactly what is sent", "Send report"]
+    const ctx = {
+      ...sessionCtx,
+      ui: {
+        input: async () => undefined,
+        select: async (title: string) => {
+          steps.push(`select:${title.startsWith("Sending also includes") ? "notice" : title}`)
+          return choices.shift()
+        },
+        notify: (message: string) => steps.push(`notify:sent=${sent.length}:${message.split("\n")[0]}`),
+      },
+    }
+
+    await (pi.commands.find((entry) => entry.name === "report")?.options.handler as (args: string, ctx: unknown) => Promise<void>)("the answer stopped", ctx)
+
+    expect(steps.slice(0, 3)).toEqual(["select:notice", expect.stringMatching(/^notify:sent=0:## /), "select:notice"])
+    expect(sent).toHaveLength(1)
+    expect(JSON.parse(sent[0] ?? "{}").kind).toBe("bug")
+  })
+
+  test("#given the TUI #when the user runs /report and chooses Cancel #then nothing is sent", async () => {
+    const { pi, api, component, sent } = host({ withRedactor: true })
+    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Cancel", notify: () => undefined } }
+
+    await (pi.commands.find((entry) => entry.name === "report")?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+
+    expect(sent).toHaveLength(0)
+  })
+
   test("#given the desktop reports from a thread that is not an OmO session #when it asks for no session #then no conversation is attached even though a session is live", async () => {
     const { pi, api, handlers, component } = host({ withRedactor: true })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })

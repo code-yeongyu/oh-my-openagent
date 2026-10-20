@@ -1,3 +1,7 @@
+## 2026-10-20 - `/report` is a second name for `/bug` (#10718)
+
+`/report` is registered on the same `runCommand("bug", ...)` handler as `/bug`, so there is still one report path. Tests pin that it reaches the preview step first and that Cancel uploads nothing. Do not give `/report` its own flow.
+
 ## 2026-10-19 - The feedback core is a lazy sidecar, so omo.js stays inside its byte budget (#10546)
 
 `/feedback`, `/bug` and the `omo.feedback.prepare` / `omo.feedback.submit` RPCs run only when someone sends a report, so their core (host collection, draft building, the draft store and the upload) now ships as `extensions/omo-feedback.js` behind `#omo-feedback-runtime`, imported on the first report. The entry bundle keeps the component registration, the session tracking, the two command and two RPC shells and the redactor check; the TUI flow behind `/feedback` and `/bug` (the description prompt, the notice, "See exactly what is sent" and the result message) runs from the sidecar too; a host without `pi.redactForUpload` still answers `unavailable` without loading anything. Results, errors, idempotency keys and `OMO_DISABLE_FEEDBACK` behave as before. If the sidecar cannot load, the RPC rejects and the command shows an error naming the missing artifact; a failed import is not cached, so the next report retries. This replaces a byte-budget raise: the feature had added ~14.5 KB to omo.js, and the budget is raised only for code that runs on every turn.

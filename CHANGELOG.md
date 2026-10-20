@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**`/report` opens the same report flow as `/bug` ([#10718](https://github.com/code-yeongyu/oh-my-openagent/issues/10718), [#10721](https://github.com/code-yeongyu/oh-my-openagent/pull/10721)).** In the TUI, `/report [what went wrong]` now runs the existing problem report: you always see what will be sent first, and Cancel sends nothing. The desktop composer offers the same command.
+
 **Report a problem from inside OmO ([#10546](https://github.com/code-yeongyu/oh-my-openagent/pull/10546)).** `/feedback` (or `/bug`) sends a bug report or an idea to the OmO team in one step: your description plus your account, this device, versions, this conversation's recent messages, recent logs and your settings. Passwords, keys and tokens are removed first with the same redactor `/share` uses, your memory is never sent, and `OMO_DISABLE_FEEDBACK=1` saves the report as a local file instead of uploading it. The desktop app's Report a problem dialog uses the same report.
 
 **A DAG node whose child dies on infrastructure is retried instead of taking its whole branch down.** When a mass-ulw node's child stops answering its heartbeats or loses its host session, the node is now retried automatically, at most twice, with a backoff. Its dependents are skipped only if the retries fail too. Before, one starved wave failed and every later node was skipped (an overloaded machine skipped 54 of 61 nodes). Task failures and cancelled nodes behave as before, and the TUI and the desktop app share this behaviour ([#10605](https://github.com/code-yeongyu/oh-my-openagent/issues/10605), [#10616](https://github.com/code-yeongyu/oh-my-openagent/pull/10616)).

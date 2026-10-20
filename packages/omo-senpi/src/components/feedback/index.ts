@@ -151,6 +151,11 @@ export function createFeedbackComponent(options: FeedbackComponentOptions = {}):
         argumentHint: "[what went wrong]",
         handler: (args: string, ctx: unknown) => runCommand("bug", args, ctx),
       })
+      pi.registerCommand("report", {
+        description: "Report a problem to the OmO team",
+        argumentHint: "[what went wrong]",
+        handler: (args: string, ctx: unknown) => runCommand("bug", args, ctx),
+      })
     },
   }
 }
