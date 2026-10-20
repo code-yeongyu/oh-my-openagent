@@ -194,7 +194,7 @@ describe("telemetry consent gate routes", () => {
   test("#given the unregistered legacy component becomes registered #when routes are checked #then its ungated send fails", () => {
     const registered = [...packageSources(), { name: "extension/component-list.ts", source: "createSenpiTelemetryComponent()\n" }]
     expect(findGateBypasses(realSources(), REVIEWED_WRITERS, registered)).toEqual([
-      "bypass index.ts: recordSenpiDailyActive |  | recordDailyActive(options.transportFactory === undefined ? input : { ...input,) (its caller index.ts: createSenpiTelemetryComponent>register>on(=>) |  | recordSenpiDailyActive(options) bypasses the consent gate)",
+      "bypass index.ts: recordSenpiDailyActive |  | recordDailyActive(input) (its caller index.ts: createSenpiTelemetryComponent>register>on(=>) |  | recordSenpiDailyActive(options) bypasses the consent gate)",
       "bypass index.ts: createSenpiTelemetryComponent>register>on(=>) |  | recordSenpiDailyActive(options) (extension/component-list.ts registers it)",
     ])
   })
