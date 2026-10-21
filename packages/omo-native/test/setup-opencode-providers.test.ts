@@ -507,6 +507,51 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
   })
 })
 
+describe("omo setup auth.json at-rest passphrase mode (PR-E)", () => {
+  describe("#given the same custom-provider key scenario under passphrase mode", () => {
+    describe("#when writeAuthStore / readAuthStore are called with a passphrase", () => {
+      test("#then the engine still resolves the same key, the on-disk file is encrypted, and a wrong passphrase fails closed", async () => {
+        const item = fixture()
+        const path = join(item.agentDir, "auth.json")
+        opencode(item, {
+          provider: {
+            dgx: {
+              npm: "@ai-sdk/openai-compatible",
+              options: { baseURL: "https://dgx.example/v1", apiKey: "dgx-inline" },
+              models: { m: {} },
+            },
+          },
+        })
+
+        const result = run(item, ["setup", "--yes"])
+        expect(result.status).toBe(0)
+
+        // Simulate the first run writing the store plaintext (the launcher under PR-E writes
+        // it the same way it always did - the migration to encrypted mode happens the next time).
+        const current = readAuthStore(path)
+        expect(current.entries.dgx).toMatchObject({ type: "api_key", key: "dgx-inline" })
+
+        writeAuthStore(path, current, [], {
+          mode: "passphrase",
+          passphrase: "roundtrip-key",
+        })
+
+        const text = readFileSync(path, "utf8")
+        expect(text).not.toContain("dgx-inline")
+        expect(text).not.toContain("dgx")
+
+        const good = readAuthStore(path, { mode: "passphrase", passphrase: "roundtrip-key" })
+        const engine = { DGX_API_KEY: "wrong" }
+        expect(await resolveConfigValue(good.entries.dgx.key, engine)).toBe("dgx-inline")
+
+        const bad = readAuthStore(path, { mode: "passphrase", passphrase: "totally-wrong" })
+        expect(bad.entries).toBeUndefined()
+        expect(bad.error).toMatch(/decryption|auth-at-rest/)
+      })
+    })
+  })
+})
+
 describe("omo setup e2e temp isolation (#9766)", () => {
   test("#given a setup run #when the child process asks for its temp dir #then it is inside the fixture root that teardown removes", () => {
     const item = fixture()
