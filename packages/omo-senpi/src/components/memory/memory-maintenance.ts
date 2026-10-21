@@ -1,12 +1,17 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 
 import {
+  FactsQueue,
   GitMemoryRepo,
   LockContentionError,
   createLockRecord,
+  enforceTranscriptBudget,
+  formatMemoryFootprint,
+  measureMemoryFootprint,
   memoryMaintenanceLockPath,
   sweepEmptyTranscriptJournals,
   withLock,
+  type TranscriptBudgetResult,
 } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
@@ -28,6 +33,10 @@ export interface MemoryMaintenanceOptions {
   readonly timeoutMs?: number
   readonly now?: () => number
   readonly isLiveSession?: (sessionId: string) => boolean
+  /** Transcript budget per identity; memory-core's default (32 MiB) when omitted. */
+  readonly transcriptBudgetBytes?: number
+  /** Replaces the transcript budget pass, so a test can observe or fail it. */
+  readonly enforceBudget?: typeof enforceTranscriptBudget
 }
 
 export interface MemoryMaintenance {
@@ -65,6 +74,10 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   exit) cancels it and stops a running git, and every failure is logged, never raised.
  * - Empty transcript journals left by older builds (#9737) are swept once per identity per process, at
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
+ * - The same pass keeps the transcript store inside its budget (memory-core `enforceTranscriptBudget`):
+ *   consumed idle journals are retired, and the oldest idle ones are evicted while the store is over
+ *   budget. On an existing oversized store this is the one-time compaction; afterwards it is a directory
+ *   walk plus small state reads every interval. Nothing runs on a host without a binding session.
  */
 export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}): MemoryMaintenance {
   const createRepo = options.createRepo
@@ -74,6 +87,7 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
   const minLooseObjects = options.minLooseObjects ?? DEFAULT_MIN_LOOSE_OBJECTS
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const now = options.now ?? Date.now
+  const enforceBudget = options.enforceBudget ?? enforceTranscriptBudget
   let abort = new AbortController()
   const scheduled = new Set<string>()
   const swept = new Set<string>()
@@ -96,6 +110,41 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     }
   }
 
+  async function compactTranscripts(context: MemoryIdentityContext, signal: AbortSignal): Promise<void> {
+    const facts = new FactsQueue({ identityPaths: context.identityPaths })
+    let result: TranscriptBudgetResult
+    try {
+      result = await enforceBudget({
+        transcriptsDir: context.identityPaths.transcripts,
+        now,
+        signal,
+        releaseConversation: (conversationId) => facts.resetConversation(conversationId),
+        ...(options.isLiveSession === undefined ? {} : { isLive: options.isLiveSession }),
+        ...(options.transcriptBudgetBytes === undefined ? {} : { budgetBytes: options.transcriptBudgetBytes }),
+      })
+    } catch (error) {
+      if (signal.aborted) throw error
+      // The repo pack below is independent of the transcript store: log and keep going.
+      options.logger?.warn("omo-senpi memory transcript budget failed", {
+        identity: context.identity,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      return
+    }
+    if (result.retired.length + result.evicted.length + result.expired.length === 0) return
+    options.logger?.info("omo-senpi memory transcripts compacted", {
+      identity: context.identity,
+      bytesBefore: result.bytesBefore,
+      bytesAfter: result.bytesAfter,
+      budgetBytes: result.budgetBytes,
+      retired: result.retired.length,
+      evicted: result.evicted.length,
+      expired: result.expired.length,
+      kept: result.kept,
+      footprint: formatMemoryFootprint(await measureMemoryFootprint(context.identityPaths)),
+    })
+  }
+
   async function run(context: MemoryIdentityContext, signal: AbortSignal): Promise<void> {
     // A transient identity has no repo until it is promoted.
     if (!existsSync(context.identityPaths.repo)) return
@@ -107,6 +156,8 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
         const last = Number(await repo.configGet(STAMP_KEY) ?? Number.NaN)
         if (Number.isFinite(last) && now() - last < intervalMs) return
         await repo.configSet(STAMP_KEY, String(now()))
+        await compactTranscripts(context, signal)
+        signal.throwIfAborted()
         const result = await repo.maintain({ minLooseObjects, timeoutMs, signal })
         if (result.status === "packed") {
           options.logger?.info("omo-senpi memory repo packed", {

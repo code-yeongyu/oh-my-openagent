@@ -38,7 +38,9 @@ import { readRunJson } from "./worker/run-artifacts"
 import type { FactsRunLedger } from "./facts-runner-types"
 
 export const FACTS_RUN_KEEP_LAST = 20
-export const FACTS_RUN_MAX_TOTAL_BYTES = 128 * 1024 * 1024
+// Terminal runs are diagnostics, never injected: keep them inside the small-store budget
+// (docs/reference/memory-storage-budget.md). The newest run always survives the cap.
+export const FACTS_RUN_MAX_TOTAL_BYTES = 16 * 1024 * 1024
 const RUNS_LOCK_WAIT_MS = 2_000
 
 interface TerminalRun {

@@ -7,7 +7,20 @@ import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { V1_PERSONA_SEED_SHA256, auditMemoryRepo, isMemoryContentPath, parseLockRecord, readReflectionParkFile, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
+import {
+  MEMORY_FOOTPRINT_WARN_BYTES,
+  TRANSCRIPT_BUDGET_BYTES,
+  V1_PERSONA_SEED_SHA256,
+  auditMemoryRepo,
+  formatBytes,
+  formatMemoryFootprint,
+  isMemoryContentPath,
+  measureMemoryFootprint,
+  parseLockRecord,
+  readReflectionParkFile,
+  type MemoryAuditReport,
+  type MemoryIdentityPaths,
+} from "@oh-my-opencode/memory-core"
 
 import {
   locateReflectionChildLog,
@@ -47,6 +60,22 @@ async function listMarkdown(root: string, prefix: string): Promise<string[]> {
     }
   }
   return files
+}
+
+/**
+ * On-disk size of the identity, per area. Warns above the store target or when transcripts exceed
+ * their budget; the remedy is automatic (the next maintenance pass compacts), so the line says so.
+ */
+export async function checkStorage(paths: MemoryIdentityPaths): Promise<DoctorCheck> {
+  const footprint = await measureMemoryFootprint(paths)
+  const over = footprint.totalBytes > MEMORY_FOOTPRINT_WARN_BYTES || footprint.areas.transcripts > TRANSCRIPT_BUDGET_BYTES
+  const detail = formatMemoryFootprint(footprint)
+  if (!over) return { name: "storage", level: "ok", detail }
+  return {
+    name: "storage",
+    level: "warn",
+    detail: `${detail}; target ${formatBytes(MEMORY_FOOTPRINT_WARN_BYTES)} total, ${formatBytes(TRANSCRIPT_BUDGET_BYTES)} transcripts; the next maintenance pass retires idle transcripts`,
+  }
 }
 
 export function checkRepository(identity: MemoryCommandIdentity): DoctorCheck {
