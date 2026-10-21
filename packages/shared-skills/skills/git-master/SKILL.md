@@ -20,43 +20,74 @@ Do not commit, rebase, push, force-push, reset, stash-pop, or delete anything un
 
 ## Ground Truth
 
-Gather independent facts in parallel when the tools allow it:
+Gather independent facts in parallel when the tools allow it. Scope the set to the mode. Do not run the full set for a read-only question.
+
+Every mode:
 
 ```bash
 git status --short
+git branch --show-current
+```
+
+`COMMIT` adds:
+
+```bash
 git diff --stat
 git diff --staged --stat
-git branch --show-current
 git log -30 --oneline
-git log -30 --pretty=format:%s
 git rev-parse --abbrev-ref @{upstream}
+```
+
+Once status shows the touched paths, also run `git log -10 --oneline -- <touched paths>`. It depends on status, so it cannot run in the parallel batch.
+
+`REBASE` adds, on top of the `COMMIT` set:
+
+```bash
 git merge-base HEAD origin/main
 git merge-base HEAD origin/master
+git log --oneline @{upstream}..HEAD
 ```
+
+The last command lists commits not yet on the upstream. Any commit in the rewrite range missing from that list is already pushed. The result is only as fresh as the last fetch and covers only the upstream branch; with no upstream, pushed status is unknown.
+
+`HISTORY` and `STATUS` need nothing beyond the shared pair plus the specific query that answers the question.
 
 Missing upstream or missing `main`/`master` is normal. Fall back to the best available branch or report the missing fact. Never treat a failed lookup as proof.
 
 ## PR Body Evidence Attachments
 
-When a PR body needs screenshots or terminal PNGs, use the repo reference at `docs/reference/github-attachment-upload.md`. The allowed hosting path is GitHub user attachments from the authenticated web attachment flow; never commit temporary images, never use GitHub Releases for PR evidence, and never use external image hosts. Do not log browser cookies, CSRF tokens, S3 form fields, or upload headers.
+When a PR body needs screenshots or terminal PNGs, use the repo reference at `docs/reference/github-attachment-upload.md`. If that reference does not exist in the current repo, say so and ask before uploading anything; do not improvise a hosting path. The allowed hosting path is GitHub user attachments from the authenticated web attachment flow; never commit temporary images, never use GitHub Releases for PR evidence, and never use external image hosts. Do not log browser cookies, CSRF tokens, S3 form fields, or upload headers.
 
 ## Commit Mode
 
 Commit only the user's requested changes. Preserve unrelated dirty work.
 
-1. Detect message style from recent history. Use the dominant local pattern, language, and casing. Do not default to Conventional Commits unless the repo uses them.
+1. Resolve the message convention before writing anything. A declared convention wins over an observed one: check `git config commit.template`, `.gitmessage`, `commitlint.config.*`, `.commitlintrc*`, the `commitlint` key in `package.json`, `.czrc`, commit-msg hooks (`.husky/commit-msg`, `lefthook.yml`), and the commit section of `CONTRIBUTING.md`. Only when none is declared, infer from recent history and use the dominant local pattern, language, and casing. Do not default to Conventional Commits unless the repo declares or uses them.
 2. Inspect the full diff, not only filenames. Separate unrelated user edits from the requested commit.
 3. Build atomic groups by behavior, module, and revertability. Keep implementation and its direct tests together.
 4. Prefer multiple commits for unrelated concerns. A single commit is acceptable only when the changed files form one indivisible behavior or the user explicitly asks for one commit.
 5. Stage by path or hunk so each commit contains only its atomic group.
 6. Before each commit, verify `git diff --staged --stat` and enough staged diff to prove the group is right.
-7. Commit with the detected style. After each commit, verify `git log -1 --oneline`.
+7. Write each message to carry both the change and the reason for it: what changed, and the problem, defect, or intent it serves. Reference the issue, ticket, or PR identifier when one is identifiable from the branch name or the user's request, unless the resolved convention excludes such references. Do not take an identifier from the diff; code and comments often mention unrelated issues. When the reason is known, a message that only restates the diff in prose is not sufficient, however well it matches the style of previous messages. State a reason only when the request, branch, diff, or issue supports it; never invent one. If the reason is unknown, describe the change alone and say so in the final report.
+8. Commit with the resolved convention. After each commit, verify the stored message in full rather than its subject alone: `git log -1 --format='%h%n%B'`. Confirm that the body, the blank line before any trailers, and the trailers themselves survived shell quoting.
 
 Grouping rules:
 
 - Split different features, modules, generated artifacts, config, docs, and test-only changes unless they are inseparable.
 - Keep generated files with the source change that produced them when omitting them would leave the repo inconsistent.
 - Never hide failing or unrelated changes inside a broad commit.
+
+Per-commit validity: when a request yields more than one commit, each commit should leave the tree in a working state. A split whose intermediate commits do not build silently destroys `git bisect` and `git revert`, which are the properties the split exists to provide. When the user asked for atomic, clean, or bisectable history, run the project's cheapest build or test at each commit and report the result per commit. Otherwise state explicitly that per-commit validity was not verified.
+
+Do not run that check in the main worktree: it still holds the edits of later commits, so a pass there proves nothing about an earlier commit. Check each commit in isolation:
+
+```bash
+git worktree add --detach <tmp-dir> <hash>
+# run the check inside <tmp-dir>
+git worktree remove --force <tmp-dir>
+```
+
+`--force` is needed because builds can leave untracked files, and the temporary worktree holds nothing worth keeping. If the check needs dependencies the temporary worktree lacks, install them there only when that is cheap; otherwise report that commit as unverified.
 
 Final report: list commit hashes, messages, and any remaining uncommitted files.
 
@@ -65,7 +96,7 @@ Final report: list commit hashes, messages, and any remaining uncommitted files.
 History rewriting is a shared-impact operation.
 
 - Never rebase or rewrite `main`, `master`, `dev`, release branches, or a protected branch unless the user explicitly named that exact operation.
-- If commits may already be pushed, ask before force-pushing. Use `--force-with-lease`, never plain `--force`.
+- If any commit in the rewrite range is already pushed, or pushed status is unknown, ask before force-pushing. Use `--force-with-lease`, never plain `--force`.
 - If the worktree is dirty, preserve it intentionally before rebasing. Do not stash-pop over conflicts without checking what changed.
 - For fixups, prefer `git commit --fixup=<hash>` followed by `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <base>`.
 - For conflicts, read the conflicting files and resolve by intent. Do not choose ours/theirs blindly.
@@ -85,7 +116,7 @@ Choose the Git tool by the question:
 - `git bisect`: find the first bad commit when there is a deterministic pass/fail command and known good/bad bounds.
 - `git reflog`: recover or explain recent local history movement.
 
-Always cite the exact command evidence in the answer: commit hash, subject, file path, and line or diff context when relevant. If the evidence is ambiguous, say what remains unproven.
+Always cite the exact command evidence in the answer: the command you ran, commit hash, subject, file path, and line or diff context when relevant. Name the tool you chose and why it fits the question, because a plausible-looking hash produced by the wrong search is not evidence. If the evidence is ambiguous, say what remains unproven.
 
 ## Safety Checks
 
@@ -100,5 +131,6 @@ Before any write to Git history:
 Before finishing:
 
 - Run the most relevant verification available for the changed behavior or history operation.
-- Report commands that passed and any command you could not run.
+- Report each verification as the command plus its exit status or output. Your own assertion that a step succeeded is not a verification; with no command output, the step is unverified and must be reported as unverified.
+- Report any command you could not run, and why.
 - Leave the worktree state explicit.
