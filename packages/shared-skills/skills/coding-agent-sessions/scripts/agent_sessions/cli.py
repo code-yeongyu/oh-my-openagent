@@ -4,6 +4,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from .body_search import body_snippet, fold, snippet
 from .jsonio import as_map, dumps, iter_jsonl
 from .scanners import DEFAULT_PLATFORMS, scan
 from .timeparse import date_bound, parse_stamp
@@ -221,16 +222,21 @@ def _prompt_edges(item: Session, events: list[Json]) -> tuple[str, str]:
 
 
 def _match_reasons(item: Session, query: str) -> list[JsonMap]:
-    needle = query.lower()
+    needle = fold(query)
     reasons: list[JsonMap] = []
     for field, value in _search_fields(item):
-        if needle in value.lower():
-            reasons.append({"query": query, "platform": item.platform, "field": field, "snippet": _snippet(value, needle)})
+        if needle in fold(value):
+            reasons.append({"query": query, "platform": item.platform, "field": field, "snippet": snippet(value, needle)})
     if not reasons:
-        prompt = next((message for message in item.user_messages or () if needle in message.lower()), "")
+        prompt = next((message for message in item.user_messages or () if needle in fold(message)), "")
         if prompt:
-            reasons.append({"query": query, "platform": item.platform, "field": "user_message", "snippet": _snippet(prompt, needle)})
+            reasons.append({"query": query, "platform": item.platform, "field": "user_message", "snippet": snippet(prompt, needle)})
     return reasons
+
+
+def _body_reasons(item: Session, query: str) -> list[JsonMap]:
+    found = body_snippet(Path(item.path), fold(query))
+    return [] if found is None else [{"query": query, "platform": item.platform, "field": "body", "snippet": found}]
 
 
 def _search_fields(item: Session) -> tuple[tuple[str, str], ...]:
@@ -247,12 +253,6 @@ def _search_fields(item: Session) -> tuple[tuple[str, str], ...]:
     )
 
 
-def _snippet(value: str, needle: str) -> str:
-    start = max(value.lower().find(needle) - 60, 0)
-    end = min(start + 160, len(value))
-    return value[start:end]
-
-
 def _queries(opts: Options, rest: list[str]) -> tuple[str, ...]:
     if opts.queries:
         return opts.queries
@@ -262,8 +262,18 @@ def _queries(opts: Options, rest: list[str]) -> tuple[str, ...]:
 
 def _search_one(sessions: list[Session], query: str, limit: int) -> tuple[str, list[tuple[Session, list[JsonMap]]]]:
     matches: list[tuple[Session, list[JsonMap]]] = []
+    unmatched: list[Session] = []
     for item in sessions:
         reasons = _match_reasons(item, query)
+        if reasons:
+            matches.append((item, reasons))
+        else:
+            unmatched.append(item)
+    # Transcript bodies are re-read only for sessions the cheap fields missed, newest first, until the limit is met.
+    for item in unmatched:
+        if len(matches) >= limit:
+            break
+        reasons = _body_reasons(item, query)
         if reasons:
             matches.append((item, reasons))
     return query, matches[:limit]
