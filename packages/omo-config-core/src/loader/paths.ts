@@ -1,4 +1,4 @@
-import { homedir } from "node:os"
+import { userInfo } from "node:os"
 import { dirname, join, posix, resolve } from "node:path"
 import { toPosixPath } from "../internal/posix-path"
 import { DEFAULT_READ_FILE_SYSTEM, type OmoConfigEnv, type OmoConfigReadFileSystem } from "./types"
@@ -17,7 +17,54 @@ export type ResolveOmoConfigPathsOptions = {
 
 export const MAX_PROJECT_CONFIG_DIRECTORY_DEPTH = 256
 
-const ACCOUNT_HOME_DIR = homedir()
+export class AccountHomeResolutionError extends Error {
+  override readonly name = "AccountHomeResolutionError"
+
+  constructor(
+    readonly configuredHomeDir: string,
+    readonly cause: unknown,
+  ) {
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    super(
+      `Cannot resolve the account home directory: os.userInfo() failed (${detail}) and HOME ${configuredHomeDir} is not an owned real directory.`,
+      { cause },
+    )
+  }
+}
+
+function resolveAccountHomeDir(
+  env: OmoConfigEnv,
+  fileSystem: OmoConfigReadFileSystem,
+): string {
+  try {
+    return userInfo().homedir
+  } catch (error) {
+    const configuredHomeDir = resolveHomeDir(env)
+    if (!isMissingPasswdRecord(error) || !isRealDirectory(configuredHomeDir, fileSystem)) {
+      throw new AccountHomeResolutionError(configuredHomeDir, error)
+    }
+    return configuredHomeDir
+  }
+}
+
+function isMissingPasswdRecord(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const code = Reflect.get(error, "code")
+  const syscall = Reflect.get(error, "syscall")
+  return code === "ERR_SYSTEM_ERROR" && syscall === "uv_os_get_passwd"
+}
+
+function isRealDirectory(path: string, fileSystem: OmoConfigReadFileSystem): boolean {
+  if (fileSystem.realpathSync === undefined || fileSystem.lstatSync === undefined) return false
+  if (!fileSystem.existsSync(path)) return false
+  try {
+    if (fileSystem.lstatSync(path).isSymbolicLink()) return false
+    const realPath = fileSystem.realpathSync(path)
+    return realPath === path || fileSystem.realpathSync(realPath) === realPath
+  } catch {
+    return false
+  }
+}
 
 export function resolveHomeDir(env: OmoConfigEnv = process.env): string {
   const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd()
@@ -105,7 +152,12 @@ export function resolveOmoConfigPaths(options: ResolveOmoConfigPathsOptions): re
   const fileSystem = options.fileSystem ?? DEFAULT_READ_FILE_SYSTEM
   const env = options.env ?? process.env
   const userPath = detectUserOmoJsonPath(env, fileSystem)
-  const projectPaths = findProjectConfigPathsFarthestFirst(options.cwd, resolveHomeDir(env), fileSystem, ACCOUNT_HOME_DIR)
+  const projectPaths = findProjectConfigPathsFarthestFirst(
+    options.cwd,
+    resolveHomeDir(env),
+    fileSystem,
+    resolveAccountHomeDir(env, fileSystem),
+  )
   return [
     { path: userPath, scope: "user" },
     ...projectPaths.map((path): OmoConfigPathCandidate => ({ path, scope: "project" })),
