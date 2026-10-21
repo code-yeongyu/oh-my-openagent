@@ -40,7 +40,7 @@ git rev-parse --abbrev-ref @{upstream}
 
 Once status shows the touched paths, also run `git log -10 --oneline -- <touched paths>`. It depends on status, so it cannot run in the parallel batch.
 
-`REBASE` adds, on top of the `COMMIT` set:
+`REBASE` adds, on top of the `COMMIT` set and its touched-path log:
 
 ```bash
 git merge-base HEAD origin/main
@@ -68,7 +68,7 @@ Commit only the user's requested changes. Preserve unrelated dirty work.
 4. Prefer multiple commits for unrelated concerns. A single commit is acceptable only when the changed files form one indivisible behavior or the user explicitly asks for one commit.
 5. Stage by path or hunk so each commit contains only its atomic group.
 6. Before each commit, verify `git diff --staged --stat` and enough staged diff to prove the group is right.
-7. Write each message to carry both the change and the reason for it: what changed, and the problem, defect, or intent it serves. Reference the issue, ticket, or PR identifier when one is identifiable from the branch name or the user's request, unless the resolved convention excludes such references. Do not take an identifier from the diff; code and comments often mention unrelated issues. When the reason is known, a message that only restates the diff in prose is not sufficient, however well it matches the style of previous messages. State a reason only when the request, branch, diff, or issue supports it; never invent one. If the reason is unknown, describe the change alone and say so in the final report.
+7. Write each message to state what changed and why: the problem or intent it serves. Take a reason only from the request, branch, diff, or issue; never invent one. If none is known, describe the change alone and say so in the final report. Reference an issue or ticket only when the branch name or the request names it, never from the diff, unless the resolved convention excludes references.
 8. Commit with the resolved convention. After each commit, verify the stored message in full rather than its subject alone: `git log -1 --format='%h%n%B'`. Confirm that the body, the blank line before any trailers, and the trailers themselves survived shell quoting.
 
 Grouping rules:
@@ -77,7 +77,7 @@ Grouping rules:
 - Keep generated files with the source change that produced them when omitting them would leave the repo inconsistent.
 - Never hide failing or unrelated changes inside a broad commit.
 
-Per-commit validity: when a request yields more than one commit, each commit should leave the tree in a working state. A split whose intermediate commits do not build silently destroys `git bisect` and `git revert`, which are the properties the split exists to provide. When the user asked for atomic, clean, or bisectable history, run the project's cheapest build or test at each commit and report the result per commit. Otherwise state explicitly that per-commit validity was not verified.
+Per-commit validity: when a request yields more than one commit, each commit should leave the tree in a working state. A split whose intermediate commits do not build silently destroys `git bisect` and `git revert`, which are the properties the split exists to provide. When the user asked for bisectable history or for each commit to build, run the project's cheapest build or test at each commit and report the result per commit. Otherwise state explicitly that per-commit validity was not verified.
 
 Do not run that check in the main worktree: it still holds the edits of later commits, so a pass there proves nothing about an earlier commit. Check each commit in isolation:
 
