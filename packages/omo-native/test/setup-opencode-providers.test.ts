@@ -74,8 +74,8 @@ function childEnv(item: Fixture): NodeJS.ProcessEnv {
   return env
 }
 
-function run(item: Fixture, args: string[]) {
-  const result = spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env: childEnv(item) })
+function run(item: Fixture, args: string[], envOverrides: Record<string, string> = {}) {
+  const result = spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env: { ...childEnv(item), ...envOverrides } })
   if (result.error) throw result.error
   return result
 }
@@ -127,6 +127,60 @@ describe("omo setup opencode custom provider import", () => {
           ["claude-relay", "anthropic-messages", "https://relay.example/anthropic", true, ["text", "image"]],
         ])
         expect(result.stdout).toContain("providers-imported: acme, relay")
+      })
+    })
+  })
+
+  describe("#given a custom provider whose apiKey references a path via {file:...}", () => {
+    describe("#when the engine supports reference objects", () => {
+      test("#then the apiKey lands in auth.json as a $file reference object, not the file's bytes", () => {
+        const item = fixture()
+        const secretPath = join(item.tmp, "api-key")
+
+        opencode(item, {
+          provider: {
+            acme: {
+              npm: "@ai-sdk/openai-compatible",
+              options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
+              models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
+            },
+          },
+        })
+
+        const result = run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "1" })
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect(auth.malformed).toBeUndefined()
+        // The reference ships as an object; the engine resolves it at load time.
+        expect((auth.entries as Record<string, { type: string, key: unknown }>).acme).toEqual({
+          type: "api_key",
+          key: { $file: secretPath },
+        })
+      })
+    })
+
+    describe("#when the engine does not support reference objects", () => {
+      test("#then the provider is not imported, because a {file:...} has no plain-string spelling", () => {
+        const item = fixture()
+        const secretPath = join(item.tmp, "api-key")
+
+        opencode(item, {
+          provider: {
+            acme: {
+              npm: "@ai-sdk/openai-compatible",
+              options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
+              models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
+            },
+          },
+        })
+
+        const result = run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "0" })
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect((auth.entries as Record<string, unknown>).acme).toBeUndefined()
+        expect(result.stdout).toContain("acme")
       })
     })
   })

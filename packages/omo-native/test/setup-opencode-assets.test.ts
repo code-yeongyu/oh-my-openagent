@@ -15,7 +15,7 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-function fixture(config: unknown, options: { jsonc?: string, skills?: string[] } = {}) {
+function fixture(config: unknown, options: { jsonc?: string, skills?: string[], referenceObjects?: boolean } = {}) {
   const root = mkdtempSync(join(tmpdir(), "omo-assets-"))
   roots.push(root)
   const home = join(root, "home")
@@ -26,7 +26,11 @@ function fixture(config: unknown, options: { jsonc?: string, skills?: string[] }
   for (const name of options.skills ?? []) {
     write(join(configDir, "skills", name, "SKILL.md"), `---\nname: ${name}\ndescription: test\n---\n\nbody\n`)
   }
-  return planOpencodeAssets({ home, env: { XDG_CONFIG_HOME: join(root, "config") } })
+  return planOpencodeAssets({
+    home,
+    env: { XDG_CONFIG_HOME: join(root, "config") },
+    ...(options.referenceObjects === undefined ? {} : { referenceObjects: options.referenceObjects }),
+  })
 }
 
 describe("opencode asset plan", () => {
@@ -121,21 +125,194 @@ describe("opencode asset plan", () => {
     })
   })
 
-  describe("#given placeholders the engine has no spelling for", () => {
-    describe("#when they are planned", () => {
-      test("#then those servers are refused with a notice instead of carrying literal placeholder text", () => {
+  describe("#given placeholders in an mcp server", () => {
+    describe("#when the engine supports reference objects", () => {
+      test("#then a {file:...} header becomes a $concat object with the path intact", () => {
         const plan = fixture({
           mcp: {
-            "file-header": { type: "remote", url: "https://f.test/mcp", headers: { Authorization: "Bearer {file:~/.secrets/token}" } },
+            "header-from-file": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "Bearer {file:~/.creds/dgx/litellm-key}" },
+            },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([{
+          name: "header-from-file",
+          config: {
+            type: "http",
+            url: "https://f.test/mcp",
+            headers: { Authorization: { $concat: ["Bearer ", { $file: "~/.creds/dgx/litellm-key" }] } },
+          },
+        }])
+        expect(plan.refusedServers).toEqual([])
+      })
+
+      test("#then a bare {file:...} header becomes the reference object itself, not a one-element concat", () => {
+        const plan = fixture({
+          mcp: {
+            "bare-file": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "{file:/abs/path/to/secret}" },
+            },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([{
+          name: "bare-file",
+          config: {
+            type: "http",
+            url: "https://f.test/mcp",
+            headers: { Authorization: { $file: "/abs/path/to/secret" } },
+          },
+        }])
+      })
+
+      test("#then a {env:NAME} environment value becomes a $env object", () => {
+        const plan = fixture({
+          mcp: {
+            "env-value": { type: "local", command: ["tool"], environment: { TOKEN: "{env:MY_TOKEN}" } },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([{
+          name: "env-value",
+          config: { type: "stdio", command: "tool", env: { TOKEN: { $env: "MY_TOKEN" } } },
+        }])
+      })
+
+      test("#then a relative {file:...} path is made absolute against the opencode config directory", () => {
+        const plan = fixture({
+          mcp: {
+            "relative-file": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "{file:./local-secret.txt}" },
+            },
+          },
+        }, { referenceObjects: true })
+
+        const authorization = (plan.mcpServers[0].config as any).headers.Authorization
+        expect(authorization.$file).toBeTypeOf("string")
+        expect(authorization.$file.startsWith("/")).toBe(true)
+        expect(authorization.$file.endsWith("/local-secret.txt")).toBe(true)
+      })
+
+      test("#then a {env:MY-TOKEN} placeholder is refused with a named message", () => {
+        const plan = fixture({
+          mcp: {
             "dashed-env": { type: "local", command: ["tool"], environment: { TOKEN: "{env:MY-TOKEN}" } },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.notices.join("\n")).toContain("MY-TOKEN")
+        expect(plan.notices.join("\n")).toContain("not a valid environment variable name")
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["dashed-env"])
+      })
+
+      test("#then a placeholder in a url is refused", () => {
+        const plan = fixture({
+          mcp: {
+            "url-placeholder": { type: "remote", url: "https://{env:HOST}/mcp" },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["url-placeholder"])
+        expect(plan.refusedServers[0].reason).toContain("url")
+      })
+
+      test("#then a {file:...} in the command is reported, not written", () => {
+        const plan = fixture({
+          mcp: {
+            "command-file": { type: "local", command: ["tool", "{file:/abs/path}"] },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["command-file"])
+        expect(plan.refusedServers[0].reason).toContain("command")
+      })
+
+      test("#then a complete mcp document with a reference in every field still produces a valid config", () => {
+        const plan = fixture({
+          mcp: {
+            complete: {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "Bearer {file:/abs/key}" },
+              oauth: { clientId: "cid", callbackPort: 19876, scope: "repo" },
+            },
+            local: {
+              type: "local",
+              command: ["tool", "--flag", "a", "b"],
+              cwd: "/srv/work",
+              environment: { TOKEN: "{env:MY_TOKEN}" },
+            },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([
+          {
+            name: "complete",
+            config: {
+              type: "http",
+              url: "https://f.test/mcp",
+              headers: { Authorization: { $concat: ["Bearer ", { $file: "/abs/key" }] } },
+              oauth: { clientId: "cid", callbackPort: 19876, scopes: ["repo"] },
+            },
+          },
+          {
+            name: "local",
+            config: {
+              type: "stdio",
+              command: "tool",
+              args: ["--flag", "a", "b"],
+              env: { TOKEN: { $env: "MY_TOKEN" } },
+              cwd: "/srv/work",
+            },
+          },
+        ])
+        expect(plan.refusedServers).toEqual([])
+      })
+    })
+
+    describe("#when the engine does not support reference objects", () => {
+      test("#then a {file:...} reference is refused and the server is not imported", () => {
+        const plan = fixture({
+          mcp: {
+            "file-header": { type: "remote", url: "https://f.test/mcp", headers: { Authorization: "{file:/abs/key}" } },
             plain: { type: "local", command: ["tool"], environment: { TOKEN: "{env:MY_TOKEN}" } },
           },
-        })
+        }, { referenceObjects: false })
 
-        expect(plan.mcpServers).toEqual([{ name: "plain", config: { type: "stdio", command: "tool", env: { TOKEN: "${MY_TOKEN}" } } }])
+        expect(plan.mcpServers).toEqual([
+          { name: "plain", config: { type: "stdio", command: "tool", env: { TOKEN: "${MY_TOKEN}" } } },
+        ])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["file-header"])
         expect(plan.notices.join("\n")).toContain("file-header")
-        expect(plan.notices.join("\n")).toContain("dashed-env")
-        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["file-header", "dashed-env"])
+      })
+
+      test("#then a {env:MY-TOKEN} placeholder is refused with a named message", () => {
+        const plan = fixture({
+          mcp: {
+            "dashed-env": { type: "local", command: ["tool"], environment: { TOKEN: "{env:MY-TOKEN}" } },
+          },
+        }, { referenceObjects: false })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["dashed-env"])
+      })
+
+      test("#then a config with no placeholder in it gets no engine-version notice", () => {
+        const plan = fixture({
+          mcp: { plain: { type: "remote", url: "https://f.test/mcp", headers: { A: "b" } } },
+        }, { referenceObjects: false })
+
+        expect(plan.notices).toEqual([])
       })
     })
   })
