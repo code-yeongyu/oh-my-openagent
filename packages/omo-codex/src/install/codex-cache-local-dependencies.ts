@@ -15,7 +15,7 @@ export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: stri
     if (!isPlainRecord(parsed)) continue
     const packageDir = dirname(packageJsonPath)
     const sourcePackageDir = join(sourceRoot, relative(pluginRoot, packageDir))
-    let changed = false
+    let changed = removeExternalDevelopmentFileDependencies(parsed, packageDir, pluginRoot, packageLock)
     for (const field of ["dependencies", "optionalDependencies", "peerDependencies"] as const) {
       const dependencies = parsed[field]
       if (!isPlainRecord(dependencies)) continue
@@ -52,6 +52,43 @@ type PackageLockState = {
   readonly path: string
   readonly value: Record<string, unknown> | null
   changed: boolean
+}
+
+// npm resolves file: development packages even with --omit=dev. Cached runtimes use the
+// bundled output; keep monorepo-only build dependencies in the source package instead.
+function removeExternalDevelopmentFileDependencies(
+  manifest: Record<string, unknown>,
+  packageDir: string,
+  pluginRoot: string,
+  packageLock: PackageLockState,
+): boolean {
+  const dependencies = manifest.devDependencies
+  if (!isPlainRecord(dependencies)) return false
+  let changed = false
+  const packages = getPackageLockPackages(packageLock.value)
+  const packageKey = toPackageLockPath(relative(pluginRoot, packageDir))
+  for (const [name, specifier] of Object.entries(dependencies)) {
+    if (typeof specifier !== "string" || !specifier.startsWith("file:")) continue
+    const targetPath = resolve(packageDir, specifier.slice("file:".length))
+    if (isPathInside(targetPath, pluginRoot)) continue
+    delete dependencies[name]
+    changed = true
+    if (!packages) continue
+    const packageEntry = packages[packageKey]
+    if (isPlainRecord(packageEntry) && isPlainRecord(packageEntry.devDependencies)) {
+      delete packageEntry.devDependencies[name]
+    }
+    const targetKey = toPackageLockPath(relative(pluginRoot, targetPath))
+    const targetEntry = packages[targetKey]
+    if (isPlainRecord(targetEntry) && targetEntry.dev === true) {
+      delete packages[targetKey]
+      for (const [key, entry] of Object.entries(packages)) {
+        if (isPlainRecord(entry) && entry.link === true && entry.resolved === targetKey) delete packages[key]
+      }
+    }
+    packageLock.changed = true
+  }
+  return changed
 }
 
 async function readPackageLock(pluginRoot: string): Promise<PackageLockState> {

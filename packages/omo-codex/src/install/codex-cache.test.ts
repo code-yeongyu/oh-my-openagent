@@ -5,10 +5,11 @@
 
 import { describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, readlink, rename, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { basename, dirname, join, relative, sep } from "node:path"
 import { installCachedPlugin, linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
+import { defaultRunCommand } from "./codex-process"
 
 describe("codex-cache", () => {
   test("rewrites cached mcp manifest relative args and cwd", async () => {
@@ -125,6 +126,68 @@ describe("codex-cache", () => {
     expect(cachedPackageLock.packages[packageLockDependencyPath]).toEqual({ name: "@scope/lsp-tools", version: "0.1.0" })
     expect(cachedPackageLock.packages["node_modules/@scope/lsp-tools"]?.resolved).toBe(packageLockDependencyPath)
   })
+
+  test("installs prebuilt workspaces with omitted external development packages using real npm", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-production-"))
+    try {
+      const sourceRoot = join(root, "packages", "omo-codex", "plugin")
+      const componentRoot = join(sourceRoot, "components", "comment-checker")
+      const runtimeRoot = join(root, "packages", "runtime")
+      await mkdir(componentRoot, { recursive: true })
+      await mkdir(runtimeRoot, { recursive: true })
+      const manifest = {
+        name: "@scope/omo", version: "0.1.0", private: true,
+        workspaces: ["components/comment-checker"],
+        dependencies: { "@scope/runtime": "file:../../runtime" },
+        devDependencies: { "@scope/omitted-root": "file:../../omitted-root" },
+      }
+      const component = {
+        name: "@scope/comment-checker", version: "0.1.0",
+        devDependencies: { "@scope/omitted-core": "file:../../../../omitted-core" },
+      }
+      await writeFile(join(sourceRoot, "package.json"), JSON.stringify(manifest))
+      await writeFile(join(componentRoot, "package.json"), JSON.stringify(component))
+      const runtime = {
+        name: "@scope/runtime", version: "0.1.0",
+        devDependencies: { "@scope/runtime-build-core": "file:../runtime-build-core" },
+      }
+      await writeFile(join(runtimeRoot, "package.json"), JSON.stringify(runtime))
+      await writeFile(join(runtimeRoot, "index.js"), "module.exports = 42\n")
+      await writeFile(join(sourceRoot, "package-lock.json"), JSON.stringify({
+        name: manifest.name, version: manifest.version, lockfileVersion: 3,
+        packages: {
+          "": manifest,
+          "components/comment-checker": component,
+          "../../runtime": runtime,
+          "../../omitted-root": { name: "@scope/omitted-root", version: "0.1.0", dev: true },
+          "../../omitted-core": { name: "@scope/omitted-core", version: "0.1.0", dev: true },
+          "node_modules/@scope/runtime": { resolved: "../../runtime", link: true },
+          "node_modules/@scope/comment-checker": { resolved: "components/comment-checker", link: true },
+          "node_modules/@scope/omitted-root": { resolved: "../../omitted-root", link: true },
+          "node_modules/@scope/omitted-core": { resolved: "../../omitted-core", link: true },
+        },
+      }))
+
+      // when
+      const installed = await installCachedPlugin({
+        buildSource: false, codexHome: join(root, "codex-home"), marketplaceName: "debug", name: "omo",
+        sourcePath: sourceRoot, version: "0.1.0", runCommand: defaultRunCommand,
+        env: { ...process.env, NPM_CONFIG_OFFLINE: "true", NPM_CONFIG_CACHE: join(root, "npm-cache") },
+      })
+
+      // then
+      expect(await readFile(join(installed.path, "node_modules", "@scope", "runtime", "index.js"), "utf8")).toBe("module.exports = 42\n")
+      expect(JSON.parse(await readFile(join(sourceRoot, "package.json"), "utf8"))).toEqual(manifest)
+      expect(JSON.parse(await readFile(join(componentRoot, "package.json"), "utf8"))).toEqual(component)
+      const cachedRoot = JSON.parse(await readFile(join(installed.path, "package.json"), "utf8"))
+      const cachedComponent = JSON.parse(await readFile(join(installed.path, "components", "comment-checker", "package.json"), "utf8"))
+      expect(cachedRoot.devDependencies["@scope/omitted-root"]).toBeUndefined()
+      expect(cachedComponent.devDependencies["@scope/omitted-core"]).toBeUndefined()
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, { timeout: 30_000 })
 
   test("#given source plugin has an npm lockfile #when caching plugin #then lockfile is preserved for deterministic install", async () => {
     // given
