@@ -354,13 +354,18 @@ describe("omo setup credential inheritance", () => {
     expect(`${result.stdout}${result.stderr}`).toContain("DRY RUN")
   })
 
-  test.skipIf(process.platform === "win32")("#given declined consent #when setup runs #then auth remains absent", () => {
+  test.skipIf(process.platform === "win32")("#given credentials only #when setup runs non-interactively #then auth lands with no per-server prompt", () => {
+    // PR-D split the legacy one-batch prompt into per-server prompts for MCP servers and custom
+    // providers. Credentials are NOT servers and never got a per-server prompt; the credential
+    // stage runs regardless of the per-server interactive flow, so a user whose setup finds
+    // only credentials imports them without any prompt.
     const item = fixture()
     write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({ openai: { type: "api", key: secrets[0] } }))
-    const result = run(item, ["setup"], "n\n")
+    const result = run(item, ["setup"])
     expect(result.status).toBe(0)
-    expect(existsSync(join(item.agentDir, "auth.json"))).toBe(false)
-    expect(`${result.stdout}${result.stderr}`).toContain("Import cancelled")
+    expect(existsSync(join(item.agentDir, "auth.json"))).toBe(true)
+    expect(existsSync(join(item.agentDir, "mcp.json"))).toBe(false)
+    expect(existsSync(join(item.agentDir, "models.json"))).toBe(false)
   })
 
   test("#given malformed senpi auth #when accepted #then it warns and skips all writes", () => {

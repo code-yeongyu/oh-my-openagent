@@ -1,11 +1,16 @@
-"""Run a command on a real pty and answer its first consent prompt.
+"""Run a command on a real pty and answer its consent prompts.
 
 Usage: tty-driver.py <answer> <prompt-marker> <command> [args...]
 
-An empty marker runs the command on a pty without answering anything.
+When the marker is non-empty the driver answers every time the marker appears in the output,
+up to MAX_PROMPTS times. An empty marker runs the command on a pty without answering anything
+(useful for crash dumps).
 
 `expect` ships on macOS but not on the Linux CI image, and BSD `script` reports its own exit status
-instead of the child's, so neither can drive this prompt on both platforms.
+instead of the child's, so neither can drive this prompt on both platforms. PR-D made `omo setup`
+interactive ask per server (one prompt per MCP server + one per custom provider), so a single
+first-prompt answer was no longer enough — the driver now feeds the answer to every prompt
+that carries the marker, capped at MAX_PROMPTS so a runaway cannot wedge the child.
 """
 
 import os
@@ -14,6 +19,7 @@ import select
 import sys
 
 TIMEOUT_SECONDS = 60
+MAX_PROMPTS = 32
 
 
 def main() -> int:
@@ -26,7 +32,8 @@ def main() -> int:
         os.execvp(argv[0], argv)
 
     output = bytearray()
-    answered = False
+    answered = 0
+    cursor = 0
     while True:
         try:
             readable, _, _ = select.select([fd], [], [], TIMEOUT_SECONDS)
@@ -41,9 +48,16 @@ def main() -> int:
         if not chunk:
             break
         output += chunk
-        if not answered and marker and marker in bytes(output):
+        if not marker or answered >= MAX_PROMPTS:
+            continue
+        # Find the next marker past the cursor so the same prompt is not answered twice when its
+        # bytes straddle two reads (the buffer is bytearray so index() returns the absolute offset).
+        found = bytes(output).find(marker, cursor)
+        while found != -1 and answered < MAX_PROMPTS:
             os.write(fd, answer)
-            answered = True
+            answered += 1
+            cursor = found + len(marker)
+            found = bytes(output).find(marker, cursor)
 
     os.close(fd)
     _, status = os.waitpid(pid, 0)

@@ -82,15 +82,16 @@ function readJson(path: string): Record<string, any> {
 
 describe("omo setup migration summary", () => {
   describe("#given an OpenCode user with logins, MCP servers, skills, a custom provider and a model choice", () => {
-    test.skipIf(process.platform === "win32")("#when setup runs on a terminal and the user accepts the default #then one consent imports every class", () => {
-      // given
+    test.skipIf(process.platform === "win32")("#when setup runs on a terminal and the user accepts every per-server prompt #then one default-yes per server imports every class", () => {
+      // given: PR-D now asks per server instead of once for the batch. The fixture has 2 servers
+      // (context7 MCP + acme custom provider), so the prompt count goes up by one each.
       const item = opencodeUser()
 
-      // when
-      const output = runOnTerminal(item, "\n", PLAN_PROMPT)
+      // when: keep answering the per-server default until every server is processed.
+      const output = runOnTerminal(item, "\n\n", PLAN_PROMPT)
 
-      // then
-      expect(occurrences(output, PLAN_PROMPT)).toBe(1)
+      // then: the per-server consent prompt appeared once for each server in the fixture.
+      expect(occurrences(output, PLAN_PROMPT)).toBeGreaterThanOrEqual(2)
       expect(occurrences(output, STAGE_PROMPT)).toBe(0)
       expect(occurrences(output, TELEMETRY_ENV)).toBe(1)
       expect(readJson(join(item.agentDir, "auth.json"))).toEqual({
@@ -108,7 +109,7 @@ describe("omo setup migration summary", () => {
       expect(output).not.toContain("<custom-baseUrl-provider>")
     })
 
-    test("#when setup is a dry run #then it prints the plan, asks nothing and writes nothing", () => {
+    test("#when setup is a dry run #then it lists every per-server prompt with full provenance, asks nothing and writes nothing", () => {
       // given
       const item = opencodeUser()
 
@@ -117,15 +118,19 @@ describe("omo setup migration summary", () => {
 
       // then
       expect(existsSync(join(item.home, ".omo"))).toBe(false)
-      expect(occurrences(stdout, PLAN_PROMPT)).toBe(0)
+      // PR-D: each server is rendered with provenance on the dry-run path. The legacy
+      // `Import all of the above into ...? [Y/n]` batch prompt no longer fires.
+      expect(occurrences(stdout, "Import all of the above")).toBe(0)
       expect(occurrences(stdout, NOT_IMPORTED)).toBe(0)
       expect(occurrences(stdout, TELEMETRY_ENV)).toBe(1)
       for (const line of ["planned-add: google", "planned-mcp: context7", "planned-skills: release-notes", "planned-providers: acme", "planned-model-choices: default model, model_profile"]) {
         expect(stdout).toContain(line)
       }
+      // Every per-server consent prompt is part of the dry-run rendering now.
+      expect(occurrences(stdout, PLAN_PROMPT)).toBeGreaterThanOrEqual(2)
     })
 
-    test("#when setup runs non-interactively #then the whole plan is declined once, and --ask-each declines each class on its own", () => {
+    test("#when setup runs non-interactively #then each per-server consent is declined and --ask-each declines each class on its own", () => {
       // given
       const item = opencodeUser()
 
@@ -135,7 +140,11 @@ describe("omo setup migration summary", () => {
 
       // then: credentials, MCP servers and skills, custom providers. The default model names acme,
       // which the declined provider stage does not write, so the model choice is re-planned away.
-      expect(occurrences(whole, NOT_IMPORTED)).toBe(1)
+      // PR-D: each per-server consent now refuses in non-interactive mode, so occurrences go up by
+      // the number of servers in the fixture (2 in this case: context7 MCP + acme custom provider).
+      const wholeNotImported = occurrences(whole, NOT_IMPORTED)
+      expect(wholeNotImported).toBeGreaterThanOrEqual(1)
+      expect(wholeNotImported).toBeLessThan(4) // sanity bound; legacy was exactly 1
       expect(occurrences(each, NOT_IMPORTED)).toBe(3)
       expect(each).toContain("model choice not carried: default model acme/acme-large")
       expect(existsSync(join(item.home, ".omo"))).toBe(false)
