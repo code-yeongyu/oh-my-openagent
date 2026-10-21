@@ -20,6 +20,7 @@ export function isOpenAiOnlyAvailability(availability: ProviderAvailability): bo
     !availability.opencodeZen &&
     !availability.copilot &&
     !availability.zai &&
+    !availability.zhipuaiCodingPlan &&
     !availability.kimiForCoding &&
     !availability.bailianCodingPlan &&
     !availability.minimaxCnCodingPlan &&

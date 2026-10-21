@@ -85,7 +85,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
       ],
       "unspecified-high": [
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "medium" },
-        { providers: ["zai", "zai-coding-cn", "opencode-go"], model: "glm-5.3", variant: "max" },
+        { providers: ["zai", "zai-coding-cn", "zhipuai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }
       ],
       writing: [

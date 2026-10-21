@@ -190,7 +190,7 @@ describe("category routing policy", () => {
         variant: "medium",
       },
       {
-        providers: ["zai-coding-plan", "opencode-go"],
+        providers: ["zai-coding-plan", "zhipuai-coding-plan", "opencode-go"],
         model: "glm-5.3",
         variant: "max",
       },

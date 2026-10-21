@@ -11,6 +11,7 @@ export interface InstallArgs {
   copilot?: BooleanArg
   opencodeZen?: BooleanArg
   zaiCodingPlan?: BooleanArg
+  zhipuaiCodingPlan?: BooleanArg
   kimiForCoding?: BooleanArg
   opencodeGo?: BooleanArg
   bailianCodingPlan?: BooleanArg
@@ -34,6 +35,7 @@ export interface InstallConfig {
   hasNativeDev: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
+  hasZhipuaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasBailianCodingPlan: boolean
@@ -60,6 +62,7 @@ export interface DetectedConfig {
   hasCodex: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
+  hasZhipuaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasBailianCodingPlan: boolean
