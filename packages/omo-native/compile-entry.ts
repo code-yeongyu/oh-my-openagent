@@ -36,7 +36,8 @@ import { runLoroSmoke } from "./loro-smoke"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
 import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
-import { ExtraCaCertificatesError, installEngineCaTrust } from "./compiled-ca-trust"
+import { answeredFromLocalData } from "./compile-entry-fast-path"
+import { engineCaTrustReady, ExtraCaCertificatesError, installEngineCaTrust, selfSpawnTrustEnv } from "./compiled-ca-trust"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -100,7 +101,7 @@ export function answerCompiledFastPath(
   args: string[],
   manifest: Pick<EmbeddedManifest, "omoAiVersion" | "enginePin" | "buildInfo" | "engineBuild">,
 ): boolean {
-  if ((args[0] === "--version" || args[0] === "-v") && args.length === 1) {
+  if (answeredFromLocalData(args)) {
     console.log(versionLine({
       version: manifest.omoAiVersion,
       omoBuild: manifest.buildInfo,
@@ -155,7 +156,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   // node path here would re-enter omo itself and leave a phantom session behind.
   const engine = {
     run(engineArgs: string[], options: { env: Record<string, string | undefined> }) {
-      const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env: options.env, windowsHide: true })
+      const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env: selfSpawnTrustEnv(options.env), windowsHide: true })
       return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
     },
   }
@@ -231,7 +232,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     })
     return true
   }
-  if ((command === "--version" || command === "-v") && args.length === 1) { console.log(versionLine(packageJson, enginePin ?? "unknown")); return true }
+  if (answeredFromLocalData(args)) { console.log(versionLine(packageJson, enginePin ?? "unknown")); return true }
   if (isSelfUpdate(args)) { answerUpdateHint(args, packageJson.omoBuild); return true }
   return false
 }
@@ -272,7 +273,16 @@ async function main(): Promise<void> {
   // exact argv `--version` or `--help` is answered, from static local data, before anything else runs
   // (#10236): the engine's own help loads extensions, which can install packages over the network.
   try {
-    installEngineCaTrust()
+    // `--version` / `-v` / `--help` never touch the OS store; every other start reads it off the main
+    // thread and waits for it below, once and bounded (#10760).
+    const argv = process.argv.slice(2)
+    const skipSystem = answeredFromLocalData(argv)
+    installEngineCaTrust(process.env, undefined, { skipSystem, handoffDir: join(canonicalAgentDir(), "cache") })
+    // The one choke point: no engine code runs before the store answers or the bound expires, so
+    // every client that reads the runtime trust set starts with it. The wait is async (nothing is
+    // blocked); it costs the store's own read time (tens of ms), and at most the bound on a machine
+    // whose store never answers.
+    if (!skipSystem) await engineCaTrustReady()
   } catch (error) {
     if (!(error instanceof ExtraCaCertificatesError)) throw error
     if (await answerUnderRefusedTrust(process.argv.slice(2))) {
@@ -325,7 +335,7 @@ async function main(): Promise<void> {
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
   if (launch.handOff) {
-    await handOffToProvisionedRuntime(expected)
+    await handOffToProvisionedRuntime(expected, { env: selfSpawnTrustEnv(process.env) })
     return
   }
   const execDir = launch.execDir
