@@ -13,7 +13,15 @@ bunx oh-my-opencode doctor              # Full diagnostics
 bunx oh-my-opencode doctor --status     # Compact dashboard (status only)
 bunx oh-my-opencode doctor --verbose    # Deep details (model resolution traces)
 bunx oh-my-opencode doctor --json       # Machine-readable output
+bunx oh-my-opencode doctor --explain-security  # Plain prose: what the security controls enforce
 ```
+
+`--explain-security` is an OUTPUT MODE, not a check. `doctor/index.ts` intercepts it before
+`runDoctor`, prints the lines from `packages/omo-native/bin/lib/doctor-security-explain.js`
+(`runSecurityExplain({ home, env, agentDir })`, imported across the package boundary with a
+sibling `.d.ts`), runs no probe, and returns `EXIT_CODES.SUCCESS`. Each section names the
+`omo.jsonc` key or env var that carries it; a control that has not landed in this build reports
+`feature pending: see PR-<letter>`. `--json` prints the same lines as a JSON string array.
 
 ## CHECK CATEGORIES
 

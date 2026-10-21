@@ -5,6 +5,11 @@ export interface DoctorOptions {
   mode: DoctorMode
   json?: boolean
   target?: DoctorTarget
+  /**
+   * Print the effective state of every security control in plain prose and stop. This is an output
+   * mode, not a check: it runs no diagnostic and reports no pass/fail summary.
+   */
+  explainSecurity?: boolean
 }
 
 export interface DoctorIssue {

@@ -36,6 +36,8 @@ A generated JSON schema artifact ships at `assets/omo.schema.json`, produced fro
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json
 ```
 
+A complete, valid starting point ships as [`assets/omo.jsonc.example`](../../assets/omo.jsonc.example). It shows every documented default with the optional keys commented out and the reason each one is commented, so an untouched copy changes nothing about how omo behaves. Copy it to the user or project path and delete what you do not need; `tests/omo-jsonc-example.test.ts` holds it to the same schema the loader applies.
+
 ## Resolution order
 
 After the file layers merge, each harness resolves its own view out of the merged document (`packages/omo-config-core/src/loader/resolution.ts`). Later layers win:

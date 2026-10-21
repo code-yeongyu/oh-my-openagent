@@ -10,6 +10,7 @@ import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
+import { runSecurityExplain } from "./doctor-security-explain.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
@@ -175,6 +176,14 @@ export async function runLauncher(args = process.argv.slice(2)) {
     return
   }
   if (command === "doctor") {
+    // `doctor --explain-security` is a different question, not a smaller report: it answers what the
+    // security controls are enforcing on this machine and stops, so it never runs a probe, spawns
+    // the engine, or touches the plugin payload.
+    if (args.includes("--explain-security")) {
+      console.log(runSecurityExplain({ env: process.env }).join("\n"))
+      process.exitCode = 0
+      return
+    }
     // Doctor is a launch too: it reports only what the launch-time preparation could not fix.
     preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
     const [categoryCoverage, computerUse, configDiagnostics, gateway] = args[1] === "--reap"

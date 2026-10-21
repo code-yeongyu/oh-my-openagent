@@ -27,6 +27,7 @@
 | OmO Desktop updates, release notes and tracks, omo.dev/docs/desktop-updates | [docs/guide/desktop-updates.md](guide/desktop-updates.md) |
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
+| Security controls as user journeys (what you do, the command, the output) | [docs/security/usability.md](security/usability.md) |
 | Native `computer` tool contract | [docs/reference/computer.md](reference/computer.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
@@ -62,6 +63,7 @@ docs/
 ├── guide/                                    # User-facing tutorial-style guides (7 files)
 ├── reference/                                # API / config / CLI reference (18 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
+├── security/                                 # User journeys for each security control (usability.md)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
 ├── templates/
 │   └── AGENTS.md.example                     # Copyable OMO project rules template
