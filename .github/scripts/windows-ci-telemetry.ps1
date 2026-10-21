@@ -128,9 +128,31 @@ $testProcess = $null
 $testProcessRecord = $null
 $testLaunchErrorType = $null
 try {
+  # Root-shard diagnostics are opt-in (CI sets WINDOWS_SHARD_PROFILE=1 only for a dispatch with shard_profile or a
+  # PR labelled ci:windows-profile); every other run keeps its existing launch path. A collector that cannot even
+  # load is caught by the preflight, and the tests then run unprofiled: telemetry never decides the test outcome.
+  $launchArguments = $TestArguments
+  $profileReady = $false
+  if ($env:WINDOWS_SHARD_PROFILE -eq "1") {
+    try {
+      & bun .github/scripts/ci-test-telemetry.mjs --preflight
+      $profileReady = $LASTEXITCODE -eq 0
+      if (-not $profileReady) { throw [System.InvalidOperationException]::new("profile preflight exited $LASTEXITCODE") }
+    } catch {
+      Add-TelemetryError -Stage "profile preflight" -Exception $_.Exception
+    }
+  }
+  if ($profileReady) {
+    $launchArguments = @(
+      ".github/scripts/ci-test-telemetry.mjs",
+      $ArtifactDirectory,
+      $Invocation,
+      $env:WINDOWS_TEST_WORKERS
+    ) + $TestArguments
+  }
   $testProcess = Start-Process `
     -FilePath "bun" `
-    -ArgumentList $TestArguments `
+    -ArgumentList $launchArguments `
     -NoNewWindow `
     -PassThru
   try {

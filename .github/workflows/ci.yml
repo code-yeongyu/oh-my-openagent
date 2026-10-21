@@ -9,13 +9,28 @@ on:
   merge_group:
     types: [checks_requested]
   workflow_call:
+  workflow_dispatch:
+    inputs:
+      windows_workers:
+        description: "Windows file workers (compare 4 and 2 on the same SHA)"
+        type: choice
+        options: ["4", "2"]
+        default: "4"
+      comparison_sha:
+        description: "Exact diagnostic commit SHA (use the same SHA for both worker counts)"
+        type: string
+        required: true
+      shard_profile:
+        description: "Profile the Windows root-test shards (sampler, preload and per-file timings)"
+        type: boolean
+        default: false
 
 concurrency:
   # Queue refs are unique per group, so unrelated groups never cancel each other. One group per ref: a push to
   # master/dev is never cancelled, so the running dev run always finishes (the baseline PR failures are judged
   # against), and GitHub keeps only the newest pending push run, so at most two dev runs exist at a time. PR runs
   # still cancel their superseded run on the same ref.
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && format('-workers-{0}', inputs.windows_workers) || '' }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions:
@@ -31,6 +46,18 @@ jobs:
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       runtime_touching: ${{ steps.classify.outputs.runtime_touching }}
     steps:
+      # A branch name would bring back the moving ref the pinned comparison exists to avoid.
+      - name: Validate comparison SHA
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          COMPARISON_SHA: ${{ inputs.comparison_sha }}
+        run: |
+          if [[ ! "$COMPARISON_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::comparison_sha must be a full 40-character lowercase commit SHA, not a branch or short SHA."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -161,6 +188,12 @@ jobs:
 
   test:
     needs: [ci-mode]
+    env:
+      # Off by default: only a dispatch with shard_profile or a PR carrying the ci:windows-profile label profiles
+      # the Windows shards; every other run keeps the unprofiled launch path.
+      WINDOWS_SHARD_PROFILE: ${{ ((github.event_name == 'workflow_dispatch' && inputs.shard_profile) || contains(github.event.pull_request.labels.*.name, 'ci:windows-profile')) && '1' || '0' }}
+      WINDOWS_TEST_WORKERS: ${{ inputs.windows_workers || '4' }}
+      CI_TEST_SHA: ${{ inputs.comparison_sha || github.sha }}
     # Preserve required matrix check names during the Ubuntu image migration.
     runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
@@ -185,6 +218,8 @@ jobs:
             shard: "2/2"
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.comparison_sha || github.sha }}
 
       - uses: actions/setup-node@v7
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -312,13 +347,20 @@ jobs:
             -TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")
           exit $LASTEXITCODE
 
+      # Telemetry reports its own outcome here, never through the required test steps above.
+      - name: Report Windows shard profile
+        if: always() && env.WINDOWS_SHARD_PROFILE == '1' && runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        continue-on-error: true
+        shell: bash
+        run: bun .github/scripts/ci-test-telemetry-report.mjs "$RUNNER_TEMP/windows-root-test-telemetry"
+
       - name: Upload Windows post-test telemetry
         if: always() && runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
-          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}
-          path: ${{ runner.temp }}/windows-root-test-telemetry/*.json
+          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}-workers-${{ inputs.windows_workers || '4' }}
+          path: ${{ runner.temp }}/windows-root-test-telemetry/
           if-no-files-found: warn
           overwrite: false
 
