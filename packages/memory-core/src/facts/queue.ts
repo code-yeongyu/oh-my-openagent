@@ -171,6 +171,27 @@ export class FactsQueue {
     return this.locked(() => this.readCursorUnlocked(conversationId))
   }
 
+  /**
+   * Forgets a conversation's watermarks so its journal can be retired: the watermarks are snapshot
+   * LINES of the old transcript, and a retired journal restarts at line 0, where a kept watermark would
+   * reject every later batch. Refuses (returns false) while a queue file for the conversation is still
+   * pending, because that batch still has to advance them.
+   */
+  async resetConversation(conversationId: string): Promise<boolean> {
+    return this.locked(async () => {
+      const pending = await this.listPendingUnlocked()
+      if (pending.some((entry) => entry.conversationId === conversationId)) return false
+      await rm(this.layout.cursorPath(conversationId), { force: true })
+      const consumed = await this.readConsumedUnlocked()
+      if (consumed.consumed[conversationId] !== undefined) {
+        const next: Record<string, FactsConsumedRecord> = { ...consumed.consumed }
+        delete next[conversationId]
+        await this.writeConsumed({ version: FACTS_QUEUE_VERSION, consumed: next })
+      }
+      return true
+    })
+  }
+
   private async locked<T>(task: () => Promise<T>): Promise<T> {
     await mkdir(this.layout.queueDir, { recursive: true })
     await mkdir(join(this.lockPath, ".."), { recursive: true })
@@ -306,7 +327,10 @@ export class FactsQueue {
       }
     }
 
-    const payload: FactsConsumedWatermark = { version: FACTS_QUEUE_VERSION, consumed: next }
+    await this.writeConsumed({ version: FACTS_QUEUE_VERSION, consumed: next })
+  }
+
+  private async writeConsumed(payload: FactsConsumedWatermark): Promise<void> {
     const temporary = `${this.layout.consumedPath}.tmp`
     await writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
     await rename(temporary, this.layout.consumedPath)

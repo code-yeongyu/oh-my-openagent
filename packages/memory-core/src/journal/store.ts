@@ -18,6 +18,7 @@ import {
 } from "./entries"
 import { withLocalJournalLock, JournalLockTimeoutError, type JournalLock } from "./lock"
 import { syncJournalDirectory, syncJournalFile } from "./fsync"
+import { readRetiredMessageKeys, retiredMessageKey } from "./retire"
 
 export { withLocalJournalLock, JournalLockTimeoutError, type JournalLock }
 
@@ -271,10 +272,13 @@ export class TranscriptJournal {
   private async appendUnlocked(entries: readonly TranscriptEntry[]): Promise<AppendResult> {
     const existing = await this.readEntriesUnlocked()
     const sourceIds = new Set(existing.map((entry) => entry.source_line_id))
+    // A retired journal remembers only its message keys: a resumed session replaying its branch must
+    // not journal (and reflect) those messages a second time.
+    const retired = await readRetiredMessageKeys(this.options.journalDir)
     const fresh: TranscriptEntry[] = []
     let skipped = 0
     for (const entry of entries) {
-      if (sourceIds.has(entry.source_line_id)) {
+      if (sourceIds.has(entry.source_line_id) || (retired.size > 0 && retired.has(retiredMessageKey(entry.source_message_id)))) {
         skipped += 1
       } else {
         sourceIds.add(entry.source_line_id)
