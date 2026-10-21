@@ -4,6 +4,19 @@
 
 - <!-- summary item -->
 
+## AI Assistance
+
+<!-- Tick exactly one box. Pair-programming is the common case: you drove the agent, reviewed and
+     corrected what it wrote, and you own the result. "Fully AI-authored" means an agent produced
+     the change with no hand-editing. "none" means you wrote it yourself. This is a disclosure for
+     downstream audit, not a gate: leaving everything unticked records nothing and never blocks a
+     merge. See "AI-generated commits" in CONTRIBUTING.md for what is expected of an agent-assisted
+     change beyond ticking the box. -->
+
+- [ ] none
+- [ ] pair-programming
+- [ ] fully AI-authored
+
 ## Changes
 
 <!-- Group by reviewer-relevant area. Each bullet should say what changed and how to map it to the diff. -->
