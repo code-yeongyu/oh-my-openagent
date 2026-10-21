@@ -12,6 +12,7 @@ import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host
 import { runDoctor } from "./doctor.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
+import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
@@ -130,6 +131,7 @@ export function rollbackMigrateCall(request) {
 
 export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
+  removeLegacyServiceCredentials()
   reportLegacyFlatAdoption()
   const command = args[0]
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
