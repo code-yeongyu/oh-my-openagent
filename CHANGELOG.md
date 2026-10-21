@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**The launcher deletes a legacy `~/.omo/credentials.json` left by an intermediate sign-in build.** The file held the device's private keys and account refresh material in plaintext, sometimes world-readable; upgrading removes it. Only the exact legacy shape is removed. ([#10697](https://github.com/code-yeongyu/oh-my-openagent/issues/10697), [#10698](https://github.com/code-yeongyu/oh-my-openagent/pull/10698))
+
 **Cancelling a background task no longer races idle, assistant-error and session-error handling.** Cancellation intent is recorded before the session abort is awaited, concurrent duplicate cancellations are rejected, and deferred lifecycle events are replayed when an abort fails, discarded when it succeeds and cleared during shutdown. The runtime-fallback first-prompt watchdog is extended from 90 seconds to 3 minutes. ([#8167](https://github.com/code-yeongyu/oh-my-openagent/pull/8167))
 
 **Report a problem from inside OmO ([#10546](https://github.com/code-yeongyu/oh-my-openagent/pull/10546)).** `/feedback` (or `/bug`) sends a bug report or an idea to the OmO team in one step: your description plus your account, this device, versions, this conversation's recent messages, recent logs and your settings. Passwords, keys and tokens are removed first with the same redactor `/share` uses, your memory is never sent, and `OMO_DISABLE_FEEDBACK=1` saves the report as a local file instead of uploading it. The desktop app's Report a problem dialog uses the same report.
