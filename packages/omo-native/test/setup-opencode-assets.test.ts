@@ -225,16 +225,61 @@ describe("opencode asset plan", () => {
         expect(plan.refusedServers[0].reason).toContain("url")
       })
 
-      test("#then a {file:...} in the command is reported, not written", () => {
+      test("#then a {file:...} in the executable is reported, not written", () => {
         const plan = fixture({
           mcp: {
-            "command-file": { type: "local", command: ["tool", "{file:/abs/path}"] },
+            "command-file": { type: "local", command: ["{file:/abs/path}", "tool"] },
           },
         }, { referenceObjects: true })
 
         expect(plan.mcpServers).toEqual([])
         expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["command-file"])
         expect(plan.refusedServers[0].reason).toContain("command")
+        expect(plan.notices.join("\n")).toContain("not supported in this field")
+      })
+
+      test("#then a {file:...} in an argument becomes a reference object, because args[] accepts references", () => {
+        const plan = fixture({
+          mcp: {
+            "args-file": { type: "local", command: ["tool", "{file:/abs/path}"] },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([{
+          name: "args-file",
+          config: { type: "stdio", command: "tool", args: [{ $file: "/abs/path" }] },
+        }])
+        expect(plan.refusedServers).toEqual([])
+      })
+
+      test("#then a {file:...} in oauth.clientId is refused, because that field does not accept references", () => {
+        const plan = fixture({
+          mcp: {
+            "oauth-file": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              oauth: { clientId: "{file:/abs/path}", callbackPort: 19876 },
+            },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.notices.join("\n")).toContain("not supported in this field")
+      })
+
+      test("#then a malformed {env:NAME} in oauth.clientId is refused with the named message", () => {
+        const plan = fixture({
+          mcp: {
+            "oauth-env": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              oauth: { clientId: "{env:MY-TOKEN}", callbackPort: 19876 },
+            },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.notices.join("\n")).toContain("not a valid environment variable name")
       })
 
       test("#then a complete mcp document with a reference in every field still produces a valid config", () => {
