@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**The launcher deletes a legacy `~/.omo/credentials.json` left by an intermediate sign-in build.** The file held the device's private keys and account refresh material in plaintext, sometimes world-readable; upgrading removes it. Only the exact legacy shape is removed. ([#10697](https://github.com/code-yeongyu/oh-my-openagent/issues/10697), [#10698](https://github.com/code-yeongyu/oh-my-openagent/pull/10698))
+
 **Preemptive compaction no longer re-fires from a pre-compaction measurement, and an empty summary is not recorded as a success.** When a summarize outlives its budget and the prompt is replaced, the cached pre-compaction measurement is dropped, so a tool call landing before a fresh measurement can no longer justify a second compaction from a prompt that no longer exists. A summary with no text and zero output tokens is logged, warned about and left unlatched so a retry stays possible, and the summarize budget is raised from 60s to 120s, matching the degradation monitor. ([#8473](https://github.com/code-yeongyu/oh-my-openagent/pull/8473))
 
 **Report a problem from inside OmO ([#10546](https://github.com/code-yeongyu/oh-my-openagent/pull/10546)).** `/feedback` (or `/bug`) sends a bug report or an idea to the OmO team in one step: your description plus your account, this device, versions, this conversation's recent messages, recent logs and your settings. Passwords, keys and tokens are removed first with the same redactor `/share` uses, your memory is never sent, and `OMO_DISABLE_FEEDBACK=1` saves the report as a local file instead of uploading it. The desktop app's Report a problem dialog uses the same report.
