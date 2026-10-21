@@ -5,6 +5,11 @@ export const TOOL_ARGS_TRUNCATE_LIMIT = 300
  * head+tail window so both the invocation shape and the outcome survive.
  */
 export const TOOL_RESULT_TRUNCATE_LIMIT = 4096
+/**
+ * Reasoning is the second growth term: a thinking model writes several KB per step, the reflection
+ * payload only needs the gist, and nothing else reads it. Capture keeps the same head+tail window.
+ */
+export const REASONING_TRUNCATE_LIMIT = 2048
 export const REDACTED_REASONING_TEXT = "[REDACTED REASONING]"
 
 export type TextTranscriptEntry = {
@@ -108,7 +113,9 @@ export function projectTranscriptEntries(
   }
 
   for (const [index, reasoning] of (message.reasoningBlocks ?? []).entries()) {
-    const text = typeof reasoning === "string" ? reasoning : REDACTED_REASONING_TEXT
+    const text = typeof reasoning === "string"
+      ? truncateToolResult(reasoning, REASONING_TRUNCATE_LIMIT)
+      : REDACTED_REASONING_TEXT
     if (text.trim().length === 0) continue
     entries.push(
       textRow(
