@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **A DAG node whose child dies on infrastructure is retried instead of taking its whole branch down.** When a mass-ulw node's child stops answering its heartbeats or loses its host session, the node is now retried automatically, at most twice, with a backoff. Its dependents are skipped only if the retries fail too. Before, one starved wave failed and every later node was skipped (an overloaded machine skipped 54 of 61 nodes). Task failures and cancelled nodes behave as before, and the TUI and the desktop app share this behaviour ([#10605](https://github.com/code-yeongyu/oh-my-openagent/issues/10605), [#10616](https://github.com/code-yeongyu/oh-my-openagent/pull/10616)).
 
+**Stopping a language server on Windows no longer raises a stray broken-pipe error.** When an LSP server's pipe closed while OmO was shutting the server down, Windows could report the failed write after cleanup had already let go of it, and the EPIPE escaped as an unhandled error. Every pipe of a spawned language server now keeps an error handler for its whole life, so the failure is logged as ignored cleanup noise ([#9601](https://github.com/code-yeongyu/oh-my-openagent/issues/9601), [#10725](https://github.com/code-yeongyu/oh-my-openagent/pull/10725)).
+
 **Session search finds words in replies, tool output and summaries, not just your prompts.** The `coding-agent-sessions` finder falls back to the transcript body and matches Korean and other text regardless of Unicode normalization form (NFC or NFD). ([#10723](https://github.com/code-yeongyu/oh-my-openagent/pull/10723))
 
 ## [5.1.40] - 2026-10-20
