@@ -325,7 +325,37 @@ export function createMyHook(deps: { logger: Logger }) {
 3. Add the MCP name to `McpNameSchema` in `packages/omo-opencode/src/mcp/types.ts`
 4. Document in README if it requires external setup
 
-## QA Discipline
+## Identity scrub rule
+
+The repo enforces an identity-scrub rule via the test at
+`script/identity-scrub.test.ts`, which fails `bun test` if any committed
+file contains an operational-identifier pattern tied to a single
+contributor's deployment.
+
+Forbidden patterns (case-insensitive) live in
+`script/identity-scrub-patterns.json`. Each entry has a `"rationale"`
+field explaining what it covers and why. Adding or changing entries is
+a normal PR; the rationale belongs on the entry, not buried in this
+doc.
+
+The rule exists because a 2026-10 PR shipped the contributor's
+deployment URL and secret-file basename into a test fixture and PR
+body. Don't repeat that.
+
+When writing test fixtures, examples, comments, or documentation,
+use generic placeholders:
+
+- URLs: `https://example.test`, `https://api.example`, `https://gateway.example`
+- Secret paths: `~/.creds/<provider>/api-key` where `<provider>` is `acme`, `relay`, `gateway`
+- Server / provider names: `my-tool`, `header-from-file`, `relay-server`, `acme`, `relay`
+
+The literal word **CloudBSD** as the upstream project name on GitHub
+(`code-yeongyu/CloudBSD`, `code-yeongyu/oh-my-openagent`, and similar) is
+fine. The rule is about operational correlation, not about the
+project name.
+
+There is no override for this rule. Fixing it requires scrubbing the
+content, not asking for an exception.
 
 Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the `opencode-qa` skill. Any change to `packages/omo-codex` (the Codex Light side) must be QA'd with the `codex-qa` skill. Any change to `packages/omo-senpi` or `packages/senpi-task` (the Senpi side) must be QA'd with the `senpi-qa` skill. Record QA evidence under `.omo/evidence/<date>-<slug>/`; live Senpi QA records it under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by `.agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs`. Evidence stays local: `.omo/evidence/` is gitignored and `script/tracked-evidence-paths-audit.test.ts` fails when any evidence path is tracked, so summarize the captures in the PR's QA & Evidence section instead of committing them.
 

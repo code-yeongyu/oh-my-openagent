@@ -1,0 +1,27 @@
+[
+  {
+    "id": "cloudbsd-org-private-endpoint",
+    "regex": "[a-z0-9.-]*cloudbsd\\.org",
+    "rationale": "Private infrastructure endpoint under *.cloudbsd.org tied to a single contributor's deployment. Use https://example.test or https://api.example in examples instead."
+  },
+  {
+    "id": "dgx-cloudbsd-connector",
+    "regex": "dgx[_-]?cloudbsd",
+    "rationale": "String variant of the same private infrastructure identifier. Any case, dash or underscore or none."
+  },
+  {
+    "id": "dgx-mlapointe-handle",
+    "regex": "dgx[_-]?mlapointe",
+    "rationale": "A user-specific handle that has appeared in secret file paths like ~/.creds/dgx-mlapointe/litellm-key. Replace with a generic provider-name placeholder."
+  },
+  {
+    "id": "dgx-litellm-server",
+    "regex": "dgx[_-]?litellm",
+    "rationale": "A specific MCP server name from one contributor's deployment. Replace with my-tool, relay-server, or a similar generic name in examples."
+  },
+  {
+    "id": "litellm-key-basename",
+    "regex": "litellm[_-]?key",
+    "rationale": "A specific secret file basename from one contributor's layout. Replace with api-key in examples; document paths as ~/.creds/<provider>/api-key rather than the literal filename."
+  }
+]
