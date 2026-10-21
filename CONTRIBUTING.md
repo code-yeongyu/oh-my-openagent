@@ -21,6 +21,7 @@ First off, thanks for taking the time to contribute! This document provides guid
   - [Adding a New Hook](#adding-a-new-hook)
   - [Adding a New Tool](#adding-a-new-tool)
   - [Adding a New MCP Server](#adding-a-new-mcp-server)
+- [Security](#security)
 - [QA Discipline](#qa-discipline)
 - [Pull Request Process](#pull-request-process)
   - [PR Checklist](#pr-checklist)
@@ -330,6 +331,31 @@ export function createMyHook(deps: { logger: Logger }) {
 Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the `opencode-qa` skill. Any change to `packages/omo-codex` (the Codex Light side) must be QA'd with the `codex-qa` skill. Any change to `packages/omo-senpi` or `packages/senpi-task` (the Senpi side) must be QA'd with the `senpi-qa` skill. Record QA evidence under `.omo/evidence/<date>-<slug>/`; live Senpi QA records it under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by `.agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs`. Evidence stays local: `.omo/evidence/` is gitignored and `script/tracked-evidence-paths-audit.test.ts` fails when any evidence path is tracked, so summarize the captures in the PR's QA & Evidence section instead of committing them.
 
 "It typechecks" or "`bun test` is green" is not QA. You must drive the real harness and record the observed behavior.
+
+## Security
+
+The 5.x hardening roadmap ships its threat model at
+[`docs/security/threat-model.md`](docs/security/threat-model.md).
+Per-area writeups (forthcoming: `docs/security/file-references.md`
+lands with PR-A, `docs/security/permissions.md` with PR-C,
+`docs/security/auth-storage.md` with PR-E, `docs/security/filesystem.md`
+with PR-H) cite the threat-model rows they address.
+
+Before opening a PR that touches any of the surfaces in the threat
+model's **Trust boundaries** table (the `{file:...}` resolver,
+`auth-store.js`, the setup-time importer, the tool permission gate,
+the engine host, or anything under `docs/security/`), read the threat
+model rows that the change could close or weaken and call those
+answers out in the PR body under **Risks & Residuals**. The reverse
+index that ties threat-model rows to per-surface checklists is
+advisory today and will live in the forthcoming `security-review`
+skill at `.agents/skills/security-review/` once it lands. Until then,
+the per-row text in **Threats** is the checklist; coverage is a
+social norm, not a CI gate, and reviewers reserve the right to
+request changes that close a listed threat.
+
+Vulnerability disclosures follow the process in [`SECURITY.md`](SECURITY.md)
+at the repo root.
 
 ## Pull Request Process
 
