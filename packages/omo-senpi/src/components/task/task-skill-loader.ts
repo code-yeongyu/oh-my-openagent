@@ -47,7 +47,7 @@ function withGitMasterSettings(
     const resolution = loader(names, cwd)
     const resolvedSkills = resolution.skills ?? []
     if (!resolvedSkills.some((skill) => skill.name === GIT_MASTER_SKILL_NAME)) return resolution
-    const additions = resolveGitMasterSkillAdditions(loadSettings(cwd))
+    const additions = resolveGitMasterSkillAdditions(loadSettings(cwd), { cwd })
     if (additions === undefined) return resolution
     const skills = resolvedSkills.map((skill) => {
       if (skill.name !== GIT_MASTER_SKILL_NAME) return skill

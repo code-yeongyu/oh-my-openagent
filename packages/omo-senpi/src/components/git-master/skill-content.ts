@@ -1,4 +1,5 @@
 import type { OmoGitMasterSettings } from "@oh-my-opencode/omo-config-core"
+import type { GitAttributionCheckOptions } from "@oh-my-opencode/utils"
 import { injectGitMasterConfig } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/git-master-template-injection"
 
 import { buildGitMasterAttributionDirective } from "./directive"
@@ -21,9 +22,12 @@ function injectAfterFrontmatter(text: string, gitEnvPrefix: string): string {
   return frontmatter + injectGitMasterConfig(body, config, SENPI_COMMAND_SHELL)
 }
 
-export function resolveGitMasterSkillAdditions(settings: OmoGitMasterSettings): GitMasterSkillAdditions | undefined {
+export function resolveGitMasterSkillAdditions(
+  settings: OmoGitMasterSettings,
+  options: GitAttributionCheckOptions = {},
+): GitMasterSkillAdditions | undefined {
   const gitEnvPrefix = settings.git_env_prefix
-  const directive = buildGitMasterAttributionDirective(settings, gitEnvPrefix)
+  const directive = buildGitMasterAttributionDirective(settings, { ...options, gitCommandPrefix: gitEnvPrefix })
   if (gitEnvPrefix === "" && directive === undefined) return undefined
   return {
     rewriteSkillText: gitEnvPrefix === "" ? (text) => text : (text) => injectAfterFrontmatter(text, gitEnvPrefix),
