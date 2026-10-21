@@ -15,6 +15,7 @@ import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisione
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
+import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
@@ -140,6 +141,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
   migrateLegacyBunGlobalManifest(execDir)
+  removeLegacyServiceCredentials()
   adoptLegacyFlatState()
   const command = args[0]
   // The toolkit CLI is no longer shipped in the Native payload: the loop runs in-process behind the
