@@ -20,49 +20,17 @@ export const MAX_PROJECT_CONFIG_DIRECTORY_DEPTH = 256
 export class AccountHomeResolutionError extends Error {
   override readonly name = "AccountHomeResolutionError"
 
-  constructor(
-    readonly configuredHomeDir: string,
-    readonly cause: unknown,
-  ) {
+  constructor(readonly cause: unknown) {
     const detail = cause instanceof Error ? cause.message : String(cause)
-    super(
-      `Cannot resolve the account home directory: os.userInfo() failed (${detail}) and HOME ${configuredHomeDir} is not an owned real directory.`,
-      { cause },
-    )
+    super(`Cannot resolve the account home directory: os.userInfo() failed (${detail}).`, { cause })
   }
 }
 
-function resolveAccountHomeDir(
-  env: OmoConfigEnv,
-  fileSystem: OmoConfigReadFileSystem,
-): string {
+function resolveAccountHomeDir(): string {
   try {
     return userInfo().homedir
   } catch (error) {
-    const configuredHomeDir = resolveHomeDir(env)
-    if (!isMissingPasswdRecord(error) || !isRealDirectory(configuredHomeDir, fileSystem)) {
-      throw new AccountHomeResolutionError(configuredHomeDir, error)
-    }
-    return configuredHomeDir
-  }
-}
-
-function isMissingPasswdRecord(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const code = Reflect.get(error, "code")
-  const syscall = Reflect.get(error, "syscall")
-  return code === "ERR_SYSTEM_ERROR" && syscall === "uv_os_get_passwd"
-}
-
-function isRealDirectory(path: string, fileSystem: OmoConfigReadFileSystem): boolean {
-  if (fileSystem.realpathSync === undefined || fileSystem.lstatSync === undefined) return false
-  if (!fileSystem.existsSync(path)) return false
-  try {
-    if (fileSystem.lstatSync(path).isSymbolicLink()) return false
-    const realPath = fileSystem.realpathSync(path)
-    return realPath === path || fileSystem.realpathSync(realPath) === realPath
-  } catch {
-    return false
+    throw new AccountHomeResolutionError(error)
   }
 }
 
@@ -156,7 +124,7 @@ export function resolveOmoConfigPaths(options: ResolveOmoConfigPathsOptions): re
     options.cwd,
     resolveHomeDir(env),
     fileSystem,
-    resolveAccountHomeDir(env, fileSystem),
+    resolveAccountHomeDir(),
   )
   return [
     { path: userPath, scope: "user" },

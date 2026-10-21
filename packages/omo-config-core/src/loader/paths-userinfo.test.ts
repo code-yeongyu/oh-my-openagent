@@ -2,10 +2,10 @@ import { mkdirSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { afterEach, describe, expect, mock, test } from "bun:test"
-import { AccountHomeResolutionError, resolveOmoConfigPaths } from "./paths"
+import { AccountHomeResolutionError, findProjectConfigPathsFarthestFirst, resolveOmoConfigPaths } from "./paths"
 import type { OmoConfigReadFileSystem } from "./types"
 
-const realUserInfo = require("node:os").userInfo
+const realOs = require("node:os")
 const realFileSystem: OmoConfigReadFileSystem = {
   existsSync: require("node:fs").existsSync,
   lstatSync: require("node:fs").lstatSync,
@@ -13,9 +13,9 @@ const realFileSystem: OmoConfigReadFileSystem = {
   realpathSync: require("node:fs").realpathSync,
 }
 
-function withoutPasswdRecord(): void {
+function mockUserInfoFailure(): void {
   mock.module("node:os", () => ({
-    ...require("node:os"),
+    ...realOs,
     userInfo: () => {
       throw Object.assign(new Error("uv_os_get_passwd returned ENOENT"), {
         code: "ERR_SYSTEM_ERROR",
@@ -27,64 +27,50 @@ function withoutPasswdRecord(): void {
 
 afterEach(() => {
   mock.restore()
-  mock.module("node:os", () => ({ ...require("node:os"), userInfo: realUserInfo }))
+  mock.module("node:os", () => realOs)
 })
 
-describe("resolveOmoConfigPaths without a passwd record", () => {
-  test("#given HOME is a real non-symlinked directory #when resolving candidates #then HOME is used as the account home", () => {
+describe("account home resolution", () => {
+  test("#given userInfo fails #when the loader is imported #then importing it still succeeds", async () => {
     // given
-    const homeDir = resolve(mkdtempSync(join(tmpdir(), "omo-account-home-")))
-    const projectDir = join(homeDir, "work", "project")
-    mkdirSync(join(projectDir, ".omo"), { recursive: true })
-    withoutPasswdRecord()
+    mockUserInfoFailure()
 
     // when
-    const candidates = resolveOmoConfigPaths({
-      cwd: projectDir,
-      env: { HOME: homeDir },
-      fileSystem: realFileSystem,
-    })
+    const loaded = await import("./paths")
 
     // then
-    expect(candidates[0]).toEqual({ path: join(homeDir, ".omo", "omo.jsonc"), scope: "user" })
+    expect(typeof loaded.resolveOmoConfigPaths).toBe("function")
   })
 
-  test("#given HOME is a symlink #when resolving candidates #then it fails with a typed account-home error", () => {
-    // given
-    const homeDir = mkdtempSync(join(tmpdir(), "omo-account-home-"))
-    withoutPasswdRecord()
-    const fileSystem: OmoConfigReadFileSystem = {
-      ...realFileSystem,
-      lstatSync: (path: string) => ({ isSymbolicLink: (): boolean => path === homeDir }),
-    }
-
-    // when
-    const resolveWithSymlink = (): unknown =>
-      resolveOmoConfigPaths({ cwd: homeDir, env: { HOME: homeDir }, fileSystem })
-
-    // then
-    expect(resolveWithSymlink).toThrow(AccountHomeResolutionError)
-  })
-
-  test("#given userInfo fails for another reason #when resolving candidates #then HOME is not used", () => {
+  test("#given userInfo fails #when resolving paths #then it throws a typed error instead of using HOME", () => {
     // given
     const homeDir = resolve(mkdtempSync(join(tmpdir(), "omo-account-home-")))
-    mock.module("node:os", () => ({
-      ...require("node:os"),
-      userInfo: () => {
-        throw Object.assign(new Error("unexpected"), { code: "ERR_SYSTEM_ERROR", syscall: "something_else" })
-      },
-    }))
+    mockUserInfoFailure()
 
     // when
-    const resolveWithUnexpectedError = (): unknown =>
+    const resolveWithFailure = (): unknown =>
       resolveOmoConfigPaths({ cwd: homeDir, env: { HOME: homeDir }, fileSystem: realFileSystem })
 
     // then
-    expect(resolveWithUnexpectedError).toThrow(AccountHomeResolutionError)
+    expect(resolveWithFailure).toThrow(AccountHomeResolutionError)
   })
 
-  test("#given the mock was restored #when resolving after the test #then the real userInfo is used", () => {
+  test("#given HOME differs from the account home #when resolving paths #then the account home stays the boundary", () => {
+    // given
+    const accountHomeDir = resolve(mkdtempSync(join(tmpdir(), "omo-account-home-")))
+    const configuredHomeDir = resolve(mkdtempSync(join(tmpdir(), "omo-configured-home-")))
+    const projectDir = join(accountHomeDir, "work", "project")
+    mkdirSync(projectDir, { recursive: true })
+    mock.module("node:os", () => ({ ...realOs, userInfo: () => ({ ...realOs.userInfo(), homedir: accountHomeDir }) }))
+
+    // when
+    const paths = findProjectConfigPathsFarthestFirst(projectDir, configuredHomeDir, realFileSystem)
+
+    // then
+    expect(paths).toEqual([])
+  })
+
+  test("#given the mock was restored #when resolving paths #then the real userInfo is used", () => {
     // given
     const homeDir = resolve(mkdtempSync(join(tmpdir(), "omo-account-home-")))
 
