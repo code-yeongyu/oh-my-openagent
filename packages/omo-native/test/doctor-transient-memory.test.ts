@@ -6,6 +6,10 @@ import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
 import { countTransientMemoryIdentities, formatTransientMemoryLines } from "../bin/lib/doctor.js"
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
@@ -81,6 +85,11 @@ describe("omo doctor transient memory identities", () => {
       "plugin/runtime/lsp-daemon/dist/cli.js",
       "plugin/runtime/agent-toolkit/cli.js",
     ]) writeFile(join(packageRoot, artifact))
+    // PR-F fixture: stage the integrity marker so the launcher's first-launch check accepts the payload.
+    writeFile(
+      join(packageRoot, "plugin", ".omo-payload.sha256"),
+      PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+    )
 
     const memoryHome = join(root, "memory")
     writeFile(join(memoryHome, "agents", "durable-1", "repo", "system", "persona.md"))

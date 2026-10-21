@@ -5,6 +5,11 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
+
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
 
@@ -112,6 +117,12 @@ import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ argv: process.argv.slice(2), target: "ulw-loop" }))
 process.exit(Number(process.env.FAKE_EXIT ?? 0))
 `)
+  // Stage the integrity marker the way the build script would (PR-F). Every fixture models a
+  // freshly published install, so the launcher's first-launch verification accepts the payload.
+  writeFile(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   const captureFile = join(root, "capture.json")
   return { root, packageRoot, launcher: join(packageRoot, "bin", "omo.js"), captureFile, shimPath }
 }

@@ -5,6 +5,11 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
+
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
 
@@ -38,6 +43,12 @@ function launchCapture(args: readonly string[], env: Record<string, string>, std
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
   ]) write(join(packageRoot, artifact), "fixture\n")
+  // PR-F fixture: stage the integrity marker the build script would have written so the launcher's
+  // first-launch check accepts the payload.
+  write(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   const capture = join(root, "exec.json")
   const probe = join(packageRoot, "probe.mjs")
   write(probe, `import { writeFileSync } from "node:fs"

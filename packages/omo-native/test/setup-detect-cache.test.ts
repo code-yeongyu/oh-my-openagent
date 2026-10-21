@@ -11,6 +11,10 @@ import {
   readSetupSuggestionCache,
   setupDetectInputStats,
 } from "../bin/lib/setup-detect-cache.js"
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
 
 // The launcher answers the interactive banner's sibling-credential hint from a small cache instead
 // of blocking on live detection. These tests pin that contract through the real surfaces: the
@@ -68,6 +72,11 @@ process.exit(0)
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
   ]) write(join(packageRoot, artifact), "fixture\n")
+  // PR-F fixture: stage the integrity marker so the launcher's first-launch check accepts the payload.
+  write(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   const env = { HOME: home, SENPI_CODING_AGENT_DIR: agentDir, XDG_DATA_HOME: xdg }
   return {
     root,

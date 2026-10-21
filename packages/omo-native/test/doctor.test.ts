@@ -5,6 +5,11 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
+
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
 const artifacts = [
@@ -43,6 +48,11 @@ function createFixture(): Fixture {
   writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const [, artifact] of artifacts) writeFile(join(packageRoot, artifact))
+  // PR-F fixture: stage the integrity marker so the launcher's first-launch check accepts the payload.
+  writeFile(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   return { root, packageRoot, launcher: join(packageRoot, "bin", "omo.js"), agentDir }
@@ -105,6 +115,13 @@ describe("omo doctor", () => {
       test(`#then missing ${label} fails diagnostics and names the path`, () => {
         const fixture = createFixture()
         rmSync(join(fixture.packageRoot, artifact))
+        // PR-F: refreshing the integrity marker keeps the test scoped to doctor's missing-artifact
+        // check; without this, the launcher's first-launch verification would refuse on a stale
+        // marker and doctor would never run.
+        writeFile(
+          join(fixture.packageRoot, "plugin", ".omo-payload.sha256"),
+          PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(fixture.packageRoot, "plugin") })),
+        )
         const result = run(fixture)
         expect(result.status).toBe(1)
         expect(result.stdout).toContain(`FAIL ${label}`)

@@ -16,6 +16,7 @@ import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
 import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
+import { verifyPayloadIntegrity } from "./plugin-payload-integrity.js"
 import { runSelfUpdate } from "./self-update.js"
 import { isSelfUpdate } from "./update-args.js"
 import { detectHarnesses } from "./setup-detect.js"
@@ -29,6 +30,14 @@ function engineVersion() {
   } catch {
     return "unknown"
   }
+}
+
+function runIntegrityVerification() {
+  verifyPayloadIntegrity({
+    pluginRoot: join(packageRoot, "plugin"),
+    omoAiVersion: packageManifest().version,
+    reinstallCommand: updateTarget().command,
+  })
 }
 
 function preparedSenpi() {
@@ -129,6 +138,7 @@ export function rollbackMigrateCall(request) {
 }
 
 export async function runLauncher(args = process.argv.slice(2)) {
+  runIntegrityVerification()
   migrateLegacyBunGlobalManifest()
   reportLegacyFlatAdoption()
   const command = args[0]

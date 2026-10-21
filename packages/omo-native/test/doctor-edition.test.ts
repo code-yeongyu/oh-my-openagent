@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url"
 import { latestFromDistTags, runDoctor } from "../bin/lib/doctor.js"
 import { fetchNpmDistTagsSync } from "../bin/lib/npm-dist-tags.js"
 import { packageManifest, updateTarget } from "../bin/lib/package-paths.js"
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
@@ -53,6 +57,11 @@ function createFixture(installLayout: InstallLayout = "npm"): Fixture {
   writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const [, artifact] of artifacts) writeFile(join(packageRoot, artifact))
+  // PR-F fixture: stage the integrity marker so the launcher's first-launch check accepts the payload.
+  writeFile(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   return { root, packageRoot, launcher: join(packageRoot, "bin", "omo.js"), agentDir }

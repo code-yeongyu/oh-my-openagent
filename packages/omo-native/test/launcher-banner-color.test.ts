@@ -5,6 +5,10 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { CACHE_FILENAME, CACHE_VERSION, setupDetectInputStats } from "../bin/lib/setup-detect-cache.js"
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const TTY_DRIVER = resolve(fileURLToPath(new URL("tty-driver.py", import.meta.url)))
@@ -45,6 +49,11 @@ process.exit(0)
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
   ]) write(join(packageRoot, artifact), "fixture\n")
+  // PR-F fixture: stage the integrity marker so the launcher's first-launch check accepts the payload.
+  write(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   const home = join(root, "home")
   mkdirSync(home, { recursive: true })
   const agentDir = join(root, "senpi-agent")

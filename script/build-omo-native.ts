@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import {
   chmodSync,
   copyFileSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -158,9 +161,81 @@ function runSenpiPluginBuild(outputDir: string): void {
     buildCategoryCoverageRuntime(join(stagedPluginDir, CATEGORY_COVERAGE_ARTIFACT))
     buildRuntimeBundle(TASK_CONFIG_ENTRY, join(stagedPluginDir, TASK_CONFIG_ARTIFACT), "task-config")
     copyPluginPayload(outputDir, stagedPluginDir)
+    writePayloadShaMarker(outputDir)
   } finally {
     rmSync(buildRoot, { recursive: true, force: true })
   }
+}
+
+function toHexSha(content: string | Buffer): string {
+  return createHash("sha256").update(content).digest("hex")
+}
+
+// Marker file the runtime reads at first launch. The basename is a single dot-prefixed file inside
+// the published `plugin/`. The contents match the sha256sum format so a reviewer can `cat` it and
+// diff it against any other tooling that produces the same line.
+export const PAYLOAD_SHA_MARKER_FILENAME = ".omo-payload.sha256"
+export function PAYLOAD_SHA_MARKER_FORMAT(hex: string): string {
+  return `${hex}  plugin\n`
+}
+
+// Mirrors the runtime recompute in packages/omo-native/bin/lib/plugin-payload-integrity.js. The
+// parity test in `packages/omo-native/test/plugin-payload-sha256.test.ts` imports both functions
+// and asserts the two produce the same hash on the same fixture, so a silent drift is caught at
+// `bun test packages/omo-native/test`.
+export function computePayloadSha256(args: { readonly pluginRoot: string }): string {
+  type Entry = { path: string; sha: string }
+  const entries: Entry[] = []
+  function walk(current: string, prefix: string): void {
+    let names: string[]
+    try {
+      names = readdirSync(current).sort()
+    } catch {
+      return
+    }
+    for (const name of names) {
+      const fullPath = join(current, name)
+      const relativePath = prefix === "" ? name : `${prefix}/${name}`
+      let stat
+      try {
+        stat = lstatSync(fullPath)
+      } catch {
+        continue
+      }
+      // Recurse into directories; only leaf files land in the manifest.
+      if (stat.isDirectory()) {
+        walk(fullPath, relativePath)
+        continue
+      }
+      if (!stat.isFile()) continue
+      let content: Buffer
+      try {
+        content = readFileSync(fullPath)
+      } catch {
+        continue
+      }
+      entries.push({ path: relativePath, sha: toHexSha(content) })
+    }
+  }
+  walk(args.pluginRoot, "")
+  // Sort by path; the recompute uses POSIX separators and so does the runtime.
+  const sorted = entries.filter((entry) => entry.path !== PAYLOAD_SHA_MARKER_FILENAME).sort(byPath)
+  const manifest = sorted.map((entry) => `${entry.path}\0${entry.sha}\n`).join("")
+  return toHexSha(manifest)
+}
+
+function byPath(a: { readonly path: string }, b: { readonly path: string }): number {
+  if (a.path < b.path) return -1
+  if (a.path > b.path) return 1
+  return 0
+}
+
+function writePayloadShaMarker(outputDir: string): void {
+  // The marker is the last file written: the recompute excludes itself, so the marker has to land
+  // after every other byte in the staged payload to remain valid. README, the dag runtime, and the
+  // category-coverage bundles are first; this is last.
+  const sha = computePayloadSha256({ pluginRoot: outputDir })
+  writeFileSync(join(outputDir, PAYLOAD_SHA_MARKER_FILENAME), PAYLOAD_SHA_MARKER_FORMAT(sha))
 }
 
 function buildRuntimeBundle(entry: string, outfile: string, name: string): void {
@@ -217,6 +292,10 @@ function findMissingArtifact(outputDir: string): string | undefined {
   for (const artifact of NATIVE_REQUIRED_ARTIFACTS) {
     if (!existsSync(join(outputDir, artifact))) return artifact
   }
+  // The integrity check at first launch depends on the marker being present; refuse a payload
+  // that ships without it (a runtime that booted against an unmarked plugin/ would never refuse a
+  // tampered install, which is exactly the regression this check is meant to gate).
+  if (!existsSync(join(outputDir, PAYLOAD_SHA_MARKER_FILENAME))) return PAYLOAD_SHA_MARKER_FILENAME
   return undefined
 }
 

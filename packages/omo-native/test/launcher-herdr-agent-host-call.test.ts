@@ -5,6 +5,11 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
+
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
 
@@ -43,6 +48,11 @@ console.log("{}")
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
   ]) write(join(app, artifact), "fixture\n")
+  // PR-F fixture: stage the integrity marker the build script would have written.
+  write(
+    join(app, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(app, "plugin") })),
+  )
   const capture = join(root, "engine-launches.jsonl")
   const home = join(root, "home")
   mkdirSync(home, { recursive: true })

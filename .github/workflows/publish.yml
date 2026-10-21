@@ -949,6 +949,30 @@ jobs:
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
         run: node script/verify-omo-ai-payload.mjs
 
+      - name: Upload plugin payload sha256 (PR-F)
+        if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+        run: |
+          if [ ! -f packages/omo-native/plugin/.omo-payload.sha256 ]; then
+            echo "::error::plugin/.omo-payload.sha256 is missing; PR-F requires the integrity marker."
+            exit 1
+          fi
+          mkdir -p .omo/payload-sha256
+          cp packages/omo-native/plugin/.omo-payload.sha256 ".omo/payload-sha256/omo-payload-sha256-${VERSION}"
+          cat ".omo/payload-sha256/omo-payload-sha256-${VERSION}"
+
+      - name: Publish plugin payload sha256 artifact (PR-F)
+        if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: omo-payload-sha256-${{ env.VERSION }}
+          path: .omo/payload-sha256/omo-payload-sha256-${{ env.VERSION }}
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||

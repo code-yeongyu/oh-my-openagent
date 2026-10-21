@@ -5,6 +5,11 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
+
 /**
  * The JS launcher's `omo daemon adopt` end to end: the real `bin/omo.js` releases the session
  * through the plugin's thread SDK (a fake that answers the senpi `release_session` contract) and
@@ -44,6 +49,11 @@ export function createThreadSdk() {
   }
 }
 `)
+  // PR-F fixture: stage the integrity marker so the launcher's first-launch check accepts the payload.
+  writeFile(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   const sessionCwd = join(root, "session-cwd")
   mkdirSync(sessionCwd)
   return { root, packageRoot, sessionCwd, captureFile: join(root, "capture.json") }

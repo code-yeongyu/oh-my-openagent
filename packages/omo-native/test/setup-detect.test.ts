@@ -7,6 +7,10 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { detectHarnesses, needsSetupSuggestion } from "../bin/lib/setup-detect.js"
 import { formatSetupReport } from "../bin/lib/setup-report.js"
+import {
+  PAYLOAD_SHA_MARKER_FORMAT,
+  computePayloadSha256 as computeRuntimePayloadSha256,
+} from "../bin/lib/plugin-payload-integrity.js"
 
 function sqlLiteral(value: string | null): string {
   return value === null ? "NULL" : `'${value.replace(/'/g, "''")}'`
@@ -147,6 +151,11 @@ function createLauncherFixture(fixture: Fixture): string {
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
 
   ]) write(join(packageRoot, artifact), "fixture\n")
+  // PR-F fixture: stage the integrity marker so the launcher's first-launch check accepts the payload.
+  write(
+    join(packageRoot, "plugin", ".omo-payload.sha256"),
+    PAYLOAD_SHA_MARKER_FORMAT(computeRuntimePayloadSha256({ pluginRoot: join(packageRoot, "plugin") })),
+  )
   return join(packageRoot, "bin", "omo.js")
 }
 
