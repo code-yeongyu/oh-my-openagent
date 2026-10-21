@@ -50,10 +50,10 @@
 		"check": "tsc --noEmit && biome check src test && tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@oh-my-opencode/lsp-core": "file:../../../../lsp-core",
 		"@code-yeongyu/lsp-daemon": "file:../../../../lsp-daemon"
 	},
 	"devDependencies": {
+		"@oh-my-opencode/lsp-core": "file:../../../../lsp-core",
 		"@vitest/coverage-v8": "5.0.1",
 		"@biomejs/biome": "2.5.14",
 		"@types/node": "^26.6.2",

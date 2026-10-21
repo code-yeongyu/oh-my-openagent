@@ -29,7 +29,6 @@ describe("plugin package metadata", () => {
 		expect(packageJson.type).toBe("module");
 		expect(packageJson.packageManager).toBe("npm@11.12.1");
 		expect(packageJson.dependencies).toEqual({
-			"@oh-my-opencode/lsp-core": "file:../../../../lsp-core",
 			"@code-yeongyu/lsp-daemon": "file:../../../../lsp-daemon",
 		});
 		expect(packageJson.bin["omo-lsp"]).toBe("./dist/cli.js");
