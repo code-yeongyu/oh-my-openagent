@@ -10,6 +10,7 @@ import { migrationReport } from "./doctor-migration.js"
 import { launchSpecDoctorLines } from "./launch-spec-mode.js"
 import { piConfigReport } from "./doctor-pi-config.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
+import { authAtRestDoctorLines } from "./auth-store-encryption.ts"
 
 export function installedDistTag(version) {
   return releaseChannel(version)
@@ -416,6 +417,7 @@ export function runDoctor(inventory, args = [], options = {}) {
   const latest = latestFromDistTags(readDistTags(options), version)
   lines.push(`INFO omo · Edition: Native · Installed: ${version} (engine: senpi ${engineVersionOrUnresolved(senpi)}) · Latest: ${latest}`)
   lines.push(`INFO Update: ${updateTarget().command}`)
+  lines.push(...authAtRestDoctorLines({ agentDir: canonicalAgentDir(), env: options.env }))
   lines.push(...migrationReport(options, updateTarget().command))
   lines.push(...warningsForSettings())
   lines.push(...(options.configDiagnostics ?? []))

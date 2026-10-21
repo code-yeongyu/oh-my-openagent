@@ -1,6 +1,9 @@
 import { spawnSync } from "node:child_process"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
+import { homedir } from "node:os"
 import { join } from "node:path"
+
+import { resolveAuthAtRestMode } from "./auth-store-encryption.ts"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { doctorCoverageLines } from "./category-coverage.js"
@@ -97,6 +100,64 @@ function setupSuggestionForLaunch() {
   const cached = readSetupSuggestionCache()
   if (!cached.fresh) spawnSetupSuggestionRefresh()
   return cached.suggestion === true
+}
+
+/**
+ * First-run prompt that lives in a launcher of a one-shot engine spawn. It is only meaningful
+ * when the legacy `plain` mode would otherwise be left as the default and there are already
+ * keys on disk. The launcher never blocks the engine spawn on user input: it prints the prompt
+ * with a recommended default, the user either presses Enter (keep `plain`) or runs `omo setup`
+ * afterwards. The decision is sticky and persisted at `~/.omo/state/auth-at-rest-mode.json` so
+ * the prompt never returns.
+ *
+ * Returns nothing; the decision (if any) is written through `writeStickyAuthMode`.
+ */
+function offerAuthAtRestUpgrade({ agentDir, env, stderr }) {
+  try {
+    const resolved = resolveAuthAtRestMode({
+      home: env.HOME || env.USERPROFILE || homedir(),
+      interactive: process.stdin.isTTY === true,
+      existingEntries: countAuthEntries(agentDir),
+    })
+    if (!resolved.shouldPrompt) return
+    if (!process.stdin.isTTY) return
+    const recommended = resolved.recommended ?? "passphrase"
+    stderr.write(`\nomo: auth.json is plain. encrypt at rest with ${recommended}? [y/N] `)
+    let answer = ""
+    try {
+      answer = readFileSync(0, "utf8", { end: 0 })
+    } catch {
+      return
+    }
+    if (!/^y(es)?$/i.test(answer.trim())) return
+    writeStickyAuthMode({
+      home: env.HOME || env.USERPROFILE || homedir(),
+      mode: recommended,
+    })
+    stderr.write(`omo: auth-at-rest mode set to ${recommended} (sticky at ~/.omo/state/auth-at-rest-mode.json)\n`)
+  } catch (error) {
+    // A misconfigured state file or a non-interactive shell must never block the engine.
+    notice(`omo: auth-at-rest upgrade prompt skipped: ${error.message}`)
+  }
+}
+
+function countAuthEntries(agentDir) {
+  try {
+    const path = join(agentDir, "auth.json")
+    if (!existsSync(path)) return 0
+    const parsed = JSON.parse(readFileSync(path, "utf8"))
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return 0
+    if (parsed.mode === "passphrase" || parsed.mode === "ssh-key") return 0
+    return Object.keys(parsed).length
+  } catch {
+    return 0
+  }
+}
+
+function writeStickyAuthMode({ home, mode }) {
+  const stateDir = join(home, ".omo", "state")
+  mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+  writeFileSync(join(stateDir, "auth-at-rest-mode.json"), `${JSON.stringify({ auth_at_rest: mode, since: new Date().toISOString() }, null, 2)}\n`, { mode: 0o600 })
 }
 
 /**
@@ -237,6 +298,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     if (process.stdout.isTTY === true && setupSuggestionForLaunch()) {
       notice("omo: sibling credentials detected; run `omo setup` to review them")
     }
+    offerAuthAtRestUpgrade({ agentDir: canonicalAgentDir(), env: process.env, stderr: process.stderr })
   }
   await spawnSenpi(args, true)
 }

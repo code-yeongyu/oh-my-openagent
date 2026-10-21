@@ -2239,6 +2239,24 @@
       },
       "additionalProperties": false
     },
+    "security": {
+      "type": "object",
+      "properties": {
+        "auth_at_rest": {
+          "default": "plain",
+          "type": "string",
+          "enum": [
+            "plain",
+            "passphrase",
+            "ssh-key"
+          ]
+        },
+        "ssh_key_path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "telemetry": {
       "type": "object",
       "properties": {
@@ -4486,6 +4504,23 @@
           },
           "additionalProperties": false
         },
+        "security": {
+          "type": "object",
+          "properties": {
+            "auth_at_rest": {
+              "type": "string",
+              "enum": [
+                "plain",
+                "passphrase",
+                "ssh-key"
+              ]
+            },
+            "ssh_key_path": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
         "telemetry": {
           "type": "object",
           "properties": {
@@ -6705,6 +6740,23 @@
                 },
                 "additionalProperties": false
               }
+            }
+          },
+          "additionalProperties": false
+        },
+        "security": {
+          "type": "object",
+          "properties": {
+            "auth_at_rest": {
+              "type": "string",
+              "enum": [
+                "plain",
+                "passphrase",
+                "ssh-key"
+              ]
+            },
+            "ssh_key_path": {
+              "type": "string"
             }
           },
           "additionalProperties": false
@@ -8932,6 +8984,23 @@
           },
           "additionalProperties": false
         },
+        "security": {
+          "type": "object",
+          "properties": {
+            "auth_at_rest": {
+              "type": "string",
+              "enum": [
+                "plain",
+                "passphrase",
+                "ssh-key"
+              ]
+            },
+            "ssh_key_path": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
         "telemetry": {
           "type": "object",
           "properties": {
@@ -11149,6 +11218,23 @@
                   },
                   "additionalProperties": false
                 }
+              }
+            },
+            "additionalProperties": false
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "auth_at_rest": {
+                "type": "string",
+                "enum": [
+                  "plain",
+                  "passphrase",
+                  "ssh-key"
+                ]
+              },
+              "ssh_key_path": {
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -13376,6 +13462,23 @@
                 },
                 "additionalProperties": false
               },
+              "security": {
+                "type": "object",
+                "properties": {
+                  "auth_at_rest": {
+                    "type": "string",
+                    "enum": [
+                      "plain",
+                      "passphrase",
+                      "ssh-key"
+                    ]
+                  },
+                  "ssh_key_path": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
               "telemetry": {
                 "type": "object",
                 "properties": {
@@ -15599,6 +15702,23 @@
                 },
                 "additionalProperties": false
               },
+              "security": {
+                "type": "object",
+                "properties": {
+                  "auth_at_rest": {
+                    "type": "string",
+                    "enum": [
+                      "plain",
+                      "passphrase",
+                      "ssh-key"
+                    ]
+                  },
+                  "ssh_key_path": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
               "telemetry": {
                 "type": "object",
                 "properties": {
@@ -17818,6 +17938,23 @@
                       },
                       "additionalProperties": false
                     }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "security": {
+                "type": "object",
+                "properties": {
+                  "auth_at_rest": {
+                    "type": "string",
+                    "enum": [
+                      "plain",
+                      "passphrase",
+                      "ssh-key"
+                    ]
+                  },
+                  "ssh_key_path": {
+                    "type": "string"
                   }
                 },
                 "additionalProperties": false
