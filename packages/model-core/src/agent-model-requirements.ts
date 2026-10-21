@@ -159,6 +159,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "medium",
       },
       { providers: ["opencode-go"], model: "minimax-m3" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M3.1-Flash" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go"], model: "minimax-m2.7" }
     ],
@@ -173,6 +174,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "medium",
       },
       { providers: ["opencode-go"], model: "minimax-m3" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M3.1-Flash" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go"], model: "minimax-m2.7" },
       { providers: ["opencode"], model: "big-pickle" }

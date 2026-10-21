@@ -180,15 +180,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(momus.fallbackChain.some((entry) => entry.model.startsWith("gpt-5.6-"))).toBe(false)
   })
 
-  test("atlas keeps sonnet, kimi, gpt-5.6-sol, and minimax fallback order", () => {
+  test("atlas keeps sonnet, kimi, gpt-5.6-sol, and Flash-first MiniMax fallback order", () => {
     // given
     const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // when
-    const [primary, secondary, solFallback, fourth, fifth, sixth] = atlas.fallbackChain
+    const [primary, secondary, solFallback, fourth, fifth, sixth, seventh] = atlas.fallbackChain
 
     // then
-    expect(atlas.fallbackChain).toHaveLength(6)
+    expect(atlas.fallbackChain).toHaveLength(7)
     expect(primary?.model).toBe("claude-sonnet-5")
     expect(primary?.providers[0]).toBe("anthropic")
     expect(secondary?.model).toBe("kimi-k3")
@@ -201,11 +201,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(fourth?.model).toBe("minimax-m3")
     expect(fourth?.providers[0]).toBe("opencode-go")
     expect(fifth).toEqual({
-          providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
-          model: "MiniMax-M3",
-        })
-    expect(sixth?.model).toBe("minimax-m2.7")
-    expect(sixth?.providers[0]).toBe("opencode-go")
+      providers: ["minimax-coding-plan"],
+      model: "MiniMax-M3.1-Flash",
+    })
+    expect(sixth).toEqual({
+      providers: ["minimax-coding-plan", "minimax-cn-coding-plan"],
+      model: "MiniMax-M3",
+    })
+    expect(seventh?.model).toBe("minimax-m2.7")
+    expect(seventh?.providers[0]).toBe("opencode-go")
   })
 
   test("sisyphus-junior keeps sonnet, Kimi, minimax, and big-pickle fallbacks", () => {
@@ -221,6 +225,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       "kimi-k3",
       "gpt-5.6-sol",
       "minimax-m3",
+      "MiniMax-M3.1-Flash",
       "MiniMax-M3",
       "minimax-m2.7",
       "big-pickle",
