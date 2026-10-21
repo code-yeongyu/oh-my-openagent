@@ -9,6 +9,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { literalConfigValue } from "./engine-config-value.js"
 import {
+  convertPlainField,
   convertToObjectField,
   legacyConfigValue,
   opencodeConfigSources,
@@ -112,6 +113,53 @@ function fixedUrl(value) {
   return value !== undefined && !/\{(?:env|file):|\$\{/.test(value) ? value : undefined
 }
 
+// A display name is a plain string the engine reads as-is, so it cannot hold a reference object.
+// A `{file:...}` in one is reported, not written.
+function convertModelName(source, providerId, id, notices) {
+  const raw = text(source.name)
+  if (raw === undefined) return undefined
+  const converted = convertPlainField(raw)
+  if (converted.refused) {
+    notices.push(`NOTICE opencode: model ${providerId}/${id} name has ${converted.reason}; a model name cannot hold a reference value; not imported - inline the value`)
+    return null
+  }
+  return converted.value
+}
+
+// The engine's model entry carries no apiKey and no headers, so a per-model key or header has
+// nowhere to land. It is reported rather than dropped in silence.
+function reportModelFieldsWithoutHome(source, providerId, id, notices) {
+  if (text(source.options?.apiKey) !== undefined) {
+    notices.push(`NOTICE opencode: model ${providerId}/${id} apiKey is not carried over; the engine's model entry has no apiKey field - set it on the provider, or add the model to models.json by hand`)
+  }
+  if (isPlainObject(source.options?.headers) && Object.keys(source.options.headers).length > 0) {
+    notices.push(`NOTICE opencode: model ${providerId}/${id} headers are not carried over; the engine's model entry has no headers field - set them on the provider, or add the model to models.json by hand`)
+  }
+}
+
+// The endpoint a model is sent to: the provider's `options.baseURL`, else the model's own
+// `provider.api`, else the provider's `api`. A model's own endpoint that is not a fixed URL is
+// refused rather than silently falling back to the provider's, because a url field has no
+// spelling for a reference object.
+function resolveModelEndpoint(provider, source, id, api, notices) {
+  const own = text(source.provider?.api)
+  if (own !== undefined && fixedUrl(own) === undefined) {
+    notices.push(`NOTICE opencode: model ${provider.id}/${id} baseURL ${own} is not a fixed URL omo's ${api} client can use; not imported - set the url to a fixed value`)
+    return undefined
+  }
+  const baseURL = provider.optionsBaseURL ?? own ?? provider.baseURL
+  if (fixedUrl(baseURL) === undefined) {
+    notices.push(`NOTICE opencode: model ${provider.id}/${id} baseURL ${baseURL} is not a fixed URL omo's ${api} client can use; not imported - set the url to a fixed value`)
+    return undefined
+  }
+  const baseUrl = engineBaseUrl(api, baseURL)
+  if (baseUrl === undefined) {
+    notices.push(`NOTICE opencode: model ${provider.id}/${id} baseURL ${baseURL} does not end in /v1, which omo's ${api} client needs; not imported - the url must end in /v1`)
+    return undefined
+  }
+  return baseUrl
+}
+
 function convertModel(provider, id, entry, notices) {
   const source = isPlainObject(entry) ? entry : {}
   const npm = text(source.provider?.npm)
@@ -123,19 +171,18 @@ function convertModel(provider, id, entry, notices) {
   // OpenCode sends every model to `options.baseURL`, else to the model's own `provider.api`, else to
   // the provider's `api` (provider.ts "extend database from config" and the SDK baseURL). A model
   // whose protocol differs from its provider's needs that URL in its own engine spelling.
-  const baseURL = provider.optionsBaseURL ?? text(source.provider?.api) ?? provider.baseURL
-  const baseUrl = fixedUrl(baseURL) === undefined ? undefined : engineBaseUrl(api, baseURL)
-  if (baseUrl === undefined) {
-    notices.push(`NOTICE opencode: model ${provider.id}/${id} baseURL ${baseURL} is not a fixed URL omo's ${api} client can use; not imported`)
-    return undefined
-  }
+  const baseUrl = resolveModelEndpoint(provider, source, id, api, notices)
+  if (baseUrl === undefined) return undefined
+  const name = convertModelName(source, provider.id, id, notices)
+  if (name === null) return undefined
+  reportModelFieldsWithoutHome(source, provider.id, id, notices)
   const input = Array.isArray(source.modalities?.input) ? source.modalities.input.filter((kind) => MODEL_INPUTS.has(kind)) : []
   return {
     id,
     // OpenCode's model `id` is the id sent to the API when the key is an alias; the engine's
     // `upstreamModelId` replaces the request model id the same way (model-runtime.js).
     ...(text(source.id) !== undefined && source.id !== id ? { upstreamModelId: source.id } : {}),
-    ...(text(source.name) !== undefined ? { name: source.name } : {}),
+    ...(name !== undefined ? { name } : {}),
     ...(api !== provider.api ? { api } : {}),
     ...(baseUrl !== provider.baseUrl ? { baseUrl } : {}),
     ...(typeof source.reasoning === "boolean" ? { reasoning: source.reasoning } : {}),

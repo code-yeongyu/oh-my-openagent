@@ -385,7 +385,35 @@ function convertRecordObjects(record, baseDir, noticeFor) {
   return { result: converted.result, refusal: undefined }
 }
 
-function convertLocal(entry, baseDir, legacy) {
+// The environment of an mcp server, in whichever shape the engine supports. A remote server has
+// one too: the engine's server schema carries `env` for stdio and http alike, and OpenCode
+// spells the field `environment` on a local server and `env` on either.
+function convertEnv(name, entry, baseDir, legacy) {
+  const environment = entry.environment ?? entry.env
+  if (legacy) {
+    return convertRecordPlain(
+      environment,
+      (value) => {
+        const converted = convertPlainField(value)
+        return converted.refused ? converted : { value: converted.value }
+      },
+      (key, reason) => ({
+        reason: "environment value has a placeholder omo cannot express in the plain-string form",
+        notice: `NOTICE opencode: mcp server ${name} environment.${key} has ${reason}; not imported - inline the value or reference it as \${NAME}`,
+      }),
+    )
+  }
+  return convertRecordObjects(
+    environment,
+    baseDir,
+    (key, reason) => ({
+      reason,
+      notice: `NOTICE opencode: mcp server ${name} environment.${key} has ${reason}; not imported - inline the value or reference it as \${NAME}`,
+    }),
+  )
+}
+
+function convertLocal(name, entry, baseDir, legacy) {
   const command = Array.isArray(entry.command) ? entry.command.filter((part) => typeof part === "string") : []
   if (command.length === 0) return { config: undefined, refusal: undefined }
   // `command[0]` is the executable: a field that does not accept reference objects. The
@@ -414,23 +442,7 @@ function convertLocal(entry, baseDir, legacy) {
       },
     }
   }
-  const env = legacy
-    ? convertRecordPlain(
-        entry.environment,
-        (value) => {
-          const converted = convertPlainField(value)
-          return converted.refused ? converted : { value: converted.value }
-        },
-        (key, reason) => ({
-          reason: "environment value has a placeholder omo cannot express in the plain-string form",
-          notice: `NOTICE opencode: mcp server environment.${key} has ${reason}`,
-        }),
-      )
-    : convertRecordObjects(
-        entry.environment,
-        baseDir,
-        (key, reason) => ({ reason, notice: `NOTICE opencode: mcp server environment.${key} has ${reason}` }),
-      )
+  const env = convertEnv(name, entry, baseDir, legacy)
   if (env.refusal) return { config: undefined, refusal: env.refusal }
   return {
     config: {
@@ -450,7 +462,22 @@ function convertLocal(entry, baseDir, legacy) {
 // server that needs either is reported rather than silently imported as a public client.
 function convertOauth(name, oauth) {
   if (oauth === null || typeof oauth !== "object" || Array.isArray(oauth)) return { config: undefined, refusal: undefined }
-  const scopes = typeof oauth.scope === "string" ? oauth.scope.split(/\s+/).filter(Boolean) : []
+  // A scope is a plain string the engine reads as-is, so it cannot hold a reference object. A
+  // `{file:...}` in one is reported, not written.
+  const scopes = []
+  for (const scope of typeof oauth.scope === "string" ? oauth.scope.split(/\s+/).filter(Boolean) : []) {
+    const converted = convertPlainField(scope)
+    if (converted.refused) {
+      return {
+        config: undefined,
+        refusal: {
+          reason: converted.reason,
+          notice: `NOTICE opencode: mcp server ${name} oauth scope has ${converted.reason}; oauth scopes cannot hold a reference value; not imported - inline the value`,
+        },
+      }
+    }
+    scopes.push(converted.value)
+  }
   // oauth.clientId is NOT an object field — it stays a plain string, so a reference in it has
   // no engine spelling and is refused rather than written as literal text.
   let clientId
@@ -520,6 +547,8 @@ function convertRemote(name, entry, baseDir, legacy, notices) {
         (key, reason) => ({ reason, notice: `NOTICE opencode: mcp server ${name} headers.${key} has ${reason}` }),
       )
   if (headers.refusal) return { config: undefined, refusal: headers.refusal }
+  const env = convertEnv(name, entry, baseDir, legacy)
+  if (env.refusal) return { config: undefined, refusal: env.refusal }
   const oauth = convertOauth(name, entry.oauth)
   if (oauth.refusal) return { config: undefined, refusal: oauth.refusal }
   const dropped = ["clientSecret", "redirectUri"].filter((key) => entry.oauth?.[key] !== undefined)
@@ -531,6 +560,7 @@ function convertRemote(name, entry, baseDir, legacy, notices) {
       type: "http",
       url: convertPlaceholders(entry.url),
       ...(headers.result ? { headers: headers.result } : {}),
+      ...(env.result ? { env: env.result } : {}),
       // OpenCode's `oauth: false` disables OAuth auto-detection; the engine spells that `auth: false`.
       ...(entry.oauth === false ? { auth: false } : {}),
       ...(oauth.config ? { oauth: oauth.config } : {}),
@@ -543,7 +573,7 @@ function convertRemote(name, entry, baseDir, legacy, notices) {
 // A refused server is recorded with a short reason for the setup summary; the notice says what to do.
 function convertServer(name, entry, baseDir, legacy, notices, refused) {
   if (entry === null || typeof entry !== "object") return undefined
-  const result = entry.type === "remote" ? convertRemote(name, entry, baseDir, legacy, notices) : convertLocal(entry, baseDir, legacy)
+  const result = entry.type === "remote" ? convertRemote(name, entry, baseDir, legacy, notices) : convertLocal(name, entry, baseDir, legacy)
   if (result.refusal) {
     notices.push(result.refusal.notice)
     refused.push({ name, reason: result.refusal.reason })
