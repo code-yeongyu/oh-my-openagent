@@ -140,6 +140,108 @@ describe("opencode asset plan", () => {
     })
   })
 
+  describe("#given a remote mcp server whose header references a real file via {file:...}", () => {
+    describe("#when it is planned", () => {
+      test("#then the file's trimmed contents replace the placeholder and the server imports verbatim", () => {
+        const root = mkdtempSync(join(tmpdir(), "omo-assets-"))
+        roots.push(root)
+        const secretPath = join(root, "secret.txt")
+        writeFileSync(secretPath, "Bearer real-token\n")
+        const configDir = join(root, "config", "opencode")
+        mkdirSync(configDir, { recursive: true })
+        writeFileSync(join(configDir, "opencode.json"), JSON.stringify({
+          mcp: {
+            "header-from-file": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: `{file:${secretPath}}` },
+            },
+          },
+        }))
+
+        const plan = planOpencodeAssets({ home: join(root, "home"), env: { XDG_CONFIG_HOME: join(root, "config") } })
+
+        expect(plan.mcpServers).toEqual([{
+          name: "header-from-file",
+          config: { type: "http", url: "https://f.test/mcp", headers: { Authorization: "Bearer real-token" } },
+        }])
+        expect(plan.refusedServers).toEqual([])
+      })
+
+      test("#then a leading ~ expands against the caller-provided home so ~/.creds/x resolves", () => {
+        const root = mkdtempSync(join(tmpdir(), "omo-assets-"))
+        roots.push(root)
+        const home = join(root, "home")
+        mkdirSync(join(home, ".creds"), { recursive: true })
+        writeFileSync(join(home, ".creds", "token"), "Bearer tilde-token")
+        const configDir = join(root, "config", "opencode")
+        mkdirSync(configDir, { recursive: true })
+        writeFileSync(join(configDir, "opencode.json"), JSON.stringify({
+          mcp: {
+            "header-tilde": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "{file:~/.creds/token}" },
+            },
+          },
+        }))
+
+        const plan = planOpencodeAssets({ home, env: { XDG_CONFIG_HOME: join(root, "config") } })
+
+        expect(plan.mcpServers).toEqual([{
+          name: "header-tilde",
+          config: { type: "http", url: "https://f.test/mcp", headers: { Authorization: "Bearer tilde-token" } },
+        }])
+        expect(plan.refusedServers).toEqual([])
+      })
+
+      test("#then an empty referenced file refuses the server with a notice naming it", () => {
+        const root = mkdtempSync(join(tmpdir(), "omo-assets-"))
+        roots.push(root)
+        const secretPath = join(root, "empty.txt")
+        writeFileSync(secretPath, "   \n\n")
+        const configDir = join(root, "config", "opencode")
+        mkdirSync(configDir, { recursive: true })
+        writeFileSync(join(configDir, "opencode.json"), JSON.stringify({
+          mcp: {
+            "header-empty-file": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: `Bearer {file:${secretPath}}` },
+            },
+          },
+        }))
+
+        const plan = planOpencodeAssets({ home: join(root, "home"), env: { XDG_CONFIG_HOME: join(root, "config") } })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["header-empty-file"])
+        expect(plan.notices.join("\n")).toContain("header-empty-file")
+      })
+
+      test("#then a relative-path referenced file refuses the server (setup cwd is not a stable anchor)", () => {
+        const root = mkdtempSync(join(tmpdir(), "omo-assets-"))
+        roots.push(root)
+        const configDir = join(root, "config", "opencode")
+        mkdirSync(configDir, { recursive: true })
+        writeFileSync(join(configDir, "opencode.json"), JSON.stringify({
+          mcp: {
+            "header-relative": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "Bearer {file:./local-secret.txt}" },
+            },
+          },
+        }))
+
+        const plan = planOpencodeAssets({ home: join(root, "home"), env: { XDG_CONFIG_HOME: join(root, "config") } })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["header-relative"])
+      })
+    })
+  })
+
   describe("#given an opencode.jsonc with comments and a trailing comma", () => {
     describe("#when it is planned", () => {
       test("#then it parses", () => {

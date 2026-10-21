@@ -131,6 +131,33 @@ describe("omo setup opencode custom provider import", () => {
     })
   })
 
+  describe("#given a custom provider whose apiKey references a real file via {file:...}", () => {
+    describe("#when setup is accepted", () => {
+      test("#then the file's trimmed contents are baked into auth.json as the key, not carried as a placeholder", () => {
+        const item = fixture()
+        const secretPath = join(item.tmp, "dgx.key")
+        writeFileSync(secretPath, "Bearer dgx-file-key\n")
+
+        opencode(item, {
+          provider: {
+            dgx: {
+              npm: "@ai-sdk/openai-compatible",
+              options: { baseURL: "https://dgx.cloudbsd.org/v1", apiKey: `{file:${secretPath}}` },
+              models: { "dgx-default": { name: "DGX Default", limit: { context: 1024, output: 256 } } },
+            },
+          },
+        })
+
+        const result = run(item, ["setup", "--yes"])
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect(auth.malformed).toBeUndefined()
+        expect((auth.entries as Record<string, { type: string, key: string }>).dgx).toEqual({ type: "api_key", key: "Bearer dgx-file-key" })
+      })
+    })
+  })
+
   describe("#given custom providers whose models name their own npm package or url", () => {
     describe("#when setup is accepted", () => {
       test("#then the engine sends each model to the endpoint opencode would", () => {
