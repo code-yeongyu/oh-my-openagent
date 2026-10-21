@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**The launcher deletes a legacy `~/.omo/credentials.json` left by an intermediate sign-in build.** The file held the device's private keys and account refresh material in plaintext, sometimes world-readable; upgrading removes it. Only the exact legacy shape is removed. ([#10697](https://github.com/code-yeongyu/oh-my-openagent/issues/10697), [#10698](https://github.com/code-yeongyu/oh-my-openagent/pull/10698))
+
 **A session no longer continues on its compaction model after a compaction.** With `agents.<name>.compaction.model` set, the compaction marker row carries the working agent's name and the summarizer's model, and the agent-name check let the compaction context injector and the session lifecycle take that model as the session's working model. A row with a `compaction` part is no longer used as the working model, and the checkpoint taken before compaction skips the model the summarize request is running on. ([#10120](https://github.com/code-yeongyu/oh-my-openagent/issues/10120), [#10211](https://github.com/code-yeongyu/oh-my-openagent/pull/10211))
 
 **Report a problem from inside OmO ([#10546](https://github.com/code-yeongyu/oh-my-openagent/pull/10546)).** `/feedback` (or `/bug`) sends a bug report or an idea to the OmO team in one step: your description plus your account, this device, versions, this conversation's recent messages, recent logs and your settings. Passwords, keys and tokens are removed first with the same redactor `/share` uses, your memory is never sent, and `OMO_DISABLE_FEEDBACK=1` saves the report as a local file instead of uploading it. The desktop app's Report a problem dialog uses the same report.
