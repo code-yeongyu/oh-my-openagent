@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { TaskRecord } from "../state"
 import { runTaskSend } from "../tools/control/send"
 import type { FakeHost, FakeHostOptions } from "./rpc-host/__fixtures__/fake-host"
+import { sessionListedAfterClose } from "./rpc-host/__fixtures__/host-state-dump"
 import { HOST_CHILD_MODEL, startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
 import { hostWorldRecovery } from "./rpc-host/__fixtures__/host-world-recovery"
 import { manualRecoveryClock, type ManualRecoveryClock } from "./rpc-host/__fixtures__/manual-recovery-clock"
@@ -298,7 +299,7 @@ describe("a child whose host transport drops", () => {
     // then
     await Promise.race([session.processExit, rejectAfter(10_000, "the child's process never exited")])
     expect(processAlive(session.processPid)).toBe(false)
-    expect(world.host.sessions().some((candidate) => candidate.sessionPath === child.host_session?.session_path)).toBe(false)
+    expect(sessionListedAfterClose(world.host, child.host_session?.session_path)).toBe(false)
   })
 
   test("#given a healthy child quiet past the bound #when the recovery clock runs out #then nothing is armed, it keeps running, and its lease stays held", async () => {
