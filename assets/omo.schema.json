@@ -2249,6 +2249,31 @@
       },
       "additionalProperties": false
     },
+    "security": {
+      "type": "object",
+      "properties": {
+        "file_ref_allowlist_roots": {
+          "default": [
+            "~/.config/opencode"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+        },
+        "file_ref_default_mode": {
+          "default": "refuse",
+          "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+          "type": "string",
+          "enum": [
+            "refuse",
+            "allow"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "side_panel": {
       "type": "object",
       "properties": {
@@ -4495,6 +4520,28 @@
           },
           "additionalProperties": false
         },
+        "security": {
+          "type": "object",
+          "properties": {
+            "file_ref_allowlist_roots": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+            },
+            "file_ref_default_mode": {
+              "default": "refuse",
+              "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+              "type": "string",
+              "enum": [
+                "refuse",
+                "allow"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
         "side_panel": {
           "type": "object",
           "properties": {
@@ -6714,6 +6761,28 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "security": {
+          "type": "object",
+          "properties": {
+            "file_ref_allowlist_roots": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+            },
+            "file_ref_default_mode": {
+              "default": "refuse",
+              "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+              "type": "string",
+              "enum": [
+                "refuse",
+                "allow"
+              ]
             }
           },
           "additionalProperties": false
@@ -8941,6 +9010,28 @@
           },
           "additionalProperties": false
         },
+        "security": {
+          "type": "object",
+          "properties": {
+            "file_ref_allowlist_roots": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+            },
+            "file_ref_default_mode": {
+              "default": "refuse",
+              "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+              "type": "string",
+              "enum": [
+                "refuse",
+                "allow"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
         "side_panel": {
           "type": "object",
           "properties": {
@@ -11158,6 +11249,28 @@
             "properties": {
               "enabled": {
                 "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "file_ref_allowlist_roots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+              },
+              "file_ref_default_mode": {
+                "default": "refuse",
+                "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+                "type": "string",
+                "enum": [
+                  "refuse",
+                  "allow"
+                ]
               }
             },
             "additionalProperties": false
@@ -13385,6 +13498,28 @@
                 },
                 "additionalProperties": false
               },
+              "security": {
+                "type": "object",
+                "properties": {
+                  "file_ref_allowlist_roots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+                  },
+                  "file_ref_default_mode": {
+                    "default": "refuse",
+                    "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+                    "type": "string",
+                    "enum": [
+                      "refuse",
+                      "allow"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
               "side_panel": {
                 "type": "object",
                 "properties": {
@@ -15608,6 +15743,28 @@
                 },
                 "additionalProperties": false
               },
+              "security": {
+                "type": "object",
+                "properties": {
+                  "file_ref_allowlist_roots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+                  },
+                  "file_ref_default_mode": {
+                    "default": "refuse",
+                    "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+                    "type": "string",
+                    "enum": [
+                      "refuse",
+                      "allow"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
               "side_panel": {
                 "type": "object",
                 "properties": {
@@ -17827,6 +17984,28 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "security": {
+                "type": "object",
+                "properties": {
+                  "file_ref_allowlist_roots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Absolute paths, or paths starting \"~/\", a {file:...} placeholder may read from. Default [\"~/.config/opencode\"]. Replaces the default rather than extending it. /proc, /sys, /dev, /etc/shadow, ~/.ssh, ~/.gnupg and ~/.aws are never readable, whatever this holds."
+                  },
+                  "file_ref_default_mode": {
+                    "default": "refuse",
+                    "description": "\"refuse\" (default): a {file:...} reference outside file_ref_allowlist_roots is refused and named in the setup summary. Widen file_ref_allowlist_roots instead.",
+                    "type": "string",
+                    "enum": [
+                      "refuse",
+                      "allow"
+                    ]
                   }
                 },
                 "additionalProperties": false

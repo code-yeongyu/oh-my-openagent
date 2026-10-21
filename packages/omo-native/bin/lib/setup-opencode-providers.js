@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { literalConfigValue } from "./auth-store.js"
-import { convertPlaceholders, opencodeConfigSources, readOpencodeSection, unconvertedPlaceholder } from "./setup-opencode-assets.js"
+import { convertPlaceholders, defaultFileRefAllowlistRoots, fileRefNotice, opencodeConfigSources, readOpencodeSection, unconvertedPlaceholder } from "./setup-opencode-assets.js"
 import providerMap from "./provider-map.json" with { type: "json" }
 
 // The AI SDK package an OpenCode provider names decides its wire protocol; each engine api id here
@@ -44,9 +44,11 @@ function builtinProviderIds() {
 
 // The engine resolves api keys and header values as config values: literal bytes are escaped, and
 // OpenCode's `{env:NAME}` becomes the engine's `${NAME}`. Undefined when a placeholder is left that
-// the engine has no spelling for (`{file:...}`, a non-identifier `{env:...}`).
-function configValue(value) {
-  const converted = convertPlaceholders(literalConfigValue(value))
+// the engine has no spelling for - a `{file:...}` the allowlist refused, or a non-identifier
+// `{env:...}`. `options` carries the file-reference context so a provider key resolves under the
+// same allowlist, and the same caller-provided home, an MCP header does.
+function configValue(value, options) {
+  const converted = convertPlaceholders(literalConfigValue(value), options)
   return unconvertedPlaceholder(converted) ? undefined : converted
 }
 
@@ -72,11 +74,11 @@ function readOpencodeAuth(home, env, notices) {
 
 // OpenCode's order (provider.ts): `options.apiKey` wins, else the auth.json `api` entry, else the
 // one env var `env` names - a list of several names never yields a key.
-function convertKey(id, entry, opencodeAuth, notices) {
+function convertKey(id, entry, opencodeAuth, notices, options) {
   const kind = entry.catalog === true ? "catalog provider" : "custom provider"
   const inline = text(entry.options?.apiKey)
   if (inline !== undefined) {
-    const key = configValue(inline)
+    const key = configValue(inline, options)
     if (key !== undefined) return { key, source: "opencode config apiKey" }
     notices.push(`NOTICE opencode: ${kind} ${id} apiKey uses a {file:...} or {env:...} placeholder omo cannot express; its key was not imported - start omo and run /login ${id}`)
     return undefined
@@ -127,12 +129,12 @@ function convertModel(provider, id, entry, notices) {
   }
 }
 
-function convertHeaders(headers) {
+function convertHeaders(headers, options) {
   if (!isPlainObject(headers)) return {}
   const converted = {}
   for (const [name, value] of Object.entries(headers)) {
     if (typeof value !== "string") continue
-    const resolved = configValue(value)
+    const resolved = configValue(value, options)
     if (resolved === undefined) return undefined
     converted[name] = resolved
   }
@@ -163,7 +165,7 @@ function convertProvider(id, entry, context) {
     notices.push(`NOTICE opencode: ${kind} ${id} baseURL ${baseURL} does not end in /v1, which omo's Anthropic client needs; not imported`)
     return undefined
   }
-  const headers = convertHeaders(entry.options?.headers)
+  const headers = convertHeaders(entry.options?.headers, context.placeholders)
   if (headers === undefined) {
     notices.push(`NOTICE opencode: ${kind} ${id} has a header with a {file:...} or {env:...} placeholder omo cannot express; not imported`)
     return undefined
@@ -184,7 +186,7 @@ function convertProvider(id, entry, context) {
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
     models,
   }
-  return { id, npm, config, key: convertKey(id, entry, context.opencodeAuth, notices) }
+  return { id, npm, config, key: convertKey(id, entry, context.opencodeAuth, notices, context.placeholders) }
 }
 
 // OpenCode's own copy of the models.dev catalog (core/src/models-dev.ts: Global.Path.cache, or
@@ -258,8 +260,16 @@ export function planOpencodeProviders(options = {}) {
   const opencodeAuth = readOpencodeAuth(home, env, Object.keys(config).length > 0 ? notices : [])
   const declared = withCatalog(config, opencodeAuth, builtin, home, env, notices)
   // auth.json is only a key source here; with no provider to describe it is the credential stage's alone.
-  if (Object.keys(declared).length === 0) return { providers: [], skipped: [], notices }
-  const context = { builtin, opencodeAuth, notices }
+  const refusedFileRefs = []
+  const resolvedFileRefs = []
+  const placeholders = {
+    home,
+    allowlistRoots: options.fileRefAllowlistRoots ?? defaultFileRefAllowlistRoots(home, env),
+    refusedFileRefs,
+    resolvedFileRefs,
+  }
+  if (Object.keys(declared).length === 0) return { providers: [], skipped: [], refusedFileRefs, resolvedFileRefs, notices }
+  const context = { builtin, opencodeAuth, notices, placeholders }
   const providers = []
   // The ids declared but not carried; each one's reason is in `notices`.
   const skipped = []
@@ -268,5 +278,12 @@ export function planOpencodeProviders(options = {}) {
     if (converted) providers.push(converted)
     else skipped.push(id)
   }
-  return { providers: providers.sort((left, right) => left.id.localeCompare(right.id)), skipped: skipped.sort(), notices }
+  for (const refusal of refusedFileRefs) notices.push(fileRefNotice(refusal.reference, refusal.reason))
+  return {
+    providers: providers.sort((left, right) => left.id.localeCompare(right.id)),
+    skipped: skipped.sort(),
+    refusedFileRefs,
+    resolvedFileRefs,
+    notices,
+  }
 }

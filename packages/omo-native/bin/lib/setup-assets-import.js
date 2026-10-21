@@ -86,13 +86,17 @@ function list(label, ids) {
   return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
 }
 
-export function assetPlanLines({ result }) {
+// `--dry-run` names the canonical path of every `{file:...}` reference this run resolved, so a user
+// checking a plan sees which file's plaintext is about to land in mcp.json.
+export function assetPlanLines({ result, resolvedFileRefs = [], refusedFileRefs = [] }) {
   return [
     list("planned-mcp", result.servers.added.map((server) => server.name)),
     list("mcp-skipped-existing", result.servers.skippedExisting),
     list("planned-skills", result.skills.added.map((skill) => skill.name)),
     list("skills-skipped-existing", result.skills.skippedExisting),
     list("skills-skipped-bundled", result.skills.skippedBundled),
+    list("file-refs-resolved", resolvedFileRefs.map((item) => item.source)),
+    list("file-refs-refused", refusedFileRefs.map((item) => `${item.reference} (${item.reason})`)),
   ]
 }
 
@@ -130,6 +134,8 @@ export function planAssets({ runtime, agentDir }) {
     result,
     refusedServers: source.refusedServers,
     skippedSkills: source.skippedSkills,
+    refusedFileRefs: source.refusedFileRefs,
+    resolvedFileRefs: source.resolvedFileRefs,
     pending: result.servers.added.length + result.skills.added.length,
   }
 }

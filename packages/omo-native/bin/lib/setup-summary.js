@@ -60,6 +60,19 @@ function withReasons(items) {
   return items.map((item) => `${item.name}: ${item.reason}`).join(", ")
 }
 
+// Every `{file:...}` reference the run resolved and refused, across the asset and provider stages.
+// A resolved one prints the canonical path it read, so a summary names the file that ended up in
+// auth.json / mcp.json; a refused one prints the raw reference and why, because that is the whole
+// answer to "why did my key not import".
+function fileRefParts(context) {
+  const resolved = [...(context.assets?.resolvedFileRefs ?? []), ...(context.providers?.resolvedFileRefs ?? [])]
+  const refused = [...(context.assets?.refusedFileRefs ?? []), ...(context.providers?.refusedFileRefs ?? [])]
+  return segments([
+    [resolved, (items) => `${items.length} file reference(s) resolved (${items.map((item) => item.source).join(", ")})`],
+    [refused, (items) => `${items.length} refused (${items.map((item) => `${item.reference}: ${item.reason}`).join(", ")})`],
+  ])
+}
+
 function segments(list) {
   const present = list.filter(([items]) => items.length > 0).map(([items, render]) => render(items))
   return present.length > 0 ? [present.join("; ")] : []
@@ -155,6 +168,7 @@ export function formatSetupSummary(context) {
     ...row("skills", skillParts(context)),
     ...row("providers", providerParts(context)),
     ...row("model choices", modelChoiceParts(context)),
+    ...row("file refs", fileRefParts(context)),
   ]
   // Coverage is not something found, so it never turns an empty summary into a non-empty one.
   const coverage = context.categories === undefined ? [] : row("categories", coverageSummaryParts(context.categories))

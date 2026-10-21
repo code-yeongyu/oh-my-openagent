@@ -3,39 +3,142 @@
  * the engine's global `mcp.json` and global skill root accept. Read-only: nothing here writes.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { join, resolve } from "node:path"
+import { isAbsolute, join, relative, resolve } from "node:path"
 import { parseJsonc } from "./jsonc.js"
 
-// `{file:...}` opens once, at setup time: the engine cannot read files, so the bytes that end up in
-// auth.json / models.json / mcp.json must be the literal secret. A leading `~` resolves against the
-// user HOME the caller passed in (the test fixture's `home`, never `os.homedir()` blind); an empty
-// or non-absolute path returns undefined so the literal `{file:...}` falls through unchanged and
-// `unconvertedPlaceholder` later refuses the server. Every other fs error re-throws - only ENOENT,
-// EACCES, and EISDIR are silent refusals; the test author's setup ought to hear about, say, a JSON
-// parse error in the secret file, not lose it to a swallowed catch.
-function readFileRef(rawPath, home) {
-  if (typeof rawPath !== "string") return undefined
-  const trimmed = rawPath.trim()
-  if (trimmed === "") return undefined
-  let resolved
-  if (trimmed === "~") resolved = home
-  else if (trimmed.startsWith("~/")) resolved = home + trimmed.slice(1)
-  else if (trimmed.startsWith("/")) resolved = trimmed
-  else return undefined
-  let bytes
+/**
+ * The one root `{file:...}` may read from, unless `security.file_ref_allowlist_roots` adds more. The
+ * OpenCode config dir is where setup already reads user config from, so a user who keeps a secret
+ * for omo keeps it next to the config that names it.
+ */
+export const DEFAULT_FILE_REF_ALLOWLIST_ROOTS = ["~/.config/opencode"]
+
+/**
+ * The default root, resolved the way every other path here is: XDG-aware, against the caller's home.
+ * `security.file_ref_allowlist_roots` replaces it entirely, so a user who names one root gets that
+ * root and not this one.
+ */
+export function defaultFileRefAllowlistRoots(home, env = process.env) {
+  return [join(env.XDG_CONFIG_HOME || join(home, ".config"), "opencode")]
+}
+
+/**
+ * Never readable through a `{file:...}` reference, and no `security.file_ref_allowlist_roots` entry
+ * can widen them: a pseudo-filesystem under `/proc`, `/sys` or `/dev` hands out another process's
+ * environment, and these hold credentials rather than configuration. `~` is expanded against the
+ * caller's home, never `os.homedir()` blind.
+ */
+export const FILE_REF_DENYLIST_PREFIXES = ["/proc", "/sys", "/dev", "/etc/shadow", "~/.ssh", "~/.gnupg", "~/.aws"]
+
+// Group- and other-readable, or group- and other-writable: a secret either mode exposes is a secret
+// the next local user can copy out of the file the reference named.
+const GROUP_OR_OTHER_BITS = 0o077
+
+function expandHome(path, home) {
+  if (path === "~") return home
+  return path.startsWith("~/") ? join(home, path.slice(2)) : path
+}
+
+function isUnder(canonicalPath, canonicalRoot) {
+  const inside = relative(canonicalRoot, canonicalPath)
+  return inside === "" || (!inside.startsWith("..") && !isAbsolute(inside))
+}
+
+// The canonical form of an allowlist root, so a root that is itself reached through a symlink (a
+// macOS `/tmp` is one) still matches the canonical path the file resolved to. A root that does not
+// exist yet stays lexical: nothing can resolve through it either.
+function canonicalRoot(root) {
   try {
-    bytes = readFileSync(resolved, "utf8")
+    return realpathSync(root)
+  } catch {
+    return resolve(root)
+  }
+}
+
+function errorCode(error) {
+  return error !== null && typeof error === "object" && "code" in error ? String(error.code) : undefined
+}
+
+/**
+ * Resolves one `{file:...}` reference under the allowlist, or says why it will not.
+ *
+ * Returns `{ value, source }` with `source` the canonical path the bytes came from, or
+ * `{ refused, reason }` with `reason` one of `denied` (a denylisted prefix, which no config widens),
+ * `outside_allowlist`, `symlink`, `too_permissive`, `missing`.
+ *
+ * The order is the contract. Denylist first, so a refusal never depends on whether an attacker can
+ * create the path; then existence, so `missing` names a path the user expected to be there; then the
+ * link, so a symlink inside the allowlist is named as one rather than as whatever it points at; and
+ * only then the canonical path, because `/etc/hostname` and `~/.ssh/id_ed25519` are both reachable
+ * by a path that is not itself sensitive. An empty path, a blank one, and a relative one are all
+ * outside every root, which is what a relative path was already treated as.
+ *
+ * `context` is `{ home, allowlistRoots }`; `home` is the caller's, so a test fixture and the setup
+ * that owns `~/.omo` read the same tree the user configured.
+ */
+export function resolveFileRef(rawPath, context = {}) {
+  const home = context.home ?? homedir()
+  const roots = (context.allowlistRoots ?? DEFAULT_FILE_REF_ALLOWLIST_ROOTS).filter((root) => typeof root === "string" && root.trim() !== "")
+  const reference = typeof rawPath === "string" ? rawPath.trim() : ""
+  const resolved = reference === "" ? "" : expandHome(reference, home)
+  if (!isAbsolute(resolved)) return { refused: "outside_allowlist" }
+  if (FILE_REF_DENYLIST_PREFIXES.some((prefix) => isUnder(resolved, expandHome(prefix, home)) || resolved === expandHome(prefix, home))) {
+    return { refused: "denied" }
+  }
+  let entry
+  try {
+    entry = lstatSync(resolved)
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && (error.code === "ENOENT" || error.code === "EACCES" || error.code === "EISDIR")) {
-      return undefined
-    }
+    // ENOENT/ENOTDIR: nothing there. EACCES/EISDIR/ELOOP: nothing this process may read as a file.
+    if (["ENOENT", "ENOTDIR", "EACCES", "EISDIR", "ELOOP", "ENAMETOOLONG"].includes(errorCode(error) ?? "")) return { refused: "missing" }
     throw error
   }
-  // Trailing whitespace only (typical LF/CRLF on a credential file); interior whitespace stays.
-  const stripped = bytes.replace(/\s+$/, "")
-  return stripped === "" ? undefined : stripped
+  if (entry.isSymbolicLink()) return { refused: "symlink" }
+  let canonical
+  try {
+    canonical = realpathSync(resolved)
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return { refused: "missing" }
+    throw error
+  }
+  // A parent directory can be a symlink the lstat above never saw, so the sensitive-prefix and
+  // allowlist questions are asked again of the path the file really lives at.
+  if (FILE_REF_DENYLIST_PREFIXES.some((prefix) => isUnder(canonical, expandHome(prefix, home)) || canonical === expandHome(prefix, home))) {
+    return { refused: "denied" }
+  }
+  if (!roots.some((root) => isUnder(canonical, canonicalRoot(expandHome(root.trim(), home))))) return { refused: "outside_allowlist" }
+  const target = lstatSync(canonical)
+  if (!target.isFile()) return { refused: "missing" }
+  if ((target.mode & GROUP_OR_OTHER_BITS) !== 0) return { refused: "too_permissive" }
+  // Trailing whitespace only (typical LF/CRLF on a credential file); interior whitespace stays. A
+  // file with nothing but whitespace names no secret, so it is the same refusal as a missing one.
+  const value = readFileSync(canonical, "utf8").replace(/\s+$/, "")
+  return value === "" ? { refused: "missing" } : { value, source: canonical }
+}
+
+// What each refusal reason means in the words the setup summary prints, and what to do about it.
+const FILE_REF_REFUSAL = {
+  denied: "is on the built-in denylist, which no config widens",
+  outside_allowlist: "is outside security.file_ref_allowlist_roots",
+  symlink: "is a symlink, which omo does not follow",
+  too_permissive: "is readable by group or other; chmod 600 it",
+  missing: "has no readable file there",
+}
+
+function recordFileRefRefusal(refusedFileRefs, resolvedFileRefs, reference, outcome) {
+  if (outcome.refused === undefined) {
+    const entry = { reference, source: outcome.source }
+    if (!resolvedFileRefs.some((item) => item.reference === entry.reference && item.source === entry.source)) resolvedFileRefs.push(entry)
+    return outcome.value
+  }
+  if (!refusedFileRefs.some((item) => item.reference === reference && item.reason === outcome.refused)) {
+    refusedFileRefs.push({ reference, reason: outcome.refused })
+  }
+  // The literal placeholder is left in place, so `unconvertedPlaceholder` refuses whatever carries
+  // it rather than the engine receiving `{file:...}` as data.
+  return undefined
 }
 
 // `interpolateString` in the engine's mcp config rejects any string value that looks like command
@@ -124,17 +227,28 @@ export function readOpencodeConfig(files, label, notices) {
 }
 
 // OpenCode substitutes `{env:NAME}`; the engine substitutes `${NAME}`. Same intent, same value.
-// OmO additionally substitutes `{file:...}` at setup time by reading the file's contents inline;
-// the engine does not see placeholders, only the bytes OpenCode would have sent.
+// OmO additionally substitutes `{file:...}` at setup time by reading the file's contents inline; the
+// engine does not see placeholders, only the bytes OpenCode would have sent. A reference the
+// allowlist refuses stays literal, so `unconvertedPlaceholder` drops whatever carried it.
 const PLACEHOLDER_REGEX = /\{(?:env:([A-Za-z_][A-Za-z0-9_]*)|file:([^}]+))\}/g
 
+/**
+ * `options` is `{ home, allowlistRoots }` plus the two collectors the plan surfaces: `refusedFileRefs`
+ * and `resolvedFileRefs`, shared across one plan so the setup summary can name every file reference
+ * it resolved and every one it refused, once each.
+ */
 export function convertPlaceholders(value, options = {}) {
   if (typeof value !== "string") return value
-  const home = options.home ?? homedir()
+  const context = { home: options.home, allowlistRoots: options.allowlistRoots, refusedFileRefs: options.refusedFileRefs, resolvedFileRefs: options.resolvedFileRefs }
   return value.replace(PLACEHOLDER_REGEX, (match, envName, filePath) => {
     if (envName !== undefined) return "${" + envName + "}"
-    return readFileRef(filePath, home) ?? match
+    return recordFileRefRefusal(options.refusedFileRefs, options.resolvedFileRefs, filePath, resolveFileRef(filePath, context)) ?? match
   })
+}
+
+/** One line per refused `{file:...}` reference, naming the raw reference and why it was refused. */
+export function fileRefNotice(reference, reason) {
+  return `NOTICE opencode: {file:${reference}} ${FILE_REF_REFUSAL[reason]}; its plaintext was not imported - move the file under ~/.config/opencode/secrets/, add its directory to security.file_ref_allowlist_roots, or reference an environment variable as \${NAME} instead`
 }
 
 // What is left after conversion is a placeholder the engine has no spelling for: `{file:path}`
@@ -268,11 +382,20 @@ export function planOpencodeAssets(options = {}) {
   const notices = []
   const mcpServers = []
   const refusedServers = []
+  const refusedFileRefs = []
+  const resolvedFileRefs = []
+  const placeholderOptions = {
+    home,
+    allowlistRoots: options.fileRefAllowlistRoots ?? defaultFileRefAllowlistRoots(home, env),
+    refusedFileRefs,
+    resolvedFileRefs,
+  }
   for (const [name, entry] of Object.entries(readOpencodeSection(sources.files, "mcp", "mcp servers", notices))) {
-    const converted = convertServer(name, entry, notices, refusedServers, { home })
+    const converted = convertServer(name, entry, notices, refusedServers, placeholderOptions)
     if (converted) mcpServers.push({ name, config: converted })
   }
   const skippedSkills = []
   const skills = readSkills(sources.directories, notices, skippedSkills)
-  return { mcpServers, refusedServers, skills, skippedSkills, notices }
+  for (const refusal of refusedFileRefs) notices.push(fileRefNotice(refusal.reference, refusal.reason))
+  return { mcpServers, refusedServers, skills, skippedSkills, refusedFileRefs, resolvedFileRefs, notices }
 }

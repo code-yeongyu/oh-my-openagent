@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -133,10 +133,11 @@ describe("omo setup opencode custom provider import", () => {
 
   describe("#given a custom provider whose apiKey references a real file via {file:...}", () => {
     describe("#when setup is accepted", () => {
-      test("#then the file's trimmed contents are baked into auth.json as the key, not carried as a placeholder", () => {
+      test("#then an allowlisted secret's trimmed contents are baked into auth.json as the key, not carried as a placeholder", () => {
         const item = fixture()
-        const secretPath = join(item.tmp, "dgx.key")
-        writeFileSync(secretPath, "Bearer dgx-file-key\n")
+        const secretPath = join(item.configHome, "opencode", "secrets", "dgx.key")
+        write(secretPath, "Bearer dgx-file-key\n")
+        chmodSync(secretPath, 0o600)
 
         opencode(item, {
           provider: {
@@ -154,6 +155,32 @@ describe("omo setup opencode custom provider import", () => {
         expect(result.status).toBe(0)
         expect(auth.malformed).toBeUndefined()
         expect((auth.entries as Record<string, { type: string, key: string }>).dgx).toEqual({ type: "api_key", key: "Bearer dgx-file-key" })
+      })
+
+      test("#then an apiKey pointing at an ssh private key is refused and auth.json gains no key for that provider", () => {
+        const item = fixture()
+        const privateKeyPath = join(item.home, ".ssh", "id_ed25519")
+        write(privateKeyPath, "-----BEGIN OPENSSH PRIVATE KEY-----\nnot-a-provider-key\n")
+        chmodSync(privateKeyPath, 0o600)
+
+        opencode(item, {
+          provider: {
+            relay: {
+              npm: "@ai-sdk/openai-compatible",
+              options: { baseURL: "https://relay.example/v1", apiKey: `{file:${privateKeyPath}}` },
+              models: { "relay-large": { name: "Relay Large", limit: { context: 200000, output: 32000 } } },
+            },
+          },
+        })
+
+        const result = run(item, ["setup", "--yes"])
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect(auth.malformed).toBeUndefined()
+        expect(Object.hasOwn(auth.entries as Record<string, unknown>, "relay")).toBe(false)
+        expect(result.stdout).toContain("denylist")
+        expect(result.stdout).not.toContain("not-a-provider-key")
       })
     })
   })

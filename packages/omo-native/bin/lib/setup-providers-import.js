@@ -64,8 +64,13 @@ function list(label, ids) {
   return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
 }
 
-export function providerPlanLines({ result }) {
-  return [list("planned-providers", result.added.map((provider) => provider.id)), list("providers-skipped-existing", result.skippedExisting)]
+export function providerPlanLines({ result, resolvedFileRefs = [], refusedFileRefs = [] }) {
+  return [
+    list("planned-providers", result.added.map((provider) => provider.id)),
+    list("providers-skipped-existing", result.skippedExisting),
+    list("file-refs-resolved", resolvedFileRefs.map((item) => item.source)),
+    list("file-refs-refused", refusedFileRefs.map((item) => `${item.reference} (${item.reason})`)),
+  ]
 }
 
 export function providerCounts({ result }) {
@@ -105,7 +110,18 @@ export function planProviders(source, agentDir) {
   const result = classify(source, models, auth)
   const notices = [...source.notices]
   if (result.blocked.length > 0) notices.push(`WARN senpi: malformed models.json; these custom providers were not imported: ${result.blocked.join(", ")}`)
-  return { paths, models, authBytes: auth.bytes, notices, result, skipped: source.skipped, present: source.providers.length > 0, pending: result.added.length }
+  return {
+    paths,
+    models,
+    authBytes: auth.bytes,
+    notices,
+    result,
+    skipped: source.skipped,
+    resolvedFileRefs: source.resolvedFileRefs,
+    refusedFileRefs: source.refusedFileRefs,
+    present: source.providers.length > 0,
+    pending: result.added.length,
+  }
 }
 
 /**
