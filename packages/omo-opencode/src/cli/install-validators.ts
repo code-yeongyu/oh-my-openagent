@@ -58,7 +58,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
   lines.push(formatProvider("Bailian Coding Plan", config.hasBailianCodingPlan, "Qwen/GLM/Kimi fallback"))
   lines.push(formatProvider("MiniMax Coding Plan (minimaxi.com)", config.hasMinimaxCnCodingPlan, "MiniMax-M3 fallback"))
-  lines.push(formatProvider("MiniMax Coding Plan (minimax.io)", config.hasMinimaxCodingPlan, "MiniMax-M3 fallback"))
+  lines.push(formatProvider("MiniMax Coding Plan (minimax.io)", config.hasMinimaxCodingPlan, "MiniMax-M3.1-Flash → MiniMax-M3 fallback"))
   lines.push(formatProvider("Vercel AI Gateway", config.hasVercelAiGateway, "universal proxy"))
 
   lines.push("")

@@ -320,7 +320,7 @@ describe("formatConfigSummary", () => {
     expect(summary).not.toContain("Librarian/Multimodal")
   })
 
-  test("describes MiniMax Coding Plan as MiniMax-M3 fallback", () => {
+  test("describes MiniMax Coding Plan as Flash-first with MiniMax-M3 fallback", () => {
     // #given
     const config = argsToConfig(createArgs({ platform: "opencode", minimaxCodingPlan: "yes" }))
 
@@ -329,7 +329,7 @@ describe("formatConfigSummary", () => {
 
     // #then
     expect(summary).toContain("MiniMax Coding Plan (minimax.io)")
-    expect(summary).toContain("MiniMax-M3 fallback")
+    expect(summary).toContain("MiniMax-M3.1-Flash → MiniMax-M3 fallback")
   })
 
   test("hides OpenCode model catalog for codex-only installs", () => {

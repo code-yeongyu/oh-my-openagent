@@ -299,7 +299,7 @@ describe("generateModelConfig provider routes", () => {
   })
 
   describe("MiniMax Coding Plan providers", () => {
-    test("uses minimax.io MiniMax-M3 when only MiniMax Coding Plan is available", () => {
+    test("uses minimax.io Flash first with M3 fallback when only MiniMax Coding Plan is available", () => {
       // given only MiniMax Coding Plan is available
       const config = createConfig({ hasMinimaxCodingPlan: true })
 
@@ -310,8 +310,14 @@ describe("generateModelConfig provider routes", () => {
       // carry no Coding Plan rung, so librarian is omitted and explore takes the ultimate fallback
       expect(result.agents?.librarian).toBeUndefined()
       expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
-      expect(result.agents?.atlas?.model).toBe("minimax-coding-plan/MiniMax-M3")
-      expect(result.agents?.["sisyphus-junior"]?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      // Serialize the installer output at the config boundary consumed by OpenCode.
+      const serialized = JSON.parse(JSON.stringify(result))
+      for (const name of ["atlas", "sisyphus-junior"]) {
+        expect(serialized.agents[name]).toEqual({
+          model: "minimax-coding-plan/MiniMax-M3.1-Flash",
+          fallback_models: [{ model: "minimax-coding-plan/MiniMax-M3" }],
+        })
+      }
     })
 
     test("keeps opencode-go MiniMax M3 ahead of Coding Plan fallback when both are available", () => {
@@ -324,8 +330,9 @@ describe("generateModelConfig provider routes", () => {
       // then OpenCode Go remains ahead of the Coding Plan fallback
       expect(result.agents?.atlas?.model).toBe("opencode-go/kimi-k3")
       expect(result.agents?.atlas?.fallback_models?.[0]?.model).toBe("opencode-go/minimax-m3")
-      expect(result.agents?.atlas?.fallback_models?.[1]?.model).toBe("minimax-coding-plan/MiniMax-M3")
-      expect(result.agents?.atlas?.fallback_models?.[2]?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.atlas?.fallback_models?.[1]?.model).toBe("minimax-coding-plan/MiniMax-M3.1-Flash")
+      expect(result.agents?.atlas?.fallback_models?.[2]?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.atlas?.fallback_models?.[3]?.model).toBe("opencode-go/minimax-m2.7")
     })
 
     test("uses minimaxi.com MiniMax-M3 when only MiniMax CN Coding Plan is available", () => {
