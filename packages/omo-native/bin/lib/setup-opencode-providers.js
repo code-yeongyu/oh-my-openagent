@@ -6,9 +6,16 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { literalConfigValue } from "./auth-store.js"
-import { convertPlaceholders, opencodeConfigSources, readOpencodeSection, unconvertedPlaceholder } from "./setup-opencode-assets.js"
+import {
+  convertPlaceholders,
+  convertToObjectField,
+  legacyConfigValue,
+  opencodeConfigSources,
+  readOpencodeSection,
+  shouldEmitReferenceObjects,
+} from "./setup-opencode-assets.js"
 import providerMap from "./provider-map.json" with { type: "json" }
 
 // The AI SDK package an OpenCode provider names decides its wire protocol; each engine api id here
@@ -42,12 +49,19 @@ function builtinProviderIds() {
   return new Set([...providerMap.builtinProviderIds, ...Object.keys(providerMap.providers)])
 }
 
-// The engine resolves api keys and header values as config values: literal bytes are escaped, and
-// OpenCode's `{env:NAME}` becomes the engine's `${NAME}`. Undefined when a placeholder is left that
-// the engine has no spelling for (`{file:...}`, a non-identifier `{env:...}`).
-function configValue(value) {
-  const converted = convertPlaceholders(literalConfigValue(value))
-  return unconvertedPlaceholder(converted) ? undefined : converted
+// The engine resolves api keys and header values as config values at load time: literal bytes
+// are escaped, OpenCode's `{env:NAME}` becomes the engine's `${NAME}`, and any `{file:...}` or
+// `{env:...}` reference in an object-shaped field becomes a structured reference object
+// (`{$file: ...}` / `{$env: ...}` / `{$concat: [...]}`) that the engine reads at load. Returns
+// undefined when a placeholder is left that the engine has no spelling for.
+//
+// `legacy` is the engine-version gate closed: the value lands in the engine config as a plain
+// string, so the pre-change rules apply (a `{file:...}` or malformed `{env:...}` is refused).
+function configValue(value, baseDir = "", legacy = false) {
+  if (legacy) return legacyConfigValue(value)
+  const split = convertToObjectField(value, baseDir)
+  if (split.refused) return undefined
+  return split.value
 }
 
 // @ai-sdk/anthropic posts to `<baseURL>/messages` (its default base is https://api.anthropic.com/v1);
@@ -72,13 +86,17 @@ function readOpencodeAuth(home, env, notices) {
 
 // OpenCode's order (provider.ts): `options.apiKey` wins, else the auth.json `api` entry, else the
 // one env var `env` names - a list of several names never yields a key.
-function convertKey(id, entry, opencodeAuth, notices) {
+function convertKey(id, entry, opencodeAuth, baseDir, legacy, notices) {
   const kind = entry.catalog === true ? "catalog provider" : "custom provider"
   const inline = text(entry.options?.apiKey)
   if (inline !== undefined) {
-    const key = configValue(inline)
+    const key = configValue(inline, baseDir, legacy)
     if (key !== undefined) return { key, source: "opencode config apiKey" }
-    notices.push(`NOTICE opencode: ${kind} ${id} apiKey uses a {file:...} or {env:...} placeholder omo cannot express; its key was not imported - start omo and run /login ${id}`)
+    notices.push(
+      legacy
+        ? `NOTICE opencode: ${kind} ${id} apiKey has a {file:...} or malformed {env:NAME} placeholder that omo cannot express in the plain-string form; the key was not imported - start omo and run /login ${id}, or fix the apiKey value.`
+        : `NOTICE opencode: ${kind} ${id} apiKey has a malformed {env:NAME} placeholder (NAME outside the identifier shape) that omo refuses to ship; the {file:...} form is supported (the engine resolves it at load time). Start omo and run /login ${id}, or fix the apiKey value.`,
+    )
     return undefined
   }
   const stored = opencodeAuth[id]
@@ -88,8 +106,9 @@ function convertKey(id, entry, opencodeAuth, notices) {
   return undefined
 }
 
-// A URL still holding a placeholder has no engine spelling: the engine sends baseUrl verbatim, while
-// OpenCode substitutes `{env:...}` / `{file:...}` into its config and `${NAME}` into the URL itself.
+// A URL still holding a placeholder has no engine spelling at URL position: the engine sends
+// baseUrl verbatim, while OpenCode substitutes `{env:...}` / `{file:...}` into URLs in its
+// own config and `${NAME}` into the URL itself. URLs that have reached us must be opaque.
 function fixedUrl(value) {
   return value !== undefined && !/\{(?:env|file):|\$\{/.test(value) ? value : undefined
 }
@@ -127,12 +146,12 @@ function convertModel(provider, id, entry, notices) {
   }
 }
 
-function convertHeaders(headers) {
+function convertHeaders(headers, baseDir, legacy) {
   if (!isPlainObject(headers)) return {}
   const converted = {}
   for (const [name, value] of Object.entries(headers)) {
     if (typeof value !== "string") continue
-    const resolved = configValue(value)
+    const resolved = configValue(value, baseDir, legacy)
     if (resolved === undefined) return undefined
     converted[name] = resolved
   }
@@ -163,9 +182,13 @@ function convertProvider(id, entry, context) {
     notices.push(`NOTICE opencode: ${kind} ${id} baseURL ${baseURL} does not end in /v1, which omo's Anthropic client needs; not imported`)
     return undefined
   }
-  const headers = convertHeaders(entry.options?.headers)
+  const headers = convertHeaders(entry.options?.headers, context.baseDir, context.legacy)
   if (headers === undefined) {
-    notices.push(`NOTICE opencode: ${kind} ${id} has a header with a {file:...} or {env:...} placeholder omo cannot express; not imported`)
+    notices.push(
+      context.legacy
+        ? `NOTICE opencode: ${kind} ${id} has a header with a {file:...} or malformed {env:NAME} placeholder omo cannot express in the plain-string form; not imported`
+        : `NOTICE opencode: ${kind} ${id} has a header with a malformed {env:NAME} placeholder omo cannot express; not imported`,
+    )
     return undefined
   }
   const models = Object.entries(isPlainObject(entry.models) ? entry.models : {})
@@ -184,7 +207,7 @@ function convertProvider(id, entry, context) {
     ...(Object.keys(headers).length > 0 ? { headers } : {}),
     models,
   }
-  return { id, npm, config, key: convertKey(id, entry, context.opencodeAuth, notices) }
+  return { id, npm, config, key: convertKey(id, entry, context.opencodeAuth, context.baseDir, context.legacy, notices) }
 }
 
 // OpenCode's own copy of the models.dev catalog (core/src/models-dev.ts: Global.Path.cache, or
@@ -252,14 +275,26 @@ export function planOpencodeProviders(options = {}) {
   const home = options.home ?? homedir()
   const env = options.env ?? process.env
   const notices = []
-  const config = readOpencodeSection(opencodeConfigSources(home, env).files, "provider", "custom providers", notices)
+  const sources = opencodeConfigSources(home, env)
+  const config = readOpencodeSection(sources.files, "provider", "custom providers", notices)
   const builtin = builtinProviderIds()
   // With no provider block, a bad auth.json is the credential stage's to report.
   const opencodeAuth = readOpencodeAuth(home, env, Object.keys(config).length > 0 ? notices : [])
   const declared = withCatalog(config, opencodeAuth, builtin, home, env, notices)
   // auth.json is only a key source here; with no provider to describe it is the credential stage's alone.
   if (Object.keys(declared).length === 0) return { providers: [], skipped: [], notices }
-  const context = { builtin, opencodeAuth, notices }
+  // baseDir is the directory of the OpenCode config file the entry came from. The config is
+  // MERGED across every file OpenCode reads, so the file a given entry came from is not known
+  // here; the global config directory is the best available anchor. A relative `{file:...}` path
+  // therefore resolves against the global dir, not against the file that wrote it.
+  const baseDir = sources.files[0] ? dirname(sources.files[0]) : ""
+  const referenceObjects = shouldEmitReferenceObjects(options)
+  const context = { builtin, opencodeAuth, notices, baseDir, legacy: !referenceObjects }
+  if (!referenceObjects && Object.keys(declared).length > 0) {
+    notices.push(
+      `NOTICE omo: the installed senpi engine does not support {file:...} / {env:...} reference objects yet, so omo imported these providers in the plain-string form and refused any {file:...} reference in them. Update senpi to pick up the reference-object support.`,
+    )
+  }
   const providers = []
   // The ids declared but not carried; each one's reason is in `notices`.
   const skipped = []
