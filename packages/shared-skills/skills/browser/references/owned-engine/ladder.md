@@ -40,8 +40,8 @@ A challenge is an obstacle on the path, not a stop sign: clear it, confirm it cl
 
 - **Checkbox** (the common embedded widgets): the control lives in a nested frame, so
   `captcha.click(bounds)` addresses it by viewport coordinates.
-- **Slider / puzzle**: `captcha.drag(from, to, { steps })` with enough intermediate steps that the
-  motion reads as human. Raise the step count before you change the endpoints.
+- **Slider / puzzle**: `captcha.drag(from, to, { steps })`. Keep the default step count; if the
+  drag is correct and still fails, that is the trajectory case below, not a reason to tune motion.
 - **Text or number**: `captcha.readText(bounds)` OCRs the region — the macOS Vision framework by
   default, or pass your own `ocr` function or a vision model.
 - **Image grid**: annotate a screenshot, then click per cell with `createCua`.
@@ -55,11 +55,11 @@ engine is the variable: relaunch through `connectCloakProfile()`.
 
 **A correct click that keeps failing is a trajectory problem, and the answer is the human.** reCAPTCHA
 scores the pointer path, not the click: it reads whether the cursor arrived straight, jittered,
-accelerating, or the way people actually move. Do not answer that with a synthetic motion model —
-detection-evasion code raises the account risk this skill exists to avoid, and the real session
-already carries a human's own trajectory, so faking the one input a human did for free makes the
-run look less human, not more. Name the cause in the diagnosis and hand the page over with
-`requestHuman`.
+accelerating, or the way people actually move. Do not go beyond the slider's `steps` option to model
+pointer motion: detection-evasion code raises the account risk this skill exists to avoid, and the
+real session already carries a human's own trajectory, so faking the one input a human did for free
+makes the run look less human, not more. Name the cause in the diagnosis and hand the page over with
+[`requestHuman`](frames-and-humans.md).
 
 ## Delegating the pixel loop
 
