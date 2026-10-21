@@ -8,6 +8,36 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { parseJsonc } from "./jsonc.js"
 
+// `{file:...}` opens once, at setup time: the engine cannot read files, so the bytes that end up in
+// auth.json / models.json / mcp.json must be the literal secret. A leading `~` resolves against the
+// user HOME the caller passed in (the test fixture's `home`, never `os.homedir()` blind); an empty
+// or non-absolute path returns undefined so the literal `{file:...}` falls through unchanged and
+// `unconvertedPlaceholder` later refuses the server. Every other fs error re-throws - only ENOENT,
+// EACCES, and EISDIR are silent refusals; the test author's setup ought to hear about, say, a JSON
+// parse error in the secret file, not lose it to a swallowed catch.
+function readFileRef(rawPath, home) {
+  if (typeof rawPath !== "string") return undefined
+  const trimmed = rawPath.trim()
+  if (trimmed === "") return undefined
+  let resolved
+  if (trimmed === "~") resolved = home
+  else if (trimmed.startsWith("~/")) resolved = home + trimmed.slice(1)
+  else if (trimmed.startsWith("/")) resolved = trimmed
+  else return undefined
+  let bytes
+  try {
+    bytes = readFileSync(resolved, "utf8")
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && (error.code === "ENOENT" || error.code === "EACCES" || error.code === "EISDIR")) {
+      return undefined
+    }
+    throw error
+  }
+  // Trailing whitespace only (typical LF/CRLF on a credential file); interior whitespace stays.
+  const stripped = bytes.replace(/\s+$/, "")
+  return stripped === "" ? undefined : stripped
+}
+
 // `interpolateString` in the engine's mcp config rejects any string value that looks like command
 // substitution - one containing `$(` or starting (after leading whitespace) with `!` - and one bad
 // value fails the whole file, so such a server is dropped, not copied.
@@ -94,8 +124,17 @@ export function readOpencodeConfig(files, label, notices) {
 }
 
 // OpenCode substitutes `{env:NAME}`; the engine substitutes `${NAME}`. Same intent, same value.
-export function convertPlaceholders(value) {
-  return typeof value === "string" ? value.replace(/\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g, "${$1}") : value
+// OmO additionally substitutes `{file:...}` at setup time by reading the file's contents inline;
+// the engine does not see placeholders, only the bytes OpenCode would have sent.
+const PLACEHOLDER_REGEX = /\{(?:env:([A-Za-z_][A-Za-z0-9_]*)|file:([^}]+))\}/g
+
+export function convertPlaceholders(value, options = {}) {
+  if (typeof value !== "string") return value
+  const home = options.home ?? homedir()
+  return value.replace(PLACEHOLDER_REGEX, (match, envName, filePath) => {
+    if (envName !== undefined) return "${" + envName + "}"
+    return readFileRef(filePath, home) ?? match
+  })
 }
 
 // What is left after conversion is a placeholder the engine has no spelling for: `{file:path}`
@@ -108,27 +147,27 @@ export function unconvertedPlaceholder(value) {
   return false
 }
 
-function convertRecord(record) {
+function convertRecord(record, options) {
   if (record === null || typeof record !== "object" || Array.isArray(record)) return undefined
   const entries = Object.entries(record).filter(([, value]) => typeof value === "string")
-  return entries.length > 0 ? Object.fromEntries(entries.map(([key, value]) => [key, convertPlaceholders(value)])) : undefined
+  return entries.length > 0 ? Object.fromEntries(entries.map(([key, value]) => [key, convertPlaceholders(value, options)])) : undefined
 }
 
 function disabled(entry) {
   return entry.enabled === false ? { enabled: false } : {}
 }
 
-function convertLocal(entry) {
+function convertLocal(entry, options) {
   const command = Array.isArray(entry.command) ? entry.command.filter((part) => typeof part === "string") : []
   if (command.length === 0) return undefined
-  const env = convertRecord(entry.environment)
+  const env = convertRecord(entry.environment, options)
   return {
     type: "stdio",
-    command: convertPlaceholders(command[0]),
-    ...(command.length > 1 ? { args: command.slice(1).map(convertPlaceholders) } : {}),
+    command: convertPlaceholders(command[0], options),
+    ...(command.length > 1 ? { args: command.slice(1).map((part) => convertPlaceholders(part, options)) } : {}),
     ...(env ? { env } : {}),
     // Both sides resolve a relative cwd from the workspace directory the session runs in.
-    ...(typeof entry.cwd === "string" && entry.cwd.trim() !== "" ? { cwd: convertPlaceholders(entry.cwd) } : {}),
+    ...(typeof entry.cwd === "string" && entry.cwd.trim() !== "" ? { cwd: convertPlaceholders(entry.cwd, options) } : {}),
     ...disabled(entry),
   }
 }
@@ -136,11 +175,11 @@ function convertLocal(entry) {
 // OpenCode's pre-registered OAuth client, in the engine's `oauth` shape (a space-separated `scope`
 // becomes the `scopes` list). The engine has no client secret or per-server redirect URI, so a
 // server that needs either is reported rather than silently imported as a public client.
-function convertOauth(name, oauth, notices) {
+function convertOauth(name, oauth, notices, options) {
   if (oauth === null || typeof oauth !== "object" || Array.isArray(oauth)) return undefined
   const scopes = typeof oauth.scope === "string" ? oauth.scope.split(/\s+/).filter(Boolean) : []
   const converted = {
-    ...(typeof oauth.clientId === "string" && oauth.clientId !== "" ? { clientId: convertPlaceholders(oauth.clientId) } : {}),
+    ...(typeof oauth.clientId === "string" && oauth.clientId !== "" ? { clientId: convertPlaceholders(oauth.clientId, options) } : {}),
     ...(Number.isInteger(oauth.callbackPort) && oauth.callbackPort >= 0 && oauth.callbackPort <= 65_535 ? { callbackPort: oauth.callbackPort } : {}),
     ...(scopes.length > 0 ? { scopes } : {}),
   }
@@ -151,13 +190,13 @@ function convertOauth(name, oauth, notices) {
   return Object.keys(converted).length > 0 ? converted : undefined
 }
 
-function convertRemote(name, entry, notices) {
+function convertRemote(name, entry, notices, options) {
   if (typeof entry.url !== "string" || entry.url.trim() === "") return undefined
-  const headers = convertRecord(entry.headers)
-  const oauth = convertOauth(name, entry.oauth, notices)
+  const headers = convertRecord(entry.headers, options)
+  const oauth = convertOauth(name, entry.oauth, notices, options)
   return {
     type: "http",
-    url: convertPlaceholders(entry.url),
+    url: convertPlaceholders(entry.url, options),
     ...(headers ? { headers } : {}),
     // OpenCode's `oauth: false` disables OAuth auto-detection; the engine spells that `auth: false`.
     ...(entry.oauth === false ? { auth: false } : {}),
@@ -167,9 +206,9 @@ function convertRemote(name, entry, notices) {
 }
 
 // A refused server is recorded with a short reason for the setup summary; the notice says what to do.
-function convertServer(name, entry, notices, refused) {
+function convertServer(name, entry, notices, refused, options) {
   if (entry === null || typeof entry !== "object") return undefined
-  const config = entry.type === "remote" ? convertRemote(name, entry, notices) : convertLocal(entry)
+  const config = entry.type === "remote" ? convertRemote(name, entry, notices, options) : convertLocal(entry, options)
   if (!config) {
     notices.push(`NOTICE opencode: mcp server ${name} has no usable command or url; not imported`)
     refused.push({ name, reason: "no usable command or url" })
@@ -230,7 +269,7 @@ export function planOpencodeAssets(options = {}) {
   const mcpServers = []
   const refusedServers = []
   for (const [name, entry] of Object.entries(readOpencodeSection(sources.files, "mcp", "mcp servers", notices))) {
-    const converted = convertServer(name, entry, notices, refusedServers)
+    const converted = convertServer(name, entry, notices, refusedServers, { home })
     if (converted) mcpServers.push({ name, config: converted })
   }
   const skippedSkills = []
