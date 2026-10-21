@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**The launcher deletes a legacy `~/.omo/credentials.json` left by an intermediate sign-in build.** The file held the device's private keys and account refresh material in plaintext, sometimes world-readable; upgrading removes it. Only the exact legacy shape is removed. ([#10697](https://github.com/code-yeongyu/oh-my-openagent/issues/10697), [#10698](https://github.com/code-yeongyu/oh-my-openagent/pull/10698))
+
 **Runtime fallback keeps compaction retries separate from the primary model chain and preserves substantive retry prompts.** Compaction watchdogs defer within a bounded budget, exhausted native retry signals do not trigger an abort, and stuck-session watchdogs still return control when no replacement can be dispatched. ([#9787](https://github.com/code-yeongyu/oh-my-openagent/pull/9787))
 
 **Background tasks let runtime fallback decide who recovers a session error before starting a replacement or finalizing the task.** Exhausted and refused retries release recovery ownership, model-less retry errors can finish the task, and a slow decision never starts a competing replacement. ([#9683](https://github.com/code-yeongyu/oh-my-openagent/pull/9683), [#9787](https://github.com/code-yeongyu/oh-my-openagent/pull/9787))
