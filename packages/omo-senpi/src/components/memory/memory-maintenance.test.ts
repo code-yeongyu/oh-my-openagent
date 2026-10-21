@@ -318,3 +318,72 @@ describe("createMemoryMaintenance", () => {
     expect(existsSync(dir)).toBe(true)
   }, 30_000)
 })
+
+describe("createMemoryMaintenance consumed transcript retirement", () => {
+  async function seedJournal(transcriptsDir: string, id: string, ageMs: number): Promise<string> {
+    const dir = join(transcriptsDir, id)
+    await mkdir(dir, { recursive: true })
+    const rows = [0, 1].map((index) => JSON.stringify({
+      kind: index === 0 ? "user" : "assistant",
+      text: "z".repeat(4000),
+      captured_at: "2026-01-01T00:00:00.000Z",
+      source_line_id: `${id}-m${index}:x`,
+      source_message_id: `${id}-m${index}`,
+    }))
+    await writeFile(join(dir, "transcript.jsonl"), `${rows.join("\n")}\n`)
+    await writeFile(join(dir, "state.json"), JSON.stringify({
+      schema_version: "v3_assistant_steps",
+      total_completed_steps: 1,
+      reflected_completed_steps: 1,
+      steps_since_last_successful_reflection: 0,
+      reflected_through_message_id: `${id}-m1`,
+    }))
+    const at = new Date(Date.now() - ageMs)
+    for (const name of ["transcript.jsonl", "state.json"]) await utimes(join(dir, name), at, at)
+    return dir
+  }
+
+  test("#given consumed journals idle for weeks #when the maintenance pass runs #then they are retired, a live one is kept, and the compaction is logged", async () => {
+    // given
+    const { context } = await identityWithHistory(1)
+    const week = 8 * 24 * 60 * 60 * 1000
+    const idle = await seedJournal(context.identityPaths.transcripts, "idle-session", week)
+    const live = await seedJournal(context.identityPaths.transcripts, "live-session", week)
+    const log = recorder()
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, isLiveSession: (id) => id === "live-session" })
+
+    // when
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    // then
+    expect(existsSync(join(idle, "transcript.jsonl"))).toBe(false)
+    expect(existsSync(join(idle, "retired.ids"))).toBe(true)
+    expect(existsSync(join(live, "transcript.jsonl"))).toBe(true)
+    expect(log.info).toEqual(["omo-senpi memory consumed transcripts retired"])
+    expect(log.warn).toEqual([])
+  }, 60_000)
+
+  test("#given the retirement pass throws #when maintenance runs #then it warns and the repo pass still completes", async () => {
+    // given
+    const { context, repo } = await identityWithHistory(20)
+    const log = recorder()
+    const maintenance = createMemoryMaintenance({
+      logger: log.logger,
+      delayMs: 0,
+      minLooseObjects: 10,
+      retireConsumed: async () => {
+        throw new Error("disk walk failed")
+      },
+    })
+
+    // when
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    // then
+    expect(log.warn).toEqual(["omo-senpi memory transcript retirement failed"])
+    expect(log.info).toEqual(["omo-senpi memory repo packed"])
+    expect((await repo.log()).length).toBe(21)
+  }, 60_000)
+})

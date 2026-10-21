@@ -7,7 +7,19 @@ import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { V1_PERSONA_SEED_SHA256, auditMemoryRepo, isMemoryContentPath, parseLockRecord, readReflectionParkFile, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
+import {
+  MEMORY_FOOTPRINT_WARN_BYTES,
+  V1_PERSONA_SEED_SHA256,
+  auditMemoryRepo,
+  formatBytes,
+  formatMemoryFootprint,
+  isMemoryContentPath,
+  measureMemoryFootprint,
+  parseLockRecord,
+  readReflectionParkFile,
+  type MemoryAuditReport,
+  type MemoryIdentityPaths,
+} from "@oh-my-opencode/memory-core"
 
 import {
   locateReflectionChildLog,
@@ -47,6 +59,25 @@ async function listMarkdown(root: string, prefix: string): Promise<string[]> {
     }
   }
   return files
+}
+
+/**
+ * On-disk size of the identity, per area. Warns above the store target, naming the largest area so the
+ * reader sees which store grew, and when the walk hit its entry cap: the totals are then only a lower
+ * bound and cannot be called healthy. Read-only: nothing is removed from here.
+ */
+export async function checkStorage(paths: MemoryIdentityPaths, options: { readonly maxEntries?: number } = {}): Promise<DoctorCheck> {
+  const footprint = await measureMemoryFootprint(paths, options)
+  const detail = formatMemoryFootprint(footprint)
+  if (footprint.truncated) {
+    return { name: "storage", level: "warn", detail: `${detail}; scan stopped at its entry cap, so the size is a lower bound` }
+  }
+  if (footprint.totalBytes <= MEMORY_FOOTPRINT_WARN_BYTES) return { name: "storage", level: "ok", detail }
+  return {
+    name: "storage",
+    level: "warn",
+    detail: `${detail}; above the ${formatBytes(MEMORY_FOOTPRINT_WARN_BYTES)} target`,
+  }
 }
 
 export function checkRepository(identity: MemoryCommandIdentity): DoctorCheck {

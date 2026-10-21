@@ -16,6 +16,7 @@ import {
   checkRepository,
   checkReflectionHealth,
   checkSoulSeed,
+  checkStorage,
   checkTokens,
   checkWorktrees,
   type CheckLevel,
@@ -117,6 +118,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
       await checkGhostReservation(identity.identityPaths, deps),
       await checkReflectionHealth(identity.identityPaths.reflection, { now: deps.now?.() ?? Date.now() }),
       await checkTokens(repoDir, warnTokens, systemTokens),
+      await checkStorage(identity.identityPaths),
     )
     const projection = await checkProjection(repoDir, identity.identity, projectionLimits(settings, identity.identity))
     if (projection !== undefined) checks.push(projection)

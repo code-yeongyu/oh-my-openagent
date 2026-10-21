@@ -39,3 +39,18 @@ export {
   type EmptyJournalSweepOptions,
   type EmptyJournalSweepResult,
 } from "./sweep"
+export {
+  RETIRED_IDS_FILE,
+  readRetiredMessageKeys,
+  retireTranscriptJournal,
+  retiredMessageKey,
+  type RetireJournalOptions,
+  type RetireJournalResult,
+} from "./retire"
+export {
+  TRANSCRIPT_RETIRE_IDLE_MS,
+  retireConsumedTranscriptJournals,
+  type ConsumedJournalKeepReason,
+  type ConsumedJournalRetirementOptions,
+  type ConsumedJournalRetirementResult,
+} from "./retire-consumed"
