@@ -17,6 +17,7 @@ import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
 import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
 import { runSelfUpdate } from "./self-update.js"
+import { promptTelemetryConsentOnce } from "./telemetry-consent.js"
 import { isSelfUpdate } from "./update-args.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
@@ -234,6 +235,10 @@ export async function runLauncher(args = process.argv.slice(2)) {
   }
   if (isInteractiveDefault(args)) {
     notice(releaseBanner())
+    // Telemetry is opt-in, so the first interactive launch is where the machine answers. It is asked
+    // once and never again, and a launch must not be blocked on it: any failure here leaves the
+    // default, which is off.
+    await promptTelemetryConsentOnce().catch(() => false)
     if (process.stdout.isTTY === true && setupSuggestionForLaunch()) {
       notice("omo: sibling credentials detected; run `omo setup` to review them")
     }

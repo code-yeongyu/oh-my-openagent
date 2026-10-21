@@ -112,6 +112,7 @@ describe("telemetry before/after parity", () => {
   it("pins event name, distinct ID prefix, state file path, env matrix, and payload keys", async () => {
     // given
     resetTelemetryEnv()
+    process.env.OMO_SEND_ANONYMOUS_TELEMETRY = "1"
     const captured: CapturedPostHogMessage[] = []
     const xdgDataHome = join(tmpdir(), `telemetry-parity-${Date.now()}-${Math.random()}`)
     process.env.XDG_DATA_HOME = xdgDataHome
@@ -150,19 +151,26 @@ describe("telemetry before/after parity", () => {
     expect(payloadKeys).toContain("product_name")
   })
 
-  it("preserves the legacy env opt-out matrix including yes as enabled", async () => {
+  it("keeps the legacy env opt-out matrix, and adds the opt-in default on top of it", async () => {
     // given / when
     const disabledByPostHogFlag = await captureWithEnv({ OMO_DISABLE_POSTHOG: "1" })
     const disabledBySendZero = await captureWithEnv({ OMO_SEND_ANONYMOUS_TELEMETRY: "0" })
     const enabledBySendYes = await captureWithEnv({ OMO_SEND_ANONYMOUS_TELEMETRY: "yes" })
     const disabledBySendNo = await captureWithEnv({ OMO_SEND_ANONYMOUS_TELEMETRY: "no" })
     const enabledByUnset = await captureWithEnv({})
+    const enabledBySendOne = await captureWithEnv({ OMO_SEND_ANONYMOUS_TELEMETRY: "1" })
 
     // then
     expect(disabledByPostHogFlag).toHaveLength(0)
     expect(disabledBySendZero).toHaveLength(0)
+    // This edition remaps a legacy `yes` to `1` before handing the env to telemetry-core, so `yes`
+    // has always meant "on" here and still does. That is an adapter-level compat shim
+    // (`createCoreCompatibleTelemetryEnv`), not the core's opt-out reading of `yes`.
     expect(enabledBySendYes).toHaveLength(1)
     expect(disabledBySendNo).toHaveLength(0)
-    expect(enabledByUnset).toHaveLength(1)
+    // Telemetry is opt-in, so an environment that says nothing does not opt in. The first-run prompt's
+    // answer arrives as this flag.
+    expect(enabledByUnset).toHaveLength(0)
+    expect(enabledBySendOne).toHaveLength(1)
   })
 })

@@ -31,8 +31,15 @@ export function createOsProvider(hostname: string): TelemetryOsProvider {
   }
 }
 
+/**
+ * Telemetry is opt-in since the 2026 Q4 default flip, so a suite that wants a working client has to
+ * say so. The flag is the machine's override, not a product default: it is what a user who answered
+ * "yes" in the first-run prompt ends up with, so every "enabled" case now exercises the real
+ * opt-in path instead of the retired default-on one.
+ */
 export function createEnabledEnv(agentDir: string): TelemetryEnv {
   return {
+    OMO_SEND_ANONYMOUS_TELEMETRY: "1",
     POSTHOG_API_KEY: "test-api-key",
     SENPI_CODING_AGENT_DIR: agentDir,
   }

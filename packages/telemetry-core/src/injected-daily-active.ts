@@ -10,6 +10,8 @@ import type {
 } from "./types"
 
 export type RecordDailyActiveInput = {
+  /** Where this machine's answer lives. Defaults to `~/.omo/state/telemetry.json`. */
+  readonly consentStatePath?: string
   readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
   readonly env?: TelemetryEnv
   readonly now?: Date
@@ -28,6 +30,7 @@ export async function recordDailyActive(input: RecordDailyActiveInput): Promise<
 
   const osProvider = input.osProvider
   const client = createTelemetryClient({
+    consentStatePath: input.consentStatePath,
     diagnostics: input.diagnostics,
     env: input.env,
     osProvider,

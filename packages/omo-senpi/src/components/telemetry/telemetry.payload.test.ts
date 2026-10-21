@@ -83,7 +83,7 @@ describe("omo-senpi telemetry payloads", () => {
 
       // when
       createSenpiTelemetryComponent({
-        env: { POSTHOG_API_KEY: "test-api-key" },
+        env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-api-key" },
         now: FIXED_NOW,
         osProvider: createOsProvider("senpi-empty-input-host"),
         stateDir,

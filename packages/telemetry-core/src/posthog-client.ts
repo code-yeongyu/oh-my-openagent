@@ -2,6 +2,19 @@ import { createTelemetryClient as createInjectedTelemetryClient, type CreateTele
 import { createDefaultPostHogTransport } from "./posthog-transport"
 import type { TelemetryClient } from "./types"
 
+export {
+  TELEMETRY_CONSENT_FILE_ENV,
+  TELEMETRY_CONSENT_FILE_MODE,
+  TELEMETRY_CONSENT_STATE_FILE,
+  readTelemetryConsentEnabled,
+  readTelemetryConsentState,
+  resolveTelemetryConsentStatePath,
+  writeTelemetryConsentState,
+} from "./consent-state"
+export type {
+  ResolveTelemetryConsentStatePathOptions,
+  TelemetryConsentState,
+} from "./consent-state"
 export { createDefaultPostHogTransport } from "./posthog-transport"
 export { isTelemetryClientEnabled, type TelemetryClientEnabledInput } from "./injected-client"
 

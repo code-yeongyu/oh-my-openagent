@@ -1,3 +1,4 @@
+import { readTelemetryConsentEnabled, resolveTelemetryConsentStatePath } from "./consent-state"
 import { getTelemetryApiKey, getTelemetryHost, hasTelemetryApiKey, shouldDisableTelemetry } from "./env"
 import { getDefaultTelemetryOsProvider } from "./machine-id"
 import type {
@@ -12,6 +13,7 @@ import type {
 } from "./types"
 
 export type CreateTelemetryClientInput = {
+  readonly consentStatePath?: string
   readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
   readonly env?: TelemetryEnv
   readonly osProvider?: TelemetryOsProvider
@@ -21,6 +23,8 @@ export type CreateTelemetryClientInput = {
 }
 
 export type TelemetryClientEnabledInput = {
+  /** Where this machine's answer lives. Defaults to `~/.omo/state/telemetry.json`. */
+  readonly consentStatePath?: string
   readonly env?: TelemetryEnv
   readonly product: Pick<TelemetryProductConfig, "defaultApiKey" | "productEnvPrefix">
 }
@@ -32,10 +36,22 @@ const NO_OP_CLIENT: TelemetryClient = {
   shutdown: async () => undefined,
 }
 
+/**
+ * Telemetry is opt-in, so this is a three-way answer: the environment can force it off, the
+ * environment can force it on, and otherwise the machine's recorded answer decides. A machine that
+ * never answered reads as disabled.
+ */
 export function isTelemetryClientEnabled(input: TelemetryClientEnabledInput): boolean {
   const env = input.env ?? process.env
+  const consentEnabled = readTelemetryConsentEnabled(
+    input.consentStatePath ?? resolveTelemetryConsentStatePath({ env }),
+  )
   return (
-    !shouldDisableTelemetry({ env, productEnvPrefix: input.product.productEnvPrefix }) &&
+    !shouldDisableTelemetry({
+      consentEnabled,
+      env,
+      productEnvPrefix: input.product.productEnvPrefix,
+    }) &&
     hasTelemetryApiKey(env, input.product.defaultApiKey)
   )
 }

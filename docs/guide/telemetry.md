@@ -1,6 +1,24 @@
 # Telemetry
 
-OmO sends anonymous usage data so we can see which features people use and what breaks. It is on by default, you can turn it off at any time, and OmO works the same either way.
+OmO can send anonymous usage data so we can see which features people use and what breaks. It is **off by default**: nothing is sent until you say yes. OmO works the same either way.
+
+## Turning it on
+
+The first time you run `omo` interactively, it asks:
+
+```
+Anonymous usage stats help us focus work — turn them on? [y/N]
+```
+
+Your answer is saved on this machine at `~/.omo/state/telemetry.json`, readable only by you. Every later run reads that answer and never asks again.
+
+You can also turn it on from the environment at any time, which overrides a saved "no":
+
+```bash
+OMO_SEND_ANONYMOUS_TELEMETRY=1 omo
+```
+
+The "never send anything" switches always win over both.
 
 ## What is sent
 
@@ -28,6 +46,8 @@ OmO creates a random install id on your computer and stores it there. It is not 
 
 ## Turn it off
 
+Answering `n` at the first-run prompt, or setting `enabled` to `false` in `~/.omo/state/telemetry.json`, keeps it off. You can delete that file to be asked again.
+
 In OmO Desktop, choose **Turn telemetry off** when the telemetry notice first appears.
 
 Anywhere, add this to `~/.omo/omo.jsonc`:
@@ -38,7 +58,7 @@ Anywhere, add this to `~/.omo/omo.jsonc`:
 }
 ```
 
-Setting `DO_NOT_TRACK=1` or `OMO_DISABLE_POSTHOG=1` in your environment also turns it off. Turning telemetry off stops all of it, including crash reports.
+Setting `DO_NOT_TRACK=1`, `OMO_DISABLE_TELEMETRY=1` or `OMO_DISABLE_POSTHOG=1` in your environment turns it off no matter what the answer file or the other flags say. Turning telemetry off stops all of it, including crash reports.
 
 ## The full list
 

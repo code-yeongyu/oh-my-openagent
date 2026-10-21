@@ -6,6 +6,8 @@ Not locked to Claude. Not locked to OpenAI. Not locked to anyone.
 
 Just better results, cheaper models, real orchestration.
 
+Anonymous usage stats are opt-in: they are off until you turn them on. The first interactive `omo` run asks once, remembers your answer on this machine, and every later run reads that answer instead of asking. OmO works exactly the same either way. Details in the [Telemetry guide](./telemetry.md).
+
 ---
 
 ## Quick Start

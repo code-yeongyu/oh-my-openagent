@@ -1,7 +1,11 @@
 import { arch, hostname, platform, release } from "node:os"
 
 import { isOmoTelemetryEnabled } from "@oh-my-opencode/omo-config-core"
-import { shouldDisableTelemetry } from "@oh-my-opencode/telemetry-core"
+import {
+  readTelemetryConsentEnabled,
+  resolveTelemetryConsentStatePath,
+  shouldDisableTelemetry,
+} from "@oh-my-opencode/telemetry-core"
 
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { getOmoNativeAttribution, hashSessionId } from "../telemetry/product-identity"
@@ -33,9 +37,16 @@ export interface HostCollection {
 
 const locale = (): string => Intl.DateTimeFormat().resolvedOptions().locale
 
-const telemetryAllowed = (facts: HostFacts, config: unknown): boolean =>
-  !shouldDisableTelemetry({ env: { ...facts.env }, productEnvPrefix: "OMO_NATIVE" }) &&
-  isOmoTelemetryEnabled(config as Parameters<typeof isOmoTelemetryEnabled>[0])
+const telemetryAllowed = (facts: HostFacts, config: unknown): boolean => {
+  const env = { ...facts.env }
+  return (
+    !shouldDisableTelemetry({
+      consentEnabled: readTelemetryConsentEnabled(resolveTelemetryConsentStatePath({ env })),
+      env,
+      productEnvPrefix: "OMO_NATIVE",
+    }) && isOmoTelemetryEnabled(config as Parameters<typeof isOmoTelemetryEnabled>[0])
+  )
+}
 
 export function collectHostSections(facts: HostFacts): HostCollection {
   const loaded = loadSenpiOmoConfig({

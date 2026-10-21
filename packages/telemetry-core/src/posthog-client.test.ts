@@ -1,18 +1,22 @@
 import { createHash } from "node:crypto"
-import { describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
+  TELEMETRY_CONSENT_FILE_MODE,
   UNCONFIGURED_POSTHOG_API_KEY,
   createTelemetryClient,
   getTelemetryActivityStateFilePath,
   getTelemetryDistinctId,
   isTelemetryClientEnabled,
+  readTelemetryConsentState,
   recordDailyActive,
+  resolveTelemetryConsentStatePath,
+  writeTelemetryConsentState,
 } from "./index"
 import type {
   TelemetryCaptureMessage,
@@ -55,6 +59,228 @@ function createCapturingFactory(capturedMessages: TelemetryCaptureMessage[]): Te
   })
 }
 
+/**
+ * A consent answer is per machine and per product prefix, so every case that needs one
+ * gets its own temp root instead of the real `~/.omo/state/telemetry.json`.
+ */
+const consentRoots: string[] = []
+
+function consentStatePath(): string {
+  const root = mkdtempSync(join(tmpdir(), "omo-pr-b-consent-"))
+  consentRoots.push(root)
+  return join(root, "telemetry.json")
+}
+
+afterEach(() => {
+  for (const root of consentRoots.splice(0)) {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+describe("telemetry opt-in default", () => {
+  test("#given no env flags and no answered consent file #when enabled state is checked #then telemetry is disabled", () => {
+    // given
+    const input = {
+      consentStatePath: consentStatePath(),
+      env: {},
+      product: PRODUCT,
+    } as const
+
+    // when
+    const enabled = isTelemetryClientEnabled(input)
+
+    // then
+    expect(existsSync(input.consentStatePath)).toBe(false)
+    expect(enabled).toBe(false)
+  })
+
+  test("#given a persisted off answer #when enabled state is checked #then telemetry stays disabled", () => {
+    // given
+    const stateFilePath = consentStatePath()
+    writeTelemetryConsentState(stateFilePath, { enabled: false })
+
+    // when
+    const enabled = isTelemetryClientEnabled({ consentStatePath: stateFilePath, env: {}, product: PRODUCT })
+
+    // then
+    expect(enabled).toBe(false)
+  })
+
+  test("#given a persisted on answer #when enabled state is checked #then telemetry is enabled", () => {
+    // given
+    const stateFilePath = consentStatePath()
+    writeTelemetryConsentState(stateFilePath, { enabled: true })
+
+    // when
+    const enabled = isTelemetryClientEnabled({ consentStatePath: stateFilePath, env: {}, product: PRODUCT })
+
+    // then
+    expect(enabled).toBe(true)
+  })
+
+  test("#given a persisted off answer and a force-on env flag #when enabled state is checked #then the env flag wins", () => {
+    // given
+    const stateFilePath = consentStatePath()
+    writeTelemetryConsentState(stateFilePath, { enabled: false })
+
+    // when
+    const enabled = isTelemetryClientEnabled({
+      consentStatePath: stateFilePath,
+      env: { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "1" },
+      product: PRODUCT,
+    })
+
+    // then
+    expect(enabled).toBe(true)
+  })
+
+  test("#given a persisted on answer and a force-off env flag #when enabled state is checked #then the disable flag wins", () => {
+    // given
+    const stateFilePath = consentStatePath()
+    writeTelemetryConsentState(stateFilePath, { enabled: true })
+
+    // when
+    const enabled = isTelemetryClientEnabled({
+      consentStatePath: stateFilePath,
+      env: { OMO_DISABLE_POSTHOG: "1" },
+      product: PRODUCT,
+    })
+
+    // then
+    expect(enabled).toBe(false)
+  })
+
+  test("#given both a force-on and a disable env flag #when enabled state is checked #then telemetry is disabled", () => {
+    // given
+    const input = {
+      consentStatePath: consentStatePath(),
+      env: { OMO_DISABLE_POSTHOG: "1", OMO_SEND_ANONYMOUS_TELEMETRY: "1" },
+      product: PRODUCT,
+    } as const
+
+    // when
+    const enabled = isTelemetryClientEnabled(input)
+
+    // then
+    expect(enabled).toBe(false)
+  })
+
+  test("#given a first-run answer written to the canonical path #when the file is inspected #then it is readable only by its owner", () => {
+    // given
+    const home = mkdtempSync(join(tmpdir(), "omo-pr-b-firstrun-"))
+    consentRoots.push(home)
+    const stateFilePath = resolveTelemetryConsentStatePath({ env: { HOME: home } })
+
+    // when
+    const written = writeTelemetryConsentState(stateFilePath, { enabled: true })
+
+    // then
+    expect(written).toBe(true)
+    expect(stateFilePath).toBe(join(home, ".omo", "state", "telemetry.json"))
+    expect(statSync(stateFilePath).mode & 0o777).toBe(TELEMETRY_CONSENT_FILE_MODE)
+  })
+
+  test("#given a canonical answer file #when it is read back #then it names the answer that was written", () => {
+    // given
+    const home = mkdtempSync(join(tmpdir(), "omo-pr-b-readback-"))
+    consentRoots.push(home)
+    const stateFilePath = resolveTelemetryConsentStatePath({ env: { HOME: home } })
+
+    // when
+    writeTelemetryConsentState(stateFilePath, { enabled: false })
+
+    // then
+    expect(readTelemetryConsentState(stateFilePath)).toEqual({
+      enabled: false,
+      version: 1,
+      answered_at: expect.any(String),
+    })
+  })
+
+  test("#given an answer file that cannot be parsed #when it is read #then it reads as unanswered", () => {
+    // given
+    const stateFilePath = consentStatePath()
+    writeFileSync(stateFilePath, "{ not json")
+
+    // when
+    const state = readTelemetryConsentState(stateFilePath)
+
+    // then
+    expect(state).toBeUndefined()
+    expect(isTelemetryClientEnabled({ consentStatePath: stateFilePath, env: {}, product: PRODUCT })).toBe(false)
+  })
+
+  test("#given an answer file without an enabled field #when it is read #then it reads as unanswered", () => {
+    // given
+    const stateFilePath = consentStatePath()
+    writeFileSync(stateFilePath, JSON.stringify({ version: 1 }))
+
+    // when
+    const state = readTelemetryConsentState(stateFilePath)
+
+    // then
+    expect(state).toBeUndefined()
+  })
+
+  test("#given the canonical path resolution #when no override is set #then the answer lives under the omo state directory", () => {
+    // given
+    const home = mkdtempSync(join(tmpdir(), "omo-pr-b-home-"))
+    consentRoots.push(home)
+
+    // when
+    const stateFilePath = resolveTelemetryConsentStatePath({ env: { HOME: home } })
+
+    // then
+    expect(stateFilePath).toBe(join(home, ".omo", "state", "telemetry.json"))
+  })
+
+  test("#given a persisted on answer #when a client is created #then the transport is constructed", () => {
+    // given
+    const stateFilePath = consentStatePath()
+    writeTelemetryConsentState(stateFilePath, { enabled: true })
+    let transportsCreated = 0
+
+    // when
+    const client = createTelemetryClient({
+      consentStatePath: stateFilePath,
+      env: { POSTHOG_API_KEY: "test-key" },
+      osProvider: OS_PROVIDER,
+      product: PRODUCT,
+      source: "cli",
+      transportFactory: () => {
+        transportsCreated += 1
+        return { capture: () => undefined, shutdown: async () => undefined }
+      },
+    })
+
+    // then
+    expect(client.enabled).toBe(true)
+    expect(transportsCreated).toBe(1)
+  })
+
+  test("#given no answered consent file #when a client is created #then the transport is never constructed", () => {
+    // given
+    let transportsCreated = 0
+
+    // when
+    const client = createTelemetryClient({
+      consentStatePath: consentStatePath(),
+      env: { POSTHOG_API_KEY: "test-key" },
+      osProvider: OS_PROVIDER,
+      product: PRODUCT,
+      source: "cli",
+      transportFactory: () => {
+        transportsCreated += 1
+        return { capture: () => undefined, shutdown: async () => undefined }
+      },
+    })
+
+    // then
+    expect(client.enabled).toBe(false)
+    expect(transportsCreated).toBe(0)
+  })
+})
+
 describe("posthog telemetry client", () => {
   test("#given the unconfigured OmO Native placeholder and clean env #when clients are created #then telemetry fails closed without constructing transports", () => {
     let transportsCreated = 0
@@ -84,9 +310,19 @@ describe("posthog telemetry client", () => {
     expect(transportsCreated).toBe(0)
   })
 
-  test("#given the placeholder default and a real env override #when enabled state is checked #then telemetry is enabled", () => {
+  test("#given the placeholder default and a real env override #when enabled state is checked #then telemetry stays disabled without a force-on flag", () => {
     expect(isTelemetryClientEnabled({
       env: { POSTHOG_API_KEY: "phc_test" },
+      product: {
+        defaultApiKey: UNCONFIGURED_POSTHOG_API_KEY,
+        productEnvPrefix: "OMO_SENPI",
+      },
+    })).toBe(false)
+  })
+
+  test("#given the placeholder default and a real env override #when a force-on flag is set #then telemetry is enabled", () => {
+    expect(isTelemetryClientEnabled({
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "phc_test" },
       product: {
         defaultApiKey: UNCONFIGURED_POSTHOG_API_KEY,
         productEnvPrefix: "OMO_SENPI",
@@ -94,28 +330,29 @@ describe("posthog telemetry client", () => {
     })).toBe(true)
   })
 
-  test("#given the legacy shared key as the default #when enabled state is checked #then telemetry remains enabled", () => {
+  test("#given the legacy shared key as the default #when enabled state is checked #then telemetry stays disabled", () => {
     expect(isTelemetryClientEnabled({
       env: {},
       product: PRODUCT,
-    })).toBe(true)
+    })).toBe(false)
   })
 
-  test("#given a real OmO Native default replaces the placeholder #when enabled state is checked #then telemetry activates without another flag", () => {
+  test("#given a real OmO Native default replaces the placeholder #when enabled state is checked #then telemetry still needs a force-on flag", () => {
     expect(isTelemetryClientEnabled({
       env: {},
       product: {
         defaultApiKey: "phc_omo_native_project_key",
         productEnvPrefix: "OMO_SENPI",
       },
-    })).toBe(true)
+    })).toBe(false)
   })
 
   test("#given codex product parameters #when daily active is captured #then payload shape matches current contract", async () => {
     // given
     const capturedMessages: TelemetryCaptureMessage[] = []
     const client = createTelemetryClient({
-      env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
+      consentStatePath: consentStatePath(),
+      env: { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
       osProvider: OS_PROVIDER,
       product: PRODUCT,
       source: "cli",
@@ -170,7 +407,8 @@ describe("posthog telemetry client", () => {
 
     try {
       const options = {
-        env: { POSTHOG_API_KEY: "test-key" },
+        consentStatePath: consentStatePath(),
+        env: { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
         now: new Date("2026-05-25T01:02:03.000Z"),
         osProvider: OS_PROVIDER,
         product: PRODUCT,
@@ -203,7 +441,8 @@ describe("posthog telemetry client", () => {
 
     // when
     const client = createTelemetryClient({
-      env: { POSTHOG_API_KEY: " " },
+      consentStatePath: consentStatePath(),
+      env: { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: " " },
       osProvider: OS_PROVIDER,
       product: PRODUCT,
       source: "install",
@@ -262,7 +501,8 @@ describe("posthog telemetry client", () => {
     try {
       // when
       await recordDailyActive({
-        env: { POSTHOG_API_KEY: " " },
+        consentStatePath: consentStatePath(),
+        env: { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: " " },
         now: new Date("2026-05-25T01:02:03.000Z"),
         osProvider: OS_PROVIDER,
         product: PRODUCT,

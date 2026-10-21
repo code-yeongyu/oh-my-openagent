@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { DEFAULT_POSTHOG_API_KEY as TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY } from "@oh-my-opencode/telemetry-core"
+import {
+  DEFAULT_POSTHOG_API_KEY as TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY,
+  TELEMETRY_CONSENT_FILE_ENV,
+  writeTelemetryConsentState,
+} from "@oh-my-opencode/telemetry-core"
 
 import { CACHE_DIR_NAME } from "./product-identity"
 
@@ -28,7 +32,16 @@ function createDataHomePath(): string {
   return tempPath
 }
 
+/** Telemetry is opt-in, so an "enabled" case has to say so. A persisted yes is the honest way to say it. */
+function answerConsent(enabled: boolean): void {
+  const tempPath = mkdtempSync(join(tmpdir(), "omo-codex-posthog-consent-"))
+  tempPaths.push(tempPath)
+  process.env[TELEMETRY_CONSENT_FILE_ENV] = join(tempPath, "telemetry.json")
+  writeTelemetryConsentState(process.env[TELEMETRY_CONSENT_FILE_ENV] as string, { enabled })
+}
+
 function clearTelemetryEnv(): void {
+  delete process.env[TELEMETRY_CONSENT_FILE_ENV]
   delete process.env.OMO_DISABLE_POSTHOG
   delete process.env.OMO_SEND_ANONYMOUS_TELEMETRY
   delete process.env.OMO_CODEX_DISABLE_POSTHOG
@@ -153,7 +166,7 @@ describe("omo-codex posthog telemetry", () => {
     expect(capturedMessages).toHaveLength(0)
   })
 
-  it("matrix row 5 enabled when all vars unset", async () => {
+  it("matrix row 5 disabled when all vars are unset, because telemetry is opt-in", async () => {
     // given
     const capturedMessages: CapturedPostHogMessage[] = []
 
@@ -167,7 +180,41 @@ describe("omo-codex posthog telemetry", () => {
     posthog.createCliPostHog().trackActive("distinct", "cli_run")
 
     // then
+    expect(capturedMessages).toHaveLength(0)
+  })
+
+  it("matrix row 6 enabled when the machine answered yes", async () => {
+    // given
+    const capturedMessages: CapturedPostHogMessage[] = []
+    answerConsent(true)
+    process.env.POSTHOG_API_KEY = "test-api-key"
+    setMatrix(undefined, undefined, undefined, undefined)
+    const posthog = await importPostHogModule()
+    mockPostHogNode(posthog, capturedMessages)
+    posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
+
+    // when
+    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+
+    // then
     expect(capturedMessages).toHaveLength(1)
+  })
+
+  it("matrix row 7 disabled when the machine answered no", async () => {
+    // given
+    const capturedMessages: CapturedPostHogMessage[] = []
+    answerConsent(false)
+    process.env.POSTHOG_API_KEY = "test-api-key"
+    setMatrix(undefined, undefined, undefined, undefined)
+    const posthog = await importPostHogModule()
+    mockPostHogNode(posthog, capturedMessages)
+    posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
+
+    // when
+    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+
+    // then
+    expect(capturedMessages).toHaveLength(0)
   })
 
   it("captures omo_codex_daily_active with omo-codex platform", async () => {
@@ -175,6 +222,7 @@ describe("omo-codex posthog telemetry", () => {
     const capturedMessages: CapturedPostHogMessage[] = []
 
     process.env.POSTHOG_API_KEY = "test-api-key"
+    answerConsent(true)
     const posthog = await importPostHogModule()
     mockPostHogNode(posthog, capturedMessages)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
@@ -208,6 +256,7 @@ describe("omo-codex posthog telemetry", () => {
     const capturedMessages: CapturedPostHogMessage[] = []
 
     process.env.POSTHOG_API_KEY = "test-api-key"
+    answerConsent(true)
     const posthog = await importPostHogModule()
     mockPostHogNode(posthog, capturedMessages)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
@@ -224,6 +273,7 @@ describe("omo-codex posthog telemetry", () => {
     const capturedMessages: CapturedPostHogMessage[] = []
 
     process.env.POSTHOG_API_KEY = "test-api-key"
+    answerConsent(true)
     const posthog = await importPostHogModule()
     mockPostHogNode(posthog, capturedMessages)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))

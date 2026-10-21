@@ -3,6 +3,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import {
+  TELEMETRY_CONSENT_FILE_ENV,
+  writeTelemetryConsentState,
+} from "@oh-my-opencode/telemetry-core"
+
 import { CACHE_DIR_NAME } from "./product-identity"
 
 type CapturedPostHogMessage = {
@@ -20,7 +25,16 @@ async function importPostHogModule(): Promise<PostHogModule> {
   return import(`./posthog?test=${Date.now()}-${Math.random()}`)
 }
 
+/** A diagnostics case is only meaningful when the client is actually enabled, so it records a yes. */
+function answerConsent(): void {
+  const tempPath = mkdtempSync(join(tmpdir(), "omo-codex-posthog-diag-consent-"))
+  tempPaths.push(tempPath)
+  process.env[TELEMETRY_CONSENT_FILE_ENV] = join(tempPath, "telemetry.json")
+  writeTelemetryConsentState(process.env[TELEMETRY_CONSENT_FILE_ENV] as string, { enabled: true })
+}
+
 function clearTelemetryEnv(): void {
+  delete process.env[TELEMETRY_CONSENT_FILE_ENV]
   delete process.env.OMO_DISABLE_POSTHOG
   delete process.env.OMO_SEND_ANONYMOUS_TELEMETRY
   delete process.env.OMO_CODEX_DISABLE_POSTHOG
@@ -99,6 +113,7 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     process.env.XDG_DATA_HOME = dataHomePath
     process.env.XDG_STATE_HOME = dataHomePath
     process.env.POSTHOG_API_KEY = "test-api-key"
+    answerConsent()
     const posthog = await importPostHogModule()
     mockPostHogCaptureFailure(posthog)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
@@ -119,6 +134,7 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     process.env.XDG_DATA_HOME = dataHomePath
     process.env.XDG_STATE_HOME = dataHomePath
     process.env.POSTHOG_API_KEY = "test-api-key"
+    answerConsent()
     const posthog = await importPostHogModule()
     mockPostHogCaptureSymbolFailure(posthog)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
@@ -141,6 +157,7 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     process.env.XDG_DATA_HOME = dataHomePath
     process.env.XDG_STATE_HOME = dataHomePath
     process.env.POSTHOG_API_KEY = "test-api-key"
+    answerConsent()
     const posthog = await importPostHogModule()
     mockPostHogShutdownFailure(posthog, capturedMessages)
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))

@@ -1,5 +1,5 @@
 export declare const DEFAULT_POSTHOG_HOST: "https://us.i.posthog.com";
-export declare const DEFAULT_POSTHOG_API_KEY: "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
+export declare const DEFAULT_POSTHOG_API_KEY: "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74"; // gitleaks:allow # a PostHog project key, public by design: it ships in client-side code and only ever accepts writes. The secret is the personal API key, which this repo does not carry.
 /** A product default with this exact value is intentionally unconfigured and must fail closed. */
 export declare const UNCONFIGURED_POSTHOG_API_KEY: "phc_REPLACE_ME_OMO_NATIVE";
 
@@ -177,6 +177,7 @@ export type WriteTelemetryDiagnosticOptions = {
 };
 
 export type RecordDailyActiveInput = {
+  readonly consentStatePath?: string;
   readonly diagnostics?: (input: TelemetryDiagnosticInput) => void;
   readonly env?: TelemetryEnv;
   readonly now?: Date;
@@ -189,9 +190,37 @@ export type RecordDailyActiveInput = {
 };
 
 export type TelemetryClientEnabledInput = {
+  /** Where this machine's answer lives. Defaults to `~/.omo/state/telemetry.json`. */
+  readonly consentStatePath?: string;
   readonly env?: TelemetryEnv;
   readonly product: Pick<TelemetryProductConfig, "defaultApiKey" | "productEnvPrefix">;
 };
+
+export type TelemetryEnvDecision = "disable" | "opt_in" | "unset";
+
+export type TelemetryConsentState = {
+  readonly enabled: boolean;
+  readonly answered_at?: string;
+  readonly version: 1;
+};
+
+export type ResolveTelemetryConsentStatePathOptions = {
+  readonly env?: TelemetryEnv;
+};
+
+export declare const TELEMETRY_CONSENT_STATE_FILE: "telemetry.json";
+export declare const TELEMETRY_CONSENT_FILE_MODE: 0o600;
+export declare const TELEMETRY_CONSENT_FILE_ENV: "OMO_TELEMETRY_CONSENT_FILE";
+
+export declare function resolveTelemetryConsentStatePath(
+  options?: ResolveTelemetryConsentStatePathOptions,
+): string;
+export declare function readTelemetryConsentState(stateFilePath: string): TelemetryConsentState | undefined;
+export declare function readTelemetryConsentEnabled(stateFilePath: string): boolean;
+export declare function writeTelemetryConsentState(
+  stateFilePath: string,
+  state: { readonly enabled: boolean; readonly answered_at?: string },
+): boolean;
 
 export declare function createEventTelemetryClient(
   input: CreateEventTelemetryClientInput,
@@ -210,10 +239,19 @@ export declare function createTelemetryClient(input: {
   readonly source: string;
   readonly transportFactory?: TelemetryTransportFactory;
 }): TelemetryClient;
+/** What the environment alone says. `disable` beats `opt_in` inside one environment. */
+export declare function resolveTelemetryEnvDecision(input: {
+  readonly env?: TelemetryEnv;
+  readonly globalEnvPrefix?: string;
+  readonly productEnvPrefix: string;
+  readonly consentEnabled?: boolean;
+}): TelemetryEnvDecision;
+/** Telemetry is opt-in: only a recorded yes or a force-on flag enables anything. */
 export declare function shouldDisableTelemetry(input: {
   readonly env?: TelemetryEnv;
   readonly globalEnvPrefix?: string;
   readonly productEnvPrefix: string;
+  readonly consentEnabled?: boolean;
 }): boolean;
 export declare function getTelemetryApiKey(env?: TelemetryEnv, defaultApiKey?: string): string;
 export declare function isConfiguredTelemetryApiKey(apiKey: string): boolean;

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [<next>]
+
+### Changed
+
+**Anonymous usage stats are now off unless you turn them on.** Telemetry used to be on by default and needed an opt-out. The first interactive `omo` run now asks "Anonymous usage stats help us focus work — turn them on? [y/N]", and your answer is remembered on this machine in `~/.omo/state/telemetry.json`, which only you can read. Until you answer, nothing is sent. If you already relied on it being on, answer `y` once, or set `OMO_SEND_ANONYMOUS_TELEMETRY=1`. `DO_NOT_TRACK=1`, `OMO_DISABLE_TELEMETRY=1` and `OMO_DISABLE_POSTHOG=1` still turn it off and always win over the saved answer. OmO itself behaves the same either way.
+
 ## [Unreleased]
 
 **Report a problem from inside OmO ([#10546](https://github.com/code-yeongyu/oh-my-openagent/pull/10546)).** `/feedback` (or `/bug`) sends a bug report or an idea to the OmO team in one step: your description plus your account, this device, versions, this conversation's recent messages, recent logs and your settings. Passwords, keys and tokens are removed first with the same redactor `/share` uses, your memory is never sent, and `OMO_DISABLE_FEEDBACK=1` saves the report as a local file instead of uploading it. The desktop app's Report a problem dialog uses the same report.

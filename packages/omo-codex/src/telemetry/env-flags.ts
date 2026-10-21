@@ -2,6 +2,8 @@ import {
   getTelemetryApiKey,
   getTelemetryHost,
   hasTelemetryApiKey,
+  readTelemetryConsentEnabled,
+  resolveTelemetryConsentStatePath,
   shouldDisableTelemetry,
 } from "@oh-my-opencode/telemetry-core"
 
@@ -9,6 +11,7 @@ import { createCodexTelemetryProductConfig } from "./product-identity"
 
 export function shouldDisablePostHog(): boolean {
   return shouldDisableTelemetry({
+    consentEnabled: readTelemetryConsentEnabled(resolveTelemetryConsentStatePath()),
     productEnvPrefix: createCodexTelemetryProductConfig().productEnvPrefix,
   })
 }

@@ -1,5 +1,6 @@
 export * from "./activity-state"
 export * from "./consent-gated-fetch"
+export * from "./consent-state"
 export * from "./constants"
 export * from "./diagnostics"
 export * from "./env"

@@ -64,7 +64,7 @@ function createClient(recorder: Recorder, diagnostics: TelemetryDiagnosticInput[
   return createEventTelemetryClient({
     diagnostics: (input) => diagnostics.push(input),
     distinctId: "machine-hash",
-    env: { POSTHOG_API_KEY: "test-key" },
+    env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
     product: PRODUCT,
     propertyAllowlist: ALLOWLIST,
     schemaVersion: 1,
@@ -101,7 +101,7 @@ describe("event telemetry client event ids", () => {
     const recorder = createRecorder()
     const client = createEventTelemetryClient({
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: { ...PRODUCT, additionalProperties: { event_id: "spoofed-by-product" } },
       propertyAllowlist: { session_started: ["event_id"] },
       schemaVersion: 1,
@@ -124,7 +124,7 @@ describe("event telemetry client event ids", () => {
     const observed: TelemetryCaptureMessage[] = []
     const client = createEventTelemetryClient({
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       onCapture: (payload) => observed.push(payload),
       product: PRODUCT,
       propertyAllowlist: ALLOWLIST,
@@ -158,7 +158,7 @@ describe("event telemetry client event ids", () => {
     })
     const client = createEventTelemetryClient({
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: `http://127.0.0.1:${sink.port}` },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key", POSTHOG_HOST: `http://127.0.0.1:${sink.port}` },
       product: PRODUCT,
       propertyAllowlist: ALLOWLIST,
       schemaVersion: 1,
@@ -240,7 +240,7 @@ describe("event telemetry client", () => {
     const client = createEventTelemetryClient({
       diagnostics: () => undefined,
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: {
         ...PRODUCT,
         additionalProperties: { install_id: "a".repeat(64), platform: "spoofed", surface: "desktop" },
@@ -271,7 +271,7 @@ describe("event telemetry client", () => {
     const client = createEventTelemetryClient({
       diagnostics: (input) => diagnostics.push(input),
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: {
         ...PRODUCT,
         disableGeoip: true,
@@ -335,7 +335,7 @@ describe("event telemetry client", () => {
     const recorder = createRecorder()
     const client = createEventTelemetryClient({
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: PRODUCT,
       propertyAllowlist: { prompt_submitted: ["is_real_user_prompt"] },
       schemaVersion: 1,
@@ -366,7 +366,7 @@ describe("event telemetry client", () => {
       const client = createEventTelemetryClient({
         diagnostics: (input) => diagnostics.push(input),
         distinctId: "machine-hash",
-        env: { POSTHOG_API_KEY: "test-key" },
+        env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
         product: PRODUCT,
         propertyAllowlist: { session_started: [key] },
         schemaVersion: 1,
@@ -390,7 +390,7 @@ describe("event telemetry client", () => {
     const client = createEventTelemetryClient({
       diagnostics: (input) => diagnostics.push(input),
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: PRODUCT,
       propertyAllowlist: { prompt_submitted: ["null_prompt", "undefined_prompt", "object_prompt"] },
       schemaVersion: 1,
@@ -421,7 +421,7 @@ describe("event telemetry client", () => {
     const client = createEventTelemetryClient({
       diagnostics: (input) => diagnostics.push(input),
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: PRODUCT,
       propertyAllowlist: { event: ["nullish", "missing", "nested", "array"] },
       schemaVersion: 1,
@@ -495,7 +495,7 @@ describe("event telemetry client", () => {
     const recorder = createRecorder({ flush: () => new Promise<void>(() => undefined) })
     const client = createEventTelemetryClient({
       distinctId: "machine-hash",
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: PRODUCT,
       propertyAllowlist: ALLOWLIST,
       schemaVersion: 1,
@@ -522,13 +522,13 @@ describe("event telemetry client", () => {
 
     // when
     createTelemetryClient({
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: PRODUCT,
       source: "test",
       transportFactory: defaults.factory,
     })
     createTelemetryClient({
-      env: { POSTHOG_API_KEY: "test-key" },
+      env: { OMO_SEND_ANONYMOUS_TELEMETRY: "1", POSTHOG_API_KEY: "test-key" },
       product: {
         ...PRODUCT,
         disableGeoip: true,
