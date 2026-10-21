@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-30 tracked Markdown files across 6 subdirectories (guide 7, reference 18, examples 3 JSONC, legal 2, templates 1, troubleshooting 1) + root files. Categorized by audience: user-facing guides + reference, troubleshooting, legal. The web site at [packages/web/](../packages/web) consumes some of these (via `web-deploy.yml` triggers).
+31 tracked Markdown files across 7 subdirectories (guide 7, security 1, reference 18, examples 3 JSONC, legal 2, templates 1, troubleshooting 1) + root files. Categorized by audience: user-facing guides + reference, troubleshooting, legal. The web site at [packages/web/](../packages/web) consumes some of these (via `web-deploy.yml` triggers).
 
 ## WHERE TO LOOK
 
@@ -25,6 +25,7 @@
 | Reserved keywords (ulw, ulw loop, ulw plan, ulw research, mass ulw), omo.dev/docs/keywords | [docs/guide/keywords.md](guide/keywords.md) |
 | Telemetry in plain words and how to opt out, omo.dev/docs/telemetry | [docs/guide/telemetry.md](guide/telemetry.md) |
 | OmO Desktop updates, release notes and tracks, omo.dev/docs/desktop-updates | [docs/guide/desktop-updates.md](guide/desktop-updates.md) |
+| Per-tool permission profile: `allow` / `ask` / `deny`, resolution order, audit log | [docs/security/permissions.md](security/permissions.md) |
 | Configuration field reference | [docs/reference/configuration.md](reference/configuration.md) |
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Native `computer` tool contract | [docs/reference/computer.md](reference/computer.md) |
@@ -60,6 +61,7 @@ docs/
 ├── manifesto.md                              # The "why" — referenced from README
 ├── model-capabilities-maintenance.md         # How model-capabilities cache is refreshed
 ├── guide/                                    # User-facing tutorial-style guides (7 files)
+├── security/                                 # Security behavior docs (permissions gate)
 ├── reference/                                # API / config / CLI reference (18 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md

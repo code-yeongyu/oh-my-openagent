@@ -2426,6 +2426,29 @@
         "type": "string"
       }
     },
+    "tools": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "permission": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "ask",
+              "deny"
+            ]
+          }
+        },
+        "required": [
+          "permission"
+        ],
+        "additionalProperties": false
+      }
+    },
     "[opencode]": {
       "$ref": "#/definitions/opencode"
     },
@@ -4647,6 +4670,29 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "tools": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "permission": {
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ]
+              }
+            },
+            "required": [
+              "permission"
+            ],
+            "additionalProperties": false
           }
         }
       },
@@ -6871,6 +6917,29 @@
           "items": {
             "type": "string"
           }
+        },
+        "tools": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "permission": {
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ]
+              }
+            },
+            "required": [
+              "permission"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
@@ -9094,6 +9163,29 @@
           "items": {
             "type": "string"
           }
+        },
+        "tools": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "permission": {
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ]
+              }
+            },
+            "required": [
+              "permission"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
@@ -11314,6 +11406,29 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "tools": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "permission": {
+                  "type": "string",
+                  "enum": [
+                    "allow",
+                    "ask",
+                    "deny"
+                  ]
+                }
+              },
+              "required": [
+                "permission"
+              ],
+              "additionalProperties": false
             }
           },
           "[opencode]": {
@@ -13538,6 +13653,29 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "tools": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "permission": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "ask",
+                        "deny"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "permission"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "additionalProperties": false
@@ -15761,6 +15899,29 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "tools": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "permission": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "ask",
+                        "deny"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "permission"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "additionalProperties": false
@@ -17983,6 +18144,29 @@
                 "type": "array",
                 "items": {
                   "type": "string"
+                }
+              },
+              "tools": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "permission": {
+                      "type": "string",
+                      "enum": [
+                        "allow",
+                        "ask",
+                        "deny"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "permission"
+                  ],
+                  "additionalProperties": false
                 }
               }
             },
@@ -27776,6 +27960,49 @@
             "auto_commit": {
               "default": true,
               "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "tools": {
+          "type": "object",
+          "properties": {
+            "tools": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "permission": {
+                    "type": "string",
+                    "enum": [
+                      "allow",
+                      "ask",
+                      "deny"
+                    ]
+                  }
+                },
+                "required": [
+                  "permission"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "session_overrides": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ]
+              }
             }
           },
           "additionalProperties": false

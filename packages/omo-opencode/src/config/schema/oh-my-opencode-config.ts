@@ -25,6 +25,7 @@ import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
+import { ToolsPermissionConfigSchema } from "./tools"
 import { TuiConfigSchema } from "./tui"
 import { UlwExecuteConfigSchema } from "./ulw-execute"
 import { WebsearchConfigSchema } from "./websearch"
@@ -101,6 +102,13 @@ export const OhMyOpenCodeConfigSchema = z.object({
   ulw_execute: UlwExecuteConfigSchema.optional(),
   /** Deprecated compatibility shim. Old \`start_work\` key is parsed and migrated to \`ulw_execute\` in validate.ts. */
   start_work: UlwExecuteConfigSchema.optional(),
+  /**
+   * Per-tool permission profile. Maps tool name to one of `allow`, `ask`,
+   * `deny`. Resolution order is documented at
+   * `docs/security/permissions.md`. The default for unlisted tools is
+   * `allow` for read-only tools and `ask` for mutating tools.
+   */
+  tools: ToolsPermissionConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, goal) */
   default_mode: DefaultModeConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */

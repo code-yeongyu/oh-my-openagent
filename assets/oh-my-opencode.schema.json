@@ -9772,6 +9772,49 @@
       },
       "additionalProperties": false
     },
+    "tools": {
+      "type": "object",
+      "properties": {
+        "tools": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "permission": {
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "ask",
+                  "deny"
+                ]
+              }
+            },
+            "required": [
+              "permission"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "session_overrides": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "ask",
+              "deny"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "default_mode": {
       "type": "object",
       "properties": {

@@ -70,3 +70,8 @@ export { createFsyncSkipWarningHook } from "./fsync-skip-warning"
 export { createNotepadWriteGuardHook } from "./notepad-write-guard"
 export { createPlanFormatValidatorHook } from "./plan-format-validator"
 export { createMonitorStatusInjectorHook } from "./monitor-status-injector"
+export {
+  createPermissionGateHook,
+  resolveToolPermission as resolvePermissionGateToolPermission,
+  type PermissionGateDeps,
+} from "./permission-gate"
