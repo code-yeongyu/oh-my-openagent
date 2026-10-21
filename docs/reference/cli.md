@@ -150,12 +150,14 @@ bunx oh-my-openagent doctor
 | `--status` | Show compact system dashboard |
 | `--verbose` | Show detailed diagnostic information |
 | `--json` | Output results in JSON format |
+| `--explain-security` | Print every active security setting in plain prose and stop |
 | `--platform <opencode|codex>` | Select the doctor target platform |
 
 ### Notes
 
 - The current minimum OpenCode version check is `>= 1.4.0`.
 - The doctor command warns when legacy plugin registration (`oh-my-opencode`) is still present in `opencode.json`.
+- `--explain-security` is an output mode, not a check: it prints what the security controls are enforcing on this machine, runs no probe, and reports no pass/fail summary. Each section names the `omo.jsonc` key or environment variable that carries it and reports the resolved omo home and agent directory. A section whose control is not in your build reads `feature pending: see PR-<letter>`, so an install can tell the difference between "off" and "not shipped yet". `--explain-security --json` prints the same lines as a JSON array of strings. The journey each section belongs to is documented in [`security/usability.md`](../security/usability.md).
 - OmO Native's `doctor` subcommand also reports computer use (experimental) without opening a desktop session or requesting OS permissions. It prints:
   - whether the effective Native config enables computer use and whether the host is supported;
   - the selected engine path and its version, protocol, and ABI, or the engine-location diagnostic and every path tried;

@@ -35,6 +35,7 @@ type DoctorCommandOptions = {
   readonly status?: boolean
   readonly verbose?: boolean
   readonly json?: boolean
+  readonly explainSecurity?: boolean
   readonly platform?: DoctorOptions["target"]
 }
 
@@ -195,6 +196,7 @@ program
   .option("--status", "Show compact system dashboard")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
+  .option("--explain-security", "Print every active security setting in plain prose and stop")
   .addOption(new Option("--platform <platform>", "Doctor target platform: opencode, codex").choices(["opencode", "codex"]))
   .addHelpText("after", `
 Examples:
@@ -203,6 +205,7 @@ Examples:
   $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics
   $ bunx oh-my-opencode doctor --json     # JSON output
   $ omo-agent-toolkit doctor --platform=codex   # Codex/LazyCodex diagnostics only
+  $ bunx oh-my-opencode doctor --explain-security   # What the security controls are enforcing
 `)
   .action(async (options: DoctorCommandOptions) => {
     const rootOptions = program.opts<RootCommandOptions>()
@@ -211,6 +214,7 @@ Examples:
     const doctorOptions: DoctorOptions = {
       mode,
       json: options.json ?? false, target: resolveDoctorTarget(process.env.OMO_INVOCATION_NAME, options.platform ?? rootDoctorPlatform),
+      explainSecurity: options.explainSecurity ?? false,
     }
     const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)

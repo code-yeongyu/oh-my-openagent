@@ -1,0 +1,56 @@
+// assets/omo.jsonc.example
+//
+// A complete, valid `omo.jsonc`. Copy it to one of the two places the loader reads:
+//
+//   user     ~/.omo/omo.jsonc
+//   project  <project>/.omo/omo.jsonc   (nearest ancestor directory wins)
+//
+// Delete whatever you do not need. Every block is shown at its documented default, so an
+// untouched copy changes nothing about how omo behaves. Uncomment a block, set one value, and
+// `omo doctor --explain-security` prints what the build is enforcing.
+//
+// The `security` block is commented as a whole, not key by key, because the config schema rejects
+// a key it does not know: each `security.*` key arrives in its own release, and an uncommented key
+// would make this file fail to load on every build before that release. Uncomment one line at a
+// time, from the inside out, after the release that adds it is installed.
+
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+
+  // Directory `omo` watches for rule files (`.omo/rules/*.md`). Optional.
+  // "formatOnMutation": {
+  //   "mode": "best-effort",
+  // },
+
+  // Skills a user or project turns off, by skill name.
+  // "disabled_skills": [],
+
+  // Right-hand panel in the interactive session. Off by default.
+  // "side_panel": {
+  //   "enabled": false,
+  // },
+
+  // Anonymous usage statistics. `true` ships today; the release that flips the default leaves
+  // this key commented so the copy above keeps reporting whatever your build actually does.
+  // "telemetry": {
+  //   "enabled": true,
+  // },
+
+  // Where a `{file:...}` reference is allowed to resolve, and how the token store is protected at
+  // rest. Both keys are documented below at their shipped defaults. See
+  // docs/security/usability.md for the journey that moves an existing install onto them.
+  // "security": {
+  //   // The only directory omo itself allowlists. Add your own to keep secrets somewhere else,
+  //   // for example a directory your password manager owns. Prefixes that are never
+  //   // allowlist-overridable (`/proc`, `/sys`, `/dev`, `/etc/shadow`, `~/.ssh`, `~/.gnupg`,
+  //   // `~/.aws`) are refused whatever this list says.
+  //   "file_ref_allowlist_roots": ["~/.config/opencode"],
+  //
+  //   // How `<agent dir>/auth.json` is protected at rest:
+  //   //   "plain"       the shipped default; the file is readable JSON
+  //   //   "passphrase"  encrypted with a passphrase you are prompted for
+  //   //   "ssh-key"     encrypted with a key derived from an SSH key you point at
+  //   // An existing plaintext file is rewritten encrypted the next time omo writes it.
+  //   "auth_at_rest": "plain",
+  // },
+}

@@ -263,6 +263,25 @@ Tests are co-located as `*.test.ts` files and follow a given/when/then style.
 
 ## Making Changes
 
+### Adding a Security Control
+
+A security control is not done when the code lands. Three user-facing surfaces belong to the PR
+that adds it, and the [`security-usability` skill](.agents/skills/security-usability/SKILL.md) is
+the checklist for all three:
+
+1. A journey in [`docs/security/usability.md`](docs/security/usability.md): `## <journey title>`, a
+   one or two sentence intro ending with the `omo.jsonc` key or env var that carries it, then a
+   fenced `console` transcript of the real command and the output a real install prints.
+2. A section in `SECURITY_EXPLAIN_SECTIONS` in
+   `packages/omo-native/bin/lib/doctor-security-explain.js`, so `omo doctor --explain-security`
+   reports the effective state. A control that is not in the build yet keeps the heading and
+   prints `feature pending: see PR-<x>` instead of dropping the section.
+3. A failure message that names what was refused, why, and the smallest change that unblocks it.
+
+A new top-level key under `security.*` also gets a commented entry in
+[`assets/omo.jsonc.example`](assets/omo.jsonc.example), the shipped example that documents every
+defaulted key and stays valid against the schema of the build it ships with.
+
 ### Adding a New Agent
 
 1. Create a new `.ts` file in `packages/omo-opencode/src/agents/`
@@ -335,19 +354,23 @@ Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the 
 
 1. **Fork** the repository and create your branch from `dev`
 2. **Make changes** following the conventions above
-3. **Build and test** locally:
+3. **Config changes:** start from [`assets/omo.jsonc.example`](assets/omo.jsonc.example). It is a
+   complete, valid `omo.jsonc` with every documented default shown and every optional key
+   commented out with the reason it is commented. Copy it to `~/.omo/omo.jsonc` (user) or
+   `<project>/.omo/omo.jsonc` (project) and delete what you do not need.
+4. **Build and test** locally:
    ```bash
    bun run typecheck  # Ensure no type errors
    bun run build      # Ensure build succeeds
    bun test           # Run the root test suite
    bun run test:codex # Run the Codex Light compatibility suite
    ```
-4. **Test in OpenCode** using the local build method described above
-5. **Commit** with clear, descriptive messages:
+5. **Test in OpenCode** using the local build method described above
+6. **Commit** with clear, descriptive messages:
    - Use present tense ("Add feature" not "Added feature")
    - Reference issues if applicable ("Fix #123")
-6. **Push** to your fork and create a Pull Request
-7. **Describe** your changes clearly in the PR description
+7. **Push** to your fork and create a Pull Request
+8. **Describe** your changes clearly in the PR description
 
 ### PR Checklist
 
