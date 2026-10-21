@@ -1,3 +1,7 @@
+## 2026-10-21 - Release cancelled facts claims before the next session retries (#10813)
+
+`FactsExtractorRunner` releases its own batch claim after a cancelled in-process child stops and the run is abandoned. The cancellation return previously bypassed the normal finalization cleanup, leaving saved input claimed until the 15-minute stale-claim expiry. Cancellation still retains the queued transcript and does not record an extraction failure. The real-engine regression closes a session during an event-gated facts request and verifies that the next session's first settled prompt consumes the inherited input. Queue coverage preserves crash expiry and prevents an old owner from releasing a replacement owner's claim.
+
 ## 2026-10-20 - Adopt senpi 2026.10.19-2 for the 5.1.39 cut
 
 All exact senpi pins (root, `omo-native`, `omo-senpi` peer/dev and its `senpi-ai`/`senpi-tui` aliases, `senpi-task`, the pin and package-shape tests, the provider-map derivation comment and the catalog-coverage comment) move from `2026.10.19` to `2026.10.19-2`, with the lockfile regenerated. The provider-map registry, catalog-coverage and chain-provider tests pass unchanged against the new engine, so the map needs no re-derivation. The committed Senpi plugin bundles were regenerated on the canonical linux/amd64 build (bun 1.4.3): only `omo.js` and `omo-onboarding-scan.js` change, both in the provider map they inline (`omo-native/bin/lib/provider-map.json`), whose derivation comment now names senpi 2026.10.19-2; `omo.js` is 1,396,195 bytes, inside its 1,424,569 budget.

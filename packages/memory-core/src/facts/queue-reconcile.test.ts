@@ -73,6 +73,26 @@ async function queueFileNames(paths: MemoryIdentityPaths): Promise<string[]> {
 }
 
 describe("facts queue reconcile", () => {
+  test("#given a crashed owner leaves its claim #when a fresh process retries #then only expiry permits reclaim and the old owner cannot release it", async () => {
+    let now = Date.parse("2026-01-01T00:00:00.000Z")
+    const paths = await identityFixture()
+    const crashed = new FactsQueue({ identityPaths: paths, now: () => new Date(now) })
+    await crashed.enqueue(request(journal(2)))
+    const entries = await crashed.listPending()
+    expect(await crashed.claim(entries, "crashed-owner")).toHaveLength(1)
+
+    const recovered = new FactsQueue({ identityPaths: paths, now: () => new Date(now) })
+    expect(await recovered.claim(entries, "next-owner")).toHaveLength(0)
+    now += 15 * 60_000
+    expect(await recovered.claim(entries, "next-owner")).toHaveLength(0)
+    now += 1
+    expect(await recovered.claim(entries, "next-owner")).toHaveLength(1)
+    await crashed.releaseClaim(entries, "crashed-owner")
+    expect(await recovered.claim(entries, "third-owner")).toHaveLength(0)
+    await recovered.releaseClaim(entries, "next-owner")
+    expect(await recovered.claim(entries, "third-owner")).toHaveLength(1)
+  })
+
   test("#given a leftover queue file with no completion #when reconcile runs #then it is listed as launchable", async () => {
     // given
     const paths = await identityFixture()

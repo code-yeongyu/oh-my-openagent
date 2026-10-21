@@ -14,13 +14,15 @@ import type { MemorySessionStateLike } from "./wiring-types"
 import { FACTS_RECORD_TOOL_NAME } from "./facts-record-tool"
 import { sessionIdFrom } from "./wiring-context"
 
-async function engineFixture() {
+async function engineFixture(options: { readonly holdFirstExtraction?: boolean } = {}) {
   const { root, identity, queue, cleanup } = await fixture(undefined, { registerCleanup: false })
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
   await repo.init({ seedFiles: buildDefaultSeedFiles() })
   const headBefore = await repo.head()
   const requests: Array<{ readonly model: string; readonly extraction: boolean }> = []
   let extractionCalls = 0
+  const extractionStarted = Promise.withResolvers<void>()
+  const releaseExtraction = Promise.withResolvers<void>()
   const server = Bun.serve({
     port: 0,
     async fetch(request) {
@@ -31,7 +33,11 @@ async function engineFixture() {
       const extraction = "tools" in body && JSON.stringify(body.tools).includes(FACTS_RECORD_TOOL_NAME)
       requests.push({ model: body.model, extraction })
       if (extraction) extractionCalls += 1
-      const recordsFact = extraction && extractionCalls === 1
+      if (options.holdFirstExtraction && extraction && extractionCalls === 1) {
+        extractionStarted.resolve()
+        await releaseExtraction.promise
+      }
+      const recordsFact = extraction && extractionCalls === (options.holdFirstExtraction ? 2 : 1)
       const delta = recordsFact
         ? { role: "assistant", tool_calls: [{ index: 0, id: "record-fact", type: "function", function: {
           name: FACTS_RECORD_TOOL_NAME,
@@ -48,6 +54,7 @@ async function engineFixture() {
   })
   const activeClosers = new Set<() => Promise<void>>()
   onTestFinished(async () => {
+    releaseExtraction.resolve()
     for (const close of [...activeClosers]) await close()
     server.stop(true)
     await cleanup()
@@ -151,9 +158,34 @@ async function engineFixture() {
   }
   return {
     start, requests, queue, repo, headBefore, debounceSettles: memory.facts.debounce_settles,
+    extractionStarted: extractionStarted.promise,
+    releaseExtraction: () => releaseExtraction.resolve(),
     seedPending: () => enqueue(queue, identity, "session-2", "m2", "The project uses TypeScript."),
   }
 }
+
+test("#given facts extraction in flight #when the real session closes and the next session settles #then inherited facts retry immediately", async () => {
+  const f = await engineFixture({ holdFirstExtraction: true })
+  const first = await f.start()
+  await first.session.prompt("The project uses Bun.", { source: "rpc" })
+  await f.extractionStarted
+
+  try {
+    await first.close()
+  } finally {
+    f.releaseExtraction()
+  }
+  expect((await f.queue.listPending()).length).toBeGreaterThan(0)
+  expect(await f.repo.head()).toBe(f.headBefore)
+
+  const next = await f.start()
+  await next.session.prompt("Continue the project.", { source: "rpc" })
+  await next.session.waitForIdle()
+  await next.drain()
+
+  expect(await f.queue.listPending()).toHaveLength(0)
+  expect(await f.repo.head()).not.toBe(f.headBefore)
+}, 60_000)
 
 test("#given pending facts #when the real engine launches and relaunches without a prompt #then no HTTP model request occurs", async () => {
   const f = await engineFixture()

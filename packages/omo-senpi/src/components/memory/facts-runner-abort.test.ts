@@ -69,6 +69,10 @@ describe("facts runner shutdown abort boundary", () => {
     expect(await queue.listPending()).toHaveLength(1)
     expect((await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()).entries).toHaveLength(0)
     expect(await readFile(join(runDir, "abandoned.json"), "utf8")).toContain("session_shutdown")
+
+    const next = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact"))
+    expect((await next.launchPending()).status).toBe("committed")
+    expect(await queue.listPending()).toHaveLength(0)
   }, 30_000)
 
   test("#given the abort fires at the batch-id hook mid-composite #when launch proceeds #then the reservation boundary refuses to start", async () => {
