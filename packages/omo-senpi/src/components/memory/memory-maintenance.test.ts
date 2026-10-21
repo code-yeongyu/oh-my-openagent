@@ -319,7 +319,7 @@ describe("createMemoryMaintenance", () => {
   }, 30_000)
 })
 
-describe("createMemoryMaintenance transcript budget", () => {
+describe("createMemoryMaintenance consumed transcript retirement", () => {
   async function seedJournal(transcriptsDir: string, id: string, ageMs: number): Promise<string> {
     const dir = join(transcriptsDir, id)
     await mkdir(dir, { recursive: true })
@@ -360,11 +360,11 @@ describe("createMemoryMaintenance transcript budget", () => {
     expect(existsSync(join(idle, "transcript.jsonl"))).toBe(false)
     expect(existsSync(join(idle, "retired.ids"))).toBe(true)
     expect(existsSync(join(live, "transcript.jsonl"))).toBe(true)
-    expect(log.info).toEqual(["omo-senpi memory transcripts compacted"])
+    expect(log.info).toEqual(["omo-senpi memory consumed transcripts retired"])
     expect(log.warn).toEqual([])
   }, 60_000)
 
-  test("#given the budget pass throws #when maintenance runs #then it warns and the repo pass still completes", async () => {
+  test("#given the retirement pass throws #when maintenance runs #then it warns and the repo pass still completes", async () => {
     // given
     const { context, repo } = await identityWithHistory(20)
     const log = recorder()
@@ -372,7 +372,7 @@ describe("createMemoryMaintenance transcript budget", () => {
       logger: log.logger,
       delayMs: 0,
       minLooseObjects: 10,
-      enforceBudget: async () => {
+      retireConsumed: async () => {
         throw new Error("disk walk failed")
       },
     })
@@ -382,7 +382,7 @@ describe("createMemoryMaintenance transcript budget", () => {
     await maintenance.settled()
 
     // then
-    expect(log.warn).toEqual(["omo-senpi memory transcript budget failed"])
+    expect(log.warn).toEqual(["omo-senpi memory transcript retirement failed"])
     expect(log.info).toEqual(["omo-senpi memory repo packed"])
     expect((await repo.log()).length).toBe(21)
   }, 60_000)

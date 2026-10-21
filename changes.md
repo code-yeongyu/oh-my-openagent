@@ -1,13 +1,11 @@
-## 2026-10-22 - Memory transcripts get a storage budget; /doctor shows the store size
+## 2026-10-22 - Consumed memory transcripts are retired; /doctor shows the store size
 
-Per-session transcript journals (`runtime/transcripts/<session>/transcript.jsonl`) were append-only and never removed, so a busy identity grew by about 26 KB per tool-heavy turn (7.9 MB for a synthetic 300-turn session) without a bound. The memory store now targets 10-50 MB per identity (design note: `docs/reference/memory-storage-budget.md`).
+Per-session transcript journals (`runtime/transcripts/<session>/transcript.jsonl`) were append-only and never removed, so a busy identity grew by about 26 KB per tool-heavy turn (7.9 MB for a synthetic 300-turn session) with no bound. Design note: `docs/reference/memory-storage-budget.md`.
 
-- Reasoning rows are cut at capture to a 2,048-character head+tail window (`REASONING_TRUNCATE_LIMIT`, `journal/entries.ts`), like tool results.
 - `retireTranscriptJournal` (`journal/retire.ts`) deletes a journal's transcript, resets `state.json` and keeps `retired.ids`, one 16-hex key per message; `TranscriptJournal.append` skips retired messages, so replaying a resumed session's branch journals only new messages.
-- `enforceTranscriptBudget` (`journal/budget.ts`) retires journals reflection has consumed after 7 idle days, then, while the identity is over 32 MiB, the least recently active journals idle for 24 h, and removes retired markers after 90 days. Live sessions are never touched. It runs inside the existing 12-hour memory maintenance pass, which is also the one-time compaction of an existing oversized store: a synthetic 460 MiB store compacted to 30.4 MiB in 316 ms with a largest event-loop stall of 1 ms.
+- `retireConsumedTranscriptJournals` (`journal/retire-consumed.ts`) retires journals reflection has fully consumed, idle for 7 days, not live. Unconsumed journals are never touched. It runs inside the existing 12-hour memory maintenance pass.
 - `FactsQueue.resetConversation` drops a conversation's facts cursor and consumed record under the journal lock before retirement (the watermarks are transcript line numbers), and refuses while a batch for it is queued.
-- `measureMemoryFootprint` (`footprint/`) reports bytes per area; `/doctor` adds a `storage` line that warns above 64 MiB total or 32 MiB of transcripts.
-- Terminal facts runs keep at most 16 MiB (was 128 MiB).
+- `measureMemoryFootprint` (`footprint/`) reports bytes per area; `/doctor` adds a `storage` line that warns above 64 MiB.
 
 ## 2026-10-20 - Adopt senpi 2026.10.19-2 for the 5.1.39 cut
 

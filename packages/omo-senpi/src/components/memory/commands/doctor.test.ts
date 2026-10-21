@@ -102,14 +102,14 @@ describe("/doctor", () => {
     expect(ctx.ui.notifications.at(-1)?.message).toBe(text)
   })
 
-  test("#given transcripts above their budget #when doctor runs #then the storage line warns with the per-area footprint", async () => {
+  test("#given a store above the size target #when doctor runs #then the storage line warns with the per-area footprint", async () => {
     const { identity, pi, ctx } = await harness()
     const clean = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
     expect(clean.checks.find((check: { name: string }) => check.name === "storage").level).toBe("ok")
     await mkdir(join(identity.identityPaths.transcripts, "s1"), { recursive: true })
-    await writeFile(join(identity.identityPaths.transcripts, "s1", "transcript.jsonl"), Buffer.alloc(33 * 1024 * 1024, 120))
+    await writeFile(join(identity.identityPaths.transcripts, "s1", "transcript.jsonl"), Buffer.alloc(65 * 1024 * 1024, 120))
     const text = await invoke(pi, "doctor", "", ctx)
-    expect(text).toMatch(/^\[warn\] storage: 33\.\d MiB \(transcripts 33\.0 MiB, repo .*\); target 64\.0 MiB total, 32\.0 MiB transcripts; the next maintenance pass retires idle transcripts$/m)
+    expect(text).toMatch(/^\[warn\] storage: 65\.\d MiB \(transcripts 65\.0 MiB, repo .*\); above the 64\.0 MiB target$/m)
   })
 
   test("#given legacy secrets #when JSON is requested #then audit redaction preserves counts", async () => {

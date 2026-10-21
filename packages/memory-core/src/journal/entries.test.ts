@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { REASONING_TRUNCATE_LIMIT, TOOL_RESULT_TRUNCATE_LIMIT, projectTranscriptEntries } from "./entries"
+import { TOOL_RESULT_TRUNCATE_LIMIT, projectTranscriptEntries } from "./entries"
 
 function toolResultText(resultText: string): string {
   const rows = projectTranscriptEntries(
@@ -39,25 +39,6 @@ describe("transcript entry projection", () => {
     // when / then
     expect(toolResultText("done")).toBe("done")
     expect(toolResultText(exact)).toBe(exact)
-  })
-
-  it("#given oversized reasoning #when projected #then only a head+tail window of the reasoning is stored", () => {
-    // given
-    const reasoning = `${"h".repeat(5000)}${"t".repeat(5000)}`
-
-    // when
-    const rows = projectTranscriptEntries(
-      { kind: "assistant", messageId: "msg", reasoningBlocks: [reasoning, "short"] },
-      "2026-08-09T12:00:00.000Z",
-    )
-
-    // then
-    const texts = rows.map((row) => (row.kind === "reasoning" ? row.text : ""))
-    const dropped = reasoning.length - REASONING_TRUNCATE_LIMIT
-    expect(texts[0]).toContain(`\n…[truncated ${dropped} chars]…\n`)
-    expect(texts[0]?.startsWith("h".repeat(100))).toBe(true)
-    expect(texts[0]?.endsWith("t".repeat(100))).toBe(true)
-    expect(texts[1]).toBe("short")
   })
   it("#given an assistant trajectory #when projected #then canonical and contextual rows use stable ids", () => {
     // given

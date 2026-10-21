@@ -9,7 +9,6 @@ import { join } from "node:path"
 
 import {
   MEMORY_FOOTPRINT_WARN_BYTES,
-  TRANSCRIPT_BUDGET_BYTES,
   V1_PERSONA_SEED_SHA256,
   auditMemoryRepo,
   formatBytes,
@@ -63,18 +62,17 @@ async function listMarkdown(root: string, prefix: string): Promise<string[]> {
 }
 
 /**
- * On-disk size of the identity, per area. Warns above the store target or when transcripts exceed
- * their budget; the remedy is automatic (the next maintenance pass compacts), so the line says so.
+ * On-disk size of the identity, per area. Warns above the store target, naming the largest area so the
+ * reader sees which store grew. Read-only: nothing is removed from here.
  */
 export async function checkStorage(paths: MemoryIdentityPaths): Promise<DoctorCheck> {
   const footprint = await measureMemoryFootprint(paths)
-  const over = footprint.totalBytes > MEMORY_FOOTPRINT_WARN_BYTES || footprint.areas.transcripts > TRANSCRIPT_BUDGET_BYTES
   const detail = formatMemoryFootprint(footprint)
-  if (!over) return { name: "storage", level: "ok", detail }
+  if (footprint.totalBytes <= MEMORY_FOOTPRINT_WARN_BYTES) return { name: "storage", level: "ok", detail }
   return {
     name: "storage",
     level: "warn",
-    detail: `${detail}; target ${formatBytes(MEMORY_FOOTPRINT_WARN_BYTES)} total, ${formatBytes(TRANSCRIPT_BUDGET_BYTES)} transcripts; the next maintenance pass retires idle transcripts`,
+    detail: `${detail}; above the ${formatBytes(MEMORY_FOOTPRINT_WARN_BYTES)} target`,
   }
 }
 

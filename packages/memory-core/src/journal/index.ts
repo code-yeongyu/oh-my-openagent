@@ -1,5 +1,4 @@
 export {
-  REASONING_TRUNCATE_LIMIT,
   REDACTED_REASONING_TEXT,
   TOOL_ARGS_TRUNCATE_LIMIT,
   TOOL_RESULT_TRUNCATE_LIMIT,
@@ -42,21 +41,16 @@ export {
 } from "./sweep"
 export {
   RETIRED_IDS_FILE,
-} from "./retire"
-export {
-  TRANSCRIPT_BUDGET_BYTES,
-  TRANSCRIPT_EVICT_IDLE_MS,
-  TRANSCRIPT_RETIRED_TTL_MS,
-  TRANSCRIPT_RETIRE_IDLE_MS,
-  enforceTranscriptBudget,
-  type TranscriptBudgetKeepReason,
-  type TranscriptBudgetOptions,
-  type TranscriptBudgetResult,
-} from "./budget"
-export {
   readRetiredMessageKeys,
   retireTranscriptJournal,
   retiredMessageKey,
   type RetireJournalOptions,
   type RetireJournalResult,
 } from "./retire"
+export {
+  TRANSCRIPT_RETIRE_IDLE_MS,
+  retireConsumedTranscriptJournals,
+  type ConsumedJournalKeepReason,
+  type ConsumedJournalRetirementOptions,
+  type ConsumedJournalRetirementResult,
+} from "./retire-consumed"
