@@ -527,6 +527,52 @@ jobs:
           JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  # The committed Senpi plugin bundle must match its sources. Its own job, so a stale bundle is one named check
+  # ("bundle-currency") that a bundle-train early review can tell apart from a real senpi-compatibility failure.
+  bundle-currency:
+    needs: [ci-mode]
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          bun-version: "1.4.3"
+
+      - uses: actions/cache@v6
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Remove stale self-package test copies
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun run script/remove-stale-self-package-tests.ts
+
+      # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
+      # which are backslash-separated on Windows, so the source digest is platform-dependent and
+      # a committed artifact can never match on every OS. One platform is enough to catch drift.
+      - name: Verify committed Senpi plugin bundle is current
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+          # The installer embeds the required-artifact list, so a stale copy demands files the
+          # plugin no longer ships and refuses to install. Nothing else in CI reads it.
+          node packages/omo-senpi/plugin/scripts/build-install.mjs --check
+
+
   senpi-compatibility:
     needs: [ci-mode]
     # Preserve required matrix check names during the Ubuntu image migration.
@@ -562,19 +608,6 @@ jobs:
       - name: Remove stale self-package test copies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
-
-      # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
-      # which are backslash-separated on Windows, so the source digest is platform-dependent and
-      # a committed artifact can never match on every OS. One platform is enough to catch drift.
-      - name: Verify committed Senpi plugin bundle is current
-        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
-        shell: bash
-        run: |
-          set -euo pipefail
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
-          # The installer embeds the required-artifact list, so a stale copy demands files the
-          # plugin no longer ships and refuses to install. Nothing else in CI reads it.
-          node packages/omo-senpi/plugin/scripts/build-install.mjs --check
 
       - name: Run Senpi compatibility tests
         id: senpi-tests-posix
@@ -976,7 +1009,7 @@ jobs:
   auto-commit-schema:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
+    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, bundle-currency, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -1027,7 +1060,7 @@ jobs:
   draft-release:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
+    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, bundle-currency, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/dev' &&
