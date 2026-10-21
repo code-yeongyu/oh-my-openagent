@@ -33,7 +33,7 @@ export type ConsumedJournalRetirementOptions = {
   readonly signal?: AbortSignal
 }
 
-export type ConsumedJournalKeepReason = "live" | "recent" | "unconsumed" | "facts-pending" | "locked"
+export type ConsumedJournalKeepReason = "live" | "recent" | "unconsumed" | "facts-pending" | "locked" | "changed"
 
 export type ConsumedJournalRetirementResult = {
   readonly retired: readonly string[]
@@ -60,6 +60,19 @@ async function reflectionCaughtUp(dir: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * The eligibility the scan decided on, re-read under the journal lock: an append from a resumed
+ * session (possibly in another process, which the local `isLive` cannot see) between the scan and the
+ * lock moves the transcript mtime or the reflection state, and the journal is then kept.
+ */
+async function stillEligible(dir: string, sessionId: string, options: ConsumedJournalRetirementOptions, idleMs: number): Promise<boolean> {
+  if (options.isLive?.(sessionId) === true) return false
+  const transcript = await lstat(join(dir, TRANSCRIPT)).catch(() => undefined)
+  if (transcript === undefined || transcript.size === 0) return false
+  if ((options.now ?? Date.now)() - transcript.mtimeMs < idleMs) return false
+  return reflectionCaughtUp(dir)
 }
 
 export async function retireConsumedTranscriptJournals(
@@ -102,15 +115,23 @@ export async function retireConsumedTranscriptJournals(
       continue
     }
     const release = options.releaseConversation
+    let changed = false
     const result = await retireTranscriptJournal(dir, {
       lock,
-      ...(release === undefined ? {} : { beforeRetire: () => release(entry.name) }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
+      beforeRetire: async () => {
+        if (!(await stillEligible(dir, entry.name, options, idleMs))) {
+          changed = true
+          return false
+        }
+        return release === undefined ? true : release(entry.name)
+      },
     })
     if (result.status === "retired") {
       retired.push(entry.name)
       freedBytes += result.freedBytes
     } else if (result.status === "refused") {
-      keep("facts-pending")
+      keep(changed ? "changed" : "facts-pending")
     } else if (result.status === "locked") {
       keep("locked")
     }

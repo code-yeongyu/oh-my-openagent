@@ -16,6 +16,7 @@ import {
   type FakeDeps,
 } from "./commands.test-support"
 import { registerDoctorCommand } from "./doctor"
+import { checkStorage } from "./doctor-checks"
 import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
@@ -100,6 +101,15 @@ describe("/doctor", () => {
     expect(report.checks.find((check: { name: string }) => check.name === "repository").level).toBe("ok")
     expect(report.skills).toEqual({ scanned: 0, repaired: 0 })
     expect(ctx.ui.notifications.at(-1)?.message).toBe(text)
+  })
+
+  test("#given a footprint walk stopped at its entry cap #when storage is checked #then it warns that the size is a lower bound", async () => {
+    const { identity } = await harness()
+    await mkdir(join(identity.identityPaths.transcripts, "s1"), { recursive: true })
+    await writeFile(join(identity.identityPaths.transcripts, "s1", "transcript.jsonl"), "small")
+    const check = await checkStorage(identity.identityPaths, { maxEntries: 1 })
+    expect(check.level).toBe("warn")
+    expect(check.detail).toMatch(/\+.*; scan stopped at its entry cap, so the size is a lower bound$/)
   })
 
   test("#given a store above the size target #when doctor runs #then the storage line warns with the per-area footprint", async () => {

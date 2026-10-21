@@ -90,6 +90,32 @@ describe("transcript journal retirement", () => {
     expect(existsSync(join(journalDir, RETIRED_IDS_FILE))).toBe(false)
   })
 
+  it("#given an abort during the stream #when retiring #then no file changes and the caller is never asked to release", async () => {
+    // given
+    const root = await transcriptsDir()
+    const journalDir = join(root, "session-a")
+    await new TranscriptJournal({ journalDir }).reconcile(branch)
+    const before = await readFile(join(journalDir, "transcript.jsonl"), "utf8")
+    const controller = new AbortController()
+    controller.abort()
+    let asked = false
+
+    // when
+    const outcome = await retireTranscriptJournal(journalDir, {
+      signal: controller.signal,
+      beforeRetire: async () => {
+        asked = true
+        return true
+      },
+    }).catch((error: unknown) => error)
+
+    // then
+    expect(outcome).toBeInstanceOf(Error)
+    expect(asked).toBe(false)
+    expect(await readFile(join(journalDir, "transcript.jsonl"), "utf8")).toBe(before)
+    expect(existsSync(join(journalDir, RETIRED_IDS_FILE))).toBe(false)
+  })
+
   it("#given a retired journal idle past the sweep window #when empty journals are swept #then the retired marker is kept", async () => {
     // given
     const root = await transcriptsDir()

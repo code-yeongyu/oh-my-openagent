@@ -49,7 +49,7 @@ export async function readRetiredMessageKeys(journalDir: string): Promise<Readon
 }
 
 /** Streams the message ids out of a transcript without holding the file in memory. */
-async function collectMessageKeys(transcriptPath: string, into: Set<string>): Promise<number> {
+async function collectMessageKeys(transcriptPath: string, into: Set<string>, signal?: AbortSignal): Promise<number> {
   let handle
   try {
     handle = await open(transcriptPath, "r")
@@ -74,6 +74,8 @@ async function collectMessageKeys(transcriptPath: string, into: Set<string>): Pr
       }
     }
     for (;;) {
+      // Checked per chunk: a multi-GB legacy journal must not keep streaming after maintenance is disposed.
+      signal?.throwIfAborted()
       const { bytesRead } = await handle.read(buffer, 0, READ_CHUNK_BYTES, null)
       if (bytesRead === 0) break
       bytes += bytesRead
@@ -106,10 +108,14 @@ export type RetireJournalResult =
 export type RetireJournalOptions = {
   readonly lock?: JournalLock
   /**
-   * Runs under the journal lock right before anything is removed; false leaves the journal untouched.
-   * Holding the lock across it means no append can land between the caller's release and the retirement.
+   * Runs under the journal lock after the transcript has been streamed and right before anything is
+   * removed; false leaves the journal untouched. Holding the lock across it means no append can land
+   * between the caller's check (or release) and the retirement, and running it last means an abort
+   * during the stream never leaves a released caller next to a kept journal.
    */
   readonly beforeRetire?: () => Promise<boolean>
+  /** Aborts the stream between chunks and before any file is changed; the journal is then left as it was. */
+  readonly signal?: AbortSignal
 }
 
 /**
@@ -130,18 +136,19 @@ export async function retireTranscriptJournal(
   const lock = options.lock ?? withLocalJournalLock
   try {
     return await lock(join(journalDir, LOCK), async () => {
-      if (options.beforeRetire !== undefined && !(await options.beforeRetire())) return { status: "refused" as const }
       const transcriptPath = join(journalDir, TRANSCRIPT)
       const keys = new Set(await readRetiredMessageKeys(journalDir))
       const before = keys.size
-      const freedBytes = await collectMessageKeys(transcriptPath, keys)
+      const freedBytes = await collectMessageKeys(transcriptPath, keys, options.signal)
+      options.signal?.throwIfAborted()
+      if (options.beforeRetire !== undefined && !(await options.beforeRetire())) return { status: "refused" as const }
       await publish(join(journalDir, RETIRED_IDS_FILE), keys.size === 0 ? "" : `${[...keys].join("\n")}\n`)
       await unlink(transcriptPath).catch((error: unknown) => {
         if (errorCode(error) !== "ENOENT") throw error
       })
       await publish(join(journalDir, STATE), `${JSON.stringify(initialReflectionState(), null, 2)}\n`)
       return { status: "retired" as const, messages: keys.size - before, freedBytes }
-    })
+    }, options.signal)
   } catch (error) {
     if (error instanceof JournalLockTimeoutError) return { status: "locked" }
     throw error

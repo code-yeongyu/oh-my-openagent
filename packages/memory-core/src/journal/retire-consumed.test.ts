@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readdir, stat, utimes, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, mkdtemp, readdir, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { removeTree } from "../../../../test-support/remove-tree"
+import { withLocalJournalLock, type JournalLock } from "./lock"
 import { RETIRED_IDS_FILE } from "./retire"
 import { retireConsumedTranscriptJournals } from "./retire-consumed"
 
@@ -111,6 +112,47 @@ describe("consumed transcript journal retirement", () => {
     expect(result.retired).toEqual([])
     expect(result.kept["facts-pending"]).toBe(1)
     expect(existsSync(join(root, "queued", "transcript.jsonl"))).toBe(true)
+  })
+
+  it("#given a resumed session appends between the scan and the lock #when the pass retires #then the journal and facts are left alone", async () => {
+    // given: the lock is taken only after another process appended a fresh row
+    const root = await transcriptsDir()
+    const dir = await seedJournal(root, "resumed", { bytes: 64 * 1024, ageMs: 8 * DAY, reflected: true })
+    const fresh = new Date(NOW)
+    const appendingLock: JournalLock = async (path, task, signal) => {
+      await appendFile(join(dir, "transcript.jsonl"), `${JSON.stringify({ kind: "user", text: "back again", captured_at: fresh.toISOString(), source_line_id: "new:user", source_message_id: "new" })}\n`)
+      await utimes(join(dir, "transcript.jsonl"), fresh, fresh)
+      return withLocalJournalLock(path, task, signal)
+    }
+    const released: string[] = []
+
+    // when
+    const result = await retireConsumedTranscriptJournals({
+      transcriptsDir: root,
+      now: () => NOW,
+      lock: appendingLock,
+      releaseConversation: async (id) => {
+        released.push(id)
+        return true
+      },
+    })
+
+    // then
+    expect(result.retired).toEqual([])
+    expect(result.kept.changed).toBe(1)
+    expect(released).toEqual([])
+    expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
+    expect(existsSync(join(dir, RETIRED_IDS_FILE))).toBe(false)
+  })
+
+  it("#given an aborted maintenance pass #when the pass runs #then it stops before retiring anything", async () => {
+    const root = await transcriptsDir()
+    await seedJournal(root, "consumed", { bytes: 64 * 1024, ageMs: 8 * DAY, reflected: true })
+    const controller = new AbortController()
+    controller.abort()
+    const outcome = await retireConsumedTranscriptJournals({ transcriptsDir: root, now: () => NOW, signal: controller.signal }).catch((error: unknown) => error)
+    expect(outcome).toBeInstanceOf(Error)
+    expect(existsSync(join(root, "consumed", "transcript.jsonl"))).toBe(true)
   })
 
   it("#given no transcripts directory #when the pass runs #then nothing is reported", async () => {
