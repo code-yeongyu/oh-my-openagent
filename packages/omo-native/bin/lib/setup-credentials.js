@@ -11,6 +11,8 @@ import { readRow, readRows } from "./sqlite-rows.js"
 import { credentialGuidance } from "./setup-guidance.js"
 import { readAuthStore, writeAuthStore } from "./auth-store.js"
 import { literalConfigValue } from "./engine-config-value.js"
+import { findSecretCandidates } from "./secret-detect.js"
+import { moveAndReport, secretCountLines, secretExtractionPlan, secretPlanLines } from "./secret-extract.js"
 import providerMap from "./provider-map.json" with { type: "json" }
 
 export const API_KEY_TYPE_ACCEPTLIST = new Set(["api_key"])
@@ -155,11 +157,14 @@ export async function planCredentials(runtime, target, customProviderIds) {
     return { target, current, notices, malformed: true, pending: 0, found: sources.candidates.length + sources.oauth.length }
   }
   const result = classify(sources, current.entries, customProviderIds)
+  const secrets = secretExtractionPlan(runtime)
+  secrets.candidates = findSecretCandidates("auth", result.additions)
   return {
     target,
     current,
     notices: sources.notices,
     result,
+    secrets,
     guidance: credentialGuidance(result, providerMap, current.entries),
     pending: result.additions.length,
     found: sources.candidates.length + sources.oauth.length,
@@ -172,8 +177,11 @@ export async function planCredentials(runtime, target, customProviderIds) {
  * backup-and-write.
  */
 export function applyCredentials(plan, options = {}) {
-  if (options.writeAuth !== undefined) return options.writeAuth(plan.target, plan.result.additions)
-  writeAuthStore(plan.target, plan.current, plan.result.additions)
+  // The key moves out of the file here too, so the engine's own locked writer receives the
+  // reference and not the secret.
+  const additions = moveAndReport("auth", plan.result.additions, plan.secrets)
+  if (options.writeAuth !== undefined) return options.writeAuth(plan.target, additions)
+  writeAuthStore(plan.target, plan.current, additions)
 }
 
 function list(label, ids) {
@@ -182,17 +190,21 @@ function list(label, ids) {
 
 export function credentialPlanLines(plan) {
   if (plan.malformed) return []
+  const secrets = plan.secrets
   return [
     list("planned-add", plan.result.additions.map((item) => item.provider)),
     list("skipped-existing", plan.result.skippedExisting),
     list("skipped-oauth", plan.result.skippedOauth),
     list("skipped-unmapped", plan.result.skippedUnmapped),
+    ...secretPlanLines(secrets),
   ]
 }
 
 export function credentialCounts(plan) {
   if (plan.malformed) return []
+  const secrets = plan.secrets
   return [
+    ...secretCountLines(secrets),
     `imported: ${plan.result.additions.length}`,
     `skipped-existing: ${plan.result.skippedExisting.length}`,
     `skipped-oauth: ${plan.result.skippedOauth.length}`,

@@ -6,10 +6,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
-import { compareSemver, REFERENCE_OBJECTS_MIN_SENPI_VERSION } from "./engine-version.js"
 import { literalConfigValue } from "./engine-config-value.js"
+import { shouldEmitReferenceObjects } from "./engine-version.js"
 import { parseJsonc } from "./jsonc.js"
-import { senpiPackageRoot } from "./package-paths.js"
 
 // `interpolateString` in the engine's mcp config rejects any string value that looks like command
 // substitution - one containing `$(` or starting (after leading whitespace) with `!` - and one bad
@@ -113,30 +112,9 @@ export function readOpencodeConfig(files, label, notices) {
 //
 // The version is read straight off the engine's own package.json, without resolveSenpi's
 // CLI-file existence checks: this is a version comparison, not a launch.
-function readSenpiVersion() {
-  try {
-    return JSON.parse(readFileSync(join(senpiPackageRoot(), "package.json"), "utf8")).version
-  } catch {
-    return "unresolved"
-  }
-}
-
-// Whether the installed engine is new enough to receive reference objects. The comparison is
-// semver, so the gate opens on purpose and not by accident of how a version string happens to
-// sort. The threshold is the exact version the maintainer's senpi PR names.
-function engineSupportsReferenceObjects(version) {
-  if (version === "unresolved") return false
-  if (REFERENCE_OBJECTS_MIN_SENPI_VERSION === null) return false
-  return compareSemver(version, REFERENCE_OBJECTS_MIN_SENPI_VERSION) >= 0
-}
-
-// Per-call override (also driven by the OMO_REFERENCE_OBJECTS env var). Tests set this directly.
-export function shouldEmitReferenceObjects(opts = {}) {
-  if (opts.referenceObjects === true) return true
-  if (opts.referenceObjects === false) return false
-  if (process.env.OMO_REFERENCE_OBJECTS === "1") return true
-  return engineSupportsReferenceObjects(readSenpiVersion())
-}
+// The gate lives with the version it compares against, so a low-level writer can read it without
+// pulling in this module.
+export { shouldEmitReferenceObjects } from "./engine-version.js"
 
 // The placeholder pattern also matches an EMPTY argument, so `{file:}` and `{env:}` reach the
 // refusal below instead of being written out as literal text. The two other placeholder readers

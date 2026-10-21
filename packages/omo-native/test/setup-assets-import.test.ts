@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -43,9 +43,10 @@ function opencode(item: Fixture, config: unknown, skills: string[] = []): void {
   }
 }
 
-function run(item: Fixture, args: string[]) {
+function run(item: Fixture, args: string[], extra: NodeJS.ProcessEnv = {}) {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    ...extra,
     HOME: item.home,
     USERPROFILE: item.home,
     SENPI_CODING_AGENT_DIR: item.agentDir,
@@ -189,6 +190,59 @@ describe("omo setup opencode asset import", () => {
         expect(existsSync(join(item.agentDir, "skills", "git-master"))).toBe(false)
         expect(existsSync(join(item.agentDir, "skills", "mine-only", "SKILL.md"))).toBe(true)
         expect(result.stdout).toContain("skills-skipped-bundled: 1")
+      })
+    })
+  })
+
+  describe("#given an opencode mcp server whose header carries a secret", () => {
+    describe("#when setup is accepted with secret extraction on", () => {
+      test("#then the header becomes a reference in mcp.json and the bytes are in the store", () => {
+        const item = fixture()
+        const secret = "Bearer sk-live-0123456789abcdefghij"
+        opencode(item, {
+          mcp: { secret: { type: "remote", url: "https://f.test/mcp", headers: { Authorization: secret } } },
+        })
+
+        const result = run(item, ["setup", "--yes"], { OMO_EXTRACT_SECRETS: "1", OMO_REFERENCE_OBJECTS: "1" })
+
+        expect(result.status).toBe(0)
+        const mcp = JSON.parse(readFileSync(join(item.agentDir, "mcp.json"), "utf8"))
+        const reference = mcp.mcpServers.secret.headers.Authorization
+        expect(reference.$file).toBeTypeOf("string")
+        expect(readFileSync(reference.$file, "utf8")).toBe(secret)
+        expect(readdirSync(join(item.home, ".omo", "secrets"))).toHaveLength(1)
+        expect(readFileSync(join(item.agentDir, "mcp.json"), "utf8")).not.toContain("sk-live")
+      })
+
+      test("#then the store is not readable by anyone but the user", () => {
+        const item = fixture()
+        opencode(item, {
+          mcp: { secret: { type: "remote", url: "https://f.test/mcp", headers: { Authorization: "Bearer sk-live-0123456789abcdefghij" } } },
+        })
+
+        run(item, ["setup", "--yes"], { OMO_EXTRACT_SECRETS: "1", OMO_REFERENCE_OBJECTS: "1" })
+
+        const store = join(item.home, ".omo", "secrets")
+        expect(statSync(store).mode & 0o777).toBe(0o700)
+        const file = readdirSync(store)[0]
+        expect(statSync(join(store, file)).mode & 0o777).toBe(0o600)
+      })
+    })
+
+    describe("#when the engine does not read reference objects yet", () => {
+      test("#then nothing is moved, because a config that points at a file the engine cannot read is worse", () => {
+        const item = fixture()
+        const secret = "Bearer sk-live-0123456789abcdefghij"
+        opencode(item, {
+          mcp: { secret: { type: "remote", url: "https://f.test/mcp", headers: { Authorization: secret } } },
+        })
+
+        const result = run(item, ["setup", "--yes"], { OMO_EXTRACT_SECRETS: "1" })
+
+        expect(result.status).toBe(0)
+        const mcp = JSON.parse(readFileSync(join(item.agentDir, "mcp.json"), "utf8"))
+        expect(mcp.mcpServers.secret.headers.Authorization).toBe(secret)
+        expect(existsSync(join(item.home, ".omo", "secrets"))).toBe(false)
       })
     })
   })

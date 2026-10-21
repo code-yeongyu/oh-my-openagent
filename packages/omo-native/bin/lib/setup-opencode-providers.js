@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { literalConfigValue } from "./engine-config-value.js"
+import { secretExtractionPlan } from "./secret-extract.js"
 import {
   convertPlainField,
   convertToObjectField,
@@ -328,7 +329,7 @@ export function planOpencodeProviders(options = {}) {
   const opencodeAuth = readOpencodeAuth(home, env, Object.keys(config).length > 0 ? notices : [])
   const declared = withCatalog(config, opencodeAuth, builtin, home, env, notices)
   // auth.json is only a key source here; with no provider to describe it is the credential stage's alone.
-  if (Object.keys(declared).length === 0) return { providers: [], skipped: [], notices }
+  if (Object.keys(declared).length === 0) return { providers: [], skipped: [], notices, secrets: secretExtractionPlan({ home, env }) }
   // baseDir is the directory of the OpenCode config file the entry came from. The config is
   // MERGED across every file OpenCode reads, so the file a given entry came from is not known
   // here; the global config directory is the best available anchor. A relative `{file:...}` path
@@ -351,5 +352,5 @@ export function planOpencodeProviders(options = {}) {
   }
   providers.sort((left, right) => left.id.localeCompare(right.id))
   skipped.sort((left, right) => left.localeCompare(right))
-  return { providers, skipped, notices }
+  return { providers, skipped, notices, secrets: secretExtractionPlan({ home, env }) }
 }

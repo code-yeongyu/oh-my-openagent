@@ -8,6 +8,9 @@
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { packageRoot } from "./package-paths.js"
+import { findSecretCandidates } from "./secret-detect.js"
+import { defineEntry } from "./config-keys.js"
+import { moveAndReport, secretCountLines, secretExtractionPlan, secretPlanLines } from "./secret-extract.js"
 import { planOpencodeAssets } from "./setup-opencode-assets.js"
 
 // The plugin's bundled skills reach the engine through `resources_discover`, which senpi appends
@@ -59,8 +62,8 @@ function timestamp() {
 function writeMcp(path, target, added) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   if (target.bytes !== undefined) copyFileSync(path, `${path}.bak-${timestamp()}`)
-  const next = { ...target.document, mcpServers: { ...(target.document.mcpServers ?? {}) } }
-  for (const server of added) next.mcpServers[server.name] = server.config
+  const next = { ...target.document, mcpServers: { ...target.document.mcpServers } }
+  for (const server of added) defineEntry(next.mcpServers, server.name, server.config)
   const temporary = `${path}.tmp-${process.pid}`
   try {
     // Server env and headers can carry tokens, so this file gets the same 0600 the auth store does.
@@ -74,7 +77,12 @@ function writeMcp(path, target, added) {
 /** The asset stage's one writer: the servers and skills `planAssets` classified as new. */
 export function applyAssets(plan) {
   const { result, paths } = plan
-  if (result.servers.added.length > 0) writeMcp(paths.mcp, result.target, result.servers.added)
+  if (result.servers.added.length > 0) {
+    // A header, an environment value or an argument that carries a secret leaves the file: the
+    // bytes move into the store and a reference takes their place.
+    const servers = moveAndReport("mcp", result.servers.added, plan.secrets)
+    writeMcp(paths.mcp, result.target, servers)
+  }
   for (const skill of result.skills.added) {
     // classifyAssets already skipped every name that exists; force: false only keeps a directory
     // created between that check and this copy from being overwritten file by file.
@@ -86,18 +94,24 @@ function list(label, ids) {
   return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
 }
 
-export function assetPlanLines({ result }) {
+export function assetPlanLines(plan) {
+  const { result } = plan
+  const secrets = plan.secrets
   return [
     list("planned-mcp", result.servers.added.map((server) => server.name)),
     list("mcp-skipped-existing", result.servers.skippedExisting),
     list("planned-skills", result.skills.added.map((skill) => skill.name)),
     list("skills-skipped-existing", result.skills.skippedExisting),
     list("skills-skipped-bundled", result.skills.skippedBundled),
+    ...secretPlanLines(secrets),
   ]
 }
 
-export function assetCounts({ result }) {
+export function assetCounts(plan) {
+  const { result } = plan
+  const secrets = plan.secrets
   return [
+    ...secretCountLines(secrets),
     `mcp-imported: ${result.servers.added.length}`,
     `mcp-skipped-existing: ${result.servers.skippedExisting.length}`,
     `skills-imported: ${result.skills.added.length}`,
@@ -119,15 +133,18 @@ export function planAssets({ runtime, agentDir }) {
   const notices = [...source.notices]
   const present = source.mcpServers.length > 0 || source.skills.length > 0
   const paths = { mcp: join(agentDir, "mcp.json"), skills: join(agentDir, "skills") }
+  const secrets = secretExtractionPlan(runtime)
   const pluginRoot = runtime.pluginRoot ?? join(packageRoot, "plugin")
   const result = classifyAssets(source, paths, bundledSkillNames(join(pluginRoot, "skills")))
   if (result.servers.blocked.length > 0) notices.push(`WARN senpi: malformed mcp.json; these servers were not imported: ${result.servers.blocked.join(", ")}`)
+  secrets.candidates = findSecretCandidates("mcp", result.servers.added)
   return {
     agentDir,
     paths,
     notices,
     present,
     result,
+    secrets,
     refusedServers: source.refusedServers,
     skippedSkills: source.skippedSkills,
     pending: result.servers.added.length + result.skills.added.length,

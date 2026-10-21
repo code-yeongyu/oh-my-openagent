@@ -9,6 +9,9 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rename
 import { dirname, join } from "node:path"
 import { readAuthStore, timestamp, writeAuthStore } from "./auth-store.js"
 import { parseJsonc } from "./jsonc.js"
+import { findSecretCandidates } from "./secret-detect.js"
+import { defineEntry } from "./config-keys.js"
+import { moveAndReport, secretCountLines, secretPlanLines } from "./secret-extract.js"
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -64,12 +67,21 @@ function list(label, ids) {
   return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
 }
 
-export function providerPlanLines({ result }) {
-  return [list("planned-providers", result.added.map((provider) => provider.id)), list("providers-skipped-existing", result.skippedExisting)]
+export function providerPlanLines(plan) {
+  const { result } = plan
+  const secrets = plan.secrets
+  return [
+    list("planned-providers", result.added.map((provider) => provider.id)),
+    list("providers-skipped-existing", result.skippedExisting),
+    ...secretPlanLines(secrets),
+  ]
 }
 
-export function providerCounts({ result }) {
+export function providerCounts(plan) {
+  const { result } = plan
+  const secrets = plan.secrets
   return [
+    ...secretCountLines(secrets),
     list("providers-imported", result.added.map((provider) => provider.id)),
     `provider-keys-imported: ${result.keys.length}`,
     `providers-skipped-existing: ${result.skippedExisting.length}`,
@@ -84,7 +96,7 @@ function writeModels(path, target, added) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   if (target.bytes !== undefined) copyFileSync(path, `${path}.bak-${timestamp()}`)
   const next = { ...target.document, providers: { ...target.document.providers } }
-  for (const provider of added) next.providers[provider.id] = provider.config
+  for (const provider of added) defineEntry(next.providers, provider.id, provider.config)
   // A models.json symlinked from a dotfiles checkout is written through the link, not replaced by a copy.
   const destination = target.bytes !== undefined ? realpathSync(path) : path
   const temporary = `${destination}.tmp-${process.pid}`
@@ -99,13 +111,15 @@ function writeModels(path, target, added) {
 
 /** `source` is `planOpencodeProviders`' result, classified against the engine's files. Read-only. */
 export function planProviders(source, agentDir) {
+  const secrets = source.secrets ?? {}
   const paths = { models: join(agentDir, "models.json"), auth: join(agentDir, "auth.json") }
   const models = readModelsTarget(paths.models)
   const auth = readAuthStore(paths.auth)
   const result = classify(source, models, auth)
   const notices = [...source.notices]
   if (result.blocked.length > 0) notices.push(`WARN senpi: malformed models.json; these custom providers were not imported: ${result.blocked.join(", ")}`)
-  return { paths, models, authBytes: auth.bytes, notices, result, skipped: source.skipped, present: source.providers.length > 0, pending: result.added.length }
+  secrets.candidates = [...findSecretCandidates("models", result.added), ...findSecretCandidates("auth", result.keys)]
+  return { paths, models, authBytes: auth.bytes, notices, result, secrets, skipped: source.skipped, present: source.providers.length > 0, pending: result.added.length }
 }
 
 /**
@@ -113,13 +127,19 @@ export function planProviders(source, agentDir) {
  * store holds under its lock; the CLI path keeps its direct backup-and-write.
  */
 export function applyProviders(plan, options = {}) {
-  writeModels(plan.paths.models, plan.models, plan.result.added)
+  // A provider header that carries a secret leaves the file: the bytes move into the store
+  // and a reference takes their place.
+  const providers = moveAndReport("models", plan.result.added, plan.secrets)
+  writeModels(plan.paths.models, plan.models, providers)
   // Re-read: the credential stage of the same run may have just written auth.json, after this plan
   // was classified. A mapped credential target can also be a custom provider id (claude-sdk-oauth ->
   // anthropic-subscription), so a key written since the plan is kept, never overwritten.
   const auth = readAuthStore(plan.paths.auth)
   plan.result.keys = auth.malformed ? [] : plan.result.keys.filter((item) => !Object.hasOwn(auth.entries, item.provider))
   if (plan.result.keys.length === 0) return
-  if (options.writeAuth !== undefined) return options.writeAuth(plan.paths.auth, plan.result.keys)
-  writeAuthStore(plan.paths.auth, auth, plan.result.keys)
+  // The keys move out of the file here too, so the engine's own locked writer receives the
+  // reference and not the secret.
+  const keys = moveAndReport("auth", plan.result.keys, plan.secrets)
+  if (options.writeAuth !== undefined) return options.writeAuth(plan.paths.auth, keys)
+  writeAuthStore(plan.paths.auth, auth, keys)
 }

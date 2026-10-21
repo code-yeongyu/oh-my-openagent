@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+
+import { senpiPackageRoot } from "./package-paths.js"
 /**
  * The engine-version gate for the reference-object setup path.
  *
@@ -28,7 +32,7 @@
  */
 export const REFERENCE_OBJECTS_MIN_SENPI_VERSION = null
 
-const PRERELEASE_IDENTIFIER = /^[0-9]+$/
+const PRERELEASE_IDENTIFIER = /^\d+$/
 
 /**
  * Compare two semver strings. Returns a negative number when `left` sorts
@@ -43,28 +47,41 @@ const PRERELEASE_IDENTIFIER = /^[0-9]+$/
 export function compareSemver(left, right) {
   const a = parseSemver(left)
   const b = parseSemver(right)
+  const core = compareCore(a, b)
+  if (core !== 0) return core
+  return comparePrerelease(a.prerelease, b.prerelease)
+}
+
+function compareCore(a, b) {
   for (const part of ["major", "minor", "patch"]) {
     if (a[part] !== b[part]) return a[part] < b[part] ? -1 : 1
   }
-  // A release outranks any prerelease of the same version.
-  if (a.prerelease.length === 0 && b.prerelease.length === 0) return 0
-  if (a.prerelease.length === 0) return 1
-  if (b.prerelease.length === 0) return -1
-  const shared = Math.min(a.prerelease.length, b.prerelease.length)
+  return 0
+}
+
+// A release outranks any prerelease of the same version.
+function comparePrerelease(left, right) {
+  if (left.length === 0 && right.length === 0) return 0
+  if (left.length === 0) return 1
+  if (right.length === 0) return -1
+  const shared = Math.min(left.length, right.length)
   for (let i = 0; i < shared; i++) {
-    const left_id = a.prerelease[i]
-    const right_id = b.prerelease[i]
-    if (left_id === right_id) continue
-    const left_numeric = PRERELEASE_IDENTIFIER.test(left_id)
-    const right_numeric = PRERELEASE_IDENTIFIER.test(right_id)
-    if (left_numeric && right_numeric) return Number(left_id) < Number(right_id) ? -1 : 1
-    // Numeric identifiers always have lower precedence than alphanumeric ones.
-    if (left_numeric) return -1
-    if (right_numeric) return 1
-    return left_id < right_id ? -1 : 1
+    const compared = comparePrereleaseIdentifier(left[i], right[i])
+    if (compared !== 0) return compared
   }
-  if (a.prerelease.length === b.prerelease.length) return 0
-  return a.prerelease.length < b.prerelease.length ? -1 : 1
+  if (left.length === right.length) return 0
+  return left.length < right.length ? -1 : 1
+}
+
+function comparePrereleaseIdentifier(left, right) {
+  if (left === right) return 0
+  const leftNumeric = PRERELEASE_IDENTIFIER.test(left)
+  const rightNumeric = PRERELEASE_IDENTIFIER.test(right)
+  if (leftNumeric && rightNumeric) return Number(left) < Number(right) ? -1 : 1
+  // Numeric identifiers always have lower precedence than alphanumeric ones.
+  if (leftNumeric) return -1
+  if (rightNumeric) return 1
+  return left < right ? -1 : 1
 }
 
 function parseSemver(version) {
@@ -80,4 +97,38 @@ function parseSemver(version) {
     patch: patch ?? 0,
     prerelease: prerelease === "" ? [] : prerelease.split("."),
   }
+}
+
+/**
+ * Whether the installed engine reads reference objects.
+ *
+ * The comparison is semver, so the gate opens on purpose and not by accident of how a version
+ * string happens to sort. The threshold is the exact version the maintainer's senpi PR names, and
+ * it is `null` until then, which closes the gate by construction: a version that is lower than
+ * every real version would open it for every engine.
+ *
+ * `OMO_REFERENCE_OBJECTS=1` forces the new shape regardless of the engine version, for tests and
+ * early adopters.
+ */
+export function shouldEmitReferenceObjects(options = {}) {
+  if (options.referenceObjects === true) return true
+  if (options.referenceObjects === false) return false
+  if (process.env.OMO_REFERENCE_OBJECTS === "1") return true
+  if (options.env !== undefined && options.env.OMO_REFERENCE_OBJECTS === "1") return true
+  return engineSupportsReferenceObjects(readSenpiVersion(options))
+}
+
+function readSenpiVersion(options = {}) {
+  try {
+    const root = options.senpiPackageRoot ?? senpiPackageRoot()
+    return JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version
+  } catch {
+    return "unresolved"
+  }
+}
+
+function engineSupportsReferenceObjects(version) {
+  if (version === "unresolved") return false
+  if (REFERENCE_OBJECTS_MIN_SENPI_VERSION === null) return false
+  return compareSemver(version, REFERENCE_OBJECTS_MIN_SENPI_VERSION) >= 0
 }

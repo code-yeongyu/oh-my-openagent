@@ -6,6 +6,8 @@
 import { chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 
+import { defineEntry } from "./config-keys.js"
+
 export function readAuthStore(path) {
   if (!existsSync(path)) return { entries: {}, bytes: undefined }
   const bytes = readFileSync(path, "utf8")
@@ -36,7 +38,7 @@ export function writeAuthStore(path, current, additions) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   if (current.bytes !== undefined) backup(path)
   const next = { ...current.entries }
-  for (const item of additions) next[item.provider] = { type: "api_key", key: item.key }
+  for (const item of additions) defineEntry(next, item.provider, { type: "api_key", key: item.key })
   const temporary = `${path}.tmp-${process.pid}`
   try {
     writeFileSync(temporary, JSON.stringify(next, null, 2), { encoding: "utf8", mode: 0o600 })
