@@ -7,6 +7,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { compareSemver, REFERENCE_OBJECTS_MIN_SENPI_VERSION } from "./engine-version.js"
+import { literalConfigValue } from "./engine-config-value.js"
 import { parseJsonc } from "./jsonc.js"
 import { senpiPackageRoot } from "./package-paths.js"
 
@@ -92,7 +93,7 @@ export function readOpencodeSection(files, section, label, notices) {
 
 /** Every file of `files` deep-merged in order, later keys winning. */
 export function readOpencodeConfig(files, label, notices) {
-  return readDocuments(files, label, notices).reduce(mergeDeep, {})
+  return readDocuments(files, label, notices).reduce((merged, parsed) => mergeDeep(merged, parsed), {})
 }
 
 // OpenCode substitutes `{env:NAME}`; the engine substitutes `${NAME}`. Same intent, same value.
@@ -137,8 +138,11 @@ export function shouldEmitReferenceObjects(opts = {}) {
   return engineSupportsReferenceObjects(readSenpiVersion())
 }
 
-const PLACEHOLDER_REGEX = /\{(file|env):([^}]+)\}/g
-const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
+// The placeholder pattern also matches an EMPTY argument, so `{file:}` and `{env:}` reach the
+// refusal below instead of being written out as literal text. The two other placeholder readers
+// (`findFileRefIn`, `findMalformedEnvRef`) already match the empty form.
+const PLACEHOLDER_REGEX = /\{(file|env):([^}]*)\}/g
+const ENV_NAME = /^\w+$/
 
 // Resolve a `{file:...}` path against `baseDir` (the directory of the OpenCode config file the
 // value came from) so a RELATIVE path becomes absolute. A `~` path is left as the user wrote it:
@@ -158,7 +162,17 @@ function resolveFilePath(raw, baseDir) {
 //
 // A single bare placeholder (e.g. `"{env:TOKEN}"` alone) is returned as just the reference
 // object, not a one-element concat. Surrounding text wraps it in a concat array.
-function splitStringByPlaceholders(value, baseDir) {
+//
+// Every plain-string fragment is ESCAPED, exactly as the plain-string path escapes a whole
+// value: the engine resolves every config value as a template, so a literal `$` would be read as
+// an environment lookup and a literal `!` at the start as a shell command. The maintainer's rule
+// is that a literal value stays a plain string "exactly as today", and today means escaped.
+// The literal fragment of a value, escaped only where the field's spelling escapes.
+function literalFragment(text, escaped) {
+  return escaped ? literalConfigValue(text) : text
+}
+
+function splitStringByPlaceholders(value, baseDir, escaped) {
   const result = []
   let lastIndex = 0
   let m
@@ -167,7 +181,7 @@ function splitStringByPlaceholders(value, baseDir) {
     const kind = m[1]
     const arg = m[2]
     if (m.index > lastIndex) {
-      result.push(value.slice(lastIndex, m.index))
+      result.push(literalFragment(value.slice(lastIndex, m.index), escaped))
     }
     if (kind === "env") {
       // The maintainer's wording: `{env:MY-TOKEN}: not a valid environment variable name`.
@@ -180,7 +194,7 @@ function splitStringByPlaceholders(value, baseDir) {
     lastIndex = m.index + m[0].length
   }
   if (lastIndex < value.length) {
-    result.push(value.slice(lastIndex))
+    result.push(literalFragment(value.slice(lastIndex), escaped))
   }
   if (result.length === 0) return { parts: [""] }
   return { parts: result }
@@ -205,7 +219,7 @@ function buildConcat(parts) {
 // every such field goes through `convertPlainField` instead, which refuses them.
 export function convertPlaceholders(value) {
   if (typeof value !== "string") return value
-  return value.replace(/\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g, "${$1}")
+  return value.replace(/\{env:(\w+)\}/g, "${$1}")
 }
 
 // A `{file:...}` reference in a field that does NOT accept reference objects has no engine
@@ -257,14 +271,13 @@ export function convertPlainField(value) {
 // `resolveConfigValue` parser expects: `$$` is a literal `$` and `${NAME}` is an env lookup.
 // Doing it the other way round turns `${NAME}` into `$${NAME}`, which the engine reads as a
 // literal `$` followed by the text `{NAME}`.
-export function legacyConfigValue(value) {
+export function legacyConfigValue(value, escaped = true) {
   if (typeof value !== "string") return undefined
   // A `{file:...}` or a malformed `{env:...}` has no spelling in the plain-string shape, so it
   // is refused here rather than written as literal text.
   if (findFileRefIn(value) !== undefined) return undefined
   if (findMalformedEnvRef(value) !== undefined) return undefined
-  const escaped = value.replace(/[$!]/g, "$$$&")
-  return convertPlaceholders(escaped)
+  return convertPlaceholders(escaped ? literalConfigValue(value) : value)
 }
 
 // `convertToObjectField` takes a value destined for a structured field and returns either the
@@ -273,9 +286,9 @@ export function legacyConfigValue(value) {
 // `args[]`, `apiKey`, and the auth.json key fields. Returns `{ refused: true, reason }` if the
 // value contains a placeholder that has no engine spelling (e.g. `{env:MY-TOKEN}` with a
 // non-identifier name, or an empty `{file:}`).
-export function convertToObjectField(value, baseDir) {
+export function convertToObjectField(value, baseDir, escaped = true) {
   if (typeof value !== "string") return { ok: true, value }
-  const split = splitStringByPlaceholders(value, baseDir)
+  const split = splitStringByPlaceholders(value, baseDir, escaped)
   if (split.error) return { refused: true, reason: split.error }
   // No placeholder — original string passes through verbatim. The engine reads it as-is.
   if (split.parts.length === 1 && typeof split.parts[0] === "string") {
@@ -287,12 +300,12 @@ export function convertToObjectField(value, baseDir) {
 // Object fields are mcp.json `headers.*`, `env.*`, `args[]`, models.json `apiKey` and `headers.*`,
 // auth.json `key` and pool `accounts[].key`. Every other field keeps the legacy `${NAME}` conversion
 // only (no objects, no `{file:...}` reads).
-function convertRecordAsObjects(record, baseDir) {
+function convertRecordAsObjects(record, baseDir, escaped = true) {
   if (record === null || typeof record !== "object" || Array.isArray(record)) return { result: undefined, refused: null }
   const out = {}
   for (const [key, value] of Object.entries(record)) {
     if (typeof value !== "string") continue
-    const split = convertToObjectField(value, baseDir)
+    const split = convertToObjectField(value, baseDir, escaped)
     if (split.refused) return { result: undefined, refused: { key, reason: split.reason } }
     out[key] = split.value
   }
@@ -306,6 +319,72 @@ function disabled(entry) {
 // convertLocal / convertRemote return `{ config, refusal }` instead of pushing the refusal
 // themselves, so the SERVER name is attached in one place (convertServer) rather than each
 // callee guessing which name belongs in the setup summary.
+// args[], env.* and headers.* are spelled one of two ways: as plain strings when the engine
+// cannot read a reference object, or as reference objects when it can. Each spelling has its own
+// refusal message, so each is a function of its own and the caller picks one.
+//
+// Every helper here returns the COMPLETE refusal, so the caller holds no branch of its own:
+// that is what keeps `convertLocal` and `convertRemote` readable. `noticeFor` names the field and
+// the server in a refusal, because the environment notice and the header notice name them
+// differently, and that difference is what omo has always printed.
+function convertArgsPlain(parts) {
+  const record = []
+  for (const part of parts) {
+    const converted = convertPlainField(part)
+    if (converted.refused) {
+      return {
+        result: undefined,
+        refusal: {
+          reason: "uses {file:...} in args",
+          notice: `NOTICE opencode: mcp server args uses ${converted.reason} which omo does not write in the args field; not imported - inline the value or move the path to a header or env entry`,
+        },
+      }
+    }
+    record.push(converted.value)
+  }
+  return { result: record.length > 0 ? record : undefined, refusal: undefined }
+}
+
+function convertArgsObjects(parts, baseDir) {
+  const record = []
+  for (const part of parts) {
+    const converted = convertToObjectField(part, baseDir, false)
+    if (converted.refused) {
+      return {
+        result: undefined,
+        refusal: { reason: converted.reason, notice: `NOTICE opencode: mcp server args has ${converted.reason}` },
+      }
+    }
+    record.push(converted.value)
+  }
+  return { result: record.length > 0 ? record : undefined, refusal: undefined }
+}
+
+// A record field in the plain-string spelling. `convert` produces the value or refuses it, and
+// `noticeFor` writes the refusal notice.
+function convertRecordPlain(record, convert, noticeFor) {
+  const out = {}
+  for (const [key, value] of Object.entries(isPlainObject(record) ? record : {})) {
+    if (typeof value !== "string") continue
+    const converted = convert(value)
+    if (converted.refused) {
+      return { result: undefined, refusal: noticeFor(key, converted.reason) }
+    }
+    out[key] = converted.value
+  }
+  return { result: Object.keys(out).length > 0 ? out : undefined, refusal: undefined }
+}
+
+// A record field in the reference-object spelling, over the same record reader the environment
+// and the headers share.
+function convertRecordObjects(record, baseDir, noticeFor) {
+  const converted = convertRecordAsObjects(record, baseDir, false)
+  if (converted.refused) {
+    return { result: undefined, refusal: noticeFor(converted.refused.key, converted.refused.reason) }
+  }
+  return { result: converted.result, refusal: undefined }
+}
+
 function convertLocal(entry, baseDir, legacy) {
   const command = Array.isArray(entry.command) ? entry.command.filter((part) => typeof part === "string") : []
   if (command.length === 0) return { config: undefined, refusal: undefined }
@@ -323,40 +402,8 @@ function convertLocal(entry, baseDir, legacy) {
   }
   // args[] takes reference objects in the new mode; in the legacy mode it takes plain strings
   // and a reference there has no spelling, so it is refused.
-  let args
-  if (legacy) {
-    const record = []
-    for (const part of command.slice(1)) {
-      const converted = convertPlainField(part)
-      if (converted.refused) {
-        return {
-          config: undefined,
-          refusal: {
-            reason: "uses {file:...} in args",
-            notice: `NOTICE opencode: mcp server args uses ${converted.reason} which omo does not write in the args field; not imported - inline the value or move the path to a header or env entry`,
-          },
-        }
-      }
-      record.push(converted.value)
-    }
-    args = record.length > 0 ? record : undefined
-  } else {
-    const record = []
-    for (const part of command.slice(1)) {
-      const converted = convertToObjectField(part, baseDir)
-      if (converted.refused) {
-        return {
-          config: undefined,
-          refusal: {
-            reason: converted.refused.reason,
-            notice: `NOTICE opencode: mcp server args has ${converted.refused.reason}`,
-          },
-        }
-      }
-      record.push(converted.value)
-    }
-    args = record.length > 0 ? record : undefined
-  }
+  const args = legacy ? convertArgsPlain(command.slice(1)) : convertArgsObjects(command.slice(1), baseDir)
+  if (args.refusal) return { config: undefined, refusal: args.refusal }
   const cwd = convertPlainField(entry.cwd)
   if (cwd.refused) {
     return {
@@ -367,45 +414,30 @@ function convertLocal(entry, baseDir, legacy) {
       },
     }
   }
-  let env
-  if (legacy) {
-    // Pre-change behavior: a plain-string env record, and a reference it cannot express is
-    // refused.
-    const record = {}
-    for (const [key, value] of Object.entries(isPlainObject(entry.environment) ? entry.environment : {})) {
-      if (typeof value !== "string") continue
-      const converted = convertPlainField(value)
-      if (converted.refused) {
-        return {
-          config: undefined,
-          refusal: {
-            reason: "environment value has a placeholder omo cannot express in the plain-string form",
-            notice: `NOTICE opencode: mcp server environment.${key} has ${converted.reason}`,
-          },
-        }
-      }
-      record[key] = converted.value
-    }
-    env = Object.keys(record).length > 0 ? record : undefined
-  } else {
-    const converted = convertRecordAsObjects(entry.environment, baseDir)
-    if (converted.refused) {
-      return {
-        config: undefined,
-        refusal: {
-          reason: converted.refused.reason,
-          notice: `NOTICE opencode: mcp server environment.${converted.refused.key} has ${converted.refused.reason}`,
+  const env = legacy
+    ? convertRecordPlain(
+        entry.environment,
+        (value) => {
+          const converted = convertPlainField(value)
+          return converted.refused ? converted : { value: converted.value }
         },
-      }
-    }
-    env = converted.result
-  }
+        (key, reason) => ({
+          reason: "environment value has a placeholder omo cannot express in the plain-string form",
+          notice: `NOTICE opencode: mcp server environment.${key} has ${reason}`,
+        }),
+      )
+    : convertRecordObjects(
+        entry.environment,
+        baseDir,
+        (key, reason) => ({ reason, notice: `NOTICE opencode: mcp server environment.${key} has ${reason}` }),
+      )
+  if (env.refusal) return { config: undefined, refusal: env.refusal }
   return {
     config: {
       type: "stdio",
       command: executable.value,
-      ...(args ? { args } : {}),
-      ...(env ? { env } : {}),
+      ...(args.result ? { args: args.result } : {}),
+      ...(env.result ? { env: env.result } : {}),
       ...(typeof entry.cwd === "string" && entry.cwd.trim() !== "" ? { cwd: cwd.value } : {}),
       ...disabled(entry),
     },
@@ -468,37 +500,26 @@ function convertRemote(name, entry, baseDir, legacy, notices) {
       },
     }
   }
-  let headers
-  if (legacy) {
-    const record = {}
-    for (const [key, value] of Object.entries(isPlainObject(entry.headers) ? entry.headers : {})) {
-      if (typeof value !== "string") continue
-      const converted = legacyConfigValue(value)
-      if (converted === undefined) {
-        return {
-          config: undefined,
-          refusal: {
-            reason: "header value has a placeholder omo cannot express in the plain-string form",
-            notice: `NOTICE opencode: mcp server ${name} headers.${key} has a placeholder omo cannot express in the plain-string form; not imported`,
-          },
-        }
-      }
-      record[key] = converted
-    }
-    headers = Object.keys(record).length > 0 ? record : undefined
-  } else {
-    const converted = convertRecordAsObjects(entry.headers, baseDir)
-    if (converted.refused) {
-      return {
-        config: undefined,
-        refusal: {
-          reason: converted.refused.reason,
-          notice: `NOTICE opencode: mcp server ${name} headers.${converted.refused.key} has ${converted.refused.reason}`,
+  const headers = legacy
+    ? convertRecordPlain(
+        entry.headers,
+        (value) => {
+          const converted = legacyConfigValue(value, false)
+          return converted === undefined
+            ? { refused: true, reason: "a placeholder omo cannot express in the plain-string form" }
+            : { value: converted }
         },
-      }
-    }
-    headers = converted.result
-  }
+        (key) => ({
+          reason: "header value has a placeholder omo cannot express in the plain-string form",
+          notice: `NOTICE opencode: mcp server ${name} headers.${key} has a placeholder omo cannot express in the plain-string form; not imported`,
+        }),
+      )
+    : convertRecordObjects(
+        entry.headers,
+        baseDir,
+        (key, reason) => ({ reason, notice: `NOTICE opencode: mcp server ${name} headers.${key} has ${reason}` }),
+      )
+  if (headers.refusal) return { config: undefined, refusal: headers.refusal }
   const oauth = convertOauth(name, entry.oauth)
   if (oauth.refusal) return { config: undefined, refusal: oauth.refusal }
   const dropped = ["clientSecret", "redirectUri"].filter((key) => entry.oauth?.[key] !== undefined)
@@ -509,7 +530,7 @@ function convertRemote(name, entry, baseDir, legacy, notices) {
     config: {
       type: "http",
       url: convertPlaceholders(entry.url),
-      ...(headers ? { headers } : {}),
+      ...(headers.result ? { headers: headers.result } : {}),
       // OpenCode's `oauth: false` disables OAuth auto-detection; the engine spells that `auth: false`.
       ...(entry.oauth === false ? { auth: false } : {}),
       ...(oauth.config ? { oauth: oauth.config } : {}),
@@ -556,27 +577,34 @@ function readSkills(configDirs, notices, skipped) {
   const skills = []
   for (const root of configDirs.flatMap((configDir) => [join(configDir, "skills"), join(configDir, "skill")])) {
     if (!existsSync(root)) continue
-    for (const entry of readdirSync(root, { withFileTypes: true })) {
-      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
-      const source = join(root, entry.name)
-      const skillFile = join(source, "SKILL.md")
-      if (!existsSync(skillFile)) {
-        notices.push(`NOTICE opencode: skill ${entry.name} has no SKILL.md at its top level; not imported - copy it into the omo skills dir by hand if it holds nested skills`)
-        skipped.push({ name: entry.name, reason: "no SKILL.md" })
-        continue
-      }
-      if (!hasDescription(skillFile)) {
-        notices.push(`NOTICE opencode: skill ${entry.name} has no description in its SKILL.md frontmatter, so omo would not load it; not imported`)
-        skipped.push({ name: entry.name, reason: "no description in SKILL.md" })
-        continue
-      }
-      if (skills.some((skill) => skill.name === entry.name)) continue
-      skills.push({ name: entry.name, source })
-    }
+    readSkillDir(root, skills, notices, skipped)
   }
   // readdir order is filesystem-dependent; the printed plan and the import order must not be.
   return skills.sort((left, right) => left.name.localeCompare(right.name))
 }
+
+// One skill directory's entries. Split out of `readSkills` so neither function carries the
+// nesting of both loops.
+function readSkillDir(root, skills, notices, skipped) {
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) continue
+    const source = join(root, entry.name)
+    const skillFile = join(source, "SKILL.md")
+    if (!existsSync(skillFile)) {
+      notices.push(`NOTICE opencode: skill ${entry.name} has no SKILL.md at its top level; not imported - copy it into the omo skills dir by hand if it holds nested skills`)
+      skipped.push({ name: entry.name, reason: "no SKILL.md" })
+      continue
+    }
+    if (!hasDescription(skillFile)) {
+      notices.push(`NOTICE opencode: skill ${entry.name} has no description in its SKILL.md frontmatter, so omo would not load it; not imported`)
+      skipped.push({ name: entry.name, reason: "no description in SKILL.md" })
+      continue
+    }
+    if (skills.some((skill) => skill.name === entry.name)) continue
+    skills.push({ name: entry.name, source })
+  }
+}
+
 
 export function planOpencodeAssets(options = {}) {
   const home = options.home ?? homedir()

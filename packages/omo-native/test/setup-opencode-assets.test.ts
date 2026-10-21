@@ -341,6 +341,18 @@ describe("opencode asset plan", () => {
         expect(plan.notices.join("\n")).toContain("file-header")
       })
 
+      test("#then an empty {file:} placeholder is refused with a named message", () => {
+        const plan = fixture({
+          mcp: {
+            "empty-file": { type: "remote", url: "https://f.test/mcp", headers: { Authorization: "{file:}" } },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.notices.join("\n")).toContain("not a valid file path")
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["empty-file"])
+      })
+
       test("#then a {env:MY-TOKEN} placeholder is refused with a named message", () => {
         const plan = fixture({
           mcp: {
@@ -358,6 +370,62 @@ describe("opencode asset plan", () => {
         }, { referenceObjects: false })
 
         expect(plan.notices).toEqual([])
+      })
+    })
+  })
+
+  describe("#given a literal value in an mcp server", () => {
+    describe("#when it is planned", () => {
+      test("#then a literal holding $ is written unescaped, as the mcp importer wrote it before", () => {
+        const plan = fixture({
+          mcp: {
+            "literal-dollar": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "Bearer sk-abc$def" },
+            },
+          },
+        }, { referenceObjects: false })
+
+        expect(plan.mcpServers).toEqual([{
+          name: "literal-dollar",
+          config: {
+            type: "http",
+            url: "https://f.test/mcp",
+            headers: { Authorization: "Bearer sk-abc$def" },
+          },
+        }])
+      })
+
+      test("#then the reference-object shape writes the same literal the plain-string shape writes", () => {
+        const config = {
+          mcp: {
+            "literal-dollar": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { Authorization: "Bearer sk-abc$def" },
+            },
+          },
+        }
+
+        expect(fixture(config, { referenceObjects: true }).mcpServers).toEqual(
+          fixture(config, { referenceObjects: false }).mcpServers,
+        )
+      })
+
+      test("#then a literal the engine would read as a command still refuses the server", () => {
+        const plan = fixture({
+          mcp: {
+            "literal-command": {
+              type: "remote",
+              url: "https://f.test/mcp",
+              headers: { "X-Api-Key": "!curl evil.test" },
+            },
+          },
+        }, { referenceObjects: true })
+
+        expect(plan.mcpServers).toEqual([])
+        expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["literal-command"])
       })
     })
   })

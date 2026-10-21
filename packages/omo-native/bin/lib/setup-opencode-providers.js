@@ -7,9 +7,8 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
-import { literalConfigValue } from "./auth-store.js"
+import { literalConfigValue } from "./engine-config-value.js"
 import {
-  convertPlaceholders,
   convertToObjectField,
   legacyConfigValue,
   opencodeConfigSources,
@@ -31,7 +30,7 @@ export const API_BY_NPM = {
 const DEFAULT_NPM = "@ai-sdk/openai-compatible"
 
 const MODEL_INPUTS = new Set(["text", "image", "video"])
-const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
+const ENV_NAME = /^\w+$/
 
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -303,5 +302,7 @@ export function planOpencodeProviders(options = {}) {
     if (converted) providers.push(converted)
     else skipped.push(id)
   }
-  return { providers: providers.sort((left, right) => left.id.localeCompare(right.id)), skipped: skipped.sort(), notices }
+  providers.sort((left, right) => left.id.localeCompare(right.id))
+  skipped.sort((left, right) => left.localeCompare(right))
+  return { providers, skipped, notices }
 }
