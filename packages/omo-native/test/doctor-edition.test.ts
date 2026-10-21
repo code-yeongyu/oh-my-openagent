@@ -63,6 +63,10 @@ function run(fixture: Fixture, env: NodeJS.ProcessEnv = {}) {
     encoding: "utf8",
     env: {
       ...process.env,
+      // The launch tightens `~/.omo` before doctor audits it, so the fixture has to own the home
+      // it is examined against: an inherited one would chmod the developer's real `~/.omo`.
+      HOME: fixture.root,
+      USERPROFILE: fixture.root,
       OMO_CODING_AGENT_DIR: fixture.agentDir,
       SENPI_CODING_AGENT_DIR: fixture.agentDir,
       OMO_RUNTIME: "node",
@@ -75,11 +79,15 @@ function captureDoctor(options: Record<string, unknown> = {}): { stdout: string;
   const output: string[] = []
   const originalLog = console.log
   const originalExitCode = process.exitCode
+  const home = mkdtempSync(join(tmpdir(), "omo-doctor-home-"))
+  roots.push(home)
   console.log = (value?: unknown) => { output.push(String(value)) }
   process.exitCode = undefined
   try {
     runDoctor({ harnesses: [] }, [], {
       list: () => [],
+      // Same reason as `run`: doctor audits `~/.omo`, so the home under test is pinned here.
+      homeDir: home,
       ...options,
     })
     return { stdout: output.join("\n"), exitCode: process.exitCode }

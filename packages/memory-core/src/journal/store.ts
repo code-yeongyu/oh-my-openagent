@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
+import { appendFile, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
+import { ensurePrivateDirectory } from "../fs/private-dir"
 import { join } from "node:path"
 
 import {
@@ -264,7 +265,7 @@ export class TranscriptJournal {
 
   private async locked<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     signal?.throwIfAborted()
-    await mkdir(this.options.journalDir, { recursive: true, mode: 0o700 })
+    await ensurePrivateDirectory(this.options.journalDir)
     return this.lock(this.lockPath, task, signal)
   }
 

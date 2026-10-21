@@ -1,6 +1,5 @@
 import {
   existsSync,
-  mkdirSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -10,6 +9,7 @@ import {
 } from "node:fs"
 import { join } from "node:path"
 
+import { ensurePrivateDirectory } from "./private-dir"
 import { parseTaskId, transitionTaskRecord } from "../state"
 import type { TaskId, TaskRecord } from "../state"
 import { appendTaskEvent, closeAppendFd, taskEventLogPath, type AppendFdCache } from "./event-log"
@@ -114,7 +114,7 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
       const path = taskPath(stateDir, parsedTaskId)
       // The lock file lives beside the record, so the tasks dir must exist even when the record
       // itself was never written (the "missing" outcome is defined and must not throw ENOENT).
-      mkdirSync(join(stateDir, "tasks"), { recursive: true })
+      ensurePrivateDirectory(join(stateDir, "tasks"))
       return withTaskRecordLock(path, () => {
         // Re-read + validate + tombstone ONLY: artifact deletion is phase 2, outside the lock,
         // because recursive filesystem work can outlive any lease.

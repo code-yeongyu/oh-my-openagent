@@ -1,9 +1,10 @@
 import { randomBytes } from "node:crypto"
-import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { renameSync, rmSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 
 import { parseTaskId } from "../state"
 import type { TaskId, TaskRecord } from "../state"
+import { ensurePrivateDirectory } from "./private-dir"
 import { toStorableTaskRecord } from "./storable-record"
 
 export type WriteRecordMode = "create" | "replace"
@@ -30,7 +31,7 @@ export class TaskRecordCollisionError extends Error {
 }
 
 export function writeRecord(path: string, record: TaskRecord, mode: WriteRecordMode, platform: NodeJS.Platform): void {
-  mkdirSync(dirname(path), { recursive: true })
+  ensurePrivateDirectory(dirname(path))
   const payload = JSON.stringify(toStorableTaskRecord(record))
   if (mode === "create") {
     try {
@@ -49,7 +50,7 @@ export function writeRecord(path: string, record: TaskRecord, mode: WriteRecordM
 
 // Shared by task records and plain workpool data. Callers own the short record lock.
 export function atomicReplace(path: string, payload: string, platform: NodeJS.Platform = process.platform): void {
-  mkdirSync(dirname(path), { recursive: true })
+  ensurePrivateDirectory(dirname(path))
   // pid + random segment: two writers in one process (or a pid reused across a crash) never share
   // a temp name, and the finally leaves nothing behind when the rename is refused.
   const tmpPath = `${path}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`

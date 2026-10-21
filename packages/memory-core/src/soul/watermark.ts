@@ -9,7 +9,8 @@
 // `notice` lock so concurrent sessions bound to the same identity cannot both
 // emit and both advance.
 
-import { mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { readFile, rename, writeFile } from "../fs/resilient"
+import { ensurePrivateDirectory } from "../fs/private-dir"
 import { join } from "node:path"
 
 import { GitCommandError, type GitMemoryRepo } from "../git"
@@ -121,7 +122,7 @@ function isWatermark(value: unknown): value is SoulHeadWatermark {
 }
 
 async function writeWatermark(noticesDir: string, head: string): Promise<void> {
-  await mkdir(noticesDir, { recursive: true, mode: 0o700 })
+  await ensurePrivateDirectory(noticesDir)
   const target = join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME)
   const temporary = `${target}.tmp-${process.pid}`
   const watermark: SoulHeadWatermark = { version: 1, lastNotifiedHead: head }

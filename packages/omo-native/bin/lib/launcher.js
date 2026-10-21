@@ -12,7 +12,7 @@ import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host
 import { runDoctor } from "./doctor.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
-import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
+import { adoptLegacyFlatState, canonicalAgentDir, hardenOmoHomeModes, runtimeHome } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
 import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
@@ -72,19 +72,34 @@ function isInteractiveDefault(args) {
 
 /**
  * Engine state that predates the unified directory is carried forward once, so unifying the
- * location never presents itself to the user as one more round of erased settings.
+ * location never presents itself to the user as one more round of erased settings. The same pass
+ * tightens every directory under `~/.omo` to 0700: a tree left at 0755 by an older build, or by
+ * an extraction under a loose umask, is readable by every other account on the machine.
  */
-function reportLegacyFlatAdoption() {
-  let result
+function reportAgentHomeStartup() {
+  let adoption
   try {
-    result = adoptLegacyFlatState()
+    adoption = adoptLegacyFlatState()
   } catch (error) {
     console.error(`omo: could not adopt legacy state: ${error.message}`)
     return
   }
-  if (!result.adopted) return
-  const moved = [...result.copied, ...result.backfilled].join(", ")
-  notice(`omo: carried forward settings from the legacy ~/.omo layout (${moved})`)
+  if (adoption.adopted) {
+    const moved = [...adoption.copied, ...adoption.backfilled].join(", ")
+    notice(`omo: carried forward settings from the legacy ~/.omo layout (${moved})`)
+  }
+
+  try {
+    const modes = hardenOmoHomeModes(runtimeHome())
+    if (modes.hardened.length > 0) {
+      notice(`omo: tightened ${modes.hardened.length} director${modes.hardened.length === 1 ? "y" : "ies"} under ~/.omo to 0700`)
+    }
+    // A directory omo cannot chmod is the user's to fix; `omo doctor` names the path. It never
+    // blocks the launch.
+    for (const path of modes.failed) notice(`omo: could not set 0700 on ${path}`)
+  } catch (error) {
+    notice(`omo: could not check the permissions of ~/.omo (${error.message})`)
+  }
 }
 
 /**
@@ -130,7 +145,7 @@ export function rollbackMigrateCall(request) {
 
 export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
-  reportLegacyFlatAdoption()
+  reportAgentHomeStartup()
   const command = args[0]
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
   // eval SDK the extension publishes. Report that plainly instead of failing on a missing file.

@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
-import { canonicalAgentDir } from "./agent-dir.js"
+import { auditOmoHomeModes, canonicalAgentDir, runtimeHome } from "./agent-dir.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
 import { channelDistTagVersion, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
 import { daemonReportLines } from "./daemon.js"
@@ -344,6 +344,24 @@ export function transientMemoryReport(options) {
   }))
 }
 
+/**
+ * The omo home holds credentials, transcripts and task state, so every directory under it belongs
+ * at 0700. The launch migration repairs the tree; doctor only reads it, because a diagnostic run
+ * must not mutate the machine it is diagnosing. A directory left wider than 0700 is a FAIL,
+ * because that is exactly the state this guards.
+ *
+ * @param {{ wider: string[], unreadable: string[] }} audit
+ */
+export function agentHomeModeLines(audit) {
+  return [
+    ...audit.unreadable.map((path) => `FAIL omo home modes: could not read ${path}`),
+    ...audit.wider.map((path) => `FAIL omo home modes: ${path} is wider than 0700`),
+    ...(audit.wider.length === 0 && audit.unreadable.length === 0
+      ? ["PASS omo home modes: every directory under ~/.omo is 0700"]
+      : []),
+  ]
+}
+
 function retiredPayloadReport(options) {
   const list = options.list ?? listProcesses
   const now = options.now ?? Date.now
@@ -423,6 +441,14 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(...staleEngineReport(options))
   lines.push(...retiredPayloadReport(options))
   lines.push(...transientMemoryReport(options))
+  // `homeDir` is the same pin `piConfigReport` takes, so a caller can diagnose an isolated tree
+// instead of the machine's real one. Falling through to the real home is correct for a user
+// running `omo doctor`.
+const homeModes = agentHomeModeLines(
+    auditOmoHomeModes(options.homeDir ?? runtimeHome(options.env ?? process.env)),
+  )
+  if (homeModes.some((line) => line.startsWith("FAIL "))) failed = true
+  lines.push(...homeModes)
   const launchSpec = launchSpecDoctorLines(options.pluginRoot ?? join(packageRoot, "plugin"), options.launchSpecIo)
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)

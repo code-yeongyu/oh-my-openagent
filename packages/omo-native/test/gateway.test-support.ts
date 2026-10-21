@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -42,7 +42,10 @@ export function write(root: string, path: string, content: string): void {
 
 export function home(userConfig?: string): { HOME: string } {
   const root = tempRoot("omo-gateway-hook-home-")
-  mkdirSync(join(root, ".omo"), { recursive: true })
+  // An omo-installed home is 0700 (see `hardenOmoHomeModes`); the fixture has to stand in for a
+  // home omo itself created, or `omo doctor` correctly reports the tree as world-readable.
+  mkdirSync(join(root, ".omo"), { recursive: true, mode: 0o700 })
+  chmodSync(join(root, ".omo"), 0o700)
   if (userConfig !== undefined) writeFileSync(join(root, ".omo", "omo.jsonc"), userConfig)
   return { HOME: root }
 }
