@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { spawn, spawnSync } from "node:child_process"
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { createServer, type Server } from "node:https"
 import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
@@ -12,13 +12,16 @@ import {
   MAX_EXTRA_CA_BYTES,
   parseExtraCaCertificates,
 } from "../compiled-ca-trust"
+import { generateCaTrustMaterial } from "./ca-trust-certificates"
 
-const fixtures = join(import.meta.dir, "fixtures", "ca-trust")
+// Generated in memory per run, so no private key is committed (#10403).
+const material = generateCaTrustMaterial()
+const fixtureNames = { "ca.pem": material.ca, "leaf.pem": material.leaf, "leaf.key": material.leafKey, "not-ca.pem": material.notCa } as const
 const withoutCaVariables = (env: NodeJS.ProcessEnv) => {
   const { NODE_EXTRA_CA_CERTS: _extra, NODE_USE_SYSTEM_CA: _system, OMO_EXTRA_CA_CERTIFICATES: _omo, ...rest } = env
   return rest
 }
-const fixture = (name: string) => readFileSync(join(fixtures, name), "utf8")
+const fixture = (name: keyof typeof fixtureNames) => fixtureNames[name]
 
 describe("parseExtraCaCertificates", () => {
   test("#given one CA PEM twice with CRLF #then returns it once", () => {
