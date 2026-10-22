@@ -1,34 +1,53 @@
 import { afterEach, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { startHostWorld } from "./rpc-host/__fixtures__/host-world"
+import { HOST_CHILD_MODEL, startHostWorld } from "./rpc-host/__fixtures__/host-world"
 import { runTaskSend } from "../tools/control/send"
 import { cleanupSteering, makeHarness } from "../steering/__fixtures__/steering-fakes"
 import { adaptRpcHandle } from "../manager/child-handle"
+import { launchSettled } from "../manager/__fixtures__/manager-fakes"
 import { childSpec, hostRunnerHarness } from "./rpc-host.test-support"
 import { HostSessionClient } from "./rpc-host/session-client"
 import { RpcRequestTimeout } from "./rpc/errors"
 
 afterEach(cleanupSteering)
 
-test("#given a daemon task #when it starts and receives two messages #then every parsed input carries the durable increasing identity", async () => {
-  const world = await startHostWorld({ transcripts: true })
-  const parent = world.connect("parent")
-  try {
-    await parent.startChildren(1)
-    const record = parent.records()[0]
-    if (record === undefined) throw new Error("task did not start")
-    await runTaskSend(parent.manager, { to: record.task_id, message: "first" }, "parent")
-    await runTaskSend(parent.manager, { to: record.task_id, message: "second" }, "parent")
-    const inputs = world.host.commands.filter(command => ["prompt", "steer", "follow_up"].includes(command.type))
-    expect(inputs.map(command => command.payload.clientMessageId)).toEqual([
-      `${record.task_id}:0:1`, `${record.task_id}:0:2`, `${record.task_id}:0:3`,
-    ])
-    expect(parent.store.load(record.task_id)?.host_session?.effect_seq).toBe(3)
-  } finally {
-    await world.cleanup()
-  }
-})
+for (const delayed of [false, true]) {
+  test(`#given a daemon task with ${delayed ? "delayed" : "immediate"} startup #when it receives two messages #then every parsed input carries the durable increasing identity`, async () => {
+    const world = await startHostWorld({ transcripts: true })
+    const parent = world.connect("parent")
+    const release = delayed ? world.host.holdReply("prompt") : () => {}
+    try {
+      const prompt = world.host.waitForCommand("prompt")
+      const starting = parent.manager.start({
+        prompt: "host child parent #0", parent_session_id: "parent", depth: 1,
+        execution_mode: "process", model: HOST_CHILD_MODEL,
+      })
+      await bounded(prompt)
+      const started = await starting
+      if (delayed) expect(started).toMatchObject({ kind: "started", starting: true })
+      release()
+      if (started.kind !== "started") throw new Error(`task did not start: ${started.kind}`)
+      await bounded(launchSettled(parent.manager, started.task_id))
+      const record = parent.store.load(started.task_id)
+      if (record === null) throw new Error("task record is missing")
+      for (const message of ["first", "second"]) {
+        const received = world.host.waitForCommand("steer")
+        const sent = await runTaskSend(parent.manager, { to: record.task_id, message }, "parent")
+        expect(["steered", "queued"]).toContain(sent.details.kind)
+        await bounded(received)
+      }
+      const inputs = world.host.commands.filter(command => ["prompt", "steer", "follow_up"].includes(command.type))
+      expect(inputs.map(command => command.payload.clientMessageId)).toEqual([
+        `${record.task_id}:0:1`, `${record.task_id}:0:2`, `${record.task_id}:0:3`,
+      ])
+      expect(parent.store.load(record.task_id)?.host_session?.effect_seq).toBe(3)
+    } finally {
+      release()
+      await world.cleanup()
+    }
+  })
+}
 
 for (const conflict of [false, true]) {
   test(`#given a withheld steer ack #when the same-id retry ${conflict ? "conflicts" : "replays"} #then ${conflict ? "no delivery is reported" : "the host admits it once"}`, async () => {

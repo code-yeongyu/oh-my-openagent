@@ -225,13 +225,19 @@ export function stepToAssistantMessage(
 let parentCallCount = 0
 let childCallCount = 0
 
+function isChildSession(context: Context, argv: readonly string[] = process.argv): boolean {
+  const nameIndex = argv.indexOf("--name")
+  const rpcParent = nameIndex >= 0 && argv[nameIndex + 1] === "omo-task-e2e-parent"
+  return messagesContainChild(context) || (argv.includes("rpc") && !rpcParent)
+}
+
 function streamMockResponse(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const stream = createLocalAssistantMessageEventStream()
   const script = loadMockScript(context.cwd ?? process.cwd())
   // RPC children (--mode rpc) never see the in-process subagent identity line in their
-  // message context, so argv mode is the structural child signal; the identity line stays the
-  // in-process signal.
-  const isChild = messagesContainChild(context) || process.argv.includes("rpc")
+  // message context. The live idle-wake parent also uses RPC, with an explicit QA parent name;
+  // other RPC sessions are children, and the identity line remains the in-process signal.
+  const isChild = isChildSession(context)
   if (isChild && script.failChildModels?.includes(streamModel.id)) {
     if (process.argv.includes("rpc")) {
       queueMicrotask(() => process.exit(42))
@@ -293,7 +299,7 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
       stream.push({ type: "text_end", contentIndex: 0, content: step.text, partial: message })
     } else {
       const toolCall = message.content[0]
-      stream.push({ type: "toolcall_start", contentIndex: 0, partial: { ...message, content: [] } })
+      stream.push({ type: "toolcall_start", contentIndex: 0, partial: message })
       stream.push({ type: "toolcall_delta", contentIndex: 0, delta: JSON.stringify(step.arguments), partial: message })
       stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message })
     }
@@ -388,6 +394,10 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     // given a parent context / when detected / then false
     const parentCtx: Context = { messages: [{ role: "user", content: "ulw parent prompt" }] }
     if (messagesContainChild(parentCtx)) throw new Error("parent must not detect child identity")
+    const rpcParentArgv = ["senpi", "--mode", "rpc", "--name", "omo-task-e2e-parent"]
+    if (isChildSession(parentCtx, rpcParentArgv)) throw new Error("RPC parent must consume parent steps")
+    if (!isChildSession(parentCtx, ["senpi", "--mode", "rpc"])) throw new Error("RPC child must consume child steps")
+    if (!isChildSession(childCtx, rpcParentArgv)) throw new Error("in-process child identity must win over parent argv")
     console.log("SELF-TEST OK")
   }
 }

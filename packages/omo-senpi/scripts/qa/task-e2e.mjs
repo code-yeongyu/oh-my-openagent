@@ -31,14 +31,17 @@ import {
   SYNC_FINAL,
   SYNC_SCRIPT,
 } from "./task-e2e-scenarios.mjs"
-import { isAlive, killTree } from "./task-e2e-process.mjs"
+import { driveIdleSenpi, isAlive, killTree } from "./task-e2e-process.mjs"
 import { runTaskResumeScenarios } from "./task-resume-e2e.mjs"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
-const OMO_CONFIG = { categories: { mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" } } }
+const OMO_CONFIG = {
+  task: { default_execution_mode: "in-process" },
+  categories: { mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" } },
+}
 
 function findOnPath(bin) {
   if (bin.includes("/")) return existsSync(bin) ? bin : null
@@ -74,7 +77,7 @@ function driveSenpi(senpiBin, scenario, prompt, pids) {
     ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", scenario.sessionDir, prompt],
     {
       cwd: scenario.sandbox.cwd,
-      env: { ...isolatedChildEnv(process.env, scenario.sandbox.agentDir), SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir, XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir, OMO_SENPI_QA: "1" },
+      env: scenarioEnv(scenario),
       encoding: "utf8",
       timeout: 120_000,
       maxBuffer: 64 * 1024 * 1024,
@@ -82,6 +85,20 @@ function driveSenpi(senpiBin, scenario, prompt, pids) {
   )
   if (typeof run.pid === "number") pids.push(run.pid)
   return { run, events: parseJsonEvents(run.stdout ?? "") }
+}
+
+function scenarioEnv(scenario) {
+  const { sandbox } = scenario
+  return {
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
+    HOME: sandbox.homeDir,
+    USERPROFILE: sandbox.homeDir,
+    XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+    XDG_DATA_HOME: sandbox.xdgDataHome,
+    XDG_CACHE_HOME: sandbox.xdgCacheHome,
+    SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
+    OMO_SENPI_QA: "1",
+  }
 }
 
 function readStoreTaskIds(stateDir) {
@@ -102,9 +119,18 @@ function markerCount(markerLog) {
   return readFileSync(markerLog, "utf8").trim().split(/\r?\n/).filter((line) => line.length > 0).length
 }
 
-function runMainFlow(senpiBin, checks, capture, pids) {
+async function runMainFlow(senpiBin, checks, capture, pids) {
   const scenario = seedScenario(MAIN_SCRIPT, { withMarker: true })
-  const { run, events } = driveSenpi(senpiBin, scenario, "spawn a background child, keep working, then follow up and read its output", pids)
+  const run = await driveIdleSenpi({
+    senpiBin, mockProviderEntry, scenario, pids, env: scenarioEnv(scenario),
+    prompt: "spawn a background child, keep working, then follow up and read its output",
+    completionToken: CHILD_SECOND,
+    childCompleted: () => {
+      const taskId = readStoreTaskIds(scenario.stateDir)[0]
+      return taskId !== undefined && matchesOrderedSubsequence(jsonlSignatures(readStoreJsonl(scenario.stateDir, taskId)), MAIN_FLOW_EXPECTED_SEQUENCE)
+    },
+  })
+  const events = parseJsonEvents(run.stdout ?? "")
   capture.main = { exit: run.status, signal: run.signal ?? null, stateDir: scenario.stateDir }
   const taskId = readStoreTaskIds(scenario.stateDir)[0]
   const jsonl = taskId === undefined ? "" : readStoreJsonl(scenario.stateDir, taskId)
@@ -171,7 +197,7 @@ async function main() {
   const sandboxes = []
   try {
     for (const runner of [runMainFlow, runBatchFlow, runSyncFlow, runNegativeFlow]) {
-      sandboxes.push(runner(senpiBin, checks, capture, pids))
+      sandboxes.push(await runner(senpiBin, checks, capture, pids))
     }
     // Plan todo 22: quit->resume revival scenarios live in their own module (this driver is oversize).
     sandboxes.push(...await runTaskResumeScenarios({ senpiBin, checks, capture, pids, outDir }))

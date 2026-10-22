@@ -8,7 +8,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
 import { terminateRpcChild } from "../runners/rpc/terminate"
 import { createRpcManagedRunner } from "./runner"
-import { FakeRunner, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
+import { FakeRunner, cleanupProjects, launchSettled, makeManager } from "./__fixtures__/manager-fakes"
 
 // The same shape start-failure-security.test.ts uses: a cause carrying a credential, so any test that
 // persists free text fails loudly instead of leaking quietly.
@@ -80,55 +80,64 @@ describe("TaskManager start failure diagnostics", () => {
     expect(eventLog).not.toContain("credentials.json")
   })
 
-  test("#given an rpc prompt rejects while its child is alive #when the manager records startup failure #then the breadcrumb says alive without invented exit facts", async () => {
-    // given: the real RPC runner sees a stdin-side rejection before cleanup terminates its child.
-    const rpcRunner = new RpcProcessRunner({
-      modelAdmission: async () => {},
-      buildSpawn: (spec) => ({ command: process.execPath, args: [], cwd: spec.cwd, env: process.env }),
-      spawnChild: () => {
-        const child = spawnFakeChild()
-        spawned.push(child)
-        const stdin = child.stdin
-        if (stdin === null) throw new Error("fake child stdin was not piped")
-        const write = (...args: unknown[]): boolean => {
-          const callback = args.findLast((value): value is (error: Error) => void => typeof value === "function")
-          callback?.(new Error(SECRET_BEARING_STDERR))
-          return false
-        }
-        Object.defineProperty(stdin, "write", { value: write })
-        return child
-      },
-    })
-    const { manager, store } = makeManager({ process: createRpcManagedRunner(rpcRunner) })
+  for (const delayed of [false, true]) {
+    test(`#given an rpc prompt rejects after ${delayed ? "delayed" : "immediate"} admission while its child is alive #when the manager records startup failure #then the breadcrumb says alive without invented exit facts`, async () => {
+      // given: the real RPC runner sees a stdin-side rejection before cleanup terminates its child.
+      let admit = () => {}
+      const admission = new Promise<void>(resolve => { admit = resolve })
+      if (!delayed) admit()
+      const rpcRunner = new RpcProcessRunner({
+        modelAdmission: () => admission,
+        buildSpawn: (spec) => ({ command: process.execPath, args: [], cwd: spec.cwd, env: process.env }),
+        spawnChild: () => {
+          const child = spawnFakeChild()
+          spawned.push(child)
+          const stdin = child.stdin
+          if (stdin === null) throw new Error("fake child stdin was not piped")
+          const write = (...args: unknown[]): boolean => {
+            const callback = args.findLast((value): value is (error: Error) => void => typeof value === "function")
+            callback?.(new Error(SECRET_BEARING_STDERR))
+            return false
+          }
+          Object.defineProperty(stdin, "write", { value: write })
+          return child
+        },
+      })
+      const { manager, store } = makeManager({ process: createRpcManagedRunner(rpcRunner) })
 
-    // when
-    const result = await manager.start({
-      prompt: "private prompt payload",
-      parent_session_id: "parent-1",
-      depth: 1,
-      execution_mode: "process",
-      category: "quick",
-    })
+      // when
+      const result = await manager.start({
+        prompt: "private prompt payload",
+        parent_session_id: "parent-1",
+        depth: 1,
+        execution_mode: "process",
+        category: "quick",
+      }).finally(admit)
 
-    // then
-    expect(result.kind).toBe("start_failed")
-    const eventLog = readOnlyEventLog(store.stateDir)
-    const event = JSON.parse(eventLog.trim().split("\n").at(-1) ?? "{}") as {
-      type?: string
-      payload?: Record<string, unknown>
-    }
-    expect(event.type).toBe("task_start_failed")
-    expect(event.payload).toEqual({
-      error_message: PUBLIC_START_FAILURE,
-      failure_kind: "child-prompt-failed",
-      rejected_while: "alive",
-    })
-    expect(event.payload).not.toHaveProperty("exit_kind")
-    expect(eventLog).not.toContain("sk-live-secret")
+      // then
+      if (delayed) expect(result).toMatchObject({ kind: "started", starting: true })
+      if (result.kind !== "started" && result.kind !== "start_failed") throw new Error(`unexpected ${result.kind}`)
+      if (result.kind === "started") expect(result.starting).toBe(true)
+      await launchSettled(manager, result.task_id)
+      expect(store.load(result.task_id)?.status).toBe("error")
+      const eventLog = readOnlyEventLog(store.stateDir)
+      const event = JSON.parse(eventLog.trim().split("\n").at(-1) ?? "{}") as {
+        type?: string
+        payload?: Record<string, unknown>
+      }
+      expect(event.type).toBe("task_start_failed")
+      expect(event.payload).toEqual({
+        error_message: PUBLIC_START_FAILURE,
+        failure_kind: "child-prompt-failed",
+        rejected_while: "alive",
+      })
+      expect(event.payload).not.toHaveProperty("exit_kind")
+      expect(eventLog).not.toContain("sk-live-secret")
 
-    // and: the stderr-derived message is still excluded from the durable artifact.
-    expect(eventLog).not.toContain("credentials.json")
-  })
+      // and: the stderr-derived message is still excluded from the durable artifact.
+      expect(eventLog).not.toContain("credentials.json")
+    })
+  }
 
   test("#given a start failure that never reached a process exit #when it is recorded #then the failure kind alone is persisted", async () => {
     // given: no exit facts exist, because no child process was ever created

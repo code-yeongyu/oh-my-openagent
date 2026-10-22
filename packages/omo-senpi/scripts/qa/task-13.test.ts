@@ -12,6 +12,8 @@ import registerMockProvider, {
 	streamMockStep,
 } from "./mock-provider/index.ts";
 
+import registerTaskMockProvider from "./task-e2e-mock-provider.ts";
+
 import { describe, expect, test } from "bun:test";
 
 interface ChildProcessModule {
@@ -309,6 +311,29 @@ describe("task 13 senpi QA scripts", () => {
 			expect(events).toContainEqual(
 				expect.objectContaining({ type: "done", reason: "toolUse" }),
 			);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+
+	test("#given the task lane provider #when a tool call streams over RPC #then every indexed partial contains its tool call", async () => {
+		let capturedProvider: Parameters<Parameters<typeof registerTaskMockProvider>[0]["registerProvider"]>[1] | undefined;
+		const cwd = mkdtempSync(join(tmpdir(), "omo-task-stream-"));
+		try {
+			const step = { type: "tool_call", name: "read", arguments: { path: "hello.txt" }, id: "call-task-rpc" };
+			writeFileSync(join(cwd, "mock-script.json"), JSON.stringify({ parentSteps: [step], childSteps: [step] }));
+			registerTaskMockProvider({ registerProvider(_id, provider) { capturedProvider = provider; } });
+			if (capturedProvider === undefined) throw new Error("task provider was not registered");
+			const stream = capturedProvider.streamSimple({ id: "mock-1" }, { cwd });
+			const indexedEvents = [];
+			for await (const event of stream) {
+				const candidate = event as { type: string; contentIndex: number; partial: { content: Array<{ type?: string; id?: string; name?: string }> } };
+				if (candidate.type.startsWith("toolcall_")) indexedEvents.push(candidate);
+			}
+			expect(indexedEvents.map((event) => event.type)).toEqual(["toolcall_start", "toolcall_delta", "toolcall_end"]);
+			for (const event of indexedEvents) {
+				expect(event.partial.content[event.contentIndex]).toMatchObject({ type: "toolCall", id: "call-task-rpc", name: "read" });
+			}
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
 		}

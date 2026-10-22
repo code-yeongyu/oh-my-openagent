@@ -43,19 +43,28 @@ async function runCancelLane(ctx) {
   ctx.sandboxes.push(sandbox)
   seedResumeProject(sandbox, resumeOmoConfig())
   const sentinel1 = join(sandbox.root, "cancel-release-1")
-  const run1 = startRun(ctx, sandbox, cancelRun1Script(sentinel1))
+  const cancelReady = join(sandbox.root, "cancel-ready")
+  const run1 = startRun(ctx, sandbox, cancelRun1Script(sentinel1, cancelReady))
+  const childRunning = await pollUntil(
+    () => findTaskByName(sandbox, "cancelchild")?.status === "running"
+      && childSessionHasAssistant(sandbox, findTaskByName(sandbox, "cancelchild")?.task_id ?? ""),
+    (value) => value === true,
+    POLL_MS,
+  )
+  writeFileSync(cancelReady, "go\n")
   const seeded = await pollUntil(
     () => ({
       cancelled: findTaskByName(sandbox, "cancelchild")?.status === "cancelled",
-      witnessDone: findTaskByName(sandbox, "cancelwitness")?.status === "completed",
+      witnessAssistant: findTaskByName(sandbox, "cancelwitness")?.status === "running"
+        && childSessionHasAssistant(sandbox, findTaskByName(sandbox, "cancelwitness")?.task_id ?? ""),
     }),
-    (v) => v.cancelled && v.witnessDone,
+    (v) => v.cancelled && v.witnessAssistant,
     POLL_MS,
   )
   writeFileSync(sentinel1, "go\n")
   const result1 = await run1.completion
   writeLaneLog(ctx, "resume-cancel-run1", result1)
-  ctx.checks.resume_cancel_setup = verdict(result1.status === 0 && seeded.cancelled && seeded.witnessDone)
+  ctx.checks.resume_cancel_setup = verdict(result1.status === 0 && childRunning && seeded.cancelled && seeded.witnessAssistant)
   const cancelTask = findTaskByName(sandbox, "cancelchild")
   const logBefore = taskEventText(sandbox, cancelTask?.task_id ?? "")
   const sentinel2 = join(sandbox.root, "cancel-release-2")
@@ -84,16 +93,17 @@ async function runKillLane(ctx) {
   const seeded = await pollUntil(
     () => ({
       targetDone: findTaskByName(sandbox, "killchild")?.status === "completed",
-      witnessDone: findTaskByName(sandbox, "killwitness")?.status === "completed",
+      witnessAssistant: findTaskByName(sandbox, "killwitness")?.status === "running"
+        && childSessionHasAssistant(sandbox, findTaskByName(sandbox, "killwitness")?.task_id ?? ""),
     }),
-    (v) => v.targetDone && v.witnessDone,
+    (v) => v.targetDone && v.witnessAssistant,
     POLL_MS,
   )
   writeFileSync(sentinel1, "go\n")
   const result1 = await run1.completion
   writeLaneLog(ctx, "resume-kill-run1", result1)
   const killTask = findTaskByName(sandbox, "killchild")
-  ctx.checks.resume_kill_setup = verdict(result1.status === 0 && seeded.targetDone && seeded.witnessDone && killTask !== undefined)
+  ctx.checks.resume_kill_setup = verdict(result1.status === 0 && seeded.targetDone && seeded.witnessAssistant && killTask !== undefined)
   const logBefore = taskEventText(sandbox, killTask?.task_id ?? "")
   if (killTask !== undefined) {
     const recordPath = join(taskStateDir(sandbox), "tasks", `${killTask.task_id}.json`)
@@ -126,16 +136,17 @@ async function runLruLane(ctx) {
   const seeded = await pollUntil(
     () => ({
       evicted: findTaskByName(sandbox, "lruone")?.residency_state === "evicted",
-      newestDone: findTaskByName(sandbox, "lrutwo")?.status === "completed",
+      newestAssistant: findTaskByName(sandbox, "lrutwo")?.status === "running"
+        && childSessionHasAssistant(sandbox, findTaskByName(sandbox, "lrutwo")?.task_id ?? ""),
     }),
-    (v) => v.evicted && v.newestDone,
+    (v) => v.evicted && v.newestAssistant,
     POLL_MS,
   )
   writeFileSync(sentinel1, "go\n")
   const result1 = await run1.completion
   writeLaneLog(ctx, "resume-lru-run1", result1)
   const lruOne = findTaskByName(sandbox, "lruone")
-  ctx.checks.resume_lru_setup = verdict(result1.status === 0 && seeded.evicted && seeded.newestDone && lruOne !== undefined)
+  ctx.checks.resume_lru_setup = verdict(result1.status === 0 && seeded.evicted && seeded.newestAssistant && lruOne !== undefined)
   const logBefore = taskEventText(sandbox, lruOne?.task_id ?? "")
   const sentinel2 = join(sandbox.root, "lru-release-2")
   const run2 = startRun(ctx, sandbox, resumeProbeScript(sentinel2), sessionIdFromEvents(result1.events))

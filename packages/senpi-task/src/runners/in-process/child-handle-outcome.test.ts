@@ -83,6 +83,41 @@ function emptyTextEnd(): ChildSessionEvent {
 }
 
 describe("createChildHandle turn outcomes", () => {
+  test("#given a child waiting in prompt preflight #when aborted before ownership #then no work starts and revival uses a fresh signal", async () => {
+    let release = () => {}
+    const preflight = new Promise<void>((resolve) => { release = resolve })
+    const signals: Array<AbortSignal | undefined> = []
+    let workStarts = 0
+    const fake = createEmittingSession()
+    const session: ChildSession = {
+      ...fake.session,
+      async prompt(_text: string, options?: { readonly signal?: AbortSignal }) {
+        signals.push(options?.signal)
+        await preflight
+        if (options?.signal?.aborted) throw new Error("prompt preflight cancelled")
+        workStarts += 1
+      },
+    }
+    const handle = createChildHandle({ taskId: "preflight-child", session, promptText: "first", completion: "turn" })
+    try {
+      await handle.abort()
+      release()
+      expect(await handle.waitForIdle()).toEqual({ status: "cancelled" })
+      expect(workStarts).toBe(0)
+      expect(signals[0]?.aborted).toBe(true)
+
+      await handle.followUp("continue")
+      await handle.waitForIdle()
+      expect(workStarts).toBe(1)
+      expect(signals[1]).not.toBe(signals[0])
+      expect(signals[1]?.aborted).toBe(false)
+    } finally {
+      release()
+      await handle.abort()
+      await handle.dispose()
+    }
+  })
+
   test('#given completion "turn" and a toolUse message_end followed by a stop message_end with an empty text part #when the prompt resolves #then the outcome is completed with empty finalResponse', async () => {
     const fake = createEmittingSession()
     const handle = createChildHandle({ taskId: "task-1", session: fake.session, promptText: "judge", completion: "turn" })
