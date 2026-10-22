@@ -69,6 +69,52 @@ describe("runConfigMigrate", () => {
     expect(report.migrations[0]?.movePlan).toHaveLength(1)
   })
 
+  test("#given a legacy config with keys the migration does not import #when dry running #then text and JSON output name the keys without their values", () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "omo-config-migrate-unimported-"))
+    fixtures.push(root)
+    const homeDir = join(root, "home")
+    const sourcePath = join(homeDir, ".config", "opencode", "oh-my-openagent.json")
+    mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true })
+    writeFileSync(sourcePath, JSON.stringify({
+      disabled_hooks: ["claude-code-hooks"],
+      git_master: { git_env_prefix: "SECRET_PREFIX_VALUE" },
+      model_fallback: true,
+    }))
+    const environment = { HOME: homeDir, XDG_CONFIG_HOME: join(homeDir, ".config") }
+    const textLines: string[] = []
+    const jsonLines: string[] = []
+
+    // when
+    const textExitCode = runConfigMigrate({
+      cwd: root,
+      dryRun: true,
+      environment,
+      output: (line) => textLines.push(line),
+    })
+    const jsonExitCode = runConfigMigrate({
+      cwd: root,
+      dryRun: true,
+      environment,
+      json: true,
+      output: (line) => jsonLines.push(line),
+    })
+
+    // then
+    expect(textExitCode).toBe(0)
+    expect(textLines.join("\n")).toContain("not imported: disabled_hooks")
+    expect(textLines.join("\n")).toContain("not imported: git_master")
+    expect(textLines.join("\n")).not.toContain("SECRET_PREFIX_VALUE")
+    expect(textLines.join("\n")).not.toContain("claude-code-hooks")
+    expect(jsonExitCode).toBe(0)
+    const report = JSON.parse(jsonLines.join("\n")) as { migrations: Array<{ readonly diagnostics: readonly string[] }> }
+    const diagnostics = report.migrations.flatMap((migration) => migration.diagnostics)
+    expect(diagnostics).toContain("not imported: disabled_hooks")
+    expect(diagnostics).toContain("not imported: git_master")
+    expect(diagnostics.join("\n")).not.toContain("SECRET_PREFIX_VALUE")
+    expect(diagnostics.join("\n")).not.toContain("claude-code-hooks")
+  })
+
   test("#given a dry run completed first #when non-dry migration runs twice #then the second exits successfully with nothing to migrate", () => {
     // given
     const fixture = createFixture()
