@@ -15,7 +15,7 @@ export type ReloadCleanup = {
   readonly shutdowns: ReadonlyArray<() => Promise<unknown>>
   readonly hosts: readonly ReloadHost[]
   readonly restore: () => void
-  /** Whole-cleanup deadline; it must stay below the hook limit the suite runs with (`bun test --timeout 20000`). */
+  /** Whole-cleanup deadline; the caller's hook must allow it (`RELOAD_CLEANUP_HOOK_TIMEOUT_MS` for the default). */
   readonly budgetMs?: number
   /** How long SIGTERM gets before SIGKILL. */
   readonly termGraceMs?: number
@@ -23,12 +23,15 @@ export type ReloadCleanup = {
   readonly killWaitMs?: number
 }
 
-// The cleanup runs inside onTestFinished, which Bun bounds by the run's --timeout (20 s in this repo). Every phase
-// waits against one absolute deadline below that, so a host slow to honour SIGTERM under load is killed early and
-// the hook still ends with this helper's own diagnosis instead of a generic hook timeout (#10844).
-const DEFAULT_BUDGET_MS = 15_000
+// Every phase waits against one absolute deadline, so a host slow to honour SIGTERM is killed early and the cleanup
+// ends with this helper's own diagnosis (#10844). The SIGKILL wait is sized for a loaded Linux host: a process
+// blocked in an fsync on a saturated disk is reaped only when that I/O completes, and its `exit` event arrived more
+// than 12 s after SIGKILL there (#10870). The hook running the cleanup gets RELOAD_CLEANUP_HOOK_TIMEOUT_MS, which
+// covers the budget, so a slow reap is reported here instead of by Bun's default hook limit.
+const DEFAULT_BUDGET_MS = 60_000
 const DEFAULT_TERM_GRACE_MS = 3_000
-const DEFAULT_KILL_WAIT_MS = 2_000
+const DEFAULT_KILL_WAIT_MS = 45_000
+export const RELOAD_CLEANUP_HOOK_TIMEOUT_MS = DEFAULT_BUDGET_MS + 5_000
 
 export function ownsHostSocket(launchArgs: readonly string[] | undefined, root: string): boolean {
   const index = launchArgs?.indexOf("--socket") ?? -1

@@ -117,6 +117,40 @@ describe("cleanUpReloadRun", () => {
     expect(restored).toBe(1)
   })
 
+  it("#given a host whose exit arrives 13 s after SIGKILL (a loaded Linux host) #when cleanup runs with the default budget #then it waits for that exit and succeeds", async () => {
+    // given - SIGTERM is ignored; the exit event follows SIGKILL only after the reap a saturated disk delays (#10870)
+    const REAP_DELAY_MS = 13_000
+    const root = tempRoot()
+    const exit = Promise.withResolvers<void>()
+    const signals: NodeJS.Signals[] = []
+    let reap: ReturnType<typeof setTimeout> | undefined
+    onTestFinished(() => clearTimeout(reap))
+    const child = {
+      exitCode: null as number | null,
+      signalCode: null as NodeJS.Signals | null,
+      kill(signal: NodeJS.Signals) {
+        signals.push(signal)
+        if (signal === "SIGKILL") reap = setTimeout(() => exit.resolve(), REAP_DELAY_MS)
+        return true
+      },
+    }
+    let restored = 0
+
+    // when
+    const outcome = await settledWithin(cleanUpReloadRun({
+      root,
+      shutdowns: [],
+      hosts: [{ child, exited: exit.promise }],
+      restore: () => { restored += 1 },
+    }), 30_000)
+
+    // then
+    expect(outcome.error).toBeUndefined()
+    expect(signals).toEqual(["SIGTERM", "SIGKILL"])
+    expect(existsSync(root)).toBe(false)
+    expect(restored).toBe(1)
+  }, 35_000)
+
   it("#given a host that ignores SIGTERM #when its grace ends #then it escalates to SIGKILL, succeeds and still restores the state", async () => {
     // given
     const root = tempRoot()

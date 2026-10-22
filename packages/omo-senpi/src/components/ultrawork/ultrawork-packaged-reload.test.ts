@@ -7,7 +7,7 @@ import { basename, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
-import { cleanUpReloadRun, ownsHostSocket, type ReloadHost } from "./packaged-reload-cleanup.test-support"
+import { cleanUpReloadRun, ownsHostSocket, RELOAD_CLEANUP_HOOK_TIMEOUT_MS, type ReloadHost } from "./packaged-reload-cleanup.test-support"
 import { dispatchInput, sessionEventCtx } from "./ultrawork.test-support"
 
 describe("omo-senpi ultrawork packaged reload", () => {
@@ -30,7 +30,7 @@ describe("omo-senpi ultrawork packaged reload", () => {
       shutdowns: sessions.map((pi) => () => pi.dispatch("session_shutdown", {})),
       hosts,
       restore: () => { for (const restore of restores) restore() },
-    }))
+    }), { timeout: RELOAD_CLEANUP_HOOK_TIMEOUT_MS })
     Object.assign(process.env, pinned)
     const spawn = childProcess.spawn
     const spawnSpy = spyOn(childProcess, "spawn")

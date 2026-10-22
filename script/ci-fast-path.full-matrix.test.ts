@@ -267,7 +267,7 @@ describe("full-matrix classification", () => {
       ["the Cargo workspace manifest", "Cargo.toml"],
       ["the Cargo lockfile", "Cargo.lock"],
       ["the Rust toolchain pin", "rust-toolchain.toml"],
-      ["the native launcher package", "packages/omo-native/bin/omo.js"],
+      ["the native launcher package", "packages/omo-native/compile-entry.ts"],
       ["a darwin platform package", "packages/oh-my-opencode-darwin-arm64/package.json"],
       ["a windows platform package", "packages/oh-my-opencode-windows-x64/package.json"],
       ["the platform binary postinstall", "postinstall.mjs"],
