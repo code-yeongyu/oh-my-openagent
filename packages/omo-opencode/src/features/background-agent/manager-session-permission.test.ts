@@ -195,7 +195,7 @@ describe("BackgroundManager child session directory", () => {
     const promptStarted = Promise.withResolvers<void>()
     const client = {
       session: {
-        messages: async () => ({ data: [] }),
+        messages: async () => ({ data: [{ info: { id: "msg_launch", role: "user" } }] }),
         get: async () => ({ data: { directory: "/parent" } }),
         create: async (input: Record<string, unknown>) => {
           createCalls.push(input)
