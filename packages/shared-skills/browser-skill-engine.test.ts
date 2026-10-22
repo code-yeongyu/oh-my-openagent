@@ -35,10 +35,21 @@ function fakeSession(script: SessionScript = {}) {
     if (script.failOn?.method === method) throw script.failOn.error
     return { ok: true }
   }
+  const listeners: Record<string, Array<(...args: unknown[]) => void>> = {}
   const session = {
     sessionId: "ckhg",
     stopped: false,
     calls,
+    on: (event: string, fn: (...args: unknown[]) => void) => {
+      listeners[event] = listeners[event] || []
+      listeners[event].push(fn)
+    },
+    off: (event: string, fn: (...args: unknown[]) => void) => {
+      listeners[event] = (listeners[event] || []).filter((f) => f !== fn)
+    },
+    emit: (event: string, ...args: unknown[]) => {
+      for (const fn of listeners[event] || []) fn(...args)
+    },
     navigate: (...args: unknown[]) => record("navigate", ...args),
     back: (...args: unknown[]) => record("back", ...args),
     click: (...args: unknown[]) => record("click", ...args),
@@ -790,5 +801,42 @@ describe("what else a cooperating session could do by accident", () => {
     await guardedSession.click("#control")
 
     expect(asked(host)).toHaveLength(0)
+  })
+
+  test("#given a navigate in flight #when the CDP session detaches #then it immediately rejects with cdp_failed (#10406)", async () => {
+    const host = fakeHost()
+    let triggerDetach: (() => void) | undefined
+    const { session, guardedSession } = await connected(host)
+
+    session.navigate = () =>
+      new Promise((_, reject) => {
+        triggerDetach = () => session.emit("detach", "Detached while handling command.")
+      })
+
+    const navigatePromise = guardedSession.navigate("https://example.com")
+    await new Promise((r) => setTimeout(r, 20))
+    expect(triggerDetach).toBeDefined()
+    triggerDetach!()
+
+    await expect(navigatePromise).rejects.toMatchObject({
+      code: "cdp_failed",
+      message: "Detached while handling command.",
+    })
+  })
+
+  test("#given a navigate in flight #when session.stop is called early #then in-flight commands reject promptly with cdp_failed (#10406)", async () => {
+    const host = fakeHost()
+    const { session, guardedSession } = await connected(host)
+
+    session.navigate = () => new Promise(() => {})
+
+    const navigatePromise = guardedSession.navigate("https://example.com")
+    await new Promise((r) => setTimeout(r, 20))
+    await guardedSession.stop()
+
+    await expect(navigatePromise).rejects.toMatchObject({
+      code: "cdp_failed",
+      message: "Detached while handling command.",
+    })
   })
 })

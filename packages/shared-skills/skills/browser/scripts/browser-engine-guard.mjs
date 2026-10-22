@@ -264,6 +264,65 @@ async function describeForConfirmation(rawSession, label, rawSessionTab) {
 }
 
 function wrapSession(rawSession, context, bridge, host) {
+  const activeInFlightCancels = new Set()
+
+  const raceWithDetach = async (run) => {
+    let cancelInFlight
+    let onDetach
+
+    const detachPromise = new Promise((_, reject) => {
+      cancelInFlight = (err) => reject(err)
+      activeInFlightCancels.add(cancelInFlight)
+
+      onDetach = (reason) => {
+        const msg = typeof reason === "string" ? reason : "Detached while handling command."
+        reject(new CodedError("BskRpcError", "cdp_failed", msg))
+      }
+
+      if (typeof rawSession.on === "function") {
+        rawSession.on("detach", onDetach)
+        rawSession.on("detached", onDetach)
+        rawSession.on("close", onDetach)
+      }
+      if (typeof rawSession.client?.on === "function") {
+        rawSession.client.on("detach", onDetach)
+        rawSession.client.on("close", onDetach)
+        rawSession.client.on("disconnect", onDetach)
+      }
+    })
+
+    try {
+      return await Promise.race([run(), detachPromise])
+    } catch (error) {
+      if ((codeOf(error) === "timeout" || error?.message?.includes("timed out")) && (rawSession.stopped || rawSession.detached)) {
+        throw new CodedError("BskRpcError", "cdp_failed", "Detached while handling command.")
+      }
+      throw error
+    } finally {
+      if (cancelInFlight) activeInFlightCancels.delete(cancelInFlight)
+      const offFn = typeof rawSession.off === "function" ? rawSession.off : typeof rawSession.removeListener === "function" ? rawSession.removeListener : undefined
+      if (offFn) {
+        try {
+          offFn.call(rawSession, "detach", onDetach)
+          offFn.call(rawSession, "detached", onDetach)
+          offFn.call(rawSession, "close", onDetach)
+        } catch {
+          // ignore
+        }
+      }
+      const clientOffFn = typeof rawSession.client?.off === "function" ? rawSession.client.off : typeof rawSession.client?.removeListener === "function" ? rawSession.client.removeListener : undefined
+      if (clientOffFn) {
+        try {
+          clientOffFn.call(rawSession.client, "detach", onDetach)
+          clientOffFn.call(rawSession.client, "close", onDetach)
+          clientOffFn.call(rawSession.client, "disconnect", onDetach)
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
   const nowStopped = async () => {
     if (!(await bridge.stopped())) return
     try {
@@ -347,7 +406,7 @@ function wrapSession(rawSession, context, bridge, host) {
     await bridge.emit("acting", { action: kind })
     let result
     try {
-      result = await run()
+      result = await raceWithDetach(run)
     } catch (error) {
       if (codeOf(error) === "user_aborted") {
         await bridge.markStopped()
@@ -400,6 +459,10 @@ function wrapSession(rawSession, context, bridge, host) {
     },
     async stop() {
       if (rawSession.stopped) return null
+      for (const cancel of activeInFlightCancels) {
+        cancel(new CodedError("BskRpcError", "cdp_failed", "Detached while handling command."))
+      }
+      activeInFlightCancels.clear()
       try {
         return await rawSession.stop()
       } finally {
