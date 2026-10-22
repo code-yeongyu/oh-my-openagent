@@ -233,6 +233,7 @@ function createPluginInput(client: unknown, directory = tmpdir()): PluginInput {
 function createBackgroundManager(): BackgroundManager {
   const client = {
     session: {
+      messages: async () => ({ data: [] }),
       prompt: async () => ({}),
       promptAsync: async () => ({}),
       abort: async () => ({}),
@@ -244,6 +245,7 @@ function createBackgroundManager(): BackgroundManager {
 function createBackgroundManagerWithOptions(options: Partial<ConstructorParameters<typeof BackgroundManager>[0]>): BackgroundManager {
   const client = {
     session: {
+      messages: async () => ({ data: [] }),
       prompt: async () => ({}),
       promptAsync: async () => ({}),
       abort: async () => ({}),
@@ -738,6 +740,7 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
     }
     const client = {
       session: {
+        messages: async () => ({ data: [] }),
         promptAsync: async () => {
           throw promptError
         },
@@ -797,6 +800,7 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
     let abortCalls = 0
     const client = {
       session: {
+        messages: async () => ({ data: [] }),
         promptAsync: async () => {
           throw new Error("JSON Parse error: Unexpected EOF")
         },
@@ -3222,6 +3226,7 @@ describe("BackgroundManager.resume model persistence", () => {
        session: {
          prompt: promptMock,
          promptAsync: promptMock,
+         messages: async () => ({ data: [] }),
          abort: async () => ({}),
        },
      }
@@ -3261,6 +3266,7 @@ describe("BackgroundManager.resume model persistence", () => {
       parentSessionId: "parent-session-2",
       parentMessageId: "msg-2",
     })
+    await flushBackgroundNotifications()
 
     // then
     expect(promptCalls).toHaveLength(1)
@@ -3302,6 +3308,7 @@ describe("BackgroundManager.resume model persistence", () => {
       parentSessionId: "parent-session-2",
       parentMessageId: "msg-2",
     })
+    await flushBackgroundNotifications()
 
     // then
     expect(promptCalls).toHaveLength(1)
@@ -3346,6 +3353,7 @@ describe("BackgroundManager.resume model persistence", () => {
       parentSessionId: "parent-session-2",
       parentMessageId: "msg-2",
     })
+    await flushBackgroundNotifications()
 
     // then
     expect(promptCalls).toHaveLength(1)
@@ -7929,6 +7937,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     //#given
     const client = {
       session: {
+        messages: async () => ({ data: [] }),
         prompt: async () => ({}),
         promptAsync: async () => ({}),
         abort: async () => ({}),
@@ -8382,6 +8391,7 @@ describe("BackgroundManager - tool permission spread order", () => {
     let capturedTools: Record<string, unknown> | undefined
     const client = {
       session: {
+        messages: async () => ({ data: [] }),
         promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
           capturedTools = args.body.tools as Record<string, unknown>
           return {}
@@ -8411,6 +8421,7 @@ describe("BackgroundManager - tool permission spread order", () => {
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
     })
+    await flushBackgroundNotifications()
 
     //#then
     expect(capturedTools).toBeDefined()
@@ -8427,6 +8438,7 @@ describe("BackgroundManager - tool permission spread order", () => {
     let promptCall: { path: { id: string }; body: Record<string, unknown> } | undefined
     const client = {
       session: {
+        messages: async () => ({ data: [] }),
         promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
           promptCall = args
           return {}
@@ -8457,6 +8469,7 @@ describe("BackgroundManager - tool permission spread order", () => {
       parentSessionId: "parent-session",
       parentMessageId: "parent-message",
     })
+    await flushBackgroundNotifications()
 
     //#then
     expect(promptCall).toBeDefined()
