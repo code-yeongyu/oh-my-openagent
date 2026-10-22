@@ -32,6 +32,9 @@ function fixture(): Fixture {
   mkdirSync(join(root, "tmp"), { recursive: true })
   cpSync(join(SOURCE_ROOT, "bin"), join(app, "bin"), { recursive: true })
   write(join(app, "package.json"), JSON.stringify({ name: "omo-ai", version: "test", type: "module" }))
+  // The installed engine catalog must resolve from the locked dependency tree, even with a cold
+  // Bun cache. A Windows junction does not need the privilege required for directory symlinks.
+  symlinkSync(realpathSync(resolve(SOURCE_ROOT, "..", "..", "node_modules")), join(app, "node_modules"), process.platform === "win32" ? "junction" : "dir")
   return {
     home: join(root, "home"),
     agentDir: join(root, "senpi-agent"),
@@ -47,11 +50,8 @@ function opencode(item: Fixture, config: unknown, auth?: unknown): void {
   if (auth !== undefined) write(join(item.dataHome, "opencode", "auth.json"), JSON.stringify(auth))
 }
 
-// The launcher runs from a copied app with no node_modules, so Bun auto-installs the engine's dependencies
-// on first import and extracts them under the temp dir. On Windows those extraction directories outlive the
-// child (#9766 guard: `.typebox`, `.openai`, `.client-bedrock-runtime`), so the child gets its own temp dir
-// inside the fixture root, which teardown removes. The Bun install cache stays the host's: it is a cache, not a temp
-// leak, and a fresh per-file cache would make the first engine-importing case install cold (#10210's timeout).
+// The copied launcher uses installed dependencies with auto-install disabled. Its temporary files
+// stay inside the fixture root that teardown removes (#9766); the install cache stays inherited.
 function childEnv(item: Fixture): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -75,7 +75,7 @@ function childEnv(item: Fixture): NodeJS.ProcessEnv {
 }
 
 function run(item: Fixture, args: string[]) {
-  const result = spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env: childEnv(item) })
+  const result = spawnSync(process.execPath, ["--no-install", item.launcher, ...args], { encoding: "utf8", env: childEnv(item) })
   if (result.error) throw result.error
   return result
 }
@@ -393,6 +393,10 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
 
         expect(result.status).toBe(0)
         expect(config.getError()).toBeUndefined()
+        expect(readJson(join(item.agentDir, "settings.json"))).toMatchObject({
+          defaultProvider: "neuralwatt",
+          defaultModel: "kimi-k2.5",
+        })
         expect(models.map((model: any) => [model.id, model.api, model.baseUrl, model.contextWindow, model.maxTokens, model.reasoning])).toEqual([
           ["kimi-k2.5", "openai-completions", "https://api.neuralwatt.com/v1", 262144, 32768, true],
         ])

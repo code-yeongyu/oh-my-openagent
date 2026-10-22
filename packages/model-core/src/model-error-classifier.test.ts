@@ -291,6 +291,33 @@ describe("model-error-classifier", () => {
     //#then
     expect(result).toBe(true)
   })
+
+  describe("UnknownError name as retryable catch-all", () => {
+    test("treats UnknownError (PascalCase) name as retryable so opaque SDK failures advance the chain", () => {
+      //#given: SDKs occasionally fall back to name="UnknownError" when they
+      // cannot classify a provider response. Without retry, the first opaque
+      // failure tears down the task even when a healthy fallback exists.
+      const error = { name: "UnknownError", message: "<no detail>" }
+      expect(shouldRetryError(error)).toBe(true)
+    })
+
+    test("treats unknownerror (lowercase) name as retryable", () => {
+      const error = { name: "unknownerror" }
+      expect(shouldRetryError(error)).toBe(true)
+    })
+
+    test("keeps user-initiated aborts non-retryable", () => {
+      const error = { name: "messageabortederror" }
+      expect(shouldRetryError(error)).toBe(false)
+    })
+
+    test("treats UnknownError plus a terminal quota marker as non-retryable", () => {
+      //#given: UnknownError is an opaque wrapper, not a named retry class.
+      // Explicitly terminal quota text still terminates before the catch-all.
+      const error = { name: "UnknownError", message: "terminal quota exhausted" }
+      expect(isRetryableModelError(error)).toBe(false)
+    })
+  })
 })
 
 export {}
