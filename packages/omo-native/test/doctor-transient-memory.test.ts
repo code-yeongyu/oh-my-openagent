@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
-import { countTransientMemoryIdentities, formatTransientMemoryLines } from "../bin/lib/doctor.js"
+import { countTransientMemoryIdentities, DOCTOR_PLUGIN_ARTIFACTS, formatTransientMemoryLines } from "../bin/lib/doctor.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
@@ -75,12 +75,7 @@ describe("omo doctor transient memory identities", () => {
     writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
     writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
     writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-    for (const artifact of [
-      "plugin/package.json",
-      "plugin/extensions/omo.js",
-      "plugin/runtime/lsp-daemon/dist/cli.js",
-      "plugin/runtime/agent-toolkit/cli.js",
-    ]) writeFile(join(packageRoot, artifact))
+    for (const [, artifact] of DOCTOR_PLUGIN_ARTIFACTS) writeFile(join(packageRoot, artifact))
 
     const memoryHome = join(root, "memory")
     writeFile(join(memoryHome, "agents", "durable-1", "repo", "system", "persona.md"))

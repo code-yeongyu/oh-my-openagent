@@ -1,3 +1,10 @@
+## 2026-10-21 - Diagnose a missing credential-gated x-search payload (#7774)
+
+The `omo doctor` command now fails when the installed payload is missing
+`plugin/skills-conditional/x-search/SKILL.md`. Launcher and compiled diagnostics share
+one artifact checklist, preserving the current runtime layout while catching stripped
+installations before an xAI session encounters a missing skill.
+
 ## 2026-10-20 - Adopt senpi 2026.10.19-2 for the 5.1.39 cut
 
 All exact senpi pins (root, `omo-native`, `omo-senpi` peer/dev and its `senpi-ai`/`senpi-tui` aliases, `senpi-task`, the pin and package-shape tests, the provider-map derivation comment and the catalog-coverage comment) move from `2026.10.19` to `2026.10.19-2`, with the lockfile regenerated. The provider-map registry, catalog-coverage and chain-provider tests pass unchanged against the new engine, so the map needs no re-derivation. The committed Senpi plugin bundles were regenerated on the canonical linux/amd64 build (bun 1.4.3): only `omo.js` and `omo-onboarding-scan.js` change, both in the provider map they inline (`omo-native/bin/lib/provider-map.json`), whose derivation comment now names senpi 2026.10.19-2; `omo.js` is 1,396,195 bytes, inside its 1,424,569 budget.

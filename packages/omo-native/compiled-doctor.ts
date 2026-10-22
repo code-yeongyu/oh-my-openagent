@@ -4,7 +4,7 @@ import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { doctorCoverageLines } from "./bin/lib/category-coverage.js"
 import { doctorComputerUseLines } from "./bin/lib/computer-use-doctor.js"
 import { daemonReportLines } from "./bin/lib/daemon.js"
-import { reapStaleEngines, staleEngineReport, transientMemoryReport, warningsForSettings } from "./bin/lib/doctor.js"
+import { DOCTOR_PLUGIN_ARTIFACTS, reapStaleEngines, staleEngineReport, transientMemoryReport, warningsForSettings } from "./bin/lib/doctor.js"
 import { migrationReport } from "./bin/lib/doctor-migration.js"
 import { piConfigReport } from "./bin/lib/doctor-pi-config.js"
 import { launchSpecDoctorLines } from "./bin/lib/launch-spec-mode.js"
@@ -24,12 +24,6 @@ export type CompiledDoctorOptions = {
   readonly list?: () => { pid: number; ppid: number; elapsed: string; tty: string; command: string }[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
 }
-
-const doctorArtifacts = [
-  ["plugin manifest", "plugin/package.json"],
-  ["extension", "plugin/extensions/omo.js"],
-  ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-] as const
 
 export type CompiledDoctorInput = {
   readonly inventory: Awaited<ReturnType<typeof detectHarnesses>>
@@ -73,7 +67,7 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   const env = options.env ?? process.env
   let failed = false
   const lines: string[] = []
-  for (const [label, artifact] of doctorArtifacts) {
+  for (const [label, artifact] of DOCTOR_PLUGIN_ARTIFACTS) {
     if (existsSync(join(input.execDir, artifact))) lines.push(`PASS ${label}: ${artifact}`)
     else {
       lines.push(`FAIL ${label}: missing ${artifact}`)

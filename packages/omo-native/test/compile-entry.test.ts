@@ -15,6 +15,7 @@ import {
   updateHint,
   versionLine,
 } from "../compile-entry"
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
 import { compiledUpdate, pickUpdateVersion, releaseAssetName, releaseVersionOf, replaceCommand } from "../compiled-update"
 import { engineDependencyDir } from "../bin/lib/engine-dependency.js"
 import { registerEngineRuntimeModules } from "../engine-runtime-modules"
@@ -394,7 +395,7 @@ describe("embedded runtime provisioning", () => {
   test("compiled doctor resolves package artifacts from the provided execDir", async () => {
     const root = temp()
     writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.2.1" }))
-    for (const artifact of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js"]) {
+    for (const [, artifact] of DOCTOR_PLUGIN_ARTIFACTS) {
       const path = join(root, artifact)
       mkdirSync(join(path, ".."), { recursive: true })
       writeFileSync(path, "fixture\n")
@@ -411,6 +412,7 @@ describe("embedded runtime provisioning", () => {
       process.exitCode = originalExitCode ?? 0
     }
     expect(output.join("\n")).toContain("PASS plugin manifest: plugin/package.json")
+    expect(output.join("\n")).toContain("PASS x-search skill: plugin/skills-conditional/x-search/SKILL.md")
     expect(output.join("\n")).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.28; scheme nodef)")
   })
 

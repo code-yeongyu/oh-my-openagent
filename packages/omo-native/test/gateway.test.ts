@@ -200,7 +200,7 @@ describe("omo doctor gateway rows", () => {
     write(app, "package.json", JSON.stringify({ name: "omo-ai", version: "1.2.3-test.0", type: "module", dependencies: senpi }))
     write(app, "node_modules/@code-yeongyu/senpi/package.json", JSON.stringify({ name: "@code-yeongyu/senpi", version: "2026.8.9", type: "module", exports: { ".": "./dist/index.js" } }))
     for (const file of ["dist/index.js", "dist/cli.js", "dist/core/brand.js"]) write(app, `node_modules/@code-yeongyu/senpi/${file}`, "export {}\n")
-    for (const file of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js"]) write(app, file, "fixture\n")
+    for (const file of ["plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js", "plugin/skills-conditional/x-search/SKILL.md"]) write(app, file, "fixture\n")
     write(app, "doctor.mjs", [
       'import { runDoctor } from "./bin/lib/doctor.js"',
       'import { gatewayDoctorLines } from "./bin/lib/gateway.js"',

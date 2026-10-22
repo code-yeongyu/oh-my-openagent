@@ -28,10 +28,13 @@ function readDistTags(options) {
   }
 }
 
-const artifacts = [
+/** Required payload artifacts shared by launcher and compiled diagnostics. */
+/** @type {ReadonlyArray<readonly [string, string]>} */
+export const DOCTOR_PLUGIN_ARTIFACTS = [
   ["plugin manifest", "plugin/package.json"],
   ["extension", "plugin/extensions/omo.js"],
   ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
+  ["x-search skill", "plugin/skills-conditional/x-search/SKILL.md"],
 ]
 
 function pass(lines, message) {
@@ -377,7 +380,7 @@ export function runDoctor(inventory, args = [], options = {}) {
 
   let failed = false
   const lines = []
-  for (const [label, artifact] of artifacts) {
+  for (const [label, artifact] of DOCTOR_PLUGIN_ARTIFACTS) {
     const path = join(packageRoot, artifact)
     if (existsSync(path)) pass(lines, `${label}: ${artifact}`)
     else {
