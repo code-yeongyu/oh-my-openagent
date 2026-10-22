@@ -14,14 +14,9 @@ import {
   type MemoryIdentityRuntimeDeps,
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
-import { resolveMemoryModelRegistry } from "./model-registry-resolver"
 import { resolveMemorySessionModel } from "./session-model-resolver"
-import {
-  resolveParentCacheReusable as resolveParentCacheReusableFromCtx,
-  resolveParentContextTokens as resolveParentContextTokensFromCtx,
-  resolveParentSessionFile as resolveParentSessionFileFromCtx,
-  resolveSessionAgentDir,
-} from "./session-context-resolver"
+import { NO_LAUNCH_FACTS, currentLaunchScope, factsForScope, readLaunchFacts, withLaunchScope, type LaunchFacts } from "./launch-facts"
+import { isStaleExtensionContextError } from "./stale-extension-context"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
 import { isRecord, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
@@ -33,6 +28,8 @@ export interface MemoryRuntimeWiring {
   journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring
   factsWiringFor(identity: MemoryIdentityContext): MemoryFactsWiring
   runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime
+  /** Resolves once every reflection launch started by this wiring's runtimes has returned. */
+  settled(): Promise<void>
   triggerSessionFor(eventCtx: unknown): ReflectionTriggerSession | undefined
   dreamSessionById(sessionId: string): DreamTriggerSession | undefined
   dreamSessionFor(eventCtx: unknown): DreamTriggerSession | undefined
@@ -58,29 +55,80 @@ export function createMemoryRuntimeWiring(
   const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
     options.sessions.get(sessionId)?.context
 
+  // Launch facts are bound to the run (launch-facts.ts): a trigger launch reads only its own
+  // immutable snapshot, any other launch reads the current ctx only when it belongs to the run.
+  function currentLaunchFacts(): LaunchFacts {
+    const scope = currentLaunchScope()
+    if (scope?.snapshot !== undefined) return scope.snapshot
+    const current = lastEventCtx.current
+    let live: LaunchFacts
+    try {
+      live = readLaunchFacts(current)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+      live = NO_LAUNCH_FACTS
+    }
+    // Outside any launch (a facts launch without a captured selection) no session's own details apply:
+    // only the process-wide model registry, never whichever session happens to be current.
+    if (scope === undefined) return { ...NO_LAUNCH_FACTS, modelRegistry: live.modelRegistry }
+    let currentSessionId: string | undefined
+    try {
+      currentSessionId = sessionIdFrom(current)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+    }
+    return factsForScope(scope, currentSessionId, live)
+  }
+
   function resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]> {
-    return resolveMemoryModelRegistry(lastEventCtx.current)
+    return currentLaunchFacts().modelRegistry
   }
 
   function resolveSessionModel(): ReflectionSessionModel | undefined {
-    return resolveMemorySessionModel(lastEventCtx.current)
+    return currentLaunchFacts().sessionModel
   }
 
   function resolveParentContextTokens(): number | undefined {
-    return resolveParentContextTokensFromCtx(lastEventCtx.current)
+    return currentLaunchFacts().parentContextTokens
   }
 
   function resolveParentSessionFile(): string | undefined {
-    return resolveParentSessionFileFromCtx(lastEventCtx.current)
+    return currentLaunchFacts().parentSessionFile
   }
 
   function resolveParentCacheReusable(): boolean {
-    return resolveParentCacheReusableFromCtx(lastEventCtx.current)
+    return currentLaunchFacts().parentCacheReusable
+  }
+
+  function snapshotLaunchFacts(eventCtx: unknown): LaunchFacts | undefined {
+    try {
+      return readLaunchFacts(eventCtx)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) {
+        options.logger?.warn("memory reflection could not read its session details at trigger time; the launch reads them later", { error: error instanceof Error ? error.message : String(error) })
+      }
+      return undefined
+    }
+  }
+
+  function ownSessionModel(identity: MemoryIdentityContext): ReflectionSessionModel | undefined {
+    const current = lastEventCtx.current
+    let sessionId: string | undefined
+    let model: ReflectionSessionModel | undefined
+    try {
+      sessionId = sessionIdFrom(current)
+      model = resolveMemorySessionModel(current)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+      return undefined
+    }
+    if (sessionId === undefined) return undefined
+    return resolveContext(sessionId)?.identity === identity.identity ? model : undefined
   }
 
   /** The engine's own answer for this session; detection is the fallback for hosts without it. */
   function resolveAgentDir(): string {
-    return resolveSessionAgentDir(lastEventCtx.current) ?? resolveAgentHome({ env: process.env })
+    return currentLaunchFacts().agentDir ?? resolveAgentHome({ env: process.env })
   }
 
   function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
@@ -109,7 +157,9 @@ export function createMemoryRuntimeWiring(
       cwd: options.cwd(),
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
       resolveModelRegistry,
-      resolveSessionModel,
+      // A facts launch handed no selection (unpark, reconcile, final delta) may use the current
+      // session's model only when that session belongs to this identity: never another agent's.
+      resolveSessionModel: () => ownSessionModel(identity),
       env: options.env,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
@@ -179,9 +229,13 @@ export function createMemoryRuntimeWiring(
       engine: {
         evaluate: async (conversationId, event) => {
           lastEventCtx.current = eventCtx
+          // Snapshot this session's facts while its ctx is live; a failed read only loses the snapshot
+          // (the launch then reads the current ctx), it never blocks the reservation.
+          const facts = snapshotLaunchFacts(eventCtx)
           const result = await runtime.store.evaluate(conversationId, event)
           if (result?.status === "active") {
-            void runtime.launch(result.run)
+            const run = result.run
+            void withLaunchScope({ conversationIds: run.request.conversationIds, ...(facts === undefined ? {} : { snapshot: facts }) }, () => runtime.launch(run))
             await hooks.onLaunch?.(identity.identity, result.run)
           }
           return result
@@ -216,6 +270,9 @@ export function createMemoryRuntimeWiring(
     journalWiringFor,
     factsWiringFor,
     runtimeFor,
+    async settled(): Promise<void> {
+      await Promise.all([...runtimes.values()].map((runtime) => runtime.settled()))
+    },
     triggerSessionFor,
     dreamSessionById,
     dreamSessionFor,

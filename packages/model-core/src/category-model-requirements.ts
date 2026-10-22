@@ -108,6 +108,8 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.6-pro", variant: "max" },
       { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
+      // GLM 5.3 sits ahead of the GPT rungs so a Claude + Z.ai user does not fall from Sonnet to GPT (#10306).
+      { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "high" },
       // GPT-6.1 Sol is the current GPT default, served only by the OpenAI lanes; GPT-5.6 Sol stays
       // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane (#9844).
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },

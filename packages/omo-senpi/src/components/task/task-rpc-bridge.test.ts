@@ -127,6 +127,7 @@ describe("event-bridge native task telemetry and controls", () => {
 
     expect([...rpcHandlers.keys()].sort()).toEqual([
       "omo.task.cancel",
+      "omo.task.list",
       "omo.task.output",
       "omo.task.send",
     ])

@@ -4,6 +4,7 @@ import {
   MemoryBlockCache,
   markMemoryBlock,
   replaceMemoryBlock,
+  type AgreementItem,
   type ExternalProjectionLimits,
 } from "@oh-my-opencode/memory-core"
 
@@ -23,6 +24,7 @@ export const MEMORY_NOTICE_CUSTOM_TYPE = "omo-memory:notice"
 export const MEMORY_NUDGE_METADATA_TOKEN = "user turns since your last memory save"
 export const MEMORY_PRESSURE_METADATA_TOKEN = "memory pressure:"
 export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
+export const MEMORY_AGREEMENT_METADATA_TOKEN = "Agreement NEEDS-HUMAN"
 
 export interface MemoryPromptSession {
   readonly id: string
@@ -51,11 +53,16 @@ export interface MemoryPromptInjectionOptions {
     sessionId: string,
     identity: string,
   ) => Promise<{ readonly sha: string } | undefined>
+  readonly resolveAgreementsNotice?: (
+    repo: GitMemoryRepo,
+    sessionId: string,
+    identity: string,
+  ) => Promise<readonly AgreementItem[] | undefined>
   /**
    * A notice input (the nudge count or the soul notice) failed or timed out. The turn goes on without
    * that notice; the failure is reported here, never thrown into the extension (#9667).
    */
-  readonly onNoticeInputFailed?: (input: "nudge" | "soul", sessionId: string, error: unknown) => void
+  readonly onNoticeInputFailed?: (input: "nudge" | "soul" | "agreements", sessionId: string, error: unknown) => void
 }
 
 /**
@@ -75,7 +82,7 @@ export function createMemoryPromptHandler(
   // 45 git spawns between Enter and the provider request in a 2.7k-commit identity.
   const pressureEstimates = new Map<string, number>()
   async function noticeInput<T>(
-    input: "nudge" | "soul",
+    input: "nudge" | "soul" | "agreements",
     sessionId: string,
     read: () => Promise<T | undefined> | undefined,
   ): Promise<T | undefined> {
@@ -105,6 +112,9 @@ export function createMemoryPromptHandler(
     const soulNotice = preview
       ? undefined
       : await noticeInput("soul", session.id, () => options.resolveSoulNotice?.(repo, session.id, context.identity))
+    const flaggedAgreements = preview
+      ? undefined
+      : await noticeInput("agreements", session.id, () => options.resolveAgreementsNotice?.(repo, session.id, context.identity))
     const pinInput = { repo, sessionId: session.id, branch: session.branch, head: await repo.head() }
     const turn: ProjectionTurn = preview
       ? { revision: await pins.peek(pinInput) }
@@ -122,7 +132,7 @@ export function createMemoryPromptHandler(
       options.resolveCompileWarnTokens?.(context.identity),
       pressureEstimates,
     )
-    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice, turn)
+    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice, turn, flaggedAgreements ?? [])
     const nextPrompt = replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock))
     if (notice === undefined) return { systemPrompt: nextPrompt }
     return {
@@ -163,6 +173,7 @@ function renderMemoryNotice(
   nudgeTurns: number | undefined,
   soulNotice: { readonly sha: string } | undefined,
   turn: ProjectionTurn,
+  flaggedAgreements: readonly AgreementItem[],
 ): string | undefined {
   const lines = [
     ...(compactedMessageCount === 0
@@ -174,7 +185,9 @@ function renderMemoryNotice(
     ...(soulNotice === undefined
       ? []
       : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${soulNotice.sha.slice(0, 7)} since your last run`]),
-    ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision)]),
+    ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision, turn.sources)]),
+    ...flaggedAgreements.map((item) =>
+      `- ${MEMORY_AGREEMENT_METADATA_TOKEN} (broken x${item.n}): "${item.text}" Do not break it again this session; if the task needs it, stop and ask your person.`),
   ]
   if (lines.length === 0) return undefined
   return ["<memory_notice>", ...lines, "</memory_notice>"].join("\n")

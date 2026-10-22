@@ -4,6 +4,7 @@
 // owns (bound identities, settings, prompt-cache bust, reflection sink).
 
 import type { SenpiExtensionAPI } from "../../../extension/types"
+import { registerAgreementsCommand } from "./agreements"
 import { registerDoctorCommand } from "./doctor"
 import { registerDreamCommand } from "./dream"
 import { registerFactsCommand } from "./facts"
@@ -33,6 +34,7 @@ export const MEMORY_COMMAND_NAMES = [
   "search",
   "people",
   "facts",
+  "agreements",
 ] as const
 
 export type MemoryCommandName = (typeof MEMORY_COMMAND_NAMES)[number]
@@ -53,6 +55,7 @@ export function registerMemoryCommands(pi: SenpiExtensionAPI, deps: MemoryComman
   // here would consume a config resolution the enablement latch depends on counting.
   registerPeopleCommand(pi, deps)
   registerFactsCommand(pi, deps)
+  registerAgreementsCommand(pi, deps)
 }
 
 export type {

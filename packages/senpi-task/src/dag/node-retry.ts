@@ -1,15 +1,11 @@
 // Retry and run re-entry: returning settled nodes to a fresh attempt and handing the run to a NEW
 // scheduler instance.
 import { dagNodeRetriedEvent, dagNodeTransitionedEvent, dagRunResumedEvent } from "./events"
+import type { DagJournal } from "./journal"
+import type { DagRunEventPayload } from "./types"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagManager, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
-import {
-  controlErrorMessage,
-  controlJournal,
-  DagNodeControlError,
-  ownedRecord,
-  readRecord,
-} from "./node-control-context"
+import { controlJournal, DagNodeControlError, ownedRecord, readRecord } from "./node-control-context"
 import { createDagScheduler, type DagScheduler, type DagSchedulerOptions } from "./scheduler"
 import { TERMINAL_DAG_RUN_STATUSES, type DagNode, type DagNodeId, type DagNodeState, type DagRunId } from "./types"
 
@@ -104,34 +100,44 @@ export function retryDagNodes(
   assertRetryable(record, runId, targets)
 
   // A prompt override is a definition amendment: it is recorded even when the cap then refuses the retry.
-  const current = retryOptions?.prompt === undefined
-    ? record
-    : amendRetryPrompt(options, record, targets[0] as DagNodeId, retryOptions.prompt)
+  let current = record
+  if (retryOptions?.prompt !== undefined) {
+    for (const target of targets) current = amendRetryPrompt(options, record, target, retryOptions.prompt)
+  }
   // The node mutations and the resume share one cap check, so a refused retry leaves every node as it was.
   const resumed = withRevivalCapacity(options, current, () => {
     const journal = controlJournal(options, current)
-    for (const nodeId of targets) {
-      const node = nodeById(journal.snapshot(), nodeId)
-      // The DISPLAY attempt belongs to task attachment; execAttempt is the execution-intent counter
-      // the owner fingerprint is keyed on, so a retried node claims a new owner identity.
-      journal.append(dagNodeRetriedEvent({
-        nodeId,
-        ...(node.taskId === undefined ? {} : { priorTaskId: node.taskId }),
-        execAttempt: (node.execAttempt ?? 0) + 1,
-        promptChanged: retryOptions?.prompt !== undefined,
-      }))
-    }
-    for (const node of skippedDependentsOf(journal.snapshot(), targets)) {
-      journal.append(dagNodeTransitionedEvent({
-        nodeId: node.id,
-        from: "skipped",
-        to: "blocked",
-        reason: { kind: "retried" },
-      }))
-    }
+    resetDagNodes(journal, targets, retryOptions?.prompt !== undefined)
     return resumeIfSettled(options, journal.snapshot())
   })
   return startReentry(options, resumed)
+}
+
+/** Shared reset for manual run re-entry and infrastructure retries inside the live scheduler. */
+export function resetDagNodes(
+  journal: DagJournal<DagRunRecordV1>,
+  targets: readonly DagNodeId[],
+  promptChanged = false,
+  automatic?: Extract<DagRunEventPayload, { readonly type: "dag.node.retried" }>["automatic"],
+): void {
+  for (const nodeId of targets) {
+    const node = nodeById(journal.snapshot(), nodeId)
+    journal.append(dagNodeRetriedEvent({
+      nodeId,
+      ...(node.taskId === undefined ? {} : { priorTaskId: node.taskId }),
+      execAttempt: (node.execAttempt ?? 0) + 1,
+      promptChanged,
+      ...(automatic === undefined ? {} : { automatic }),
+    }))
+  }
+  for (const node of skippedDependentsOf(journal.snapshot(), targets)) {
+    journal.append(dagNodeTransitionedEvent({
+      nodeId: node.id,
+      from: "skipped",
+      to: "blocked",
+      reason: { kind: "retried" },
+    }))
+  }
 }
 
 function defaultRetryTargets(record: DagRunRecordV1): DagNodeId[] {
@@ -203,7 +209,8 @@ function blockingAncestors(record: DagRunRecordV1, node: DagNode): readonly DagN
   const seen = new Set<DagNodeId>([node.id])
   const queue = [...node.dependsOn]
   while (queue.length > 0) {
-    const id = queue.shift() as DagNodeId
+    const id = queue.shift()
+    if (id === undefined) break
     if (seen.has(id)) continue
     seen.add(id)
     const ancestor = record.nodes.find((entry) => entry.id === id)
@@ -261,9 +268,9 @@ const identityMaterializer: DagMaterializeSkills = ({ definition }) => ({
   nodes: definition.nodes.map((node) => ({ nodeId: node.id, effectivePrompt: node.prompt })),
 })
 
-function definitionNode(node: DagNodeInput, prompt: string): DagNodeInput {
-  const { effectivePrompt: _effectivePrompt, ...input } = node as DagNodeInput & { readonly effectivePrompt?: string }
-  return { ...input, prompt } as DagNodeInput
+function definitionNode(node: DagNodeInput & { readonly effectivePrompt?: string }, prompt: string): DagNodeInput {
+  const { effectivePrompt: _effectivePrompt, ...input } = node
+  return { ...input, prompt }
 }
 
 function nodeById(record: DagRunRecordV1, nodeId: DagNodeId): DagNode {

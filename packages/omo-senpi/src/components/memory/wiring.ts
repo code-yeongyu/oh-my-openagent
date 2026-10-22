@@ -1,4 +1,4 @@
-import { MemoryBlockCache, RecallCorpusCache } from "@oh-my-opencode/memory-core"
+import { MemoryBlockCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
@@ -11,9 +11,10 @@ import { createShutdownDrain, type ShutdownDrainInput, type ShutdownEvaluator } 
 import { type SkillsUsageTracker } from "./skills-usage"
 import { type MemoryUsageTracker } from "./memory-usage"
 import { createMemoryNoticeWiring } from "./memory-notice-wiring"
+import { createConfiguredFactsApplier, publishSessionFactsApplier } from "./facts-apply-rpc"
 import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
 import { createPressureDreamAdmission } from "./pressure-dream-admission"
-import { createMemoryRecallWiring } from "./recall-wiring"
+import { createMemoryRecallWiring, createSharedRecallCorpusCache } from "./recall-wiring"
 import { branchEntryCount, sessionIdFrom } from "./wiring-context"
 import { createMemoryUserActivity } from "./user-activity"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
@@ -72,7 +73,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // collection. The composition is built in registerStatic, before any hook can fire.
   const deliveryRef: { current?: KibitzerComposition["delivery"] } = {}
   // One corpus cache for both: the sidecar's read-only memory tool reads the corpus the candidates came from.
-  const corpusCache = new RecallCorpusCache()
+  const corpusCache = (options.createCorpusCache ?? createSharedRecallCorpusCache)(options.logger)
 
   const recallWiring = createMemoryRecallWiring({
     resolveContext,
@@ -83,7 +84,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   const kibitzerRef: { current?: KibitzerComposition } = {}
-  const maintenance = createMemoryMaintenance({
+  const maintenance = (options.createMaintenance ?? createMemoryMaintenance)({
     isLiveSession: (sessionId) => options.sessions.has(sessionId),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
@@ -142,7 +143,9 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   return {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       userActivity.register(pi)
-      reflectionLive.registerRpc(pi, resolveContext)
+      const applyFacts = createConfiguredFactsApplier(options, (sessionId) => resolveContext(sessionId ?? activeSession.current ?? ""))
+      reflectionLive.registerRpc(pi, resolveContext, applyFacts)
+      publishSessionFactsApplier(applyFacts)
       const kibitzer = createKibitzerComposition({
         env: options.env,
         cwd: options.cwd,
@@ -237,6 +240,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
       // one first-position flush captures everything and the drain must never re-run it.
       const journalFlushed = await shutdownDrain.flushJournal(input)
+      // dispose() stops a running pass but does not wait for it, and the bind/settle status refreshes
+      // run git in the identity dir unawaited. Work still running there holds its files open past
+      // shutdown, which Windows reports as EBUSY/EFAULT on the next remove (#10154).
+      await shutdownDrain.raceDetached(input, "maintenance-settle", () => maintenance.settled())
+      await shutdownDrain.raceDetached(input, "status-settle", () => reflectionLive.settled())
+      // A recall ranking saves the repository's terms into its `.git` after the prompt; let that write finish.
+      await shutdownDrain.raceDetached(input, "recall-store-settle", () => corpusCache.settled())
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
       // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
       // drain deadline: both are started and raced against it, and whichever loses keeps running
@@ -253,6 +263,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         }
       }
       await shutdownDrain.run(input, { journalFlushed })
+      // A reflection launch runs its child under the identity dir too. It is awaited last, on what
+      // budget is left: a run that outlives it keeps going detached (by design), and it never
+      // displaces the drain's own steps (#10154).
+      await shutdownDrain.raceDetached(input, "reflection-launch-settle", () => runtimeWiring.settled())
       pressureDreamAdmission.reset(input.sessionId)
       userActivity.reset(input.sessionId)
     },

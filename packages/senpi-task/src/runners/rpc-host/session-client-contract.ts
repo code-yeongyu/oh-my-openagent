@@ -42,6 +42,19 @@ export interface HostSessionClosed {
   readonly reason: string | undefined
 }
 
+/**
+ * The host swapped the session under its live routing handle (`new_session`, `switch_session`,
+ * `fork`): the handle stays, the durable id and the transcript move. The child follows both.
+ */
+export interface HostSessionReplaced {
+  /** The routing handle the host kept live across the swap. */
+  readonly sessionId: string
+  /** The session's new durable id. */
+  readonly durableSessionId: string
+  /** The session's new transcript path - the child's identity from now on. */
+  readonly sessionFile: string
+}
+
 export interface HostSessionClientPorts {
   readonly createClient?: HostRpcClientFactory
   readonly probeProtocolInfo?: HostProtocolProbe

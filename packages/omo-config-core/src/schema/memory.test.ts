@@ -29,6 +29,7 @@ const FULL_DEFAULTS: OmoMemorySettings = {
     auto_select_max_chars: 150000,
   },
   people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+  agreements: { enabled: true, needs_human_threshold: 3, max_items: 64 },
   soul: { edit_notice: true },
   write_notice: { enabled: true },
   sync: { enabled: true },
@@ -84,6 +85,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         auto_select_max_chars: 100000,
       },
       people: { enabled: false, max_entries: 20, max_entry_chars: 100 },
+      agreements: { enabled: false, needs_human_threshold: 5, max_items: 32 },
       soul: { edit_notice: false },
       write_notice: { enabled: false },
       sync: { remote: "file:///tmp/memory-mirror.git", enabled: true },
@@ -104,6 +106,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         "backend-lead": {
           enabled: true,
           reflection: { trigger: { step_count: 10 }, category: "quick" },
+          agreements: { needs_human_threshold: 2 },
         },
       },
     }

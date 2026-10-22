@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import { consumeSoulNoticeDelta, type MemoryBlockCache, type ReservedRun } from "@oh-my-opencode/memory-core"
+import type { MemoryBlockCache, ReservedRun } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
@@ -33,6 +33,7 @@ import { registerMemoryWriteListener } from "./wiring-memory-write"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { MemoryIdentityContext } from "./context"
 import { createMemoryPromptHandler as createPromptHandler } from "./prompt"
+import { createMemoryNoticeInputs } from "./wiring-notice-inputs"
 import { createProjectionPins, PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
 import { projectionLimits } from "./projection-limits"
 import { resolveMemoryModelRegistry } from "./model-registry-resolver"
@@ -84,8 +85,13 @@ export function registerMemoryStatic(input: {
     nudgeWiring.register(pi)
     noticeWiring.register(pi)
   }
-  const projectionPins = createProjectionPins()
+  const projectionPins = createProjectionPins(options.deviceName === undefined ? {} : { deviceName: options.deviceName })
   const entryApi = hasMemoryCapabilities(pi) ? pi : undefined
+  const noticeInputs = createMemoryNoticeInputs({
+    resolveContext,
+    loadSettings: () => loadCommandSettings().settings,
+    ...(entryApi === undefined ? {} : { appendEntry: (customType, data) => entryApi.appendEntry(customType, data) }),
+  })
   const promptHandler = createPromptHandler({
     resolveContext,
     cache: promptCache,
@@ -102,14 +108,7 @@ export function registerMemoryStatic(input: {
         error: error instanceof Error ? error.message : String(error),
       })
     },
-    resolveSoulNotice: async (repo, sessionId, identity) => {
-      const context = resolveContext(sessionId)
-      if (context === undefined || context.identity !== identity) return undefined
-      return consumeSoulNoticeDelta(repo, {
-        noticesDir: context.identityPaths.notices,
-        locksDir: context.identityPaths.locks,
-      })
-    },
+    ...noticeInputs,
   })
   pi.on("before_agent_start", (payload, eventCtx) => {
     if (!isPreview(payload)) lastEventCtx.current = eventCtx
