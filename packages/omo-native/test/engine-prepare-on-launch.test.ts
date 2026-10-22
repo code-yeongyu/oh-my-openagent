@@ -22,6 +22,7 @@ function createEngine(uaVersion: string): string {
   const rpcPath = join(root, RPC_MODE)
   mkdirSync(dirname(rpcPath), { recursive: true })
   writeFileSync(rpcPath, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
+  writeFileSync(join(root, "dist", "main.js"), "const selection = created.session.thinkingSelection;\ncreated.session.setThinkingLevel(selection?.requested ?? created.session.thinkingLevel);\n")
   const messages = join(root, PI_AI_MESSAGES)
   mkdirSync(dirname(messages), { recursive: true })
   writeFileSync(messages, uaSource(uaVersion))
@@ -46,6 +47,9 @@ describe("launcher engine preparation (#8713)", () => {
       prepareOnce(root)
       expect(readUa(root)).toBe(uaSource("2.1.280"))
       expect(readFileSync(join(root, RPC_MODE), "utf8")).toContain("invalid_stream_event")
+      expect(readFileSync(join(root, "dist", "main.js"), "utf8")).toBe(
+        "const selection = created.session.thinkingSelection;\ncreated.session.setSessionThinkingLevel(selection?.requested ?? created.session.thinkingLevel);\n",
+      )
       expect(readStamp(root)).toBe(OMO_VERSION)
     })
   })

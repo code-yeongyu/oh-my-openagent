@@ -140,6 +140,10 @@ export function stageInstalledPackage(fixture: Fixture): void {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"))
   writeFileSync(manifestPath, JSON.stringify({ ...manifest, scripts: { postinstall: shipped.scripts.postinstall } }))
   const senpiRoot = join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi")
+  writeFileSync(join(senpiRoot, "dist", "main.js"), `
+const selection = created.session.thinkingSelection
+created.session.setThinkingLevel(selection?.requested ?? created.session.thinkingLevel)
+`)
   const rpcMode = join(senpiRoot, "dist", "modes", "rpc", "rpc-mode.js")
   mkdirSync(dirname(rpcMode), { recursive: true })
   writeFileSync(rpcMode, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))

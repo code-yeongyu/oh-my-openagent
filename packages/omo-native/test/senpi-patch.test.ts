@@ -14,7 +14,7 @@ const FLOOR = "2.1.280"
 
 const roots: string[] = []
 
-type Fixture = { root: string; anthropicMessages: string }
+type Fixture = { root: string; anthropicMessages: string; main: string }
 
 function anthropicMessagesSource(claudeCodeVersion: string): string {
   return [
@@ -30,6 +30,18 @@ function anthropicMessagesSource(claudeCodeVersion: string): string {
     "export { claudeCodeTools }",
     "",
   ].join("\n")
+}
+
+const CLI_THINKING_PERSISTENT = "created.session.setThinkingLevel(created.session.thinkingLevel)"
+const CLI_THINKING_SESSION = "created.session.setSessionThinkingLevel(created.session.thinkingLevel)"
+const CLI_THINKING_REQUESTED = "created.session.setThinkingLevel(selection?.requested ?? created.session.thinkingLevel)"
+
+function cliThinkingMainSource(apply: string): string {
+  return `if (created.session.model && cliThinkingOverride) {
+  const selection = created.session.thinkingSelection;
+  ${apply};
+}
+`
 }
 
 // Where senpi's pi-ai lives: inside senpi (bundled publish), beside senpi (hoisted npm install), or
@@ -53,18 +65,20 @@ function createFixture(claudeCodeVersion: string, layout: Layout = "bundled"): F
   const anthropicMessages = join(layout === "bundled" ? root : installRoot, "node_modules", PI_AI_ANTHROPIC_MESSAGES)
   mkdirSync(dirname(anthropicMessages), { recursive: true })
   writeFileSync(anthropicMessages, anthropicMessagesSource(claudeCodeVersion))
-  if (layout !== "bun-store") return { root, anthropicMessages }
+  const main = join(root, "dist", "main.js")
+  writeFileSync(main, cliThinkingMainSource(CLI_THINKING_SESSION))
+  if (layout !== "bun-store") return { root, anthropicMessages, main }
   const linked = join(scratch, "node_modules", "@code-yeongyu", "senpi")
   mkdirSync(dirname(linked), { recursive: true })
   symlinkSync(root, linked, "junction")
-  return { root: linked, anthropicMessages }
+  return { root: linked, anthropicMessages, main }
 }
 
 function bundledChunkSources(claudeCodeVersion: string): Record<string, string> {
   return {
     "chunks/anthropic-messages-TEST.js": `function cacheControl(){return{type:"ephemeral"}}var claudeCodeVersion="${claudeCodeVersion}",claudeCodeTools=["Read","Write"];export{claudeCodeTools};\n`,
     "chunks/session-worker.js": `init_prompt_cache_ttl();claudeCodeVersion="${claudeCodeVersion}",claudeCodeTools=["Read","Write"]}});\n`,
-    "cli.js": 'import("./chunks/session-worker.js");\n',
+    "cli.js": `import("./chunks/session-worker.js");\n${cliThinkingMainSource(CLI_THINKING_SESSION)}`,
   }
 }
 
@@ -218,4 +232,53 @@ describe("senpi-patch claudeCodeVersion floor in the engine bundle", () => {
       })
     })
   })
+})
+
+describe("senpi-patch CLI thinking session-only apply", () => {
+  test.each([CLI_THINKING_PERSISTENT, CLI_THINKING_REQUESTED])(
+    "#given a published startup apply %s #then postinstall preserves its argument with session-only persistence",
+    (application) => {
+      const fixture = createFixture(FLOOR)
+      writeFileSync(fixture.main, cliThinkingMainSource(application))
+      const result = runPatch(fixture.root)
+      expect(result.stderr).toBe("")
+      expect(result.status).toBe(0)
+      expect(readFileSync(fixture.main, "utf8")).toBe(
+        cliThinkingMainSource(application.replace(".setThinkingLevel(", ".setSessionThinkingLevel(")),
+      )
+      const before = readFileSync(fixture.main, "utf8")
+      expect(runPatch(fixture.root).status).toBe(0)
+      expect(readFileSync(fixture.main, "utf8")).toBe(before)
+    },
+  )
+
+  test("#given bundled startup and RPC setters #then only startup becomes session-only", () => {
+    const fixture = createFixture(FLOOR)
+    const files = bundledChunkSources(FLOOR)
+    files["cli.js"] = "import './chunks/startup.js';\n"
+    files["chunks/startup.js"] = `let selection=created.session.thinkingSelection;created.session.setThinkingLevel(selection?.requested??created.session.thinkingLevel);\n`
+    files["chunks/session-worker.js"] += "ctx.session.setThinkingLevel(command.level,{source:'rpc'});\n"
+    writeEngineBundle(fixture.root, files)
+    expect(runPatch(fixture.root).status).toBe(0)
+    expect(readEngineBundle(fixture.root, files)).toEqual({
+      ...files,
+      "chunks/startup.js": files["chunks/startup.js"].replace(".setThinkingLevel(", ".setSessionThinkingLevel("),
+    })
+  })
+
+  test.each(["dist/main.js", "dist/bundle"])(
+    "#given unsupported startup in %s #then postinstall fails with the target named",
+    (target) => {
+      const fixture = createFixture(FLOOR)
+      if (target === "dist/main.js") writeFileSync(fixture.main, "export {}\n")
+      else {
+        const files = bundledChunkSources(FLOOR)
+        files["cli.js"] = "export {}\n"
+        writeEngineBundle(fixture.root, files)
+      }
+      const result = runPatch(fixture.root)
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain(`omo-ai: unsupported Senpi ${target}: no CLI thinking application`)
+    },
+  )
 })

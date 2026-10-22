@@ -148,6 +148,7 @@ describe("compile-safe engine preparation", () => {
           join(root, "dist", "modes", "rpc", "rpc-mode.js"),
           readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"),
         )
+        write(join(root, "dist", "main.js"), "created.session.setSessionThinkingLevel(created.session.thinkingLevel);\n")
         const result = spawnSync("node", [PATCH_SCRIPT], {
           encoding: "utf8",
           env: { ...process.env, OMO_SENPI_PATCH_ROOT: root },
