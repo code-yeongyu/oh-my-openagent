@@ -25,16 +25,19 @@ function evidence(name: string, value: unknown): void {
 afterEach(cleanupProjects)
 
 describe("typed task handles", () => {
-  test("#given a real restored session #when the task tool returns #then its handle matches the actual record", async () => {
-    // given / when
-    const receipt = await realSessionHandle()
-    // then
-    matched(receipt.response.details, receipt.record)
-    expect(receipt.sessionText).toBe("TYPED_HANDLE_SESSION_SENTINEL")
-    expect(receipt.transcriptMessages).toHaveLength(1)
-    for (const transcript of receipt.transcriptMessages) expect(transcript.after).toBe(transcript.before)
-    evidence("real-session", receipt)
-  })
+  for (const delayed of [false, true]) {
+    test(`#given a real session with ${delayed ? "delayed" : "immediate"} restore #when the task tool returns #then its handle matches the actual record`, async () => {
+      // given / when
+      const receipt = await realSessionHandle(delayed)
+      // then
+      if (delayed) expect(receipt.reportedBeforeRestore).toBe(true)
+      matched(receipt.response.details, receipt.record)
+      expect(receipt.sessionText).toBe("TYPED_HANDLE_SESSION_SENTINEL")
+      expect(receipt.transcriptMessages).toHaveLength(1)
+      for (const transcript of receipt.transcriptMessages) expect(transcript.after).toBe(transcript.before)
+      evidence(delayed ? "real-session-delayed" : "real-session", receipt)
+    })
+  }
 
   test("#given foreground output containing unrelated ids #when completed #then the body and record identity are preserved", async () => {
     // given

@@ -18,6 +18,7 @@ const platformSensitiveExactPaths = new Set([
   "script/bun-panic-retry.ts",
   "script/root-test-serial-quarantine.ts",
   "packages/openclaw-core/src/reply-listener-process.ts",
+  "packages/team-core/src/team-state-store/locks.ts",
 ])
 
 function parseArguments(argv) {

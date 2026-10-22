@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **`ulw-research` shows its report inline and checks a visual reproduction against the source ([#10812](https://github.com/code-yeongyu/oh-my-openagent/pull/10812)).** When the host can show an HTML page in the thread (`show_html_page`, `html_render`), the run ends with the report there, before the file paths, on every tier and even when the research was shortened; a built app or 3D scene shown inline no longer stands in for it. When the ask is to recreate something visual, such as a clip rebuilt in 3D, the run puts real frames of the source next to its own output at the same moments, writes down what differs, fixes the biggest gaps, and shows the side-by-side pairs in the report.
 
+**Team state writes retry a bounded number of temporary Windows rename conflicts and retain the previous file if the rename cannot complete.** ([#7958](https://github.com/code-yeongyu/oh-my-openagent/pull/7958))
+
 ## [5.1.40] - 2026-10-20
 
 **Onboarding saves only the facts you keep, and the TUI and the desktop share one completion flag.** The facts you accept are written through memory's own write path, and finishing onboarding in either the TUI or the desktop marks it done for both. ([#10506](https://github.com/code-yeongyu/oh-my-openagent/pull/10506))
