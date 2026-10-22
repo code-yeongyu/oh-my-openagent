@@ -66,7 +66,7 @@ export async function runSpawn(deps: TaskToolDeps, input: RunSpawnInput): Promis
   }
   const policy =
     selection.kind === "subagent_type"
-      ? evaluateSpawnPolicy(deps, selection.subagentType, params.prompt, ctx.sessionManager.getSessionId())
+      ? evaluateSpawnPolicy(deps, selection.subagentType, params.prompt, ctx.sessionManager.getSessionId(), ctx.cwd)
       : undefined
   if (policy?.kind === "deny") {
     return result(policy.message, { task_id: "", status: "denied", mode: "spawn", reason: policy.message })
