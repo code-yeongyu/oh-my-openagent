@@ -125,7 +125,15 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // Reduced for #9915: the PostHog SDK now lives in a lazy sidecar.
 // Canonical linux/amd64, Bun 1.4.3 after merging dev: 1,553,891 -> 1,396,636 bytes (-157,255).
 // 1,424,569 = ceil(1,396,636 * 1.02), locking in the saving with 2% headroom.
-const BUDGET_BYTES = 1_424_569
+// Raised 1,424,569 -> 1,450,000 in a standalone measured budget PR for the serialized memory-sync bundle batch
+// (#10824, #10785, #10763, #10627, #10630, #10772, #10047, #10694, #10675): memory-sync receive path and
+// device keys, device-session binding, claim-receipt entry glue, doctor --models / exclude_models, i18n.
+// Committed dev measures 1,423,122 bytes; the batch integration head measures 1,444,459 (+21,337) after the
+// canonical regen (linux container, node 24 + bun 1.4.3). Cold start is unchanged: importing the entry bundle
+// takes 116.37 ms on dev vs 114.65 ms on the batch (min of 11, interleaved, same host).
+// 1,450,000 is the measured need plus a 5,541-byte margin. #10860 wins the bytes back by lazy-loading what
+// startup does not need, and lowers this ceiling to 1,424,569 again.
+const BUDGET_BYTES = 1_450_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

@@ -235,17 +235,24 @@ describe("Senpi compatibility test script", () => {
 
     // #when
     const senpiJob = sliceWorkflowSection(workflow, "  senpi-compatibility:", "  lazycodex-published-smoke:")
+    const posixScript = readFileSync(new URL("../.github/scripts/ci-senpi-posix.sh", import.meta.url), "utf8")
     const needsReferences = workflow.match(/needs: \[[^\]]*senpi-compatibility[^\]]*\]/g) ?? []
 
     // #then
-    expect(senpiJob).toContain("os: [ubuntu-latest, macos-latest, windows-latest]")
+    expect(senpiJob).toContain("os: [ubuntu-latest, windows-latest]")
+    expect(senpiJob).toContain("bash .github/scripts/ci-senpi-posix.sh")
     expect(senpiJob).toContain('node-version: "24"')
     expect(senpiJob).toContain('bun-version: "1.4.3"')
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
     expect(senpiJob).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
-    expect(senpiJob).toContain("bun test --timeout 20000 packages/omo-senpi")
+    expect(posixScript).toContain("bun run build:senpi-plugin")
+    expect(posixScript).toContain("npm pack --pack-destination")
+    expect(posixScript).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
+    expect(posixScript).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(posixScript).toContain("bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs")
+    expect(posixScript).toContain("bun test --timeout 20000 packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")
     expect(needsReferences.length, "senpi-compatibility must be included in both downstream needs lists").toBeGreaterThanOrEqual(2)
   })
