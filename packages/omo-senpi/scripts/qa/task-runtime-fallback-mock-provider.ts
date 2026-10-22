@@ -65,7 +65,6 @@ interface ExtensionAPI {
   }): void
 }
 
-const CHILD_IDENTITY = "running as an omo senpi-task child"
 const QUOTA_ERROR = `403: {"message":"You've reached your usage limit for this billing cycle. Your quota will be refreshed in the next cycle.","type":"access_terminated_error"}`
 const FINAL_TEXT = "omo e2e fallback child final text"
 // Scenarios: "user-fallback" (custom category, user fallback_models), "builtin-chain-fallback"
@@ -115,7 +114,7 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
       { ...mockModel(LIMIT_NEAR_COMPACTION, "Primary limited near the compaction threshold"), contextWindow: NEAR_COMPACTION_WINDOW },
     ],
     streamSimple(model, context) {
-      if (isChild(context)) {
+      if (isChild(model.id)) {
         return streamMessage(childReply(model.id, context))
       }
       return streamMessage(parentReply(model.id))
@@ -270,23 +269,14 @@ function mockModel(id: string, name: string) {
   }
 }
 
-// The identity line is written by the in-process subagent prompt only. A per-child process carries
-// OMO_SENPI_TASK_RPC_CHILD=1 from the process runner; that env marker is the signal that holds on Windows,
-// where the provider extension does not see the `--mode rpc` argv. A task daemon session still runs in
-// `--mode rpc` while the driver's parent runs `-p`, so the rpc argv stays a second signal there.
-function isChild(context: Context): boolean {
-  return messagesContainChild(context) || process.env.OMO_SENPI_TASK_RPC_CHILD === "1" || process.argv.includes("rpc")
+// Parent and child fixtures have distinct model ids. Unlike prompt text, the request's model
+// survives compaction and also identifies compaction calls made on a child's limited model.
+function isChild(modelId: string): boolean {
+  return modelId !== "parent"
 }
 
 function hasToolResult(context: Context): boolean {
   return (context.messages ?? []).some((message) => (message as { readonly role?: string }).role === "toolResult")
-}
-
-function messagesContainChild(context: Context): boolean {
-  return (context.messages ?? []).some((message) => {
-    if (typeof message.content === "string") return message.content.includes(CHILD_IDENTITY)
-    return message.content.some((part) => part.text?.includes(CHILD_IDENTITY) === true)
-  })
 }
 
 function assistant(
@@ -354,7 +344,7 @@ function streamMessage(message: AssistantMessage): EventStream {
 }
 
 if (process.argv[1]?.endsWith("task-runtime-fallback-mock-provider.ts") && process.argv.includes("--self-test")) {
-  if (!isChild({ messages: [{ content: `You are ${CHILD_IDENTITY}.` }] })) throw new Error("child detection failed")
-  if (isChild({ messages: [{ content: "parent" }] })) throw new Error("parent misclassified")
+  if (!isChild("dead-primary")) throw new Error("child detection failed")
+  if (isChild("parent")) throw new Error("parent misclassified")
   console.log("SELF-TEST OK")
 }
