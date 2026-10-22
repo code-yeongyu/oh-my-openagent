@@ -113,7 +113,9 @@ export interface BackgroundTask {
   resumeAnchor?: {
     anchorMessageCount: number
     anchorMessageID?: string
+    capturedMessageIDs?: readonly string[]
   }
+  resumeAnchorPending?: object
 }
 
 export interface BackgroundTaskSnapshot {
