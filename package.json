@@ -214,7 +214,6 @@
     "@oh-my-opencode/utils": "workspace:*",
     "@opencode-ai/plugin": "1.18.31",
     "@opencode-ai/sdk": "1.18.31",
-    "@opencode/plugin": "2.0.32",
     "@opentui/core": "^0.5.11",
     "@opentui/keymap": "^0.5.11",
     "@types/js-yaml": "^4.0.9",
