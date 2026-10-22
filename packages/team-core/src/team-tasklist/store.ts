@@ -1,4 +1,5 @@
-import { mkdir, readFile } from "node:fs/promises"
+import type { Dirent } from "node:fs"
+import { mkdir, readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../config"
@@ -9,16 +10,48 @@ import type { Task } from "../types"
 
 const HIGH_WATERMARK_FILE = ".highwatermark"
 
-async function readHighWatermark(watermarkPath: string): Promise<number> {
+function errorCode(error: unknown): string | null {
+  if (!(error instanceof Error) || !("code" in error)) return null
+  return typeof error.code === "string" ? error.code : null
+}
+
+async function readTaskFileHighWatermark(tasksDirectory: string): Promise<number> {
+  let entries: Dirent[]
+  try {
+    entries = await readdir(tasksDirectory, { withFileTypes: true })
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    if (errorCode(error) === "ENOENT") return 0
+    throw error
+  }
+
+  return entries.reduce((maxTaskId, entry) => {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) return maxTaskId
+    const taskFileStem = path.basename(entry.name, ".json")
+    if (!/^\d+$/.test(taskFileStem)) return maxTaskId
+    const taskId = Number.parseInt(taskFileStem, 10)
+    return Number.isInteger(taskId) && taskId > maxTaskId ? taskId : maxTaskId
+  }, 0)
+}
+
+async function readHighWatermark(watermarkPath: string, tasksDirectory: string): Promise<number> {
+  let parsedWatermark: number | null = null
   try {
     const watermarkContent = (await readFile(watermarkPath, "utf8")).trim()
-    const parsedWatermark = Number.parseInt(watermarkContent, 10)
-    return Number.isInteger(parsedWatermark) && parsedWatermark >= 0 ? parsedWatermark : 0
+    const parsedValue = Number.parseInt(watermarkContent, 10)
+    if (Number.isInteger(parsedValue) && parsedValue >= 0) {
+      parsedWatermark = parsedValue
+    }
   } catch (error) {
-    error instanceof Error
-    await atomicWrite(watermarkPath, "0")
-    return 0
+    if (!(error instanceof Error)) throw error
   }
+
+  const recoveredWatermark = await readTaskFileHighWatermark(tasksDirectory)
+  const nextWatermark = Math.max(parsedWatermark ?? 0, recoveredWatermark)
+  if (parsedWatermark !== nextWatermark) {
+    await atomicWrite(watermarkPath, String(nextWatermark))
+  }
+  return nextWatermark
 }
 
 export async function createTask(
@@ -33,7 +66,7 @@ export async function createTask(
 
   return withLock(path.join(tasksDirectory, ".lock"), async () => {
     const watermarkPath = path.join(tasksDirectory, HIGH_WATERMARK_FILE)
-    const nextTaskId = (await readHighWatermark(watermarkPath)) + 1
+    const nextTaskId = (await readHighWatermark(watermarkPath, tasksDirectory)) + 1
     await atomicWrite(watermarkPath, String(nextTaskId))
 
     const now = Date.now()
