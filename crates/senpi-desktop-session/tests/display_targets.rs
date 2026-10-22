@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, RecordedPointer, RecordingSink, SinkOp};
 use senpi_desktop_core::backend::{Backend, DeliveryMode};
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
-use senpi_desktop_core::protocol_params::{CaptureParams, PointParams};
+use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, PointParams};
 use senpi_desktop_core::types::{CaptureResult, DesktopPoint, DesktopSessionOptions, Target};
 use senpi_desktop_safety::{FakeClock, StopPathId, Supervisor};
 use senpi_desktop_session::{
@@ -76,6 +76,15 @@ async fn per_call_display_frames_survive_other_target_captures_without_reopening
     assert_eq!((all.source_width, all.source_height), (4800, 1800));
     assert_eq!(selected.target, "display:2");
     assert_ne!(selected.frame_id, desktop.frame_id);
+    // Desktop and display input needs the human-confirmed control grant (#10788).
+    session
+        .submit(Op::ControlGrant(ControlGrantParams {
+            reason: "display input".to_owned(),
+            confirmation_id: "confirm-1".to_owned(),
+        }))
+        .wait()
+        .await
+        .unwrap();
     for (target, frame_id) in [
         ("desktop", desktop.frame_id),
         ("display:2", selected.frame_id.clone()),

@@ -8,6 +8,7 @@ import { parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
 import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
 import type { LockDomain } from "../locks"
+import { refuseAgreementsViolation } from "./agreements-write-guard"
 import {
   applyMemoryPatchHunk,
   MemoryPatchHunkError,
@@ -64,6 +65,8 @@ export async function runMemoryApplyPatch(
     return await lock("memory-write", async () => {
       await repo.cleanCheck()
       const paths = await applyOperations(repo.dir, parseMemoryPatch(params.input))
+      const violation = await refuseAgreementsViolation(repo, paths)
+      if (violation !== undefined) throw new MemoryApplyPatchError(violation)
       let result
       try {
         result = await repo.commitWrite(paths, memoryCommitMessage(reason, params.provenance), params.author)

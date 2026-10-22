@@ -136,6 +136,7 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "loro_wasm_bg.wasm"), "")
       await writeFile(join(pluginRoot, "extensions", "CaseFolding.txt"), "")
       await writeFile(join(pluginRoot, "extensions", "omo-thread-client.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-feedback.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")

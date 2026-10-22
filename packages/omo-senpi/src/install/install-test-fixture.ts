@@ -41,6 +41,7 @@ export async function createPluginFixture(options: { readonly runtime?: boolean 
   await writeFixtureFile(join(pluginPath, "extensions", "loro_wasm_bg.wasm"), "")
   await writeFixtureFile(join(pluginPath, "extensions", "CaseFolding.txt"), "")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-thread-client.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-feedback.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "thread-sdk", "sdk.js"), "export {}\n")

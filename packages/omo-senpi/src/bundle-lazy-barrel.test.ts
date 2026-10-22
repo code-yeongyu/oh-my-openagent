@@ -26,6 +26,7 @@ const BUNDLE_FILES = [
   "omo-telemetry-posthog.js",
   "omo-memory-sync.js",
   "omo-thread-client.js",
+  "omo-feedback.js",
 ] as const
 
 type LazyBarrel = {

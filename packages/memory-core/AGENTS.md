@@ -20,6 +20,7 @@ The public API is the barrel at `src/index.ts`.
 | `src/facts/` | Durable fact pipeline: queue + cursor watermarks, failure backoff/store, payload capping, person routing, recovery, mutation planning. |
 | `src/people/` | People-card grammar: parse/serialize, slug rules, reserved slugs, observations. |
 | `src/soul/` | Soul-file paths and identity-scoped soul-notice watermark consumption. |
+| `src/agreements/` | The working-agreement ledger at `system/agreements.md` (#10780): one line per agreement with `id`/`by`/`n`/`since`/`last`/`status` in a trailing comment, id = sha256 of the normalized text (first 10 hex). `mutate.ts` counts repeat corrections, flags `needs-human` at the threshold, and at the cap evicts only the oldest never-reaffirmed, unflagged agent item (reported as an `AgreementEvent`, named in the facts commit as `Omo-Agreement-Evicted`) or refuses the new one - it never merges distinct rules; `guard.ts` refuses automation edits to `by: human` items; `render.ts` builds the compiled `<agreements>` section; `notice-watermark.ts` announces each newly flagged item once per identity. |
 | `src/reflection/` | Trigger evaluation, run reservation, worktree execution, completion validation, merge outcomes, the orphan sweep that reclaims worktrees/branches no live run owns, and the park policy that stops automatic reflection after repeated failures (one half-open probe per interval). |
 | `src/compile/` | Compile committed memory revisions into marked system-prompt blocks and cache them by template hash. |
 | `src/search/` | Query parsing, transcript providers, and ranked memory/session search. |
@@ -66,6 +67,16 @@ The public API is the barrel at `src/index.ts`.
   lock; malformed JSON parses to empty, never blocks. Enqueue/consumed
   watermarks NEVER regress, and ordering follows canonical journal position /
   snapshot boundary — never lexical message-ID comparison.
+- **Agreements the person wrote are immutable to automation.** Only the
+  adapter's `/agreements` command (`commitMemoryWrite` with `writer:
+  "human-command"`) may create, reword, ack, or drop a `by: human` item. The
+  memory tools and `memory_apply_patch` refuse such edits
+  (`tools/agreements-write-guard.ts`), reflection/dream completion fails on
+  any change to `system/agreements.md`, a move or delete included (the check
+  diffs with `--no-renames`), and the facts lane only counts them. Automation
+  also may not remove a counted agent item (`n > 0`), so a count cannot be
+  reset by delete-and-re-add. With `agreements.enabled: false` the existing
+  ledger is still projected, so the person's own items stay visible.
 - **Behavioral patterns are NEVER stored in people cards.** Card lines are
   limited to the `IDENTITY` / `ATTRIBUTE` / `RELATIONSHIP` / `INSTRUCTION`
   prefixes with bounded metadata.

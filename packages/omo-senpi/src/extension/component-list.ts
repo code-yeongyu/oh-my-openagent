@@ -8,6 +8,7 @@ import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
+import { createFeedbackComponent } from "../components/feedback"
 import { createGatewayComponent } from "../components/gateway"
 import { createGitMasterAttributionComponent } from "../components/git-master"
 import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
@@ -60,6 +61,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createLspComponent(),
     createXSearchComponent(),
     createComputerUseComponent(),
+    createFeedbackComponent(),
     createBrowserBridgeComponent(),
     createClaudeCodeComponent(),
     createCommentCheckerComponent(),

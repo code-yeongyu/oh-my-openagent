@@ -15,8 +15,20 @@ export type ReloadCleanup = {
   readonly shutdowns: ReadonlyArray<() => Promise<unknown>>
   readonly hosts: readonly ReloadHost[]
   readonly restore: () => void
-  readonly exitTimeoutMs?: number
+  /** Whole-cleanup deadline; it must stay below the hook limit the suite runs with (`bun test --timeout 20000`). */
+  readonly budgetMs?: number
+  /** How long SIGTERM gets before SIGKILL. */
+  readonly termGraceMs?: number
+  /** Time reserved after SIGKILL for the exit event. */
+  readonly killWaitMs?: number
 }
+
+// The cleanup runs inside onTestFinished, which Bun bounds by the run's --timeout (20 s in this repo). Every phase
+// waits against one absolute deadline below that, so a host slow to honour SIGTERM under load is killed early and
+// the hook still ends with this helper's own diagnosis instead of a generic hook timeout (#10844).
+const DEFAULT_BUDGET_MS = 15_000
+const DEFAULT_TERM_GRACE_MS = 3_000
+const DEFAULT_KILL_WAIT_MS = 2_000
 
 export function ownsHostSocket(launchArgs: readonly string[] | undefined, root: string): boolean {
   const index = launchArgs?.indexOf("--socket") ?? -1
@@ -30,13 +42,13 @@ function signalRunning(hosts: readonly ReloadHost[], signal: NodeJS.Signals): vo
   }
 }
 
-async function waitForExit(hosts: readonly ReloadHost[], timeoutMs: number): Promise<void> {
+async function settlesBy<T>(work: Promise<T>, deadline: number): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    await Promise.race([
-      Promise.all(hosts.map(({ exited }) => exited)),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("packaged reload task host did not exit")), timeoutMs)
+    return await Promise.race([
+      work.then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), Math.max(0, deadline - Date.now()))
       }),
     ])
   } finally {
@@ -47,22 +59,28 @@ async function waitForExit(hosts: readonly ReloadHost[], timeoutMs: number): Pro
 export async function cleanUpReloadRun(run: ReloadCleanup): Promise<void> {
   const errors: unknown[] = []
   let exited = false
+  const budgetMs = run.budgetMs ?? DEFAULT_BUDGET_MS
+  const termGraceMs = run.termGraceMs ?? DEFAULT_TERM_GRACE_MS
+  const killWaitMs = run.killWaitMs ?? DEFAULT_KILL_WAIT_MS
+  const deadline = Date.now() + budgetMs
+  const killAt = deadline - killWaitMs
+  const shutdownsBy = killAt - termGraceMs
   try {
     for (const shutdown of run.shutdowns) {
-      try {
-        await shutdown()
-      } catch (error) {
-        errors.push(error)
+      const settled = shutdown().then(
+        () => undefined,
+        (error: unknown) => { errors.push(error) },
+      )
+      if (!(await settlesBy(settled, shutdownsBy))) {
+        errors.push(new Error("packaged reload plugin shutdown did not settle in time"))
+        break
       }
     }
+    const allExited = Promise.all(run.hosts.map(({ exited }) => exited))
     signalRunning(run.hosts, "SIGTERM")
-    const timeoutMs = run.exitTimeoutMs ?? 10_000
-    try {
-      await waitForExit(run.hosts, timeoutMs)
-    } catch (error) {
-      errors.push(error)
+    if (!(await settlesBy(allExited, Math.min(killAt, Date.now() + termGraceMs)))) {
       signalRunning(run.hosts, "SIGKILL")
-      await waitForExit(run.hosts, timeoutMs)
+      if (!(await settlesBy(allExited, deadline))) throw new Error("packaged reload task host did not exit")
     }
     exited = true
     const leftovers = readdirSync(run.root).filter((name) => name.startsWith("senpi-rpc-host-internal-"))

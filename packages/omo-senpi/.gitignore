@@ -22,6 +22,7 @@
 !/plugin/extensions/omo-side-panel.js
 !/plugin/extensions/omo-task.js
 !/plugin/extensions/omo-thread-client.js
+!/plugin/extensions/omo-feedback.js
 !/plugin/extensions/omo.js
 !/plugin/extensions/reflection-persona.md
 /plugin/skills/

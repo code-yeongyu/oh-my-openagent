@@ -254,6 +254,21 @@ describe("checkExtensionCurrent", () => {
     }
   })
 
+  test("#given the split extension build #when feedback inputs are inspected #then the report core loads only from the lazy entry", async () => {
+    const { mainInputs, feedbackInputs } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/feedback/runtime.ts",
+      "packages/omo-senpi/src/components/feedback/collect.ts",
+      "packages/omo-senpi/src/components/feedback/collect-host.ts",
+      "packages/omo-senpi/src/components/feedback/draft.ts",
+      "packages/omo-senpi/src/components/feedback/submit.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(feedbackInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/feedback/index.ts"))).toBe(true)
+  })
+
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
     const { mainInputs, threadClientInputs } = await sharedOutputs()
     const suffix = "/components/thread/live-surface.ts"
@@ -407,6 +422,7 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
+    expect(main).toContain('import("#omo-feedback-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
     expect(manifest.imports).not.toHaveProperty("#omo-agent-toolkit-runtime")
@@ -420,6 +436,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
+      "#omo-feedback-runtime": "./extensions/omo-feedback.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })

@@ -1785,6 +1785,33 @@
           },
           "additionalProperties": false
         },
+        "agreements": {
+          "default": {
+            "enabled": true,
+            "needs_human_threshold": 3,
+            "max_items": 64
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "needs_human_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "max_items": {
+              "default": 64,
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 256
+            }
+          },
+          "additionalProperties": false
+        },
         "soul": {
           "default": {
             "edit_notice": true
@@ -2105,6 +2132,25 @@
                     "type": "integer",
                     "minimum": 50,
                     "maximum": 500
+                  }
+                },
+                "additionalProperties": false
+              },
+              "agreements": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "needs_human_threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 256
                   }
                 },
                 "additionalProperties": false
@@ -4088,6 +4134,25 @@
               },
               "additionalProperties": false
             },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
+                }
+              },
+              "additionalProperties": false
+            },
             "soul": {
               "type": "object",
               "properties": {
@@ -4352,6 +4417,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -6311,6 +6395,25 @@
               },
               "additionalProperties": false
             },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
+                }
+              },
+              "additionalProperties": false
+            },
             "soul": {
               "type": "object",
               "properties": {
@@ -6575,6 +6678,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -8534,6 +8656,25 @@
               },
               "additionalProperties": false
             },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
+                }
+              },
+              "additionalProperties": false
+            },
             "soul": {
               "type": "object",
               "properties": {
@@ -8798,6 +8939,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -10755,6 +10915,25 @@
                 },
                 "additionalProperties": false
               },
+              "agreements": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "needs_human_threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 256
+                  }
+                },
+                "additionalProperties": false
+              },
               "soul": {
                 "type": "object",
                 "properties": {
@@ -11019,6 +11198,25 @@
                           "type": "integer",
                           "minimum": 50,
                           "maximum": 500
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "agreements": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "needs_human_threshold": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "max_items": {
+                          "type": "integer",
+                          "minimum": 8,
+                          "maximum": 256
                         }
                       },
                       "additionalProperties": false
@@ -12978,6 +13176,25 @@
                     },
                     "additionalProperties": false
                   },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "soul": {
                     "type": "object",
                     "properties": {
@@ -13242,6 +13459,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -15201,6 +15437,25 @@
                     },
                     "additionalProperties": false
                   },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "soul": {
                     "type": "object",
                     "properties": {
@@ -15465,6 +15720,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -17424,6 +17698,25 @@
                     },
                     "additionalProperties": false
                   },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "soul": {
                     "type": "object",
                     "properties": {
@@ -17688,6 +17981,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false

@@ -11,6 +11,7 @@
     "#omo-memory-doctor-runtime": "./src/components/memory/commands/doctor-runtime.ts",
     "#omo-thread-client-runtime": "./src/components/thread/live-surface.ts",
     "#omo-memory-memfs-runtime": "./src/components/memory/commands/memfs-runtime.ts",
+    "#omo-feedback-runtime": "./src/components/feedback/runtime.ts",
     "#omo-memory-palace-runtime": "./src/components/memory/palace/runtime.ts",
     "#omo-session-history-runtime": "./src/components/onboarding/session-history/runtime.ts",
     "#omo-recall-store-runtime": "./src/components/memory/recall-store-runtime.ts",

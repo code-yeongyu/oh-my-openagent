@@ -22,6 +22,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "loro_wasm_bg.wasm"),
   join("extensions", "CaseFolding.txt"),
   join("extensions", "omo-thread-client.js"),
+  join("extensions", "omo-feedback.js"),
   join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
   join("extensions", "memory-run-supervisor.mjs"),

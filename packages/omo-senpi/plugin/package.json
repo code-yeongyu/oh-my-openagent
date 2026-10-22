@@ -15,6 +15,7 @@
     "#omo-session-history-runtime": "./extensions/omo-session-history.js",
     "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
     "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
+    "#omo-feedback-runtime": "./extensions/omo-feedback.js",
     "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js"
   },
   "keywords": [
