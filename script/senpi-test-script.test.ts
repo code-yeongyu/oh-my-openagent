@@ -242,7 +242,7 @@ describe("Senpi compatibility test script", () => {
     expect(senpiJob).toContain("os: [ubuntu-latest, windows-latest]")
     expect(senpiJob).toContain("bash .github/scripts/ci-senpi-posix.sh")
     expect(senpiJob).toContain('node-version: "24"')
-    expect(senpiJob).toContain('bun-version: "1.4.3"')
+    expect(senpiJob).toContain('bun-version: "1.4.4"')
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")

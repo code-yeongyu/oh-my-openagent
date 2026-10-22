@@ -62,7 +62,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - name: Install pinned Rust toolchain and target
         run: |
@@ -201,7 +201,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -856,7 +856,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/setup-python@v6
         with:

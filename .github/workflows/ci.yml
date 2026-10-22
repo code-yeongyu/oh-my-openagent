@@ -195,14 +195,14 @@ jobs:
         with:
           # and 1.3.12 hangs on windows-latest in the ast-grep install-script
           # timeout race.
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
 
       - uses: actions/cache@v6
         if: runner.os != 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -368,11 +368,11 @@ jobs:
           node-version: "24"
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
       - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
       - name: Install dependencies
         id: install
         run: |
@@ -536,13 +536,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -608,13 +608,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -708,13 +708,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -818,7 +818,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - name: Run published lazycodex-ai smoke commands
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -907,13 +907,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -973,13 +973,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -1058,13 +1058,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/cache@v6
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -1139,12 +1139,12 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -1195,7 +1195,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       # The notes travel as a file: passed through a step output into env, a long range exceeded the
       # per-string exec limit and failed the job with "Argument list too long" (#8894).
