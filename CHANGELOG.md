@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Background children within maxDepth keep the task family at launch and resume.** Ordinary children can delegate deeper instead of ending on "ESCALATE: deep-high"; team/DAG members, depth-floor children, and explicit user denies still get no task tools. ([#10826](https://github.com/code-yeongyu/oh-my-openagent/issues/10826), [#10828](https://github.com/code-yeongyu/oh-my-openagent/pull/10828))
-
 **The launcher deletes a legacy `~/.omo/credentials.json` left by an intermediate sign-in build.** The file held the device's private keys and account refresh material in plaintext, sometimes world-readable; upgrading removes it. Only the exact legacy shape is removed. ([#10697](https://github.com/code-yeongyu/oh-my-openagent/issues/10697), [#10698](https://github.com/code-yeongyu/oh-my-openagent/pull/10698))
 
 **Report a problem from inside OmO ([#10546](https://github.com/code-yeongyu/oh-my-openagent/pull/10546)).** `/feedback` (or `/bug`) sends a bug report or an idea to the OmO team in one step: your description plus your account, this device, versions, this conversation's recent messages, recent logs and your settings. Passwords, keys and tokens are removed first with the same redactor `/share` uses, your memory is never sent, and `OMO_DISABLE_FEEDBACK=1` saves the report as a local file instead of uploading it. The desktop app's Report a problem dialog uses the same report.
@@ -18,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Stopping a language server on Windows no longer raises a stray broken-pipe error.** When an LSP server's pipe closed while OmO was shutting the server down, Windows could report the failed write after cleanup had already let go of it, and the EPIPE escaped as an unhandled error. Every pipe of a spawned language server now keeps an error handler for its whole life, so the failure is logged as ignored cleanup noise ([#9601](https://github.com/code-yeongyu/oh-my-openagent/issues/9601), [#10725](https://github.com/code-yeongyu/oh-my-openagent/pull/10725)).
 
 **The frontend skill now covers HTML reports, figures and slides, and its stripe check catches square callouts.** The skill now loads for any HTML, CSS or SVG made for visual output (a report printed to PDF, a figure, a diagram, a slide, an image for Notion or Slack), not only web UI. Its `check-accent-stripes.ts` linter fails a coloured bar along one side of a box whether the box is rounded or square, and a 2px-or-wider accent outline on a rounded card. Neutral hairlines, table rules, a blockquote's neutral rule, focus rings and input validation states stay allowed. The `visualize` skill runs the linter on every page before previewing or showing it ([#10774](https://github.com/code-yeongyu/oh-my-openagent/issues/10774), [#10776](https://github.com/code-yeongyu/oh-my-openagent/pull/10776)).
+
+**Background children within maxDepth keep the task family at launch and resume.** Ordinary children can delegate deeper instead of ending on "ESCALATE: deep-high"; team/DAG members, depth-floor children, and explicit user denies still get no task tools. ([#10826](https://github.com/code-yeongyu/oh-my-openagent/issues/10826), [#10828](https://github.com/code-yeongyu/oh-my-openagent/pull/10828))
 
 ## [5.1.40] - 2026-10-20
 
