@@ -112,6 +112,8 @@ export interface BackgroundTask {
 export interface ResumeAnchor {
   readonly sessionID: string
   readonly messageIDs: ReadonlySet<string>
+  /** The continuation prompt; completion counts only output after its user message */
+  readonly prompt: string
 }
 
 export interface BackgroundTaskSnapshot {

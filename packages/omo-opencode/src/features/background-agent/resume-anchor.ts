@@ -1,8 +1,10 @@
 import type { OpencodeClient } from "./constants"
 import type { BackgroundTask, ResumeAnchor } from "./types"
+import { stripInternalInitiatorMarkers } from "../../shared/internal-initiator-marker"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { isRecord } from "../../shared/record-type-guard"
 import { messagesInDirectory } from "../../shared/session-route"
+import { withTimeout } from "../../shared/with-timeout"
 import { isTerminalSessionStatus } from "./session-status-classifier"
 
 const SESSION_READ_TIMEOUT_MS = 5_000
@@ -12,28 +14,28 @@ type SessionMessage = {
   readonly parts?: readonly { readonly type?: string; readonly text?: string; readonly content?: string | readonly unknown[] }[]
 }
 
-async function withDeadline<T>(read: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Session read timed out after ${SESSION_READ_TIMEOUT_MS}ms`)), SESSION_READ_TIMEOUT_MS)
-  })
-  try {
-    return await Promise.race([read, deadline])
-  } finally {
-    clearTimeout(timer)
-  }
+function readWithin<T>(read: Promise<T>): Promise<T> {
+  return withTimeout(read, SESSION_READ_TIMEOUT_MS, `Session read timed out after ${SESSION_READ_TIMEOUT_MS}ms`)
 }
 
 async function readMessages(client: OpencodeClient, sessionID: string, directory: string): Promise<readonly SessionMessage[]> {
-  const response = await withDeadline(messagesInDirectory(client, { path: { id: sessionID } }, directory))
+  const response = await readWithin(messagesInDirectory(client, { path: { id: sessionID } }, directory))
   const messages = normalizeSDKResponse<unknown>(response, undefined)
   if (!Array.isArray(messages)) throw new Error(`Could not read the messages of session ${sessionID}`)
   return messages
 }
 
-function isOutputAfter(anchor: ResumeAnchor, message: SessionMessage): boolean {
+function isNew(anchor: ResumeAnchor, message: SessionMessage): boolean {
   const id = message.info?.id
-  if (id === undefined || anchor.messageIDs.has(id)) return false
+  return id !== undefined && !anchor.messageIDs.has(id)
+}
+
+function isContinuationPrompt(anchor: ResumeAnchor, message: SessionMessage): boolean {
+  return isNew(anchor, message) && message.info?.role === "user" &&
+    (message.parts?.some((part) => part.type === "text" && stripInternalInitiatorMarkers(part.text ?? "") === anchor.prompt) ?? false)
+}
+
+function isOutput(message: SessionMessage): boolean {
   if (message.info?.role !== "assistant" && message.info?.role !== "tool") return false
   return message.parts?.some((part) =>
     ((part.type === "text" || part.type === "reasoning") && Boolean(part.text?.trim())) ||
@@ -42,23 +44,31 @@ function isOutputAfter(anchor: ResumeAnchor, message: SessionMessage): boolean {
 }
 
 /** Records the messages a session has before a continuation is sent. Throws when they cannot be read. */
-export async function captureResumeAnchor(client: OpencodeClient, sessionID: string, directory: string): Promise<ResumeAnchor> {
+export async function captureResumeAnchor(
+  client: OpencodeClient, sessionID: string, directory: string, prompt: string,
+): Promise<ResumeAnchor> {
   const messages = await readMessages(client, sessionID, directory)
-  return { sessionID, messageIDs: new Set(messages.flatMap((message) => message.info?.id ? [message.info.id] : [])) }
+  return {
+    sessionID,
+    messageIDs: new Set(messages.flatMap((message) => message.info?.id ? [message.info.id] : [])),
+    prompt: stripInternalInitiatorMarkers(prompt),
+  }
 }
 
 /**
- * Whether a resumed task's continuation has finished: its session holds assistant or tool output
- * that was not there at the resume, the session is idle now, and the task still runs on it.
- * Unreadable state counts as unfinished. Tasks without an anchor for their current session pass.
+ * Whether a resumed task's continuation has finished: the session holds the continuation's own
+ * user message, new assistant or tool output after it, the session is idle now, and the task
+ * still runs on it. Output that precedes the continuation's message never counts. Unreadable
+ * state counts as unfinished. Tasks without an anchor for their current session pass.
  */
 export async function resumedTurnFinished(client: OpencodeClient, task: BackgroundTask, directory: string): Promise<boolean> {
   const anchor = task.resumeAnchor
   if (anchor === undefined || anchor.sessionID !== task.sessionId) return true
   try {
     const messages = await readMessages(client, anchor.sessionID, directory)
-    if (!messages.some((message) => isOutputAfter(anchor, message))) return false
-    const statuses = normalizeSDKResponse<unknown>(await withDeadline(client.session.status({ query: { directory } })), undefined)
+    const prompt = messages.findIndex((message) => isContinuationPrompt(anchor, message))
+    if (prompt < 0 || !messages.slice(prompt + 1).some((message) => isNew(anchor, message) && isOutput(message))) return false
+    const statuses = normalizeSDKResponse<unknown>(await readWithin(client.session.status({ query: { directory } })), undefined)
     if (!isRecord(statuses)) return false
     const status = statuses[anchor.sessionID]
     const idle = status === undefined ||

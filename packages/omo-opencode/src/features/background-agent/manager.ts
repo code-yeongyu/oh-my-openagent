@@ -1442,7 +1442,7 @@ The fallback retry session is now created and can be inspected directly.
     // continuation is sent; completion must then be proven by output beyond it.
     const { status, pendingResume } = existingTask
     try {
-      const anchor = await captureResumeAnchor(this.client, existingTask.sessionId, existingTask.cwd ?? this.directory)
+      const anchor = await captureResumeAnchor(this.client, existingTask.sessionId, existingTask.cwd ?? this.directory, input.prompt)
       if (this.shutdownTriggered || this.tasks.get(existingTask.id) !== existingTask ||
         existingTask.status !== status || existingTask.pendingResume !== pendingResume) {
         throw new Error(`Task ${existingTask.id} changed while its continuation was being prepared`)
@@ -2686,7 +2686,7 @@ The task was re-queued on a fallback model after a retryable failure.
     }
     if (task.resumeAnchor) {
       const finished = await resumedTurnFinished(this.client, task, task.cwd ?? this.directory)
-      if (!finished || task.status !== "running") {
+      if (!finished || task.status !== "running" || this.shutdownTriggered || this.tasks.get(task.id) !== task) {
         log("[background-agent] Resumed task has not finished its continuation, skipping:", { taskId: task.id, source })
         return false
       }
