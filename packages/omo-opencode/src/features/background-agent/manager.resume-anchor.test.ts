@@ -80,6 +80,7 @@ const failedReads: Array<[string, Read]> = [
   ["rejects", () => Promise.reject(new TypeError("fetch failed"))],
   ["returns an SDK error", async () => ({ error: { name: "UnknownError" } })],
   ["never settles", () => new Promise(() => {})],
+  ["returns an empty history", async () => ({ data: [] })],
 ]
 
 beforeEach(() => {

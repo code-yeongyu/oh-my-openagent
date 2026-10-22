@@ -43,11 +43,15 @@ function isOutput(message: SessionMessage): boolean {
     (part.type === "tool_result" && Boolean(typeof part.content === "string" ? part.content.trim() : part.content?.length))) ?? false
 }
 
-/** Records the messages a session has before a continuation is sent. Throws when they cannot be read. */
+/**
+ * Records the messages a session has before a continuation is sent. Throws when they cannot be
+ * read; an empty history counts as unread, since a resumed session has already run.
+ */
 export async function captureResumeAnchor(
   client: OpencodeClient, sessionID: string, directory: string, prompt: string,
 ): Promise<ResumeAnchor> {
   const messages = await readMessages(client, sessionID, directory)
+  if (messages.length === 0) throw new Error(`Session ${sessionID} returned no messages to resume from`)
   return {
     sessionID,
     messageIDs: new Set(messages.flatMap((message) => message.info?.id ? [message.info.id] : [])),
