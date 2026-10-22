@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import type { ManagerStartSpec, StartResult } from "../../manager"
 import type { PlanArtifactReference, SkillInvocationState } from "../../agents"
@@ -52,6 +55,102 @@ const OPEN_SESSION = {
   references: refs([[PLAN_A, 3, 2], [PLAN_B, 1, 1]]),
 } as const
 
+const tempRoots: string[] = []
+
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+// A real project directory with the given plan files under .omo/plans, so explicit-path resolution
+// runs against the filesystem instead of the session's touched-plan bookkeeping.
+function projectWithPlans(names: readonly string[]): string {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "plan-review-contract-")))
+  tempRoots.push(root)
+  mkdirSync(join(root, ".omo", "plans"), { recursive: true })
+  for (const name of names) writeFileSync(join(root, ".omo", "plans", name), `# ${name}\n`)
+  return root
+}
+
+describe("buildTaskExecute plan-review contract explicit path (#10837)", () => {
+  test("#given an explicit plan that exists in the project but was never touched and another plan that was touched #when spawning plan-reviewer #then the explicit plan is reviewed, not the touched one", async () => {
+    // given
+    const project = projectWithPlans(["untouched-plan.md"])
+    const { specs, manager } = specCapture()
+    const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
+
+    // when
+    const result = await execute(
+      "c",
+      { prompt: ".omo/plans/untouched-plan.md", subagent_type: "plan-reviewer", run_in_background: true },
+      undefined,
+      undefined,
+      { ...CTX, cwd: project },
+    )
+
+    // then
+    expect(result.details.status).not.toBe("denied")
+    expect(specs).toHaveLength(1)
+    expect(specs[0]?.prompt).toBe(canonical(join(project, ".omo", "plans", "untouched-plan.md")))
+  })
+
+  test("#given an explicit plan path that does not exist and a touched plan #when spawning plan-reviewer #then the spawn is refused instead of swapped", async () => {
+    // given
+    const project = projectWithPlans([])
+    const { specs, manager } = specCapture()
+    const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
+
+    // when
+    const result = await execute(
+      "c",
+      { prompt: "review .omo/plans/missing-plan.md", subagent_type: "plan-reviewer" },
+      undefined,
+      undefined,
+      { ...CTX, cwd: project },
+    )
+
+    // then
+    expect(specs).toHaveLength(0)
+    expect(result.details.status).toBe("denied")
+    expect(resultText(result)).toContain(".omo/plans/missing-plan.md")
+  })
+
+  test("#given an explicit existing plan outside this project's .omo/plans that was never touched #when spawning plan-reviewer #then the spawn is refused instead of swapped", async () => {
+    // given
+    const project = projectWithPlans([])
+    const elsewhere = projectWithPlans(["foreign-plan.md"])
+    const foreign = join(elsewhere, ".omo", "plans", "foreign-plan.md")
+    const { specs, manager } = specCapture()
+    const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
+
+    // when
+    const result = await execute("c", { prompt: `review ${foreign}`, subagent_type: "plan-reviewer" }, undefined, undefined, { ...CTX, cwd: project })
+
+    // then
+    expect(specs).toHaveLength(0)
+    expect(result.details.status).toBe("denied")
+    expect(resultText(result)).toContain(foreign)
+  })
+
+  test("#given an explicit path to a plan touched in another worktree #when spawning plan-reviewer #then the recorded plan is reviewed", async () => {
+    // given
+    const project = projectWithPlans([])
+    const worktree = projectWithPlans(["worktree-plan.md"])
+    const recorded = join(worktree, ".omo", "plans", "worktree-plan.md")
+    const { specs, manager } = specCapture()
+    const execute = buildTaskExecute(
+      makeDeps(manager, {
+        resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, references: refs([[PLAN_A, 5, 2], [recorded, 1, 1]]) }),
+      }),
+    )
+
+    // when
+    await execute("c", { prompt: `review ${recorded}`, subagent_type: "plan-reviewer", run_in_background: true }, undefined, undefined, { ...CTX, cwd: project })
+
+    // then
+    expect(specs[0]?.prompt).toBe(canonical(recorded))
+  })
+})
+
 describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
   test("#given a chatty no-path prompt and a session with plans A(x3)/B(x1) #when spawning plan-reviewer #then the child prompt is the canonical contract for the most-referenced plan", async () => {
     // given
@@ -85,16 +184,17 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     expect(specs[0]?.prompt).toBe(canonical(PLAN_B))
   })
 
-  test("#given two plan paths in the prompt #when spawning plan-reviewer #then it falls back to the most-referenced session plan", async () => {
+  test("#given two plan paths in the prompt #when spawning plan-reviewer #then the spawn is refused instead of picking one", async () => {
     // given
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
     // when
-    await execute("c", { prompt: `compare ${PLAN_A} with ${PLAN_B}`, subagent_type: "plan-reviewer", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute("c", { prompt: `compare ${PLAN_A} with ${PLAN_B}`, subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
 
     // then
-    expect(specs[0]?.prompt).toBe(canonical(PLAN_A))
+    expect(specs).toHaveLength(0)
+    expect(result.details.status).toBe("denied")
   })
 
   test("#given a synthetic inconsistent state (artifact true, zero references) and no path #when spawning plan-reviewer #then the contract denies (unreachable via the real tool path - the plan gate fires first)", async () => {
@@ -203,41 +303,43 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     expect(exploreSpec?.prompt).toBe("scan the repo")
   })
 
-  test("#given a caller-controlled prefixed path matching no recorded reference #when spawning plan-reviewer #then the recorded most-referenced plan is used and the caller token never reaches the child", async () => {
+  test("#given a caller-controlled prefixed path that resolves to no recorded or existing plan #when spawning plan-reviewer #then the spawn is refused and no child receives the caller token", async () => {
     // given
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
     // when
-    await execute(
+    const result = await execute(
       "c",
-      { prompt: "review ATTACKER_CONTROLLED:.omo/plans/alpha-plan.md now", subagent_type: "plan-reviewer", run_in_background: true },
+      { prompt: "review ATTACKER_CONTROLLED:.omo/plans/alpha-plan.md now", subagent_type: "plan-reviewer" },
       undefined,
       undefined,
       CTX,
     )
 
-    // then the suffix matches a recorded reference, so the RECORDED path is used - not the caller's token
-    expect(specs[0]?.prompt).toBe(canonical(PLAN_A))
-    expect(specs[0]?.prompt).not.toContain("ATTACKER_CONTROLLED")
+    // then
+    expect(specs).toHaveLength(0)
+    expect(result.details.status).toBe("denied")
   })
 
-  test("#given a traversal or absolute path matching no recorded reference #when spawning plan-reviewer #then it falls back to the recorded most-referenced plan", async () => {
+  test("#given a single traversal path escaping the project #when spawning plan-reviewer #then the spawn is refused", async () => {
     // given
+    const project = projectWithPlans([])
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
     // when
-    await execute(
+    const result = await execute(
       "c",
-      { prompt: "review ../../secret/.omo/plans/gamma-plan.md and /tmp/untrusted/.omo/plans/delta-plan.md", subagent_type: "plan-reviewer", run_in_background: true },
+      { prompt: "review ../../secret/.omo/plans/gamma-plan.md", subagent_type: "plan-reviewer" },
       undefined,
       undefined,
-      CTX,
+      { ...CTX, cwd: project },
     )
 
-    // then two unrecorded candidates are not a single explicit selector, so the top reference wins
-    expect(specs[0]?.prompt).toBe(canonical(PLAN_A))
+    // then
+    expect(specs).toHaveLength(0)
+    expect(result.details.status).toBe("denied")
   })
 
   test("#given a single unrecorded path and an empty reference list #when spawning plan-reviewer #then the contract denies (synthetic state, unreachable via the real tool path)", async () => {
@@ -253,7 +355,7 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // then
     expect(specs).toHaveLength(0)
     expect(result.details.status).toBe("denied")
-    expect(resultText(result)).toBe(PLAN_REVIEW_DENY_MESSAGE)
+    expect(resultText(result)).toContain("/tmp/untrusted/.omo/plans/delta-plan.md")
   })
 
   test("#given an explore spawn with a plan path in the prompt #when executed #then the contract does not apply", async () => {

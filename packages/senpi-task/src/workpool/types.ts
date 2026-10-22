@@ -44,7 +44,7 @@ export type WorkpoolWorker = {
   readonly idle_since: number
 }
 export type WorkpoolSpec = {
-  readonly start: ManagerStartSpec
+  readonly start: ManagerStartSpec & { readonly cwd: string }
   readonly plan: ResolvedChildPlan
 }
 export type WorkpoolRecord = {

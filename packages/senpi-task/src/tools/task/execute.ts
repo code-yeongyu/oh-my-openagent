@@ -132,7 +132,7 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
         let itemParams = singleSpawnParams(item, runInBackground)
         const target = item.kind === "category" ? { category: item.category } : { subagentType: item.subagentType }
         if (item.kind === "subagent_type") {
-          const policy = evaluateSpawnPolicy(deps, item.subagentType, itemParams.prompt, parentSessionId)
+          const policy = evaluateSpawnPolicy(deps, item.subagentType, itemParams.prompt, parentSessionId, ctx.cwd)
           if (policy.kind === "deny") {
             return { kind: "plan_unresolved", error: { code: "invalid_target", message: policy.message } }
           }

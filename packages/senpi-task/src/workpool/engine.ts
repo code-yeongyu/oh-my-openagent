@@ -50,12 +50,12 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     }, error => emit({ kind: "aggregate_failed", pool_id: pool.pool_id, error: { code: "delivery_uncertain", message: error instanceof Error ? error.message : String(error) } }))
     if (!started) awaitingAck.delete(key)
   }
-  let checkPolicy = (agent: WorkpoolAgent, _parent: string): void => {
+  let checkPolicy = (agent: WorkpoolAgent, _parent: string, _cwd: string): void => {
     if (agent.subagent_type === undefined) return
     const verdict = evaluateInvocationGuard(agent.subagent_type, EMPTY_SKILL_INVOCATIONS)
     if (verdict.kind === "deny") throw new WorkpoolError("policy_denied", verdict.message)
   }
-  const dispatcher = createWorkpoolDispatcher({ store, admission, emit, authorize: pool => checkPolicy(pool.agent, pool.parent_session_id) })
+  const dispatcher = createWorkpoolDispatcher({ store, admission, emit, authorize: pool => checkPolicy(pool.agent, pool.parent_session_id, pool.worker_spec.start.cwd) })
   function assertParent(caller: WorkpoolCaller): void {
     if (caller.sessionId.trim().length === 0) throw new WorkpoolError("scope_denied", "A host session identity is required.")
     for (const pool of store.list()) {
@@ -96,7 +96,7 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     if (names.length > 0 && grant === undefined) {
       throw new WorkpoolError("tools_unavailable", "Parent-defined worker tools need a live JavaScript kernel capability.")
     }
-    checkPolicy(input.agent, caller.sessionId)
+    checkPolicy(input.agent, caller.sessionId, caller.cwd)
     const pool = store.create(caller, { ...input, mode: input.mode ?? WORKPOOL_DEFAULT_MODE, tools: names }, admission.resolve(caller, input.agent))
     if (grant !== undefined) {
       kernelToolBindings?.bind(pool.pool_id, grant)
@@ -162,7 +162,7 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     })
   }
   return { create, resolveKernelTools, inspect, push, close, cancel, yieldResults, waitForEvent,
-    setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string) => void) => { checkPolicy = policy },
+    setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string, cwd: string) => void) => { checkPolicy = policy },
     ownsTask: (taskId: string) => store.list().some(pool => pool.workers.some(worker => worker.task_id === taskId) || pool.items.some(item => item.binding?.task_id === taskId)),
     subscribe: (listener: (event: WorkpoolEvent) => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
     attach: (caller: WorkpoolCaller) => {

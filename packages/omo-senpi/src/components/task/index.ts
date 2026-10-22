@@ -130,6 +130,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
             node.subagentType,
             node.prompt,
             node.parentSessionId,
+            cwd,
           ),
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
       })

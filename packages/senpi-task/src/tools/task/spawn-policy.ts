@@ -14,11 +14,12 @@ export function evaluateSpawnPolicy(
   subagentType: string,
   callerPrompt: string,
   sessionId: string,
+  cwd: string,
 ): SpawnPolicyVerdict {
   const name = subagentType.trim()
   const denial = invocationGateDenial(deps, name, sessionId)
   if (denial !== undefined) return { kind: "deny", message: denial }
-  const contract = planReviewContractOutcome(deps, name, callerPrompt, sessionId)
+  const contract = planReviewContractOutcome(deps, name, callerPrompt, sessionId, cwd)
   if (contract?.kind === "deny") return { kind: "deny", message: contract.message }
   if (contract?.kind === "prompt") return { kind: "force", prompt: contract.prompt }
   return { kind: "allow" }
