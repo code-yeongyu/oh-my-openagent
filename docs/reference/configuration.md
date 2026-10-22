@@ -443,7 +443,7 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 | **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (high)` |
 | **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
 | **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `zai-coding-plan/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
-| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `zai-coding-plan\|opencode-go/glm-5.3 (high)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
 | **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
@@ -825,6 +825,16 @@ Records about individuals, stored as cards with an observation ledger.
 | `people.max_entries`      | `40`    | Maximum observation entries per person (1-100)     |
 | `people.max_entry_chars`  | `200`   | Maximum characters per entry (50-500)              |
 
+#### Agreements
+
+Standing agreements with your person, kept in `system/agreements.md` with how many times each was broken. The facts extractor counts a repeated correction against the agreement it repeats; past the threshold the agreement is flagged and you see a notice. Manage the list with `/agreements` (`list`, `add [--project] <text>`, `ack <id>`, `drop <id>`). Agreements you add can only be changed by you.
+
+| Option                             | Default | Description                                                    |
+| ---------------------------------- | ------- | -------------------------------------------------------------- |
+| `agreements.enabled`               | `true`  | Count repeated corrections and announce flagged agreements      |
+| `agreements.needs_human_threshold` | `3`     | Breaks at which an agreement is flagged as needing you (min 1)  |
+| `agreements.max_items`             | `64`    | Ledger size; at the cap the oldest never-reaffirmed agent item is evicted (8-256) |
+
 #### Soul
 
 | Option             | Default | Description                                            |
@@ -841,8 +851,8 @@ Records about individuals, stored as cards with an observation ledger.
 
 | Option           | Default | Description                                    |
 | ---------------- | ------- | ---------------------------------------------- |
-| `sync.enabled`   | `true`  | Sync the memory repository                      |
-| `sync.remote`    | -       | Optional git remote for the memory repository   |
+| `sync.enabled`   | `true`  | End-to-end encrypted memory sync on this device (needs sign-in and sync on for the account) |
+| `sync.remote`    | -       | Deprecated, ignored; the git mirror is set with `/memfs`  |
 | `search.enabled` | `true`  | Enable memory search                            |
 
 In Senpi, run `/sleeptime` to see every resolved memory value, including which ones a per-agent

@@ -5,6 +5,8 @@ import { join } from "node:path"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { runInProcessMemoryChild, type InProcessMemoryChildState, type MemoryChildResult, type StartChildInput } from "./in-process-memory-child"
 import { createFactsRecordTool, FACTS_RECORD_TOOL_NAME } from "./facts-record-tool"
+import { createFactsAgreementTool, FACTS_AGREEMENT_TOOL_NAME, type FactsAgreementTool } from "./facts-agreement-tool"
+import { FACTS_AGREEMENTS_FILENAME } from "./facts-agreements"
 import type { FactsQueuedKey } from "./facts-failure-recording"
 import { type ReflectionModelCandidate, type ReflectionModelResolution } from "./worker/resolve-model"
 import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
@@ -19,11 +21,14 @@ type ResolvedChildModel = NonNullable<StartChildInput["model"]>
 type FactsInProcessLaunchInput = {
   readonly runId: string
   readonly runDir: string
-  readonly payload: FactsPayload
+  /** A conversation batch, or text that is already the extractor's input (onboarding's session digests). */
+  readonly payload: FactsPayload | string
   readonly oversized?: boolean
+  /** Caps on this run's `record_fact` tool calls; `onCall` sees every call. */
+  readonly recordLimits?: { readonly maxCalls: number; readonly onCall: () => void }
   readonly resolution: Extract<ReflectionModelResolution, { readonly kind: "resolved" }>
   readonly modelRegistry?: ReturnType<FactsExtractorRunnerOptions["resolveModelRegistry"]>
-  readonly options: FactsExtractorRunnerOptions
+  readonly options: Pick<FactsExtractorRunnerOptions, "createRunner" | "createSession" | "logger">
   readonly env: NodeJS.ProcessEnv
   readonly configSources: readonly { readonly path: string; readonly exists: boolean }[]
   readonly batchId: string
@@ -69,11 +74,12 @@ async function launchCandidate(
   attempt: number,
   fallbacks: readonly ReflectionModelCandidate[],
 ): Promise<MemoryChildResult> {
-  const payloadText = serializeFactsPayload(input.payload)
+  const payloadText = typeof input.payload === "string" ? input.payload : serializeFactsPayload(input.payload)
   const payloadPath = join(input.runDir, "facts-payload.json")
   const extractionPath = join(input.runDir, "extraction.jsonl")
+  const agreementsPath = join(input.runDir, FACTS_AGREEMENTS_FILENAME)
   const state: InProcessMemoryChildState = { cancelled: false }
-  if (input.oversized === true && !admitOversizedFacts(input.payload, model)) {
+  if (input.oversized === true && (typeof input.payload === "string" || !admitOversizedFacts(input.payload, model))) {
     throw new Error("oversized facts input does not fit the pinned model budget")
   }
   const guard = input.oversized !== true ? undefined : createOversizedFactsGuard({
@@ -87,6 +93,12 @@ async function launchCandidate(
   const tool = createFactsRecordTool({
     extractionPath, state,
     ...(guard === undefined ? {} : { maxBytes: FACTS_RECORD_BYTES, maxRecords: FACTS_RECORD_LIMIT, onFailure: guard.fail }),
+    ...(input.recordLimits === undefined ? {} : input.recordLimits),
+  })
+  const known = typeof input.payload === "string" ? undefined : input.payload.agreements
+  const agreementTool = known === undefined ? undefined : createFactsAgreementTool({
+    extractionPath: agreementsPath, state, knownIds: new Set(known.map((item) => item.id)),
+    ...(guard === undefined ? {} : { onFailure: guard.fail }),
   })
   const createSession = guard?.createSession ?? input.options.createSession
   input.onState?.(state)
@@ -104,6 +116,7 @@ async function launchCandidate(
       await writeFile(payloadPath, payloadText, { encoding: "utf8", mode: 0o600 })
       await chmod(payloadPath, 0o400)
       await writeFile(extractionPath, "", { encoding: "utf8", mode: 0o600 })
+      if (agreementTool !== undefined) await writeFile(agreementsPath, "", { encoding: "utf8", mode: 0o600 })
       await updateRunLedger(join(input.runDir, "ledger.json"), {
         attempt,
         model: candidate.model,
@@ -114,12 +127,13 @@ async function launchCandidate(
         // therefore treats a missing child identity as unknown liveness and abandons, not fails.
       })
     },
-    buildStart: () => buildStart(input, candidate, model, fallbacks, payloadText, tool),
+    buildStart: () => buildStart(input, candidate, model, fallbacks, payloadText, tool, agreementTool),
     onHandle: () => undefined,
     ...(input.onState === undefined ? {} : { onState: input.onState }),
   })
   if (result.status === "failed" && result.cause === "cancelled") {
     tool.deactivate()
+    agreementTool?.deactivate()
     return result
   }
   if (result.status === "completed" && guard !== undefined && !guard.succeeded()) result = { status: "failed", cause: "child_failed" }
@@ -129,6 +143,7 @@ async function launchCandidate(
     : { version: 1, runId: input.runId, attempt, finishedAt: new Date().toISOString(), childExit: { code: result.status === "completed" ? 0 : 1, signal: null }, timedOut: false }
   await writeRunJsonAtomic(join(input.runDir, "outcome.json"), outcome)
   tool.deactivate()
+  agreementTool?.deactivate()
   return result
 }
 
@@ -139,6 +154,7 @@ function buildStart(
   fallbacks: readonly ReflectionModelCandidate[],
   payloadText: string,
   tool: ReturnType<typeof createFactsRecordTool>,
+  agreementTool: FactsAgreementTool | undefined,
 ): StartChildInput {
   const childRegistry = isChildModelRegistry(input.modelRegistry) ? input.modelRegistry : undefined
   return {
@@ -151,8 +167,8 @@ function buildStart(
     ...childModelChainSpec({ model: candidate.model, fallbacks }),
     ...(input.oversized === true ? { retry: { maxRetries: 0 } } : {}),
     ...(candidate.thinking === undefined ? {} : { thinkingLevel: candidate.thinking }),
-    toolAllowlist: [FACTS_RECORD_TOOL_NAME],
-    memberScopedTools: [tool],
+    toolAllowlist: agreementTool === undefined ? [FACTS_RECORD_TOOL_NAME] : [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME],
+    memberScopedTools: agreementTool === undefined ? [tool] : [tool, agreementTool],
     depth: 1,
     parentSessionId: `facts-${input.runId}`,
     rootSessionId: `facts-${input.runId}`,

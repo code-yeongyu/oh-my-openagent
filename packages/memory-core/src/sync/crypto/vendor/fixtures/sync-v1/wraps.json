@@ -1,0 +1,63 @@
+{
+  "comment": "real HPKE base-mode wraps over synthetic keys; fixed ephemerals for reproducibility",
+  "account": "encoding-account",
+  "info": "omo-sync/v1/wrap",
+  "wraps": [
+    {
+      "name": "epoch1_to_recovery1",
+      "epoch": 1,
+      "id": "recovery:CwsLCwsLCwsLCwsLCwsLCw",
+      "wrap": "Sk-MzeGY1m6ZtMAUQYoyI84lbJiQCuSmgR_RD364TCx3_VF6jOgMaFWsWgH1SxETjZ0TEPsTzicSFU21umey8hfX15-DGsR7ZYk_aqZyQhKqYm3ePOfAvJR8sM4IUByo24W-N5e6HW2SG_WGeKaLZS1PSJdCj1MsbkymRW5TlA3oz4uKKIVxBRg23upImYNtd7WC0UuYVVDAZjTC0zRrg6tb4HFbwGb9shTXB0cdXm4nNr_8da5RIJAKuIKlfvG4y8y1xtZcthN2XFYay9eLeUtc_9Ah9udd-fxu6aoDmJAhRDc9-YqIXBdIzdmWxoW5mUtiiwWHHZyxtyJs4PGlMKnDLbyGBBheZZO5WUK6Dk05lyzjEBMLLeUjdxrbN5oRDza9nq_1AT5ZHJGkXzE-4C5dcA",
+      "key_material": {
+        "version": 1,
+        "current_key": "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0",
+        "history": {
+          "nonce": "Y2NjY2NjY2NjY2Nj",
+          "ciphertext": "mbnDd-8yTI3xE9NhHp8fSVsE"
+        }
+      },
+      "history_plaintext": []
+    },
+    {
+      "name": "epoch3_to_recovery2",
+      "epoch": 3,
+      "id": "recovery:FRUVFRUVFRUVFRUVFRUVFQ",
+      "wrap": "az1Xdi-LrbaUM_nG0GD4X15ca2gDqBbRQcB19jVBrRCElmDIKt8T8LQMkiY9bHvY6AK1XvecmYxgPl472oM6Q9gj_TvSQpXVZtcVA15dmyaxwuDV_AJpcemFsKeqyEoi92_O1IfU77L6rij3JioYmFGV6tuazUWczRg1GQPFQz_TuMe_rg8zkivPA0FIAZr4m-gtD3cg_GwvyAjeZjIRrxY46j1qdwWTKeyBb0mX8z7ZpdoofoHxiH4sdNZXeviaQIor5rKlgYUDVxEeMhODJDKofCjExqhAC3i-p_GbEMCdh3AfpyTeHdvIqJbpslA8BsJrNXqfmxQ71WOFGGUlfCFn0pyJBxY8TgIzKZHeStaC5rVhNdrP0_8qMzS9DCcG8KWDM3VaAFqQrkMxOLVRxtsLvJj6uwVjhyZ4QlBk60vSua8NUSBvTF4taCNIsch15DFVbXDn3VDtWrCGAjdC6Eo5gBeaYUH0L85RNY03IggzAtHUNTG8-dXhE1ZvGfMt2QafC_C0Kdab2sBE0ujngQOPSbmLY6Xa1iwweZ6eOweGqxyE2D1L2SUEvJUsChxtovTcO1N9O4EtJgawM_cyYrr6YXAP7ao4SJvpot3SMMMcxyWJNiYNWu4PlRVrbckh_lYFaOljwMaAtWEdjpV4mCZbk9-xIEZURobvRtphUoo38rL1bLAE7taXTqxyiFMsuva3YboXtqWI5JbkBrIk-sbWBQ9RxNBXBkCxxk_OqU8wOW2wwS44fXS-DD2sj2l3NzWBqbImCRnAAd_sxRe3sctnQAo_aOS0H4OLyrc-V08vyk30zOM1_zouDzrv11o",
+      "key_material": {
+        "version": 1,
+        "current_key": "Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8_Pz8",
+        "history": {
+          "nonce": "ZWVlZWVlZWVlZWVl",
+          "ciphertext": "lnEVcvhAXqGZkwIbPv16yKJ-gbRZtJHW41NAIXX_3g14kezPx37Q08iwYdL_e5V-GQDbNTNrEfsat_Gj88V1HTgepb881fIp8wd-ZcLzY5P4CzweuDuqUU5wUn3Om6e26NujFqvBLCtwBA-hfeis-gitRltS7XhTs1OG2xhiDaTu50x9n5X7PDpc5CaqSjoM6K2aB71E1vkUgLSyTUQJPxtlE52pFJ94XeCBnvawtGQmDJl75K9rY4wsg_OkmjlpU3snrCD6_LBehWQ_TQNS2Js8LUdnXLoq-4WadYVUeMa-wRd4EOUCmxxc5c7sY92al8r3a0Jb3pxsE96Eq_ij"
+        }
+      },
+      "history_plaintext": [
+        {
+          "epoch": 1,
+          "origin": "w76Z82xyftRZn9CGXGwpQx-5EjTRPSR5s7xkFXjm-t4",
+          "key": "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0"
+        },
+        {
+          "epoch": 2,
+          "origin": "-qTCj5O_7kXYm0va-rQNDyk2NSWjhBTaGb9R4ul1vkw",
+          "key": "Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4-Pj4"
+        }
+      ]
+    },
+    {
+      "name": "epoch1_to_wrap_test_device",
+      "epoch": 1,
+      "id": "device:wrap-test",
+      "wrap": "IZ5NgA2paNKl_LAJx4T0dGxxOO257khEtznoMLBc9CQz0wpIeWDLGW8zo1ir0s8CrPbOISnaAIyPx73ysj1Aa3J7E4p7N7bNFfkRIkalU4PBW6x_14QB-jk8AgXJCibqtTPs8j4ZPfNrp5gPqrjGBTyzB-46GaCQYAlhrO6LopyxwYV_RTRMxIKuZ5ap-UMPuIncTGezZ3CVTkPMrRpiEi5BlYaLS_sKZtfYBWg0QejfaOa8yfAaoAGJDw44g-1i3UPzJylR4cN7MW4-OM47GH6Bb_sRbuqAMAp8ClRF2_uGxKKfg_jBRClwUOaYU_srf6eNvOzKGh5V8YIU1IT1ZWnBWstC3vMjIhRPvDWPcHVwh6TcT8AqNvmgDQhdjZ6UzZTbRA",
+      "key_material": {
+        "version": 1,
+        "current_key": "PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0",
+        "history": {
+          "nonce": "Z2dnZ2dnZ2dnZ2dn",
+          "ciphertext": "K4Iv7W4Y-0kv2isbpjQ3VtKX"
+        }
+      },
+      "history_plaintext": []
+    }
+  ]
+}

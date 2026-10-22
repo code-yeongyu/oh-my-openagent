@@ -48,6 +48,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
       auto_select_max_chars: 150000,
     },
     people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+    agreements: { enabled: true, needs_human_threshold: 3, max_items: 64 },
     soul: { edit_notice: true },
     write_notice: { enabled: true },
     sync: { enabled: true },

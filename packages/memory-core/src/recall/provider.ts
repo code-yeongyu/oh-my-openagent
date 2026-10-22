@@ -11,9 +11,12 @@
 
 import { join } from "node:path"
 
-import { readFile, stat } from "../fs/resilient"
+import { readFile, realpathSync, stat } from "../fs/resilient"
 import type { GitMemoryRepo } from "../git"
 import { parseMemoryFile } from "../memfs"
+import { recallDocumentTerms } from "./bm25"
+import { onRecallDocumentsEncoded, recallTermAccess } from "./bm25-index"
+import type { RecallTermIndex, RecallTermPersistence } from "./bm25-persist"
 
 export interface RecallDocument {
   readonly path: string
@@ -105,6 +108,58 @@ interface HeadProbe {
 export interface RecallCorpusCacheOptions {
   /** HEAD resolution seam; the default spawns `git rev-parse` through the repo. Injected in tests. */
   readonly head?: (repo: GitMemoryRepo) => Promise<string | null>
+  /**
+   * Share one corpus per memory repository with every other shared cache in this process. A
+   * multi-session host builds one cache per session, and a private cache per session parsed and
+   * indexed the same repository once per live session. The shared state lives while any shared
+   * cache that loaded the repository is alive.
+   */
+  readonly shared?: boolean
+  /** Told when the persisted recall terms cannot be read or saved; recall itself is unaffected. */
+  readonly onTermStoreError?: (error: unknown) => void
+  /**
+   * Loads the persisted-terms store (`@oh-my-opencode/memory-core/recall-store`) on the first corpus load, so
+   * its codec stays out of a host's startup bundle. Without it every new process tokenizes the corpus.
+   */
+  readonly termStore?: () => Promise<RecallTermStoreModule>
+}
+
+export interface RecallTermStoreModule {
+  readonly RecallTermPersistence: typeof RecallTermPersistence
+}
+
+/** The live index a persisted store reads and seeds. */
+export const recallTermIndex: RecallTermIndex = {
+  onEncoded: onRecallDocumentsEncoded,
+  access: recallTermAccess,
+  terms: recallDocumentTerms,
+}
+
+const sharedCaches = new Map<string, WeakRef<RecallCorpusCache>>()
+const releaseSharedCache = new FinalizationRegistry<{ readonly dir: string; readonly ref: WeakRef<RecallCorpusCache> }>(
+  ({ dir, ref }) => {
+    if (sharedCaches.get(dir) === ref) sharedCaches.delete(dir)
+  },
+)
+
+// One repository reached through a symlink, `/tmp` vs `/private/tmp`, or a trailing slash is still one
+// corpus; keying by the spelled path gave each spelling its own copy and silently lost the sharing.
+function sharedKey(dir: string): string {
+  try {
+    return realpathSync(dir)
+  } catch {
+    return dir
+  }
+}
+
+function acquireSharedCache(dir: string, options: RecallCorpusCacheOptions): RecallCorpusCache {
+  const live = sharedCaches.get(dir)?.deref()
+  if (live !== undefined) return live
+  const cache = new RecallCorpusCache({ ...options, shared: false })
+  const ref = new WeakRef(cache)
+  sharedCaches.set(dir, ref)
+  releaseSharedCache.register(cache, { dir, ref })
+  return cache
 }
 
 const REF_NAME = /^refs\/[A-Za-z0-9._\-/]+$/
@@ -155,13 +210,21 @@ export class RecallCorpusCache {
   private entry: RecallCorpusCacheEntry | undefined
   private probe: HeadProbe | undefined
   private blobs: { readonly dir: string; readonly loaded: LoadedBlobs } | undefined
+  private terms: RecallTermPersistence | undefined
+  /** Every repository's persisted terms this cache attached, so `settled()` covers a save started before a switch. */
+  private readonly attached = new Set<RecallTermPersistence>()
   private readonly resolveHead: (repo: GitMemoryRepo) => Promise<string | null>
+  private readonly options: RecallCorpusCacheOptions
+  /** Shared mode only: the process-wide caches this instance keeps alive, one per repository. */
+  private readonly held = new Map<string, RecallCorpusCache>()
 
   constructor(options: RecallCorpusCacheOptions = {}) {
+    this.options = options
     this.resolveHead = options.head ?? ((repo) => repo.head())
   }
 
   async load(repo: GitMemoryRepo): Promise<RecallCorpus> {
+    if (this.options.shared === true) return this.sharedFor(repo.dir).load(repo)
     const signature = await headSignature(repo.dir)
     if (
       this.entry !== undefined &&
@@ -197,16 +260,51 @@ export class RecallCorpusCache {
     }
   }
 
+  /** Settles once no persisted-terms save started by this cache, or a shared cache it holds, is running. */
+  async settled(): Promise<void> {
+    await Promise.all([
+      ...[...this.attached].map((terms) => terms.settled()),
+      ...[...this.held.values()].map((cache) => cache.settled()),
+    ])
+  }
+
   clear(): void {
+    this.held.clear()
     this.entry = undefined
     this.probe = undefined
     this.blobs = undefined
+  }
+
+  private sharedFor(dir: string): RecallCorpusCache {
+    const key = sharedKey(dir)
+    let cache = this.held.get(key)
+    if (cache === undefined) {
+      cache = acquireSharedCache(key, this.options)
+      this.held.set(key, cache)
+    }
+    return cache
   }
 
   private async loadRevision(repo: GitMemoryRepo, revision: string): Promise<RecallCorpus> {
     const previous = this.blobs?.dir === repo.dir ? this.blobs.loaded : new Map<string, LoadedBlob>()
     const { corpus, loaded } = await loadCorpusAtRevision(repo, revision, previous)
     this.blobs = { dir: repo.dir, loaded }
+    if (this.terms?.dir !== repo.dir) this.terms = await this.persistenceFor(repo.dir)
+    await this.terms?.attach(corpus.documents)
     return corpus
+  }
+
+  private async persistenceFor(dir: string): Promise<RecallTermPersistence | undefined> {
+    if (this.options.termStore === undefined) return undefined
+    const onError = this.options.onTermStoreError ?? (() => undefined)
+    try {
+      const store = await this.options.termStore()
+      const persistence = new store.RecallTermPersistence(dir, onError, recallTermIndex)
+      this.attached.add(persistence)
+      return persistence
+    } catch (error) {
+      onError(error)
+      return undefined
+    }
   }
 }

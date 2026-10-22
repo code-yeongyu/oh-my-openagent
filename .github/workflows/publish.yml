@@ -365,7 +365,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       # build-extension.mjs derives its --external list from the runner's builtinModules;
       # the senpi-compatibility freshness check runs it on node 24, so this job must too, or
@@ -754,7 +754,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - uses: actions/setup-node@v7
         with:
@@ -1085,7 +1085,7 @@ jobs:
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
       # Fail before the platform builds rather than after them: the release body is extracted
       # from this commit's CHANGELOG section, so a source prepared without one can never publish.
       - name: Verify the release notes exist on the prepared source
@@ -1151,7 +1151,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -1355,7 +1355,7 @@ jobs:
           done
           ls -la .omo/release-binaries/
           # The release owns two checksum assets: one for 12 omo launchers,
-          # and one for the four separately downloadable desktop engines.
+          # and one for the six separately downloadable desktop engines.
           (cd .omo/release-binaries && shasum -a 256 omo-* > SHA256SUMS)
           bun script/desktop-engine-release.ts checksums .omo/release-binaries
           gh release upload "v${VERSION}" .omo/release-binaries/omo-* \
@@ -1385,21 +1385,21 @@ jobs:
             if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
             touch "$EXPECTED_DIR/$NAME"
           done
-          for HOST in darwin-arm64 darwin-x64 linux-x64; do
+          for HOST in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
             touch "$EXPECTED_DIR/senpi-desktop-engine-${HOST}"
           done
-          touch "$EXPECTED_DIR/senpi-desktop-engine-win32-x64.exe" \
+          touch "$EXPECTED_DIR/senpi-desktop-engine-win32-x64.exe" "$EXPECTED_DIR/senpi-desktop-engine-win32-arm64.exe" \
             "$EXPECTED_DIR/SHA256SUMS" "$EXPECTED_DIR/senpi-desktop-engine-checksums.txt"
           diff -u <(cd "$EXPECTED_DIR" && printf '%s\n' * | sort) \
             <(cd "$VERIFY_DIR" && printf '%s\n' * | sort)
           (
             cd "$VERIFY_DIR"
             test "$(wc -l < SHA256SUMS)" -eq 12
-            test "$(wc -l < senpi-desktop-engine-checksums.txt)" -eq 4
+            test "$(wc -l < senpi-desktop-engine-checksums.txt)" -eq 6
             shasum -a 256 -c SHA256SUMS
             shasum -a 256 -c senpi-desktop-engine-checksums.txt
           )
-          echo "Verified 18/18 release assets for v${VERSION}"
+          echo "Verified 20/20 release assets for v${VERSION}"
 
       - name: Delete draft release
         if: inputs.lazycodex_only != true
@@ -1526,6 +1526,35 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Wait for every published package on the registry
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+          # ONE 60-minute deadline shared by every package, probe time included (each probe is capped at
+          # 15 s): well inside the job's 120-minute timeout, so a missing package fails with its name.
+          REGISTRY_WAIT_DEADLINE_SECONDS: "3600"
+        run: |
+          set -euo pipefail
+          # npm answers every publish with 202 "being processed": 5.1.38's oh-my-openagent printed
+          # "+ oh-my-openagent@5.1.38" at 10:09Z and was served only from 10:34Z, while this job only
+          # waited on omo-ai. Read EVERY main and platform package back at its exact version (no-cache),
+          # or fail naming what is missing and why.
+          # Platform packages come from package.json optionalDependencies (--platform-packages), the
+          # one list the release-platform test holds equal to build-binaries PLATFORMS, so this step
+          # cannot drift from the platforms that are built and published.
+          if [ "${LAZYCODEX_ONLY}" = "true" ]; then
+            node script/wait-registry-versions.mjs "lazycodex-ai@$VERSION"
+          else
+            # omo-ai carries its own version (a prerelease spells it differently from the wrappers).
+            SPECS=("oh-my-opencode@$VERSION" "oh-my-openagent@$VERSION" "omo-ai@$OMO_AI_VERSION")
+            if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
+              SPECS+=("lazycodex-ai@$VERSION")
+            fi
+            node script/wait-registry-versions.mjs --platform-packages "$VERSION" "${SPECS[@]}"
+          fi
 
       - name: Wait for omo-ai registry readiness
         if: inputs.lazycodex_only != true

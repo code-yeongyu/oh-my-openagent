@@ -1,3 +1,5 @@
+import { agreementItemsOf, readAgreementsAt, readAgreementsWorktree } from "../agreements/ledger-file"
+import { AGREEMENTS_PATH } from "../agreements/types"
 import type { GitCommitAuthor, GitMemoryRepo, MemoryCommit } from "../git"
 import type { FactsApplyRecovery } from "./mutation-plan"
 import { FactsMutationTransaction, FactsOwnershipLostError } from "./recovery-mutation"
@@ -30,7 +32,7 @@ export async function applyFactsRecovery(
     await transaction.applyPostState()
     const result = await repo.commitPrepared(
       recovery.paths.map((entry) => entry.path),
-      commitMessage(recovery.batchId, recordCount),
+      commitMessage(recovery.batchId, recordCount, await evictedAgreementIds(repo, recovery)),
       author,
     )
     return { outcome: "committed", sha: result.sha, affectedPaths: recovery.paths.map((entry) => entry.path) }
@@ -44,12 +46,21 @@ export async function applyFactsRecovery(
   }
 }
 
-function commitMessage(batchId: string, count: number): string {
+// The facts lane removes an agreement only by evicting it at the cap; each removal is named in the commit.
+async function evictedAgreementIds(repo: GitMemoryRepo, recovery: FactsApplyRecovery): Promise<readonly string[]> {
+  if (!recovery.paths.some((entry) => entry.path === AGREEMENTS_PATH)) return []
+  const after = new Set(agreementItemsOf(await readAgreementsWorktree(repo.dir)).map((item) => item.id))
+  const before = agreementItemsOf(await readAgreementsAt(repo, recovery.headBeforeApply))
+  return before.filter((item) => !after.has(item.id)).map((item) => item.id)
+}
+
+function commitMessage(batchId: string, count: number, evicted: readonly string[]): string {
   return [
     `chore(facts): extract ${count} ${count === 1 ? "fact" : "facts"}`,
     "",
     "Generated-By: facts-extractor",
     "Omo-Writer: facts-extractor",
     `Omo-Facts-Batch: ${batchId}`,
+    ...evicted.map((id) => `Omo-Agreement-Evicted: ${id}`),
   ].join("\n")
 }

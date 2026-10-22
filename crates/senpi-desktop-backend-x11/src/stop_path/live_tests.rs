@@ -7,7 +7,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use senpi_desktop_safety::{Chord, MonotonicClock, StopPathError, StopPathListener, StopSource, Supervisor};
+use senpi_desktop_safety::{Chord, MonotonicClock, StopPathError, StopPathListener, Supervisor};
 
 use super::xi2::CONNECTION_FAILED;
 use super::{Xi2Listener, DEFAULT_STOP_CHORD};
@@ -21,7 +21,7 @@ fn supervisor() -> Arc<Supervisor> {
 
 #[test]
 #[ignore = "live: needs an X server on DISPLAY and xdotool"]
-fn raw_key_chord_latches_supervisor() {
+fn an_xtest_chord_never_latches_the_supervisor() {
     // Given: a live listener and an unsuspended supervisor
     let supervisor = supervisor();
     let mut listener = Xi2Listener::new();
@@ -43,28 +43,31 @@ fn raw_key_chord_latches_supervisor() {
         .unwrap();
     let xdotool_exited = Instant::now();
 
-    // Then: the listener latches the supervisor
+    // Then: the listener saw the XTEST presses (so the check is not vacuous)
+    // and ignored them: only a physical keyboard stops input.
     let mut control = shared.control.lock();
     let waited = shared
         .changed
-        .wait_while_for(&mut control, |control| control.stops == 0, HANG_GUARD);
-    let latched = Instant::now();
+        .wait_while_for(&mut control, |control| control.xtest_ignored == 0 && control.stops == 0, HANG_GUARD);
+    let seen = Instant::now();
+    let (ignored, stops) = (control.xtest_ignored, control.stops);
     drop(control);
     let status = supervisor.status();
     println!(
-        "xdotool_status={xdotool} suspended_before={} suspended={} stopped_by={:?} global_live={} \
-         latch_ms_from_post={} latch_ms_after_xdotool_exit={}",
-        before.suspended,
+        "xdotool_status={xdotool} xtest_ignored={ignored} stops={stops} suspended={} stopped_by={:?} \
+         global_live={} seen_ms_from_post={} seen_ms_after_xdotool_exit={}",
         status.suspended,
         status.stopped_by,
         status.global_live,
-        latched.duration_since(posted).as_millis(),
-        latched.saturating_duration_since(xdotool_exited).as_millis(),
+        seen.duration_since(posted).as_millis(),
+        seen.saturating_duration_since(xdotool_exited).as_millis(),
     );
     assert!(xdotool.success());
     assert!(!waited.timed_out(), "hang guard expired");
-    assert!(status.suspended);
-    assert_eq!(status.stopped_by, Some(StopSource::Hotkey));
+    assert!(!status.suspended, "an XTEST chord stopped input");
+    assert_eq!(stops, 0);
+    assert!(ignored > 0);
+    assert!(status.global_live, "the listener must stay armed");
 }
 
 #[test]
