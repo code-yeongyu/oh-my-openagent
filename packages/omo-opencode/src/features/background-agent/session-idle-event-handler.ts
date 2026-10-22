@@ -68,7 +68,7 @@ export function handleSessionIdleBackgroundEvent(args: {
         return
       }
 
-      if (task.resumeAnchor && !(await sessionHasMessagesAfterAnchor(sessionID, task))) {
+      if ((task.resumeAnchor || task.resumeAnchorPending) && !(await sessionHasMessagesAfterAnchor(sessionID, task))) {
         log("[background-agent] Session.idle but resumed task has no new messages after the resume anchor, waiting:", task.id)
         return
       }

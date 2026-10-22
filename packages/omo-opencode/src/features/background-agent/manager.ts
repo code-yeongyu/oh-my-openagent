@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { captureResumeAnchor, sessionHasResumedOutput } from "./resume-anchor"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
@@ -568,6 +569,8 @@ export class BackgroundManager {
     task.parentTools = snapshot.parentTools
     task.concurrencyKey = snapshot.concurrencyKey
     task.concurrencyGroup = snapshot.concurrencyGroup
+    task.resumeAnchor = undefined
+    task.resumeAnchorPending = undefined
     this.updateTaskParent(task, snapshot.parentSessionId)
 
     removeTaskToastTracking(task.id)
@@ -1468,7 +1471,20 @@ The fallback retry session is now created and can be inspected directly.
 
     // Anchor on the messages that already exist so completion paths can tell
     // the previous run's output apart from the continuation's new turn.
-    existingTask.resumeAnchor = await this.captureResumeAnchor(existingTask.sessionId)
+    const captureToken = {}
+    existingTask.resumeAnchorPending = captureToken
+    const anchor = await captureResumeAnchor(this.client, existingTask, this.directory)
+    if (this.shutdownTriggered || existingTask.status !== "running" ||
+      existingTask.concurrencyKey !== concurrencyKey || this.tasks.get(existingTask.id) !== existingTask ||
+      existingTask.resumeAnchorPending !== captureToken) {
+      return existingTask
+    }
+    existingTask.resumeAnchorPending = undefined
+    if (!anchor) {
+      this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, "unavailable")
+      return existingTask
+    }
+    existingTask.resumeAnchor = anchor
 
     this.startPolling()
     if (existingTask.sessionId) {
@@ -2418,37 +2434,8 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
-  private async captureResumeAnchor(sessionID: string): Promise<NonNullable<BackgroundTask["resumeAnchor"]> | undefined> {
-    try {
-      const response = await messagesInDirectory(this.client, {
-        path: { id: sessionID },
-      }, this.directory)
-      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { id?: string } }>, { preferResponseOnMissingData: true })
-      return { anchorMessageCount: messages.length, anchorMessageID: messages.at(-1)?.info?.id }
-    } catch (error) {
-      log("[background-agent] Could not capture resume anchor; completing unanchored:", { sessionID, error })
-      return undefined
-    }
-  }
-
   private async sessionHasMessagesAfterAnchor(sessionID: string, task: BackgroundTask): Promise<boolean> {
-    const anchor = task.resumeAnchor
-    if (!anchor) return true
-    try {
-      const response = await messagesInDirectory(this.client, {
-        path: { id: sessionID },
-      }, this.directory)
-      const messages = normalizeSDKResponse<Array<{ info?: { id?: string } }> | undefined>(response, undefined)
-      if (!Array.isArray(messages)) return false
-      if (anchor.anchorMessageID !== undefined) {
-        const anchorIndex = messages.findIndex((message) => message.info?.id === anchor.anchorMessageID)
-        return anchorIndex === -1 || anchorIndex < messages.length - 1
-      }
-      return messages.length > anchor.anchorMessageCount
-    } catch (error) {
-      log("[background-agent] Error checking resume anchor messages:", { sessionID, error })
-      return false
-    }
+    return sessionID === task.sessionId && sessionHasResumedOutput(this.client, task, this.directory)
   }
 
   private async readStoppedSessionError(sessionID: string): Promise<string | undefined> {
@@ -2700,7 +2687,7 @@ The task was re-queued on a fallback model after a retryable failure.
    */
   private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
     // Guard: Check if task is still running (could have been completed by another path)
-    if (task.status !== "running") {
+    if (task.status !== "running" || task.resumeAnchorPending) {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
       return false
     }
@@ -3236,7 +3223,7 @@ The task was re-queued on a fallback model after a retryable failure.
           // A resumed task must produce at least one message after its resume
           // anchor before any completion path may finish it; otherwise the
           // previous run's output re-completes it before the continuation runs.
-          if (task.resumeAnchor && !(await this.sessionHasMessagesAfterAnchor(sessionID, task))) {
+          if ((task.resumeAnchor || task.resumeAnchorPending) && !(await this.sessionHasMessagesAfterAnchor(sessionID, task))) {
             log("[background-agent] Resumed task has no new messages after the resume anchor, waiting:", task.id)
             continue
           }
