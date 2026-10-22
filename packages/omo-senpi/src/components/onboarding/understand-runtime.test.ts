@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdir, symlink, writeFile } from "node:fs/promises"
 import type { ChildSpec } from "@oh-my-opencode/senpi-task"
 import { join } from "node:path"
+import { fakeClock } from "../../../../senpi-task/src/runners/rpc/__fixtures__/clock"
 
 import { registrySnapshot } from "../memory/facts-runner.test-support"
 import { digestByteLength } from "./session-history/session-digest"
@@ -336,29 +337,48 @@ describe("onboarding understanding (#10480)", () => {
     // given
     const root = await workspace()
     const leftoversBefore = await understandRunDirs()
-    let lateWrite: (() => void) | undefined
-    const wrote = new Promise<void>((resolve) => { lateWrite = resolve })
+    const clock = fakeClock()
+    const childStarted = Promise.withResolvers<void>()
+    const releaseChild = Promise.withResolvers<void>()
+    let lateWrites = 0
 
     // when
-    const { done } = await run({
+    const pending = run({
       digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)],
       budget: { ...ONBOARDING_UNDERSTAND_BUDGET, stepMs: 50, totalMs: 30_000 },
       turn: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 200))
+        childStarted.resolve()
+        await releaseChild.promise
         return "hang"
       },
       onAbort: async (spec) => {
         const sessionDir = String(spec.sessionDir)
         await mkdir(sessionDir, { recursive: true })
         await writeFile(join(sessionDir, "late-session.jsonl"), "written after abort\n")
-        lateWrite?.()
+        lateWrites += 1
       },
     })
-    await wrote
+    try {
+      await Promise.race([childStarted.promise, pending.then(() => { throw new Error("step ended before its child started") })])
+      await clock.advance(50)
+      releaseChild.resolve()
+      const { done, events, starts } = await pending
 
-    // then
-    expect(done.kind).toBe("done")
-    expect(await understandRunDirs()).toEqual(leftoversBefore)
+      // then
+      expect(starts).toHaveLength(1)
+      expect(lateWrites).toBe(1)
+      expect(events.some((event) => event.kind === "budget" && event.budget === "step_ms")).toBe(true)
+      expect(done.kind).toBe("done")
+      expect(await understandRunDirs()).toEqual(leftoversBefore)
+    } finally {
+      releaseChild.resolve()
+      try {
+        await clock.advance(50)
+        await pending
+      } finally {
+        clock.restore()
+      }
+    }
   })
 
   test("#given a failed step and no time left #when the retry would start #then the run ends at total_ms without a second model call", async () => {
