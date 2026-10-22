@@ -76,6 +76,14 @@ export function reflectionRemediation(
   if (combined.includes("api key") || combined.includes("auth_missing")) {
     return "run /login <provider>"
   }
+  // A supervisor failure predates child outcome publication; its own stderr carries the cause.
+  if (
+    reason === "supervisor_failed"
+    || combined.includes("memory run supervisor exited")
+    || combined.includes("did not publish an outcome")
+  ) {
+    return "inspect supervisor-stderr.log in the newest failing run directory under the memory identity's runtime/reflection/runs"
+  }
   return childLogHint(childLog)
 }
 

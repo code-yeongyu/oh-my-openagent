@@ -1,12 +1,14 @@
-import { spawn } from "node:child_process"
-import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
-import { mkdir } from "@oh-my-opencode/memory-core/fs"
+import { spawn, type ChildProcess } from "node:child_process"
+import { closeSync, existsSync, mkdir, openSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
+import { childFailureCause } from "./failure-detail"
 import {
   readRunJson,
+  readRunTextTail,
   runOutcomeMatchesLedger,
   writeRunJsonAtomic,
+  writeRunTextAtomic,
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
@@ -161,14 +163,21 @@ async function runSupervisedChild(input: {
   await writeRunJsonAtomic(join(input.runDir, "ledger.json"), ledger)
   await writeRunJsonAtomic(join(input.runDir, "launch.json"), launch)
 
-  const supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
-    env: { ...process.env, ...input.env, BUN_BE_BUN: "1" },
-    detached: true,
-    stdio: "ignore",
-    // win32 gives a detached child its own console, which flashes an empty terminal window on the
-    // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
-    windowsHide: true,
-  })
+  const supervisorStderrPath = join(input.runDir, "supervisor-stderr.log")
+  const supervisorStderrFd = openSync(supervisorStderrPath, "w", 0o600)
+  let supervisor: ChildProcess
+  try {
+    supervisor = spawn(process.execPath, [input.supervisorPath ?? defaultSupervisorPath(), input.runDir], {
+      env: { ...process.env, ...input.env, BUN_BE_BUN: "1" },
+      detached: true,
+      stdio: ["ignore", "ignore", supervisorStderrFd],
+      // win32 gives a detached child its own console, which flashes an empty terminal window on the
+      // user's desktop for every reflection run. CREATE_NO_WINDOW keeps the detachment, drops the window.
+      windowsHide: true,
+    })
+  } finally {
+    closeSync(supervisorStderrFd)
+  }
   supervisor.unref()
   if (input.receiptsDir !== undefined && input.attempt === 1) {
     await emitMemoryReceipt(input.receiptsDir, runReceipt(launchedRun(input.ledger), "launched"), undefined, input.receiptWarn)
@@ -219,12 +228,25 @@ async function runSupervisedChild(input: {
     supervisor.off("error", onError)
     supervisor.off("close", onClose)
   })
-  if (result.kind === "error" && !hasCompleteOutcome()) throw result.error
+  if (result.kind === "error" && !hasCompleteOutcome()) {
+    throw await supervisorFailure(result.error.message, supervisorStderrPath, input.maxOutputBytes)
+  }
   if (result.kind === "close" && !hasCompleteOutcome()) {
-    throw new Error(`${SUPERVISOR_EXIT_PREFIX} ${result.exit.code ?? result.exit.signal ?? "unknown status"}`)
+    throw await supervisorFailure(
+      `${SUPERVISOR_EXIT_PREFIX} ${result.exit.code ?? result.exit.signal ?? "unknown status"}`,
+      supervisorStderrPath,
+      input.maxOutputBytes,
+    )
   }
   if (result.kind === "outcome" && result.result === "timeout") {
-    throw new Error("memory run supervisor did not publish an outcome before its deadline")
+    // The supervisor can still own the inherited stderr handle. Windows cannot replace that live
+    // file, so preserve it and publish the bounded diagnostic under a separate snapshot path.
+    throw await supervisorFailure(
+      "memory run supervisor did not publish an outcome before its deadline",
+      supervisorStderrPath,
+      input.maxOutputBytes,
+      join(input.runDir, "supervisor-stderr-tail.log"),
+    )
   }
   const outcome = await readRunJson<RunOutcome>(outcomePath)
   if (!runOutcomeMatchesLedger(ledger, outcome)) {
@@ -237,6 +259,18 @@ async function runSupervisedChild(input: {
     stderr: readTail(stderrPath, input.maxOutputBytes),
     timedOut: outcome.timedOut,
   }
+}
+
+async function supervisorFailure(
+  message: string,
+  stderrPath: string,
+  maxBytes: number,
+  snapshotPath = stderrPath,
+): Promise<Error> {
+  const stderr = await readRunTextTail(stderrPath, maxBytes)
+  await writeRunTextAtomic(snapshotPath, stderr)
+  const cause = childFailureCause(stderr)
+  return new Error(cause === undefined ? message : `${message}: ${cause}`)
 }
 
 function launchedRun(ledger: Readonly<Record<string, unknown>>): RunReceiptLedger {
