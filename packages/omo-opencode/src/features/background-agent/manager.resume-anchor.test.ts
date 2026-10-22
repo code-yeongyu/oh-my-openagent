@@ -49,7 +49,7 @@ function setup() {
     $: {} as PluginInput["$"],
     client: { session } as unknown as PluginInput["client"],
   } satisfies PluginInput
-  const manager = new BackgroundManager({ pluginContext, enableParentSessionNotifications: false })
+  const manager = new BackgroundManager({ pluginContext, config: { defaultConcurrency: 1 }, enableParentSessionNotifications: false })
   managers.push(manager)
   const task: BackgroundTask = {
     id: "bg_resumed", status: "completed", sessionId: SESSION, cwd: WORKTREE, parentSessionId: "ses_parent",
@@ -181,9 +181,42 @@ describe("resuming a completed background task", () => {
     await expect(manager.resume(resumeInput)).rejects.toThrow()
 
     expect(task.status).toBe("completed")
-    expect(task.concurrencyKey).toBeUndefined()
+    expect(manager["concurrencyManager"].getCount("explore")).toBe(0)
+    expect(manager["completionTimers"].has(task.id)).toBe(true)
     expect(prompts).toBe(0)
   }, 10_000)
+
+  test("takes the anchor when a queued resume is admitted, not when it was queued", async () => {
+    const { manager, task, messages, dispatched, aborts } = setup()
+    const slots = manager["concurrencyManager"]
+    await slots.acquire("explore")
+    await manager.resume(resumeInput)
+    messages.push(message("msg_wake", "assistant", "answer to a wake while the resume waited"))
+
+    slots.release("explore")
+    await dispatched
+    await manager["pollRunningTasks"]()
+
+    expect(task.status).toBe("running")
+    expect(aborts).toHaveLength(0)
+  })
+
+  test("restores a queued resume whose messages cannot be read at admission", async () => {
+    const { manager, task, session } = setup()
+    let prompts = 0
+    session.promptAsync = async () => { prompts += 1; return { data: {} } }
+    const slots = manager["concurrencyManager"]
+    await slots.acquire("explore")
+    await manager.resume(resumeInput)
+    session.messages = () => Promise.reject(new TypeError("fetch failed"))
+
+    slots.release("explore")
+    await new Promise((resolve) => setImmediate(resolve))
+
+    expect(task.status).toBe("completed")
+    expect(slots.getCount("explore")).toBe(0)
+    expect(prompts).toBe(0)
+  })
 
   test("rejects the resume when the manager shuts down while the messages are read", async () => {
     const { manager, task, session } = setup()

@@ -1371,18 +1371,6 @@ The fallback retry session is now created and can be inspected directly.
         "Wait for it to complete before resuming it with task_id.")
     }
 
-    // The session still holds the previous run's output; completion must be proven by output
-    // the continuation adds, so record what is there now and refuse the resume if that fails.
-    this.resumesAwaitingAdmission.add(existingTask.id)
-    try {
-      existingTask.resumeAnchor = await captureResumeAnchor(this.client, existingTask.sessionId, existingTask.cwd ?? this.directory)
-    } finally {
-      this.resumesAwaitingAdmission.delete(existingTask.id)
-    }
-    if (this.shutdownTriggered || this.tasks.get(existingTask.id) !== existingTask) {
-      throw new Error(`Task ${existingTask.id} is no longer available to resume`)
-    }
-
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask, input.parentSessionId)
     const completionTimer = this.completionTimers.get(existingTask.id)
     if (completionTimer) {
@@ -1401,6 +1389,10 @@ The fallback retry session is now created and can be inspected directly.
         // Yield one turn so a same-turn second resume observes the reservation before this task flips to running.
         await Promise.resolve()
         return await this.startResumedTask(existingTask, input, resumeSnapshot, concurrencyKey)
+      } catch (error) {
+        // The continuation never started: expire the finished task as if it had not been resumed.
+        if (!this.shutdownTriggered) this.scheduleTaskRemoval(existingTask.id)
+        throw error
       } finally {
         this.resumesAwaitingAdmission.delete(existingTask.id)
       }
@@ -1446,6 +1438,20 @@ The fallback retry session is now created and can be inspected directly.
       return existingTask
     }
     if (!existingTask.sessionId) throw new Error(`Task has no sessionID: ${existingTask.id}`)
+    // The session still holds earlier output. Record what it holds right before the
+    // continuation is sent; completion must then be proven by output beyond it.
+    const { status, pendingResume } = existingTask
+    try {
+      const anchor = await captureResumeAnchor(this.client, existingTask.sessionId, existingTask.cwd ?? this.directory)
+      if (this.shutdownTriggered || this.tasks.get(existingTask.id) !== existingTask ||
+        existingTask.status !== status || existingTask.pendingResume !== pendingResume) {
+        throw new Error(`Task ${existingTask.id} changed while its continuation was being prepared`)
+      }
+      existingTask.resumeAnchor = anchor
+    } catch (error) {
+      this.concurrencyManager.release(concurrencyKey)
+      throw error
+    }
     existingTask.pendingResume = undefined
     existingTask.originalPrompt ??= existingTask.prompt
     existingTask.prompt = input.prompt
