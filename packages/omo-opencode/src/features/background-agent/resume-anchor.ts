@@ -1,76 +1,71 @@
 import type { OpencodeClient } from "./constants"
-import type { BackgroundTask } from "./types"
+import type { BackgroundTask, ResumeAnchor } from "./types"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
-import { messagesInDirectory } from "../../shared/session-route"
 import { isRecord } from "../../shared/record-type-guard"
+import { messagesInDirectory } from "../../shared/session-route"
 import { isTerminalSessionStatus } from "./session-status-classifier"
 
-export const RESUME_ANCHOR_READ_TIMEOUT_MS = 5_000
+const SESSION_READ_TIMEOUT_MS = 5_000
 
-type ResumeMessage = {
+type SessionMessage = {
   readonly info?: { readonly id?: string; readonly role?: string }
   readonly parts?: readonly { readonly type?: string; readonly text?: string; readonly content?: string | readonly unknown[] }[]
 }
 
-async function readBeforeDeadline<T>(read: () => Promise<T>): Promise<T | undefined> {
+async function withDeadline<T>(read: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Session read timed out after ${SESSION_READ_TIMEOUT_MS}ms`)), SESSION_READ_TIMEOUT_MS)
+  })
   try {
-    return await Promise.race([
-      read(),
-      new Promise<undefined>((resolve) => {
-        timer = setTimeout(() => resolve(undefined), RESUME_ANCHOR_READ_TIMEOUT_MS)
-      }),
-    ])
-  } catch {
-    // SDK rejections are untyped; none can establish a completion signal.
-    return undefined
+    return await Promise.race([read, deadline])
   } finally {
-    if (timer !== undefined) clearTimeout(timer)
+    clearTimeout(timer)
   }
 }
 
-async function readResumeMessages(client: OpencodeClient, task: BackgroundTask, directory: string) {
-  if (!task.sessionId) return undefined
-  const sessionID = task.sessionId
-  const response = await readBeforeDeadline(() => messagesInDirectory(client, {
-    path: { id: sessionID },
-  }, task.cwd ?? directory))
-  const messages = normalizeSDKResponse<ResumeMessage[] | undefined>(response, undefined)
-  return Array.isArray(messages) ? messages : undefined
+async function readMessages(client: OpencodeClient, sessionID: string, directory: string): Promise<readonly SessionMessage[]> {
+  const response = await withDeadline(messagesInDirectory(client, { path: { id: sessionID } }, directory))
+  const messages = normalizeSDKResponse<unknown>(response, undefined)
+  if (!Array.isArray(messages)) throw new Error(`Could not read the messages of session ${sessionID}`)
+  return messages
 }
 
-export async function captureResumeAnchor(client: OpencodeClient, task: BackgroundTask, directory: string) {
-  const messages = await readResumeMessages(client, task, directory)
-  if (!messages) return undefined
-  return {
-    anchorMessageCount: messages.length,
-    anchorMessageID: messages.at(-1)?.info?.id,
-    capturedMessageIDs: messages.flatMap((message) => message.info?.id ? [message.info.id] : []),
-  }
+function isOutputAfter(anchor: ResumeAnchor, message: SessionMessage): boolean {
+  const id = message.info?.id
+  if (id === undefined || anchor.messageIDs.has(id)) return false
+  if (message.info?.role !== "assistant" && message.info?.role !== "tool") return false
+  return message.parts?.some((part) =>
+    ((part.type === "text" || part.type === "reasoning") && Boolean(part.text?.trim())) ||
+    part.type === "tool" ||
+    (part.type === "tool_result" && Boolean(typeof part.content === "string" ? part.content.trim() : part.content?.length))) ?? false
 }
 
-export async function sessionHasResumedOutput(client: OpencodeClient, task: BackgroundTask, directory: string): Promise<boolean> {
-  if (task.resumeAnchorPending) return false
+/** Records the messages a session has before a continuation is sent. Throws when they cannot be read. */
+export async function captureResumeAnchor(client: OpencodeClient, sessionID: string, directory: string): Promise<ResumeAnchor> {
+  const messages = await readMessages(client, sessionID, directory)
+  return { sessionID, messageIDs: new Set(messages.flatMap((message) => message.info?.id ? [message.info.id] : [])) }
+}
+
+/**
+ * Whether a resumed task's continuation has finished: its session holds assistant or tool output
+ * that was not there at the resume, the session is idle now, and the task still runs on it.
+ * Unreadable state counts as unfinished. Tasks without an anchor for their current session pass.
+ */
+export async function resumedTurnFinished(client: OpencodeClient, task: BackgroundTask, directory: string): Promise<boolean> {
   const anchor = task.resumeAnchor
-  if (!anchor) return true
-  const messages = await readResumeMessages(client, task, directory)
-  if (!messages || task.resumeAnchor !== anchor || task.status !== "running") return false
-  const anchorIndex = anchor.anchorMessageID === undefined
-    ? anchor.anchorMessageCount - 1
-    : messages.findIndex((message) => message.info?.id === anchor.anchorMessageID)
-  const candidates = anchorIndex >= 0 ? messages.slice(anchorIndex + 1) : messages.filter((message) =>
-    message.info?.id !== undefined && anchor.capturedMessageIDs?.includes(message.info.id) === false)
-  const hasOutput = candidates.some((message) =>
-    (message.info?.role === "assistant" || message.info?.role === "tool") &&
-    message.parts?.some((part) =>
-      ((part.type === "text" || part.type === "reasoning") && Boolean(part.text?.trim())) ||
-      part.type === "tool" ||
-      (part.type === "tool_result" && Boolean(typeof part.content === "string" ? part.content.trim() : part.content?.length))))
-  if (!hasOutput) return false
-  const response = await readBeforeDeadline(() => client.session.status({ query: { directory: task.cwd ?? directory } }))
-  const statuses = normalizeSDKResponse<unknown>(response, undefined)
-  if (!isRecord(statuses) || task.resumeAnchor !== anchor || task.status !== "running") return false
-  const status = statuses[task.sessionId ?? ""]
-  return status === undefined || (isRecord(status) && typeof status.type === "string" &&
-    (status.type === "idle" || isTerminalSessionStatus(status.type)))
+  if (anchor === undefined || anchor.sessionID !== task.sessionId) return true
+  try {
+    const messages = await readMessages(client, anchor.sessionID, directory)
+    if (!messages.some((message) => isOutputAfter(anchor, message))) return false
+    const statuses = normalizeSDKResponse<unknown>(await withDeadline(client.session.status({ query: { directory } })), undefined)
+    if (!isRecord(statuses)) return false
+    const status = statuses[anchor.sessionID]
+    const idle = status === undefined ||
+      (isRecord(status) && typeof status.type === "string" && (status.type === "idle" || isTerminalSessionStatus(status.type)))
+    return idle && task.sessionId === anchor.sessionID
+  } catch {
+    // SDK failures are untyped; an unreadable session never proves the continuation finished.
+    return false
+  }
 }

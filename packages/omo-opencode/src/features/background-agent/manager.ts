@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import { captureResumeAnchor, sessionHasResumedOutput } from "./resume-anchor"
+import { captureResumeAnchor, resumedTurnFinished } from "./resume-anchor"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
@@ -569,8 +569,6 @@ export class BackgroundManager {
     task.parentTools = snapshot.parentTools
     task.concurrencyKey = snapshot.concurrencyKey
     task.concurrencyGroup = snapshot.concurrencyGroup
-    task.resumeAnchor = undefined
-    task.resumeAnchorPending = undefined
     this.updateTaskParent(task, snapshot.parentSessionId)
 
     removeTaskToastTracking(task.id)
@@ -1373,6 +1371,18 @@ The fallback retry session is now created and can be inspected directly.
         "Wait for it to complete before resuming it with task_id.")
     }
 
+    // The session still holds the previous run's output; completion must be proven by output
+    // the continuation adds, so record what is there now and refuse the resume if that fails.
+    this.resumesAwaitingAdmission.add(existingTask.id)
+    try {
+      existingTask.resumeAnchor = await captureResumeAnchor(this.client, existingTask.sessionId, existingTask.cwd ?? this.directory)
+    } finally {
+      this.resumesAwaitingAdmission.delete(existingTask.id)
+    }
+    if (this.shutdownTriggered || this.tasks.get(existingTask.id) !== existingTask) {
+      throw new Error(`Task ${existingTask.id} is no longer available to resume`)
+    }
+
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask, input.parentSessionId)
     const completionTimer = this.completionTimers.get(existingTask.id)
     if (completionTimer) {
@@ -1468,23 +1478,6 @@ The fallback retry session is now created and can be inspected directly.
       countedToolPartIDs: existingTask.progress?.countedToolPartIDs,
       lastUpdate: new Date(),
     }
-
-    // Anchor on the messages that already exist so completion paths can tell
-    // the previous run's output apart from the continuation's new turn.
-    const captureToken = {}
-    existingTask.resumeAnchorPending = captureToken
-    const anchor = await captureResumeAnchor(this.client, existingTask, this.directory)
-    if (this.shutdownTriggered || existingTask.status !== "running" ||
-      existingTask.concurrencyKey !== concurrencyKey || this.tasks.get(existingTask.id) !== existingTask ||
-      existingTask.resumeAnchorPending !== captureToken) {
-      return existingTask
-    }
-    existingTask.resumeAnchorPending = undefined
-    if (!anchor) {
-      this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, "unavailable")
-      return existingTask
-    }
-    existingTask.resumeAnchor = anchor
 
     this.startPolling()
     if (existingTask.sessionId) {
@@ -1951,7 +1944,6 @@ The fallback retry session is now created and can be inspected directly.
         },
         idleDeferralTimers: this.idleDeferralTimers,
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
-        sessionHasMessagesAfterAnchor: (sessionID, task) => this.sessionHasMessagesAfterAnchor(sessionID, task),
         checkSessionTodos: (id) => this.checkSessionTodos(id),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
@@ -2434,10 +2426,6 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
-  private async sessionHasMessagesAfterAnchor(sessionID: string, task: BackgroundTask): Promise<boolean> {
-    return sessionID === task.sessionId && sessionHasResumedOutput(this.client, task, this.directory)
-  }
-
   private async readStoppedSessionError(sessionID: string): Promise<string | undefined> {
     try {
       const response = await messagesInDirectory(this.client, {
@@ -2580,7 +2568,6 @@ The task was re-queued on a fallback model after a retryable failure.
         task.error = reason
       }
     }
-    task.resumeAnchor = undefined
     if (wasRunning && task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
@@ -2687,9 +2674,16 @@ The task was re-queued on a fallback model after a retryable failure.
    */
   private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
     // Guard: Check if task is still running (could have been completed by another path)
-    if (task.status !== "running" || task.resumeAnchorPending) {
+    if (task.status !== "running") {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
       return false
+    }
+    if (task.resumeAnchor) {
+      const finished = await resumedTurnFinished(this.client, task, task.cwd ?? this.directory)
+      if (!finished || task.status !== "running") {
+        log("[background-agent] Resumed task has not finished its continuation, skipping:", { taskId: task.id, source })
+        return false
+      }
     }
 
     // Reserve a notification-preparation slot for the parent BEFORE flipping the
@@ -2712,7 +2706,6 @@ The task was re-queued on a fallback model after a retryable failure.
         task.status = "completed"
         task.completedAt = new Date()
       }
-      task.resumeAnchor = undefined
       this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
       if (task.rootSessionId) {
@@ -3217,14 +3210,6 @@ The task was re-queued on a fallback model after a retryable failure.
               sessionStatus: sessionStatus.type,
               toolCalls: task.progress?.toolCalls ?? 0,
             })
-            continue
-          }
-
-          // A resumed task must produce at least one message after its resume
-          // anchor before any completion path may finish it; otherwise the
-          // previous run's output re-completes it before the continuation runs.
-          if ((task.resumeAnchor || task.resumeAnchorPending) && !(await this.sessionHasMessagesAfterAnchor(sessionID, task))) {
-            log("[background-agent] Resumed task has no new messages after the resume anchor, waiting:", task.id)
             continue
           }
 

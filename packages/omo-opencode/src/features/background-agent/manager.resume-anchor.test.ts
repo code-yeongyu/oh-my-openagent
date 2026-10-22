@@ -1,20 +1,80 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, afterEach, beforeEach } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { clearPromptReservationsForTesting } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { clearRecentPromptDispatchesForTesting } from "@oh-my-opencode/utils/prompt-async-gate/recent-dispatches"
 import { BackgroundManager } from "./manager"
-import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import type { BackgroundTask } from "./types"
-import { MIN_RUNTIME_BEFORE_STALE_MS } from "./constants"
-import { createManagerWithMessages, createCompletedTask, previousRunMessages, resumeInput } from "./resume-anchor-test-fixture"
+
+const SESSION = "ses_resumed"
+const WORKTREE = mkdtempSync(join(tmpdir(), "resume-anchor-"))
+const resumeInput = { sessionId: SESSION, prompt: "continue", parentSessionId: "ses_parent", parentMessageId: "msg_parent" }
+
+type Message = { info: { id: string; role: string; time: { completed: number } }; parts: Array<{ type: string; text: string }> }
+type Read = () => Promise<unknown>
+
+function message(id: string, role: string, text: string): Message {
+  return { info: { id, role, time: { completed: Date.now() } }, parts: [{ type: "text", text }] }
+}
 
 let managers: BackgroundManager[] = []
 
-function track(manager: BackgroundManager): BackgroundManager {
+function setup() {
+  const messages = [message("msg_launch", "user", "launch"), message("msg_previous", "assistant", "previous answer")]
+  const reads: Array<string | undefined> = []
+  const aborts: string[] = []
+  const dispatched = Promise.withResolvers<void>()
+  const session = {
+    status: async (): Promise<unknown> => ({ data: { [SESSION]: { type: "idle" } } }),
+    messages: async (request?: { query?: { directory?: string } }): Promise<unknown> => {
+      reads.push(request?.query?.directory)
+      return { data: [...messages] }
+    },
+    promptAsync: async () => { dispatched.resolve(); return { data: {} } },
+    prompt: async () => ({}),
+    abort: async (request: { path: { id: string } }) => { aborts.push(request.path.id); return { data: true } },
+    todo: async () => ({ data: [] }),
+    get: async () => ({ data: { id: SESSION } }),
+  }
+  const pluginContext = {
+    project: { id: "test-project", worktree: WORKTREE, time: { created: Date.now() } },
+    directory: tmpdir(),
+    worktree: tmpdir(),
+    experimental_workspace: { register: () => {} },
+    serverUrl: new URL("http://localhost:4096"),
+    $: {} as PluginInput["$"],
+    client: { session } as unknown as PluginInput["client"],
+  } satisfies PluginInput
+  const manager = new BackgroundManager({ pluginContext, enableParentSessionNotifications: false })
   managers.push(manager)
-  return manager
+  const task: BackgroundTask = {
+    id: "bg_resumed", status: "completed", sessionId: SESSION, cwd: WORKTREE, parentSessionId: "ses_parent",
+    parentMessageId: "msg_parent", description: "synthetic task", prompt: "launch", agent: "explore",
+    concurrencyGroup: "explore", completedAt: new Date(), startedAt: new Date(Date.now() - 60_000),
+    progress: { toolCalls: 0, lastUpdate: new Date() },
+  }
+  manager["tasks"].set(task.id, task)
+  // The previous run's output was already observed, so the generic output check passes on it.
+  manager["observedOutputSessions"].add(SESSION)
+  return { manager, task, session, messages, reads, aborts, dispatched: dispatched.promise }
 }
+
+async function resumed() {
+  const fixture = setup()
+  await fixture.manager.resume(resumeInput)
+  await fixture.dispatched
+  return fixture
+}
+
+const failedReads: Array<[string, Read]> = [
+  ["rejects", () => Promise.reject(new TypeError("fetch failed"))],
+  ["returns an SDK error", async () => ({ error: { name: "UnknownError" } })],
+  ["never settles", () => new Promise(() => {})],
+]
 
 beforeEach(() => {
   clearPromptReservationsForTesting()
@@ -22,252 +82,121 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  for (const manager of managers) {
-    await manager.shutdown()
-  }
+  for (const manager of managers) await manager.shutdown()
   managers = []
 })
 
-describe("BackgroundManager resume completion anchor", () => {
-  test.each([
-    ["rejects", () => Promise.reject(new TypeError("unavailable"))],
-    ["returns an error envelope", async () => ({ error: { name: "UnknownError" } })],
-  ])("restores the completed task without dispatch when capture %s", async (_label, read) => {
-    //#given
-    const { manager, client, prompts } = createManagerWithMessages(previousRunMessages())
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    client.session.messages = read
-    //#when
-    await manager.resume(resumeInput)
-    //#then
-    expect(task.status).toBe("completed")
-    expect(task.concurrencyKey).toBeUndefined()
-    expect(prompts).toHaveLength(0)
+afterAll(() => rmSync(WORKTREE, { recursive: true, force: true }))
+
+describe("resuming a completed background task", () => {
+  test("does not complete it on the previous run's output", async () => {
+    const { manager, task, aborts } = await resumed()
+
+    await manager["pollRunningTasks"]()
+
+    expect(task.status).toBe("running")
+    expect(aborts).toHaveLength(0)
   })
 
-  test.each(["cancel", "shutdown"] as const)("does not dispatch after %s during capture", async (action) => {
-    //#given
-    const { manager, client, prompts } = createManagerWithMessages(previousRunMessages())
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
+  test("does not complete it on a session.idle event before the continuation answered", async () => {
+    const { manager, task, aborts } = await resumed()
+    task.startedAt = new Date(Date.now() - 60_000)
+
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: SESSION } })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(task.status).toBe("running")
+    expect(aborts).toHaveLength(0)
+  })
+
+  test("does not count the continuation's own user message as output", async () => {
+    const { manager, task, messages } = await resumed()
+    messages.push(message("msg_continue", "user", "continue"))
+
+    await manager["pollRunningTasks"]()
+
+    expect(task.status).toBe("running")
+  })
+
+  test("completes it once the continuation answered and the session is idle", async () => {
+    const { manager, task, messages, reads, aborts } = await resumed()
+    messages.push(message("msg_answer", "assistant", "continuation answer"))
+
+    await manager["pollRunningTasks"]()
+
+    expect(task.status).toBe("completed")
+    expect(aborts).toEqual([SESSION])
+    expect(reads.every((directory) => directory === WORKTREE)).toBe(true)
+  })
+
+  test("keeps it running when the session turned busy again after the answer was read", async () => {
+    const { manager, task, session, messages } = await resumed()
+    messages.push(message("msg_answer", "assistant", "first step"))
+    const readMessages = session.messages
+    session.messages = async (request) => {
+      session.status = async () => ({ data: { [SESSION]: { type: "busy" } } })
+      return readMessages(request)
+    }
+
+    await manager["pollRunningTasks"]()
+
+    expect(task.status).toBe("running")
+  })
+
+  test("keeps it running when a retry moved the task to another session during the check", async () => {
+    const { manager, task, session, messages, aborts } = await resumed()
+    messages.push(message("msg_partial", "assistant", "partial answer before the failure"))
     const pending = Promise.withResolvers<unknown>()
     const entered = Promise.withResolvers<void>()
-    client.session.messages = () => { entered.resolve(); return pending.promise }
+    session.messages = () => { entered.resolve(); return pending.promise }
+    const poll = manager["pollRunningTasks"]()
+    await entered.promise
+
+    task.sessionId = "ses_retry"
+    pending.resolve({ data: [...messages] })
+    await poll
+
+    expect(task.status).toBe("running")
+    expect(aborts).toHaveLength(0)
+  })
+
+  test.each(failedReads)("keeps it running when the check's message read %s", async (_label, read) => {
+    const { manager, task, session, messages, aborts } = await resumed()
+    messages.push(message("msg_answer", "assistant", "continuation answer"))
+    session.messages = read
+
+    await manager["pollRunningTasks"]()
+
+    expect(task.status).toBe("running")
+    expect(manager["pollingInFlight"]).toBe(false)
+    expect(aborts).toHaveLength(0)
+  }, 10_000)
+
+  test.each(failedReads)("rejects the resume, without dispatching, when the message read %s", async (_label, read) => {
+    const { manager, task, session } = setup()
+    let prompts = 0
+    session.messages = read
+    session.promptAsync = async () => { prompts += 1; return { data: {} } }
+
+    await expect(manager.resume(resumeInput)).rejects.toThrow()
+
+    expect(task.status).toBe("completed")
+    expect(task.concurrencyKey).toBeUndefined()
+    expect(prompts).toBe(0)
+  }, 10_000)
+
+  test("rejects the resume when the manager shuts down while the messages are read", async () => {
+    const { manager, task, session } = setup()
+    const pending = Promise.withResolvers<unknown>()
+    const entered = Promise.withResolvers<void>()
+    session.messages = () => { entered.resolve(); return pending.promise }
     const resume = manager.resume(resumeInput)
     await entered.promise
-    //#when
-    switch (action) {
-      case "cancel": await manager.cancelTask(task.id); break
-      case "shutdown": await manager.shutdown(); break
-    }
-    pending.resolve({ data: previousRunMessages() })
-    await resume
-    //#then
-    expect(prompts).toHaveLength(0)
-    expect(manager["pollingInterval"]).toBeUndefined()
-  })
 
-  test("does not complete when only the continuation user message has arrived", async () => {
-    //#given
-    const messages = previousRunMessages()
-    const { manager, aborts } = createManagerWithMessages(messages, { appendOnPrompt: true })
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    manager["observedOutputSessions"].add(resumeInput.sessionId)
-    await manager.resume(resumeInput)
-    messages.push({ info: { id: "msg_continue", role: "user" }, parts: [{ type: "text", text: "continue" }] })
-    //#when
-    await manager["pollRunningTasks"]()
-    //#then
-    expect(task.status).toBe("running")
-    expect(aborts).toHaveLength(0)
-  })
+    await manager.shutdown()
+    pending.resolve({ data: [] })
 
-  test("rechecks idle after reading resumed output", async () => {
-    //#given
-    const messages = previousRunMessages()
-    const { manager, client, aborts, submitted } = createManagerWithMessages(messages)
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    await manager.resume(resumeInput)
-    await submitted
-    messages.push({ info: { id: "msg_new", role: "assistant" }, parts: [{ type: "text", text: "working" }] })
-    client.session.messages = async () => {
-      client.session.status = async () => ({ data: { ses_bg_anchor: { type: "busy" } } })
-      return { data: messages }
-    }
-    //#when
-    await manager["pollRunningTasks"]()
-    //#then
-    expect(task.status).toBe("running")
-    expect(aborts).toHaveLength(0)
-  })
-
-  test.each([
-    ["rejects", () => Promise.reject(new TypeError("messages unavailable"))],
-    ["returns an SDK error", async () => ({ error: { name: "UnknownError", data: { message: "messages unavailable" } } })],
-  ])("poller keeps the continuation running when the post-resume read %s", async (_label, readMessages) => {
-    //#given
-    const { manager, aborts, client, submitted } = createManagerWithMessages(previousRunMessages())
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    manager["observedOutputSessions"].add(resumeInput.sessionId)
-    await manager.resume(resumeInput)
-    await submitted
-    client.session.messages = readMessages
-
-    //#when
-    await manager["pollRunningTasks"]()
-
-    //#then
-    expect(task.status).toBe("running")
-    expect(aborts).toHaveLength(0)
-  })
-
-  test("poller completes after a failed message read recovers with new output", async () => {
-    //#given
-    const messages = previousRunMessages()
-    const { manager, client, submitted } = createManagerWithMessages(messages)
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    manager["observedOutputSessions"].add(resumeInput.sessionId)
-    await manager.resume(resumeInput)
-    await submitted
-    const readMessages = client.session.messages
-    client.session.messages = async () => ({ error: { name: "UnknownError" } })
-    await manager["pollRunningTasks"]()
-    client.session.messages = readMessages
-    messages.push({ info: { id: "msg_recovered", role: "assistant" }, parts: [{ type: "text", text: "new output" }] })
-
-    //#when
-    await manager["pollRunningTasks"]()
-
-    //#then
+    await expect(resume).rejects.toThrow()
     expect(task.status).toBe("completed")
-  })
-
-  test("poller cancels an unadvanced continuation through the existing stale timeout", async () => {
-    //#given
-    const config = { staleTimeoutMs: 60_000 }
-    const { manager, client, aborts, submitted } = createManagerWithMessages(previousRunMessages(), { config })
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    await manager.resume(resumeInput)
-    await submitted
-    client.session.messages = async () => ({ error: { name: "UnknownError" } })
-    task.startedAt = new Date(Date.now() - MIN_RUNTIME_BEFORE_STALE_MS - 1)
-    task.progress = { toolCalls: 0, lastUpdate: new Date(Date.now() - config.staleTimeoutMs - 1) }
-
-    //#when
-    await manager["pollRunningTasks"]()
-
-    //#then
-    expect(task.status).toBe("cancelled")
-    expect(aborts).toHaveLength(1)
-  })
-
-  test("poller does not re-complete a resumed task on the previous run's output", async () => {
-    //#given
-    const messages = previousRunMessages()
-    const { manager, aborts, submitted } = createManagerWithMessages(messages)
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    // The previous run's part events marked this session's output observed, so
-    // validateSessionHasOutput short-circuits true on the cached entry.
-    manager["observedOutputSessions"].add(task.sessionId!)
-
-    //#when
-    const resumed = await manager.resume(resumeInput)
-    await submitted
-    expect(resumed.status).toBe("running")
-    expect(resumed.resumeAnchor).toEqual({ anchorMessageCount: 2, anchorMessageID: "msg_prev_answer", capturedMessageIDs: ["msg_launch", "msg_prev_answer"] })
-    // The continuation prompt has not landed yet; the previous run's output is
-    // still all the session contains.
-    await manager["pollRunningTasks"]()
-
-    //#then
-    expect(task.status).toBe("running")
-    expect(aborts).toHaveLength(0)
-  })
-
-  test("resumed task completes once a new turn exists after the anchor", async () => {
-    //#given
-    const messages = previousRunMessages()
-    const { manager, aborts, submitted } = createManagerWithMessages(messages)
-    track(manager)
-    const task = createCompletedTask()
-    manager["tasks"].set(task.id, task)
-    manager["observedOutputSessions"].add(task.sessionId!)
-
-    //#when
-    await manager.resume(resumeInput)
-    await submitted
-    // The continuation turn ran and produced a new assistant message.
-    messages.push({
-      info: { id: "msg_new_answer", role: "assistant" },
-      parts: [{ type: "text", text: "continuation answer" }],
-    })
-    await manager["pollRunningTasks"]()
-
-    //#then
-    expect(task.status).toBe("completed")
-    expect(task.resumeAnchor).toBeUndefined()
-    expect(aborts).toHaveLength(1)
-  })
-
-  test("session.idle handler waits for a message after the resume anchor", async () => {
-    //#given
-    const messages = previousRunMessages()
-    const { manager } = createManagerWithMessages(messages)
-    track(manager)
-    const task = createCompletedTask()
-    task.status = "running"
-    task.startedAt = new Date(Date.now() - 60_000)
-    task.resumeAnchor = { anchorMessageCount: 2, anchorMessageID: "msg_prev_answer" }
-    manager["tasks"].set(task.id, task)
-    const completions: string[] = []
-    const deps = {
-      properties: { sessionID: task.sessionId },
-      findBySession: () => task,
-      idleDeferralTimers: new Map(),
-      validateSessionHasOutput: () => manager["validateSessionHasOutput"](task.sessionId!),
-      sessionHasMessagesAfterAnchor: (sessionID: string, candidate: BackgroundTask) =>
-        manager["sessionHasMessagesAfterAnchor"](sessionID, candidate),
-      checkSessionTodos: () => manager["checkSessionTodos"](task.sessionId!),
-      tryCompleteTask: (candidate: BackgroundTask, source: string) => {
-        completions.push(source)
-        return manager["tryCompleteTask"](candidate, source)
-      },
-      emitIdleEvent: () => {},
-    }
-
-    //#when
-    handleSessionIdleBackgroundEvent(deps)
-    await new Promise((resolve) => setTimeout(resolve, 30))
-
-    //#then
-    expect(completions).toHaveLength(0)
-    expect(task.status).toBe("running")
-
-    //#when
-    messages.push({
-      info: { id: "msg_new_answer", role: "assistant" },
-      parts: [{ type: "text", text: "continuation answer" }],
-    })
-    handleSessionIdleBackgroundEvent(deps)
-    await new Promise((resolve) => setTimeout(resolve, 30))
-
-    //#then
-    expect(completions).toHaveLength(1)
-    expect(manager.getTask(task.id)?.status).toBe("completed")
   })
 })
