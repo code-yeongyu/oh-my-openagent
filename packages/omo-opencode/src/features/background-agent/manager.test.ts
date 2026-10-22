@@ -3104,6 +3104,7 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
           promptCallCount += 1
           return {}
         },
+        messages: async () => ({ data: [] }),
         abort: async () => ({}),
       },
     }
@@ -3157,6 +3158,7 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
           promptCallCount += 1
           return {}
         },
+        messages: async () => ({ data: [] }),
         abort: async () => ({}),
       },
     }
