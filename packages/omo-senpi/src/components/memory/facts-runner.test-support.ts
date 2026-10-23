@@ -133,7 +133,7 @@ export function runnerOptions(
         inProcessAttempts += 1
         if (mode === "fail") throw new Error("facts child failed")
         if (mode === "timeout") return await new Promise<ChildHandle>(() => undefined)
-        const tool = createFactsRecordTool({ extractionPath: join(spec.cwd, "extraction.jsonl") })
+        const tool = createFactsRecordTool({ exchanges: [], extractionPath: join(spec.cwd, "extraction.jsonl") })
         const payloadStart = spec.prompt.indexOf("\n\n")
         const payload = JSON.parse(spec.prompt.slice(payloadStart + 2)) as { readonly entries: readonly unknown[] }
         if (mode === "fact" || mode === "model-fallback") {

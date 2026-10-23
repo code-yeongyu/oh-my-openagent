@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { existsSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -8,6 +8,7 @@ import { join } from "node:path"
 import { GitTimeoutError } from "./errors"
 import { createNodeGitExec } from "./exec"
 import { GitMemoryRepo } from "./repo"
+import { GIT_TIMEOUT_DIAGNOSTICS_ENV } from "./timeout-diagnostics"
 import { exitedWithin, probeUntil } from "../locks/process-liveness.test-support"
 
 // omo #10199 field incident: a slow `git commit` was SIGKILLed by the 30 s timeout right after it
@@ -71,6 +72,27 @@ describe("a timed-out git (omo #10199 field incident)", () => {
     // #then
     expect(await failure).toBeInstanceOf(GitTimeoutError)
     expect(existsSync(git.lock)).toBe(true)
+  }, 60_000)
+
+  test.skipIf(process.platform === "win32")("#given the timeout diagnostics directory is set #when git outlives its timeout #then the live process table naming that git is recorded before it is signalled (#10821)", async () => {
+    // #given
+    const root = await scratch("git-timeout-diag-")
+    const git = await fakeGit(root, "remove-lock-and-exit")
+    const diagnostics = join(root, "diagnostics")
+    const exec = createNodeGitExec()
+
+    // #when
+    const failure = exec.run(["add", "-A", "--", "n000.md"], { cwd: root, timeoutMs: 2_000, killGraceMs: 30_000, env: { ...process.env, PATH: `${git.bin}:${process.env.PATH ?? ""}`, [GIT_TIMEOUT_DIAGNOSTICS_ENV]: diagnostics } }).catch((error: unknown) => error)
+    expect(await probeUntil(() => existsSync(git.started), 10_000)).toBe(true)
+
+    // #then
+    expect(await failure).toBeInstanceOf(GitTimeoutError)
+    const [file] = await readdir(diagnostics)
+    const record: { pid: number; argv: string[]; timeoutMs: number; processes: string } = JSON.parse(await readFile(join(diagnostics, file ?? ""), "utf8"))
+    expect(record.argv).toEqual(["add", "-A", "--", "n000.md"])
+    expect(record.timeoutMs).toBe(2_000)
+    expect(record.processes).toContain(String(record.pid))
+    expect(record.processes).toContain(join(git.bin, "git"))
   }, 60_000)
 
   test.skipIf(process.platform === "win32")("#given a commit whose post-commit hook outlives the commit budget #when the commit times out after HEAD moved #then it is reported committed with that commit, without waiting for the hook", async () => {

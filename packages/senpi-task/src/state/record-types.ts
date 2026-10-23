@@ -18,6 +18,32 @@ import type { TaskRunStats } from "./run-stats-types"
 /** An interrupt the parent did not request: the host replaced the child's session mid-turn. */
 export type TaskInterruptCause = "session_replaced"
 
+export const PARENT_MODEL_FALLBACK_REASONS = ["usage_limit", "not_signed_in", "unavailable", "refused", "error"] as const
+
+export type ParentModelFallbackReason = (typeof PARENT_MODEL_FALLBACK_REASONS)[number]
+
+/**
+ * Why a category child ended up on its parent session's model (#10750): every rung of its category
+ * chain failed first. `detail` is the provider's first error line, `resets` the reset time it named,
+ * and `interrupted_tools` the tool calls the failed model was still writing (never run).
+ */
+export type ParentModelFallback = {
+  readonly from_model: string
+  readonly reason: ParentModelFallbackReason
+  readonly detail?: string
+  readonly resets?: string
+  readonly interrupted_tools?: readonly string[]
+  readonly at: string
+  /**
+   * Derived on read, never persisted (#10797): absent once a child is observed on the parent's model;
+   * `switching` while the handoff onto it is in flight, `unconfirmed` when the task ended without a child ever
+   * being observed on it (never spawned, or spawned without reporting its model and died before its first message).
+   */
+  readonly phase?: ParentModelFallbackPhase
+}
+
+export type ParentModelFallbackPhase = "switching" | "unconfirmed"
+
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
@@ -85,6 +111,8 @@ export type TaskRecordInput = {
   readonly fallback_models?: readonly ResolvedModelRecord[]
   readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly resolved_model?: ResolvedModelRecord
+  /** The parent session's model at spawn (`provider/model`); a category child's last fallback rung (#10750). */
+  readonly parent_model?: string
   /**
    * The model the child ACTUALLY runs, recorded once the runner is up (#9722) and kept current
    * from the child's own model observations AND its live model events - model_changed (any
@@ -130,6 +158,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly spawn_spec?: TaskSpawnSpec
   /** Mirrors TaskRecordInput.effective_model; see there. */
   readonly effective_model?: EffectiveModelRecord
+  /** Set once the child moved onto `parent_model` (#10750): when and why. */
+  readonly parent_model_fallback?: ParentModelFallback
   readonly final_response?: string
   readonly error_message?: string
   /** Why a run was interrupted when the parent did not ask for it; such an interrupt notifies the parent. */

@@ -161,10 +161,18 @@ describe("CI fast-path workflow wiring", () => {
 
     const jobs = workflowJobs(ciWorkflowPath)
     const contexts: string[] = []
-    for (const name of ["test", "typecheck", "build", "codex-compatibility", "senpi-compatibility"]) {
-      const job = jobs[name]
-      if (!isRecord(job)) throw new Error(`CI must define ${name}`)
-      expect(job["if"]).toBeUndefined()
+    for (const id of [
+      "test", "typecheck", "build", "codex-compatibility", "senpi-compatibility",
+      "macos-test-1-status", "macos-test-2-status", "macos-codex-status", "macos-senpi-status",
+    ]) {
+      const job = jobs[id]
+      if (!isRecord(job)) throw new Error(`CI must define ${id}`)
+      const name = String(job["name"] ?? id)
+      if (id.startsWith("macos-")) {
+        expect(job["if"]).toBe("${{ always() && !cancelled() }}")
+      } else {
+        expect(job["if"]).toBeUndefined()
+      }
       const strategy = job["strategy"]
       if (!isRecord(strategy)) {
         contexts.push(name)
@@ -195,7 +203,7 @@ describe("CI fast-path workflow wiring", () => {
       "codex-compatibility (ubuntu-latest, full)",
       "codex-compatibility (macos-latest, platform)",
       "codex-compatibility (windows-latest, platform)",
-      "senpi-compatibility (ubuntu-latest)", "Review claim gate",
+      "senpi-compatibility (ubuntu-latest)", "senpi-compatibility (macos-latest)", "Review claim gate",
     ]) {
       expect(contexts).toContain(required)
     }

@@ -83,9 +83,9 @@ async function consumeUnderLock(
     // page that already contains one is the same answer an unbounded scan gives. Only a page that is
     // entirely memory-tool commits has to look underneath it. Over a long-lived identity the range is
     // thousands of commits and the unbounded form costs hundreds of milliseconds on every prompt.
-    commits = await repo.log({ range: `${watermark.lastNotifiedHead}..HEAD`, paths: SOUL_PATHS, limit: SOUL_SCAN_PAGE })
+    commits = await repo.log({ range: `${watermark.lastNotifiedHead}..${head}`, paths: SOUL_PATHS, limit: SOUL_SCAN_PAGE })
     if (commits.length === SOUL_SCAN_PAGE && commits.every(isInBand)) {
-      commits = await repo.log({ range: `${watermark.lastNotifiedHead}..HEAD`, paths: SOUL_PATHS })
+      commits = await repo.log({ range: `${watermark.lastNotifiedHead}..${head}`, paths: SOUL_PATHS })
     }
   } catch (error) {
     if (!(error instanceof GitCommandError)) throw error

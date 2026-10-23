@@ -11,6 +11,7 @@ import {
   sha256B64,
 } from "./vendor/sync-format/jcs.ts"
 import { verifyFramedBytes } from "./vendor/sync-format/keys.ts"
+import { strictEd25519Key, strictEd25519Precheck } from "./strict-ed25519/strict-ed25519.ts"
 
 export const decodeB64 = (value: JsonValue | undefined, length?: number): Uint8Array<ArrayBuffer> | null => {
   if (typeof value !== "string") return null
@@ -24,8 +25,9 @@ export const decodeB64 = (value: JsonValue | undefined, length?: number): Uint8A
 
 /**
  * Ed25519 over `context || 0x00 || JCS(payload)`, framed exactly once by the vendored
- * `verifyFramedBytes`, with the key and signature lengths checked first. Every JSON-payload
- * signature in this module verifies through here.
+ * `verifyFramedBytes`, with the key and signature lengths checked first and a weak key refused
+ * (#10742), since WebCrypto on Bun verifies a forgery under one. Every JSON-payload signature in
+ * this module verifies through here.
  */
 export const verifyTagged = async (
   context: string,
@@ -35,8 +37,14 @@ export const verifyTagged = async (
 ): Promise<boolean> => {
   const key = decodeB64(publicKey, 32)
   const sig = decodeB64(signature, 64)
-  if (key === null || sig === null) return false
+  if (key === null || sig === null || !strictEd25519Precheck(key, sig).ok) return false
   return verifyFramedBytes(context, jcsBytes(payload), key, sig)
+}
+
+/** True only for a base64url key that decodes to 32 bytes and passes the strict check; malformed keys are false. */
+export const isStrongKeyText = (publicKey: string): boolean => {
+  const key = decodeB64(publicKey, 32)
+  return key !== null && strictEd25519Key(key)
 }
 
 export const taggedHash = (context: string, payload: JsonValue): Promise<string> =>
