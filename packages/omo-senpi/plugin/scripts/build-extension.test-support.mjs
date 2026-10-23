@@ -24,6 +24,7 @@ export function outputPathsIn(root) {
     memorySyncOutputPath: join(root, "omo-memory-sync.js"),
     threadClientOutputPath: join(root, "omo-thread-client.js"),
     feedbackOutputPath: join(root, "omo-feedback.js"),
+    claimReceiptOutputPath: join(root, "omo-claim-receipt.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(root, "gateway-store-worker.mjs"),
     threadSdkOutputPath: join(root, "runtime", "thread-sdk", "sdk.js"),

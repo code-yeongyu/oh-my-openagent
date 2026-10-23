@@ -210,6 +210,35 @@ describe("session-pinned memory projection", () => {
     expect(repins).toEqual(["refresh"])
   }, 30_000)
 
+  test("#given a persisted pin at the current HEAD #when the session resumes #then it keeps the pin without asking git whether HEAD exists", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const head = await repo.head()
+    const atHead: ProjectionPinRecord = {
+      version: 1,
+      sessionId: SESSION,
+      revision: head,
+      noticedThrough: head,
+      compactionId: null,
+      pinnedAtMs: 0,
+    }
+    const revisionLookups: string[] = []
+    const log = repo.log.bind(repo)
+    repo.log = async (options) => {
+      if (options?.limit === 1 && options.paths === undefined && typeof options.range === "string") revisionLookups.push(options.range)
+      return log(options)
+    }
+    const { dispatch, repins } = pinnedHandler(repo, context)
+
+    // when
+    const resumed = await dispatch([...liveBranch(1), pinEntry(atHead)])
+
+    // then
+    expect(resumed?.systemPrompt).toContain("first")
+    expect(repins).toEqual([])
+    expect(revisionLookups).toEqual([])
+  }, 30_000)
+
   test("#given a persisted pin whose commit no longer exists #when the session resumes #then it repins to HEAD", async () => {
     // given
     const { repo, context } = await fixture()

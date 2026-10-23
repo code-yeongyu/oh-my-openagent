@@ -92,8 +92,8 @@ jobs:
             - Generated release push: `${{ steps.classify.outputs.generated_release_push || 'unknown' }}`.
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
-            - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (true runs every OS leg; only web, docs, and repository-metadata changes stay ubuntu-only).
-            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (false keeps heavy work on ubuntu; add `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
+            - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (informational; the OS matrix follows the full-matrix flag below).
+            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (pull requests set it only for platform-specific paths; false keeps heavy work on ubuntu; add `run-full-ci` or `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
           JOB_SUMMARY_NEXT: Classification failures default to heavy validation on the full matrix; inspect the changed-path diff and event metadata.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
@@ -162,11 +162,14 @@ jobs:
   test:
     needs: [ci-mode]
     # Preserve required matrix check names during the Ubuntu image migration.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
+    # Outside the full matrix a macOS/Windows leg still reports its required context, from an ubuntu
+    # runner with every heavy step skipped, so it never waits for a hosted macOS/Windows slot (#10856).
+    runs-on: ${{ (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix != 'true') && 'ubuntu-26.04' || matrix.os }}
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
-      # merge_group uses these same six required contexts, without PR labels.
+      # merge_group uses these same four matrix contexts (the macOS ones come from
+      # the macos-combined status jobs), without PR labels.
       # Queue commits always run heavy validation on every OS leg, including
       # docs/web-only groups; the fast path remains a pull-request optimization.
       matrix:
@@ -174,10 +177,6 @@ jobs:
           - os: ubuntu-latest
             shard: "1/2"
           - os: ubuntu-latest
-            shard: "2/2"
-          - os: macos-latest
-            shard: "1/2"
-          - os: macos-latest
             shard: "2/2"
           - os: windows-latest
             shard: "1/2"
@@ -233,11 +232,8 @@ jobs:
       # unprivileged PID namespace, and the step fails loudly when no namespace can be made instead
       # of falling back to the host table (omo #10199). Even inside it, the user's own LIVE git
       # processes return EACCES on /proc/<pid>/fd (this runner's azure 7.0 kernel, and Boat alike),
-      # so the 7 rows that need the scan to answer skip on Linux by themselves (host-scan-blind.test-support.ts,
-      # omo #10431); this step runs the plain command to keep that true. Behavior stays fail-closed (an unanswerable scan keeps
-      # the lock). Coverage for those rows is macOS CI (and macOS hosts) until kernel-lock liveness
-      # lands; running them on Linux CI is #10322's acceptance criterion:
-      # https://github.com/code-yeongyu/oh-my-openagent/issues/10322
+      # so the scans stay unanswerable here; the dead-writer reclaim rows pass through the kernel
+      # git-activity lock instead (omo #10322), which is what this blind host exercises.
       - name: Run tests
         id: root-tests-posix-1
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -278,9 +274,7 @@ jobs:
       - name: Run tests
         id: root-tests-posix-2
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: |
-          bun test --timeout 20000 packages/senpi-task/src/runners/rpc-process.windows.test.ts packages/senpi-task/src/__adversarial__/chaos-bench.test.ts packages/omo-codex/src/install/install-codex-legacy-agent-purge.test.ts script/codex-installer-version.test.ts packages/shared-skills/provenance-gate.test.ts packages/omo-codex/src/install/install-codex-mcp-manifest.test.ts packages/senpi-task/src/dag/scheduler.test.ts packages/omo-native/test/payload.test.ts script/build-omo-binary.test.ts packages/senpi-task/src/team/member-extension/residency.test.ts script/omob-refresh.test.ts script/release-version.test.ts packages/senpi-task/src/store/record-lock.test.ts packages/senpi-task/src/store/record-lock-reap-window.test.ts packages/senpi-task/src/runners/rpc-host/durable-json.test.ts
-          bun --config=bunfig.win2.parallel.toml test --timeout 20000
+        run: bash .github/scripts/ci-root-shard-2.sh
 
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
       # tests observe sh instead of the native PowerShell/cmd execution path.
@@ -332,8 +326,7 @@ jobs:
           TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-posix-1.outcome }} ${{ steps.root-tests-windows-1.outcome }} ${{ steps.root-tests-posix-2.outcome }} ${{ steps.root-tests-windows-2.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
-          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
-        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX" --runtime-touching "$RUNTIME_TOUCHING"
+        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
 
       - name: Write job summary
         if: always()
@@ -348,6 +341,183 @@ jobs:
             - Splits every OS by the same package groups so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # One macOS allocation per head for the four former matrix legs. Native
+  # binary parity remains independent. A full install runs prepare once and
+  # provides the LSP daemon/runtime artifacts the compatibility suites need.
+  macos-combined:
+    needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
+    runs-on: macos-latest
+    # Each part has its own step timeout so one hung part fails only its own
+    # context; the job budget covers install plus the sum of the part budgets.
+    timeout-minutes: 90
+    outputs:
+      lsp: ${{ steps.lsp-daemon-tests.outcome }}
+      shard1: ${{ steps.root-tests-posix-1.outcome }}
+      shard2: ${{ steps.root-tests-posix-2.outcome }}
+      codex: ${{ steps.codex-platform-tests.outcome }}
+      senpi: ${{ steps.senpi-tests-posix.outcome }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        id: install
+        run: |
+          bun install --frozen-lockfile
+          bun run script/remove-stale-self-package-tests.ts
+      - name: Run vendored lsp-daemon tests
+        id: lsp-daemon-tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 5
+        working-directory: packages/lsp-daemon
+        run: npm test
+      - name: Run root test shard 1
+        id: root-tests-posix-1
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 20
+        run: bun test --timeout 20000 packages/omo-opencode packages/memory-core
+      - name: Run root test shard 2
+        id: root-tests-posix-2
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 20
+        run: bash .github/scripts/ci-root-shard-2.sh
+      - name: Run Codex platform smoke
+        id: codex-platform-tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 10
+        run: |
+          bash .github/scripts/ci-codex-platform-build.sh
+          bash .github/scripts/ci-codex-platform-node.sh
+          bun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts
+      - name: Run Senpi compatibility tests
+        id: senpi-tests-posix
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 20
+        run: bash .github/scripts/ci-senpi-posix.sh
+
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_SUMMARY_TITLE: Combined macOS validation
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - LSP daemon: `${{ steps.lsp-daemon-tests.outcome }}`.
+            - Root shard 1: `${{ steps.root-tests-posix-1.outcome }}`.
+            - Root shard 2: `${{ steps.root-tests-posix-2.outcome }}`.
+            - Codex platform: `${{ steps.codex-platform-tests.outcome }}`.
+            - Senpi: `${{ steps.senpi-tests-posix.outcome }}`.
+          JOB_SUMMARY_NEXT: Inspect the failed part; independent parts continue after an earlier failure.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # Matrix values deliberately retain the ruleset's exact required check names,
+  # but these status jobs never allocate macOS runners, including on fast paths.
+  macos-test-1-status:
+    name: test
+    needs: [ci-mode, macos-combined]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            shard: "1/2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Write job summary
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard1 }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
+
+  macos-test-2-status:
+    name: test
+    needs: [ci-mode, macos-combined]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            shard: "2/2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Write job summary
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard2 }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
+
+  macos-codex-status:
+    name: codex-compatibility
+    needs: [ci-mode, macos-combined]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            suite: platform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Write job summary
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.codex }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
+
+  macos-senpi-status:
+    name: senpi-compatibility
+    needs: [ci-mode, macos-combined]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        os: [macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Write job summary
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.senpi }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
 
   typecheck:
     needs: [ci-mode]
@@ -412,7 +582,9 @@ jobs:
   codex-compatibility:
     needs: [ci-mode]
     # Preserve required matrix check names during the Ubuntu image migration.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
+    # Outside the full matrix a macOS/Windows leg still reports its required context, from an ubuntu
+    # runner with every heavy step skipped, so it never waits for a hosted macOS/Windows slot (#10856).
+    runs-on: ${{ (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix != 'true') && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
       # merge_group retains all three required compatibility contexts.
@@ -420,8 +592,6 @@ jobs:
         include:
           - os: ubuntu-latest
             suite: full
-          - os: macos-latest
-            suite: platform
           - os: windows-latest
             suite: platform
     steps:
@@ -476,25 +646,12 @@ jobs:
           exit $status
       - name: Build Codex platform smoke prerequisites
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: |
-          bun run build:codex-install
-          bun run build:git-bash-mcp
-          bun run build:lsp-tools-mcp
-          bun run build:lsp-daemon
-          npm --prefix packages/omo-codex/plugin ci
-          bun run --cwd packages/omo-codex/plugin build
+        run: bash .github/scripts/ci-codex-platform-build.sh
 
       - name: Run Codex platform smoke tests (.mjs via node --test)
         id: codex-smoke-node-tests
         if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.suite == 'platform' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: >-
-          node --test
-          packages/omo-codex/scripts/install-local.test.mjs
-          packages/omo-codex/scripts/install-local-entrypoint.test.mjs
-          packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs
-          packages/omo-codex/scripts/install-cli-args.test.mjs
-          packages/omo-codex/plugin/test/node-install-surface.test.mjs
-          packages/omo-codex/plugin/test/install-time-build-runtime.test.mjs
+        run: bash .github/scripts/ci-codex-platform-node.sh
 
       - name: Run Codex platform smoke tests (.ts via bun test)
         id: codex-smoke-bun-tests
@@ -511,8 +668,7 @@ jobs:
           TEST_OUTCOMES: ${{ steps.codex-full-tests.outcome }} ${{ steps.codex-component-tests.outcome }} ${{ steps.codex-smoke-node-tests.outcome }} ${{ steps.codex-smoke-bun-tests.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
-          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
-        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX" --runtime-touching "$RUNTIME_TOUCHING"
+        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
 
       - name: Write job summary
         if: always()
@@ -530,12 +686,14 @@ jobs:
   senpi-compatibility:
     needs: [ci-mode]
     # Preserve required matrix check names during the Ubuntu image migration.
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-26.04' || matrix.os }}
+    # Outside the full matrix a macOS/Windows leg still reports its required context, from an ubuntu
+    # runner with every heavy step skipped, so it never waits for a hosted macOS/Windows slot (#10856).
+    runs-on: ${{ (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix != 'true') && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
       # merge_group retains this matrix, including the required ubuntu context.
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -580,16 +738,7 @@ jobs:
         id: senpi-tests-posix
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: bash
-        run: |
-          set -euo pipefail
-          bun run build:senpi-plugin
-          PACK_DIR="$RUNNER_TEMP/omo-senpi-pack"
-          mkdir -p "$PACK_DIR"
-          npm pack --pack-destination "$PACK_DIR" packages/omo-senpi/plugin
-          npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
-          bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
-          bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
-          bun test --timeout 20000 packages/omo-senpi
+        run: bash .github/scripts/ci-senpi-posix.sh
 
       - name: Run Senpi compatibility tests with Windows telemetry
         id: senpi-tests-windows
@@ -637,8 +786,7 @@ jobs:
           TEST_OUTCOMES: ${{ steps.senpi-tests-posix.outcome }} ${{ steps.senpi-tests-windows.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
-          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
-        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX" --runtime-touching "$RUNTIME_TOUCHING"
+        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
 
       - name: Write job summary
         if: always()
@@ -876,6 +1024,7 @@ jobs:
   # second reuses the runtime), requiring its eval and pty steps to succeed.
   native-binary-parity:
     needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -976,7 +1125,7 @@ jobs:
   auto-commit-schema:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
+    needs: [ci-mode, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -1027,7 +1176,7 @@ jobs:
   draft-release:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, test, typecheck, codex-compatibility, senpi-compatibility, build, omo-ai-payload-check]
+    needs: [ci-mode, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/dev' &&

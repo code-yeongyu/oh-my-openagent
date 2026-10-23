@@ -90,6 +90,12 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     call: "options.captureEvent(\"computer_use_engine_error\")", reason: THROUGH_FAN_IN,
   },
   {
+    file: "omo-native-handoff-hint.ts", fn: "registerOmoNativeHandoffHintTelemetry>on(=>)",
+    guard: "unless(event === undefined)",
+    route: VIA_FAN_IN,
+    call: "options.captureEvent(\"handoff_hint\")", reason: THROUGH_FAN_IN,
+  },
+  {
     file: "omo-native-crash.ts", fn: "captureProcessCrashes",
     guard: "",
     route: VIA_SESSION_CLIENT,

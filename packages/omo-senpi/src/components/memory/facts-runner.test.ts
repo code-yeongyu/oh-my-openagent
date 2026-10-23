@@ -24,7 +24,7 @@ describe("facts launch ownership", () => {
         starts += 1
         signalStarted()
         await childReleased
-        const tool = createFactsRecordTool({ extractionPath: join(spec.cwd, "extraction.jsonl") })
+        const tool = createFactsRecordTool({ exchanges: [], extractionPath: join(spec.cwd, "extraction.jsonl") })
         const recorded = await tool.execute("fact-1", {
           scope: "project", text: "The project uses Bun.", date: "2026-08-10",
         })

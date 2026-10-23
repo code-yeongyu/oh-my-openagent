@@ -125,7 +125,23 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // Reduced for #9915: the PostHog SDK now lives in a lazy sidecar.
 // Canonical linux/amd64, Bun 1.4.3 after merging dev: 1,553,891 -> 1,396,636 bytes (-157,255).
 // 1,424,569 = ceil(1,396,636 * 1.02), locking in the saving with 2% headroom.
-const BUDGET_BYTES = 1_424_569
+// Raised 1,424,569 -> 1,450,000 in a standalone measured budget PR for the serialized memory-sync bundle batch
+// (#10824, #10785, #10763, #10627, #10630, #10772, #10047, #10694, #10675): memory-sync receive path and
+// device keys, device-session binding, claim-receipt entry glue, doctor --models / exclude_models, i18n.
+// Committed dev measures 1,423,122 bytes; the batch integration head measures 1,444,459 (+21,337) after the
+// canonical regen (linux container, node 24 + bun 1.4.3). Cold start is unchanged: importing the entry bundle
+// takes 116.37 ms on dev vs 114.65 ms on the batch (min of 11, interleaved, same host).
+// 1,450,000 is the measured need plus a 5,541-byte margin. #10860 wins the bytes back by lazy-loading what
+// startup does not need (target revised by the next entry: back to 1,450,000 via #10902).
+// Raised 1,450,000 -> 1,490,000 in a standalone measured budget PR for bundle-train batch #2 (20 cars: memory
+// recall/authority/agreements, gzip early session, git-lock kernel liveness, provider-count telemetry, senpi-task fixes).
+// MEASURED: batch #1 head 1,444,821 B -> batch #2 head 1,485,607 B (+40,786) after the canonical regen (linux container,
+// node 24 + bun 1.4.3, two hosts byte-identical). Cold start, fresh bun importing the built entry, interleaved, same host,
+// 31 runs each: min 126.37 -> 136.63 ms, p10 145.76 -> 145.94 ms, median 176.13 -> 186.27 ms.
+// 1,490,000 is the measured need plus a 4,393-byte margin. #10902 (Fixes #10860) moves the memory slash commands and the
+// memory-sync device account into lazy sidecars: measured on this batch's head, omo.js 1,485,607 -> 1,439,434 B (-46,173),
+// so that PR sets this ceiling back to 1,450,000. The commands sidecar alone (-33,263) would leave it ~2.3 KB over.
+const BUDGET_BYTES = 1_490_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

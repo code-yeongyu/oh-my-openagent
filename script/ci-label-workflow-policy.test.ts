@@ -50,7 +50,7 @@ describe("#given required CI and an optional full-matrix label run", () => {
 
     // then: GitHub evaluates the job gate before job-level concurrency.
     expect(caller["concurrency"]).toBeUndefined()
-    expect(job["if"]).toBe("github.event.label.name == 'ci:full-matrix'")
+    expect(job["if"]).toBe("github.event.label.name == 'ci:full-matrix' || github.event.label.name == 'run-full-ci'")
     expect(job["uses"]).toBe("./.github/workflows/ci.yml")
     const concurrency = record(job["concurrency"])
     expect(concurrency["cancel-in-progress"]).toBe(true)

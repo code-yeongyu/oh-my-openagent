@@ -1,5 +1,5 @@
 {
-  "description": "with a live host-relay stop path, a click before any capture, or naming a frame that is not the target's latest capture, fails InvalidCoordinateFrame; a click on the latest frame succeeds. Every click is audited.",
+  "description": "with a live host-relay stop path, a click before any capture, or naming a frame that is not the target's latest capture, fails InvalidCoordinateFrame; a click on the latest frame succeeds. Every click is audited; desktop input needs the human-confirmed control grant (#10788), granted after the heartbeat.",
   "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
     "SENPI_DESKTOP_FAKE_CLOCK": "1"
@@ -116,6 +116,55 @@
             "result": null
           },
           "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 31,
+        "method": "control.grant",
+        "params": {
+          "reason": "desktop input after the human approved (#10788)",
+          "confirmationId": "confirm-1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 31,
+            "result": {
+              "active": true,
+              "reason": "desktop input after the human approved (#10788)",
+              "grantedAt": "2026-01-01T00:00:00.000Z"
+            }
+          },
+          "variable": [
+            "/result/grantedAt"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "control.grant",
+              "target": "control",
+              "delivery": "control",
+              "frameId": null,
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": 47,
+              "textSha256": "0000000000000000",
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/textSha256"
+          ]
         }
       ]
     },

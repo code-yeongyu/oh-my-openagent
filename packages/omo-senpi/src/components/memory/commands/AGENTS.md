@@ -1,6 +1,6 @@
 # memory commands
 
-The thirteen memory slash commands, registered once by the memory component through `register.ts` (`registerMemoryCommands(pi, deps)`). `MEMORY_COMMAND_NAMES`: `/memory /memfs /remember /init /doctor /recompile /memory-repository /sleeptime /reflect /dream /search /people /facts`. Score ~24 (53 files, DI surface, central registration).
+The fourteen memory slash commands, registered once by the memory component through `register.ts` (`registerMemoryCommands(pi, deps)`). `MEMORY_COMMAND_NAMES`: `/memory /memfs /remember /init /doctor /recompile /memory-repository /sleeptime /reflect /dream /search /people /facts /agreements`. Score ~24 (53 files, DI surface, central registration).
 
 ## Anatomy
 
@@ -17,6 +17,7 @@ The thirteen memory slash commands, registered once by the memory component thro
 | `recompile.ts` / `remember.ts` / `search.ts` / `sleeptime.ts` / `reflect.ts` / `dream.ts` + `dream-staging.ts` | Single-purpose commands; `/sleeptime` shows the resolved nudge/facts/dream/people/soul settings. |
 | `memory-repository.ts` | Push-only git mirror sync (the cloud-free sync story). |
 | `people.ts` / `people-runtime.ts` / `people-ask.ts` / `people-query.ts` / `people-render.ts` / `people-search.ts` + `people.test-support.ts` | People cards: query/selection, ask runner (`createPeopleAskRunner`), roster/card rendering, search hits. `people.ts` is only the registration shell; `runPeopleCommand` in `people-runtime.ts` ships in the memory palace sidecar (`../palace/runtime.ts`) and loads on the first `/people`. |
+| `agreements.ts` | `/agreements [list] \| add [--project] <text> \| ack <id> \| drop <id>`: the person's own surface over `system/agreements.md` and the ONLY writer of `by: human` items (commits with `Omo-Writer: human-command`, then busts the prompt cache). |
 | `facts.ts` / `facts-status.ts` | `/facts` queue depth, parked/backoff counts, next eligibility, bounded per-conversation last-failure list. Corrupt `failures.json` renders as UNREADABLE, never as zeros. `/facts retry [--conversation <id>]` is the ONLY unpark path: clears failure records and fires one reconcile/launch; never moves queue data or either watermark. |
 | `skill-frontmatter.ts` / `tokens.ts` | Skill-name frontmatter repair; token estimates (`estimateSystemTokens`). |
 | `commands.test-support.ts` | Shared fixtures. |

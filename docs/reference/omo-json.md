@@ -108,6 +108,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "git_master": { "commit_footer": false }, // opt-in commit footer (Native harness); no Co-authored-by trailer is ever emitted
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
+  "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
   "[native]": {},       // OmO Native-only overrides, typed base keys
   "[codex]": {},        // Codex-only overrides, typed base keys
@@ -121,7 +122,7 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`, `exclude_models`), so a harness-specific override stays schema-checked.
 
 `[senpi]` is the legacy spelling of `[native]`, kept working for one release line. It is canonicalized to `[native]` when the config is read, so a config that cannot be rewritten still applies every value it sets, and the startup migration rewrites the key in the file once, naming it in a notice. When a file carries both blocks, `[native]` wins and the ignored `[senpi]` block is reported as a deprecation diagnostic.
 
@@ -135,6 +136,25 @@ The one supported way to turn a skill off. A name listed here is absent from the
   "disabled_skills": ["frontend", "visual-qa"]
 }
 ```
+
+### `exclude_models` (Native harness)
+
+Keeps a model out of every chain OmO Native picks from. A matching model is treated as if its provider had no login: a category's builtin rungs, its `model` / `models` / `fallback_models`, an agent's chain, an agent that borrows a category, memory children (reflection, dream and facts, including the session model they would otherwise inherit), the main session's `model_profile` walk (a literal pin included), an explicit `model` on a task call, a task child respawned or resumed on its recorded model (its recorded fallback chain is filtered the same way, so a model excluded after the child was planned never runs), and the `-fast` sibling a fast parent would upgrade a child to (the child keeps its planned model instead). A task call that pins an excluded model fails with `model_unavailable` and names the entry that matched. A category or agent whose every rung is excluded becomes unavailable, exactly like one with no connected provider.
+
+- `provider/model` matches that provider's copy only: `"opencode/claude-fable-5-1"`.
+- A bare model id matches it from any provider, including a gateway that nests the vendor in its id (`openrouter/anthropic/claude-fable-5-1`): `"claude-fable-5-1"`. A `vendor/model` entry such as `"anthropic/claude-fable-5-1"` also matches that nested id.
+- `*` matches any run of characters, and matching ignores case: `"claude-fable-*"` keeps every Fable build out.
+
+Like `disabled_skills`, layers are unioned: a project file cannot let back in a model the user file keeps out. Senpi's own mid-session retry chains for the main session (`retry.fallbackChains` in the engine settings) are not covered.
+
+```jsonc
+// ~/.omo/omo.jsonc
+{
+  "exclude_models": ["claude-fable-*"]
+}
+```
+
+To see the effect, run `omo doctor --models`. It prints, for every category and task agent, the model a spawn runs first, the runtime retry chain in order, and each declared rung with its source (`built-in`, `omo.json`, or `category:<name>` for an agent that borrows a category) and its state (`runs first`, `fallback N`, `excluded by exclude_models "..."`, `no login`, `not reached`), then the main session's `model_profile` lane. Add `--json` for tooling. The answer comes from the same resolvers spawns use, so it cannot drift from what runs. Logins are read offline and credentials are not probed.
 
 Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
 
@@ -156,7 +176,7 @@ The block may also appear at the shared top level or in profile layers and follo
 
 ### `memory` (Native harness)
 
-The optional `memory` block configures the Senpi memory subsystem (`schema/memory.ts` `OmoMemorySettingsSchema`). Keys: `enabled` (default `true`), `agent` (default `"auto"`), the sub-blocks `reflection`, `nudge`, `recall` (the resident, read-only Kibitzer sidecar behind `recalled memory:` notices - one per main session, prompt and tool-call triggered, nudge-only output, no memory writes: `enabled` as the only off switch, `max_items` per wake, `category` defaulting to `quick`, `event_caps` defaulting to `{ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }` for its redacted event feed, `sidecar_max_tokens` defaulting to `48000` with a proactive reseed at 60%, `max_concurrent_wakes` defaulting to `2` as the machine-wide wake lease, `tool_budget` defaulting to `8` read-only tool calls per wake, and `query_expansion` defaulting to `false` for letting the sidecar add discounted synonyms, keywords and related terms to its own memory searches), `facts`, `dream`, `people`, `soul`, `write_notice`, `sync`, `search`, plus `compile_warn_tokens` and per-agent overrides under `agents`. These recall keys can be set at the shared root, harness/profile layer, or per-agent override; layer values are deep-partial and later layers win.
+The optional `memory` block configures the Senpi memory subsystem (`schema/memory.ts` `OmoMemorySettingsSchema`). Keys: `enabled` (default `true`), `agent` (default `"auto"`), `auto_identity` (default `"path"`; `"git"` makes the auto identity of a linked git worktree the main checkout's, so every worktree of one clone shares that memory - set it in `~/.omo/omo.jsonc` when worktrees live outside the main checkout), the sub-blocks `reflection`, `nudge`, `recall` (the resident, read-only Kibitzer sidecar behind `recalled memory:` notices - one per main session, prompt and tool-call triggered, nudge-only output, no memory writes: `enabled` as the only off switch, `max_items` per wake, `category` defaulting to `quick`, `event_caps` defaulting to `{ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }` for its redacted event feed, `sidecar_max_tokens` defaulting to `48000` with a proactive reseed at 60%, `max_concurrent_wakes` defaulting to `2` as the machine-wide wake lease, `tool_budget` defaulting to `8` read-only tool calls per wake, and `query_expansion` defaulting to `false` for letting the sidecar add discounted synonyms, keywords and related terms to its own memory searches), `facts`, `dream`, `people`, `soul`, `write_notice`, `sync`, `search`, plus `compile_warn_tokens` and per-agent overrides under `agents`. These recall keys can be set at the shared root, harness/profile layer, or per-agent override; layer values are deep-partial and later layers win.
 
 Reflection children start without extensions so they stay fast. When the reflection model belongs to a provider that only an extension registers (a custom gateway declared under `packages` in `settings.json`, for example), omo detects that the model is missing from the extension-free model list and starts that child with extensions loaded instead; the child still keeps its own memory component off. If no child can see the model even with extensions loaded, automatic reflection pauses after that first failure and shows one notice. To fix it, point `categories.<category>.model` (or `memory.reflection.category`) at a model from a core provider, or set `memory.reflection.enabled` to `false`. `/reflect` retries at once, and the paused state is probed again every six hours.
 
@@ -311,11 +331,11 @@ When an agent or category `model` string matches a catalog key, resolution (`mod
 
 ### Model profiles (Native harness)
 
-A model profile is a named, ordered model chain you pick by lane (Daily / Geeky × Normal / Heavy) instead of by model id. Two keys drive it (`schema/model-profile.ts`, `schema/config.ts`):
+A model profile is a named, ordered model chain you pick by lane (Daily / Obsessive × Normal / Heavy) instead of by model id. Two keys drive it (`schema/model-profile.ts`, `schema/config.ts`):
 
 | Key | Type | Notes |
 |-----|------|-------|
-| `model_profiles` | record<string, `{ display_name?: string; family?: "daily" \| "geeky"; tier?: "normal" \| "heavy"; models?: model entries }`> | Named chains. `models` entries are the same shape as a category chain: a bare string (`provider/model`, a bare model id, either with an optional `:level` reasoning suffix) or `{ model, reasoning?, ... }`. Fields are optional; the object is strict. `family` / `tier` are metadata only. |
+| `model_profiles` | record<string, `{ display_name?: string; caution?: string; family?: "daily" \| "geeky"; tier?: "normal" \| "heavy"; models?: model entries }`> | Named chains. `models` entries are the same shape as a category chain: a bare string (`provider/model`, a bare model id, either with an optional `:level` reasoning suffix) or `{ model, reasoning?, ... }`. Fields are optional; the object is strict. `family` / `tier` are metadata only. |
 | `model_profile` | string | Which chain drives the main session model. Either a lane id (`daily-normal`) or a literal `provider/model` (`anthropic/claude-opus-5-5`). A value containing `/` is a pin, so the pin and the profile share one key. |
 
 This is not the `profiles` key. `profiles.<name>` is a config-layer overlay activated by `OMO_PROFILE` (see [Profile activation](#profile-activation)): it changes which configuration is loaded. `model_profiles` and `model_profile` are ordinary base keys inside that configuration: they change which model the main session starts on. A `profiles.<name>` layer may set `model_profile` like any other key, which is the one way the two meet.
@@ -326,8 +346,8 @@ Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builti
 |----|--------------|-------|
 | `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3` (max) -> `glm-5.3` (max) |
 | `daily-heavy` | Daily · Heavy | `claude-fable-5-1` (xhigh) |
-| `geeky-normal` | Geeky · Normal | `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
-| `geeky-heavy` | Geeky · Heavy | `gpt-6-astra` (high) |
+| `geeky-normal` | Obsessive · Normal | `gpt-6-astra` (medium, ChatGPT subscription/API/Copilot/OpenCode), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
+| `geeky-heavy` | Obsessive · Heavy | `gpt-6-astra` (high) |
 
 GPT profiles use the same provider coverage as the corresponding task lanes:
 ChatGPT subscription takes priority over the `openai` API/proxy lane. A user
@@ -337,7 +357,7 @@ next user-listed candidate, while a bare model id may match any provider.
 
 What happens at session start (`packages/omo-senpi/src/components/model-profile/index.ts`, `resolve.ts`) in OmO Desktop and headless sessions. The interactive TUI does not apply `model_profile` yet; it keeps the model it started with.
 
-- `model_profile` unset: Daily · Normal is applied on a fresh session. When none of its rungs resolves on the connected providers, the first of Daily · Heavy, Geeky · Normal and Geeky · Heavy that does is applied instead (a ChatGPT-only setup starts on Geeky · Normal); when none resolves, the notice names Daily · Normal and the current model stays. The apply is not written back to config. Builtin rungs are served only by their ranked providers, so a gateway aggregator's copy of a model (for example OpenGateway's `anthropic/claude-opus-5-5`) is never picked. A saved `model_profile: "recommended"` (retired) starts this same default with one log line and is never reported as unknown, unless your own `model_profiles` defines `recommended`.
+- `model_profile` unset: Daily · Normal is applied on a fresh session. When none of its rungs resolves on the connected providers, the first of Daily · Heavy, Obsessive · Normal and Obsessive · Heavy that does is applied instead (a ChatGPT-only setup starts on Obsessive · Normal); when none resolves, the notice names Daily · Normal and the current model stays. The apply is not written back to config. Builtin rungs are served only by their ranked providers, so a gateway aggregator's copy of a model (for example OpenGateway's `anthropic/claude-opus-5-5`) is never picked. A saved `model_profile: "recommended"` (retired) starts this same default with one log line and is never reported as unknown, unless your own `model_profiles` defines `recommended`.
 - A literal `provider/model`: that exact model is looked up in the live registry and applied.
 - A profile id: the builtin table is overlaid with `model_profiles`, and the first rung the live registry can serve is applied. The notice names the lane, the pick, and the thinking level, for example `OmO Native: model profile "daily-normal" (Daily · Normal) selected anthropic-subscription/claude-opus-5-5 medium; mid-session fallback follows senpi's retry chains`.
 - A rung counts for a profile only when its first turn could use it, which is resolved at session start: the provider's stored credential (per account when the provider holds several and the engine may rotate them - a pinned account is the only one that counts; with `providers.<id>.credentials.rotation: false` in `models.json` or a runtime API key only the default credential counts) and then the model's own request configuration. A saved login that can no longer be refreshed is skipped with the whole provider; a model whose configured headers do not resolve is skipped alone, and its siblings stay eligible. The notice names each skipped provider or model and the recovery for the current surface (`re-authenticate <provider> in Provider authentication settings` on the desktop, `/login <provider>` in an interactive session for a headless run); the raw error is never shown, `details.authFailed` carries `{ provider, model, reason }` with `reason` one of `refresh`, `credentials`, `request`. Each attempted account costs one credential resolution, sequentially (a rejected refresh waits for the provider's exchange timeout). A literal `provider/model` is applied without this check.

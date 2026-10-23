@@ -1,3 +1,5 @@
+import { isExcludedModel } from "@oh-my-opencode/omo-config-core"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { RETIRED_MODEL_PROFILE_IDS } from "./builtin-profiles"
@@ -160,9 +162,11 @@ async function resolveWithRequestAuth(
   agentDir: string | undefined,
   profiles: Parameters<typeof resolveModelProfile>[0]["profiles"],
   active: string,
+  excludeModels: readonly string[] | undefined,
   state: ProbeState = newProbeState(),
 ): Promise<ProbedResolution> {
-  const available = availableSelectors(registry)
+  // An excluded model is never a candidate, a literal pin included: exclude_models wins everywhere.
+  const available = availableSelectors(registry).filter((selector) => !isExcludedModel(selector, excludeModels))
   const { excludedProviders, excludedSelectors, failures } = state
   const resolve = () =>
     resolveModelProfile({
@@ -241,7 +245,7 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
         const mode = extractMode(eventCtx)
         const probes = newProbeState()
         const resolveFor = (profileId: string) =>
-          resolveWithRequestAuth(ctx, registry, extractAgentDir(eventCtx), config.model_profiles, profileId, probes)
+          resolveWithRequestAuth(ctx, registry, extractAgentDir(eventCtx), config.model_profiles, profileId, config.exclude_models, probes)
         const { resolution, model, failures } =
           explicit === undefined ? await resolveDefaultModelProfile(resolveFor) : await resolveFor(explicit)
         const content = noticeContent(resolution, failures, mode)

@@ -1,4 +1,6 @@
+import type { AgreementExtractionRecord, AgreementsPolicy, FactsKnownAgreement } from "../agreements/types"
 import type { GitCommitAuthor, GitMemoryRepo } from "../git"
+import { parseClaimReceipt, type ClaimReceipt } from "../provenance"
 import { applyFactsRecovery } from "./recovery"
 import {
   FactsPlanParentDirtyError,
@@ -14,13 +16,15 @@ export interface FactsPersonReference {
   readonly aliases: readonly string[]
 }
 
+// `receipt` is optional only for records written before #10488; the record tool always attaches one.
 export type FactsExtractionRecord =
-  | { readonly scope: "person"; readonly person: FactsPersonReference; readonly text: string; readonly date: string }
-  | { readonly scope: "project"; readonly text: string; readonly date: string }
+  | { readonly scope: "person"; readonly person: FactsPersonReference; readonly text: string; readonly date: string; readonly receipt?: ClaimReceipt }
+  | { readonly scope: "project"; readonly text: string; readonly date: string; readonly receipt?: ClaimReceipt }
 
 export interface FactsBatch {
   readonly batchId: string
   readonly records: readonly FactsExtractionRecord[]
+  readonly agreements?: readonly AgreementExtractionRecord[]
 }
 
 export interface FactsKnownPerson {
@@ -36,6 +40,7 @@ export interface FactsPayload {
   readonly entries: readonly FactsQueueEntry[]
   readonly knownPeople: readonly FactsKnownPerson[]
   readonly primaryHuman: { readonly slug: "human"; readonly aliases: readonly string[] }
+  readonly agreements?: readonly FactsKnownAgreement[]
 }
 
 export type ApplyFactsBatchResult =
@@ -45,6 +50,7 @@ export type ApplyFactsBatchResult =
 
 export interface ApplyFactsBatchOptions {
   readonly people?: FactsPeopleRouting
+  readonly agreements?: AgreementsPolicy
   readonly onAliasTie?: (tie: FactsAliasTie) => void
   readonly publishRecovery?: (recovery: FactsApplyRecovery) => Promise<void>
 }
@@ -75,11 +81,12 @@ export async function applyFactsBatch(
   options: ApplyFactsBatchOptions = {},
 ): Promise<ApplyFactsBatchResult> {
   validateFactsBatchId(batch.batchId)
-  if (batch.records.length === 0) return { outcome: "no_facts", affectedPaths: [] }
+  const count = factsBatchSize(batch)
+  if (count === 0) return { outcome: "no_facts", affectedPaths: [] }
   try {
-    const recovery = await planFactsMutation(repo, batch, options.people, options.onAliasTie)
+    const recovery = await planFactsMutation(repo, batch, options.people, options.onAliasTie, options.agreements)
     await options.publishRecovery?.(recovery)
-    return applyFactsRecovery(repo, recovery, batch.records.length, author)
+    return applyFactsRecovery(repo, recovery, count, author)
   } catch (error) {
     if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty" }
     throw error
@@ -93,10 +100,14 @@ export function validateFactsRecovery(
   validateFactsBatchId(batch.batchId)
   if (recovery.version !== 1
     || recovery.batchId !== batch.batchId
-    || recovery.recordsHash !== factsRecordsHash(batch.records)
+    || recovery.recordsHash !== factsRecordsHash(batch.records, batch.agreements)
     || recovery.paths.some((entry, index) => index > 0 && recovery.paths[index - 1]!.path >= entry.path)) {
     throw new TypeError("Invalid facts applyRecovery envelope")
   }
+}
+
+export function factsBatchSize(batch: FactsBatch): number {
+  return batch.records.length + (batch.agreements?.length ?? 0)
 }
 
 export function parseFactsExtractionRecord(value: unknown, index: number): FactsExtractionRecord {
@@ -105,21 +116,24 @@ export function parseFactsExtractionRecord(value: unknown, index: number): Facts
   const date = validDate(value.date)
   if (text === undefined) throw invalid(index, "text must be non-empty")
   if (date === undefined) throw invalid(index, "date must be YYYY-MM-DD")
+  const receipt = value.receipt === undefined ? undefined : parseClaimReceipt(value.receipt)
+  if (value.receipt !== undefined && receipt === undefined) throw invalid(index, "receipt is malformed")
+  const withReceipt = receipt === undefined ? {} : { receipt }
   if (value.scope === "project") {
     if ("person" in value) throw invalid(index, "project record must not carry person")
-    assertKeys(value, ["scope", "text", "date"], index)
-    return { scope: "project", text, date }
+    assertKeys(value, ["scope", "text", "date", "receipt"], index)
+    return { scope: "project", text, date, ...withReceipt }
   }
   if (value.scope !== "person") throw invalid(index, "scope must be person or project")
   if (!("person" in value)) throw invalid(index, "person record requires person")
-  assertKeys(value, ["scope", "person", "text", "date"], index)
+  assertKeys(value, ["scope", "person", "text", "date", "receipt"], index)
   if (!isRecord(value.person)) throw invalid(index, "person must be an object")
   assertKeys(value.person, ["name", "aliases"], index)
   const name = nonEmpty(value.person.name)
   if (name === undefined || !Array.isArray(value.person.aliases)) throw invalid(index, "person requires name and aliases")
   const aliases = value.person.aliases.map(nonEmpty)
   if (aliases.some((alias) => alias === undefined)) throw invalid(index, "person aliases must be non-empty strings")
-  return { scope: "person", person: { name, aliases: aliases as string[] }, text, date }
+  return { scope: "person", person: { name, aliases: aliases as string[] }, text, date, ...withReceipt }
 }
 
 function assertKeys(value: Record<string, unknown>, allowed: readonly string[], index: number): void {

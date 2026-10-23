@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:b408b576ee9f2c827cd2733d966cd724fd27f029332824185037c443d3f8dd57:45ee374af9a88da9712fc3e3f8e220dbdc302cebb6f4025884612f07180b8a02
+// omo-codex-install:86887beec4a71033b5338b0fe4a2a1d1ef7f01a24b155e45a4794e95ec97c925:c92f287be053aec70fa39eb4a642909b8ee5721383fc3987f69b4e0ca55ae568
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -284,6 +284,8 @@ function toDiagnosticRecord(input, now) {
     timestamp: now.toISOString(),
     event: input.event,
     source: input.source,
+    ...input.entryKind === undefined ? {} : { entry_kind: input.entryKind },
+    ...input.errorCode === undefined ? {} : { error_code: input.errorCode },
     ...input.count === undefined ? {} : { count: input.count },
     ...serializeError(input.error, input.errorKind)
   };
@@ -10036,7 +10038,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.40",
+    version: "5.1.44",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19486,6 +19488,19 @@ var OmoHarnessIdSchema = _enum(OMO_CONFIG_HARNESS_IDS);
 var OMO_CONFIG_LEGACY_HARNESS_ALIASES = { senpi: "native" };
 var OMO_CONFIG_LEGACY_HARNESS_IDS = Object.keys(OMO_CONFIG_LEGACY_HARNESS_ALIASES);
 
+// packages/omo-config-core/src/schema/memory-agreements.ts
+var OMO_MEMORY_AGREEMENTS_DEFAULTS = { enabled: true, needs_human_threshold: 3, max_items: 64 };
+var OmoMemoryAgreementsSchema = object({
+  enabled: boolean2().default(OMO_MEMORY_AGREEMENTS_DEFAULTS.enabled),
+  needs_human_threshold: number2().int().min(1).default(OMO_MEMORY_AGREEMENTS_DEFAULTS.needs_human_threshold),
+  max_items: number2().int().min(8).max(256).default(OMO_MEMORY_AGREEMENTS_DEFAULTS.max_items)
+}).strict();
+var OmoMemoryAgreementsLayerSchema = object({
+  enabled: boolean2().optional(),
+  needs_human_threshold: number2().int().min(1).optional(),
+  max_items: number2().int().min(8).max(256).optional()
+}).strict();
+
 // packages/omo-config-core/src/schema/memory.ts
 var OmoMemoryReflectionTriggerSchema = object({
   step_count: number2().int().nonnegative().default(25),
@@ -19629,6 +19644,7 @@ var OmoMemoryAgentOverridesSchema = object({
   facts: OmoMemoryFactsLayerSchema.optional(),
   dream: OmoMemoryDreamLayerSchema.optional(),
   people: OmoMemoryPeopleLayerSchema.optional(),
+  agreements: OmoMemoryAgreementsLayerSchema.optional(),
   soul: OmoMemorySoulLayerSchema.optional(),
   write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
@@ -19637,9 +19653,11 @@ var OmoMemoryAgentOverridesSchema = object({
   projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
+var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
 var OmoMemorySettingsSchema = object({
   enabled: boolean2().default(true),
   agent: string2().min(1).default("auto"),
+  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
   reflection: OmoMemoryReflectionSchema.default({
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -19659,6 +19677,7 @@ var OmoMemorySettingsSchema = object({
     auto_select_max_chars: 150000
   }),
   people: OmoMemoryPeopleSchema.default({ enabled: true, max_entries: 40, max_entry_chars: 200 }),
+  agreements: OmoMemoryAgreementsSchema.default(OMO_MEMORY_AGREEMENTS_DEFAULTS),
   soul: OmoMemorySoulSchema.default({ edit_notice: true }),
   write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
   sync: OmoMemorySyncSchema.default({ enabled: true }),
@@ -19680,11 +19699,13 @@ var OmoMemorySettingsSchema = object({
 var OmoMemorySettingsLayerSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
+  auto_identity: OmoMemoryAutoIdentitySchema.optional(),
   reflection: OmoMemoryReflectionLayerSchema.optional(),
   nudge: OmoMemoryNudgeLayerSchema.optional(),
   facts: OmoMemoryFactsLayerSchema.optional(),
   dream: OmoMemoryDreamLayerSchema.optional(),
   people: OmoMemoryPeopleLayerSchema.optional(),
+  agreements: OmoMemoryAgreementsLayerSchema.optional(),
   soul: OmoMemorySoulLayerSchema.optional(),
   write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
   sync: OmoMemorySyncLayerSchema.optional(),
@@ -19717,6 +19738,7 @@ function isRecord6(value) {
 }
 var OmoModelProfileInputSchema = object({
   display_name: string2().optional(),
+  caution: string2().optional(),
   family: _enum(["daily", "geeky"]).optional(),
   tier: _enum(["normal", "heavy"]).optional(),
   models: array(union([string2(), OmoFallbackModelObjectSchema])).optional()
@@ -19988,6 +20010,7 @@ var OmoGatewaySectionSchema = record(string2(), unknown()).describe("Chat-surfac
 // packages/omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoDisabledSkillsSchema = array(string2());
+var OmoExcludedModelsSchema = array(string2());
 var OmoTypedHarnessConfigSchema = object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   gateway: OmoGatewaySectionSchema.optional(),
@@ -20003,7 +20026,8 @@ var OmoTypedHarnessConfigSchema = object({
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
-  disabled_skills: OmoDisabledSkillsSchema.optional()
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional()
 }).strict();
 var OmoConfigProfileSchema = object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
@@ -20020,6 +20044,7 @@ var OmoConfigProfileSchema = object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -20042,6 +20067,7 @@ var OmoConfigSchema = object({
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -20067,6 +20093,7 @@ var OmoConfigLayerSchema = object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -20189,6 +20216,50 @@ var DEFAULT_READ_FILE_SYSTEM = {
   readFileSync: readFileSync2,
   realpathSync: realpathSync2
 };
+
+// packages/omo-config-core/src/loader/disabled-skills.ts
+function toRecord(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return;
+  return value;
+}
+function namesAt(record, key) {
+  const value = record?.[key];
+  if (!Array.isArray(value))
+    return [];
+  return value.filter((entry) => typeof entry === "string" && entry.trim() !== "");
+}
+function harnessBlockKeys(harness) {
+  const canonical = canonicalHarnessName(harness);
+  const legacy = Object.entries(OMO_CONFIG_LEGACY_HARNESS_ALIASES).filter(([, target]) => target === canonical).map(([name]) => harnessBlockKey(name));
+  return [harnessBlockKey(canonical), ...legacy];
+}
+function scopesOf(config, harness) {
+  if (harness === undefined)
+    return [config];
+  return [config, ...harnessBlockKeys(harness).map((key) => toRecord(config[key]))];
+}
+function collectExcludedModels(options) {
+  return collectUnionedList("exclude_models", options);
+}
+function collectUnionedList(key, options) {
+  const names = new Set;
+  for (const layer of options.layers) {
+    const config = toRecord(layer.config);
+    if (config === undefined)
+      continue;
+    const profile = options.profile === undefined ? undefined : toRecord(toRecord(config["profiles"])?.[options.profile]);
+    const scopes = [
+      ...scopesOf(config, options.harness),
+      ...profile === undefined ? [] : scopesOf(profile, options.harness)
+    ];
+    for (const scope of scopes) {
+      for (const name of namesAt(scope, key))
+        names.add(name.trim());
+    }
+  }
+  return [...names];
+}
 
 // node_modules/.bun/jsonc-parser@3.3.1/node_modules/jsonc-parser/lib/esm/impl/scanner.js
 function createScanner(text, ignoreTrivia = false) {
@@ -21262,7 +21333,7 @@ function stripUnrecognizedKeys(record, issues) {
   }
   return { issuePaths, stripped };
 }
-function toRecord(value) {
+function toRecord2(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value))
     return null;
   const record = {};
@@ -21277,7 +21348,7 @@ var validateLayerRecord = (record) => {
 };
 function validateConfigLayer(path, data) {
   const sanitized = sanitizeUnsafeKeys(data);
-  const record = toRecord(sanitized.value);
+  const record = toRecord2(sanitized.value);
   const unsafeIssuePaths = sanitized.issues.flatMap((issue) => issue.keys.map((key) => [...issue.path, key].join(".")));
   const unsafeDiagnostics = unsafeIssuePaths.length === 0 ? [] : [{ kind: "unknown-keys", message: `Ignored unknown keys in ${path}: ${unsafeIssuePaths.join(", ")}`, path, issuePaths: unsafeIssuePaths }];
   const validation = OmoConfigLayerSchema.safeParse(sanitized.value);
@@ -21417,7 +21488,7 @@ function resolveOmoProfileName(options = {}) {
   const env = options.env ?? process.env;
   return profileName(options.profile) ?? profileName(env["OMO_PROFILE"]) ?? profileName(env["OCX_PROFILE"]) ?? profileNameFromOpenCodeConfigDir(env["OPENCODE_CONFIG_DIR"]);
 }
-function toRecord2(value) {
+function toRecord3(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value))
     return;
   return Object.fromEntries(Object.entries(value));
@@ -21438,13 +21509,13 @@ function harnessLayer(config, harness) {
   const legacyKeys = Object.entries(OMO_CONFIG_LEGACY_HARNESS_ALIASES).filter(([, target]) => target === canonical).map(([legacy]) => harnessBlockKey(legacy));
   let layer = {};
   for (const key of [...legacyKeys, harnessBlockKey(canonical)]) {
-    layer = mergeOmoConfigRecords(layer, toRecord2(config[key]) ?? {});
+    layer = mergeOmoConfigRecords(layer, toRecord3(config[key]) ?? {});
   }
   return layer;
 }
 function resolveOmoConfigView(options) {
-  const profiles = toRecord2(options.config["profiles"]);
-  const profile = options.profile === undefined ? undefined : toRecord2(profiles?.[options.profile]);
+  const profiles = toRecord3(options.config["profiles"]);
+  const profile = options.profile === undefined ? undefined : toRecord3(profiles?.[options.profile]);
   const diagnostics = profile === undefined && options.profile !== undefined ? [{
     kind: "profile",
     message: `Activated omo profile "${options.profile}" does not exist; using the base configuration`,
@@ -21585,9 +21656,15 @@ function loadOmoConfig(options = {}) {
   });
   const finalInput = mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, resolved.config);
   const finalConfig = OmoConfigSchema.safeParse(finalInput);
+  const excludeModels = collectExcludedModels({
+    layers,
+    ...options.harness === undefined ? {} : { harness: options.harness },
+    ...resolved.profile === undefined ? {} : { profile: resolved.profile }
+  });
+  const withExcludedModels = (config) => excludeModels.length === 0 ? config : { ...config, exclude_models: [...excludeModels] };
   if (finalConfig.success) {
     return {
-      config: stripResolutionControlKeys(finalConfig.data),
+      config: withExcludedModels(stripResolutionControlKeys(finalConfig.data)),
       diagnostics: [...diagnostics, ...resolved.diagnostics],
       layers,
       ...resolved.profile === undefined ? {} : { profile: resolved.profile },
@@ -21600,7 +21677,7 @@ function loadOmoConfig(options = {}) {
   });
   if (pruned.ok) {
     return {
-      config: stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config)),
+      config: withExcludedModels(stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config))),
       diagnostics: [...diagnostics, ...resolved.diagnostics, ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped)],
       layers,
       ...resolved.profile === undefined ? {} : { profile: resolved.profile },

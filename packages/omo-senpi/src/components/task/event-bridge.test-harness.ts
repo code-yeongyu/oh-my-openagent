@@ -3,6 +3,7 @@ import type {
   ReconcileResult,
   SendInput,
   SuspendInput,
+  SuspendSummary,
   TaskLifecycle,
   TaskRecord,
   TaskRunStats,
@@ -28,6 +29,8 @@ type HarnessOptions = {
   readonly withRpc?: boolean | "emit-only"
   // Drives the task RPC bridge's progress-coalescing timer deterministically (no wall-clock waits).
   readonly taskRpcTimers?: TaskRpcTimers
+  // What the lifecycle's session-shutdown suspension reports (defaults to an empty summary).
+  readonly summary?: SuspendSummary
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -73,7 +76,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       suspendOnSessionShutdown: async (input: SuspendInput) => {
         calls.push(input)
         order.push("suspend")
-        return fakeSummary
+        return options.summary ?? fakeSummary
       },
       destroyResidentTask: async () => {},
       admitResident: async () => ({ kind: "admitted" as const }),
