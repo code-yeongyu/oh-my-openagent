@@ -71,7 +71,7 @@ caps: max_monitors_per_session=${input.maxMonitorsPerSession}, max_runtime_ms=${
 
 To stop this monitor, call monitor_stop with monitor_id="${input.monitorId}".
 
-output arrives automatically — do not poll`
+output arrives automatically: do not poll`
 }
 
 export function createMonitorStart(

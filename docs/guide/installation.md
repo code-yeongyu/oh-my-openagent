@@ -105,7 +105,7 @@ codex plugin add omo@sisyphuslabs
 **Bootstrap notice + restart.** The first approved session prints this status line:
 
 ```
-LazyCodex bootstrap running in background — restart the session when it completes
+LazyCodex bootstrap running in background: restart the session when it completes
 ```
 
 A detached worker finishes the install in the background (the `sg` download is the slowest part). Restart the Codex session once it completes — the next session starts fully wired and the notice no longer appears.

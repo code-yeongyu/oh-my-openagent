@@ -67,8 +67,7 @@ export async function validateCompletion(
       tipSha,
     )
     if (secretFailure !== null) return { status: "failed", detail: secretFailure }
-    const changed = await git(exec, worktree.dir, ["diff", "--name-only", "-z", `${recordedBase}..${tipSha}`, "--"])
-    const changedPaths = changed.stdout.split("\0").filter(Boolean)
+    const changedPaths = await listReflectionChangedPaths(exec, worktree.dir, recordedBase, tipSha)
     if (changedPaths.length === 0) {
       return { status: "failed", detail: "Reflection commits contain no changed paths" }
     }
@@ -88,6 +87,16 @@ export async function validateCompletion(
   } catch (error) {
     return { status: "failed", detail: errorMessage(error) }
   }
+}
+
+export async function listReflectionChangedPaths(
+  exec: GitExec,
+  dir: string,
+  baseSha: string,
+  tipSha: string,
+): Promise<string[]> {
+  const changed = await git(exec, dir, ["diff", "--name-only", "-z", `${baseSha}..${tipSha}`, "--"])
+  return changed.stdout.split("\0").filter(Boolean)
 }
 
 /**
@@ -116,7 +125,7 @@ async function findFrontmatterFailure(
   return null
 }
 
-function frontmatterBlock(content: string): string | null {
+export function frontmatterBlock(content: string): string | null {
   const match = FRONTMATTER_RE.exec(content.replace(/\r\n?/g, "\n"))
   return match?.[1] ?? null
 }

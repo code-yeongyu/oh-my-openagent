@@ -1,4 +1,4 @@
-export const HYPERPLAN_TEMPLATE = `You are running the \`/hyperplan\` command — adversarial multi-agent planning via team-mode.
+export const HYPERPLAN_TEMPLATE = `You are running the \`/hyperplan\` command: adversarial multi-agent planning via team-mode.
 
 LOAD THE HYPERPLAN SKILL IMMEDIATELY:
 

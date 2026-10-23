@@ -108,7 +108,7 @@ function walkBody(ctx, node, state) {
 	}
 }
 
-function buildContext(doc, options) {
+export function buildContext(doc, options) {
 	const lineageMode = options.lineageMode ?? "inline"
 	if (!LINEAGE_MODES.includes(lineageMode)) throw new TypeError(`lineageMode must be one of ${LINEAGE_MODES.join(", ")}`)
 	const closingPattern = options.closingPattern ? toRegExp(options.closingPattern) : null
