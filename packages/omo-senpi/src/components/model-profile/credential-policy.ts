@@ -1,6 +1,4 @@
-import { join } from "node:path"
-
-import { readJsoncFile } from "@oh-my-opencode/utils"
+import { readModelsJson } from "./models-json"
 
 /**
  * Whether the engine may rotate a provider's stored credential accounts on the first turn.
@@ -22,7 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function rotationDisabledProviders(agentDir: string | undefined): ReadonlySet<string> {
   if (agentDir === undefined) return new Set()
-  const parsed = readJsoncFile<unknown>(join(agentDir, "models.json"))
+  const parsed = readModelsJson(agentDir)
   const providers = isRecord(parsed) ? parsed["providers"] : undefined
   if (!isRecord(providers)) return new Set()
   const disabled = new Set<string>()

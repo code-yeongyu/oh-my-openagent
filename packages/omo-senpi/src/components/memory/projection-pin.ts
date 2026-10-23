@@ -73,14 +73,14 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
   let refreshEpoch = 0
   let refreshRequestedAtMs = Number.NEGATIVE_INFINITY
 
-  const resolve = async (repo: GitMemoryRepo, sessionId: string, branch: readonly unknown[]) => {
+  const resolve = async (repo: GitMemoryRepo, sessionId: string, branch: readonly unknown[], head: string | null) => {
     const compactionId = latestCompactionId(branch)
     const cached = live.get(sessionId)
     const state = cached?.record ?? readPinRecord(branch, sessionId)
     const staleByRefresh = cached === undefined
       ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
       : cached.epoch < refreshEpoch
-    const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId)
+    const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId, head)
     return { compactionId, state, reason }
   }
 
@@ -90,11 +90,11 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
       refreshRequestedAtMs = now()
     },
     async peek({ repo, sessionId, branch, head }): Promise<string | null> {
-      const { state, reason } = await resolve(repo, sessionId, branch)
+      const { state, reason } = await resolve(repo, sessionId, branch, head)
       return state === undefined || reason !== undefined ? head : state.revision
     },
     async advance({ repo, sessionId, branch, head, record }): Promise<ProjectionTurn> {
-      const { compactionId, state, reason } = await resolve(repo, sessionId, branch)
+      const { compactionId, state, reason } = await resolve(repo, sessionId, branch, head)
       if (state === undefined || reason !== undefined) {
         const fresh: ProjectionPinRecord = {
           version: 1,
@@ -163,12 +163,14 @@ async function repinReason(
   state: ProjectionPinRecord | undefined,
   loadedFromBranch: boolean,
   compactionId: string | null,
+  head: string | null,
 ): Promise<ProjectionRepinReason | undefined> {
   if (state === undefined) return "first-turn"
   if (state.compactionId !== compactionId) return "compaction"
   if (!loadedFromBranch) return undefined
-  for (const revision of [state.revision, state.noticedThrough]) {
-    if (revision !== null && !(await revisionExists(repo, revision))) return "missing-revision"
+  // HEAD was just read, so a pinned revision equal to it exists; only an older one needs the object lookup.
+  for (const revision of new Set([state.revision, state.noticedThrough])) {
+    if (revision !== null && revision !== head && !(await revisionExists(repo, revision))) return "missing-revision"
   }
   return undefined
 }

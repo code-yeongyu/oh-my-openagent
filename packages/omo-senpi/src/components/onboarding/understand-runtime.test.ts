@@ -336,11 +336,11 @@ describe("onboarding understanding (#10480)", () => {
     // given
     const root = await workspace()
     const leftoversBefore = await understandRunDirs()
-    let lateWrite: (() => void) | undefined
-    const wrote = new Promise<void>((resolve) => { lateWrite = resolve })
+    let lateWritten = false
 
-    // when
-    const { done } = await run({
+    // when: the run settles only after every started child was disposed (its scratch cleanups are awaited),
+    // so its end is the signal; a child that never started has nothing to write (#10912)
+    const { done, events, starts } = await run({
       digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)],
       budget: { ...ONBOARDING_UNDERSTAND_BUDGET, stepMs: 50, totalMs: 30_000 },
       turn: async () => {
@@ -351,13 +351,14 @@ describe("onboarding understanding (#10480)", () => {
         const sessionDir = String(spec.sessionDir)
         await mkdir(sessionDir, { recursive: true })
         await writeFile(join(sessionDir, "late-session.jsonl"), "written after abort\n")
-        lateWrite?.()
+        lateWritten = true
       },
     })
-    await wrote
 
-    // then
+    // then: a child that started wrote after its deadline; one the deadline beat to the start was never started
     expect(done.kind).toBe("done")
+    expect(events.some((event) => event.kind === "budget" && event.budget === "step_ms")).toBe(true)
+    expect(lateWritten).toBe(starts.length > 0)
     expect(await understandRunDirs()).toEqual(leftoversBefore)
   })
 
