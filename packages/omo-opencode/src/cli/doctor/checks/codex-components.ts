@@ -10,7 +10,7 @@ export const CODEX_COMPONENTS_CHECK_ID = "codex-components"
 export const CODEX_COMPONENTS_CHECK_NAME = "codex-components"
 
 const PLUGIN_DATA_DIR_NAME = "omo-sisyphuslabs"
-const BOOTSTRAP_PENDING_MESSAGE = "bootstrap pending — start a Codex session"
+const BOOTSTRAP_PENDING_MESSAGE = "bootstrap pending: start a Codex session"
 const REINSTALL_FIX = "Reinstall: npx lazycodex-ai install (or upgrade: codex plugin marketplace upgrade sisyphuslabs)"
 
 export interface CodexComponentsDoctorDeps extends CodexDoctorDeps {
@@ -54,7 +54,7 @@ export async function checkCodexComponents(deps: CodexComponentsDoctorDeps = {})
     return {
       name: CODEX_COMPONENTS_CHECK_NAME,
       status: "skip",
-      message: "OMO Codex plugin is not installed — skipping component checks",
+      message: "OMO Codex plugin is not installed: skipping component checks",
       details: [`plugin root: not installed under ${codexHome}`],
       issues: [],
     }

@@ -48,7 +48,7 @@ export const DELEGATION_MODEL_SOURCES = ["category", "explicit", "agent", "none"
 
 /** Data-quality vocabularies: a missing measurement is never a zero measurement. */
 export const DELEGATION_COVERAGE_STATUSES = ["complete", "partial", "unavailable"] as const
-export const DELEGATION_COST_STATUSES = ["reported", "unavailable", "invalid"] as const
+export const DELEGATION_COST_STATUSES = ["reported", "partial", "unavailable", "invalid"] as const
 export const DELEGATION_DURATION_STATUSES = ["monotonic", "wall_clock", "unavailable"] as const
 
 const BUILTIN_CATEGORY_NAMES = BUILTIN_CATEGORY_DEFAULTS.map(({ name }) => name)

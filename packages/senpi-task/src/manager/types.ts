@@ -11,6 +11,7 @@ import type {
   ResolvedModelRecord,
   TaskRecord,
   TaskRunStats,
+  LiveRunStats,
   TaskStartFailureKind,
   TaskStartFailureReason,
   TaskStatus,
@@ -68,6 +69,9 @@ export type ManagedStartSpec = {
   readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
+  // The delegating turn's W3C traceparent, for a process child's own turn spans. Launch-time only:
+  // never persisted on the spawn spec, so a respawned or resumed child starts its own trace.
+  readonly traceparent?: string
 }
 
 export type ManagedRunner = {
@@ -301,6 +305,9 @@ export type TaskManagerOptions = {
   // capability check). Absent -> `auto` reads as in-process, which is what a wiring without a
   // daemon (tests, a pinned engine without the host surface) must do.
   readonly executionModeGate?: ExecutionModeGate
+  // The parent session's current turn traceparent (raw session id in), read once per launch. Absent or
+  // undefined -> the child carries no inherited trace context.
+  readonly traceparentFor?: (parentSessionId: string) => string | undefined
 }
 
 export type TaskManager = {
@@ -337,6 +344,8 @@ export type TaskManager = {
   // in-flight turns/tool-calls/tok-s; the record only carries run_stats once terminal.
   // Optional so downstream structural fakes keep compiling; the concrete manager always implements it.
   runStatsSnapshot?(taskId: string): TaskRunStats | undefined
+  // The same live stats tagged with the run they measure, so a consumer reading records too never counts a run twice.
+  liveRunStats?(taskId: string): LiveRunStats | undefined
   // W1-V F3: prune a live handle (and its per-epoch release/background bookkeeping) so the lifecycle
   // destruction port and eviction path never leave a stale handle behind or grow #live unbounded.
   forget(taskId: string, options: ForgetOptions): void

@@ -1,4 +1,5 @@
 // Run only in an isolated remote test checkout. Each mutant is restored before the next.
+// oxlint-disable eslint/no-template-curly-in-string -- each mutation is TypeScript source text written into a file, so its `${...}` must stay literal.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -50,6 +51,7 @@ for (const mutation of mutations) {
 	} finally {
 		writeFileSync(mutation.file, original);
 		const restored = readFileSync(mutation.file, "utf8");
+		// oxlint-disable-next-line eslint/no-unsafe-finally -- a mutant that could not be restored must stop the run, even over the proof's own error.
 		if (restored !== original) throw new Error(`Failed to restore ${mutation.file}`);
 		console.log(`restored_sha256=${digest(restored)} cleanup=RESTORED`);
 	}
