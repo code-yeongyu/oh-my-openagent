@@ -238,6 +238,47 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   ],
   // v8: new deliveries require sender provenance; old envelopes are not rewritten.
   PROVENANCE_MIGRATION,
+
+  // v9 (todo 14): who thread_create'd which session (`thread_creations`, durable so a parent is still
+  // recognised after a host handoff or restart), and each store extension's persisted descriptor
+  // (`extension_registrations`: module URL, migrations, session-callable ops, wake dir), upserted by
+  // name, so an engine process lists the session tools another process registered.
+  // A store a build from before the renumber migrated already sits at v8 with these tables but without
+  // the provenance trigger, so this step replays v8 (idempotent) and creates only what is missing.
+  [
+    ...PROVENANCE_MIGRATION,
+    `CREATE TABLE IF NOT EXISTS thread_creations (
+      creator_durable_id TEXT NOT NULL,
+      created_durable_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (creator_durable_id, created_durable_id)
+    )`,
+    "CREATE TABLE IF NOT EXISTS extension_registrations (name TEXT PRIMARY KEY, descriptor_json TEXT NOT NULL, updated_at INTEGER NOT NULL)",
+    `INSERT OR IGNORE INTO extension_objects (type, name, owner)
+     SELECT s.type, s.name, NULL FROM sqlite_schema s
+     WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
+  ],
+
+  // v10 (#10458 review T1): durable receipts of the agent toolkit's layer-2 calls. Written INSIDE the
+  // op's own transaction, so a committed effect and its recorded result are one unit: a retry whose
+  // response was lost returns the recorded result instead of running the effect again. Like v9 it replays
+  // v8 and creates only what is missing: a store the old branch numbering left at v9 has this table but
+  // no provenance trigger.
+  [
+    ...PROVENANCE_MIGRATION,
+    `CREATE TABLE IF NOT EXISTS toolkit_replay_receipts (
+      replay_key TEXT PRIMARY KEY,
+      op TEXT NOT NULL,
+      args_sha256 TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      turn_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )`,
+    "CREATE INDEX IF NOT EXISTS toolkit_replay_receipts_turn_at ON toolkit_replay_receipts (turn_at)",
+    `INSERT OR IGNORE INTO extension_objects (type, name, owner)
+     SELECT s.type, s.name, NULL FROM sqlite_schema s
+     WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
+  ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects"] as const
+export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "thread_creations", "extension_registrations", "toolkit_replay_receipts"] as const

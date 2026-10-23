@@ -125,7 +125,7 @@ Team mode is enabled for this session. The rules below **override Phase 2-4** of
 **Precondition checks** (fail hard if any step fails):
 
 1. Load the \`team-mode\` skill via the \`skill\` tool for lifecycle, message protocol, broadcast rules, 32KB message cap, and 4 parallel worker cap.
-2. Call \`team_list\` and verify no active run named \`slop-squad\` exists. If one does, it is an orphan from a crashed prior session — \`team_shutdown_request\` + \`team_approve_shutdown\` + \`team_delete\` it before proceeding. Do not rename the team or run concurrent sessions under the same name.
+2. Call \`team_list\` and verify no active run named \`slop-squad\` exists. If one does, it is an orphan from a crashed prior session: \`team_shutdown_request\` + \`team_approve_shutdown\` + \`team_delete\` it before proceeding. Do not rename the team or run concurrent sessions under the same name.
 3. If \`~/.omo/teams/slop-squad/config.json\` is missing, write it using the spec below.
 
 **Team spec** (\`~/.omo/teams/slop-squad/config.json\`):
@@ -153,12 +153,12 @@ Team mode is enabled for this session. The rules below **override Phase 2-4** of
 
 Rationale for this composition:
 - **4 workers = team mode's parallel cap.** A fifth member just queues.
-- **Reviewer is NOT a team member** — review demands stronger reasoning than category routing provides (team category members are downcast to sisyphus-junior). The reviewer runs OUTSIDE the team as a \`deep-high\` task; see Phase 3.
+- **Reviewer is NOT a team member**: review demands stronger reasoning than category routing provides (team category members are downcast to sisyphus-junior). The reviewer runs OUTSIDE the team as a \`deep-high\` task; see Phase 3.
 - **quick × 3** absorbs the mass of per-file slop removal. **unspecified-low × 1** is the rework lane for fixes triggered by reviewer findings.
 
 **Team lifecycle** (create once, reuse until Phase 5 cleanup):
 
-1. \`team_create(teamName="slop-squad")\`. Record \`teamRunId\` — every subsequent team call needs it.
+1. \`team_create(teamName="slop-squad")\`. Record \`teamRunId\`: every subsequent team call needs it.
 2. Broadcast the detection criteria ONCE so each task description stays minimal:
    \`\`\`
    team_send_message(
@@ -167,7 +167,7 @@ Rationale for this composition:
      body=<the 9 slop categories + KEEP rules; reference the $omo:remove-ai-slops skill content>
    )
    \`\`\`
-3. Before spawning tasks, save a per-file rollback artifact that captures only the delta the slop-removal pass will introduce. Do NOT use \`git checkout -- <file>\` — that would discard pre-existing branch changes.
+3. Before spawning tasks, save a per-file rollback artifact that captures only the delta the slop-removal pass will introduce. Do NOT use \`git checkout -- <file>\`: that would discard pre-existing branch changes.
 4. For each changed file, \`team_task_create(teamRunId=<id>, subject="slop: <file>", description=<file path + rollback artifact path + reporting format>, blockedBy=[])\`.
 
 ## Phase 3 (team): Incremental reviewer dispatch
@@ -177,7 +177,7 @@ While any team task is \`pending | claimed | in_progress\`:
 - Wait for \`<system-reminder>\` or member messages. Do NOT tight-poll \`team_status\`; the runtime notifies on state changes. A single \`team_status\` check is acceptable if no notification arrives within roughly 10 seconds of expected completion.
 - On each worker completion report:
   - Log the report to the pending final summary (no blocking).
-  - Immediately dispatch an **external reviewer** — review runs OUTSIDE the team because team-member category routing downcasts to sisyphus-junior:
+  - Immediately dispatch an **external reviewer** (review runs OUTSIDE the team because team-member category routing downcasts to sisyphus-junior):
     \`\`\`
     task(
       category="deep-high",
@@ -195,11 +195,11 @@ While any team task is \`pending | claimed | in_progress\`:
 
 ## Phase 4 (team): Fix issues
 
-Fixes happen incrementally during Phase 3's loop via rework tasks — this phase is already handled when the loop exits. Any remaining manual fix that neither worker nor fix member could resolve is handled by Lead here, editing files directly.
+Fixes happen incrementally during Phase 3's loop via rework tasks: this phase is already handled when the loop exits. Any remaining manual fix that neither worker nor fix member could resolve is handled by Lead here, editing files directly.
 
 ## Phase 5 (team): Team cleanup
 
-Before producing the summary report, dismantle the team on EVERY exit path — success, escalation, abort — otherwise the next session's Phase 2 precondition check catches the orphan.
+Before producing the summary report, dismantle the team on EVERY exit path (success, escalation, abort); otherwise the next session's Phase 2 precondition check catches the orphan.
 
 1. \`team_shutdown_request\` for each member, then \`team_approve_shutdown\` if members do not self-approve within a reasonable window.
 2. \`team_delete(teamRunId=<id>)\`.
@@ -209,8 +209,8 @@ The \`~/.omo/teams/slop-squad/config.json\` declaration file stays on disk; it i
 
 ## MUST NOT (team mode)
 
-- Lead never edits files directly — orchestrate only. If editing is needed, it goes into a team task.
+- Lead never edits files directly: orchestrate only. If editing is needed, it goes into a team task.
 - Do not inline the full slop-criteria into every task description; rely on the Phase 2 broadcast.
 - Do not call \`team_create\` again mid-session. One team per resolution.
-- Do not put \`oracle\` / \`librarian\` into the team spec — they are team-ineligible; call them via \`task()\` outside the team when needed.
+- Do not put \`oracle\` / \`librarian\` into the team spec: they are team-ineligible; call them via \`task()\` outside the team when needed.
 `

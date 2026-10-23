@@ -34,7 +34,7 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
   const lines = task.attempts
     .map((attempt) => {
       const attemptLines = [
-        `  - Attempt ${attempt.attemptNumber} — ${attempt.status.toUpperCase()} — ${formatAttemptModel(attempt)} — ${attempt.sessionId ?? "unknown"}`,
+        `  - Attempt ${attempt.attemptNumber}: ${attempt.status.toUpperCase()} - ${formatAttemptModel(attempt)} - ${attempt.sessionId ?? "unknown"}`,
       ]
 
       if (attempt.status !== "completed" && attempt.error) {

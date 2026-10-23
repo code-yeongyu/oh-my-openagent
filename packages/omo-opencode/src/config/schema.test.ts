@@ -1167,7 +1167,7 @@ describe("OhMyOpenCodeConfigSchema - git_master defaults (#2040)", () => {
     if (result.success) {
       expect(result.data.git_master).toBeDefined()
       expect(result.data.git_master.commit_footer).toBe(false)
-      expect(result.data.git_master.include_co_authored_by).toBe(false)
+      expect(result.data.git_master.include_co_authored_by).toBe(true)
       expect(result.data.git_master.git_env_prefix).toBe("GIT_MASTER=1")
     }
   })
