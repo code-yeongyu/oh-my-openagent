@@ -1,7 +1,9 @@
+import { isEmptyNoProgressAssistantTurnInfo } from "../../features/background-agent/empty-assistant-turn"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import type { InternalInitiatorTextPartLike } from "../../shared/internal-initiator-marker"
 import { isSyntheticOrInternalOnlyTextParts } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
+import { isRecord } from "../../shared/record-type-guard"
 import { isSystemDirective } from "../../shared/system-directive"
 
 import { COUNTDOWN_GRACE_PERIOD_MS, HOOK_NAME } from "./constants"
@@ -50,11 +52,55 @@ function hasAcceptedContinuationLifecycle(state: SessionState): boolean {
     || state.continuationBlockReason === "directive-response"
 }
 
-function markContinuationResponseObserved(state: SessionState | undefined): void {
+function markContinuationResponseObserved(
+  state: SessionState | undefined,
+  options: { resetProviderFailures: boolean } = { resetProviderFailures: false },
+): void {
   if (state?.awaitingPostInjectionProgressCheck === true) {
     state.continuationResponseObserved = true
-    state.consecutiveProviderFailures = 0
+    if (options.resetProviderFailures) {
+      state.consecutiveProviderFailures = 0
+    }
   }
+}
+
+function isNonProgressAssistantUpdate(info: Record<string, unknown> | undefined): boolean {
+  return Boolean(info?.error) || isEmptyNoProgressAssistantTurnInfo(info)
+}
+
+function isPositiveTokenCount(value: unknown): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+}
+
+function assistantUpdateHasOutputEvidence(info: Record<string, unknown> | undefined): boolean {
+  if (!info || isNonProgressAssistantUpdate(info)) {
+    return false
+  }
+
+  const tokens = isRecord(info.tokens) ? info.tokens : undefined
+  if (isPositiveTokenCount(tokens?.output) || isPositiveTokenCount(tokens?.reasoning)) {
+    return true
+  }
+
+  return typeof info.finish === "string" && info.finish !== "" && info.finish !== "unknown"
+}
+
+function assistantPartHasOutput(properties: Record<string, unknown> | undefined): boolean {
+  const part = properties?.part
+  if (!isRecord(part)) {
+    return false
+  }
+  if (part.type === "tool") {
+    return true
+  }
+  return (part.type === "text" || part.type === "reasoning")
+    && part.synthetic !== true
+    && typeof part.text === "string"
+    && part.text.trim().length > 0
+}
+
+function assistantDeltaHasOutput(properties: Record<string, unknown> | undefined): boolean {
+  return typeof properties?.delta === "string" && properties.delta.trim().length > 0
 }
 
 function pauseForGenuineUserInterruption(args: {
@@ -155,10 +201,14 @@ export function handleNonIdleEvent(args: {
     if (role === "assistant") {
       const state = sessionStateStore.getExistingState(sessionID)
       if (state) {
-        markContinuationResponseObserved(state)
+        if (!isNonProgressAssistantUpdate(info)) {
+          markContinuationResponseObserved(state)
+        }
+        if (assistantUpdateHasOutputEvidence(info)) {
+          state.consecutiveProviderFailures = 0
+        }
         state.abortDetectedAt = undefined
         state.wasCancelled = false
-        state.consecutiveProviderFailures = 0
       }
       sessionStateStore.cancelCountdown(sessionID)
       return
@@ -199,6 +249,9 @@ export function handleNonIdleEvent(args: {
         const info = properties?.info as Record<string, unknown> | undefined
         if (info?.role === "assistant") {
           markContinuationResponseObserved(state)
+          if (assistantPartHasOutput(properties)) {
+            state.consecutiveProviderFailures = 0
+          }
         }
         state.abortDetectedAt = undefined
       }
@@ -215,7 +268,9 @@ export function handleNonIdleEvent(args: {
         const info = properties?.info as Record<string, unknown> | undefined
         if (info?.role === "assistant") {
           markContinuationResponseObserved(state)
-          state.consecutiveProviderFailures = 0
+          if (assistantDeltaHasOutput(properties)) {
+            state.consecutiveProviderFailures = 0
+          }
         }
         state.abortDetectedAt = undefined
         state.wasCancelled = false
@@ -230,7 +285,7 @@ export function handleNonIdleEvent(args: {
     if (sessionID) {
       const state = sessionStateStore.getExistingState(sessionID)
       if (state) {
-        markContinuationResponseObserved(state)
+        markContinuationResponseObserved(state, { resetProviderFailures: true })
         state.abortDetectedAt = undefined
         state.wasCancelled = false
       }
