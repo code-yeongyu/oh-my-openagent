@@ -1,20 +1,21 @@
 import { beforeAll, describe, expect, mock, spyOn, test } from "bun:test"
-import { type AppendOutcome, appendEntries, type ChainState, emptyChain } from "./chain.ts"
+import { type AppendOutcome, appendEntries, atVerifiedHead, type ChainState, emptyChain } from "./chain.ts"
 import type { KeyringEntry, SyncEntry } from "./entry.ts"
 import { createRejectionCounter } from "./rejection.ts"
 import { importSnapshot, type SnapshotRecord } from "./snapshot.ts"
 import { buildFork, rotation } from "./testing/fork.ts"
 import { envelopeRefusal } from "./envelope.ts"
-import { receiverPass, receiverRefusal, wire } from "./receiver.ts"
+import { receiverRefusal, takeReceiver, wire } from "./receiver.ts"
 import { ACCOUNT, appendBatch, appendKeyring, chain, deviceId, epochKey, keyringFor, keys, mainChain, objects, principalKeys, readBytes, record, fixtureAnchor } from "./testing/sync-v1.test-support.ts"
 import { buildBatch } from "./build.ts"
 import { b64urlDecode, sha256B64 } from "./vendor/sync-format/jcs.ts"
 import * as vendorFold from "./vendor/sync-format/fold.ts"
+import * as vendorReceive from "./vendor/sync-format/receive.ts"
 import { signFramed } from "./vendor/sync-format/keys.ts"
 import { snapshotPreimage } from "./vendor/sync-format/snapshot.ts"
 
 // The client's local chain must refuse exactly what the merged omo-service receiver
-// (vendored sync-format receiveKeyringChain, 3bedb0a) refuses, and accept what it accepts.
+// (vendored sync-format receiveKeyringChain and createKeyringReceiver, 5de1455489) refuses, and accept what it accepts.
 
 const run = async (entries: ReadonlyArray<SyncEntry>, state: ChainState = emptyChain(ACCOUNT, fixtureAnchor())) => {
   const rejections = createRejectionCounter()
@@ -258,8 +259,85 @@ describe("the receiver walks the chain once per pull, not once per entry", () =>
     for (const batch of variants) {
       expect(envelopeRefusal(batch)).toBeNull()
       const whole = vendorFold.foldRefusal(wire([...history, batch]))
-      expect((await receiverPass(history, [batch]))(batch)).toBe(whole.ok ? null : whole.reason)
+      expect((await takeReceiver({}, history)).batch(batch)).toBe(whole.ok ? null : whole.reason)
       expect(await receiverRefusal(history, batch)).toBe(whole.ok ? null : whole.reason)
+    }
+  })
+})
+
+describe("the receiver checks one new entry in constant work (#10655)", () => {
+  // Every entry the vendored receiver is handed: the length of each list folded, plus one per entry
+  // an incremental receiver receives. Appending one entry must not hand it the verified history again.
+  const handedPerAppend = async (work: (handed: () => number) => Promise<void>): Promise<void> => {
+    let received = 0
+    const create = vendorReceive.createKeyringReceiver
+    const fold = spyOn(vendorFold, "foldRefusal")
+    const chain = spyOn(vendorReceive, "receiveKeyringChain")
+    spyOn(vendorReceive, "createKeyringReceiver").mockImplementation(() => {
+      const receiver = create()
+      return { ...receiver, receive: (entry) => ((received += 1), receiver.receive(entry)) }
+    })
+    const listed = (calls: ReadonlyArray<ReadonlyArray<unknown>>) => calls.reduce((sum, [entries]) => sum + (Array.isArray(entries) ? entries.length : 0), 0)
+    try {
+      await work(() => listed(fold.mock.calls) + listed(chain.mock.calls) + received)
+    } finally {
+      mock.restore()
+    }
+  }
+
+  test("appending one rotation hands the receiver the same few entries at every chain length up to 1,000", async () => {
+    await handedPerAppend(async (handed) => {
+      let state = await verified([...mainUntil("post_join_rotation"), record("post_join_rotation")])
+      const perAppend: number[] = []
+      for (let i = 0; i < 1000; i++) {
+        const next = await rotation(state, "A")
+        const before = handed()
+        const { outcome } = await run([next], state)
+        if (!outcome.ok) throw new Error(`rotation ${i} refused: ${outcome.reason}`)
+        perAppend.push(handed() - before)
+        state = outcome.state
+      }
+      expect(Math.max(...perAppend)).toBeLessThanOrEqual(1)
+      expect(perAppend[999]).toBe(perAppend[9])
+    })
+  }, 60000)
+
+  test("the state a snapshot import continues from keeps the receiver, so its first append does not re-fold the history", async () => {
+    const base = [...mainUntil("post_join_rotation"), record("post_join_rotation")]
+    let state = await verified(base)
+    const rotations = []
+    for (let i = 0; i < 50; i++) {
+      const entry = await rotation(state, "A")
+      const { outcome } = await run([entry], state)
+      if (!outcome.ok) throw new Error(`rotation ${i} refused: ${outcome.reason}`)
+      rotations.push(entry)
+      state = outcome.state
+    }
+    const continued = atVerifiedHead(state, headOf(state))
+    if (continued === null) throw new Error("atVerifiedHead refused the verified head")
+    const next = await rotation(continued, "B")
+    let carried = false
+    await handedPerAppend(async (handed) => {
+      carried = (await run([next], continued)).outcome.ok
+      expect(handed()).toBeLessThanOrEqual(1)
+    })
+    // The carried receiver must give the verdict a receiver folded over the whole history gives.
+    const refolded = await verified([...base, ...rotations])
+    const fromRefold = atVerifiedHead(refolded, headOf(refolded))
+    if (fromRefold === null) throw new Error("atVerifiedHead refused the refolded head")
+    expect(carried).toBe(true)
+    expect((await run([next], fromRefold)).outcome.ok).toBe(carried)
+  })
+
+  test("a replayed or lower-seq keyring entry is still refused, with the whole-list fold's reason", async () => {
+    const history = mainChain()
+    const receiver = await takeReceiver({}, history)
+    const replays = [history.at(-1), history[Math.floor(history.length / 2)], history[0]]
+    for (const replay of replays) {
+      if (replay === undefined) throw new Error("fixture main chain is short")
+      const oracle = await receiverRefusal(history, replay)
+      expect(oracle).toBe("seq_not_increasing")
+      expect(await receiver.keyring(replay)).toBe(oracle)
     }
   })
 })

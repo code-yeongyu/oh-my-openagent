@@ -4,16 +4,17 @@
 // model through the SESSION-ONLY setter and never persists it.
 //   node model-profile-e2e.mjs [--bundle <pluginDir>] [--scenario <name>]
 // Scenarios (all run by default, each in its own throwaway sandbox):
-//   daily-normal-opus / daily-heavy-fable / geeky-normal-sol / geeky-heavy-astra
+//   daily-normal-opus / daily-heavy-fable / geeky-heavy-astra
 //                    each leaf's first rung + thinking level in the applied notice.
 //   daily-normal-kimi / daily-normal-glm  later Daily · Normal rungs.
-//   geeky-normal-gpt6-only-unavailable  only GPT-6 Sol ids served: unavailable, the lane never falls back to GPT-6.
-//   geeky-normal-sol serves gpt-6.1-sol next to gpt-5.6-sol and proves 6.1 Sol is the first rung.
+//   geeky-normal-astra  serves GPT-6 Astra beside the Sol ids and proves Astra heads the lane at medium.
+//   geeky-normal-gpt6-only-unavailable  only unranked GPT-6 Sol ids served: unavailable; the lane's Astra head is not served.
+//   geeky-normal-sol serves gpt-6.1-sol next to gpt-5.6-sol and proves the first Sol rung applies when Astra is absent.
 //   geeky-normal-api-sol / geeky-normal-copilot-sol  the gpt-5.6-sol medium fallback through the openai / github-copilot ids.
 //   unset            empty omo.json starts on Daily · Normal (kimi-k3 on kimi-coding here; #10029).
 //   unset-skips-gateway  the default never takes opengateway's vendor-prefixed Opus; kimi-k3 wins.
 //   unset-gpt-6-1-sol / unset-copilot-gpt-6-sol  GPT beside GLM: Daily · Normal's glm-5.3 max wins.
-//   unset-chatgpt-only-geeky-normal  no Daily lane resolves: Geeky · Normal's gpt-6.1-sol applies.
+//   unset-chatgpt-only-geeky-normal  no Daily lane resolves: Obsessive · Normal's gpt-6.1-sol applies (Astra not served).
 //   retired-recommended  model_profile "recommended" (retired, #10029) starts Daily · Normal (glm-5.3 max).
 //   empty-registry   Daily · Normal against only mock-1: unavailable, session keeps mock-1.
 //   literal-pin      model_profile "anthropic/claude-opus-5": that model id is applied.

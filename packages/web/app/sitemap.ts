@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next"
 
+import { locales } from "@/i18n/config"
 import { desktopDownloadEnabled } from "@/lib/desktop-download"
 import { DOC_GUIDE_PAGES } from "@/lib/docs-sections"
 
@@ -20,8 +21,6 @@ const PUBLIC_ROUTES = [
 ]
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const locales = ["en", "ko", "ja", "zh"]
-
   return PUBLIC_ROUTES.flatMap((route) =>
     locales.map((locale) => ({
       url: `${BASE_URL}/${locale}${route}`,

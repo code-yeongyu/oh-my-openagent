@@ -3,13 +3,14 @@ import { basename, extname, relative, resolve } from "node:path"
 import { spawn } from "node:child_process"
 import { execFileSync } from "node:child_process"
 import { createSpawnCommand, resolveServerBinary } from "@oh-my-opencode/lsp-core"
+import { resolveBunProjectCommand } from "@oh-my-opencode/lsp-core/lsp/bun-project-checks"
 import { callPackagedDaemonTool } from "../lsp/daemon-tool-client"
 import { extractMutatedFilePaths, MUTATION_TOOL_NAMES, runSingleFlight, type PostMutationEvent } from "../post-mutation/post-mutation"
 
 // Mutation formatting is intentionally opt-in through project markers and fail-open by default.
 export const formatOnMutationDefaults = { mode: "best-effort", maxFileBytes: 1_048_576, timeoutMs: 3_000 } as const
 export type FormatMode = "off" | "best-effort" | "required"
-export type FormatterTool = "biome" | "prettier" | "rustfmt" | "gofmt" | "ruff"
+export type FormatterTool = "biome" | "prettier" | "bun format" | "rustfmt" | "gofmt" | "ruff"
 export type Formatter = { readonly tool: FormatterTool; readonly command: string; readonly args: readonly string[] }
 
 // Sentinel for "the child never started": a non-numeric variant so no real exit code —
@@ -21,6 +22,8 @@ export function resolveFormatMode(config: { mode?: FormatMode; languages?: Recor
   if (config.languages?.[language] === false) return "off"
   return config.mode ?? "best-effort"
 }
+
+export const bunFormatter: Formatter = { tool: "bun format", command: "bun", args: ["format", "--write"] }
 
 export function detectFormatter(markers: readonly string[], filePath: string, configText = ""): Formatter | undefined {
   const name = basename(filePath)
@@ -39,12 +42,14 @@ export interface FormatterStepOptions {
   readonly readMarker?: (cwd: string, marker: string) => string
   readonly daemonFormat?: (filePath: string) => Promise<{ readonly content?: readonly { readonly type: string; readonly text?: string }[]; readonly details?: unknown; readonly isError?: boolean }>
   readonly resolveBinary?: (command: string, cwd: string) => string | null
+  readonly resolveBunFormat?: (cwd: string) => Promise<string | undefined>
   readonly logger?: { warn(message: string, details?: unknown): void }
 }
 
 export function createFormatterStep(options: FormatterStepOptions = {}) {
   const missingNotices = new Set<string>()
   const daemonFormat = options.daemonFormat ?? (filePath => callPackagedDaemonTool("format", { filePath }))
+  const resolveBunFormat = options.resolveBunFormat ?? (cwd => resolveBunProjectCommand("format", cwd))
   return async function formatMutation(event: PostMutationEvent, cwd: string, sessionId = "anonymous") {
     if (event.toolName === undefined || !MUTATION_TOOL_NAMES.has(event.toolName) || event.input === undefined) return { content: undefined, error: undefined }
     const config = { ...formatOnMutationDefaults, ...(options.config ?? {}) }
@@ -56,10 +61,12 @@ export function createFormatterStep(options: FormatterStepOptions = {}) {
       if (!existsSync(filePath) || isGitIgnored(filePath, cwd)) continue
       if (readFileSync(filePath).byteLength > config.maxFileBytes) continue
       const markerNames = options.markers?.(cwd) ?? []
-      const marker = detectFormatter(markerNames, filePath, options.readMarker?.(cwd, "pyproject.toml") ?? "")
-      if (!marker) continue
+      const detected = detectFormatter(markerNames, filePath, options.readMarker?.(cwd, "pyproject.toml") ?? "")
+      if (!detected) continue
       const language = languageForPath(filePath)
       if (resolveFormatMode(config, language) === "off") continue
+      const probedBun = detected.tool === "prettier" ? await resolveBunFormat(cwd) : undefined
+      const marker = probedBun === undefined ? detected : { ...bunFormatter, command: probedBun }
       const result = await runSingleFlight(filePath, () => formatOne(filePath, marker, cwd, config.timeoutMs, daemonFormat, options.resolveBinary))
       if (result.status === "formatted") additions.push({
         type: "text",

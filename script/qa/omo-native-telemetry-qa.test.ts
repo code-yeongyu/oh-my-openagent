@@ -12,6 +12,7 @@ const EXPECTED_EVENTS = [
   "delegation_completed",
   "delegation_started",
   "feature_used",
+  "handoff_hint",
   "kibitzer_summary",
   "parallelism_summary",
   "process_crashed",

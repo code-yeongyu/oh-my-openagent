@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url"
 import { ensureBunBinShim } from "./lib/bun-bin-shim.js"
 import { maybeReexecUnderBun } from "./lib/bun-runtime.js"
 import { runLauncher } from "./lib/launcher.js"
+import { removeLegacyServiceCredentials } from "./lib/legacy-service-credentials.js"
 import { runSetup } from "./lib/setup-import.js"
 
 try {
@@ -20,9 +21,17 @@ try {
   ensureBunBinShim({ scriptPath })
   const reexeced = await maybeReexecUnderBun({ scriptPath })
   if (!reexeced) {
+    // The #10697 plaintext file goes before ANY command runs: several verbs return before runLauncher.
+    removeLegacyServiceCredentials()
     if (["login", "logout", "whoami"].includes(process.argv[2])) {
       const { runServiceAuthCommand } = await import("./lib/service-auth.generated.js")
       await runServiceAuthCommand(process.argv.slice(2))
+    } else if (process.argv[2] === "sync") {
+      const { runSyncCommand } = await import("./lib/service-auth.generated.js")
+      await runSyncCommand(process.argv.slice(2))
+    } else if (process.argv[2] === "account") {
+      const { runAccountCommand } = await import("./lib/service-auth.generated.js")
+      await runAccountCommand(process.argv.slice(2))
     } else if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
     else await runLauncher()
   }

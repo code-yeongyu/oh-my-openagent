@@ -6,8 +6,9 @@ import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "
 import { TARGET_MAX_BYTES } from "./constants"
 import { decideDelivery } from "./decision"
 import { resultFromRow } from "./result"
+import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store"
-import type { EnvelopeOrigin, ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender } from "./types"
+import type { EnvelopeOrigin, ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -40,6 +41,8 @@ export type GatewayEngine = {
 }
 
 export type GatewayEngineOptions = {
+  /** Sender-owned context, kept outside every delivery/tool request. */
+  readonly senderProvenance?: () => Promise<Provenance>
   readonly store: Pick<GatewayStore, "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt">
   readonly endpoints: GatewayEndpointPort
   readonly resolve: GatewayResolve
@@ -74,6 +77,7 @@ function fail(code: ThreadErrorCode, message: string, details?: Readonly<Record<
 }
 
 type SenderFacts = {
+  readonly provenance: Provenance
   readonly principal: string
   readonly rate_principal: string
   readonly node: string
@@ -84,9 +88,12 @@ type SenderFacts = {
   readonly binding: { readonly binding_id: string; readonly revision: number } | null
 }
 
-function senderFacts(sender: GatewaySender): SenderFacts {
+function senderFacts(sender: GatewaySender, resolved: Provenance): SenderFacts {
+  const sessionLabel = sender.kind === "session" ? sender.name?.trim() : undefined
+  const provenance = { ...resolved, ...(sessionLabel ? { session: sessionLabel } : {}) }
   if (sender.kind === "session") {
     return {
+      provenance,
       principal: `session:${sender.durable_id}`,
       rate_principal: `session:${sender.durable_id}`,
       node: sender.durable_id,
@@ -100,6 +107,7 @@ function senderFacts(sender: GatewaySender): SenderFacts {
   if (sender.kind === "cli") {
     const principal = `cli:${sender.uid}`
     return {
+      provenance,
       principal,
       rate_principal: principal,
       node: principal,
@@ -113,6 +121,7 @@ function senderFacts(sender: GatewaySender): SenderFacts {
   const principal = `binding:${sender.binding_id}`
   const author = sender.origin.author
   return {
+    provenance,
     principal,
     // Each human in a bound thread gets their own pair bucket; a sender with no author shares the binding's.
     rate_principal: author === undefined ? principal : `${principal}#author:${author.platform_user_id}`,
@@ -163,10 +172,11 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     if (endpoint === null && decideDelivery("offline", mode, request.expected_turn_id ?? null, null).kind === "refuse") {
       return fail("turn_conflict", "The target has no live turn to steer.", { target: target.durable_id })
     }
-    const facts = senderFacts(request.sender)
+    const facts = senderFacts(request.sender, await (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })))
     const deliveryId = randomUUID()
     const idempotencyKey = request.idempotency_key ?? `auto:${deliveryId}`
     const outcome = await store.enqueue({
+      provenance: facts.provenance,
       now: now(),
       delivery_id: deliveryId,
       target_durable_id: target.durable_id,

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../../test-support/telemetry-env.test-helpers"
 import type { TelemetryCaptureMessage, TelemetryTransportFactory } from "@oh-my-opencode/telemetry-core"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -9,6 +10,7 @@ import type * as runnerModuleType from "./runner"
 async function* createEmptyEventStream(): AsyncIterable<unknown> {}
 
 let testPluginConfig: { readonly telemetry?: boolean } = {}
+let restoreTelemetryEnv: () => void
 
 mock.module("../../plugin-config", () => ({
   loadPluginConfig: mock(() => testPluginConfig),
@@ -122,9 +124,14 @@ function resetTelemetrySeams(): void {
 }
 
 describe("run telemetry isolation", () => {
+  beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
+  })
+
   afterEach(() => {
     resetTelemetrySeams()
     testPluginConfig = {}
+    restoreTelemetryEnv()
   })
 
   it("does not capture CLI telemetry when config disables telemetry", async () => {

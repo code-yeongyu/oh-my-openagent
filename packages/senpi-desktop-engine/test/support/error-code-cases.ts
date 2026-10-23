@@ -137,7 +137,7 @@ export const ERROR_CODE_CASES: readonly ErrorCodeCase[] = [
 		overlay: {},
 		drive: async (engine) => {
 			await makeStopPathLive(engine);
-			return click(engine, "desktop");
+			return click(engine, WINDOW);
 		},
 	},
 	{
