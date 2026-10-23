@@ -101,6 +101,8 @@ export type HostSessionChildHandle = RpcChildHandle & {
   /** Served by the CURRENT port, so they keep working after a reattach. */
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
+  /** Publish the task's status in the session's context (`task_status`) before a detach leaves it loaded. */
+  publishTaskStatus(status: TaskRecord["status"]): Promise<void>
   /** Drop this child's connection and leave the session running on the daemon. */
   detach(): Promise<void>
   /** End the session on the host without aborting a turn first (`clean`). */

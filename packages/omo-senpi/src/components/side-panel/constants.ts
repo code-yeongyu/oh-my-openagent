@@ -93,41 +93,14 @@ export const MEMORY_DETAIL_COLUMNS = 48
 export const KIBITZER_WAKES_TAIL_BYTES = 256 * 1024
 
 /**
- * Subscription usage. Both vendors expose it as a plain HTTP endpoint and neither pushes
- * updates, so it is polled - and because the quota belongs to an account rather than to a
- * session, every session polling on its own would multiply requests against that same quota.
- * The numbers therefore live in one cache file outside any session.
- */
-export const CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
-export const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
-/**
- * Credential providers per usage endpoint, current name first and the retired spelling behind it.
+ * Credential providers per usage section, current name first and the retired spelling behind it.
  * senpi renamed its subscription providers - `claude-sdk-oauth` became `anthropic-subscription`,
  * `openai-codex` became `chatgpt-subscription` - and an install that predates the rename still
  * carries the old key while a migrated one carries the new. Reading a name nobody writes any more
- * is silent: no credential, no poll, and bars that quietly age instead of going blank.
+ * is silent: no serving account is found, and the bars fall back to whichever account last reported.
  */
 export const CLAUDE_PROVIDERS: readonly string[] = ["anthropic-subscription", "claude-sdk-oauth"]
 export const CODEX_PROVIDERS: readonly string[] = ["chatgpt-subscription", "openai-codex"]
-
-/** Window lengths the payloads name only by kind; used to pace the bar's marker. */
-export const FIVE_HOUR_MS = 5 * 60 * 60 * 1_000
-export const WEEK_MS = 7 * 24 * 60 * 60 * 1_000
-
-/** A usage request sits on a timer, not in front of the render loop, so it gets a short leash. */
-export const USAGE_TIMEOUT_MS = 10_000
-
-/** How long a fetch stays announced in the shared cache, so parallel sessions do not stampede. */
-export const USAGE_CLAIM_MS = 30_000
-
-/** Nothing is retried harder than once an hour, whatever a retry-after header claims. */
-export const USAGE_MAX_BACKOFF_MS = 60 * 60 * 1_000
-
-/**
- * Per-provider freshness. Anthropic's numbers move in five-hour blocks and its endpoint is the
- * stricter of the two, so it is read half as often as Codex's.
- */
-export const USAGE_TTL_MS: Readonly<Record<"claude" | "codex", number>> = { claude: 300_000, codex: 150_000 }
 
 /**
  * Anything shorter is not an access token. senpi's generic key resolver hands back a short

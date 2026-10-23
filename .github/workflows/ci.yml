@@ -607,6 +607,18 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run typecheck
 
+      # oxlint for the packages that linted with Biome (root .oxlintrc.json, packages/web's own
+      # .oxlintrc.json); Biome stays their formatter.
+      - name: Lint
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun run lint
+
+      # Every file's count of no-explicit-any / ban-ts-comment / no-non-null-assertion must match
+      # script/lint-ratchet.baseline.json: a rise or a drop fails until the baseline is updated.
+      - name: Lint ratchet
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        run: bun run lint:ratchet
+
       - name: Write job summary
         if: always()
         shell: bash

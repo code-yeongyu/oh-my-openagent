@@ -26,3 +26,13 @@ export function fenceRun(record: TaskRecord, refEpoch: number): RunFence {
 export function nextRunEpoch(record: TaskRecord): number {
   return Math.max(record.notification.run_epoch, record.burnt_epoch ?? 0) + 1
 }
+
+// A record written before run_start_epoch existed names no run start, and its run_epoch moves inside a
+// run (model fallback, reattach), so it cannot key a run. Every such run gets this one fixed key until
+// its first revive, which always writes a real run_start_epoch.
+export const LEGACY_RUN_START_EPOCH = -1
+
+// The run_start_epoch of the record's current run, or LEGACY_RUN_START_EPOCH for a pre-field record.
+export function currentRunStartEpoch(record: TaskRecord | null): number | undefined {
+  return record === null ? undefined : record.run_start_epoch ?? LEGACY_RUN_START_EPOCH
+}

@@ -45,7 +45,7 @@ const memfsStatus: MemfsSubcommand = async ({ deps, ctx, identity }) => {
     `# Memfs status: ${identity.identity}`,
     `Repository: ${identity.identityPaths.repo}`,
     `HEAD: ${head === null ? "(no commits)" : shortSha(head)}`,
-    `Working tree: ${dirty ? `dirty — ${porcelain.length} entr${porcelain.length === 1 ? "y" : "ies"}` : "clean"}`,
+    `Working tree: ${dirty ? `dirty - ${porcelain.length} entr${porcelain.length === 1 ? "y" : "ies"}` : "clean"}`,
     `Mirror: ${mirror.redactedUrl ?? "not configured"}${mirror.url === undefined ? "" : ` (${mirror.aheadCount} ahead)`}`,
   ]
   if (dirty) {

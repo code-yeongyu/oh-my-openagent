@@ -31,6 +31,7 @@ export interface HostRpcClient {
   getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
+  setSessionContext(patch: Readonly<Record<string, string | number | boolean | null>>, sessionId?: string): Promise<void>
 }
 
 /** A session's own fallback policy, held in memory by the host (senpi `retry_fallback_profile`). */

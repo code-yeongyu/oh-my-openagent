@@ -1,7 +1,7 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { validateCompletion } from "@oh-my-opencode/memory-core"
+import { preflightReflectionDescriptions, validateCompletion } from "@oh-my-opencode/memory-core"
 
 import { emitMemoryReceipt, runReceipt } from "../receipts-port"
 import {
@@ -74,6 +74,7 @@ export async function recoverUnpublishedWorktreeTip(
   if (exit === undefined) return false
   const worktree = worktreeFromLedger(context.identity, ledger)
   if (!existsSync(worktree.dir)) return false
+  await preflightReflectionDescriptions(worktree, ledger.baseSha, worktree.exec, context.warn)
   const validation = await validateCompletion(worktree, ledger.baseSha, worktree.exec)
   if (validation.status !== "valid") return false
   const outcome: RunOutcome = {

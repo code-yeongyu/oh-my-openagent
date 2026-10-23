@@ -9,6 +9,7 @@ import {
   memoryWriterLockPath,
   probeLegacyAutoRunReceipt,
   probeReflectionIntegration,
+  preflightReflectionDescriptions,
   validateCompletion,
   validateDreamTokenBudget,
   withLock,
@@ -65,6 +66,7 @@ export async function resolveFinalizationDecision(
   const worktree = worktreeFromLedger(context.identity, ledger)
   let validated = validatedFromLedger(ledger)
   if (validated === undefined && existsSync(worktree.dir)) {
+    await preflightReflectionDescriptions(worktree, ledger.baseSha, worktree.exec, context.warn)
     const validation = await validateCompletion(worktree, ledger.baseSha, worktree.exec)
     if (validation.status === "valid") {
       maybeKillAt("after-validate")

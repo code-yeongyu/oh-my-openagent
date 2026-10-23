@@ -321,7 +321,7 @@ export function reportBinaryHeadroom(
 
 // Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts (locked by build-omo-binary.test.ts).
 export const PLUGIN_PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
-export const PLUGIN_PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json"] as const
+export const PLUGIN_PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json", "telemetry-schema.json", "telemetry-schema.omo-cloud.json"] as const
 
 const EXPORT_HTML_KEEP = new Set([
   "template.html",

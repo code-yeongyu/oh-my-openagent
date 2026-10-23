@@ -12,6 +12,7 @@ import {
   type MemoryFooterTimers,
   type MemoryFooterUi,
 } from "./status-live"
+import type { SyncStatusReader } from "./sync-status-surface"
 
 const SECOND_MS = 1_000
 
@@ -21,6 +22,7 @@ export interface MemoryFooterStatusLiveOptions {
   readonly timers?: MemoryFooterTimers
   readonly now?: () => number
   readonly createGitRepo?: (repoPath: string) => GitRepoForStatus
+  readonly syncStatus?: SyncStatusReader
 }
 
 export interface MemoryFooterStatusLive {
@@ -66,13 +68,14 @@ export function createMemoryFooterStatusLive(
       const repo = repoFor(context)
       const head = await repo.head()
       if (head === null) return `none|${options.isActive(identity)}`
-      const segments = await readMemoryStatusSegments(repo, context, sessionId)
+      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus)
       return [
         head,
         segments.dirty ? "dirty" : "clean",
         segments.backlogSteps,
         segments.streak,
         options.isActive(identity),
+        segments.syncBlocked === true ? "sync-blocked" : "sync-ok",
       ].join("|")
     },
     refreshSegments: async (identity) => {
@@ -85,7 +88,7 @@ export function createMemoryFooterStatusLive(
       const committedAt = await repo.headCommitTimestamp()
       const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, now())
       if (age === null) return undefined
-      const segments = await readMemoryStatusSegments(repo, context, sessionId)
+      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus)
       return formatMemoryStatusLine(identity, age, segments)
     },
   })

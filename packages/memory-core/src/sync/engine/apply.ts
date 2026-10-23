@@ -191,6 +191,7 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
     await save({ ...cycle, stage: "committed" }, "committed")
   }
   if (cycle.stage === "committed") {
+    await deps.repo.syncIndex(cycle.keys)
     await adoptLandedRenders(deps, journal, cycle)
     await deps.store.persist()
     await journal.recordApplied(cycle.batches)

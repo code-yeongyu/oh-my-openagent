@@ -318,3 +318,28 @@ test("a running engine whose device signs out (or is revoked) closes and leaves 
   await runner.release(paths.repo)
   expect(fake.closed).toEqual([paths.repo])
 })
+
+test("the runner reports a status change with the repository it belongs to (omo #10637 review L2)", async () => {
+  const paths = await identity()
+  let forwarded: (() => void) | undefined
+  const changed: string[] = []
+  const runner = createSyncRunner({
+    logger,
+    resolveSession: async () => session,
+    onStatusChange: (repo) => changed.push(repo),
+    open: async (o) => {
+      forwarded = o.onStatusChange
+      return {
+        engine: { start: () => undefined } as unknown as DeviceSync["engine"],
+        status: async (): Promise<EngineStatus> => ({ kind: "never_synced" }),
+        notifyLocalCommit: () => undefined,
+        close: async () => undefined,
+      }
+    },
+    watchHead: () => () => undefined,
+  })
+  await runner.acquire("agent", paths, { enabled: true })
+  forwarded?.()
+  expect(changed).toEqual([paths.repo])
+  await runner.release(paths.repo)
+})

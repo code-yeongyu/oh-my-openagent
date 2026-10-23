@@ -227,7 +227,7 @@ export async function checkpointUlwLoop(
 		} else applyBlockedOrFailed(goal, plan, args.status, evidence, now);
 		goal.updatedAt = now;
 		if (aggregateCompletion !== undefined) plan.aggregateCompletion = aggregateCompletion;
-		if (aggregateCompletion !== undefined) nextActions = [...nextActions, 'aggregate complete — now update_goal({status:"complete"})'];
+		if (aggregateCompletion !== undefined) nextActions = [...nextActions, 'aggregate complete: now update_goal({status:"complete"})'];
 		plan.updatedAt = now;
 		const ledgerEntry = buildLedger(now, args, goal, qualityGate, codexGoal, aggregateCompletion);
 		const entries = [ledgerEntry];

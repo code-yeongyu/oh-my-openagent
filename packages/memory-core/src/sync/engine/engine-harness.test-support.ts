@@ -7,6 +7,7 @@ import { execFile } from "node:child_process"
 import { tmpdir } from "node:os"
 import { promisify } from "node:util"
 import { dirname, join, relative, sep } from "node:path"
+import { disableFixtureAutoMaintenance } from "../../git/test-repo-config.test-support"
 
 import { createDeviceItemStore } from "./adapters/device-item-store"
 import { createGitSyncRepo } from "./adapters/git-sync-repo"
@@ -46,6 +47,7 @@ async function gitWith(cwd: string, env: Record<string, string>, ...args: string
 export async function gitRepo(root: string, existing = false): Promise<SyncRepo> {
   if (!existing) {
     await git(root, "init", "-q", "-b", "main")
+    disableFixtureAutoMaintenance(root)
     await git(root, "config", "user.name", "Test Agent")
     await git(root, "config", "user.email", "agent@example.invalid")
     await git(root, "config", "commit.gpgsign", "false")
@@ -157,6 +159,7 @@ export interface DeviceOptions {
   readonly memoryFrom?: string
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
   readonly realStore?: boolean
+  readonly onStatusChange?: () => void
 }
 
 export async function makeDevice(server: FakeSyncServer, name: string, fault?: EngineFault, options: DeviceOptions = {}): Promise<Device> {
@@ -184,6 +187,7 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
       clock,
       random: () => 0,
       ...(options.batchBytes === undefined ? {} : { batchBytes: options.batchBytes }),
+      ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
       ...(f === undefined ? {} : { fault: f }),
     })
     return { store, engine }

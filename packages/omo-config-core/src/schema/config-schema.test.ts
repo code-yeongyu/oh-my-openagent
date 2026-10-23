@@ -107,7 +107,7 @@ describe("omo config schema", () => {
     if (!result.success) throw new Error(result.error.message)
     expect(result.data.git_master).toEqual({
       commit_footer: false,
-      include_co_authored_by: false,
+      include_co_authored_by: true,
       git_env_prefix: "GIT_MASTER=1",
     })
   })

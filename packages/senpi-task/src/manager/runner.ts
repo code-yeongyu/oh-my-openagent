@@ -79,6 +79,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
         depth: spec.depth,
         root_session_id: spec.rootSessionId,
+        ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
       }
       return adaptRpcHandle(await runner.start(rpcSpec))
     },

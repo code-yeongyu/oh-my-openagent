@@ -111,6 +111,8 @@ export interface SyncRunnerOptions {
   /** Loads the engine sidecar; the default is the packaged `#omo-memory-sync-runtime` import. */
   readonly loadRuntime?: () => Promise<SyncRuntime>
   readonly watchHead?: HeadWatch
+  /** Called with the repo whose sync failure status appeared, changed kind or cleared. */
+  readonly onStatusChange?: (repo: string) => void
   /** How long an acquire waits for the repo's previous engine to close; default 10 s. */
   readonly closeWaitMs?: number
 }
@@ -198,6 +200,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       locksDir: paths.locks,
       session,
       log: (line) => logger.info(line, { identity }),
+      ...(options.onStatusChange === undefined ? {} : { onStatusChange: () => options.onStatusChange?.(paths.repo) }),
     })
     if (device === null) {
       logger.info("memory sync idle: another OmO process on this device is syncing this memory", { identity })

@@ -29,7 +29,7 @@ type Decision = "declined" | "allowed" | null
 
 function notInstalledResult(filePath: string, decision: Decision = null) {
   const serverId = filePath.endsWith(".json") ? "biome" : "typescript"
-  const text = `LSP server '${serverId}' is NOT INSTALLED.\nACTION REQUIRED — ASK THE USER whether to install this LSP server. [${decision ?? "ask"}]`
+  const text = `LSP server '${serverId}' is NOT INSTALLED.\nACTION REQUIRED: ASK THE USER whether to install this LSP server. [${decision ?? "ask"}]`
   return {
     content: [{ type: "text" as const, text }],
     details: {

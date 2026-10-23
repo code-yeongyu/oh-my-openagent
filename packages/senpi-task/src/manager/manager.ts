@@ -14,7 +14,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
-import type { AwaitingInputReason, EffectiveModelRecord, ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
+import type { AwaitingInputReason, EffectiveModelRecord, LiveRunStats, ResolvedModelRecord, TaskRecord, TaskRunStats } from "../state"
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
 import { createSteeringEngine } from "../steering"
 import type { CancelOptions, CancelOutcome, DestructionPort, InterruptOutcome, RedispatchOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
@@ -300,7 +300,7 @@ class TaskManagerImpl implements TaskManager {
       trackRevive: (taskId, epoch) => {
         const live = this.#live.get(taskId)
         if (live === undefined) throw new Error("Granted workpool worker lost its live handle")
-        this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
+        this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now, epoch))
         this.#outcome.trackOutcome(taskId, live.handle, live.model, epoch)
       },
       workerTools: taskId => [createWorkpoolWorkerTool({ workpools: this.workpools, taskId, runEpoch: () => this.get(taskId)?.notification.run_epoch ?? -1 })],
@@ -482,6 +482,7 @@ class TaskManagerImpl implements TaskManager {
         plan: effectivePlan,
         cwd: isolation === undefined ? this.#options.cwd : isolation.handle.mergedDir,
         stateDir: this.#options.store.stateDir,
+        traceparent: this.#options.traceparentFor?.(spec.parent_session_id),
       })
       // Persist the mode-neutral rebuild spec for BOTH execution modes: v1 carries only safe
       // launch facts (effective prompt, instructions, tool names, cwd) - never executable tools,
@@ -837,6 +838,11 @@ class TaskManagerImpl implements TaskManager {
   }
 
   runStatsSnapshot(taskId: string): TaskRunStats | undefined { return this.#runStats.get(taskId)?.snapshot(this.#now()) }
+  // The in-flight stats tagged with the run they measure; undefined when no tracker or its run is unknown.
+  liveRunStats(taskId: string): LiveRunStats | undefined {
+    const tracker = this.#runStats.get(taskId)
+    return tracker?.runStartEpoch === undefined ? undefined : { runStartEpoch: tracker.runStartEpoch, stats: tracker.snapshot(this.#now()) }
+  }
 
   residentTaskIds(): readonly string[] { return [...new Set([...this.#live.keys(), ...this.#cleanupOwners.keys()])] }
 
@@ -1692,7 +1698,7 @@ class TaskManagerImpl implements TaskManager {
       ok: true,
       release,
       commit: () => {
-        this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now))
+        this.#runStats.set(taskId, createRunStatsTracker(this.#now(), this.#now, epoch))
         this.#outcome.trackOutcome(taskId, live.handle, live.model, epoch)
       },
     }
@@ -1716,7 +1722,7 @@ class TaskManagerImpl implements TaskManager {
           release()
           return
         }
-        this.#runStats.set(record.task_id, createRunStatsTracker(this.#now(), this.#now))
+        this.#runStats.set(record.task_id, createRunStatsTracker(this.#now(), this.#now, epoch))
         this.#outcome.trackOutcome(record.task_id, live.handle, live.model, epoch)
       },
     }

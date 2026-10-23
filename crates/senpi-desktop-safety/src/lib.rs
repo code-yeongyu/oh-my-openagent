@@ -16,6 +16,6 @@ pub use gate::{gate, FrameContext, FrameId, GateError, LockState, PermissionGate
 pub use reset::{ResumeToken, UserReset};
 pub use stop_path::{Chord, HostRelay, StopPathError, StopPathListener};
 pub use supervisor::{
-    ActiveStopPath, StopPathFailure, StopPathId, StopPolicy, StopSource, Supervisor, SupervisorStatus, HEARTBEAT_FRESH_MS,
+    ActiveStopPath, DeafProbe, StopPathFailure, StopPathId, StopPolicy, StopSource, Supervisor, SupervisorStatus, HEARTBEAT_FRESH_MS,
     HEARTBEAT_INTERVAL_MS,
 };

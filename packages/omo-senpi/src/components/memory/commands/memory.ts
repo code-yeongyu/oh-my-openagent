@@ -31,10 +31,10 @@ async function renderSystemSection(repo: GitMemoryRepo, head: string, paths: rea
     let body = raw
     try {
       const parsed = parseMemoryFile(raw)
-      heading = `### ${path} — ${parsed.frontmatter.description}`
+      heading = `### ${path} - ${parsed.frontmatter.description}`
       body = parsed.body
     } catch {
-      heading = `### ${path} — (invalid frontmatter)`
+      heading = `### ${path} - (invalid frontmatter)`
     }
     lines.push("", heading, "", body.trimEnd())
   }
@@ -82,7 +82,7 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
 
       const lines = [
         `# Memory: ${identity.identity}`,
-        `HEAD: ${shortSha(head)} (${porcelain.length === 0 ? "clean" : `dirty — ${porcelain.length} entr${porcelain.length === 1 ? "y" : "ies"}`})`,
+        `HEAD: ${shortSha(head)} (${porcelain.length === 0 ? "clean" : `dirty - ${porcelain.length} entr${porcelain.length === 1 ? "y" : "ies"}`})`,
         `Repository: ${identity.identityPaths.repo}`,
         "",
         ...(await renderSystemSection(repo, head, paths)),

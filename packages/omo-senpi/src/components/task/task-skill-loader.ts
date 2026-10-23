@@ -8,7 +8,7 @@ import { buildSkillPrepend, createFsSkillLoader, type SkillLoader } from "@oh-my
 
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { loadSenpiOmoConfig } from "../config-resolution"
-import { resolveGitMasterSkillAdditions } from "../git-master/skill-content"
+import { carriesAttributionDirective, resolveGitMasterSkillAdditions } from "../git-master/skill-content"
 
 const GIT_MASTER_SKILL_NAME = "git-master"
 
@@ -52,7 +52,8 @@ function withGitMasterSettings(
     const skills = resolvedSkills.map((skill) => {
       if (skill.name !== GIT_MASTER_SKILL_NAME) return skill
       const content = additions.rewriteSkillText(skill.content)
-      return { ...skill, content: additions.directive === undefined ? content : `${content}\n\n${additions.directive}` }
+      const appendDirective = additions.directive !== undefined && !carriesAttributionDirective([skill.content])
+      return { ...skill, content: appendDirective ? `${content}\n\n${additions.directive}` : content }
     })
     return { ...resolution, skills, prepend: buildSkillPrepend(skills, "") }
   }

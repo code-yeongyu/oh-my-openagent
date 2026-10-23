@@ -8,6 +8,7 @@ import type { ForgetOptions } from "./types"
 import { terminalFailureMessage } from "./credential-failure"
 import { nowIso } from "./manager-helpers"
 import { createProvisionalExitTracker, type ExitConfirmationSchedule } from "./provisional-exit"
+import { publishHostTaskStatus } from "./host-task-status"
 
 export type ManagedOutcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
 
@@ -123,6 +124,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   function persistTerminal(taskId: string, owned: TaskRecord, timestamp: string, transition: TaskTransition): void {
     try {
       ports.store.transition(taskId, transition)
+      publishHostTaskStatus(ports.liveHandle(taskId), taskId, ports.tryLoad(taskId)?.status)
     } catch (error) {
       log("senpi-task manager terminal record write failed", {
         taskId,
@@ -216,13 +218,16 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     })
   }
 
-  // The open's own state read did not return the durable id, so the record took none at spawn; the
-  // first heartbeat that learns it fills it now (#10873). It only fills: a record that already has an
-  // id changes solely through replaceOwned, which also moves host_session in step.
+  // The open's own state read did not return the durable id, so this run stamped none at spawn; the
+  // first id its handle learns is this run's, and replaces whatever the record still carries from a
+  // predecessor run (a relaunch onto a new transcript, #10892). Each handle stamps once: a later report
+  // from the same handle is stale, and a known id moves only through replaceOwned (#10873).
+  const stampedDurableIds = new WeakSet<ManagedChildHandle>()
   function stampDurableId(taskId: string, handle: ManagedChildHandle, epoch: number, id: string): void {
-    if (ownedRecord(ports, taskId, handle, epoch) === null) return
+    if (stampedDurableIds.has(handle) || ownedRecord(ports, taskId, handle, epoch) === null) return
+    stampedDurableIds.add(handle)
     ports.store.mutate(taskId, (fresh) =>
-      fresh.child_session_id !== undefined ? fresh : { ...fresh, child_session_id: id, updated_at: nowIso(ports.now) })
+      fresh.child_session_id === id ? fresh : { ...fresh, child_session_id: id, updated_at: nowIso(ports.now) })
   }
 
   function release(taskId: string): void {

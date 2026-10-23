@@ -1,11 +1,11 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import { nowIso, type LifecycleContext } from "./context"
+import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ResidentHandle } from "./port"
 import { stopOwnedChildren, stoppedOwnerTask } from "./stopped-owner"
-import { withinTeardownBudget } from "./teardown-budget"
+import { withinTeardownBudget, type TeardownStep } from "./teardown-budget"
 import type { SuspendFailure, SuspendInput, SuspendSummary } from "./types"
 
 /**
@@ -95,6 +95,14 @@ export async function suspendHandle(context: LifecycleContext, handle: ResidentH
   if (handle.kind !== "host-session") {
     await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
   }
+  // A finished child's session stays loaded on the daemon after the detach: its terminal status goes
+  // out first, over the attachment, so a successor host drops the park instead of reopening it (omo#10778).
+  const status = context.store.load(handle.task_id)?.status
+  const publish = handle.publishTaskStatus?.bind(handle)
+  if (status !== undefined && TERMINAL_STATUSES.has(status) && publish !== undefined) {
+    await bestEffort(handle.task_id, "publish_task_status", () =>
+      withinTeardownBudget(context.teardownStepDeadline, target, "publish_task_status", () => publish(status)))
+  }
   if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()))
   try {
     await withinTeardownBudget(context.teardownStepDeadline, target, "dispose", () => handle.dispose())
@@ -145,7 +153,7 @@ function isOwnedChild(
   return record !== null && record.parent_session_id === parentSessionId && record.host_pid === context.hostPid
 }
 
-async function bestEffort(taskId: string, step: "abort" | "terminate", run: () => Promise<void>): Promise<void> {
+async function bestEffort(taskId: string, step: TeardownStep, run: () => Promise<void>): Promise<void> {
   try {
     await run()
   } catch (error) {

@@ -175,6 +175,10 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   }
   readonly killed?: boolean
   readonly run_stats?: TaskRunStats
+  // USD the provider reported for this task's EARLIER runs: each revive folds the finished run's
+  // reported `run_stats.cost_usd` in before it drops `run_stats`, so a task's lifetime spend is this
+  // plus the current run's. Absent while no earlier run reported a positive cost.
+  readonly prior_runs_cost_usd?: number
   readonly notification: TaskNotification
   readonly revive_delivery_uncertain?: ReviveDeliveryUncertainty
   readonly resumed_run_epoch?: number

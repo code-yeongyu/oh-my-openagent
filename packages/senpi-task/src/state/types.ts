@@ -165,6 +165,7 @@ export type {
   CostReportStatus,
   DurationSourceStatus,
   TaskRunStats,
+  LiveRunStats,
   TokenCoverageStatus,
 } from "./run-stats-types"
 export { isSpawnSpecV1, PARENT_MODEL_FALLBACK_REASONS } from "./record-types"

@@ -20,6 +20,13 @@ export type LockOwner = { readonly pid: number; readonly bootId: string }
 
 const newToken = (owner: LockOwner): string => `${owner.pid} ${owner.bootId} ${randomUUID()}`
 
+/**
+ * The tokens of the locks this process holds right now: added once a lock is filled, removed when its
+ * unlock runs, whether or not the file could be deleted. A lock with our own pid and boot id that is not
+ * in here belongs to no move in progress (its unlock gave up), so the sweep may delete it.
+ */
+const heldTokens = new Set<string>()
+
 function code(error: unknown): unknown {
   return error instanceof Error && "code" in error ? error.code : undefined
 }
@@ -55,6 +62,7 @@ export function tryLockSync(dir: string, source: string, owner: LockOwner): stri
     cleanUpThenThrow(error, () => closeSync(fd), path)
   }
   closeSync(fd)
+  heldTokens.add(token)
   return token
 }
 
@@ -81,6 +89,7 @@ export async function tryLock(dir: string, source: string, owner: LockOwner): Pr
     }, path)
   }
   await handle.close()
+  heldTokens.add(token)
   return token
 }
 
@@ -105,9 +114,11 @@ export async function holdsLock(dir: string, source: string, token: string): Pro
 /**
  * Deletes the lock only while it still holds `token`. Never throws: it runs in the `finally` of a move
  * that may already have happened, and an error here would replace that result. A lock it cannot delete
- * goes to `onLeft`; the sweep deletes it once it is abandoned (`isAbandonedLock`).
+ * goes to `onLeft`; the token is released either way, so the sweep deletes that lock once it is past the
+ * claim lease (`isAbandonedLock`).
  */
 export function unlock(dir: string, source: string, token: string, onLeft?: (error: unknown) => void): void {
+  heldTokens.delete(token)
   try {
     if (!holdsLockSync(dir, source, token)) return
     unlinkSync(join(dir, lockName(source)))
@@ -119,7 +130,8 @@ export function unlock(dir: string, source: string, token: string, onLeft?: (err
 
 /**
  * A lock is held for one rename. Past the claim lease it is abandoned when its owner's pid is gone (or
- * the token is unreadable: a crash between creating and filling it); a live pid may be a suspended
+ * the token is unreadable: a crash between creating and filling it). Our own lock is abandoned when it is
+ * from an earlier boot or this process no longer holds its token. Another live pid may be a suspended
  * holder, so its lock stays until the spool's age limit, past which it is abandoned whoever holds the pid.
  */
 export function isAbandonedLock(
@@ -145,8 +157,9 @@ export function isAbandonedLock(
   const [pidText, bootId] = text.split(" ")
   const pid = Number(pidText)
   if (!Number.isInteger(pid) || pid <= 0) return true
-  // Our own pid answers "alive" by definition: only the boot id tells this process from a crashed earlier one.
-  if (pid === limits.self.pid) return bootId !== limits.self.bootId
+  // Our own pid answers "alive" by definition: the boot id tells this process from a crashed earlier one,
+  // and the held tokens tell a move in progress from a lock its unlock could not delete.
+  if (pid === limits.self.pid) return bootId !== limits.self.bootId || !heldTokens.has(text)
   return !limits.isPidAlive(pid)
 }
 

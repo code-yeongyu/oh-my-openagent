@@ -3,7 +3,7 @@ import { mapExitOutcomeToError } from "../runners/rpc/exit-mapping"
 import type { HostSessionChildHandle } from "../runners/rpc-host/handle-port"
 import type { HostSessionReplaced } from "../runners/rpc-host/session-client"
 import type { RpcChildHandle, RpcEntriesResult, RpcSpawnSpec, RpcSwitchSessionResult } from "../runners/types"
-import type { SuspensionReason } from "../state"
+import type { SuspensionReason, TaskStatus } from "../state"
 import type { ChildExtensionListener } from "../runners/child-extension-events"
 import { HOST_TURN_RESUMED_EVENT } from "./host-turn-resumed"
 import type { EffectiveModel } from "../runners/pinned-model-equivalence"
@@ -63,6 +63,8 @@ export type ManagedChildHandle = {
   transportRecovering?(): boolean
   // A cancel was accepted: no transport recovery may bring this child back as running.
   markStopping?(): void
+  // Host-session: publish `task_status` in the session's context while still attached (omo#10778).
+  publishTaskStatus?(status: TaskStatus): Promise<void>
   // Stop it once reachable, before it runs anything else; resolves once it has ended on this side.
   stopWhenReachable?(): Promise<void>
   steer(text: string): Promise<void>
@@ -130,6 +132,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
           onDurableSessionId: (listener) => handle.onDurableSessionId(listener),
           transportRecovering: () => handle.transportRecovering(),
           markStopping: () => handle.markStopping(),
+          publishTaskStatus: (status: TaskStatus) => handle.publishTaskStatus(status),
           stopWhenReachable: () => handle.stopWhenReachable(),
           onReconciled: (listener: (notice: ReconciledTurnNotice) => void) => handle.onReconciled(listener),
         }

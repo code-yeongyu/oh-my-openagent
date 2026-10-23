@@ -1,5 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
+import type { TaskStatus } from "../../state"
 import { classifySessionExit, type SessionCloseIntent, type SessionExitClassification } from "./exit-mapping"
 import type { HostSessionPort } from "./handle-port"
 
@@ -13,6 +14,8 @@ export interface HostTeardownInput {
 }
 
 export interface HandleTeardownHost extends HostTeardownInput {
+  /** The open re-joined a live session, whose context may still carry an earlier terminal status. */
+  readonly openedAttached: boolean
   exited(): boolean
   intent(): SessionCloseIntent
   markIntent(intent: SessionCloseIntent): void
@@ -25,6 +28,13 @@ export interface HandleTeardownHost extends HostTeardownInput {
 }
 
 export interface HandleTeardown {
+  /** Publish the task's status in the session's context while this handle still holds the attachment. */
+  publishTaskStatus(status: TaskStatus): Promise<void>
+  /**
+   * A turn is starting: publish `running` on this connection ahead of the input that starts it, so a
+   * finished session that runs again is never dropped as finished. Never waits on the host.
+   */
+  publishRunning(): void
   detach(): Promise<void>
   close(): Promise<void>
   terminate(): Promise<void>
@@ -42,6 +52,8 @@ const INTENT_STRENGTH: Readonly<Record<SessionCloseIntent, number>> = { running:
  */
 export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
   let ending: Promise<void> | undefined
+  // Whether the session may publish a terminal status: only then does a starting turn send running.
+  let markedTerminal = host.openedAttached
   const endOnHost = async (next: "closed" | "terminated"): Promise<void> => {
     if (host.exited()) return
     if (INTENT_STRENGTH[next] > INTENT_STRENGTH[host.intent()]) host.markIntent(next)
@@ -57,6 +69,21 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
   }
 
   return {
+    publishTaskStatus: async (status) => {
+      if (host.exited()) return
+      markedTerminal = status !== "running"
+      await host.port().send({ type: "set_session_context", patch: { task_status: status } })
+    },
+    publishRunning: () => {
+      if (host.exited() || !markedTerminal) return
+      markedTerminal = false
+      const failed = (error: unknown): void => log("senpi-task host running status publish failed", { taskId: host.taskId, error: String(error) })
+      try {
+        void host.port().send({ type: "set_session_context", patch: { task_status: "running" } }).catch(failed)
+      } catch (error) {
+        failed(error)
+      }
+    },
     detach: async () => {
       host.markDetached()
       host.clearActive()

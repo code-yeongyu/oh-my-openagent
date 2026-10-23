@@ -1,3 +1,31 @@
+## 2026-10-20 - git-master adds the sisyphus-dev-ai co-author trailer by default (#10713)
+
+`components/git-master/directive.ts` builds the attribution directive whenever `git_master.include_co_authored_by` (default `true` again, no longer a no-op) or `commit_footer` is on. Its commit example is `git -c trailer.ifexists=addIfDifferent commit -m ... --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`, under the `git_env_prefix` from #10613, so git keeps one copy when the message already carries the trailer. A squash joins messages without `--trailer`, so the directive asks for one `--amend` rewrite afterwards. `skill-content.ts` runs the shared template rewrite with `include_co_authored_by: false`, because the directive carries attribution, and both channels (the `read` hook and `task-skill-loader.ts`) append the directive only when the text does not already contain `<commit_attribution>`. `scripts/qa/git-master-attribution-e2e.mjs` now expects the trailer exactly once by default, and adds an `include_co_authored_by: false` run that expects none.
+
+## 2026-10-18 - A committed layer-2 effect survives a lost response; off means not callable (#10458 review T1/T2)
+
+The replay identity no longer lives in a journal file next to the store: `gateway/schema.ts` v10 (after dev's v8 provenance trigger and the v9 thread-creation tables) adds `toolkit_replay_receipts`, and the receipt is committed INSIDE the op's own transaction (op, canonical-arguments sha256, result, the turn's time). A call whose response was lost after commit - the store worker answered, the caller never heard - returns the recorded result on retry; the effect runs once. The old sidecar file, its pending state and its claim deletion on dispatch failure are gone: nothing outside the transaction can judge whether an ambiguous failure ran the effect.
+
+With the `dori` section off, the dori extension's declared layer-2 tools are no longer built at all, so a stale registration cannot dispatch an effectful op without replay protection; the old behaviour (tools listed, dispatching bare) was the review's T2. On, and only on, those tools' schemas also accept the optional `omo_toolkit_replay` context argument, and `help()` hides it.
+
+Also: the divergence refusal carries a machine-readable tail (`replay_differs=op,args recorded_op=... attempted_op=...`) that the engine converts to the structured stop, so the kernel error keeps `key`, `differs`, and both ops; and a store at v6 upgrading to v9 drops nothing (the mixed-case migration fixture rewinds the new table too).
+
+## 2026-10-17 - The dori toolkit replay identity covers arguments, expiry and program order (#10316 review)
+
+A layer-2 call's replay identity is again the agreed one: op plus canonical arguments plus turn and call index. The journal stores a sha256 of the arguments (sorted-key JSON) beside the op, and the same key with other arguments now stops as `toolkit_replay_divergence` naming what differed, instead of returning another call's result. A turn older than the seven-day window stops as `toolkit_replay_expired` before any claim, so a pruned key can no longer let an old turn run again.
+
+Call indexes follow program order: the SDK reads the calling eval cell from the stack (the kernel evaluates each cell under its tool call id) and numbers its calls synchronously per cell, so concurrent `Promise.all` calls replay with the same indexes. The engine accepts that cell only as a tool call on the caller's own branch and files the call under the turn the cell started in, so a cell that outlives its turn stays in it; any other cell is refused as `toolkit_replay_turn_unknown`. Layer-2 tools accept the context parameter only while the toolkit is on, and `help()` hides it.
+
+Both dori layers now ship as their own sidecars, `runtime/dori/layer2.js` and `runtime/dori/replay.js`, loaded by URL only while the gate is on; the shipped SDK runs with its sidecar deleted while off. Nested function names such as `send.call` are reachable.
+
+## 2026-10-17 - The agent toolkit gets the layer-2 namespace seam a dori host fills (#10316)
+
+With an enabled `dori` section in `omo.json`, the agent toolkit SDK gains eleven namespaces (`route`, `reply`, `room`, `send`, `thread`, `describe`, `file`, `rules`, `iam`, `call`, `work`); without one, the properties do not exist and no layer module is imported. omo ships no namespace behavior: each function calls the session tool a separately installed dori host declares through a store extension named `dori` (`ext_dori_<ns>_<fn>`), so the caller is stamped by the engine as for every session-callable op, and `help()` lists the registered functions with signatures rendered from their JSON Schemas.
+
+Every such call is journaled by the engine under a replay key, `JSON.stringify(["turn", turnId, callIndex])` (inbound deliveries use `["inbound", dedupeKey]`); dori-link derives its envelope ids from the same string, and `replay-key.test.ts` pins the vectors. The turn is the calling session plus the newest assistant entry on its branch. Replaying a turn returns each recorded result without dispatching again; a different op at a recorded index stops with `ToolkitReplayStopError` (`toolkit_replay_divergence`), and a call an earlier run started but never recorded stops as `toolkit_replay_pending` instead of being sent twice. Keys are kept seven days.
+
+Tests: the key vectors, the journal (replay, divergence, per-turn indices, released claims, pending, retention, missing turn), the session-tool wiring against a real gateway store (one dispatch on replay, divergence, off means no journal, other extensions untouched), the kernel namespaces and `help()`, and an import-graph walk proving the SDK and the thread component load no layer module statically. `scripts/qa/dori-toolkit-replay-qa.mjs` drives the same contract through real eval kernels, one process per phase.
+
 ## 2026-10-21 - Gateway, onboarding and task-host hooks allow prompt previews (#10356)
 
 All three before-agent-start handlers register as preview-safe. Gateway previews read committed operating rules through a read-only connection without starting a worker, registering migrations, or changing warning and activation latches. Onboarding previews compute the same addition, migration inventory included, without claiming the completion marker, changing widgets, consuming the forced-tour flag, or starting the background session-history read. Task-host previews return without capturing runtime context, registering a store, or warming or launching a host. AST and composed-extension audits cover literal and dynamic registrations; component tests cover semantic and durable state preservation, and a real-engine test checks prefix readiness.
@@ -398,6 +426,17 @@ Tests (`model-miss.test.ts`, the exact advisory text):
 
 On the host-session runner the scenario requires the tool call (`tool_execution`) before the in-session hop (`retry_fallback_applied`), and the record's model to end on the fallback. On the per-child process runner the tool check reads `N/A`, because that runner cannot carry a per-session chain and falls back at the manager level instead. `task-runtime-fallback-mock-provider.ts` serves the `limit-after-tool` model.
 
+## 2026-10-05 - A store extension can declare a session op its component calls but the model never sees
+
+A session-callable op gave the model a tool (`ext_<extension>_<toolName>`). Some ops take a session id the session's own component already knows, while it assembles its prompt: a digest cursor write, a membership read. Declaring them session-callable would have handed the model tools it must not have. Leaving them public would have let any caller forge the session id.
+
+`SessionCallableOp` now has an internal form, `{ op, internal: true, parameters, targetArg?, description? }`. The caller is stamped and the public `extensionCall` refuses it with `caller_not_allowed`, exactly as for a tool op. It is reachable only through `extensionSessionAwait` with the caller the component knows, and `sessionCallableOps` leaves it out, so no tool is ever built for it. Registration refuses an internal entry that declares `toolName`, `await` or `wake`.
+
+Tests:
+- a session that declares a tool op and an internal op gets only the tool op's tool;
+- the public `extensionCall` refuses an internal op, and the op never runs;
+- `extensionSessionAwait` runs it with the engine caller stamped, and refuses a forged caller field;
+- an internal entry with `toolName`, `await`, `wake` or `internal: false` is refused, and the same entry without it registers.
 ## 2026-10-03 - Ultrawork routing item 4 carries a size test before it fans out (#9499)
 
 - `skills/ultrawork/SKILL.md` "Finding things" item 4: "Architecture / flow / blast radius across more files than one wave can read -> parallel explore agents armed with ast-grep, then synthesize; outside-repo research (library/API/docs/web) -> librarian. Run them in background; keep working." replaces the arrow table that sent every architecture question and every "unfamiliar layout" to background agents with no size test. `src/components/ultrawork/generated-directive.ts` is regenerated by `plugin/scripts/embed-directive.mjs` (22 words shorter; no forbidden harness tokens).

@@ -315,9 +315,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       shutdownDrain.registerEvaluator(evaluator)
     },
 
-    clearStatus(eventCtx: unknown): void {
-      reflectionLive.clearStatus(eventCtx)
-    },
+    clearStatus: reflectionLive.clearStatus,
+    onSyncStatusChanged: reflectionLive.onSyncStatusChanged,
 
     async whenIdle(): Promise<void> {
       await kibitzerRef.current?.whenIdle()

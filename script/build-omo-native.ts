@@ -31,7 +31,7 @@ export { REQUIRED_PLUGIN_ARTIFACTS }
 export const PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
 // Root-level plugin files. The daemon launch spec is the task daemon's only argv source; it is
 // generated at build time and must reach every payload, not just the source tree.
-export const PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json"] as const
+export const PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json", "telemetry-schema.json", "telemetry-schema.omo-cloud.json"] as const
 export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 
 // Native-only runtime: `omo doctor` / `omo setup` import it to classify task-category coverage with

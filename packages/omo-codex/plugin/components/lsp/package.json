@@ -44,10 +44,10 @@
 		"test:watch": "vitest",
 		"pretypecheck": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
 		"typecheck": "tsc --noEmit",
-		"lint": "biome check src test",
-		"lint:fix": "biome check --write src test",
+		"lint": "biome format src test",
+		"lint:fix": "biome format --write src test",
 		"precheck": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
-		"check": "tsc --noEmit && biome check src test && tsc -p tsconfig.build.json"
+		"check": "tsc --noEmit && biome format src test && tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
 		"@oh-my-opencode/lsp-core": "file:../../../../lsp-core",

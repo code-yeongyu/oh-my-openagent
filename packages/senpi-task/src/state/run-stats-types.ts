@@ -2,7 +2,8 @@ export const TOKEN_COVERAGE_STATUSES = ["complete", "partial", "unavailable"] as
 
 export type TokenCoverageStatus = (typeof TOKEN_COVERAGE_STATUSES)[number]
 
-export const COST_REPORT_STATUSES = ["reported", "unavailable", "invalid"] as const
+// "partial": some successful turns reported cost and some reported no usage, so cost_usd is a lower bound.
+export const COST_REPORT_STATUSES = ["reported", "partial", "unavailable", "invalid"] as const
 
 export type CostReportStatus = (typeof COST_REPORT_STATUSES)[number]
 
@@ -49,3 +50,6 @@ export type TaskRunStats = {
   /** Provenance of `runtime_ms`: measured by the live tracker, or reconstructed from record timestamps. */
   readonly duration_status?: DurationSourceStatus
 }
+
+/** In-flight stats of one run, tagged with that run's run_start_epoch (TaskManager.liveRunStats). */
+export type LiveRunStats = { readonly runStartEpoch: number; readonly stats: TaskRunStats }

@@ -28,7 +28,8 @@ const expectedNativeEvents = new Set([
 ])
 
 // Session-conditional events the scripted scenario cannot produce: `kibitzer_summary` is emitted only
-// when the memory sidecar actually woke; `handoff_hint` needs a 200k-token session left idle past its cache lifetime, which needs recall enabled and a committed memory corpus, and
+// when the memory sidecar actually woke, which needs recall enabled and a committed memory corpus;
+// `handoff_hint` needs a 200k-token session left idle past its cache lifetime; and
 // `process_crashed` only when an earlier process left a crash record on disk. `session_summary` is held
 // here only until a live capture proves it: by the code it is flushed at the drive's clean shutdown (after
 // the third settled turn the drive ends stdin, and session_shutdown flushes the open window, registered

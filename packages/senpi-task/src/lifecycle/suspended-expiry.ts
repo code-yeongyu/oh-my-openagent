@@ -124,13 +124,15 @@ export async function expireSuspendedChild(
     (fresh.status !== "pending" && fresh.status !== "running")
   )
     return
-  const undelivered = fresh.pending_steering?.length ?? 0
   const closureMessage = recoveryFailureNotice(fresh, closed)
-  const message = withDroppedSteeringNotice(closureMessage, undelivered)
+  // The failure message and the steer_dropped event count the same queue: the one this mutate clears (#10866).
+  let undelivered = 0
   context.store.mutate(record.task_id, (current) => {
+    undelivered = current.pending_steering?.length ?? 0
     const { pending_steering: _undelivered, ...rest } = current
     return rest
   })
+  const message = withDroppedSteeringNotice(closureMessage, undelivered)
   if (undelivered > 0) context.store.appendEvent(record.task_id, {
     type: "steer_dropped", payload: { count: undelivered, reason: "target_gone" },
   })

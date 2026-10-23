@@ -319,7 +319,7 @@ Hard limits (enforced, not suggestions):
 - Edge cases: up to 3 items, only when applicable.
 - Do not rephrase the user's request unless semantics change.
 
-Never open with filler: "Great question!", "That's a great idea!", "You're right to call that out", "Done —", "Got it", "Sure thing", "Happy to help". Start with the bottom line.
+Never open with filler: "Great question!", "That's a great idea!", "You're right to call that out", "Done ${String.fromCodePoint(0x2014)}", "Got it", "Sure thing", "Happy to help". Start with the bottom line.
 
 ## Uncertainty and ambiguity
 

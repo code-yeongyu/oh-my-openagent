@@ -108,6 +108,9 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   }
   events?: SenpiExtensionAPI["events"]
   rpc?: { emit(name: string, data: unknown): void }
+  // Absent by default, like a host that predates senpi#3684; a test installs the engine's limit store.
+  getSubscriptionLimits?: SenpiExtensionAPI["getSubscriptionLimits"]
+  onSubscriptionLimits?: SenpiExtensionAPI["onSubscriptionLimits"]
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 

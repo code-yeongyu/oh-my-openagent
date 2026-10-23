@@ -4,7 +4,7 @@ import type { CategoryConfigGenerations } from "./category-config-generation"
 import { createCompletionObservingStore } from "./completion-bridge"
 import { createConfigGenerationStampingStore } from "./config-generation-store"
 import type { TaskRuntimeContext } from "./runtime-context"
-import { createMutationNotifyingStore } from "./store-mutation-observer"
+import { createMutationNotifyingStore, type StoreMutation } from "./store-mutation-observer"
 import type { TaskTerminalObservers } from "./terminal-observers"
 
 export interface TaskStoreChainDeps {
@@ -22,7 +22,7 @@ export interface TaskStoreChainDeps {
 export interface TaskStoreChain {
   readonly store: TaskRecordStore
   /** Subscribe to every record mutation (spawn/transition/replace/remove). Returns an unsubscribe. */
-  readonly onMutation: (listener: () => void) => () => void
+  readonly onMutation: (listener: (change: StoreMutation) => void) => () => void
 }
 
 /**
@@ -41,9 +41,9 @@ export function createTaskStoreChain(deps: TaskStoreChainDeps): TaskStoreChain {
     currentSessionId: () => deps.runtime.sessionId(),
   })
   const stamping = createConfigGenerationStampingStore(observing, () => deps.generations.current()?.generation)
-  const listeners = new Set<() => void>()
-  const store = createMutationNotifyingStore(stamping, () => {
-    for (const listener of listeners) listener()
+  const listeners = new Set<(change: StoreMutation) => void>()
+  const store = createMutationNotifyingStore(stamping, (change) => {
+    for (const listener of listeners) listener(change)
   }, deps.terminal.observers)
   return {
     store,

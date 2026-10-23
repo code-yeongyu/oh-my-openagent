@@ -1,29 +1,10 @@
 #!/usr/bin/env bun
 // Flags coloured one-side bars on any box and accent outlines on rounded cards in CSS, Tailwind and JSX.
-// Usage: bun check-accent-stripes.ts [--json] <file-or-dir>...   Exit 0 clean, 1 findings, 2 usage.
-import { readdirSync, readFileSync, statSync } from "node:fs"
-import { join } from "node:path"
+// Usage: bun check-accent-stripes.ts [--json] <file-or-dir>...   Exit 0 clean, 1 findings, 2 usage or unreadable target.
+import { readFileSync } from "node:fs"
 import { FIX_HINT, RULE_MESSAGES } from "./accent-stripes/findings"
 import { lintFiles, type SourceFile } from "./accent-stripes/lint"
-
-const SCANNED = /\.(?:css|scss|less|pcss|postcss|html?|[cm]?[jt]sx?|vue|svelte|astro)$/i
-const SKIPPED_DIRS = new Set([
-	"node_modules", ".git", "dist", "build", "out", ".next", ".nuxt", ".svelte-kit", ".astro",
-	".turbo", ".cache", "coverage", "vendor", ".vercel", ".output",
-])
-const MAX_BYTES = 1_000_000
-
-function collect(path: string, into: string[]): void {
-	const stat = statSync(path)
-	if (stat.isDirectory()) {
-		for (const entry of readdirSync(path)) {
-			if (!SKIPPED_DIRS.has(entry)) collect(join(path, entry), into)
-		}
-		return
-	}
-	const minified = /\.min\.[a-z]+$/i.test(path) || path.endsWith(".d.ts")
-	if (SCANNED.test(path) && !minified && stat.size <= MAX_BYTES) into.push(path)
-}
+import { collectFiles } from "./collect-files"
 
 function main(argv: readonly string[]): number {
 	const json = argv.includes("--json")
@@ -32,8 +13,11 @@ function main(argv: readonly string[]): number {
 		process.stderr.write("usage: check-accent-stripes.ts [--json] <file-or-dir>...\n")
 		return 2
 	}
-	const paths: string[] = []
-	for (const target of targets) collect(target, paths)
+	const { paths, missing } = collectFiles(targets)
+	if (missing.length > 0) {
+		process.stderr.write(`check-accent-stripes: cannot read ${missing.join(", ")}\n`)
+		return 2
+	}
 	const files: SourceFile[] = paths.map((path) => ({ path, text: readFileSync(path, "utf8") }))
 	const findings = lintFiles(files)
 	if (json) process.stdout.write(`${JSON.stringify(findings, null, 2)}\n`)

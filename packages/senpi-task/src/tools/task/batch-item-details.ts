@@ -63,7 +63,7 @@ function categoryListSuffix(error: PlanResolutionError): string {
   // categories" told models to retry the same broken binding. Name the vocabulary honestly and
   // point at the omo.json config escape hatch.
   if (error.code === "model_unavailable") {
-    return ` Valid category names: ${available.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+    return ` Valid category names: ${available.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
   }
   return ` Available categories: ${available.join(", ")}.`
 }

@@ -520,6 +520,20 @@ describe("gateway -> dori rename sidecar", () => {
     expect(migrated).not.toContain('"gateway"')
   })
 
+  test("#given a config whose only escapes are in string values #when startup prepares the rename #then the sidecar is not imported", async () => {
+    // given
+    const fileSystem = memoryFileSystem()
+    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"agents":{"finder":{"prompt":"\\uac00\\ub098 \\u2014 \\u00e9"}}}')
+    let imports = 0
+
+    // when
+    const prepared = await prepareDoriSectionRename(preparationOptions(fileSystem), async () => { imports += 1; return doriSectionRename })
+
+    // then
+    expect(imports).toBe(0)
+    expect(prepared).toEqual({ rename: NO_DORI_SECTION_RENAME })
+  })
+
   test("#given a config file that exists but cannot be read #when startup prepares the rename #then it loads the sidecar rather than skip", async () => {
     // given
     const fileSystem = memoryFileSystem()

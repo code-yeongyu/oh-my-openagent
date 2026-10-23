@@ -119,6 +119,6 @@ export function feedAt(clockMs: number, limit = 3): readonly FeedLine[] {
       key: `${event.atMs}:${event.nodeId}`,
       nodeId: event.nodeId,
       state: event.state,
-      text: `${event.nodeId} · ${modelById.get(event.nodeId) ?? ""} — ${event.activity}`,
+      text: `${event.nodeId} · ${modelById.get(event.nodeId) ?? ""} · ${event.activity}`,
     }))
 }

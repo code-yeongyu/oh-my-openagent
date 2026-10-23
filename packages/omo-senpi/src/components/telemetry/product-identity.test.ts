@@ -268,7 +268,7 @@ describe("OmO Native product identity", () => {
     ])
     expect(delegation.model_source.values).toEqual(["category", "explicit", "agent", "none"])
     expect(delegation.token_status.values).toEqual(["complete", "partial", "unavailable"])
-    expect(delegation.cost_status.values).toEqual(["reported", "unavailable", "invalid"])
+    expect(delegation.cost_status.values).toEqual(["reported", "partial", "unavailable", "invalid"])
     expect(delegation.stats_status.values).toEqual(["complete", "partial", "unavailable"])
     expect(delegation.duration_status.values).toEqual(["monotonic", "wall_clock", "unavailable"])
     expect(delegation.category.values).toEqual([...BUILTIN_CATEGORY_NAMES, "custom", "none"])

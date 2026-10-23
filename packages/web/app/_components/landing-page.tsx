@@ -25,7 +25,7 @@ export async function generateLandingMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: "OmO — Your tool for real work. But it's an agent.",
+    title: "OmO: Your tool for real work. But it's an agent.",
     description,
   }
 }

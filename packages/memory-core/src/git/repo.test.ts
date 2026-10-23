@@ -11,6 +11,7 @@ import {
   createNodeGitExec,
 } from "./index"
 import { removeTree } from "../../../../test-support/remove-tree"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 
 const tempDirs: string[] = []
 
@@ -33,6 +34,7 @@ describe("GitMemoryRepo", () => {
     await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "initial\n" }] })
     const committedAt = "2026-08-10T00:00:00.000Z"
     const exec = createNodeGitExec()
+    disableFixtureAutoMaintenance(dir)
     await exec.run(["commit", "--amend", "--no-edit"], {
       cwd: dir,
       timeoutMs: 30_000,
@@ -139,6 +141,7 @@ describe("GitMemoryRepo", () => {
     const { dir } = await createRepo()
     const exec = createNodeGitExec()
     await exec.run(["init"], { cwd: dir, timeoutMs: 30_000 })
+    disableFixtureAutoMaintenance(dir)
     await exec.run([
       "-c", "user.name=Bootstrap", "-c", "user.email=bootstrap@example.com",
       "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "bootstrap",

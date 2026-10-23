@@ -11,10 +11,11 @@ import type {
   TelemetryTransport,
   TelemetryTransportFactory,
   TelemetryTransportOptions,
+  TurnTracing,
 } from "@oh-my-opencode/telemetry-core"
 
 import type { OmoSenpiComponent } from "../../extension/types"
-import { isHostWarmupSession, readSessionRole, resolveStateDir } from "@oh-my-opencode/senpi-task"
+import { isHostWarmupSession, readSessionRole, readSessionTraceparent, resolveStateDir } from "@oh-my-opencode/senpi-task"
 
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "../task/terminal-observers"
 import {
@@ -33,6 +34,7 @@ import {
   type OmoNativeSessionOptions,
 } from "./omo-native-session"
 import { registerOmoNativeToolTelemetry } from "./omo-native-tools"
+import { createOmoNativeTurnSpans } from "./omo-native-turn-span"
 import { createOmoNativeTurnHandler } from "./omo-native-turns"
 import { createSessionSummaryRecorder } from "./omo-native-session-summary"
 import { createSummaryStore } from "./session-summary-store"
@@ -55,6 +57,8 @@ type SharedState = {
   isSendAllowed?: () => boolean
   /** Empties the native SDK queue without sending it; set while a native transport is live. */
   dropQueued?: () => void
+  /** The live transport's span sink; unset on the PostHog path. */
+  traces?: TurnTracing
 }
 
 export type OmoNativeTelemetryComponentOptions = OmoNativeSessionOptions & {
@@ -138,11 +142,32 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       state.isSendAllowed = () => currentConsent(true)
       const hashSession = (rawId: string): string =>
         currentConsent(false) ? (options.hashSessionId ?? hashSessionId)(rawId) : OPTED_OUT_SESSION_HASH
+      const sessionRole = readSessionRole(pi, env) ?? "main"
+      const turnSpans = createOmoNativeTurnSpans({
+        traces: () => state.traces,
+        isConsented: () => currentConsent(false),
+        isSendAllowed: () => currentConsent(true),
+        sessionRole,
+        inheritedTraceparent: readSessionTraceparent(pi, env),
+      })
+      // Every event this session emits goes through here, so one emitted while a turn is open carries that turn's span ids.
+      const sessionClient: Pick<EventTelemetryClient, "captureEvent"> = {
+        captureEvent: (name, properties) => turnSpans.run(() => client.captureEvent(name, properties)),
+      }
+
+      // A turn still open at shutdown must end before the session component's `session_shutdown`
+      // handler shuts the transport down, or its span lands on a closed sink. Registered first, so the
+      // shutdown-time summaries below are emitted outside any turn. Like every span ending, it is ended
+      // (and so exported) only while the fresh send-time consent read allows it; otherwise dropped unended.
+      pi.on("session_shutdown", (_payload, eventCtx) => {
+        consentCwd = cwdOf(eventCtx)
+        turnSpans.shutdown()
+      })
 
       // Must precede the session component: its `session_shutdown` handler shuts the client down,
       // which clears `state.capture`, after which `parallelism_summary` would capture nothing.
       registerOmoNativeParallelSummary(pi, {
-        captureEvent: client.captureEvent,
+        captureEvent: sessionClient.captureEvent,
         hashSessionId: hashSession,
       })
 
@@ -150,7 +175,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       // handler clears `state.capture`, so this registration must precede it. Its own detach runs
       // after the emission because it is registered second.
       const detachKibitzerSummary = registerOmoNativeKibitzerSummary(pi, {
-        captureEvent: client.captureEvent,
+        captureEvent: sessionClient.captureEvent,
         hashSessionId: hashSession,
       })
       pi.on("session_shutdown", () => {
@@ -160,9 +185,9 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       // Same ordering constraint again: the final summary window must be captured before the session
       // component's shutdown handler clears `state.capture`.
       const summary = createSessionSummaryRecorder({
-        captureEvent: client.captureEvent,
+        captureEvent: sessionClient.captureEvent,
         store: createSummaryStore({ stateDir }),
-        sessionRole: readSessionRole(pi, env) ?? "main",
+        sessionRole,
         isConsented: (check) => consentedAtRegistration && currentConsent(check?.fresh === true),
         consentScope: () => (consentCwd === undefined ? {} : { cwd: consentCwd }),
         isScopeConsented: (scope) => readConsent(scope.cwd),
@@ -178,7 +203,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       })
 
       createOmoNativePromptComponent({
-        client,
+        client: sessionClient,
         hashSessionId: hashSession,
       }).register(pi, ctx)
 
@@ -188,7 +213,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       })
 
       registerOmoNativeComputerUseTelemetry(pi, {
-        captureEvent: client.captureEvent,
+        captureEvent: sessionClient.captureEvent,
         hashSessionId: hashSession,
         ...(options.computerUseTelemetryObservers === undefined
           ? {}
@@ -205,7 +230,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       // session event: a background child can settle long after the turn that spawned it. The
       // subscription is detached on session shutdown so a re-register cannot pile observers up.
       const detachDelegation = createOmoNativeDelegationCapture({
-        captureEvent: client.captureEvent,
+        captureEvent: sessionClient.captureEvent,
         ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
         hashSessionId: hashSession,
         observers: options.taskTerminalObservers ?? sharedTaskTerminalObservers(),
@@ -215,21 +240,42 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         detachDelegation()
       })
 
+      pi.on("turn_start", (payload, eventCtx) => {
+        if (!isRecord(payload) || payload.type !== "turn_start" || typeof payload.turnIndex !== "number") return
+        consentCwd = cwdOf(eventCtx)
+        turnSpans.start({
+          turnIndex: payload.turnIndex,
+          sessionHash: state.sessionHash ?? hashForContext(eventCtx, hashSession),
+          rawSessionId: rawSessionIdOf(eventCtx),
+          model: contextModelOf(eventCtx),
+        })
+      })
       pi.on("turn_end", (payload, eventCtx) => {
         if (!isTurnEndEvent(payload)) return
         consentCwd = cwdOf(eventCtx)
         const sessionHash = state.sessionHash ?? hashForContext(eventCtx, hashSession)
-        createOmoNativeTurnHandler({
-          client,
+        turnSpans.run(() => createOmoNativeTurnHandler({
+          client: sessionClient,
           diagnostics: options.diagnostics,
           isConsented: () => currentConsent(false),
           sessionId: sessionHash,
           summary,
-        })(payload)
+        })(payload))
+        const message = payload.message as Readonly<Record<string, unknown>>
+        turnSpans.end({
+          response: typeof message["provider"] === "string" && typeof message["model"] === "string"
+            ? { provider: message["provider"], modelId: message["model"] }
+            : undefined,
+          responseModelId: typeof message["responseModel"] === "string" ? message["responseModel"] : undefined,
+          failed: message["stopReason"] === "error",
+        })
+      })
+      pi.on("agent_end", () => {
+        turnSpans.abandon()
       })
 
       registerOmoNativeToolTelemetry(pi, {
-        captureEvent: client.captureEvent,
+        captureEvent: sessionClient.captureEvent,
         diagnostics: (message, details) => ctx.logger.warn(message, details),
         hashSessionId: hashSession,
         skillsRoot: options.skillsRoot,
@@ -296,6 +342,7 @@ function sharedTransportFactory(
       )
     }
     state.dropQueued = drainUnsent
+    state.traces = transport.traces
 
     const wrapped: TelemetryTransport = {
       capture(message) {
@@ -303,6 +350,7 @@ function sharedTransportFactory(
         forwardValidatedCapture(transport, message)
       },
       flush: transport.flush === undefined ? undefined : () => transport.flush?.() ?? Promise.resolve(),
+      ...(transport.traces === undefined ? {} : { traces: transport.traces }),
       async shutdown() {
         try {
           // A drop still held here keeps the gate closed, so the shutdown drain discards what is queued.
@@ -311,6 +359,7 @@ function sharedTransportFactory(
           clearTimeout(dropRetry)
           dropRetry = undefined
           state.dropQueued = undefined
+          if (state.traces === transport.traces) state.traces = undefined
           if (state.capture !== undefined) {
             state.capture = undefined
             state.sessionHash = undefined
@@ -380,6 +429,20 @@ function scheduleUnrefInterval(check: () => void): () => void {
 function cwdOf(eventCtx: unknown): string | undefined {
   const cwd = isRecord(eventCtx) ? eventCtx.cwd : undefined
   return typeof cwd === "string" && cwd.length > 0 ? cwd : undefined
+}
+
+function rawSessionIdOf(eventCtx: unknown): string | undefined {
+  if (!isRecord(eventCtx) || !isRecord(eventCtx.sessionManager)) return undefined
+  const getter = eventCtx.sessionManager.getSessionId
+  if (typeof getter !== "function") return undefined
+  const sessionId: unknown = getter.call(eventCtx.sessionManager)
+  return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined
+}
+
+function contextModelOf(eventCtx: unknown): { readonly provider: string; readonly modelId: string } | undefined {
+  const model = isRecord(eventCtx) ? eventCtx.model : undefined
+  if (!isRecord(model) || typeof model.provider !== "string" || typeof model.id !== "string") return undefined
+  return { provider: model.provider, modelId: model.id }
 }
 
 function hashForContext(value: unknown, hash: (rawId: string) => string): string {

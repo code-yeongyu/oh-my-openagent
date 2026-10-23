@@ -9603,7 +9603,7 @@
     "git_master": {
       "default": {
         "commit_footer": false,
-        "include_co_authored_by": false,
+        "include_co_authored_by": true,
         "git_env_prefix": "GIT_MASTER=1"
       },
       "type": "object",
@@ -9616,7 +9616,7 @@
           ]
         },
         "include_co_authored_by": {
-          "default": false,
+          "default": true,
           "type": "boolean"
         },
         "git_env_prefix": {

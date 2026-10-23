@@ -3,6 +3,7 @@ import { mkdir, readFile, rm } from "../fs/resilient"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
 import { validateCompletion } from "./completion-validation"
+import { preflightReflectionDescriptions, type DescriptionPreflightWarn } from "./description-preflight"
 import { cleanupReflectionWorktree, integrateValidatedReflection } from "./worktree-integration"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -40,7 +41,7 @@ export interface ReflectionFinalizeResult {
 
 type WriterLock = <T>(operation: () => Promise<T>) => Promise<T>
 
-export type ReflectionFinalizeOptions =
+export type ReflectionFinalizeOptions = (
   | {
       readonly mode: "auto"
       readonly summary: string
@@ -49,6 +50,7 @@ export type ReflectionFinalizeOptions =
       readonly withWriterLock: WriterLock
     }
   | { readonly mode: "explicit"; readonly withWriterLock: WriterLock }
+) & { readonly warn?: DescriptionPreflightWarn }
 
 export async function createReflectionWorktree(
   repo: GitMemoryRepo,
@@ -111,6 +113,7 @@ export async function finalizeReflectionWorktree(
   let detail: string | undefined
 
   try {
+    await preflightReflectionDescriptions(worktree, worktree.baseSha, worktree.exec, options.warn)
     const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
     if (validation.status !== "valid") {
       status = validation.status

@@ -6,12 +6,14 @@
 
 import { advance, applyVerified, capture } from "./apply"
 import type { EngineDeps } from "./engine-deps"
+import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
 import { type EngineState, SyncJournal } from "./journal"
 import { push, staleBackoffMs } from "./push"
 import type { RefusalCode } from "./ports"
 import { receive } from "./receive"
 
 export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from "./engine-deps"
+export type { SyncFailure, SyncFailureKind } from "./failure"
 
 export const POLL_MS = 10_000
 export const LOCAL_DEBOUNCE_MS = 2_000
@@ -21,6 +23,13 @@ export type EngineStatus =
   | { readonly kind: "never_synced" }
   | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline: number }
   | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode }
+  | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
+
+interface Failing {
+  readonly failure: SyncFailure
+  readonly since: number
+  readonly attempts: number
+}
 
 export interface CycleReport {
   readonly applied: number
@@ -35,12 +44,17 @@ export class SyncEngine {
   private loaded = false
   private running: Promise<CycleReport> | null = null
   private rerun = false
+  /** Set by stop(): no new cycle starts after it, so close() can release the device lease safely. */
+  private stopped = false
   private eventHead = 0
   private appliedMirror = 0
-  private waiters: ((report: CycleReport) => void)[] = []
+  private waiters: { readonly resolve: (report: CycleReport) => void; readonly reject: (error: unknown) => void }[] = []
   private unsubscribe: (() => void) | null = null
   private cancelPoll: (() => void) | null = null
   private cancelDebounce: (() => void) | null = null
+  private failing: Failing | null = null
+  /** The failure a UI shows: set once a failure crosses its visibility threshold, cleared only by a successful cycle. */
+  private shown: Failing | null = null
 
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
@@ -50,8 +64,10 @@ export class SyncEngine {
     return this.journal.state()
   }
 
-  /** What a UI shows: paused at a refused entry, else the last successful sync. */
+  /** What a UI shows: a shown failure until a cycle succeeds, paused at a refused entry, else the last successful sync. */
   async status(): Promise<EngineStatus> {
+    // Failing outranks paused on purpose: while no cycle completes nothing moves at all, and a paused refusal shows again after the first good cycle.
+    if (this.shown !== null) return { kind: "failing", ...this.shown }
     const s = await this.journal.state()
     if (s.paused !== null) return { kind: "paused", seq: s.paused.seq, code: s.paused.code }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
@@ -59,6 +75,7 @@ export class SyncEngine {
   }
 
   start(): void {
+    this.stopped = false
     this.unsubscribe = this.deps.transport.subscribe({
       onAdvanced: (head) => {
         this.eventHead = Math.max(this.eventHead, head)
@@ -74,7 +91,9 @@ export class SyncEngine {
     this.unsubscribe = null
     this.stopPolling()
     this.cancelDebounce?.()
-    await this.running?.catch(() => undefined)
+    this.stopped = true
+    this.rerun = false
+    while (this.running !== null) await this.running.catch(() => undefined)
   }
 
   notifyLocalCommit(): void {
@@ -85,10 +104,10 @@ export class SyncEngine {
     })
   }
 
-  /** The running cycle's report, or the next cycle's when none is running. */
+  /** The running cycle's outcome, or the next cycle's when none is running: its report, or its failure. */
   nextCycle(): Promise<CycleReport> {
     if (this.running !== null) return this.running
-    return new Promise((resolve) => this.waiters.push(resolve))
+    return new Promise((resolve, reject) => this.waiters.push({ resolve, reject }))
   }
 
   runCycle(): Promise<CycleReport> {
@@ -98,21 +117,58 @@ export class SyncEngine {
     const waiters = this.waiters.splice(0)
     void run.then(
       (report) => {
-        for (const w of waiters) w(report)
+        const shownBefore = this.shownKey()
+        this.failing = null
+        this.shown = null
+        this.announceIfChanged(shownBefore)
+        for (const w of waiters) w.resolve(report)
         if (this.running === run) this.running = null
         if (this.rerun && this.eventHead > this.appliedMirror) {
           this.rerun = false
           this.request()
         }
       },
-      () => {
+      (error: unknown) => {
+        const shownBefore = this.shownKey()
+        const failure = describeSyncFailure(error)
+        const previous = this.failing
+        const failing = previous?.failure.kind === failure.kind
+          ? { failure, since: previous.since, attempts: previous.attempts + 1 }
+          : { failure, since: this.deps.clock.now(), attempts: 1 }
+        this.failing = failing
+        // A failure below its threshold (an offline blip) never replaces or clears what is shown: only a
+        // successful cycle clears a shown failure.
+        if (isFailureShown(failing.failure.kind, failing.attempts)) this.shown = failing
+        this.announceIfChanged(shownBefore)
+        for (const w of waiters) w.reject(error)
         if (this.running === run) this.running = null
+        // A request that arrived during the failed cycle still deserves its cycle: nothing it asked for was done.
+        if (this.rerun) {
+          this.rerun = false
+          this.request()
+        }
       },
     )
     return run
   }
 
+  /** The shown failure's kind and action: a new stranded lock path changes the action, so it is a change too. */
+  private shownKey(): string | null {
+    return this.shown === null ? null : `${this.shown.failure.kind}\n${this.shown.failure.action}`
+  }
+
+  /** Tells the owner when the shown failure appears, changes or clears; a repeat of the same one is silent. */
+  private announceIfChanged(shownBefore: string | null): void {
+    if (this.shownKey() === shownBefore) return
+    try {
+      this.deps.onStatusChange?.()
+    } catch (error) {
+      this.deps.log?.(`sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`)
+    }
+  }
+
   private request(): void {
+    if (this.stopped) return
     if (this.running !== null) {
       this.rerun = true
       return
