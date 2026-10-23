@@ -105,7 +105,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "model_profiles": {}, // record<string, ModelProfile>, named model chains picked by intent (Native harness)
   "model_profile": "",  // active profile id or a literal provider/model pin (Native harness)
   "memory": {},         // MemorySettings (Native harness)
-  "git_master": { "commit_footer": false }, // opt-in commit footer (Native harness); no Co-authored-by trailer is ever emitted
+  "git_master": { "include_co_authored_by": true, "commit_footer": false }, // sisyphus-dev-ai co-author trailer (on by default) and opt-in commit footer (Native harness)
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
@@ -195,14 +195,14 @@ for scope and symlink rules.
 
 ### `git_master` (Native harness)
 
-The optional `git_master` block controls how the `git-master` skill runs git in Senpi (`schema/git-master.ts`). When the agent works with the skill — reading it in the main session or loading it into a task child via `load_skills` — omo adds a mandatory "GIT COMMAND PREFIX" section and prefixes every `git` command in the skill's bash blocks with `git_env_prefix`, so your own git hooks can tell git-master is acting (for example, a hook that checks `GIT_MASTER`). The prefix always uses the bash form (`GIT_MASTER=1 git ...`), because Senpi's bash tool runs bash (Git Bash on Windows) whatever your login shell is. It also appends a commit-footer directive when you opt in.
+The optional `git_master` block controls how the `git-master` skill runs git in Senpi (`schema/git-master.ts`). When the agent works with the skill — reading it in the main session or loading it into a task child via `load_skills` — omo adds a mandatory "GIT COMMAND PREFIX" section and prefixes every `git` command in the skill's bash blocks with `git_env_prefix`, so your own git hooks can tell git-master is acting (for example, a hook that checks `GIT_MASTER`). The prefix always uses the bash form (`GIT_MASTER=1 git ...`), because Senpi's bash tool runs bash (Git Bash on Windows) whatever your login shell is. It also appends a commit-attribution directive: the co-author trailer by default, plus the body footer when you opt in.
 
-Commit-identity contract: commits omo causes in your repository carry your own git `user.name` / `user.email` as author and committer, and omo never adds a `Co-authored-by` trailer or any other GitHub-resolvable automation identity. A default install adds only the git command prefix.
+Commit identity: commits omo causes in your repository carry your own git `user.name` / `user.email` as author and committer. By default git-master also adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` once per commit, which GitHub shows as a co-author; set `include_co_authored_by: false` to leave it out.
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
 | `commit_footer` | boolean \| string | `false` | Opt in to the "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)" footer in the commit body. A string replaces the builtin footer text. |
-| `include_co_authored_by` | boolean | `false` | Deprecated no-op, accepted so existing configs keep validating. omo does not emit a `Co-authored-by` trailer regardless of this value. |
+| `include_co_authored_by` | boolean | `true` | Adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` to every commit git-master writes. It goes through `git -c trailer.ifexists=addIfDifferent commit --trailer`, so a commit message that already carries it (an amend or a reworded commit) keeps a single copy; after a squash git-master rewrites the joined message once so it keeps one. Needs git 2.32 or newer (`git commit --trailer`). `false` leaves it out. |
 | `git_env_prefix` | string | `"GIT_MASTER=1"` | Space-separated `NAME=value` assignments (letters, digits, `_`, `-`) put before every git command git-master runs. `""` turns the prefix off. Same key and default as the OpenCode plugin's `git_master.git_env_prefix`. |
 
 To opt in to the body footer:
@@ -211,6 +211,16 @@ To opt in to the body footer:
 {
   "git_master": {
     "commit_footer": true
+  }
+}
+```
+
+To leave the co-author trailer out:
+
+```jsonc
+{
+  "git_master": {
+    "include_co_authored_by": false
   }
 }
 ```
@@ -230,8 +240,8 @@ default** because it rearranges the whole screen.
 | `width` | number \| string | `"26%"` | Column count, or a percentage of the terminal width between `10%` and `50%`. Clamped to 32-80 columns, and further reduced so the transcript keeps at least 60 columns. |
 | `min_columns` | integer | `120` | Terminals narrower than this keep the classic single-column layout; the panel hides itself rather than squeezing the transcript. |
 | `clickable` | boolean | `true` | Paint file and subagent rows as OSC 8 links, so a mouse click opens the same viewer a command would. Set it to `false` on a terminal that mangles hyperlinks. |
-| `usage_poll_seconds` | integer | `150` | Subscription usage refresh interval, and a floor rather than a ceiling: each provider keeps its own freshness window (five minutes for Anthropic, two and a half for Codex), so a smaller value does not poll faster than that. The cache is shared across sessions on one machine, so this is per machine, not per session. Minimum `60`. |
-| `sections` | object | all `true` except `usage` | Per-section switches: `session`, `goal`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. `usage` is `false` by default: it is the one section that reads credentials and contacts a vendor, so it is its own opt-in (see below). |
+| `usage_poll_seconds` | integer | `150` | Retired. The engine now reads subscription usage itself, on each provider's own cadence, so this value is ignored. It is still accepted so an existing file keeps loading. |
+| `sections` | object | all `true` except `usage` | Per-section switches: `session`, `goal`, `context`, `usage`, `agents`, `tools`, `files`, `memory`. `usage` is `false` by default (see below). |
 
 Rows are clickable because the fullscreen renderer already captures the mouse and activates OSC 8
 hyperlinks; the panel paints its rows as links to a private scheme and claims the renderer's URL
@@ -281,16 +291,14 @@ block is read on a five-second floor rather than a watcher, because a park takes
 reflection runs and the queue drains per reflection - nothing here can change between two tool
 calls of one turn.
 
-The `usage` section is **off by default** and is the only part of the panel that reaches the
-network. Turning it on (`"sections": { "usage": true }`) makes the panel read, from the agent
-directory, `auth.json` (the OAuth access token of the subscription the session is serving from) and
-`credential-pool-state.json` (which pooled account is pinned or rotated in), and send that token as a
-bearer to the vendor's own usage endpoint: `api.anthropic.com/api/oauth/usage` for a Claude
-subscription, `chatgpt.com/backend-api/wham/usage` for Codex. Nothing else is read or sent, and no
-API key is ever used. While it is off the poller is never created: no credential read, no timer,
-no request. The answers land in one cache file
-per machine (`$XDG_CACHE_HOME/omo-senpi/side-panel-usage.json`), so parallel sessions share both
-the numbers and the backoff instead of each asking on its own.
+The `usage` section is **off by default**. Turning it on (`"sections": { "usage": true }`) draws the
+subscription limits the engine already keeps: senpi reads each signed-in Claude and ChatGPT
+subscription's usage endpoint itself (about every five minutes for Claude and two and a half for
+ChatGPT, one request per account per machine however many sessions are open) and updates the same
+numbers from every turn, so they are there before the first message. The panel makes no network
+request of its own. It reads `auth.json` and `credential-pool-state.json` from the agent directory
+only to decide which pooled account is serving, so the numbers it shows belong to that account. On
+an engine too old to report limits the section stays empty.
 
 ```jsonc
 {

@@ -83,7 +83,7 @@ describe("buildAgentRows", () => {
     const rows = buildAgentRows(children, 1_000, 40).slice(1)
 
     // then
-    expect(rows.map((row) => row.text[0])).toEqual(["◦", "●", "✓", "✗", "—"])
+    expect(rows.map((row) => row.text[0])).toEqual(["◦", "●", "✓", "✗", "-"])
     expect(rows[3]?.color).toBe("error")
   })
 
