@@ -9,7 +9,7 @@ export type BrowserAutomationProvider = "playwright" | "dev-browser" | "playwrig
 
 export interface GitMasterConfig {
   readonly commit_footer?: boolean | string
-  /** @deprecated No-op kept for backward compatibility; omo never emits a Co-authored-by trailer. */
+  /** Add the sisyphus-dev-ai `Co-authored-by` trailer once per commit (default: true). */
   readonly include_co_authored_by?: boolean
   readonly git_env_prefix?: string
 }

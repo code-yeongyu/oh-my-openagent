@@ -31,7 +31,7 @@ test("#given a v7 row with no provenance #when migrated and read #then the envel
   expect(renderDeliveryText(row).split("\n")[0]).toStartWith("From (provenance not recorded) [OMO_GATEWAY v=1 ")
   const migrated = new Database(gatewayDatabasePath(h.agentDir))
   try {
-    expect(migrated.query("PRAGMA user_version").get()).toEqual({ user_version: 8 })
+    expect(migrated.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length })
     migrated.run("UPDATE deliveries SET state = 'applied' WHERE delivery_id = 'old'")
     expect(() => insert(migrated, "new", envelope)).toThrow("delivery provenance is required")
   } finally { migrated.close() }

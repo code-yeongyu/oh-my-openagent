@@ -19,7 +19,7 @@ use senpi_desktop_safety::{
 use serde_json::json;
 
 use super::{Mutation, INPUT_TRANSACTION};
-use crate::request::{Op, Response};
+use crate::request::Op;
 use crate::test_support::{
     delivery, foreground_click_mutation, grant_control, harness, op_names, two_windows, Harness,
 };
@@ -127,7 +127,7 @@ fn keypress_admission_race_preserves_suspension_before_the_first_key() {
 }
 
 #[test]
-fn non_key_actions_preserve_liveness_and_cancellation_semantics() {
+fn a_dying_stop_path_stops_typing_before_cancellation_is_reported() {
     for cancelled in [false, true] {
         // Given: the stop path dies once the transaction has passed the gate
         // and captured the front window.
@@ -147,14 +147,11 @@ fn non_key_actions_preserve_liveness_and_cancellation_semantics() {
         });
         // When
         let reply = harness.worker.process(op, &probe);
-        // Then: only cancellation stops typing; a dying stop path does not.
-        let expected = if cancelled {
-            Err(ErrorCode::Cancelled)
-        } else {
-            Ok(Response::Unit)
-        };
-        assert_eq!(reply.map_err(|error| error.code), expected);
-        assert_eq!(op_names(&harness).contains(&"type"), !cancelled);
+        // Then: gajae typed the whole text as one op, so its parity test let a
+        // dying stop path through; typing here is per character, and no
+        // character may follow a stop path that stopped authorizing input.
+        assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::StopPathUnavailable));
+        assert!(!op_names(&harness).contains(&"type"));
     }
 }
 

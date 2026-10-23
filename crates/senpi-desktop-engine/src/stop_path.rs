@@ -15,7 +15,7 @@ use senpi_desktop_core::protocol_results::{StopPathKind, StopPathStatus};
 use senpi_desktop_core::types::DesktopCapabilities;
 use senpi_desktop_safety::{
     ActiveStopPath, Chord, HostRelay, ResumeToken, StopPathError, StopPathFailure, StopPathListener,
-    StopPolicy, StopSource, Supervisor, SupervisorStatus,
+    StopPathReason, StopPolicy, StopSource, Supervisor, SupervisorStatus,
 };
 use senpi_desktop_session::BackendSelection;
 
@@ -252,6 +252,11 @@ impl StopPaths {
         let status = self.supervisor.status();
         let stop_reason = match status.stop_path {
             ActiveStopPath::Global => None,
+            ActiveStopPath::HostRelay | ActiveStopPath::None
+                if status.global_failure == Some(StopPathFailure::SecureInput) =>
+            {
+                Some(StopPathReason::SecureInputActive.as_str().to_owned())
+            }
             ActiveStopPath::HostRelay | ActiveStopPath::None => Some(
                 self.state
                     .lock()

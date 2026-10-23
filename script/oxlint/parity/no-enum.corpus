@@ -1,0 +1,11 @@
+export enum Color { Red }
+export const enum Mode { A }
+export declare enum Ambient { B }
+declare global { enum InGlobal { C } }
+export type Ok = "a" | "b";
+export const Obj = { A: "a" } as const;
+namespace N { export enum Inner { D } }
+export { N };
+declare module "m" { enum InModule { E } }
+declare namespace DN { enum InDeclaredNamespace { F } }
+export declare const enum AmbientConst { G }
