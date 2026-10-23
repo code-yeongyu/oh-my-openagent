@@ -1,5 +1,5 @@
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { resolveMemoryRoot } from "@oh-my-opencode/memory-core"
+import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"
@@ -12,6 +12,8 @@ import { resolveMemorySettings } from "./identity-runtime"
 import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createSessionBinder, readSessionSurface, releaseSession, type SessionState } from "./session-binding"
 import { finalizeIdentityRun } from "./transient-identity"
+import { createCliAccountSource, type DeviceAccountSource } from "./device-session/account-source"
+import { createDeviceSessionResolver } from "./device-session/resolver"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
 import { sweepTransientMemoryRuns, type TransientSweep } from "./transient-sweep"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
@@ -34,6 +36,8 @@ export interface MemoryComponentOptions {
   readonly sweepTransientRuns?: TransientSweep
   /** Seam for the end-to-end encrypted sync runner (sync-runner.ts). */
   readonly syncRunner?: SyncRunner
+  /** The host's signed-in device; the default reads the credentials `omo login` keeps. */
+  readonly deviceAccount?: DeviceAccountSource
 }
 
 export { MEMORY_BINDING_CUSTOM_TYPE } from "./binding"
@@ -62,7 +66,14 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         return
       }
 
-      const syncRunner = options.syncRunner ?? createSyncRunner({ logger: ctx.logger })
+      const syncRunner = options.syncRunner ?? createSyncRunner({
+        logger: ctx.logger,
+        resolveSession: createDeviceSessionResolver({
+          source: options.deviceAccount ?? createCliAccountSource({ env }),
+          pinDir: syncPinDir(resolveMemoryRoot(env, cwd)),
+          loadRuntime: () => import("#omo-memory-sync-runtime"),
+        }),
+      })
       primeMemoryPersonaAssets({ logger: ctx.logger })
       // Reclaim runs an abnormal exit left behind (#7765). Detached from registration on purpose:
       // it is pure maintenance, and a slow or failing sweep must never delay or break binding.

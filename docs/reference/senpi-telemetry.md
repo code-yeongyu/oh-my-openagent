@@ -26,6 +26,9 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `session_started` | `memory_bucket` | `string` | `lt_8_gb`, `8_15_gb`, `16_31_gb`, `32_63_gb`, `64_plus_gb` |
 | `session_started` | `model_count` | `number` | - |
 | `session_started` | `provider_count` | `number` | - |
+| `session_started` | `configured_provider_count` | `number` | - |
+| `session_started` | `connected_account_count` | `string` | - |
+| `session_started` | `signed_in_provider_count` | `number` | - |
 | `session_started` | `providers` | `string` | - |
 | `session_started` | `reason` | `string` | `startup`, `reload`, `new`, `resume`, `fork` |
 | `session_started` | `timezone` | `string` | - |
@@ -131,6 +134,15 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `computer_use_engine_error` | `backend` | `string` | `quartz`, `x11`, `wayland`, `win32`, `fake`, `unavailable`, `other` |
 | `computer_use_engine_error` | `code` | `string` | `PermissionDenied`, `CaptureFailed`, `InputFailed`, `BackgroundUnavailable`, `WindowNotFound`, `InvalidTarget`, `InvalidKey`, `InvalidCoordinateFrame`, `StaleRef`, `AxUnsupported`, `AxFailed`, `Timeout`, `Closed`, `Internal`, `StopPathUnavailable`, `Suspended`, `ScreenLocked`, `Cancelled`, `CursorRestoreFailed`, `FocusRestoreFailed`, `TransactionFailed`, `InputBusy`, `ControlRequired`, `CaptureUnavailable`, `native-unavailable`, `quarantined`, `abi-mismatch`, `other` |
 | `computer_use_engine_error` | `host_platform` | `string` | `darwin`, `linux`, `win32`, `other` |
+| `handoff_hint` | `$session_id` | `string` | - |
+| `handoff_hint` | `action` | `string` | `shown`, `accepted`, `dismissed` |
+| `handoff_hint` | `context_tokens` | `number` | - |
+| `handoff_hint` | `fresh_usd` | `number` | - |
+| `handoff_hint` | `model_id` | `string` | `qwen3.6-flash`, `qwen3.8-max-preview`, `claude-fable-5`, `claude-fable-5-1`, `claude-haiku-4-5`, `claude-haiku-5-5`, `claude-opus-4-6`, `claude-opus-5`, `claude-opus-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, `qwen3.7-plus`, `gpt-5.6-luna-fast`, `gpt-5.6-sol`, `gpt-5.6-sol-fast`, `gpt-5.6-terra`, `gpt-6-astra`, `gpt-6-luna`, `gpt-6-luna-fast`, `gpt-6-sol`, `gpt-6-sol-fast`, `gpt-6.1-sol`, `gpt-6.1-sol-fast`, `deepseek-flash`, `deepseek-v4-flash`, `deepseek-v4-pro`, `gemini-3.1-pro`, `gemini-3.6-flash`, `gemini-4-argon`, `grok-4.6`, `grok-4.7`, `k3`, `kimi-for-coding-highspeed`, `kimi-k3`, `glm-5.2`, `glm-5.3`, `mimo-v2.5-pro`, `mimo-v2.6-pro`, `minimax-m2.7`, `minimax-m3`, `grok-4.20-0309-non-reasoning`, `mimo-v2.6-flash`, `glm-5.3-flash`, `custom` |
+| `handoff_hint` | `next_reply_usd` | `number` | - |
+| `handoff_hint` | `provider` | `string` | `alibaba-token-plan`, `alibaba-token-plan-cn`, `anthropic`, `anthropic-api`, `anthropic-subscription`, `bailian-coding-plan`, `chatgpt-subscription`, `claude-sdk-oauth`, `deepseek`, `google`, `google-vertex`, `github-copilot`, `kimi-coding`, `kimi-for-coding`, `moonshotai`, `openai`, `openai-codex`, `opencode`, `opencode-go`, `qwen-token-plan`, `qwen-token-plan-cn`, `vercel`, `xai`, `xiaomi`, `zai`, `zai-coding-cn`, `zai-coding-plan`, `custom` |
+| `handoff_hint` | `saving_usd` | `number` | - |
+| `handoff_hint` | `subscription` | `boolean` | - |
 | `kibitzer_summary` | `$session_id` | `string` | - |
 | `kibitzer_summary` | `buffered_cooldown` | `number` | - |
 | `kibitzer_summary` | `buffered_no_new_candidate` | `number` | - |
@@ -270,6 +282,10 @@ Every event above also carries these properties.
 `computer_use_permission_denied` separates OS capability blocks from OmO permission rules. `scope = os` reports which fixed capability is unavailable (`capture`, `input`, or `ax`) after activation. `scope = tier` reports a denied `computer:read` or `computer:exec` request. It never includes the permission rule, feedback, tool arguments, screen state, or requested action.
 
 `computer_use_engine_error` reports the frozen desktop protocol error code, startup diagnostics (`native-unavailable`, `quarantined`, `abi-mismatch`), or `other`. Error messages, recovery hints, engine paths, coordinates, window data, application names, and typed text stay local. Backend and `host_platform` values are allowlisted; unknown values become `other`. The field is named `host_platform` because the shared telemetry envelope already owns `platform = omo-senpi`.
+
+### Handoff-hint events
+
+`handoff_hint` records the cost hint OmO shows when a large session's prompt cache has expired (senpi#3230). `action` is `shown` when the one-line hint appears, `accepted` when the user starts a fresh session from it, and `dismissed` when the user picks Keep going. `context_tokens`, `next_reply_usd`, `fresh_usd` and `saving_usd` are the numbers the hint itself displayed (rounded to cents); `subscription` says whether the dollars were API-price equivalents on a subscription. The handoff brief, the session's text, file paths and the old session's path never leave the machine.
 
 ### Parallelism v2 interpretation
 
@@ -415,6 +431,8 @@ How provider and model are masked differs, because they carry different privacy 
 |---|---|
 | `provider` | Exported only when it is one of the providers OmO itself ships. Every other value, including a self-hosted or proxy gateway name, is exported as `custom`. |
 | `model_id` | Exported when it exactly matches OmO's published model vocabulary (`claude-opus-5`, `gpt-5.6-sol`, and the other public product names listed in the tables above), **regardless of which provider routed it**. Any other value is exported as `custom`. |
+| `providers`, `provider_count`, `signed_in_provider_count`, `configured_provider_count` (`session_started`) | The providers usable this session: the providers you signed into (read from the top-level provider names in `auth.json` only, never a credential, account id or key) united with the providers configured in `models.json`. `providers` lists only the kinds OmO ships, sorted; every other provider is folded into one `custom`. The counts are plain numbers. |
+| `connected_account_count` (`session_started`) | How many accounts you have linked per provider kind, whether or not they are used: for each provider, the number of accounts the engine itself lists (the same list the app's account list shows). For a Claude subscription that is the accounts you signed in plus any `CLAUDE_CODE_OAUTH_TOKEN` environment slots; for other providers it is the stored account list, a single stored credential counting as one, and environment-variable keys counting only when nothing is stored. Only counts and whether a variable is set are read; no value is read or sent. A `kind:count` list over the provider kinds OmO ships (any other provider is summed into `custom`), each count capped at `10_plus`. No account name, email, token or id is sent. |
 
 The practical consequence: routing a publicly known model through an unknown gateway reports `custom/claude-opus-5` rather than `custom/custom`. The gateway name — the user-authored half — is still withheld, while the model id is a public product name shared by every user running that model. A model name you chose yourself is never exported.
 

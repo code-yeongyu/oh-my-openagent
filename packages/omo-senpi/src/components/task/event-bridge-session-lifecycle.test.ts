@@ -185,6 +185,19 @@ describe("event-bridge session_shutdown", () => {
     expect(calls).toEqual([{ parentSessionId: "parent-session", reason: "quit" }])
   })
 
+  it("#given a hosted child session whose session context names its task #when it shuts down #then the suspension carries that task id so a cancelled task's session finds itself", async () => {
+    const { pi, calls } = wireHarness("child-session")
+    Object.assign(pi, { sessionContext: { role: "child", task_id: "st_0000c0de" } })
+
+    await pi.dispatch(
+      "session_shutdown",
+      { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent,
+      {},
+    )
+
+    expect(calls).toEqual([{ parentSessionId: "child-session", reason: "quit", ownTaskId: "st_0000c0de" }])
+  })
+
   it("#given a session_shutdown with no captured session id and no live handles #when the event fires #then nothing is suspended and nothing is warned", async () => {
     const { pi, calls, order, warnings } = wireHarness(undefined)
 

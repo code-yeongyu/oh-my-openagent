@@ -4,6 +4,7 @@ import type { TaskRecord } from "../state"
 import { nowIso, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import type { ResidentHandle } from "./port"
+import { stopOwnedChildren, stoppedOwnerTask } from "./stopped-owner"
 import { withinTeardownBudget } from "./teardown-budget"
 import type { SuspendFailure, SuspendInput, SuspendSummary } from "./types"
 
@@ -20,6 +21,8 @@ export async function suspendOnSessionShutdown(
   context: LifecycleContext,
   input: SuspendInput,
 ): Promise<SuspendSummary> {
+  const stoppedOwner = stoppedOwnerTask(context, input.parentSessionId, input.ownTaskId)
+  if (stoppedOwner !== undefined) return stopOwnedChildren(context, input, stoppedOwner)
   if (context.config.resume_children === false) return disposeAllOnShutdown(context, input)
 
   const failures: SuspendFailure[] = []

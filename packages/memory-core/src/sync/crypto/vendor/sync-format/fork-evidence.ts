@@ -28,9 +28,11 @@ export const branchRefusal = (evidence: ForkEvidence): BranchRefusal | null => {
         return "noncanonical_order";
     }
     // A batch carries no keyring link: the tip names the branch's last keyring link, or the
-    // common ancestor's when the branch holds no keyring record.
+    // common ancestor's only when the branch holds no keyring record at all. A keyring record
+    // without a link never borrows the ancestor's.
     const lastKeyring = records.filter((r) => r.kind === "keyring").at(-1);
-    const tipLink = lastKeyring?.keyring_link ?? evidence.common.keyring_link;
+    const tipLink =
+      lastKeyring === undefined ? evidence.common.keyring_link : lastKeyring.keyring_link;
     if (last.seq !== tip.seq || last.digest !== tip.digest || tipLink !== tip.keyring_link) {
       return "fork_set_mismatch";
     }

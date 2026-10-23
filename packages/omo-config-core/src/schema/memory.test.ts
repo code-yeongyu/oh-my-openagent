@@ -10,6 +10,7 @@ import {
 const FULL_DEFAULTS: OmoMemorySettings = {
   enabled: true,
   agent: "auto",
+  auto_identity: "path",
   reflection: {
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -29,6 +30,7 @@ const FULL_DEFAULTS: OmoMemorySettings = {
     auto_select_max_chars: 150000,
   },
   people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+  agreements: { enabled: true, needs_human_threshold: 3, max_items: 64 },
   soul: { edit_notice: true },
   write_notice: { enabled: true },
   sync: { enabled: true },
@@ -65,6 +67,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
     const input: OmoMemorySettings = {
       enabled: false,
       agent: "backend-lead",
+      auto_identity: "git",
       reflection: {
         enabled: false,
         trigger: { step_count: 25, on_compaction: false },
@@ -84,6 +87,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         auto_select_max_chars: 100000,
       },
       people: { enabled: false, max_entries: 20, max_entry_chars: 100 },
+      agreements: { enabled: false, needs_human_threshold: 5, max_items: 32 },
       soul: { edit_notice: false },
       write_notice: { enabled: false },
       sync: { remote: "file:///tmp/memory-mirror.git", enabled: true },
@@ -104,6 +108,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         "backend-lead": {
           enabled: true,
           reflection: { trigger: { step_count: 10 }, category: "quick" },
+          agreements: { needs_human_threshold: 2 },
         },
       },
     }
@@ -358,6 +363,32 @@ describe("OmoMemorySettingsSchema defaults", () => {
 
     // then
     expect(parsed).toEqual(input)
+  })
+})
+
+describe("memory.auto_identity", () => {
+  test("#given a value outside path and git #when parsed on the block or its layer #then validation fails", () => {
+    // given
+    const input = { auto_identity: "repo" }
+
+    // when
+    const block = OmoMemorySettingsSchema.safeParse(input)
+    const layer = OmoMemorySettingsLayerSchema.safeParse(input)
+
+    // then
+    expect(block.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+    expect(layer.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+  })
+
+  test("#given git on a layer #when parsed #then the layer keeps it without materializing other defaults", () => {
+    // given
+    const input = { auto_identity: "git" }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual({ auto_identity: "git" })
   })
 })
 

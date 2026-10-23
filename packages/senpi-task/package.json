@@ -25,6 +25,10 @@
       "types": "./src/category/coverage.ts",
       "import": "./src/category/coverage.ts"
     },
+    "./model-chains": {
+      "types": "./src/model-chains/index.ts",
+      "import": "./src/model-chains/index.ts"
+    },
     "./category-shadow": {
       "types": "./src/agents/category-shadow.ts",
       "import": "./src/agents/category-shadow.ts"
@@ -68,8 +72,8 @@
     "typebox": "1.3.34"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.10.19-2",
-    "@earendil-works/pi-tui": "2026.10.19-2",
+    "@code-yeongyu/senpi": "2026.10.21-3",
+    "@earendil-works/pi-tui": "2026.10.21-3",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
@@ -84,8 +88,8 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.10.19-2",
-    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.19-2",
+    "@code-yeongyu/senpi": "2026.10.21-3",
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.21-3",
     "typebox": "1.3.34"
   },
   "sideEffects": false

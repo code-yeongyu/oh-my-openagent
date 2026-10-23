@@ -8,6 +8,7 @@ export type ModelProfileSource = "builtin" | "user" | "pin"
 export type ModelProfileSummary = {
   readonly id: string
   readonly displayName: string
+  readonly caution?: string
   readonly source: ModelProfileSource
   readonly family?: "daily" | "geeky"
   readonly tier?: "normal" | "heavy"
@@ -97,6 +98,7 @@ export function mergeModelProfiles(
       profile: {
         id,
         displayName: builtin.displayName,
+        ...(builtin.caution !== undefined ? { caution: builtin.caution } : {}),
         source: "builtin",
         ...(builtin.family !== undefined ? { family: builtin.family } : {}),
         ...(builtin.tier !== undefined ? { tier: builtin.tier } : {}),
@@ -108,11 +110,13 @@ export function mergeModelProfiles(
     const replaced = merged.get(id)?.profile
     const family = entry.family ?? replaced?.family
     const tier = entry.tier ?? replaced?.tier
+    const caution = entry.caution ?? replaced?.caution
     merged.set(id, {
       profile: {
         id,
         // A customized builtin lane keeps its lane name unless the entry renames it.
         displayName: entry.display_name ?? replaced?.displayName ?? id,
+        ...(caution !== undefined ? { caution } : {}),
         source: "user",
         ...(family !== undefined ? { family } : {}),
         ...(tier !== undefined ? { tier } : {}),

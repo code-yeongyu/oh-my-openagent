@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { restoreEnvironment } from "../../../../../test-support/environment-integrity"
 import { fileURLToPath } from "node:url"
 import type { HookHttp } from "./types"
 import * as sharedModule from "../../shared"
@@ -10,7 +11,7 @@ const mockFetch = mock(() =>
   Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
 )
 const originalFetch = globalThis.fetch
-const originalEnv = process.env
+const originalEnv = { ...process.env }
 
 async function importFreshExecuteHttpHook() {
   const modulePath = `${fileURLToPath(new URL("./execute-http-hook.ts", import.meta.url))}?t=${Date.now()}-${Math.random()}`
@@ -43,14 +44,14 @@ describe("executeHttpHook TLS security", () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch
-    process.env = { ...originalEnv }
+    restoreEnvironment(originalEnv)
     mockFetch.mockReset()
     mock.restore()
   })
 
   describe("#given production mode", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
     })
 
     it("#when hook uses remote http:// URL #then rejects with exit code 1", async () => {
@@ -142,7 +143,7 @@ describe("executeHttpHook TLS security", () => {
 
   describe("#given non-production mode", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv, NODE_ENV: "development" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "development" })
     })
 
     it("#when hook uses remote http:// URL #then rejects with exit code 1", async () => {
@@ -204,7 +205,7 @@ describe("executeHttpHook TLS security", () => {
 
   describe("#given NODE_ENV is unset", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv }
+      restoreEnvironment(originalEnv)
       delete process.env.NODE_ENV
     })
 
@@ -222,7 +223,7 @@ describe("executeHttpHook TLS security", () => {
 
   describe("#given redirect downgrade protection", () => {
     beforeEach(() => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
     })
 
     it("#when hook uses https:// URL #then fetch rejects redirects manually", async () => {
@@ -247,7 +248,7 @@ describe("executeHttpHook TLS security", () => {
 
   describe("#given invalid URL handling is preserved", () => {
     it("#when URL is invalid #then rejects with exit code 1", async () => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "not-a-valid-url" }
 
@@ -258,7 +259,7 @@ describe("executeHttpHook TLS security", () => {
     })
 
     it("#when URL uses disallowed scheme #then rejects with exit code 1", async () => {
-      process.env = { ...originalEnv, NODE_ENV: "production" }
+      restoreEnvironment({ ...originalEnv, NODE_ENV: "production" })
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "file:///etc/passwd" }
 

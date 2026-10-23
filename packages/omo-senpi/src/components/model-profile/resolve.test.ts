@@ -198,7 +198,37 @@ describe("builtin chain routing", () => {
     }
   })
 
-  it("resolves geeky-normal to gpt-6.1-sol medium when the subscription serves it next to gpt-5.6-sol", () => {
+  it("resolves geeky-normal to gpt-6-astra medium when the subscription serves it beside the Sol tiers", () => {
+    const result = resolveModelProfile({ active: "geeky-normal", availableModels: [ASTRA, SOL_61, SOL_56] })
+
+    expect(result).toMatchObject({
+      kind: "resolved",
+      provider: "chatgpt-subscription",
+      modelId: "gpt-6-astra",
+      reasoning: "medium",
+    })
+  })
+
+  it("carries the Obsessive caution onto the resolved profile; an overlay inherits it and can replace it", () => {
+    const builtin = resolveModelProfile({ active: "geeky-normal", availableModels: [ASTRA] })
+    expect(builtin).toMatchObject({ kind: "resolved", profile: { caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK." } })
+
+    const inherited = resolveModelProfile({
+      profiles: { "geeky-normal": { models: [ASTRA] } },
+      active: "geeky-normal",
+      availableModels: [ASTRA],
+    })
+    expect(inherited).toMatchObject({ kind: "resolved", profile: { caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK." } })
+
+    const replaced = resolveModelProfile({
+      profiles: { "geeky-normal": { caution: "Handle with care.", models: [ASTRA] } },
+      active: "geeky-normal",
+      availableModels: [ASTRA],
+    })
+    expect(replaced).toMatchObject({ kind: "resolved", profile: { caution: "Handle with care." } })
+  })
+
+  it("resolves geeky-normal to gpt-6.1-sol medium when the subscription serves it next to gpt-5.6-sol and no Astra", () => {
     const result = resolveModelProfile({ active: "geeky-normal", availableModels: [SOL_56, SOL_61] })
 
     expect(result).toMatchObject({
@@ -234,7 +264,7 @@ describe("builtin chain routing", () => {
     })
   })
 
-  it("does not fall back to a GPT-6 model when geeky-normal's gpt-5.6-sol is missing", () => {
+  it("does not resolve an unranked GPT-6 Sol id when none of geeky-normal's rungs is served", () => {
     const result = resolveModelProfile({
       active: "geeky-normal",
       availableModels: [SOL_COPILOT, SOL_FAST],
@@ -380,7 +410,7 @@ describe("builtin chain routing", () => {
 
     expect(result).toEqual({
       kind: "resolved",
-      profile: { id: "geeky-normal", displayName: "Geeky · Normal", source: "user", family: "geeky", tier: "normal" },
+      profile: { id: "geeky-normal", displayName: "Obsessive · Normal", caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.", source: "user", family: "geeky", tier: "normal" },
       provider: "openai",
       modelId: "gpt-6-sol",
       reasoning: "high",

@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url"
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
 import {
+  buildCategoryCoverageRuntime,
   ensurePrebuiltNativeInputs,
   NATIVE_REQUIRED_ARTIFACTS,
   PAYLOAD_DIRECTORIES,
@@ -229,4 +230,24 @@ describe("payload completeness gate", () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+})
+
+describe("category-coverage runtime bundle", () => {
+  // Regression: a runner-only import reached through the category resolver pulled the senpi engine's
+  // wasm and skill assets into this --outfile bundle, and bun refused to write more than one output.
+  test("#given the category-coverage entry #when the runtime bundle is built #then it emits one self-contained index.js", () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "omo-category-coverage-bundle-"))
+    try {
+      const outfile = join(root, "runtime", "category-coverage", "index.js")
+
+      // when
+      buildCategoryCoverageRuntime(outfile)
+
+      // then
+      expect(readFileSync(outfile, "utf8").length).toBeGreaterThan(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 })
