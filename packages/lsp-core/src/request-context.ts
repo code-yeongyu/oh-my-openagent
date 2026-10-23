@@ -74,7 +74,10 @@ export function createStandaloneMcpRequestContext(
 	const env = input.env ?? process.env;
 	const cwd = canonicalCwd(input.cwd ?? env["LSP_TOOLS_MCP_CWD"] ?? process.cwd());
 	const home = input.homeDir ?? homedir();
-	const projectConfigPaths = translateProjectConfigEnv(env["LSP_TOOLS_MCP_PROJECT_CONFIG"], cwd);
+	// A conventional path that resolves outside cwd (a linked .omo, say) cannot be honored, so skip it instead of failing startup.
+	const projectConfigPaths = translateProjectConfigEnv(env["LSP_TOOLS_MCP_PROJECT_CONFIG"], cwd).filter((path) =>
+		isPathInside(cwd, canonicalizeExistingOrNearestAncestor(path)),
+	);
 	const userConfigPath = translateHomeConfigEnv(env["LSP_TOOLS_MCP_USER_CONFIG"], home, ".codex/lsp-client.json");
 	const installDecisionsPath = translateHomeConfigEnv(
 		env["LSP_TOOLS_MCP_INSTALL_DECISIONS"],
