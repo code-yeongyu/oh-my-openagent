@@ -25,6 +25,31 @@ The former `omo` bin was removed from these packages in this major release. The 
 
 The `omo-agent-toolkit` npm bin stays with the wrapper packages above; `omo-ai` never declares it.
 
+### `omo account` (OmO Native)
+
+`omo account show [--account <id>]`, `adopt [--replace]`, `token`, `export`, and
+`forget` share the OS-keychain sign-in used by `omo login`. This machine interface
+accepts credentials on stdin for `adopt` and writes JSON replies on stdout;
+diagnostics go to stderr.
+
+| Exit | Outcome |
+| --- | --- |
+| 0 | Success |
+| 1 | Other operation failure |
+| 2 | Invalid arguments or credential input |
+| 3 | Adopting a different device requires `--replace` |
+| 4 | Signed out |
+| 5 | Session ended; the JSON reply includes the refusal code |
+| 6 | Refresh outcome uncertain; retained credentials must not be replayed |
+| 7 | Keychain locked: `{"keychain":"locked"}` |
+| 8 | Keychain unavailable: `{"keychain":"unavailable"}` |
+| 9 | Native storage failure or timeout: `{"error":"store-unavailable"}` |
+
+After a storage failure, the command reports that failure without another store
+read. Native operations are still awaited: there is no additional command
+deadline or forced process termination. A native timeout can therefore still
+take approximately 25 seconds, but the error handler does not repeat that wait.
+
 ## Basic Usage
 
 ```bash

@@ -204,7 +204,7 @@ The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `
 | `delegation_completed` | `cache_write_tokens` | `number` | - |
 | `delegation_completed` | `category` | `string` | `visual-engineering`, `artistry`, `ultrabrain`, `deep-low`, `deep-high`, `quick`, `unspecified-low`, `unspecified-high`, `architect`, `writing`, `custom`, `none` |
 | `delegation_completed` | `config_generation` | `number` | - |
-| `delegation_completed` | `cost_status` | `string` | `reported`, `unavailable`, `invalid` |
+| `delegation_completed` | `cost_status` | `string` | `reported`, `partial`, `unavailable`, `invalid` |
 | `delegation_completed` | `cost_usd` | `number` | - |
 | `delegation_completed` | `duration_ms` | `number` | - |
 | `delegation_completed` | `duration_status` | `string` | `monotonic`, `wall_clock`, `unavailable` |

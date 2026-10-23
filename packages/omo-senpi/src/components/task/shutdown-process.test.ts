@@ -63,7 +63,7 @@ for (const path of ["park", "missing-session", "normal", "missing-session-runnin
         logger: { info() {}, warn() {}, error() {} },
         config: { getFlag: () => false },
         getCapturedTools: () => [],
-      }, engine, { scheduleSync() {}, syncNow() {}, dispose() {} },
+      }, engine, { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
       createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }), {
         reconcileTeamMailbox: async () => {},
         leadPollers: { tick: async () => {}, shutdown() {} },

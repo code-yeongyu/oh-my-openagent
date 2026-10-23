@@ -19,7 +19,7 @@ export const HYPERPLAN_ULTRAWORK_PATTERN =
 const HYPERPLAN_ULTRAWORK_BANNER = `<hyperplan-ultrawork-mode>
 **MANDATORY**: Say "HYPERPLAN ULTRAWORK MODE ENABLED!" exactly once as your first response. Do NOT say the standalone "ULTRAWORK MODE ENABLED!" or "HYPERPLAN MODE ENABLED!" banners.
 
-Apply the ultrawork protocol below as your execution framework. You MUST ALSO load the hyperplan skill immediately via \`skill(name="hyperplan")\` and follow its full adversarial workflow — do NOT improvise, do NOT skip rounds, do NOT write the plan yourself.
+Apply the ultrawork protocol below as your execution framework. You MUST ALSO load the hyperplan skill immediately via \`skill(name="hyperplan")\` and follow its full adversarial workflow: do NOT improvise, do NOT skip rounds, do NOT write the plan yourself.
 </hyperplan-ultrawork-mode>`
 
 export function getHyperplanUltraworkMessage(agentName?: string, modelID?: string): string {

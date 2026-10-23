@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec } from "../git"
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 import { validateCompletion } from "./completion-validation"
 import {
   cleanupReflectionWorktree,
@@ -28,6 +29,7 @@ async function fixture(runId = "run-123") {
   const parentDir = join(root, "memory")
   const repo = new GitMemoryRepo({ dir: parentDir, agentId: "agent-one" })
   await repo.init({ seedFiles: [{ relativePath: "memory.md", content: "base\n" }] })
+  disableFixtureAutoMaintenance(parentDir)
   const worktree = await createReflectionWorktree(repo, runId, join(root, "worktrees"))
   return { root, parentDir, repo, worktree }
 }
