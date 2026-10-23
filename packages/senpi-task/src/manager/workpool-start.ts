@@ -29,7 +29,14 @@ export function prepareWorkpoolLaunch(input: {
   }
   const draft = prior ?? createTaskRecord(buildRecordInput({ spec, plan: workerSpec.plan, name: taskId, executionMode, taskSeq: input.taskSeq }))
   const claimed = { ...draft, task_id: taskId, host_pid: input.hostPid, notify_on_terminal: false }
-  const managedSpec = buildManagedSpec({ record: claimed, spec, plan: workerSpec.plan, cwd: options.cwd, stateDir: options.store.stateDir })
+  const managedSpec = buildManagedSpec({
+    record: claimed,
+    spec,
+    plan: workerSpec.plan,
+    cwd: options.cwd,
+    stateDir: options.store.stateDir,
+    traceparent: options.traceparentFor?.(spec.parent_session_id),
+  })
   const record = { ...claimed, spawn_spec: buildSpawnSpecV1(managedSpec) }
   if (prior === null) options.store.save(record)
   return { record, managedSpec, runner: options.runners[executionMode], model: record.model }

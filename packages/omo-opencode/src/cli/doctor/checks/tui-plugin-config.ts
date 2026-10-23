@@ -365,7 +365,7 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
       description:
         `The TUI plugin entry ("${PLUGIN_NAME}") is registered in tui.json, `
         + "but the server plugin (oh-my-openagent) is missing from opencode.json. "
-        + "The plugin cannot function correctly without both halves — the server side "
+        + "The plugin cannot function correctly without both halves: the server side "
         + "handles tool dispatch, hook execution, and SDK integration.",
       fix: "Re-run the installer (`npx oh-my-openagent install`) to auto-write opencode.json, "
         + `or add "${PLUGIN_NAME}" to the "plugin" array in ${server.configPath ?? "opencode.json"}.`,

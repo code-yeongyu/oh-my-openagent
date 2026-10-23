@@ -14,6 +14,7 @@ import { UlwLoopError } from "../../../../../omo-codex/plugin/components/ulw-loo
 import { readDriverGoalJson } from "./driver-goal"
 import { driverRelationOf, type SessionDriverRelation } from "./driver-relation"
 import { toolkitContextFromEnv, type SessionCwdSource, type SessionToolkitContext } from "./session-binding"
+import type { DoriLayer2 } from "./dori/layer2"
 
 export interface SessionBinding {
   readonly cwd: string
@@ -92,7 +93,7 @@ function isKnownRequest(request: ToolkitDispatchRequest | ToolkitUnknownRequest)
   return ULW_LOOP_OPERATIONS.some(operation => operation === request.operation)
 }
 
-export const agentToolkit: SessionAgentToolkit = {
+const baseToolkit: SessionAgentToolkit = {
   help: () => invoke("help", async (toolkit): Promise<SessionHelpResponse> => {
     const response = await toolkit.help()
     return response.ok ? { ...response, result: { ...response.result, usage: SESSION_HELP_USAGE } } : response
@@ -129,3 +130,17 @@ export const agentToolkit: SessionAgentToolkit = {
     return invoke(request.operation, toolkit => toolkit.dispatch(request))
   },
 }
+
+declare const OMO_SENPI_BUNDLED: boolean | undefined
+
+// The engine sets OMO_DORI_TOOLKIT (dori-gate.ts) only while the `dori` config section is on; otherwise the
+// namespace properties do not exist and the layer module is never imported. The shape is fixed per kernel import.
+// The built SDK loads the layer from its own sidecar (runtime/dori/layer2.js), so sdk.js carries none of it.
+function doriLayerUrl(): string {
+  const bundled = typeof OMO_SENPI_BUNDLED !== "undefined" && OMO_SENPI_BUNDLED
+  return (bundled ? new URL("../dori/layer2.js", import.meta.url) : new URL("./dori/layer2.ts", import.meta.url)).href
+}
+
+export const agentToolkit: SessionAgentToolkit & Partial<DoriLayer2> = process.env.OMO_DORI_TOOLKIT === "1"
+  ? ((await import(doriLayerUrl())) as typeof import("./dori/layer2")).withDoriLayer2(baseToolkit)
+  : baseToolkit

@@ -23,6 +23,8 @@ export interface EngineDeps {
   readonly clock: Clock
   readonly fault?: EngineFault
   readonly log?: (line: string) => void
+  /** Called when the failure status() shows appears, changes kind or clears. */
+  readonly onStatusChange?: () => void
   /** The plaintext bound per pushed batch; defaults to MAX_BATCH_BYTES. */
   readonly batchBytes?: number
   readonly random?: () => number

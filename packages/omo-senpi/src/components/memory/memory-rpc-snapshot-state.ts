@@ -14,7 +14,9 @@ import type {
   MemoryRpcLastOutcome,
   MemoryRpcSnapshot,
 } from "./memory-rpc-bridge"
+import { readMemoryRpcSync } from "./memory-rpc-sync"
 import { MEMORY_HEALTH_SCAN_LIMIT } from "./status"
+import type { SyncStatusReader } from "./sync-status-surface"
 import { readReflectionHealth } from "./worker/health"
 
 const GIT_QUERY_TIMEOUT_MS = 30_000
@@ -26,6 +28,7 @@ export interface MemorySnapshotDeps {
   readonly tokenEstimates: Map<string, number>
   /** Per-HEAD whole-tree size cache, sharing the token cache's commit-scoped lifetime. */
   readonly treeStats: Map<string, MemoryTreeStats>
+  readonly syncStatus?: SyncStatusReader
 }
 
 /**
@@ -38,12 +41,13 @@ export async function buildMemorySnapshot(
   sessionId: string,
   deps: MemorySnapshotDeps,
 ): Promise<MemoryRpcSnapshot> {
-  const [repoState, journal, health, timeline, consolidation] = await Promise.all([
+  const [repoState, journal, health, timeline, consolidation, sync] = await Promise.all([
     readMemoryRpcRepoState(deps.repo, deps.tokenEstimates, deps.treeStats),
     readMemoryRpcJournalState(context, sessionId),
     readMemoryRpcHealth(context),
     readMemoryRpcTimeline(deps.repo),
     readLastConsolidationAt(context),
+    readMemoryRpcSync(deps.syncStatus, context.identityPaths.repo),
   ])
   const activeRun = deps.activeRun(context.identity)
   return {
@@ -64,6 +68,7 @@ export async function buildMemorySnapshot(
       totalSteps: journal.totalSteps,
       reflectedSteps: journal.reflectedSteps,
     },
+    ...(sync === undefined ? {} : { sync }),
   }
 }
 
