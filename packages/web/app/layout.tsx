@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(primarySiteUrl),
     title: {
-      default: "OmO — Your tool for real work. But it's an agent.",
+      default: "OmO: Your tool for real work. But it's an agent.",
       template: "%s | OmO",
     },
     description,
@@ -66,13 +66,13 @@ export async function generateMetadata(): Promise<Metadata> {
       alternateLocale: ["ko_KR", "ja_JP", "zh_CN", "es_ES", "fr_FR", "de_DE", "pt_BR", "it_IT"],
       url: primarySiteUrl,
       siteName: "OmO",
-      title: "OmO — Your tool for real work. But it's an agent.",
+      title: "OmO: Your tool for real work. But it's an agent.",
       description,
       // Next.js supplies the dynamic image from app/opengraph-image.tsx.
     },
     twitter: {
       card: "summary_large_image",
-      title: "OmO — Your tool for real work. But it's an agent.",
+      title: "OmO: Your tool for real work. But it's an agent.",
       description,
       // app/twitter-image.tsx shares the Open Graph image generator.
     },

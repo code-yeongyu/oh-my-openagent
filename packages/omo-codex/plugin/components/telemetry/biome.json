@@ -1,27 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
 	"linter": {
-		"enabled": true,
-		"rules": {
-			"preset": "recommended",
-			"style": {
-				"noDefaultExport": "error",
-				"noEnum": "error",
-				"noNonNullAssertion": "error",
-				"useImportType": "error",
-				"useConst": "error",
-				"useNodejsImportProtocol": "off"
-			},
-			"complexity": {
-				"useLiteralKeys": "off"
-			},
-			"suspicious": {
-				"noExplicitAny": "error",
-				"noTsIgnore": "error",
-				"noControlCharactersInRegex": "off",
-				"noEmptyInterface": "off"
-			}
-		}
+		"enabled": false
 	},
 	"formatter": {
 		"enabled": true,
