@@ -93,6 +93,7 @@ describe("category settings at provider request boundaries", () => {
         }
         const sessionID = `ses_${crypto.randomUUID()}`
         const created: Array<{ body: { model?: { variant?: string } } }> = []
+        const messageHistory: Array<{ info: { id: string; role: string } }> = []
         let dispatched = Promise.withResolvers<Dispatch>()
         const client = {
           session: {
@@ -102,11 +103,12 @@ describe("category settings at provider request boundaries", () => {
               return { data: { id: sessionID } }
             },
             promptAsync: async (input: Dispatch) => {
+              messageHistory.push({ info: { id: `msg_${messageHistory.length}`, role: "user" } })
               dispatched.resolve(input)
               return {}
             },
             status: async () => ({ data: {} }),
-            messages: async () => ({ data: [] }),
+            messages: async () => ({ data: [...messageHistory] }),
             abort: async () => ({}),
           },
         }
