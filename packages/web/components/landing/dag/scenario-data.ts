@@ -142,7 +142,7 @@ export const TIMELINE: readonly TimelineEvent[] = [
     atMs: 16400,
     nodeId: "gate-review",
     state: "completed",
-    activity: "APPROVE — every claim evidenced",
+    activity: "APPROVE: every claim evidenced",
   },
 ]
 

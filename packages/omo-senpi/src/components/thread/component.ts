@@ -3,6 +3,8 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { loadSenpiOmoConfig } from "../config-resolution"
+import { applyDoriToolkitGate } from "../ulw-loop/sdk/dori-gate"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
@@ -43,6 +45,17 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
   readonly agentDir?: () => string
   readonly store?: GatewayStore
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
+  /** The raw `dori` config section; absent: read from the user's omo config at registration. */
+  readonly doriSection?: () => unknown
+}
+
+function readDoriSection(options: ThreadComponentOptions, ctx: ComponentContext): unknown {
+  try {
+    return (options.doriSection ?? (() => loadSenpiOmoConfig().config.dori))()
+  } catch (error) {
+    ctx.logger.warn(`thread gateway: the dori config section was not read, so the dori toolkit stays off: ${error instanceof Error ? error.message : String(error)}`)
+    return undefined
+  }
 }
 
 /**
@@ -192,6 +205,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const host = options.host ?? createLazyLiveThreadSurface(pi)
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
       const agentDir = options.agentDir ?? (() => resolveAgentHome({ env: process.env }))
+      // Before any kernel starts: a kernel reads the switch once, when it imports the toolkit SDK.
+      const doriToolkit = applyDoriToolkitGate(readDoriSection(options, ctx), process.env)
       const runtimeInstance = hostInstanceOf(pi)
       // The pre-gateway `thread_send` mailbox of this workspace: its undelivered items are imported
       // into the store once, when this session starts and the mailbox still exists on disk.
@@ -235,7 +250,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-      })
+        ...(doriToolkit ? { doriToolkit: true } : {}),
+      }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.

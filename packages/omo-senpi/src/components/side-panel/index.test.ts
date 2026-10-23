@@ -1,11 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { writeFileSync } from "node:fs"
-import { join } from "node:path"
 
 import { OmoSidePanelSettingsSchema, type OmoSidePanelSettings } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { ComponentContext } from "../../extension/types"
+import type { ComponentContext, SenpiAccountLimits } from "../../extension/types"
 
 import {
   GIT_REFRESH_FLOOR_MS,
@@ -19,7 +17,6 @@ import { createSidePanelComponent } from "./index"
 import type { PanelMemory, PanelMemoryIdentity, PanelTimers } from "./types"
 import { SIDE_PANEL_DIFF_COMMAND } from "./constants"
 import type { PanelTaskRecord } from "./data/task-records"
-import { testTempDir } from "../../../test-support/temp-dir"
 
 interface WidgetCall {
   readonly key: string
@@ -547,6 +544,34 @@ describe("side panel git wiring", () => {
 })
 
 describe("side panel usage wiring", () => {
+  function engineLimits(initial: readonly SenpiAccountLimits[]) {
+    let records = initial
+    const listeners = new Set<(limits: SenpiAccountLimits) => void>()
+    return {
+      get: () => records,
+      on: (listener: (limits: SenpiAccountLimits) => void) => {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      report(next: SenpiAccountLimits) {
+        records = [next]
+        for (const listener of listeners) listener(next)
+      },
+    }
+  }
+
+  const claudeRecord = (account: string, usedPercent: number): SenpiAccountLimits => ({
+    provider: "anthropic-subscription",
+    account,
+    windows: [{ id: "claude:5h", label: "5h", windowMinutes: 300, usedPercent }],
+    reportedAt: new Date(100_000).toISOString(),
+  })
+
+  function withEngine(harness: ReturnType<typeof mounted>, engine: ReturnType<typeof engineLimits>) {
+    harness.pi.getSubscriptionLimits = engine.get
+    harness.pi.onSubscriptionLimits = engine.on
+  }
+
   test("#given the usage section is off #when a session starts #then no credential is ever read", async () => {
     // given
     let reads = 0
@@ -557,9 +582,9 @@ describe("side panel usage wiring", () => {
           reads += 1
           return { auth: {}, pool: undefined }
         },
-        fetch: () => Promise.reject(new Error("the network must not be touched")),
       },
     })
+    withEngine(harness, engineLimits([claudeRecord("default", 44)]))
 
     // when
     await harness.pi.dispatch("session_start", {}, harness.host)
@@ -567,45 +592,59 @@ describe("side panel usage wiring", () => {
 
     // then
     expect(reads).toBe(0)
+    expect(columnRows(harness.tui).some((row) => row.startsWith("USAGE"))).toBe(false)
   })
 
-  test("#given the section is on #when a session starts #then credentials are read for the poll", async () => {
-    // given
-    let reads = 0
+  test("#given the engine already holds an account's limits #when the panel mounts #then they are on screen at once", async () => {
+    // given the engine polls before any turn (senpi#3684), so a fresh window starts with numbers
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
-      usage: {
-        cachePath: join(testTempDir("omo-usage-wiring-"), "usage.json"),
-        readCredentials: () => {
-          reads += 1
-          return { auth: {}, pool: undefined }
-        },
-        fetch: () => Promise.reject(new Error("no provider is configured, so nothing should be fetched")),
-      },
+      usage: { readCredentials: () => ({ auth: {}, pool: undefined }) },
     })
+    withEngine(harness, engineLimits([claudeRecord("default", 44)]))
 
     // when
     await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attach()
 
     // then
-    expect(reads).toBe(1)
+    const rows = columnRows(harness.tui)
+    expect(rows.some((row) => row.startsWith("USAGE"))).toBe(true)
+    expect(rows.some((row) => row.includes("44%"))).toBe(true)
   })
 
-  test("#given a turn ends #when the panel refreshes #then the poller gets a pass for rotations", async () => {
-    // given a pool rotation only shows up when credentials are re-read; waiting for the poll
-    // interval would leave the old account's name over the new account's numbers
+  test("#given the engine reports new limits #when the record lands #then the column shows them", async () => {
+    // given
+    const engine = engineLimits([])
+    const harness = mounted({
+      loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
+      usage: { readCredentials: () => ({ auth: {}, pool: undefined }) },
+    })
+    withEngine(harness, engine)
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attach()
+    expect(columnRows(harness.tui).some((row) => row.startsWith("USAGE"))).toBe(false)
+
+    // when
+    engine.report(claudeRecord("default", 63))
+
+    // then
+    expect(columnRows(harness.tui).some((row) => row.includes("63%"))).toBe(true)
+  })
+
+  test("#given a turn ends #when the panel refreshes #then the serving account is re-read for rotations", async () => {
+    // given a pool rotation only shows up when credentials are re-read
     let reads = 0
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
       usage: {
-        cachePath: join(testTempDir("omo-usage-nudge-"), "usage.json"),
         readCredentials: () => {
           reads += 1
           return { auth: {}, pool: undefined }
         },
-        fetch: () => Promise.reject(new Error("no provider is configured, so nothing should be fetched")),
       },
     })
+    withEngine(harness, engineLimits([]))
     await harness.pi.dispatch("session_start", {}, harness.host)
     const afterMount = reads
 
@@ -617,19 +656,16 @@ describe("side panel usage wiring", () => {
     expect(reads).toBeGreaterThan(afterMount)
   })
 
-  test("#given numbers another session cached #when the panel mounts #then they are on screen at once", async () => {
-    // given the cache is shared, so a new window starts with the numbers rather than waiting
-    const cachePath = join(testTempDir("omo-usage-shared-"), "usage.json")
-    writeFileSync(
-      cachePath,
-      JSON.stringify({ claude: { account: "work", updatedAt: 100_000, windows: [{ label: "5h", percent: 44 }] } }),
-    )
+  test("#given a host without subscription limits #when the section is on #then nothing is read and no section is drawn", async () => {
+    // given an older senpi that predates pi.getSubscriptionLimits
+    let reads = 0
     const harness = mounted({
       loadSettings: () => settings({ enabled: true, sections: { ...allSections(), usage: true } }),
       usage: {
-        cachePath,
-        readCredentials: () => ({ auth: {}, pool: undefined }),
-        fetch: () => Promise.reject(new Error("the cached entry is fresh, so nothing should be fetched")),
+        readCredentials: () => {
+          reads += 1
+          return { auth: {}, pool: undefined }
+        },
       },
     })
 
@@ -638,9 +674,8 @@ describe("side panel usage wiring", () => {
     harness.attach()
 
     // then
-    const rows = columnRows(harness.tui)
-    expect(rows.some((row) => row.startsWith("USAGE"))).toBe(true)
-    expect(rows.some((row) => row.includes("44%"))).toBe(true)
+    expect(reads).toBe(0)
+    expect(columnRows(harness.tui).some((row) => row.startsWith("USAGE"))).toBe(false)
   })
 })
 

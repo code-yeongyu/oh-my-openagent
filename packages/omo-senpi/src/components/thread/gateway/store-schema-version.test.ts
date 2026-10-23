@@ -65,7 +65,8 @@ test.each([
     expect(db.query("PRAGMA data_version").get()).toEqual(before.dataVersion)
     expect(db.query("SELECT * FROM alpha_items").all()).toEqual([{ id: 7, value: "preserved" }])
     if (reopen) {
-      expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toMatchObject({ kind: "refused", code: "extension_unknown_name" })
+      // The refused registration never replaced the persisted one: the fresh handle loads that and reads the preserved row.
+      expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({ kind: "ok", value: [{ id: 7, value: "preserved" }] })
       expect(await store.registerStoreExtension(descriptor)).toEqual({ kind: "ok", value: { version: 2 } })
     }
     expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({ kind: "ok", value: [{ id: 7, value: "preserved" }] })

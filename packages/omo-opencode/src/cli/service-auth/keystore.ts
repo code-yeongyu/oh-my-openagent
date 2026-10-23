@@ -14,8 +14,9 @@ export type CredentialStore = {
   readonly clear: () => Promise<void>
 }
 
-export class KeychainLockedError extends SignInError {}
-export class SecretServiceUnavailableError extends SignInError {}
+export class CredentialStoreError extends SignInError {}
+export class KeychainLockedError extends CredentialStoreError {}
+export class SecretServiceUnavailableError extends CredentialStoreError {}
 
 // The OS store refused because it is locked and may not ask the person (macOS errSecInteractionNotAllowed,
 // a locked libsecret keyring). Callers must surface this as its own outcome, never as a prompt.
@@ -45,14 +46,22 @@ export function createCredentialStore(
   notice: (message: string) => void = stderrNoticeOncePerProcess,
 ): CredentialStore {
   if (!secrets) throw new SignInError("OmO sign-in needs Bun 1.4 or newer with OS credential storage. No file fallback is available.")
-  const platformName = platform === "darwin" ? "macOS Keychain"
-    : platform === "linux" ? "Linux Secret Service (libsecret and an unlocked keyring)"
-    : platform === "win32" ? "Windows Credential Manager" : null
+  const platformName =
+    platform === "darwin"
+      ? "macOS Keychain"
+      : platform === "linux"
+        ? "Linux Secret Service (libsecret and an unlocked keyring)"
+        : platform === "win32"
+          ? "Windows Credential Manager"
+          : null
   if (platformName === null) throw new SignInError("This platform has no supported OS credential store.")
   const key = { service: "omo-cli", name: credentialId(api) }
-  const unavailable = (error: unknown) => isLocked(error)
-    ? new KeychainLockedError(`${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`)
-    : new SignInError(`Cannot access ${platformName}. Unlock or enable the OS credential store and try again. Credentials are never saved to a file.`)
+  const unavailable = (error: unknown) =>
+    isLocked(error)
+      ? new KeychainLockedError(`${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`)
+      : new CredentialStoreError(
+          `Cannot access ${platformName}. Unlock or enable the OS credential store and try again. Credentials are never saved to a file.`,
+        )
   // libsecret answers a locked collection by asking the keyring to show its unlock prompt, so on Linux the
   // Locked property is read over D-Bus BEFORE any secret call and a locked collection is never touched. When the
   // probe cannot answer (no gdbus binary, no Secret Service name on the bus, a bus that did not reply) the store
@@ -66,7 +75,10 @@ export function createCredentialStore(
     if (platform !== "linux" || Date.now() < unlockedUntil) return
     const lock = await lockProbe()
     if (lock === "locked") throw new KeychainLockedError(`${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`)
-    if (lock === "unlocked") { unlockedUntil = Date.now() + UNLOCKED_REUSE_MS; return }
+    if (lock === "unlocked") {
+      unlockedUntil = Date.now() + UNLOCKED_REUSE_MS
+      return
+    }
     if (!noticed) {
       noticed = true
       notice("omo: could not check whether the keyring is locked (gdbus or the Secret Service did not answer); using libsecret directly.")
@@ -76,20 +88,34 @@ export function createCredentialStore(
     async read() {
       await assertUsable()
       let value: string | null
-      try { value = await secrets.get(key) } catch (error) { throw unavailable(error) }
+      try {
+        value = await secrets.get(key)
+      } catch (error) {
+        throw unavailable(error)
+      }
       if (value === null) return null
-      try { return credentialSchema.parse(JSON.parse(value)) } catch {
+      try {
+        return credentialSchema.parse(JSON.parse(value))
+      } catch {
         throw new SignInError("Stored sign-in data is invalid. Run omo logout, then omo login.")
       }
     },
     async write(value) {
       // One OS-store replacement commits the rotating token and its access token together.
       await assertUsable()
-      try { await secrets.set({ ...key, value: JSON.stringify(credentialSchema.parse(value)) }) } catch (error) { throw unavailable(error) }
+      try {
+        await secrets.set({ ...key, value: JSON.stringify(credentialSchema.parse(value)) })
+      } catch (error) {
+        throw unavailable(error)
+      }
     },
     async clear() {
       await assertUsable()
-      try { await secrets.delete(key) } catch (error) { throw unavailable(error) }
+      try {
+        await secrets.delete(key)
+      } catch (error) {
+        throw unavailable(error)
+      }
     },
   }
 }

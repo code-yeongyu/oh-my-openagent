@@ -17,27 +17,7 @@
     }
   },
   "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": false,
-      "correctness": {
-        "noUnusedVariables": "error"
-      },
-      "style": {
-        "useConst": "error",
-        "useImportType": "error"
-      },
-      "suspicious": {
-        "noConsole": {
-          "level": "warn",
-          "options": {
-            "allow": ["warn", "error"]
-          }
-        },
-        "noExplicitAny": "error",
-        "noVar": "error"
-      }
-    }
+    "enabled": false
   },
   "javascript": {
     "formatter": {

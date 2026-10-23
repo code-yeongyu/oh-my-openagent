@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:dab69f72ed6c0be5f24e1cc943dae775cbd7b91c01b1f63e1147ef9e19fac759:83fb0288cabfd65d7a4212f7f5f4466c24e0dae8a5837695e78946f744bb8948
+// omo-codex-install:589465f5060a80fea8a2bbe83bbcfd842b5c052b84c01c9c1ec4d97118fa4a04:960b1c9132bfc8b0def0b8b62ba61e3a8873e4391079648c783d6cba18534957
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10020,6 +10020,12 @@ var init_posthog_client = __esm(() => {
 // packages/telemetry-core/src/record-daily-active.ts
 var init_record_daily_active = () => {};
 
+// packages/telemetry-core/src/turn-trace-bridge.ts
+var REGISTRY;
+var init_turn_trace_bridge = __esm(() => {
+  REGISTRY = Symbol.for("omo.telemetry.turn-traceparent.v1");
+});
+
 // packages/telemetry-core/src/index.ts
 var init_src = __esm(() => {
   init_activity_state();
@@ -10031,6 +10037,7 @@ var init_src = __esm(() => {
   init_machine_id();
   init_posthog_client();
   init_record_daily_active();
+  init_turn_trace_bridge();
 });
 
 // packages/omo-codex/package.json
@@ -19496,7 +19503,7 @@ var OmoGitMasterSettingsShape = {
 var OmoGitMasterSettingsLayerSchema = object(OmoGitMasterSettingsShape).partial().strict();
 var OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
   commit_footer: union([boolean2(), string2()]).default(false),
-  include_co_authored_by: boolean2().default(false),
+  include_co_authored_by: boolean2().default(true),
   git_env_prefix: GitEnvPrefixSchema.default("GIT_MASTER=1")
 }).strict();
 
