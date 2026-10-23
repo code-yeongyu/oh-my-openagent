@@ -55,7 +55,7 @@ function builtinProviderIds() {
 // (`{$file: ...}` / `{$env: ...}` / `{$concat: [...]}`) that the engine reads at load. Returns
 // undefined when a placeholder is left that the engine has no spelling for.
 //
-// `legacy` is the engine-version gate closed: the value lands in the engine config as a plain
+// `legacy` is the capability gate closed: the value lands in the engine config as a plain
 // string, so the pre-change rules apply (a `{file:...}` or malformed `{env:...}` is refused).
 function configValue(value, baseDir = "", legacy = false) {
   if (legacy) return legacyConfigValue(value)
@@ -334,7 +334,7 @@ export function planOpencodeProviders(options = {}) {
   // here; the global config directory is the best available anchor. A relative `{file:...}` path
   // therefore resolves against the global dir, not against the file that wrote it.
   const baseDir = sources.files[0] ? dirname(sources.files[0]) : ""
-  const referenceObjects = shouldEmitReferenceObjects(options)
+  const referenceObjects = shouldEmitReferenceObjects({ referenceObjects: options.referenceObjects, env: options.env })
   const context = { builtin, opencodeAuth, notices, baseDir, legacy: !referenceObjects }
   if (!referenceObjects && Object.keys(declared).length > 0) {
     notices.push(

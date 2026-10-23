@@ -26,10 +26,12 @@ function fixture(config: unknown, options: { jsonc?: string, skills?: string[], 
   for (const name of options.skills ?? []) {
     write(join(configDir, "skills", name, "SKILL.md"), `---\nname: ${name}\ndescription: test\n---\n\nbody\n`)
   }
+  // The gate is pinned here rather than left to whatever engine the test machine resolves, so
+  // these fixtures cannot change under a senpi pin that ships the capability.
   return planOpencodeAssets({
     home,
     env: { XDG_CONFIG_HOME: join(root, "config") },
-    ...(options.referenceObjects === undefined ? {} : { referenceObjects: options.referenceObjects }),
+    referenceObjects: options.referenceObjects ?? false,
   })
 }
 
@@ -364,7 +366,7 @@ describe("opencode asset plan", () => {
         expect(plan.refusedServers.map((server: { name: string }) => server.name)).toEqual(["dashed-env"])
       })
 
-      test("#then a config with no placeholder in it gets no engine-version notice", () => {
+      test("#then a config with no placeholder in it gets no capability notice", () => {
         const plan = fixture({
           mcp: { plain: { type: "remote", url: "https://f.test/mcp", headers: { A: "b" } } },
         }, { referenceObjects: false })

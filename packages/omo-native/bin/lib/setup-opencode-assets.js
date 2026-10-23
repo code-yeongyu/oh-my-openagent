@@ -6,7 +6,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
-import { compareSemver, REFERENCE_OBJECTS_MIN_SENPI_VERSION } from "./engine-version.js"
+import { shouldEmitReferenceObjects } from "./engine-capabilities.js"
+
+export { shouldEmitReferenceObjects }
 import { literalConfigValue } from "./engine-config-value.js"
 import { parseJsonc } from "./jsonc.js"
 import { senpiPackageRoot } from "./package-paths.js"
@@ -105,38 +107,11 @@ export function readOpencodeConfig(files, label, notices) {
 // references at load time, so setup never inlines secret bytes into `mcp.json`, `models.json`,
 // or `auth.json`; rotation of the source file is picked up on the next engine load.
 //
-// The maintainer ships the engine half themselves. The senpi PR will name the version that
-// supports the `$file` / `$env` / `$concat` shapes, and until that version is known the gate
-// stays closed, so setup uses the pre-change plain-string path (a `{file:...}` or malformed
-// `{env:...}` is refused with a notice). `OMO_REFERENCE_OBJECTS=1` forces the new shape
-// regardless of the engine version, for tests and early adopters.
-//
-// The version is read straight off the engine's own package.json, without resolveSenpi's
-// CLI-file existence checks: this is a version comparison, not a launch.
-function readSenpiVersion() {
-  try {
-    return JSON.parse(readFileSync(join(senpiPackageRoot(), "package.json"), "utf8")).version
-  } catch {
-    return "unresolved"
-  }
-}
-
-// Whether the installed engine is new enough to receive reference objects. The comparison is
-// semver, so the gate opens on purpose and not by accident of how a version string happens to
-// sort. The threshold is the exact version the maintainer's senpi PR names.
-function engineSupportsReferenceObjects(version) {
-  if (version === "unresolved") return false
-  if (REFERENCE_OBJECTS_MIN_SENPI_VERSION === null) return false
-  return compareSemver(version, REFERENCE_OBJECTS_MIN_SENPI_VERSION) >= 0
-}
-
-// Per-call override (also driven by the OMO_REFERENCE_OBJECTS env var). Tests set this directly.
-export function shouldEmitReferenceObjects(opts = {}) {
-  if (opts.referenceObjects === true) return true
-  if (opts.referenceObjects === false) return false
-  if (process.env.OMO_REFERENCE_OBJECTS === "1") return true
-  return engineSupportsReferenceObjects(readSenpiVersion())
-}
+// The maintainer ships the engine half themselves. The engine says it resolves the `$file` /
+// `$env` / `$concat` shapes with a field in its own package.json, and until that field is
+// there the gate stays closed, so setup uses the pre-change plain-string path (a `{file:...}` or
+// malformed `{env:...}` is refused with a notice). `OMO_REFERENCE_OBJECTS=1` forces the new
+// shape regardless of what the engine declares, for tests and early adopters.
 
 // The placeholder pattern also matches an EMPTY argument, so `{file:}` and `{env:}` reach the
 // refusal below instead of being written out as literal text. The two other placeholder readers
@@ -643,12 +618,12 @@ export function planOpencodeAssets(options = {}) {
   const notices = []
   const mcpServers = []
   const refusedServers = []
-  const refObjects = shouldEmitReferenceObjects(options)
+  const refObjects = shouldEmitReferenceObjects({ referenceObjects: options.referenceObjects, env: options.env })
   const legacy = !refObjects
   const mcpSection = readOpencodeSection(sources.files, "mcp", "mcp servers", notices)
-  // The engine-version notice only matters when a reference was actually DOWNGRADED. A config
+  // The capability notice only matters when a reference was actually DOWNGRADED. A config
   // with no `{file:...}` / `{env:...}` in it imports identically either way, so a host with a
-  // plain MCP config gets no notice about an engine version it is not going to use.
+  // plain MCP config gets no notice about a capability it is not going to use.
   let downgraded = false
   for (const [name, entry] of Object.entries(mcpSection)) {
     // baseDir is the directory of the OpenCode config file the entry came from. The config is
