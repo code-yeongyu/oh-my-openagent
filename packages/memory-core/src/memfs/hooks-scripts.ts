@@ -59,7 +59,8 @@ export const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 # Validate frontmatter in staged memory .md files.
 # Installed by omo memory-core. Do not edit by hand - regenerated on startup.
 
-ALL_KNOWN_KEYS="description read_only limit kind aliases"
+# provenance is the claim receipt the memory tool stamps (#10488); its value is always a quoted JSON string.
+ALL_KNOWN_KEYS="description read_only limit kind aliases provenance"
 TAB=$(printf '\\t')
 
 fm_value() {
@@ -170,14 +171,14 @@ check_file() {
 
 errors=$(
   # Skills must always be directories: skills/<name>/SKILL.md.
-  git diff --cached --name-only --diff-filter=ACMR |
+  git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR |
     grep -E '^(memory/)?skills/[^/]+\\.md$' |
     while IFS= read -r skill_file; do
       printf '  %s: invalid skill path (skills must be folders). Use skills/<name>/SKILL.md\\n' "$skill_file"
     done
 
   # Memory content keys are an allowlist under system/, reference/ and people/.
-  git diff --cached --name-only --diff-filter=ACM |
+  git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR |
     grep -E '^(memory/)?(system|reference|people)/.*\\.md$' |
     while IFS= read -r file; do
       check_file "$file" contract
@@ -185,7 +186,7 @@ errors=$(
 
   # SKILL.md is read by the skill loader as strict YAML: same value rules,
   # description required, any key allowed.
-  git diff --cached --name-only --diff-filter=ACM |
+  git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR |
     grep -E '^(memory/)?skills/.+/SKILL\\.md$' |
     while IFS= read -r file; do
       check_file "$file" skill

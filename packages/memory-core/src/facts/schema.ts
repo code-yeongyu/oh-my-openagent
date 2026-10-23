@@ -26,6 +26,12 @@ export interface FactsQueueEntry {
   readonly range: FactsQueueRange
   readonly enqueuedAt: string
   readonly entries: readonly TranscriptEntry[]
+  /**
+   * The transcript entry right before `entries[0]` (reasoning skipped), when there is one. A queue entry starts at the
+   * user's message, so this is the assistant proposal that message answered; consent binding (#10488) needs it even
+   * after the previous queue entry was consumed.
+   */
+  readonly lead?: TranscriptEntry
 }
 
 /**
@@ -157,7 +163,9 @@ export function parseQueueEntry(raw: string): FactsQueueEntry | undefined {
   }
   const entries = parsed.entries.filter((row): row is TranscriptEntry => isTranscriptEntry(row))
   if (entries.length !== parsed.entries.length) return undefined
-  return { version: FACTS_QUEUE_VERSION, identity, sessionId, conversationId, range, enqueuedAt, entries }
+  if (parsed.lead !== undefined && !isTranscriptEntry(parsed.lead)) return undefined
+  const lead = parsed.lead === undefined ? {} : { lead: parsed.lead }
+  return { version: FACTS_QUEUE_VERSION, identity, sessionId, conversationId, range, enqueuedAt, entries, ...lead }
 }
 
 function isTranscriptEntry(value: unknown): value is TranscriptEntry {

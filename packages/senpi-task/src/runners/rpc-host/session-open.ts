@@ -99,6 +99,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         }),
         client,
         session: { routingId: opened.sessionId, sessionPath, instanceId: opened.instanceId },
+        ...(opened.durableSessionId === undefined ? {} : { durableSessionId: opened.durableSessionId }),
         taskId: spec.task_id,
         heartbeatIntervalMs: input.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
         now: input.now,

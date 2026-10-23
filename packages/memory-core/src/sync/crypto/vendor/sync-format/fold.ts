@@ -4,21 +4,22 @@
  * that fails a check is refused and never applied; `receiveKeyringChain` (receive.ts) reports
  * the first one.
  */
+
+import {
+  type Authority,
+  apply,
+  copyOf,
+  doneThrough,
+  doneWithDigest,
+  type FoldState,
+} from "./authority.ts";
 import {
   assertCanonicalOrder,
   compareMembers,
   compareRecoveryKeys,
   compareWrapEntries,
 } from "./canonical.ts";
-import type {
-  AuthorityFold,
-  ChainEntry,
-  ForkEvidence,
-  ForkState,
-  KeyringBody,
-  SyncPrincipal,
-  SyncRecoveryKey,
-} from "./chain.ts";
+import type { AuthorityFold, ChainEntry, ForkEvidence, ForkState, KeyringBody } from "./chain.ts";
 import { branchRefusal } from "./fork-evidence.ts";
 import { forkSetMatchesEvidence } from "./fork-set.ts";
 import { recomputeForkStateWith } from "./fork-state.ts";
@@ -45,53 +46,35 @@ export type ReceivedChain =
   | { readonly ok: true; readonly fold: AuthorityFold }
   | { readonly ok: false; readonly seq: number; readonly reason: ReceiverRefusal };
 
-type Authority = { members: Map<string, SyncPrincipal>; registry: Map<string, SyncRecoveryKey> };
-
-const readStringField = (body: KeyringBody, key: string): string => {
-  const value: unknown = Reflect.get(body, key);
-  return typeof value === "string" ? value : "";
-};
-
-const enrolledKey = (body: KeyringBody, credentialId: string): SyncRecoveryKey => ({
-  credential_id: credentialId,
-  rp_id: readStringField(body, "rp_id"),
-  enrollment_nonce: readStringField(body, "enrollment_nonce"),
-  sealing_public_key: readStringField(body, "sealing_public_key"),
-  signing_public_key: readStringField(body, "signing_public_key"),
-  survivable: Reflect.get(body, "survivable") === "roaming" ? "roaming" : "synced",
-});
-
-const authorityOf = (state: ForkState): Authority => ({
-  members: new Map(state.members.map((member) => [member.id, member])),
-  registry: new Map(state.recovery_keys.map((key) => [key.credential_id, key])),
-});
-
 /** Checks a fork-resolution against its evidence and the chain so far; null when it holds. */
 const forkRefusal = (
   entry: ChainEntry,
   body: KeyringBody,
-  done: ReadonlyArray<ChainEntry>,
+  state: FoldState,
 ): ReceiverRefusal | null => {
-  const { evidence, state } = body;
-  if (evidence === undefined || state === undefined) return "fork_state_mismatch";
+  const { evidence, state: stated } = body;
+  if (evidence === undefined || stated === undefined) return "fork_state_mismatch";
   if (!forkSetMatchesEvidence(body.fork_set ?? [], evidence.branches)) return "fork_set_mismatch";
   const branches = branchRefusal(evidence);
   if (branches !== null) return branches;
-  if (!assertCanonicalOrder(state.members, compareMembers)) return "noncanonical_order";
-  if (!assertCanonicalOrder(state.recovery_keys, compareRecoveryKeys)) return "noncanonical_order";
-  const common = done.find(
-    (e) => e.seq === evidence.common.seq && e.digest === evidence.common.digest,
-  );
-  if (common === undefined) return "fork_common_unknown";
-  const ancestry = done.filter((e) => e.seq <= common.seq);
+  if (!assertCanonicalOrder(stated.members, compareMembers)) return "noncanonical_order";
+  if (!assertCanonicalOrder(stated.recovery_keys, compareRecoveryKeys)) return "noncanonical_order";
+  const at = state.bySeq.get(evidence.common.seq);
+  const common = at === undefined ? undefined : state.done[at];
+  if (common === undefined || common.digest !== evidence.common.digest) {
+    return "fork_common_unknown";
+  }
+  // A resolution re-folds the chain through its common ancestor once per branch: its cost is the
+  // fork's, never paid by the entries around it.
+  const ancestry = doneThrough(state, common.seq);
   // A branch record the receiver would refuse is not skipped: it refuses the whole evidence.
   for (const branch of evidence.branches) {
     if (!foldRefusal([...ancestry, ...branch.records]).ok) return "fork_evidence_invalid";
   }
   const recomputed = recomputeForkStateWith(foldAuthority, ancestry, evidence);
-  if (jcsCanonical(recomputed) !== jcsCanonical(state)) return "fork_state_mismatch";
+  if (jcsCanonical(recomputed) !== jcsCanonical(stated)) return "fork_state_mismatch";
   const signer = entry.author;
-  if (signer.kind !== "device" || !state.members.some((m) => m.id === signer.id)) {
+  if (signer.kind !== "device" || !stated.members.some((m) => m.id === signer.id)) {
     return "fork_signer_not_member";
   }
   return null;
@@ -101,38 +84,31 @@ const forkRefusal = (
 const joinRefusal = (
   entry: ChainEntry,
   body: KeyringBody,
-  atEntry: Authority | undefined,
+  atEntry: Authority,
 ): ReceiverRefusal | null => {
   const { author } = entry;
   if (author.kind !== "recovery" || author.credential_id !== body.credential_id) {
     return "recovery_join_author";
   }
-  return atEntry?.registry.has(author.credential_id) === true ? null : "recovery_join_unenrolled";
+  return atEntry.registry.has(author.credential_id) ? null : "recovery_join_unenrolled";
 };
 
 const vetoRefusal = (
   entry: ChainEntry,
   body: KeyringBody,
-  done: ReadonlyArray<ChainEntry>,
-  before: ReadonlyMap<number, Authority>,
+  state: FoldState,
 ): ReceiverRefusal | null => {
-  const join = done.find((e) => e.digest === body.join_digest);
+  const join = doneWithDigest(state, body.join_digest);
   if (join?.body?.kind !== "recovery-join") return "veto_not_a_join";
   const signer = entry.author;
-  if (signer.kind !== "device" || before.get(join.seq)?.members.has(signer.id) !== true) {
+  if (signer.kind !== "device" || state.beforeJoin.get(join.seq)?.members.has(signer.id) !== true) {
     return "veto_signer_not_member";
   }
-  const vetoed = done.some(
-    (e) => e.body?.kind === "recovery-join-vetoed" && e.body.join_digest === body.join_digest,
-  );
-  return vetoed ? "join_already_vetoed" : null;
+  return state.vetoed.has(join.digest) ? "join_already_vetoed" : null;
 };
 
-const refusalOf = (
-  entry: ChainEntry,
-  done: ReadonlyArray<ChainEntry>,
-  before: ReadonlyMap<number, Authority>,
-): ReceiverRefusal | null => {
+const refusalOf = (entry: ChainEntry, state: FoldState): ReceiverRefusal | null => {
+  if (entry.seq <= state.lastSeq) return "seq_not_increasing";
   const authorKind: unknown = entry.author.kind;
   if (authorKind !== "device" && authorKind !== "recovery") return "unknown_author_kind";
   if (entry.kind === "batch" && entry.body !== undefined && entry.body !== null) {
@@ -149,82 +125,79 @@ const refusalOf = (
   if (body.kind === "rotation" && !assertCanonicalOrder(body.members ?? [], compareMembers)) {
     return "noncanonical_order";
   }
-  if (body.kind === "recovery-join") return joinRefusal(entry, body, before.get(entry.seq));
-  if (body.kind === "recovery-join-vetoed") return vetoRefusal(entry, body, done, before);
-  return body.kind === "fork-resolution" ? forkRefusal(entry, body, done) : null;
+  if (body.kind === "recovery-join") return joinRefusal(entry, body, state.authority);
+  if (body.kind === "recovery-join-vetoed") return vetoRefusal(entry, body, state);
+  return body.kind === "fork-resolution" ? forkRefusal(entry, body, state) : null;
 };
 
-const apply = (
-  authority: Authority,
-  body: KeyringBody,
-  done: ReadonlyArray<ChainEntry>,
-  before: ReadonlyMap<number, Authority>,
-  cancelled: Set<string>,
-  seq: number,
-): Authority => {
-  const { members, registry } = authority;
-  if (body.kind === "genesis" && body.bootstrap !== undefined) {
-    const { first_device: first, recovery_key: key } = body.bootstrap;
-    return { members: new Map([[first.id, first]]), registry: new Map([[key.credential_id, key]]) };
-  }
-  if (body.kind === "approval" && body.principal !== undefined) {
-    members.set(body.principal.id, body.principal);
-  } else if (body.kind === "recovery-key" && body.credential_id !== undefined) {
-    registry.set(body.credential_id, enrolledKey(body, body.credential_id));
-  } else if (body.kind === "recovery-key-removed" && body.credential_id !== undefined) {
-    registry.delete(body.credential_id);
-  } else if (body.kind === "recovery-join" && body.principal !== undefined) {
-    const used = body.credential_id === undefined ? undefined : registry.get(body.credential_id);
-    return {
-      members: new Map([[body.principal.id, body.principal]]),
-      registry: used === undefined ? new Map() : new Map([[used.credential_id, used]]),
-    };
-  } else if (body.kind === "recovery-join-vetoed") {
-    const join = done.find((e) => e.digest === body.join_digest);
-    const prior = join === undefined ? undefined : before.get(join.seq);
-    if (join === undefined || prior === undefined) return authority;
-    const restored = new Map(prior.registry);
-    if (join.body?.credential_id !== undefined) restored.delete(join.body.credential_id);
-    for (const later of done) {
-      if (later.seq > join.seq && later.seq < seq) cancelled.add(later.digest);
+/**
+ * The keyring fold as a state machine over one entry at a time: `refusal` checks an entry
+ * against the entries accepted so far without changing anything, `accept` folds an entry the
+ * check accepted in, and `pass` records a refused entry's seq so a later replay of it is refused.
+ * Checking and folding one entry costs the same however long the chain before it is; only a
+ * veto (which cancels the records after its join) and a fork-resolution (which re-folds its
+ * branches from the common ancestor) do work in proportion to what they name.
+ */
+export type KeyringFold = {
+  readonly refusal: (entry: ChainEntry) => ReceiverRefusal | null;
+  readonly accept: (entry: ChainEntry) => void;
+  readonly pass: (entry: ChainEntry) => void;
+  /** The accepted entries through an accepted seq: a fork-resolution's ancestry. */
+  readonly through: (seq: number) => ReadonlyArray<ChainEntry>;
+  /** The authority folded so far; live, so a caller that keeps it copies it. */
+  readonly fold: () => AuthorityFold;
+};
+
+export const keyringFold = (): KeyringFold => {
+  const state: FoldState = {
+    authority: { members: new Map(), registry: new Map() },
+    cancelled: new Set(),
+    done: [],
+    byDigest: new Map(),
+    bySeq: new Map(),
+    beforeJoin: new Map(),
+    vetoed: new Set(),
+    lastSeq: 0,
+  };
+  const pass = (entry: ChainEntry): void => {
+    state.lastSeq = Math.max(state.lastSeq, entry.seq);
+  };
+  const accept = (entry: ChainEntry): void => {
+    pass(entry);
+    const body = entry.kind === "keyring" ? (entry.body ?? null) : null;
+    if (body?.kind === "recovery-join") state.beforeJoin.set(entry.seq, copyOf(state.authority));
+    if (body !== null) state.authority = apply(state, body);
+    if (body?.kind === "recovery-join-vetoed" && body.join_digest !== undefined) {
+      state.vetoed.add(body.join_digest);
     }
-    return { members: new Map(prior.members), registry: restored };
-  } else if (body.kind === "rotation" && body.members !== undefined) {
-    return { members: new Map(body.members.map((m) => [m.id, m])), registry };
-  } else if (body.kind === "fork-resolution" && body.state !== undefined) {
-    return authorityOf(body.state);
-  }
-  return authority;
+    const at = state.done.push(entry) - 1;
+    state.bySeq.set(entry.seq, at);
+    if (!state.byDigest.has(entry.digest)) state.byDigest.set(entry.digest, at);
+  };
+  return {
+    refusal: (entry) => refusalOf(entry, state),
+    accept,
+    pass,
+    through: (seq) => doneThrough(state, seq),
+    fold: () => ({ ...state.authority, cancelled: state.cancelled }),
+  };
 };
 
 const walk = (
   entries: ReadonlyArray<ChainEntry>,
 ): { readonly fold: AuthorityFold; readonly refused: ReceivedChain | null } => {
-  let authority: Authority = { members: new Map(), registry: new Map() };
-  const cancelled = new Set<string>();
-  const before = new Map<number, Authority>();
-  const done: ChainEntry[] = [];
+  const fold = keyringFold();
   let refused: ReceivedChain | null = null;
-  let lastSeq = 0;
   for (const entry of entries) {
-    const replayed = entry.seq <= lastSeq;
-    lastSeq = Math.max(lastSeq, entry.seq);
-    if (!replayed) {
-      before.set(entry.seq, {
-        members: new Map(authority.members),
-        registry: new Map(authority.registry),
-      });
-    }
-    const reason = replayed ? "seq_not_increasing" : refusalOf(entry, done, before);
-    if (reason !== null) {
-      refused ??= { ok: false, seq: entry.seq, reason };
+    const reason = fold.refusal(entry);
+    if (reason === null) {
+      fold.accept(entry);
       continue;
     }
-    const body = entry.kind === "keyring" ? (entry.body ?? null) : null;
-    if (body !== null) authority = apply(authority, body, done, before, cancelled, entry.seq);
-    done.push(entry);
+    refused ??= { ok: false, seq: entry.seq, reason };
+    fold.pass(entry);
   }
-  return { fold: { ...authority, cancelled }, refused };
+  return { fold: fold.fold(), refused };
 };
 
 /**

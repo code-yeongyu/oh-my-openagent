@@ -1,16 +1,17 @@
 import type { ModelRequirement } from "./model-requirement-types"
+import { LATEST_MODEL_BY_FAMILY } from "./latest-models"
 
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5-5",
+        model: LATEST_MODEL_BY_FAMILY.claudeOpus,
         variant: "max",
       },
       {
         providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "bailian-coding-plan", "moonshotai-cn", "firmware", "ollama-cloud", "aihubmix"],
-        model: "kimi-k3",
+        model: LATEST_MODEL_BY_FAMILY.kimi,
       },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
@@ -44,7 +45,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "high" },
       {
         providers: ["google", "google-vertex", "opencode"],
-        model: "gemini-4-argon",
+        model: LATEST_MODEL_BY_FAMILY.geminiPro,
         variant: "high",
       },
       {
@@ -54,7 +55,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5-5",
+        model: LATEST_MODEL_BY_FAMILY.claudeOpus,
         variant: "max",
       },
       { providers: ["opencode-go"], model: "glm-5.2" }
@@ -63,8 +64,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   librarian: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
-      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
+      { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m2.7" }
@@ -73,8 +74,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   explore: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
-      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
+      { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m2.7" }
@@ -83,7 +84,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "multimodal-looker": {
     fallbackChain: [
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "low" },
-      { providers: ["opencode-go"], model: "kimi-k3" },
+      { providers: ["opencode-go"], model: LATEST_MODEL_BY_FAMILY.kimi },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
       { providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"], model: "gpt-5-nano" }
     ],
@@ -92,17 +93,17 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-fable-5-1",
+        model: LATEST_MODEL_BY_FAMILY.claudeFable,
         variant: "xhigh",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5-5",
+        model: LATEST_MODEL_BY_FAMILY.claudeOpus,
         variant: "max",
       },
       {
         providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
-        model: "kimi-k3",
+        model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
       }
     ],
@@ -111,34 +112,34 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-fable-5-1",
+        model: LATEST_MODEL_BY_FAMILY.claudeFable,
         variant: "max",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5-5",
+        model: LATEST_MODEL_BY_FAMILY.claudeOpus,
         variant: "max",
       },
       {
         providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
-        model: "kimi-k3",
+        model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
       }
     ],
   },
   momus: {
     fallbackChain: [
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-astra", variant: "xhigh" },
-      { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
+      { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: "claude-opus-5-5",
+        model: LATEST_MODEL_BY_FAMILY.claudeOpus,
         variant: "max",
       },
       {
         providers: ["google", "google-vertex", "opencode"],
-        model: "gemini-4-argon",
+        model: LATEST_MODEL_BY_FAMILY.geminiPro,
         variant: "high",
       },
       {
@@ -152,7 +153,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   atlas: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-5" },
-      { providers: ["opencode-go"], model: "kimi-k3" },
+      { providers: ["opencode-go"], model: LATEST_MODEL_BY_FAMILY.kimi },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
@@ -166,7 +167,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "sisyphus-junior": {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-5" },
-      { providers: ["opencode-go"], model: "kimi-k3" },
+      { providers: ["opencode-go"], model: LATEST_MODEL_BY_FAMILY.kimi },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",

@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto"
 import { isAbsolute, join } from "node:path"
 import { readFile, rename, rm, writeFile } from "../fs/resilient"
 import type { GitRevisionRunner } from "./repo-revision-reads"
+import { STABLE_LOG_OUTPUT } from "./stable-log-output"
 
 const CACHE_SIZE = 4
 const FULL_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
@@ -98,7 +99,7 @@ export class PathCommitTimes {
 
   private log(range: readonly string[], timeoutMs?: number): ReturnType<GitRevisionRunner["run"]> {
     return this.git.run([
-      "log", "--format=%x01%ct", "--name-only", "-z", "--no-renames", "--diff-merges=first-parent",
+      ...STABLE_LOG_OUTPUT, "log", "--format=%x01%ct", "--name-only", "-z", "--no-renames", "--diff-merges=first-parent",
       "--diff-filter=d", ...range, "--",
     ], timeoutMs)
   }
