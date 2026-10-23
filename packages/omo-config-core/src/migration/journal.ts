@@ -2,7 +2,7 @@ import { join } from "node:path"
 import { isPlainObject } from "../internal/plain-object"
 import { toPosixPath } from "../internal/posix-path"
 import { resolveHomeDir } from "../loader"
-import type { MigrationClock, MigrationEnvironment, MigrationFileSystem, MigrationProcess } from "./types"
+import { MigrationTransactionError, type MigrationClock, type MigrationEnvironment, type MigrationFileSystem, type MigrationProcess } from "./types"
 
 export type MigrationBackupMove = {
   readonly from: string
@@ -95,7 +95,18 @@ export function readMigrationJournal(
 ): MigrationJournal | null {
   const path = migrationJournalPath(env)
   if (!fileSystem.existsSync(path)) return null
-  return parseJournal(JSON.parse(fileSystem.readFileSync(path, "utf-8")))
+  const content = fileSystem.readFileSync(path, "utf-8")
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(content)
+  } catch {
+    throw new MigrationTransactionError(`Invalid migration journal at ${path}: invalid JSON`)
+  }
+  try {
+    return parseJournal(parsed)
+  } catch (error) {
+    throw new MigrationTransactionError(`Invalid migration journal at ${path}: ${error instanceof Error ? error.message : "invalid fields"}`)
+  }
 }
 
 export function writeMigrationJournal(

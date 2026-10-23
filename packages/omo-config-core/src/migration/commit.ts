@@ -3,6 +3,7 @@ import { isPlainObject } from "../internal/plain-object"
 import { parseJsoncSafe } from "../internal/jsonc-parse"
 import { toPosixPath } from "../internal/posix-path"
 import { resolveHomeDir } from "../loader"
+import { configIssueSummary } from "../loader/diagnostic-values"
 import { OMO_CONFIG_HARNESS_IDS, OMO_CONFIG_LEGACY_HARNESS_IDS, OmoConfigSchema, harnessBlockKey } from "../schema"
 import { updateOmoConfig } from "../writer"
 import { diffEdits, withoutMarker } from "./diff-edits"
@@ -83,7 +84,7 @@ function uniqueDiagnostics(diagnostics: readonly string[]): readonly string[] {
 function validateTarget(targetPath: string, document: Readonly<Record<string, unknown>>): void {
   const result = OmoConfigSchema.safeParse(document)
   if (result.success) return
-  const detail = result.error.issues.map((issue) => `${issue.path.map(String).join(".")}: ${issue.message}`).join(", ")
+  const detail = result.error.issues.map((issue) => `${issue.path.map(String).join(".")}: ${configIssueSummary(issue)}`).join(", ")
   throw new MigrationValidationError(targetPath, detail)
 }
 

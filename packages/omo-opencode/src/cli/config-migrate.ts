@@ -19,17 +19,30 @@ type MigrationReport = {
   readonly transform?: Readonly<Record<string, unknown>>
 }
 
+function redactedTransform(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactedTransform)
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactedTransform(entry)]))
+  }
+  return "[redacted]"
+}
+
 function reports(result: ReturnType<typeof runOpenCodeStartupMigration>): readonly MigrationReport[] {
   return result.results.map((entry) => ({
     diagnostics: entry.diagnostics,
     movePlan: entry.preview?.backupMoves ?? [],
     status: entry.status,
     ...(entry.targetBackupPath === undefined ? {} : { targetBackupPath: entry.targetBackupPath }),
-    ...(entry.preview === undefined ? {} : { targetPath: entry.preview.targetPath, transform: entry.preview.transform }),
+    ...(entry.preview === undefined ? {} : {
+      targetPath: entry.preview.targetPath,
+      transform: redactedTransform(entry.preview.transform) as Readonly<Record<string, unknown>>,
+    }),
   }))
 }
 
-function printText(report: readonly MigrationReport[], output: (line: string) => void): void {
+function printText(report: readonly MigrationReport[], dryRun: boolean, output: (line: string) => void): void {
+  const targets = [...new Set(report.flatMap((entry) => entry.targetPath === undefined ? [] : [entry.targetPath]))]
+  for (const target of targets) output(`Full values ${dryRun ? "will be written to" : "are in"} ${target}; preview values are redacted.`)
   for (const entry of report) {
     output(`status: ${entry.status}`)
     if (entry.targetPath !== undefined) output(`target: ${entry.targetPath}`)
@@ -69,7 +82,7 @@ export function runConfigMigrate(options: ConfigMigrateOptions = {}): number {
   } else {
     if (result.journalResumed) output("Recovered pending migration journal.")
     if (result.resumedTargetBackupPath !== undefined) output(`backup: ${result.resumedTargetBackupPath}`)
-    printText(report, output)
+    printText(report, options.dryRun ?? false, output)
     if (report.every((entry) => entry.status === "skipped")) output("Nothing to migrate.")
   }
   return result.error === undefined ? 0 : 1

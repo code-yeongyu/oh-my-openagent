@@ -127,7 +127,7 @@ describe("omo gateway resolves a separately installed package", () => {
 
     // then
     expect(code).toBe(1)
-    expect(stderr.text()).toStartWith("omo gateway: cannot load @oh-my-opencode/omo-gateway/host: Cannot find package 'left-pad'")
+    expect(stderr.text()).toStartWith("omo gateway: cannot load @oh-my-opencode/omo-gateway/host;")
   })
 })
 

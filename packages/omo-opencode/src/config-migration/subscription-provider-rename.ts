@@ -34,13 +34,13 @@ function renameModelReference(modelReference: string): string | undefined {
   return `${canonicalProvider}${modelPartVerbatim}`
 }
 
-type Rewrite = { readonly path: string; readonly from: string; readonly to: string }
+type Rewrite = { readonly path: string }
 
 function rewriteValue(value: unknown, path: string, rewrites: Rewrite[]): unknown {
   if (typeof value === "string") {
     const renamed = renameModelReference(value) ?? renameProviderId(value)
     if (renamed === undefined) return value
-    rewrites.push({ from: value, path, to: renamed })
+    rewrites.push({ path })
     return renamed
   }
   if (Array.isArray(value)) return value.map((entry, index) => rewriteValue(entry, `${path}[${index}]`, rewrites))
@@ -49,7 +49,7 @@ function rewriteValue(value: unknown, path: string, rewrites: Rewrite[]): unknow
       Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
         const canonicalKey = renameModelReference(key) ?? renameProviderId(key)
         const nextKey = canonicalKey ?? key
-        if (canonicalKey !== undefined) rewrites.push({ from: key, path: `${path}.${key}`, to: canonicalKey })
+        if (canonicalKey !== undefined) rewrites.push({ path: `${path}.${key}` })
         return [nextKey, rewriteValue(entry, `${path}.${nextKey}`, rewrites)]
       }),
     )
@@ -70,7 +70,7 @@ export function transformSubscriptionProviderRename(document: unknown): ConfigMi
     ? (rewritten as Record<string, unknown>)
     : {}
   return {
-    diagnostics: rewrites.map((rewrite) => `${rewrite.path}: ${rewrite.from} renamed to ${rewrite.to}`),
+    diagnostics: rewrites.map((rewrite) => `${rewrite.path}: subscription provider renamed`),
     document: next,
   }
 }

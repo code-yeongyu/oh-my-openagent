@@ -22,7 +22,7 @@ describe("runMigration", () => {
 
     // then
     expect(result.status).toBe("migrated")
-    expect(result.diagnostics).toEqual(["skipped: task.default_concurrency legacy=3 kept=5"])
+    expect(result.diagnostics).toEqual(["skipped: task.default_concurrency"])
     expect(parseFile(fileSystem, migrationFixture.targetPath).task).toEqual({ default_concurrency: 5 })
   })
 

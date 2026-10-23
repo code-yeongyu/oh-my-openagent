@@ -174,7 +174,7 @@ describe("getCodexOmoConfig", () => {
 		// then
 		expect(result.warnings.some((warning) => warning.startsWith("omo-codex: migrated legacy configuration from ")
 			&& warning.endsWith("/.omo/config.jsonc"))).toBe(true)
-		expect(result.warnings).toContain("omo-codex: configuration migration: skipped: [codex].telemetry.enabled legacy=false kept=true")
+		expect(result.warnings).toContain("omo-codex: configuration migration: skipped: [codex].telemetry.enabled")
 	})
 
 	it("#given overlapping [omo] and [senpi] blocks in legacy config #when Codex migrates #then the transform conflict is reported", () => {

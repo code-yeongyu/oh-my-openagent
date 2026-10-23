@@ -71,7 +71,7 @@ describe("omo doctor config lines", () => {
   test("#given the staged runtime cannot be loaded #when the launcher asks for config lines #then doctor says the check was unavailable instead of staying silent", async () => {
     const lines = await doctorConfigLines({ loadRuntime: async () => { throw new Error("missing bundle") } })
 
-    expect(lines).toEqual(["WARN config: diagnostics unavailable: missing bundle"])
+    expect(lines).toEqual(["WARN config: diagnostics unavailable; check the installed config runtime"])
   })
 
   test("#given config lines from the launcher #when doctor prints its report #then every line appears in the output", () => {

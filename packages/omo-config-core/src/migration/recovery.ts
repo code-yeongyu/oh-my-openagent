@@ -68,9 +68,16 @@ export function resumeMigrationJournal(input: {
     input.renewLock()
     if (input.fileSystem.existsSync(move.from)) {
       if (input.fileSystem.existsSync(move.to)) {
-        throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`)
+        // A private backup can be committed just before a crash interrupts removal of the source.
+        if (input.fileSystem.lstatSync(move.from).isSymbolicLink()
+          || input.fileSystem.lstatSync(move.to).isSymbolicLink()
+          || input.fileSystem.readFileSync(move.from, "utf-8") !== input.fileSystem.readFileSync(move.to, "utf-8")) {
+          throw new MigrationTransactionError(`Migration backup path already exists: ${move.to}`)
+        }
+        input.fileSystem.unlinkSync(move.from)
+      } else {
+        moveMigrationBackup(input.fileSystem, move.from, move.to)
       }
-      moveMigrationBackup(input.fileSystem, move.from, move.to)
     } else if (!input.fileSystem.existsSync(move.to)) {
       throw new MigrationTransactionError(`Migration source and backup are both missing: ${move.from}`)
     }

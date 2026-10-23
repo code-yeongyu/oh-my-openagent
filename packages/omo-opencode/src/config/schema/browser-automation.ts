@@ -1,11 +1,13 @@
 import { z } from "zod"
 
+export const BROWSER_PROVIDER_ERROR = "Unsupported browser provider; supported values: playwright, dev-browser, playwright-cli. Use the built-in browser path: Bun.WebView / playwright-core scripts"
+
 export const BrowserAutomationProviderSchema = z.enum([
   "playwright",
   "dev-browser",
   "playwright-cli",
 ], {
-  error: (issue) => `Browser provider ${JSON.stringify(issue.input)} is no longer supported; use the built-in browser path: Bun.WebView / playwright-core scripts`,
+  error: BROWSER_PROVIDER_ERROR,
 })
 
 export const BrowserAutomationConfigSchema = z.object({

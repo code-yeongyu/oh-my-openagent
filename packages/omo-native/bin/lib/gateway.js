@@ -40,7 +40,7 @@ export async function loadGatewayHost(importHost) {
     host = await load()
   } catch (error) {
     if (isMissingPackage(error)) return { status: "missing" }
-    return { status: "broken", reason: `cannot load ${GATEWAY_HOST_ENTRY}: ${error instanceof Error ? error.message : String(error)}` }
+    return { status: "broken", reason: `cannot load ${GATEWAY_HOST_ENTRY}; check the installed gateway package` }
   }
   if (host?.HOST_CONTRACT_VERSION !== GATEWAY_HOST_CONTRACT_VERSION) {
     return {
@@ -160,7 +160,7 @@ export async function gatewayDoctorLines(options = {}) {
   if (loaded.status === "broken") return [`FAIL gateway: ${loaded.reason}`]
   try {
     return ["PASS gateway: installed", ...(await loaded.host.gatewayDoctorLines({ env, cwd, ...PLUGIN_PATHS }))]
-  } catch (error) {
-    return ["PASS gateway: installed", `WARN gateway: the gateway's doctor rows failed: ${error instanceof Error ? error.message : String(error)}`]
+  } catch {
+    return ["PASS gateway: installed", "WARN gateway: the gateway's doctor rows failed; check the gateway configuration"]
   }
 }

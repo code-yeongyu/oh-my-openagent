@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { displayConfigIdentifier } from "@oh-my-opencode/omo-config-core"
 
 import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import type { CheckResult, DoctorIssue, SystemInfo } from "../framework/types"
@@ -82,7 +83,8 @@ export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Pro
   const loadedInfo = deps.getLoadedPluginVersion()
 
   const opencodeVersion = binaryInfo ? await deps.getOpenCodeVersion(binaryInfo.path) : null
-  const pluginVersion = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion ?? loadedInfo.loadedVersion
+  const version = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion ?? loadedInfo.loadedVersion
+  const pluginVersion = version === null ? null : displayConfigIdentifier(version)
 
   return {
     opencodeVersion,
@@ -140,12 +142,12 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
   }
 
   if (pluginInfo.entry && !pluginInfo.isLocalDev) {
-    const entryName = getPluginEntryName(pluginInfo.entry)
+    const entryName = displayConfigIdentifier(getPluginEntryName(pluginInfo.entry))
     const isLegacyName = entryName === LEGACY_PLUGIN_NAME
       || entryName.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 
     if (isLegacyName) {
-      const suggestedEntry = entryName.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME)
+      const suggestedEntry = displayConfigIdentifier(entryName.replace(LEGACY_PLUGIN_NAME, PLUGIN_NAME))
       issues.push({
         title: "Using legacy package name",
         description: `Your opencode.json references "${LEGACY_PLUGIN_NAME}" which has been renamed to "${PLUGIN_NAME}". The old name may stop working in a future release.`,

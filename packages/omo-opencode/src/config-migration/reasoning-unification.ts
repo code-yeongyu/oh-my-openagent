@@ -51,10 +51,7 @@ function conflictDiagnostic(record: Readonly<Record<string, unknown>>, path: rea
   const present = (["reasoning", "reasoningEffort", "variant"] as const).filter((key) => record[key] !== undefined)
   if (present.length < 2) return undefined
   const [keptKey, ...droppedKeys] = present
-  const keptValue = record[keptKey]
-  const dropped = droppedKeys.map((key) => [key, record[key]] as const)
-  const droppedText = dropped.map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(" ")
-  return `conflict: ${path.join(".")} dropped ${droppedText} kept ${keptKey}=${JSON.stringify(keptValue)}`
+  return `conflict: ${path.join(".")} dropped ${droppedKeys.join(" ")} kept ${keptKey}`
 }
 
 function normalizeDefinition(

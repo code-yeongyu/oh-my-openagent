@@ -44,9 +44,9 @@ describe("subscription provider rename migration", () => {
     expect(document).toEqual({ "anthropic-subscription": { tokenInjection: "config-dir" } })
   })
 
-  it("#given a rewrite #when diagnostics are read #then each names the path, the old id and the new id", () => {
+  it("#given a rewrite #when diagnostics are read #then each names the path without the value", () => {
     const { diagnostics } = transformSubscriptionProviderRename({ default_model: "openai-codex/gpt-6-astra" })
-    expect(diagnostics).toEqual(["$.default_model: openai-codex/gpt-6-astra renamed to chatgpt-subscription/gpt-6-astra"])
+    expect(diagnostics).toEqual(["$.default_model: subscription provider renamed"])
   })
 
   it("#given the shipped id #when read #then it is the stable recorded migration id", () => {

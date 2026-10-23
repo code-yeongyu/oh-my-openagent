@@ -1,4 +1,4 @@
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { displayConfigIdentifier, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { BUILTIN_AGENT_NAMES } from "./builtin/names"
 
@@ -24,6 +24,12 @@ export function categoryShadowedAgentNames(config: OmoConfig, agentNames: Iterab
 export function categoryShadowMessage(config: OmoConfig, name: string): string {
   const category = config.categories?.[name]
   const chain = category?.models ?? (category?.model === undefined ? undefined : [category.model])
-  const value = chain === undefined ? "[...]" : JSON.stringify(chain)
+  if (chain?.some((entry) => typeof entry !== "string" && Object.keys(entry).some((key) => key !== "model"))) {
+    const models = chain.map((entry) => displayConfigIdentifier(typeof entry === "string" ? entry : entry.model)).join(", ")
+    return `categories."${name}" is not read for subagent_type "${name}" spawns (models: ${models}). Move the complete categories."${name}" configuration to agents."${name}", including every model entry and its tuning/options; inspect omo.json for the full values. If you also use task(category: "${name}"), keep the category configuration too`
+  }
+  const value = chain === undefined ? "[...]" : JSON.stringify(chain.map((entry) =>
+    typeof entry === "string" ? displayConfigIdentifier(entry) : { model: displayConfigIdentifier(entry.model) },
+  ))
   return `categories."${name}" is not read for subagent_type "${name}" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "${name}": { "models": ${value} } }. If you also use task(category: "${name}") on purpose, the key keeps working there; giving the agent its own models silences this warning`
 }

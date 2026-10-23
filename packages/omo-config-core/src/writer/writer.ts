@@ -81,7 +81,8 @@ function writeAtomically(path: string, content: string, fileSystem: typeof DEFAU
   const tempPath = `${path}.${randomUUID()}.tmp`
   let tempCreated = false
   try {
-    fileSystem.writeFileExclusiveSync(tempPath, content)
+    const mode = fileSystem.existsSync(path) ? fileSystem.lstatSync(path).mode : undefined
+    fileSystem.writeFileExclusiveSync(tempPath, content, mode === undefined ? undefined : mode & 0o777)
     tempCreated = true
     fileSystem.renameSync(tempPath, path)
   } catch (error) {

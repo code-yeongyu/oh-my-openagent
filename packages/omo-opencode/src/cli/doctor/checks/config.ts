@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../../../config"
+import { displayConfigIdentifier } from "@oh-my-opencode/omo-config-core"
 import { validatePluginConfig } from "../../../config/validate"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../framework/constants"
 import type { CheckResult, DoctorIssue } from "../framework/types"
@@ -71,7 +72,7 @@ function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
   for (const invalidAgent of invalidAgentOverrides) {
     issues.push({
       title: `Invalid agent override: ${invalidAgent.name}`,
-      description: `Override '${invalidAgent.userOverride}' must be in provider/model format.`,
+      description: `Override '${displayConfigIdentifier(invalidAgent.userOverride!)}' must be in provider/model format.`,
       severity: "warning",
       affects: [invalidAgent.name],
     })
@@ -80,7 +81,7 @@ function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
   for (const invalidCategory of invalidCategoryOverrides) {
     issues.push({
       title: `Invalid category override: ${invalidCategory.name}`,
-      description: `Override '${invalidCategory.userOverride}' must be in provider/model format.`,
+      description: `Override '${displayConfigIdentifier(invalidCategory.userOverride!)}' must be in provider/model format.`,
       severity: "warning",
       affects: [invalidCategory.name],
     })
@@ -93,7 +94,7 @@ function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
       ...resolution.categories.map((category) => category.userOverride),
     ]
       .filter((value): value is string => Boolean(value))
-      .map((value) => value.split("/")[0])
+      .map((value) => displayConfigIdentifier(value).split("/")[0])
       .filter((provider) => provider.length > 0 && !providerSet.has(provider))
 
     if (unknownProviders.length > 0) {

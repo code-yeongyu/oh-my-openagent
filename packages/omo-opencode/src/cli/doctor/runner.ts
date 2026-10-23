@@ -18,12 +18,12 @@ export async function runCheck(check: CheckDefinition): Promise<CheckResult> {
     const result = await check.check()
     result.duration = Math.round(performance.now() - start)
     return result
-  } catch (err) {
+  } catch {
     return {
       name: check.name,
       status: "fail",
-      message: err instanceof Error ? err.message : "Unknown error",
-      issues: [{ title: check.name, description: String(err), severity: "error" }],
+      message: "Check failed unexpectedly",
+      issues: [{ title: check.name, description: "Check failed unexpectedly; check its configuration and file permissions.", severity: "error" }],
       duration: Math.round(performance.now() - start),
     }
   }

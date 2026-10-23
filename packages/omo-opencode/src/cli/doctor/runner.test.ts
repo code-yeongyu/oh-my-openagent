@@ -63,7 +63,7 @@ describe("runner", () => {
 
       //#then
       expect(result.status).toBe("fail")
-      expect(result.message).toBe("boom")
+      expect(result.message).toBe("Check failed unexpectedly")
       expect(result.issues[0]?.title).toBe("System")
       expect(result.issues[0]?.severity).toBe("error")
       expect(typeof result.duration).toBe("number")

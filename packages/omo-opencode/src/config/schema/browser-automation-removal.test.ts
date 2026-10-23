@@ -5,7 +5,7 @@ import { BuiltinSkillNameSchema } from "./agent-names"
 
 // A migration input, never a shipped tool instruction.
 const removedProvider = ["agent", "browser"].join("-")
-const replacement = "use the built-in browser path: Bun.WebView / playwright-core scripts"
+const replacement = "supported values: playwright, dev-browser, playwright-cli. Use the built-in browser path: Bun.WebView / playwright-core scripts"
 
 describe("browser provider removal", () => {
   test("rejects the removed provider with an actionable diagnostic", () => {
@@ -18,7 +18,7 @@ describe("browser provider removal", () => {
     if (result.success) throw new Error("Removed provider was accepted")
     expect(result.error.issues).toMatchObject([{
       code: "invalid_value",
-      message: `Browser provider ${JSON.stringify(input)} is no longer supported; ${replacement}`,
+      message: `Unsupported browser provider; ${replacement}`,
     }])
   })
 
@@ -32,7 +32,7 @@ describe("browser provider removal", () => {
     if (result.success) throw new Error("Removed provider was accepted")
     expect(result.error.issues).toMatchObject([{
       path: ["browser_automation_engine", "provider"],
-      message: `Browser provider ${JSON.stringify(removedProvider)} is no longer supported; ${replacement}`,
+      message: `Unsupported browser provider; ${replacement}`,
     }])
   })
 

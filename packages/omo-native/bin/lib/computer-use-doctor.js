@@ -86,8 +86,7 @@ export async function doctorComputerUseLines(options = {}) {
       timeoutMs: options.timeoutMs,
     })
     return formatComputerUseDoctorLines(report)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return [`WARN computer use: diagnostics unavailable: ${message}`]
+  } catch {
+    return ["WARN computer use: diagnostics unavailable; check the computer configuration and installed runtime"]
   }
 }

@@ -50,8 +50,8 @@ export function warningsForSettings() {
   let settings
   try {
     settings = JSON.parse(readFileSync(settingsPath, "utf8"))
-  } catch (error) {
-    return [`WARN could not parse ${settingsPath}: ${error.message}`]
+  } catch {
+    return [`WARN could not parse ${settingsPath}: invalid or unreadable JSON`]
   }
 
   const packages = Array.isArray(settings?.packages) ? settings.packages : []

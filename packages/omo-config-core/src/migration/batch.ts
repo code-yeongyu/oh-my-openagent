@@ -93,7 +93,7 @@ function plannedTargetBackupPath(targetPath: string, clock: MigrationClock, file
 }
 
 function ensureBackupDirectories(moves: readonly MigrationBackupMove[], fileSystem: MigrationFileSystem): void {
-  for (const move of moves) fileSystem.mkdirSync(directoryPath(move.to), { recursive: true })
+  for (const move of moves) fileSystem.mkdirSync(directoryPath(move.to), { recursive: true, mode: 0o700 })
 }
 
 function transformResult(value: ReturnType<MigrationPlan["transform"]>): {

@@ -6,11 +6,6 @@ export type NoClobberMergeResult = {
   readonly merged: Record<string, unknown>
 }
 
-function displayValue(value: unknown): string {
-  const encoded = JSON.stringify(value)
-  return encoded === undefined ? String(value) : encoded
-}
-
 function displayPath(path: readonly string[]): string {
   return path.join(".")
 }
@@ -54,7 +49,7 @@ function mergeInto(
       continue
     }
 
-    diagnostics.push(`skipped: ${displayPath(nextPath)} legacy=${displayValue(legacyValue)} kept=${displayValue(keptValue)}`)
+    diagnostics.push(`skipped: ${displayPath(nextPath)}`)
   }
 
   return additions

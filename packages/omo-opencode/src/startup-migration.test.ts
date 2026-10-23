@@ -152,7 +152,7 @@ describe("runOpenCodeStartupMigration", () => {
         if (boundary === "target-recorded") throw new Error("crash after target recorded")
       },
     })
-    expect(crashed.error).toBe("crash after target recorded")
+    expect(crashed.error).toBe("Configuration migration failed; check the source and target config files")
     expect(parseFile(fileSystem, `${homeDir}/.omo/.migration-journal.json`).targetWritten).toBe(true)
     fileSystem.backupRenameErrorCode = "EXDEV"
 

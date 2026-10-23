@@ -257,7 +257,7 @@ describe("createConfigStartupComponent", () => {
         type: "info",
       },
       {
-        message: "OmO Native: configuration migration: skipped: [opencode].model_fallback legacy=true kept=false",
+        message: "OmO Native: configuration migration: skipped: [opencode].model_fallback",
         type: "warning",
       },
     ])

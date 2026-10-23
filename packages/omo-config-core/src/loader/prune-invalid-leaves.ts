@@ -1,4 +1,5 @@
 import type * as z from "zod"
+import { configIssueSummary } from "./diagnostic-values"
 
 /**
  * Bounded surgical pruning of invalid config values.
@@ -125,7 +126,11 @@ function prunePass(
     for (const path of targetPaths(root, issue)) {
       if (path.length === 0) return null
       const key = path.map((segment) => String(segment)).join(".")
-      if (!byKey.has(key)) byKey.set(key, { key, message: issue.message, path })
+      const summary = configIssueSummary(issue)
+      const message = path.length < issue.path.length
+        ? `${summary} at ${segmentsOf(issue.path).join(".")}`
+        : summary
+      if (!byKey.has(key)) byKey.set(key, { key, message, path })
     }
   }
   const targets = [...byKey.values()]

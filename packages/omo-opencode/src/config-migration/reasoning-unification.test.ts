@@ -22,7 +22,7 @@ describe("2026-08 reasoning unification migration", () => {
     // then
     expect(REASONING_UNIFICATION_MIGRATION_ID).toBe("2026-08-reasoning-unification")
     expect(result.document).toEqual(fixtureExpected)
-    expect(result.diagnostics).toContain('conflict: categories.conflict dropped variant="high" kept reasoningEffort="xhigh"')
+    expect(result.diagnostics).toContain("conflict: categories.conflict dropped variant kept reasoningEffort")
   })
 
   test("#given canonical reasoning outranking legacy keys #when transformed #then the journal reports reasoning as the winner", () => {
@@ -35,7 +35,8 @@ describe("2026-08 reasoning unification migration", () => {
     // then the migrated value is the canonical winner, and the journal does not claim the legacy key won
     expect(result.document.categories?.odd).toMatchObject({ reasoning: "low" })
     const journal = result.diagnostics.find((entry) => entry.includes("conflict")) ?? ""
-    expect(journal).not.toContain('kept reasoningEffort="xhigh"')
+    expect(journal).toContain("kept reasoning")
+    expect(journal).not.toContain("kept reasoningEffort")
   })
 
   test("#given an existing user omo config #when planned and executed #then dry-run, backup, journaled execution, and marker use the existing engine", () => {
@@ -76,7 +77,7 @@ describe("2026-08 reasoning unification migration", () => {
       expect(dryRun.preview?.transform).toEqual(fixtureExpected)
       expect(migrated.status).toBe("migrated")
       expect(document).toEqual({ ...fixtureExpected, _migrations: [REASONING_UNIFICATION_MIGRATION_ID] })
-      expect(journalDiagnostics).toContain('conflict: categories.conflict dropped variant="high" kept reasoningEffort="xhigh"')
+      expect(journalDiagnostics).toContain("conflict: categories.conflict dropped variant kept reasoningEffort")
       expect(readdirSync(join(homeDir, ".omo")).some((name) => name.startsWith("omo.jsonc.bak."))).toBe(true)
     } finally {
       rmSync(root, { force: true, recursive: true })

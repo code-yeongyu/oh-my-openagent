@@ -64,7 +64,7 @@ export function piConfigReport(options = {}) {
   const homeDir = options.homeDir ?? runtimeHome(env)
   try {
     return formatPiConfigLines(agentDir, findPiConfigEdits({ agentDir, homeDir }))
-  } catch (error) {
-    return [`INFO config dir: ${agentDir}`, `WARN could not check ${join(homeDir, ".pi", "agent")} for config edits: ${error.message}`]
+  } catch {
+    return [`INFO config dir: ${agentDir}`, `WARN could not check ${join(homeDir, ".pi", "agent")} for config edits: unreadable config files`]
   }
 }

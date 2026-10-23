@@ -15,12 +15,8 @@ export async function doctor(options: DoctorOptions = { mode: "default" }): Prom
   }
 }
 
-export function formatDoctorFailure(error: unknown): string[] {
-  const message = error instanceof Error ? error.message : String(error)
-  const lines = [`\nDoctor failed unexpectedly: ${message}`]
-  if (error instanceof Error && error.stack) {
-    lines.push(error.stack)
-  }
+export function formatDoctorFailure(_error: unknown): string[] {
+  const lines = ["\nDoctor failed unexpectedly; check configuration and file permissions."]
   lines.push(`Try: OMO_DISABLE_POSTHOG=1 bunx ${PUBLISHED_PACKAGE_NAME} doctor --verbose\n`)
   return lines
 }

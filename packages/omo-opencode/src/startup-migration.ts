@@ -2,6 +2,7 @@ import { posix } from "node:path"
 
 import {
   runMigrations,
+  migrationDiagnosticError,
   type MigrationBoundary,
   type MigrationClock,
   type MigrationEnvironment,
@@ -113,7 +114,7 @@ export function runOpenCodeStartupMigration(
     }
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : String(error),
+      error: migrationDiagnosticError(error),
       journalResumed: false,
       migratedFrom: [],
       reloadRequired: false,
