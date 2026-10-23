@@ -277,7 +277,7 @@ describe("reflection and dream run reconciliation", () => {
 
   test.each([
     ["final", true], ["final", false], ["abandoned", true], ["abandoned", false],
-  ] as const)("#given a retired %s run dir with prelaunch=%s shadowing a newer dead-launcher reservation #when reconciled #then pending is promoted", async (terminal, hasPrelaunch) => {
+  ] as const)("#given a retired %s run dir with prelaunch=%p shadowing a newer dead-launcher reservation #when reconciled #then pending is promoted", async (terminal, hasPrelaunch) => {
     // given: the terminal directory predates the reservation holding the same run id.
     // Abandonment writes abandonedAt and leaves the ledger without finalization fields.
     const item = await fixture()
@@ -336,7 +336,7 @@ describe("reflection and dream run reconciliation", () => {
   test.each([
     ["final", undefined], ["final", "invalid"], ["final", 123], ["final", null],
     ["abandoned", undefined], ["abandoned", "invalid"], ["abandoned", 123], ["abandoned", null],
-  ] as const)("#given %s has invalid terminal timestamp %s #when reconciled #then the reservation is released, the finished run is not quarantined and its artifact is untouched", async (terminal, timestamp) => {
+  ] as const)("#given %s has invalid terminal timestamp %p #when reconciled #then the reservation is released, the finished run is not quarantined and its artifact is untouched", async (terminal, timestamp) => {
     const item = await fixture()
     await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
     const path = join(item.runDir, `${terminal}.json`)
