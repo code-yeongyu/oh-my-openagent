@@ -9,6 +9,7 @@ import { appendFile, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parseArgs } from "node:util"
+import { AssetDownloadError, downloadAssetFile, formatDownloadFailureSummary } from "./mirror-download"
 import { betasToPrune, MirrorPlanError, parseSha256Sums, planMirrorAssets, shouldMoveChannel, VERSION_PATTERN } from "./mirror-plan"
 import { putVerified, type R2Credentials } from "./r2-signed-put"
 import { createR2Store, type R2Store } from "./r2-store"
@@ -42,10 +43,14 @@ async function readRelease(tag: string): Promise<{ readonly assets?: unknown }> 
   return (await response.json()) as { readonly assets?: unknown }
 }
 
+// Asset downloads carry their own retry policy (#9221): 5xx and network errors back off exponentially
+// for up to ~10 minutes per asset, 4xx fails immediately. Do not wrap them in withRetry, which would
+// stack a second, shorter retry loop on top and hide the last status.
 async function downloadAsset(tag: string, name: string, path: string): Promise<void> {
-  const response = await fetch(`https://github.com/${REPO}/releases/download/${tag}/${name}`)
-  if (!response.ok) throw new Error(`download ${name}: HTTP ${response.status}`)
-  await Bun.write(path, response)
+  await downloadAssetFile(`https://github.com/${REPO}/releases/download/${tag}/${name}`, name, path, {
+    onRetry: ({ attempt, status, delayMs }) =>
+      console.log(`[mirror] download ${name} attempt ${attempt} failed (${status === null ? "network error" : `HTTP ${status}`}); retrying in ${Math.round(delayMs / 1000)}s`),
+  })
 }
 
 async function inBatches<T>(items: readonly T[], width: number, run: (item: T) => Promise<void>): Promise<void> {
@@ -109,9 +114,9 @@ async function main(): Promise<void> {
       size: Number(asset.size),
       digest: typeof asset.digest === "string" ? asset.digest : null,
     }))
-    await withRetry("download SHA256SUMS", () => downloadAsset(tag, "SHA256SUMS", join(work, "SHA256SUMS")))
+    await downloadAsset(tag, "SHA256SUMS", join(work, "SHA256SUMS"))
     const plan = planMirrorAssets(assets, parseSha256Sums(await Bun.file(join(work, "SHA256SUMS")).text()))
-    await inBatches(plan, UPLOAD_CONCURRENCY, (asset) => withRetry(`download ${asset.name}`, () => downloadAsset(tag, asset.name, join(work, asset.name))))
+    await inBatches(plan, UPLOAD_CONCURRENCY, (asset) => downloadAsset(tag, asset.name, join(work, asset.name)))
     log(`plan: ${plan.length} assets, ${(plan.reduce((sum, asset) => sum + asset.size, 0) / 1e9).toFixed(2)} GB`)
     for (const asset of plan) {
       const local = await sha256File(join(work, asset.name))
@@ -175,6 +180,16 @@ async function main(): Promise<void> {
       }
     }
     log("done")
+  } catch (error) {
+    // On a final download failure the job summary must name the asset and its last status (#9221).
+    if (error instanceof AssetDownloadError && process.env.GITHUB_STEP_SUMMARY) {
+      try {
+        await appendFile(process.env.GITHUB_STEP_SUMMARY, `${formatDownloadFailureSummary(error)}\n`)
+      } catch (summaryError) {
+        console.log(`[mirror] could not write the job summary: ${String(summaryError).split("\n")[0]}`)
+      }
+    }
+    throw error
   } finally {
     await rm(work, { recursive: true, force: true })
     if (dryRun) {
