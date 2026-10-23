@@ -222,4 +222,48 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(retryCalls).toBe(0)
     expect(replacementState.currentModel).toBe("google/gemini-2.5-pro")
   })
+
+  test("#given a newer generation's dispatch owns the session #when the timeout dispatch is refused as superseded #then the newer dispatch keeps its ownership", async () => {
+    // given
+    const sessionID = "session-timeout-superseded-by-newer-dispatch"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    deps.sessionStates.set(sessionID, createFallbackState("openai/gpt-5.4"))
+    const newerState = createFallbackState("openai/gpt-5.4")
+    newerState.currentModel = "google/gemini-2.5-pro"
+    newerState.pendingFallbackModel = "google/gemini-2.5-pro"
+    let resolveRetry: (() => void) | undefined
+    const retryCalled = new Promise<void>((resolve) => {
+      resolveRetry = resolve
+    })
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async () => {},
+      async () => {
+        // The state is replaced while this dispatch awaits the network, and a newer dispatch takes the session.
+        deps.sessionStates.set(sessionID, newerState)
+        deps.sessionRetryInFlight.add(sessionID)
+        deps.sessionAwaitingFallbackResult.add(sessionID)
+        resolveRetry?.()
+        return { accepted: false, status: "superseded", reason: "stale fallback generation" }
+      },
+    )
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await Promise.race([
+      retryCalled,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("timer did not fire")), 1000)
+      }),
+    ])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // then
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+    expect(newerState.pendingFallbackModel).toBe("google/gemini-2.5-pro")
+    expect(newerState.currentModel).toBe("google/gemini-2.5-pro")
+    helpers.clearSessionFallbackTimeout(sessionID)
+  })
 })

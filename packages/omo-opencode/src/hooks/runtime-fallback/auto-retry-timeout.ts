@@ -100,7 +100,8 @@ export function createFallbackTimeoutHelpers(
         const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
         if (!dispatchOutcome.accepted) {
           restoreFallbackState(state, stateSnapshot)
-          deps.sessionAwaitingFallbackResult.delete(sessionID)
+          // A superseded refusal acquired nothing: the awaiting flag belongs to the newer dispatch that took the session.
+          if (dispatchOutcome.status !== "superseded") deps.sessionAwaitingFallbackResult.delete(sessionID)
           log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
             sessionID,
             status: dispatchOutcome.status,
