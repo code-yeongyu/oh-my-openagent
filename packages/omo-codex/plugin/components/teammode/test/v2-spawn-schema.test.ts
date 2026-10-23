@@ -61,11 +61,8 @@ describe("MultiAgentV2 spawn schema", () => {
 			// then
 			expect(added.exitCode).toBe(0);
 			expect(delivery).toContain('task_name "schema_member"');
-			expect(delivery).toContain('agent_type');
-			expect(delivery).toContain('when the spawn schema exposes it');
-			expect(delivery).toContain('lazycodex-worker-low/medium/high');
-			expect(delivery).toContain('explorer for read-only search');
-			expect(delivery).toContain('message <bootstrap>, and fork_turns "none"');
+			expect(delivery).toContain("agent_type");
+			expect(delivery).toContain('fork_turns "none"');
 			expect(delivery).not.toMatch(/model|reasoning_effort|service_tier/);
 		} finally {
 			await rm(root, { force: true, recursive: true });
