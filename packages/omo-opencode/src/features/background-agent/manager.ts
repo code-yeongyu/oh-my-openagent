@@ -1426,8 +1426,22 @@ The fallback retry session is now created and can be inspected directly.
     }).catch((error: unknown) => {
       this.logger("[background-agent] Queued resume was not admitted:", { taskId: existingTask.id, error: error instanceof Error ? error.message : String(error) })
       if (this.shutdownTriggered || existingTask.status !== "pending" || existingTask.pendingResume !== resumeToken) return
+      const failure: BackgroundTask = {
+        ...existingTask,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+        completedAt: new Date(),
+        pendingResume: undefined,
+      }
       existingTask.pendingResume = undefined
       this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, "unavailable")
+      this.markForNotification(failure)
+      this.enqueueNotificationForParent(failure.parentSessionId, () => this.notifyParentSession(failure)).catch((notificationError: unknown) => {
+        this.logger("[background-agent] Failed to notify on queued resume error:", {
+          taskId: failure.id,
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+        })
+      })
     })
     return existingTask
   }

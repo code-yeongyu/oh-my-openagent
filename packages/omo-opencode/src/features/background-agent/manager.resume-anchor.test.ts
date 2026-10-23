@@ -9,6 +9,7 @@ import { clearPromptReservationsForTesting } from "@oh-my-opencode/utils/prompt-
 import { clearRecentPromptDispatchesForTesting } from "@oh-my-opencode/utils/prompt-async-gate/recent-dispatches"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
+import { withTimeout } from "../../shared/with-timeout"
 
 const SESSION = "ses_resumed"
 const WORKTREE = mkdtempSync(join(tmpdir(), "resume-anchor-"))
@@ -241,25 +242,31 @@ describe("resuming a completed background task", () => {
     expect(aborts).toHaveLength(0)
   })
 
-  test("restores a queued resume whose messages cannot be read at admission", async () => {
+  test.each(failedReads)("reports failure and restores a queued resume when its admission read %s", async (_label, read) => {
     // given
     const { manager, task, session } = setup()
+    const reported = Promise.withResolvers<BackgroundTask>()
+    manager["notifyParentSession"] = async (notification) => { reported.resolve(notification) }
     let prompts = 0
     session.promptAsync = async () => { prompts += 1; return { data: {} } }
     const slots = manager["concurrencyManager"]
     await slots.acquire("explore")
-    await manager.resume(resumeInput)
-    session.messages = () => Promise.reject(new TypeError("fetch failed"))
+    await manager.resume({ ...resumeInput, parentSessionId: "ses_requesting_parent" })
+    session.messages = read
 
     // when
     slots.release("explore")
-    await new Promise((resolve) => setImmediate(resolve))
+    const notification = await withTimeout(reported.promise, 6_000, "Queued resume failure never notified its caller")
 
     // then
     expect(task.status).toBe("completed")
     expect(slots.getCount("explore")).toBe(0)
     expect(prompts).toBe(0)
-  })
+    expect(notification.status).toBe("error")
+    expect(notification.error).toBeTruthy()
+    expect(notification.parentSessionId).toBe("ses_requesting_parent")
+    expect(task.parentSessionId).toBe(resumeInput.parentSessionId)
+  }, 10_000)
 
   test("rejects the resume when the manager shuts down while the messages are read", async () => {
     // given
