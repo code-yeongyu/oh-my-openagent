@@ -50,6 +50,19 @@ untouched: `script/agent/qa-docker.sh` (see [references/docker-qa.md](references
 The local scripts below are the fallback for when Docker is unavailable or on
 Windows.
 
+### Optional LSP freshness budget
+
+The shipped LSP MCP manifest forwards
+`OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS` through `env_vars`. For diagnostics
+QA, set it in the isolated app-server environment before starting a fresh
+QA-owned daemon and record the value actually received by the child.
+Compare the unset 3,000 ms default with a value such as `6000`; valid values
+are positive integer milliseconds up to 2,147,483,647, and invalid values keep
+the default. Keep the isolated `CODEX_HOME`, local mock model and real-config
+digest checks. Never restart the user's daemon or assume an existing daemon
+picked up a changed export. See the repository's
+`packages/lsp-tools-mcp/README.md`; the separate total request limit still applies.
+
 ## Router: pick your case
 
 | You need to… | Run | Deep dive |

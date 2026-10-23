@@ -51,6 +51,7 @@ export async function hangAfterEnqueue(tx, binding) {
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   const result = await tx.enqueue({ binding_id: bound.binding.binding_id, event_id: binding.binding.chat_id, text: "hello" })
   if (result.kind !== "ok") throw new Error(JSON.stringify(result))
+  console.log(JSON.stringify({ enqueuedBeforeCommit: true }))
   return new Promise(() => {})
 }
 

@@ -141,6 +141,13 @@ All harnesses delegate to these scripts:
 
 The single source of truth is the `script/agent/` dev-environment contract: `setup.sh`, `cleanup.sh`, and harness launchers such as `cleanup-hook.sh`. Maintenance means keeping those scripts, harness wiring files, and pinned Dockerfile versions in sync.
 
+For slow language servers, optionally export
+`OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS=6000` before launching the harness or
+shared daemon. Unset or invalid values keep the 3,000 ms default; valid values
+are positive integer milliseconds up to 2,147,483,647. Restart an existing
+daemon after changing it. The separate total request limit still applies; see
+the [LSP runtime guidance](packages/lsp-tools-mcp/README.md).
+
 ## Credentials & Isolation
 
 `.env.example` is the committed injection point. Copy it to `.env` (gitignored) once and fill in your keys:
@@ -150,6 +157,12 @@ The single source of truth is the `script/agent/` dev-environment contract: `set
 - `OPENCODE_SERVER_PASSWORD` (optional)
 
 Both `setup.sh` and `qa-sandbox.sh` auto-source `.env`, so credentials are set once per machine and never prompted again.
+
+The optional LSP freshness budget is runtime tuning, not a credential. Set it
+explicitly in the isolated process used for a custom-budget check; an export
+in the host shell does not prove that a Docker, MCP or daemon child received it.
+Keep the same isolated homes and local mock providers for both unset-default
+and configured-budget checks, and record the effective child value.
 
 For QA isolation, run:
 

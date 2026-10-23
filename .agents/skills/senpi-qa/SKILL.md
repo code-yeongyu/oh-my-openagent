@@ -68,6 +68,18 @@ TASK_E2E_OUT_DIR="$ev/live-task-dag" SENPI_BIN="$(command -v senpi)" \
   node packages/omo-senpi/scripts/qa/task-e2e.mjs
 ```
 
+## Optional LSP freshness budget
+
+Custom diagnostics probes may set
+`OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS=6000` in the isolated engine/MCP
+process before launch. The unset or invalid-value default is 3,000 ms; valid
+values are positive integer milliseconds up to 2,147,483,647. Restart only the
+QA-owned daemon after changing it. The drivers construct minimal environments,
+so a host export alone does not prove that a child received this setting.
+Record its effective value and diagnostic result, keeping isolated agent dirs,
+protected-home certification and changed-path fields. See the repository's
+`packages/lsp-tools-mcp/README.md`; the separate total request limit still applies.
+
 ## Package gate
 
 ```bash

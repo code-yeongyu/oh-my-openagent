@@ -33,6 +33,7 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	assert.equal(lspServer.command, "node");
 	assert.deepEqual(lspServer.args, ["../../lsp-daemon/dist/cli.js", "mcp"]);
 	assert.equal(lspServer.cwd, ".");
+	assert.deepEqual(lspServer.env_vars, ["OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS"]);
 	assert.equal(Object.hasOwn(mcp.mcpServers, "ast_grep"), false);
 	assert.equal(gitBashServer.command, "node");
 	assert.deepEqual(gitBashServer.args, ["../../git-bash-mcp/dist/cli.js", "mcp"]);
