@@ -30,6 +30,7 @@ export function outputPathsIn(root) {
     claimReceiptOutputPath: join(root, "omo-claim-receipt.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(root, "gateway-store-worker.mjs"),
+    gatewayRulesExtensionOutputPath: join(root, "gateway-rules-extension.mjs"),
     threadSdkOutputPath: join(root, "runtime", "thread-sdk", "sdk.js"),
   }
 }
