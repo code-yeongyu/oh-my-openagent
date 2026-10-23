@@ -375,13 +375,17 @@ Because identity is per installation, a shared machine conflates its users into 
 Every event carries two shared attribution properties as of schema version 3:
 
 - `surface` is `cli` for standalone CLI sessions, or `desktop` when the runtime is embedded in OmO Desktop. The Desktop host sets `OMO_NATIVE_SURFACE=desktop` in the child environment; anything else is the CLI. A Desktop-driven turn is Desktop usage, not CLI adoption, and must never be counted as one.
-- The install id is a random 64-hex value stored (like the session-id salt) under the agent home at `omo-senpi/omo-native/install-id`, created with mode 0600 on first use. It is generated locally and derived from nothing: not the hostname, not hardware, not accounts. The standalone CLI and the Desktop-bundled runtime on one machine converge on the same file, which is what joins the two surfaces without fingerprinting the machine. A valid `OMO_NATIVE_INSTALL_ID` env value overrides the file, so a Desktop host can pin a remote (SSH/WSL) runtime to the local installation's id; a malformed override is ignored.
+- The install id is a random 64-hex value stored once per user at `~/.omo/agent/omo-senpi/omo-native/install-id` (the user's home, whatever agent home a process resolves), created with mode 0600 on first use. It is generated locally and derived from nothing: not the hostname, not hardware, not accounts. The standalone CLI and OmO Desktop (and its bundled runtime) on one machine read the same file, which is what joins the two surfaces without fingerprinting the machine. An agent-dir override (`OMO_CODING_AGENT_DIR` / `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) does not change the id. Releases before 5.1.44 kept the file under the resolved agent home; an id found there is copied once into the per-user file, so existing installs keep their id, except on a machine where the CLI and Desktop already held two different ids: there the CLI takes the Desktop's id once ([#10934](https://github.com/code-yeongyu/oh-my-openagent/issues/10934)). A valid `OMO_NATIVE_INSTALL_ID` env value overrides the file, so a Desktop host can pin a remote (SSH/WSL) runtime to the local installation's id; a malformed override is ignored.
 
 Schema version 3 sent this value raw as the `install_id` property; schema version 4 sends only its hash (`install_hash`). Rows written before schema version 3 carry neither property. Segment on `schema_version` when mixing eras.
 
 ### CI attribution
 
-Every event carries `ci`: `true` when the process runs with the `CI` environment variable set to anything other than empty, `0` or `false` (the convention GitHub Actions and most CI runners follow), else `false`. It lets analysis separate automated runs from people; it does not turn telemetry off. Rows written before this field existed carry no `ci`.
+Every event carries `ci`: `true` when the process runs with the `CI` environment variable set to anything other than empty, `0` or `false` (the convention GitHub Actions and most CI runners follow), else `false`. It lets analysis separate automated runs from people. Rows written before this field existed carry no `ci`.
+
+### Automated runs are not sent
+
+As of 5.1.44, OmO Native sends nothing by default from a run that cannot hold a stable anonymous id, because each such run would count as a new person ([#10934](https://github.com/code-yeongyu/oh-my-openagent/issues/10934)): when `CI` is set (as above), under a test runner (`NODE_ENV=test`, `VITEST`, `JEST_WORKER_ID`), or when the home directory itself is inside the OS temp directory. `OMO_TELEMETRY_ALLOW_AUTOMATION=1` opts a deliberate run back in; every opt-out below still wins.
 
 ### Event ids
 

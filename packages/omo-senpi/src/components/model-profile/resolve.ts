@@ -2,6 +2,7 @@ import { resolveModelForDelegateTask, type DelegateFallbackEntry } from "@oh-my-
 import type { OmoFallbackModelObject, OmoModelProfile } from "@oh-my-opencode/omo-config-core"
 
 import { BUILTIN_MODEL_PROFILES } from "./builtin-profiles"
+import type { DeclaredModelProvider } from "./custom-providers"
 
 export type ModelProfileSource = "builtin" | "user" | "pin"
 
@@ -33,6 +34,8 @@ export type ResolveModelProfileInput = {
   readonly active: string
   /** The flat `provider/id` list the live senpi registry reports. */
   readonly availableModels: readonly string[]
+  /** `customModelProviders`: models.json providers with their declared model ids, in declaration order. */
+  readonly customProviders?: readonly DeclaredModelProvider[]
 }
 
 export type ModelProfileResolution =
@@ -176,15 +179,33 @@ function matchScopedUserRung(rung: ModelProfileRung, availableModels: ReadonlySe
   return undefined
 }
 
+// A builtin rung falls back to a provider the user declared in models.json only on a model id the
+// user declared for it, served as the exact `<provider>/<model id>`: a gateway's re-published copy
+// carries a vendor-prefixed id, an undeclared provider is not in the list, and a built-in catalog
+// extended with other models does not serve this one, so #9146 still holds.
+function matchCustomProvider(
+  rung: ModelProfileRung,
+  availableModels: ReadonlySet<string>,
+  customProviders: readonly DeclaredModelProvider[],
+): RungMatch | undefined {
+  const declared = customProviders
+    .filter(({ provider, modelIds }) => !rung.providers.includes(provider) && modelIds.includes(rung.model))
+    .map(({ provider }) => provider)
+  return matchScopedUserRung({ ...rung, providers: declared }, availableModels)
+}
+
 function matchProfileRung(
   rung: ModelProfileRung,
   availableModels: ReadonlySet<string>,
   definition: ModelProfileDefinition,
+  customProviders: readonly DeclaredModelProvider[],
 ): RungMatch | undefined {
   if (definition.profile.source === "user" && rung.providers.length > 0) {
     return matchScopedUserRung(rung, availableModels)
   }
-  return matchRung(rung, availableModels)
+  const listed = matchRung(rung, availableModels)
+  if (listed !== undefined || definition.profile.source !== "builtin") return listed
+  return matchCustomProvider(rung, availableModels, customProviders)
 }
 
 /**
@@ -221,7 +242,7 @@ export function resolveModelProfile(input: ResolveModelProfileInput): ModelProfi
   const skipped: string[] = []
   if (availableModels.size > 0) {
     for (const rung of definition.models) {
-      const match = matchProfileRung(rung, availableModels, definition)
+      const match = matchProfileRung(rung, availableModels, definition, input.customProviders ?? [])
       if (match !== undefined) {
         return { kind: "resolved", profile: definition.profile, ...match, skipped }
       }

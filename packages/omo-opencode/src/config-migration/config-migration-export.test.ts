@@ -8,6 +8,8 @@ const ENTRY_POINT = join(import.meta.dir, "index.ts")
 const BINARY_DOWNLOADER_ENTRY_POINT = join(import.meta.dir, "..", "shared", "binary-downloader.ts")
 // omo#10630: the Senpi memory sync resolver reads the CLI sign-in through this third public subpath.
 const SERVICE_AUTH_ENTRY_POINT = join(import.meta.dir, "..", "cli", "service-auth", "index.ts")
+// #10315: the Senpi adapter loads the gateway -> dori rename lazily through this third public subpath.
+const DORI_SECTION_RENAME_ENTRY_POINT = join(import.meta.dir, "dori-section-rename.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
 const NEGATIVE_FIXTURE_ENTRY_POINT = join(import.meta.dir, "..", "..", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
@@ -98,6 +100,10 @@ describe("config-migration public subpath", () => {
         import: "./src/config-migration/index.ts",
         types: "./src/config-migration/index.ts",
       },
+      "./config-migration/dori-section-rename": {
+        import: "./src/config-migration/dori-section-rename.ts",
+        types: "./src/config-migration/dori-section-rename.ts",
+      },
       "./binary-downloader": {
         import: "./src/shared/binary-downloader.ts",
         types: "./src/shared/binary-downloader.ts",
@@ -112,6 +118,7 @@ describe("config-migration public subpath", () => {
   test.each([
     ["binary-downloader", BINARY_DOWNLOADER_ENTRY_POINT],
     ["service-auth", SERVICE_AUTH_ENTRY_POINT],
+    ["dori-section-rename", DORI_SECTION_RENAME_ENTRY_POINT],
   ])("#given the %s entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", (_name, entryPoint) => {
     // given
     const modules = moduleGraph(entryPoint)

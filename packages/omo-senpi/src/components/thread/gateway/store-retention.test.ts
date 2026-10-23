@@ -18,7 +18,7 @@ afterEach(async () => {
 
 function insertDelivery(db: Database, id: string, state: string, updatedAt: number, extra: { readonly target?: string; readonly seq: number; readonly root?: string; readonly binding?: string }): void {
   db.run(
-    "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at, binding_id) VALUES (?, ?, ?, 'session:A', '{}', 'body', 4, 'auto', ?, ?, 1, ?, ?, ?, ?)",
+    "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at, binding_id) VALUES (?, ?, ?, 'session:A', '{\"provenance\":{\"workspace\":\"Example\",\"project\":\"project\"}}', 'body', 4, 'auto', ?, ?, 1, ?, ?, ?, ?)",
     [id, extra.target ?? "B", extra.seq, state, extra.root ?? "root-x", updatedAt, updatedAt, updatedAt + DAY, extra.binding ?? null],
   )
 }

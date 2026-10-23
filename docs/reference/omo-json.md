@@ -184,6 +184,15 @@ Facts extraction does not launch or drain pending work at startup or relaunch. A
 
 `memory.facts.model` optionally selects a fully qualified `provider/model` for extraction, with a per-identity override at `memory.agents.<identity>.facts.model`. Without it, an explicitly configured `categories.quick` model or model list keeps its existing meaning for facts; otherwise extraction inherits the live session's selected model. Facts never use built-in quick candidates or arbitrary registry fallbacks. A missing or unavailable selection skips extraction with one warning and leaves the queue pending without adding a failure streak.
 
+`memory.project_scope` has two independent switches, `nudge` and `recall`, both defaulting to `true`.
+A successful read, edit or write under a child project with existing memory lists its note paths
+and descriptions once per project, re-armed after accepted compaction. Kibitzer ranks up to three
+recently touched projects separately from the own corpus, with reserved project seats and the same
+persisted term store per repository. Project notes are read-only; git metadata, `system/`, writes
+and enumeration stay denied. The switches accept harness/profile layers but no per-agent override.
+See [Memory from projects the session touches](configuration.md#memory-from-projects-the-session-touches)
+for scope and symlink rules.
+
 ### `git_master` (Native harness)
 
 The optional `git_master` block controls how the `git-master` skill runs git in Senpi (`schema/git-master.ts`). When the agent works with the skill — reading it in the main session or loading it into a task child via `load_skills` — omo adds a mandatory "GIT COMMAND PREFIX" section and prefixes every `git` command in the skill's bash blocks with `git_env_prefix`, so your own git hooks can tell git-master is acting (for example, a hook that checks `GIT_MASTER`). The prefix always uses the bash form (`GIT_MASTER=1 git ...`), because Senpi's bash tool runs bash (Git Bash on Windows) whatever your login shell is. It also appends a commit-footer directive when you opt in.

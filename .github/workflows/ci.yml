@@ -264,7 +264,12 @@ jobs:
         shell: pwsh
         env:
           WINDOWS_TEST_SHARD: ${{ matrix.shard }}
+          # #10821: a git that outlives its timeout records the live process table here, and every
+          # git writes a trace2 perf log, so the next stalled `git add` carries its own evidence.
+          OMO_GIT_TIMEOUT_DIAGNOSTICS_DIR: ${{ runner.temp }}/git-timeout-diagnostics
+          GIT_TRACE2_PERF: ${{ runner.temp }}/git-trace2
         run: |
+          New-Item -ItemType Directory -Force -Path $env:GIT_TRACE2_PERF | Out-Null
           $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
           & .github/scripts/windows-ci-telemetry.ps1 `
             -ArtifactDirectory $telemetryDirectory `
@@ -315,6 +320,42 @@ jobs:
           path: ${{ runner.temp }}/windows-root-test-telemetry/*.json
           if-no-files-found: warn
           overwrite: false
+
+      # #10821: keep the evidence of any git that timed out: the recorded process tables and the
+      # trace2 logs of every git that never reached its exit event (killed or still stuck).
+      - name: Collect timed-out git evidence
+        if: always() && runner.os == 'Windows' && matrix.shard == '1/2' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $diagnostics = Join-Path $env:RUNNER_TEMP "git-timeout-diagnostics"
+          if (-not (Test-Path $diagnostics)) { "no git timed out"; exit 0 }
+          $unfinished = Join-Path $diagnostics "trace2-unfinished"
+          New-Item -ItemType Directory -Force -Path $unfinished | Out-Null
+          Get-ChildItem (Join-Path $env:RUNNER_TEMP "git-trace2") -File -ErrorAction SilentlyContinue |
+            Where-Object { -not (Select-String -Path $_.FullName -Pattern '\|\s*atexit\s*\|' -Quiet -ErrorAction Continue) } |
+            Copy-Item -Destination $unfinished -ErrorAction Continue
+          # The upload can be refused (artifact quota), so the evidence is also printed here.
+          foreach ($record in Get-ChildItem $diagnostics -Filter 'git-timeout-*.json' -File) {
+            "::group::git timeout record $($record.Name)"
+            Get-Content $record.FullName -TotalCount 200
+            "::endgroup::"
+          }
+          foreach ($trace in Get-ChildItem $unfinished -File) {
+            "::group::unfinished git trace2 $($trace.Name)"
+            Get-Content $trace.FullName -Tail 60
+            "::endgroup::"
+          }
+
+      - name: Upload timed-out git evidence
+        if: always() && runner.os == 'Windows' && matrix.shard == '1/2' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-git-timeout-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/git-timeout-diagnostics
+          if-no-files-found: ignore
+          retention-days: 14
 
       # A leg whose test steps were all skipped must never look like a pass.
       - name: Check that this leg ran its tests

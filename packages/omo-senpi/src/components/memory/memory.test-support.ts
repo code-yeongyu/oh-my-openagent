@@ -55,6 +55,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
     sync: { enabled: true },
     search: { enabled: true },
     recall: { enabled: true, max_items: 2, category: "quick", event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }, sidecar_max_tokens: 48000, max_concurrent_wakes: 2, tool_budget: 8, query_expansion: false },
+    project_scope: { nudge: true, recall: true },
     projection: { max_entries_per_directory: 40, max_bytes: 24576 },
     compile_warn_tokens: 30000,
     agents: {},

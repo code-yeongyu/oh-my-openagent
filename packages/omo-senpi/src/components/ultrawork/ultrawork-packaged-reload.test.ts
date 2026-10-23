@@ -2,6 +2,7 @@ import { describe, expect, it, onTestFinished, spyOn } from "bun:test"
 import * as childProcess from "node:child_process"
 import { mkdtempSync } from "node:fs"
 import * as fs from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -31,6 +32,9 @@ describe("omo-senpi ultrawork packaged reload", () => {
       restore: () => { for (const restore of restores) restore() },
     }), { timeout: RELOAD_CLEANUP_HOOK_TIMEOUT_MS })
     Object.assign(process.env, pinned)
+    // The warmups below are observed by their directory, which warmTaskHost creates under os.tmpdir(). If an earlier
+    // file detached process.env, the pin never reaches os.tmpdir() and the wait would hang until the body timeout (#10846).
+    expect(tmpdir()).toBe(root)
     const spawn = childProcess.spawn
     const spawnSpy = spyOn(childProcess, "spawn")
     restores.push(() => spawnSpy.mockRestore())

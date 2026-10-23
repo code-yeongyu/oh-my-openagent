@@ -29,6 +29,9 @@ afterEach(() => {
 })
 
 type Settle = Awaited<ReturnType<ReturnType<typeof getMcpService>["whenAttachSettled"]>>
+/** The scenario's bounded wait for the MCP attach. Real time by default; a test that asserts the bound itself injects a clock it controls. */
+type AttachWait = (service: ReturnType<typeof getMcpService>, boundMs: number) => Promise<Settle>
+const realAttachWait: AttachWait = (service, boundMs) => service.whenAttachSettled(boundMs)
 type Observed = {
   status: string
   systemPrompt: unknown
@@ -67,6 +70,7 @@ async function runPrefixScenario(options: {
   extraMcpServers?: Record<string, unknown>
   teardownStepMs?: number
   disposeSession?: (session: Session) => Promise<void>
+  attachWait?: AttachWait
 }) {
   // A run bun abandoned at its timeout has already been cleaned up by afterEach and may resume while a later
   // test runs; it must then leave the process alone, so it only restores state it still owns.
@@ -135,7 +139,7 @@ async function runPrefixScenario(options: {
     // started would show, and so no connect is still writing when the HOME is removed.
     const service = getMcpService()
     mcp = service
-    const settled = await service.whenAttachSettled(options.attachSettleMs)
+    const settled = await (options.attachWait ?? realAttachWait)(service, options.attachSettleMs)
     if (settled !== "settled") throw new Error(`MCP attach did not settle within ${options.attachSettleMs} ms (${String(settled)})`)
     const servers = () => service.getServerSnapshots().map(({ name, lifecycleState, generation, pid }) => ({ name, lifecycleState, generation, pid }))
     const serversBefore = servers()
@@ -207,14 +211,20 @@ test("#given a real OmO session #when the engine builds its prewarm prefix #then
   expect(run.teardown.homeRemoved).toBe(true)
 }, 90_000)
 
-test("#given an MCP attach that never settles #when the prefix scenario fails #then the process env, cwd and temp HOME are restored before it reports", async () => {
-  // given: an eager stdio server that is spawned but never answers initialize, so the attach cannot settle
-  // within the 1 s bound (its connect times out at 3 s, before teardown disposes the session)
+// The bound itself is the behaviour here, so it runs on a clock the test controls: the attach wait reports that the
+// bound elapsed before anything settled, which is what an attach that never settles looks like to the scenario. On
+// real time this flaked on a loaded runner: the startup race tracks a backgrounded connect only after its 0 ms timer,
+// and a whenAttachSettled call that lands before that sees nothing pending and reports "settled".
+const boundElapsedBeforeSettle: AttachWait = async () => "timeout"
+
+test("#given an MCP attach that never settles within the bound #when the prefix scenario fails #then the process env, cwd and temp HOME are restored before it reports", async () => {
+  // given: an eager stdio server that is spawned but never answers initialize (its connect times out at 3 s, inside
+  // teardown's bounded settle wait, so teardown disposes nothing still connecting)
   const neverReady = { command: process.execPath, args: ["-e", "setInterval(() => {}, 1 << 30)"], lifecycle: "eager", connectTimeoutMs: 3_000 }
   // when
-  const run = await runPrefixScenario({ attachSettleMs: 1_000, extraMcpServers: { "never-ready": neverReady } })
+  const run = await runPrefixScenario({ attachSettleMs: 1_000, attachWait: boundElapsedBeforeSettle, extraMcpServers: { "never-ready": neverReady } })
   // then
-  expect(String(run.failure)).toContain("MCP attach did not settle within 1000 ms")
+  expect(String(run.failure)).toContain("MCP attach did not settle within 1000 ms (timeout)")
   expect(run.envAfter).toEqual(run.envBefore)
   expect(run.cwdAfter).toBe(run.cwdBefore)
   expect(run.teardown.errors).toEqual([])

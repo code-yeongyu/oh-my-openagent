@@ -14,8 +14,11 @@
     "#omo-feedback-runtime": "./src/components/feedback/runtime.ts",
     "#omo-claim-receipt-runtime": "./src/components/claim-receipt/runtime.ts",
     "#omo-memory-palace-runtime": "./src/components/memory/palace/runtime.ts",
+    "#omo-device-account-runtime": "./src/components/memory/device-session/account-runtime.ts",
+    "#omo-memory-commands-runtime": "./src/components/memory/commands/runtime.ts",
     "#omo-session-history-runtime": "./src/components/onboarding/session-history/runtime.ts",
     "#omo-recall-store-runtime": "./src/components/memory/recall-store-runtime.ts",
+    "#omo-dori-migration-runtime": "./src/components/config-startup/dori-migration-runtime.ts",
     "#omo-memory-sync-runtime": "./src/components/memory/sync-runtime.ts",
     "#omo-agent-toolkit-sdk": "./src/extension/agent-toolkit-sdk.ts"
   },

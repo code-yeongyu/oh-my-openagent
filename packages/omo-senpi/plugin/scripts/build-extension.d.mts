@@ -10,8 +10,11 @@ export interface BuildExtensionOptions {
   memoryDoctorOutputPath?: string
   memoryMemfsOutputPath?: string
   memoryPalaceOutputPath?: string
+  deviceAccountOutputPath?: string
+  memoryCommandsOutputPath?: string
   sessionHistoryOutputPath?: string
   recallStoreOutputPath?: string
+  doriMigrationOutputPath?: string
   telemetryPosthogOutputPath?: string
   memorySyncOutputPath?: string
   threadClientOutputPath?: string
@@ -31,8 +34,11 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   memoryDoctorInputs: string[]
   memoryMemfsInputs: string[]
   memoryPalaceInputs: string[]
+  deviceAccountInputs: string[]
+  memoryCommandsInputs: string[]
   sessionHistoryInputs: string[]
   recallStoreInputs: string[]
+  doriMigrationInputs: string[]
   telemetryPosthogInputs: string[]
   memorySyncInputs: string[]
   threadClientInputs: string[]

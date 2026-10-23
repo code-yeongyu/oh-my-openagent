@@ -60,6 +60,20 @@ export const OmoMemoryRecallSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
+// Project scope (#10044)
+// ---------------------------------------------------------------------------
+
+export const OmoMemoryProjectScopeSchema = z.object({
+  nudge: z.boolean().default(true),
+  recall: z.boolean().default(true),
+}).strict()
+
+export const OmoMemoryProjectScopeLayerSchema = z.object({
+  nudge: z.boolean().optional(),
+  recall: z.boolean().optional(),
+}).strict()
+
+// ---------------------------------------------------------------------------
 // Nudge
 // ---------------------------------------------------------------------------
 
@@ -281,6 +295,7 @@ export const OmoMemorySettingsSchema = z.object({
     tool_budget: 8,
     query_expansion: false,
   }),
+  project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
@@ -301,6 +316,7 @@ export const OmoMemorySettingsLayerSchema = z.object({
   sync: OmoMemorySyncLayerSchema.optional(),
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
+  project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
@@ -316,6 +332,7 @@ export type OmoMemorySync = z.infer<typeof OmoMemorySyncSchema>
 export type OmoMemorySearch = z.infer<typeof OmoMemorySearchSchema>
 export type OmoMemoryRecallEventCaps = z.infer<typeof OmoMemoryRecallEventCapsSchema>
 export type OmoMemoryRecall = z.infer<typeof OmoMemoryRecallSchema>
+export type OmoMemoryProjectScope = z.infer<typeof OmoMemoryProjectScopeSchema>
 export type OmoMemoryNudge = z.infer<typeof OmoMemoryNudgeSchema>
 export type OmoMemoryFacts = z.infer<typeof OmoMemoryFactsSchema>
 export type OmoMemoryDream = z.infer<typeof OmoMemoryDreamSchema>

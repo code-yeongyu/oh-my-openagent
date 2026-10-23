@@ -9,8 +9,11 @@
 !/plugin/extensions/omo-memory-doctor.js
 !/plugin/extensions/omo-memory-memfs.js
 !/plugin/extensions/omo-memory-palace.js
+!/plugin/extensions/omo-device-account.js
+!/plugin/extensions/omo-memory-commands.js
 !/plugin/extensions/omo-session-history.js
 !/plugin/extensions/omo-recall-store.js
+!/plugin/extensions/omo-dori-migration.js
 !/plugin/extensions/omo-telemetry-posthog.js
 !/plugin/extensions/omo-memory-sync.js
 !/plugin/extensions/loro_wasm_bg.wasm

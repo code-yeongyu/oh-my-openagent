@@ -13,7 +13,8 @@ import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
-import { OmoGatewaySectionSchema } from "./gateway"
+import { OmoDoriSectionSchema } from "./dori"
+import { OmoProvenanceSettingsSchema } from "./provenance"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -34,8 +35,9 @@ export const OmoDisabledSkillsSchema = z.array(z.string())
 export const OmoExcludedModelsSchema = z.array(z.string())
 
 export const OmoTypedHarnessConfigSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  gateway: OmoGatewaySectionSchema.optional(),
+  dori: OmoDoriSectionSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -53,7 +55,9 @@ export const OmoTypedHarnessConfigSchema = z.object({
 }).strict()
 
 export const OmoConfigProfileSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
+  dori: OmoDoriSectionSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -75,8 +79,9 @@ export const OmoConfigProfileSchema = z.object({
 }).strict()
 
 export const OmoConfigSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
-  gateway: OmoGatewaySectionSchema.optional(),
+  dori: OmoDoriSectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -102,8 +107,9 @@ export const OmoConfigSchema = z.object({
 }).strict()
 
 export const OmoConfigLayerSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  gateway: OmoGatewaySectionSchema.optional(),
+  dori: OmoDoriSectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),

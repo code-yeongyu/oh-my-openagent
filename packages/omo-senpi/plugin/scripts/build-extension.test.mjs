@@ -307,6 +307,53 @@ describe("checkExtensionCurrent", () => {
     expect(await readFile(memoryPalaceOutputPath, "utf8")).not.toContain("#omo-memory-palace-runtime")
   })
 
+  test("#given the split extension build #when memory command inputs are inspected #then the slash-command handlers load only from the lazy entry", async () => {
+    const { mainInputs, memoryCommandsInputs } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/commands/runtime.ts",
+      "packages/omo-senpi/src/components/memory/commands/sleeptime.ts",
+      "packages/omo-senpi/src/components/memory/commands/dream.ts",
+      "packages/omo-senpi/src/components/memory/commands/dream-staging.ts",
+      "packages/omo-senpi/src/components/memory/commands/agreements.ts",
+      "packages/omo-senpi/src/components/memory/commands/memory.ts",
+      "packages/omo-senpi/src/components/memory/commands/memory-unlock.ts",
+      "packages/omo-senpi/src/components/memory/commands/search.ts",
+      "packages/omo-senpi/src/components/memory/commands/facts.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/commands/metadata.ts",
+      "packages/omo-senpi/src/components/memory/commands/runtime-loader.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+  })
+
+  test("#given the split extension build #when the memory commands sidecar is inspected #then it carries no runtime loader of its own", async () => {
+    const { memoryCommandsInputs, memoryCommandsOutputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/commands/runtime-loader.ts",
+      "packages/omo-senpi/src/components/memory/commands/register.ts",
+    ]) {
+      expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+    }
+    expect(await readFile(memoryCommandsOutputPath, "utf8")).not.toContain("#omo-memory-commands-runtime")
+  })
+
+  test("#given the split extension build #when device account inputs are inspected #then the service-auth sign-in code loads only from the lazy entry", async () => {
+    const { mainInputs, deviceAccountInputs } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/memory/device-session/account-source.ts",
+      "packages/omo-opencode/src/cli/service-auth/keystore.ts",
+      "packages/omo-opencode/src/cli/service-auth/session.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(deviceAccountInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+  })
+
   test("#given the split extension build #when onboarding inputs are inspected #then the session-history scan loads only from its lazy entry", async () => {
     const { mainInputs, sessionHistoryInputs, sessionHistoryOutputPath } = await sharedOutputs()
     for (const suffix of [
@@ -413,6 +460,20 @@ describe("checkExtensionCurrent", () => {
     }
   }, PACKED_TEST_TIMEOUT_MS)
 
+  test("#given the split extension build #when config-startup inputs are inspected #then the gateway -> dori rename loads only from its lazy entry", async () => {
+    const { mainInputs, doriMigrationInputs, doriMigrationOutputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/config-startup/dori-migration-runtime.ts",
+      "packages/omo-opencode/src/config-migration/dori-section-rename.ts",
+      "packages/omo-config-core/src/schema/legacy-dori-section.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(doriMigrationInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    expect(doriMigrationInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/config-startup/dori-migration-loader.ts"))).toBe(false)
+    expect(await readFile(doriMigrationOutputPath, "utf8")).not.toContain("#omo-dori-migration-runtime")
+  })
+
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
@@ -422,8 +483,11 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-task-runtime")')
     expect(main).toContain('import("#omo-memory-memfs-runtime")')
     expect(main).toContain('import("#omo-memory-palace-runtime")')
+    expect(main).toContain('import("#omo-memory-commands-runtime")')
+    expect(main).toContain('import("#omo-device-account-runtime")')
     expect(main).toContain('import("#omo-session-history-runtime")')
     expect(main).toContain('import("#omo-recall-store-runtime")')
+    expect(main).toContain('import("#omo-dori-migration-runtime")')
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
@@ -438,8 +502,11 @@ describe("checkExtensionCurrent", () => {
       "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
       "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
+      "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+      "#omo-device-account-runtime": "./extensions/omo-device-account.js",
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
+      "#omo-dori-migration-runtime": "./extensions/omo-dori-migration.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",

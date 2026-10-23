@@ -7,6 +7,8 @@ import { type Credentials, createCredentialStore, type CredentialStore, createSe
 
 import type { DeviceKeyMaterial, DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 
+import { SyncConfigError } from "../sync-config-error"
+
 export type KeyringFactory = (material: DeviceKeyMaterial) => Promise<DeviceKeyring>
 
 export interface DeviceAccount {
@@ -42,7 +44,14 @@ export function createCliAccountSource(options: {
   readonly store?: CredentialStore
   readonly fetch?: typeof fetch
 }): DeviceAccountSource {
-  const api = serviceOrigin(options.api ?? options.env?.OMO_SERVICE_API_URL ?? DEFAULT_SERVICE_API)
+  const configured = options.api === undefined ? options.env?.OMO_SERVICE_API_URL : undefined
+  let api: string
+  try {
+    api = serviceOrigin(options.api ?? configured ?? DEFAULT_SERVICE_API)
+  } catch (error) {
+    if (configured !== undefined) throw new SyncConfigError("OMO_SERVICE_API_URL", error)
+    throw error
+  }
   const doFetch = options.fetch ?? fetch
   return async () => {
     let store: CredentialStore

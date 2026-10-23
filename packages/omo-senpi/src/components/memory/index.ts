@@ -12,7 +12,8 @@ import { resolveMemorySettings } from "./identity-runtime"
 import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createSessionBinder, readSessionSurface, releaseSession, type SessionState } from "./session-binding"
 import { finalizeIdentityRun } from "./transient-identity"
-import { createCliAccountSource, type DeviceAccountSource } from "./device-session/account-source"
+import type { DeviceAccountSource } from "./device-session/account-source"
+import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
 import { sweepTransientMemoryRuns, type TransientSweep } from "./transient-sweep"
@@ -69,7 +70,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       const syncRunner = options.syncRunner ?? createSyncRunner({
         logger: ctx.logger,
         resolveSession: createDeviceSessionResolver({
-          source: options.deviceAccount ?? createCliAccountSource({ env }),
+          source: options.deviceAccount ?? lazyCliAccountSource({ env }),
           pinDir: syncPinDir(resolveMemoryRoot(env, cwd)),
           loadRuntime: () => import("#omo-memory-sync-runtime"),
         }),

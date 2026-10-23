@@ -245,6 +245,16 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     call: "writeFileSync(path)", reason: IDENTITY_FILES,
   },
   {
+    file: "product-identity.ts", fn: "resolveUserInstallId",
+    guard: "unless(legacy === canonical) unless(shared !== undefined) unless(adopted === undefined)",
+    call: "mkdirSync(dirname(canonical))", reason: IDENTITY_FILES,
+  },
+  {
+    file: "product-identity.ts", fn: "resolveUserInstallId",
+    guard: "unless(legacy === canonical) unless(shared !== undefined) unless(adopted === undefined)",
+    call: "writeFileSync(canonical)", reason: IDENTITY_FILES,
+  },
+  {
     file: "session-summary-store.ts", fn: "createSummaryStore>write",
     guard: "",
     call: "mkdirSync(dir)", reason: SUMMARY_STORE,
