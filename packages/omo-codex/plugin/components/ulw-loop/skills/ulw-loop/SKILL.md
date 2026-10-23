@@ -59,7 +59,7 @@ Codex exposes ONE subagent surface per session — check your tool list. GPT-5.6
 
 | Intent | MultiAgentV2 (gpt-5.6 sol/terra) |
 | --- | --- |
-| Spawn a worker | `spawn_agent({"task_name":"<lower_snake_id>","message":"TASK: act as <role>. ...","fork_turns":"none"})` — `task_name`+`message` required; `fork_turns:"none"` = no parent history; do NOT set `agent_type`/`model`/`reasoning_effort` |
+| Spawn a worker | `spawn_agent({"task_name":"<lower_snake_id>","agent_type":"<exact installed LazyCodex role>","message":"TASK: act as <role>. ...","fork_turns":"none"})` — `task_name`+`message` required; when the schema exposes `agent_type`, require the exact role for the slice (worker low/medium/high by difficulty, `explorer` for read-only search); if absent, stop and report incompatible role routing; `fork_turns:"none"` = no parent history; omit `model`/`reasoning_effort`/`service_tier` so the role TOML supplies them |
 | Re-task an idle worker (wakes it) | `followup_task({"target":"<name>","message":"..."})` |
 | Send context without interrupting | `send_message({"target":"<name>","message":"..."})` |
 | Wait for a mailbox signal | `wait_agent({"timeout_ms":<ms>})` — any live worker; a timeout only means no new update |
