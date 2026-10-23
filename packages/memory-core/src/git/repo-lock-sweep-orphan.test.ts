@@ -7,6 +7,7 @@ import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { assertRepoIntegrity, git } from "../concurrency/two-process-kit.test-support"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { buildIdentityPaths } from "../identity"
 import { acquireLock, createLockRecord, memoryWriterLockPath, releaseLock } from "../locks"
 import { pidAlive, probeUntil } from "../locks/process-liveness.test-support"
@@ -39,6 +40,7 @@ async function orphanedCommitParkedInCommitMsg(): Promise<OrphanFixture> {
   await mkdir(paths.repo, { recursive: true })
   await mkdir(paths.locks, { recursive: true })
   await git(paths.repo, ["init", "-b", "main"])
+  disableFixtureAutoMaintenance(paths.repo)
   for (const [key, value] of [["commit.gpgsign", "false"], ["user.name", "Orphan Owner"], ["user.email", "orphan@omo.local"]] as const) {
     await git(paths.repo, ["config", key, value])
   }

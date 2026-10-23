@@ -1,5 +1,6 @@
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, expect, spyOn, test } from "bun:test"
 
+import { LOCAL_DEBOUNCE_MS } from "./engine"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
 
@@ -82,4 +83,67 @@ test("a local commit starts a cycle after a 2 s debounce, once for a burst", asy
   expect(a.engine.cyclesRun).toBe(2)
   await b.engine.runCycle()
   expect([await b.read("x.md"), await b.read("y.md")]).toEqual(["x\n", "y\n"])
+}, GIT_TEST_TIMEOUT)
+
+test("a cycle that fails settles nextCycle() with that failure, and a request queued while it ran still gets its cycle (omo #10637)", async () => {
+  const { b } = await started()
+  await b.restart()
+  const failure = new Error("store unavailable")
+  let loads = 0
+  let release = (): void => undefined
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let rerunStarted = (): void => undefined
+  const rerun = new Promise<void>((resolve) => {
+    rerunStarted = resolve
+  })
+  const load = spyOn(b.store, "load").mockImplementation(async () => {
+    loads += 1
+    if (loads === 1) await gate
+    else rerunStarted()
+    throw failure
+  })
+  const waiter = b.engine.nextCycle().then(() => null, (error: unknown) => error)
+  const first = b.engine.runCycle().then(() => null, (error: unknown) => error)
+  b.engine.notifyLocalCommit()
+  b.clock.advance(LOCAL_DEBOUNCE_MS)
+  release()
+
+  expect(await first).toBe(failure)
+  expect(await waiter).toBe(failure)
+  const rerunWithin = await Promise.race([
+    rerun.then(() => "ran"),
+    new Promise<string>((resolve) => setTimeout(() => resolve("the queued request never got a cycle within 5 s"), 5_000)),
+  ])
+  expect(rerunWithin).toBe("ran")
+  load.mockRestore()
+}, GIT_TEST_TIMEOUT)
+
+test("a request queued during a failing cycle never starts a cycle after stop() returns (omo #10637 review of #10971, HIGH)", async () => {
+  const { b } = await started()
+  await b.restart()
+  let loads = 0
+  let release = (): void => undefined
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const load = spyOn(b.store, "load").mockImplementation(async () => {
+    loads += 1
+    if (loads === 1) await gate
+    throw new Error("store unavailable")
+  })
+  const first = b.engine.runCycle().then(() => null, (error: unknown) => error)
+  b.engine.notifyLocalCommit()
+  b.clock.advance(LOCAL_DEBOUNCE_MS)
+
+  const stopped = b.engine.stop()
+  release()
+  await stopped
+  const loadsAtStop = loads
+  await first
+
+  expect(loadsAtStop).toBe(1)
+  expect(loads).toBe(1)
+  load.mockRestore()
 }, GIT_TEST_TIMEOUT)
