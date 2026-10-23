@@ -96,10 +96,10 @@ function childEnv(item: Fixture): NodeJS.ProcessEnv {
 
 type RunResult = { status: number | null, signal: NodeJS.Signals | null, stdout: string, stderr: string }
 
-async function run(item: Fixture, args: string[]): Promise<RunResult> {
+async function run(item: Fixture, args: string[], envOverrides: Record<string, string> = {}): Promise<RunResult> {
   // --no-install: a module the copied app cannot resolve fails the run instead of Bun fetching it from the
   // registry into the fixture home, a cold network install on every run that timed out on Windows (#10210).
-  const child = spawn(process.execPath, ["--no-install", item.launcher, ...args], { env: childEnv(item), stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
+  const child = spawn(process.execPath, ["--no-install", item.launcher, ...args], { env: { ...childEnv(item), ...envOverrides }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
   let stdout = ""
   let stderr = ""
   child.stdout.setEncoding("utf8")
@@ -174,6 +174,60 @@ describe("omo setup opencode custom provider import", () => {
           ["claude-relay", "anthropic-messages", "https://relay.example/anthropic", true, ["text", "image"]],
         ])
         expect(result.stdout).toContain("providers-imported: acme, relay")
+      })
+    })
+  })
+
+  describe("#given a custom provider whose apiKey references a path via {file:...}", () => {
+    describe("#when the engine supports reference objects", () => {
+      test("#then the apiKey lands in auth.json as a $file reference object, not the file's bytes", async () => {
+        const item = fixture()
+        const secretPath = join(item.tmp, "api-key")
+
+        opencode(item, {
+          provider: {
+            acme: {
+              npm: "@ai-sdk/openai-compatible",
+              options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
+              models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
+            },
+          },
+        })
+
+        const result = await run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "1" })
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect(auth.malformed).toBeUndefined()
+        // The reference ships as an object; the engine resolves it at load time.
+        expect((auth.entries as Record<string, { type: string, key: unknown }>).acme).toEqual({
+          type: "api_key",
+          key: { $file: secretPath },
+        })
+      })
+    })
+
+    describe("#when the engine does not support reference objects", () => {
+      test("#then the provider is not imported, because a {file:...} has no plain-string spelling", async () => {
+        const item = fixture()
+        const secretPath = join(item.tmp, "api-key")
+
+        opencode(item, {
+          provider: {
+            acme: {
+              npm: "@ai-sdk/openai-compatible",
+              options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
+              models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
+            },
+          },
+        })
+
+        const result = await run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "0" })
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect((auth.entries as Record<string, unknown>).acme).toBeUndefined()
+        expect(result.stdout).toContain("acme")
       })
     })
   })
