@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { listWindowsProcessRows, windowsTreeKillArgs } from "../windows-process-tree";
 import { getHomeDirectory } from "./home-directory";
 import { findBashPath, findZshPath } from "./shell-path";
 
@@ -151,12 +152,22 @@ export async function executeHookCommand(
       settle({ exitCode: 1, stderr: err.message });
     });
 
-    const killWindowsProcessTree = (onComplete?: () => void) => {
+    const killWindowsProcessTree = async (onComplete?: () => void) => {
       if (!proc.pid) {
         onComplete?.();
         return;
       }
-      const killer = spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+      const rows = await listWindowsProcessRows();
+      if (proc.exitCode !== null || proc.signalCode !== null) {
+        onComplete?.();
+        return;
+      }
+      const args = windowsTreeKillArgs(proc.pid, rows);
+      if (args.length === 0) {
+        onComplete?.();
+        return;
+      }
+      const killer = spawn("taskkill", args, {
         windowsHide: true,
         stdio: "ignore",
       });

@@ -81,6 +81,10 @@
       "types": "./src/process-tree.ts",
       "import": "./src/process-tree.ts"
     },
+    "./windows-process-tree": {
+      "types": "./src/windows-process-tree.ts",
+      "import": "./src/windows-process-tree.ts"
+    },
     "./prompt-async-gate": {
       "types": "./src/prompt-async-gate.ts",
       "import": "./src/prompt-async-gate.ts"

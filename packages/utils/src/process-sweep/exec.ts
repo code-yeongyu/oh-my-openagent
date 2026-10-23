@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { listWindowsProcessRows, windowsTreeKillArgs } from "../windows-process-tree"
 
 import { parsePosixProcessTable, parseWindowsProcessTable, type ProcessInfo } from "./process-table"
 
@@ -56,9 +57,14 @@ function createPosixKiller(): ProcessKiller {
 function createWindowsKiller(): ProcessKiller {
   return {
     isAlive: defaultIsProcessAlive,
-    kill: (pid) => execFileVoid("taskkill.exe", ["/PID", String(pid), "/T", "/F"]),
-    terminate: (pid) => execFileVoid("taskkill.exe", ["/PID", String(pid), "/T"]),
+    kill: (pid) => killWindowsTree(pid, true),
+    terminate: (pid) => killWindowsTree(pid, false),
   }
+}
+
+async function killWindowsTree(pid: number, force: boolean): Promise<void> {
+  const args = windowsTreeKillArgs(pid, await listWindowsProcessRows(), process.pid, force)
+  if (args.length > 0) await execFileVoid("taskkill.exe", args)
 }
 
 function execFileText(command: string, args: readonly string[]): Promise<string> {

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { listWindowsProcessRows, windowsTreeKillArgs } from "./windows-process-tree"
 
 export type ProcessTreeSignalTarget = "process" | "process-group" | "process-tree"
 export type ProcessTreeSignalOutcome = "denied" | "failed" | "missing" | "sent"
@@ -95,20 +96,25 @@ function attemptPosixSignal(
   }
 }
 
-function attemptWindowsTreeSignal(
+async function attemptWindowsTreeSignal(
   pid: number,
   signal: "SIGKILL" | "SIGTERM",
 ): Promise<ProcessTreeSignalAttempt> {
-  const args = ["/PID", String(pid), "/T", ...(signal === "SIGKILL" ? ["/F"] : [])]
+  const rows = await listWindowsProcessRows()
+  const args = windowsTreeKillArgs(pid, rows, process.pid, signal === "SIGKILL")
+  const target = rows === undefined ? "process" : "process-tree"
+  if (args.length === 0) {
+    return { outcome: "failed", error: "No eligible Windows process targets", pid, signal, target }
+  }
   return new Promise((resolvePromise) => {
     execFile("taskkill.exe", args, { timeout: 5_000, windowsHide: true }, (error) => {
       if (error === null) {
-        resolvePromise({ outcome: "sent", pid, signal, target: "process-tree" })
+        resolvePromise({ outcome: "sent", pid, signal, target })
         return
       }
       const code = "code" in error ? error.code : undefined
       const outcome = code === "EPERM" ? "denied" : code === "ESRCH" ? "missing" : "failed"
-      resolvePromise({ error: error.message, outcome, pid, signal, target: "process-tree" })
+      resolvePromise({ error: error.message, outcome, pid, signal, target })
     })
   })
 }
