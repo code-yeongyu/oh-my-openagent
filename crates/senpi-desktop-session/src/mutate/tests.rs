@@ -51,8 +51,9 @@ fn gate_refusal_is_audited_and_touches_no_backend_state() {
 
 #[test]
 fn panicking_backend_releases_all_and_reports_internal() {
-    // Given
+    // Given: desktop input needs the grant (#10788)
     let mut harness = harness(&json!({}));
+    harness.grant("desktop click");
     // When
     let result = harness
         .worker
@@ -87,8 +88,9 @@ fn error_path_release_failure_does_not_mask_primary() {
 
 #[test]
 fn suspension_observed_midflight_releases_all() {
-    // Given: a stop lands while the action runs.
+    // Given: a granted desktop click, and a stop lands while it runs.
     let mut harness = harness(&json!({}));
+    harness.grant("desktop click");
     let supervisor = Arc::clone(&harness.supervisor);
     // When
     let result = harness.worker.mutate(&click_desktop_mutation(), &|| false, |_| {

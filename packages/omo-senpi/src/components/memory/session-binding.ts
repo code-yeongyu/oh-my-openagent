@@ -3,7 +3,7 @@
 // memory module supervisor and the end-to-end encrypted sync runner for durable sessions.
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { resolveMemoryIdentity, resolveMemoryRoot } from "@oh-my-opencode/memory-core"
+import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
@@ -12,6 +12,7 @@ import { logBindReconcileFailure } from "./bind-reconcile-log"
 import type { MemoryExtensionAPI } from "./capabilities"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { adoptSessionIdentity } from "./identity-adoption"
+import { revokeProjectMemoryReads } from "./project-memory-grants"
 import { memoryModuleSupervisor } from "./supervisor"
 import type { SyncRunner } from "./sync-runner"
 import { isOneShotSurface, resolveIdentityRunPaths, type IdentityRunPaths } from "./transient-identity"
@@ -87,7 +88,9 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     // process happens to sit in: one shared host serves sessions from many workspaces (#8556).
     const sessionCwd = surface.cwd ?? cwd
     const memoryRoot = resolveMemoryRoot(env, sessionCwd)
-    const resolved = resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
+    const resolved = isAutoAgentValue(sessionConfig.agent)
+      ? resolveAutoIdentity(sessionCwd, env, sessionConfig.auto_identity)
+      : resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
     const previous = findLatestMemoryBinding(surface.readEntries())
     const adoption = adoptSessionIdentity({
       recorded: previous,
@@ -134,11 +137,12 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       identityPaths: run.paths,
       durableRoot: run.durableRoot,
       binding,
+      projectScope: { memoryRoot, autoIdentity: sessionConfig.auto_identity },
     })
     memoryModuleSupervisor.acquire()
     if (!oneShot) {
       state.syncRepo = identity.paths.repo
-      void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync)
+      void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, { profile: sessionConfig.agent, projectDir: sessionCwd })
     }
     // Disposable bookkeeping: a session closed without a conversation leaves no file (senpi#3263).
     pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })
@@ -152,6 +156,7 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
 
 export function releaseSession(state: SessionState | undefined, syncRunner?: SyncRunner): void {
   if (state?.context === undefined) return
+  revokeProjectMemoryReads(state.context)
   memoryModuleSupervisor.release()
   state.context = undefined
   if (state.syncRepo !== undefined && syncRunner !== undefined) void syncRunner.release(state.syncRepo)

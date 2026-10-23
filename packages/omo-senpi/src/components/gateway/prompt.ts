@@ -9,6 +9,7 @@ export interface GatewayRulesStore {
 }
 
 export interface GatewayRulesPromptOptions {
+  readonly previewBlockForSession?: (sessionId: string) => Promise<string | undefined>
   /**
    * Lazily connects the gateway store on first need: a session without the gateway config, or a
    * host without the store database, resolves undefined forever and this handler is a pass-through.
@@ -31,6 +32,18 @@ export function createGatewayRulesPromptHandler(
     if (systemPrompt === undefined) return undefined
     const sessionId = readSessionId(eventCtx)
     if (sessionId === undefined) return undefined
+    if (isRecord(payload) && payload.preview === true) {
+      try {
+        const block = await options.previewBlockForSession?.(sessionId)
+        return block === undefined ? undefined : { systemPrompt: composeGatewayRulesBlock(systemPrompt, block) }
+      } catch (error) {
+        if (!lookupWarned) {
+          lookupWarned = true
+          options.onLookupError?.(`gateway rules lookup failed: ${error instanceof Error ? error.message : String(error)}`)
+        }
+        return undefined
+      }
+    }
     const store = await options.ensureStore()
     if (store === undefined) return undefined
     const result = await store.extensionCall<{ readonly version: string; readonly block: string } | null>(

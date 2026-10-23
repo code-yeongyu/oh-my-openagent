@@ -1,6 +1,6 @@
 import { homedir } from "node:os"
 
-import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
+import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import type { OmoSidePanelSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
@@ -442,16 +442,19 @@ function toolDetail(args: unknown): string | undefined {
 
 /**
  * The memory identity this session writes to, resolved exactly the way the memory component
- * resolves it (`resolveMemoryIdentity(memory.agent, cwd, env)`): a column naming a different
- * identity than the one being written to would be worse than no column at all. The resolver is
- * pure apart from two `exists` probes that keep a legacy directory attached, so it runs once on
- * mount rather than on the refresh path.
+ * resolves it (`resolveAutoIdentity` with `memory.auto_identity` for an auto agent, else
+ * `resolveMemoryIdentity`): a column naming a different identity than the one being written to
+ * would be worse than no column at all. The resolver is pure apart from a few bounded file reads
+ * (legacy directory probes and the git worktree pointers), so it runs once on mount rather than on
+ * the refresh path.
  */
 function defaultResolveMemory(cwd: string): PanelMemoryIdentity | undefined {
   try {
     const settings = loadSenpiOmoConfig({ cwd }).config.memory
     if (settings?.enabled === false) return undefined
-    const identity = resolveMemoryIdentity(settings?.agent, cwd, process.env)
+    const identity = isAutoAgentValue(settings?.agent)
+      ? resolveAutoIdentity(cwd, process.env, settings?.auto_identity)
+      : resolveMemoryIdentity(settings?.agent, cwd, process.env)
     return {
       id: identity.id,
       reflectionDir: identity.paths.reflection,

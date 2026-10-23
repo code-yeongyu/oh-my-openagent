@@ -42,7 +42,7 @@ Of course! Let me help you with...`
 
 export const SESSION_SEARCH_DESCRIPTION = `Search for content within OpenCode session messages.
 
-Performs full-text search across session messages and returns matching excerpts with context.
+Performs full-text search across session messages and returns matching excerpts with context. Within a session, matches are returned newest first.
 
 Arguments:
 - query (required): Search query string

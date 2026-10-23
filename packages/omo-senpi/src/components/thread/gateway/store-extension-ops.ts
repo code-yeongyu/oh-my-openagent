@@ -3,7 +3,7 @@ import { extname } from "node:path"
 import { assertExtensionName, checkExtensionSchema, ExtensionSchemaViolation, extensionSchema, extensionSql, sqliteName } from "./extension-sql"
 import { extensionTransaction } from "./extension-transaction"
 import { singleExtensionStatement } from "./extension-statement"
-import type { GatewayResolve } from "./engine"
+import type { GatewayEngineOptions, GatewayResolve } from "./engine"
 import { isLockWaitExceeded } from "./lock-wait"
 import { GatewaySchemaVersionError } from "./schema"
 import { transaction, type StoreContext } from "./store-ops"
@@ -28,7 +28,7 @@ function fromError(error: unknown): StoreExtensionRefusal {
 export class StoreExtensions {
   private readonly registered = new Map<string, Registered>()
 
-  constructor(private readonly ctx: StoreContext, private readonly resolveTarget: GatewayResolve) {}
+  constructor(private readonly ctx: StoreContext, private readonly resolveTarget: GatewayResolve, private readonly senderProvenance: GatewayEngineOptions["senderProvenance"]) {}
 
   async register(descriptor: StoreExtensionRegistration, now: number): Promise<StoreExtensionResult<{ readonly version: number }>> {
     if (!/^[a-z][a-z0-9_]{1,31}$/.test(descriptor.name) || !Array.isArray(descriptor.migrations)
@@ -115,7 +115,7 @@ export class StoreExtensions {
         const locked = Number(row?.version ?? 0)
         if (locked !== version) throw new GatewaySchemaVersionError(locked, entry.descriptor.migrations.length, `Extension ${name}`)
         const before = extensionSchema(this.ctx.sql)
-        const scope = extensionTransaction({ ...this.ctx, afterCommit: effects, afterRollback: compensations }, name, now, this.resolveTarget)
+        const scope = extensionTransaction({ ...this.ctx, afterCommit: effects, afterRollback: compensations }, name, now, this.resolveTarget, this.senderProvenance)
         let timer: ReturnType<typeof setTimeout> | undefined
         try {
           const run = async () => {

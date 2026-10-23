@@ -30,6 +30,41 @@ const LEGACY = JSON.stringify({
   signingPrivateKey: "synthetic-signing-private",
 })
 
+// The #10697 plaintext file holds a refresh token and both private keys: it must be gone after ANY first command
+// after upgrading, including the hidden verbs a host or the desktop may call without ever doing a normal launch
+// (#10658 delta review MEDIUM). Only side-effect-free invocations are spawned; login/logout would reach the real keychain.
+const FIRST_COMMANDS: readonly (readonly string[])[] = [["sync", "--help"], ["account", "--help"], ["--version"], ["-v"]]
+
+describe("a first command after upgrading", () => {
+  const isolatedEnv = (home: string) => ({ PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun" })
+
+  for (const args of FIRST_COMMANDS) {
+    test(`#given the legacy file #when \`omo ${args.join(" ")}\` runs through bin/omo.js #then the file is removed`, () => {
+      const { home, path } = homeWith(LEGACY)
+      spawnSync(process.execPath, [join(import.meta.dir, "..", "bin", "omo.js"), ...args], { env: isolatedEnv(home), encoding: "utf8", windowsHide: true })
+      expect(existsSync(path)).toBe(false)
+    })
+
+    // Run as the main module, like the release binary: its main() answers some commands before runCompiledLauncher.
+    test(`#given the legacy file #when \`omo ${args.join(" ")}\` runs through the compiled entry's main #then the file is removed`, () => {
+      const { home, path } = homeWith(LEGACY)
+      spawnSync(process.execPath, [join(import.meta.dir, "..", "compile-entry.ts"), ...args], { env: isolatedEnv(home), encoding: "utf8", windowsHide: true })
+      expect(existsSync(path)).toBe(false)
+    })
+  }
+})
+
+describe("a first command the release entry answers before any launch", () => {
+  // A refused extra-CA value makes main() answer and return before the launcher (#10215). The legacy cleanup must
+  // already have run (#10658 round 2): it is main()'s first step, shared by every command and every early return.
+  test("#given the legacy file and a refused extra-CA value #when the compiled entry's main answers --version #then the file is removed", () => {
+    const { home, path } = homeWith(LEGACY)
+    const env = { PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun", OMO_EXTRA_CA_CERTIFICATES: "-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n" }
+    spawnSync(process.execPath, [join(import.meta.dir, "..", "compile-entry.ts"), "--version"], { env, encoding: "utf8", windowsHide: true })
+    expect(existsSync(path)).toBe(false)
+  })
+})
+
 describe("removeLegacyServiceCredentials", () => {
   test("#given the legacy credentials shape #when it runs #then the file is removed", () => {
     const { home, path } = homeWith(LEGACY)
