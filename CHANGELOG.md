@@ -438,7 +438,7 @@ Runs on senpi 2026.10.27-1, which tightens shell permission checks. ([#11364](ht
 
 **Held packaging-test directories are recorded without failing cleanup.** The packed memory-sync probe and abandoned-root sweep share one best-effort removal guard, with no retries. Every held root is printed in the test log; Windows diagnostics are bounded to 30 seconds and include the holder's pid, image and parent pid when identified, or the diagnostic failure. Unrelated filesystem errors and unrecorded leaks still fail. ([#11218](https://github.com/code-yeongyu/oh-my-openagent/pull/11218), part of [#11135](https://github.com/code-yeongyu/oh-my-openagent/issues/11135))
 
-**Codex V2 teams select an installed LazyCodex role when spawning members.** Team and ultrawork-loop guidance now requires an exact role when `agent_type` is exposed, choosing the worker tier by task difficulty or `explorer` for read-only search, so following the instructions no longer triggers the spawn guard. Model and reasoning overrides remain omitted so the role configuration supplies them.
+**Codex V2 teams select an installed LazyCodex role when spawning members.** Team and ultrawork-loop guidance now requires an exact role when `agent_type` is exposed, choosing the worker tier by task difficulty or `explorer` for read-only search, so following the instructions no longer triggers the spawn guard. Model and reasoning overrides remain omitted so the role configuration supplies them. ([#11060](https://github.com/code-yeongyu/oh-my-openagent/pull/11060))
 
 ## [5.1.45] - 2026-10-24
 
