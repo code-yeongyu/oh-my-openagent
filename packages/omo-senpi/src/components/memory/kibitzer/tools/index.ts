@@ -5,6 +5,7 @@
 
 import type { GitMemoryRepo, RecallCorpusCache, RecallNudge } from "@oh-my-opencode/memory-core"
 
+import type { ProjectRecallCorpus } from "../../project-recall-seats"
 import type { WakeToolBudget } from "./budget"
 import { resolveKibitzerToolCaps, type KibitzerToolCaps } from "./caps"
 import { createKibitzerGrepTool, KIBITZER_GREP_TOOL_NAME } from "./grep"
@@ -40,6 +41,7 @@ export interface KibitzerSidecarToolsInput {
     readonly cache?: RecallCorpusCache
     /** `memory.recall.query_expansion`; the search accepts no added terms when omitted. */
     readonly queryExpansion?: boolean
+    readonly projectCorpora?: () => Promise<readonly ProjectRecallCorpus[]>
   }
   readonly nudge: {
     readonly offered: ReadonlySet<string>
@@ -73,6 +75,7 @@ export function createKibitzerSidecarTools(input: KibitzerSidecarToolsInput): Ki
       budget: input.budget,
       searchedPaths,
       queryExpansion: input.memory.queryExpansion === true,
+      ...(input.memory.projectCorpora === undefined ? {} : { projectCorpora: input.memory.projectCorpora }),
     }),
     createKibitzerSidecarNudgeTool({ ...input.nudge, searched: searchedPaths, budget: input.budget }),
   ]

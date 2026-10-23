@@ -37,13 +37,14 @@ import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
+import { isProvenance } from "./provenance-record"
 import { GATEWAY_MIGRATIONS, GatewaySchemaVersionError } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
   ClaimOutcome,
   ClaimRequest,
-  DeliveryEnvelope,
+  StoredDeliveryEnvelope,
   DeliveryRow,
   DeliveryState,
   EnqueueOutcome,
@@ -95,7 +96,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     seq: Number(record.seq),
     sender: String(record.sender),
     sender_turn: record.sender_turn === null ? null : String(record.sender_turn),
-    envelope: JSON.parse(String(record.envelope)) as DeliveryEnvelope,
+    envelope: JSON.parse(String(record.envelope)) as StoredDeliveryEnvelope,
     body: String(record.body),
     bytes: Number(record.bytes),
     mode_requested: record.mode_requested as DeliveryRow["mode_requested"],
@@ -476,6 +477,7 @@ function checkBinding(ctx: StoreContext, request: EnqueueRequest): { readonly ex
 }
 
 export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promise<EnqueueOutcome> {
+  if (!isProvenance(request.provenance)) return refused("invalid_arguments", "Delivery provenance is required.")
   if (!DURABLE_ID_PATTERN.test(request.target_durable_id) || !DURABLE_ID_PATTERN.test(request.delivery_id)) {
     return refused("invalid_arguments", "The target session id is not a durable session id.")
   }
@@ -528,7 +530,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       seq: allocateSeq(ctx, request.target_durable_id),
       sender: request.sender_principal,
       sender_turn: request.sender_turn,
-      envelope: { origin: request.origin, actor: request.actor, via: placement.via, root_id: placement.root_id, hop: placement.hop, delivery_id: request.delivery_id },
+      envelope: { provenance: request.provenance, origin: request.origin, actor: request.actor, via: placement.via, root_id: placement.root_id, hop: placement.hop, delivery_id: request.delivery_id },
       body: request.body,
       bytes,
       mode_requested: request.mode,
@@ -878,6 +880,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           sender,
           sender_turn: null,
           envelope: {
+            provenance: { workspace: "unclassified", project: "legacy-mailbox" },
             origin: { external: { platform: "legacy_mailbox", account_id: user, chat_id: directory, thread_id: "@chat", message_id: item.operation_id } },
             actor: "legacy thread mailbox",
             via: [sender],

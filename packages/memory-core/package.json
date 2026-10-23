@@ -28,6 +28,9 @@
     },
     "./keyring": {
       "import": "./src/sync/keyring-port.ts"
+    },
+    "./memory-hook": {
+      "import": "./src/memfs/memory-hook.ts"
     }
   },
   "scripts": {

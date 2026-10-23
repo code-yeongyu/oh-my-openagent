@@ -10,7 +10,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 
-const REQUIRED_POINTER_MARKERS = ["<omo-mass-ulw-pointer>", "mass-ulw/SKILL.md", "read tool", "workflow tool"]
+const REQUIRED_POINTER_MARKERS = ["<omo-mass-ulw-mode>", "mass-ulw/SKILL.md", "read tool", "workflow tool"]
 const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 
 function collectFiles(root, files) {
@@ -100,7 +100,7 @@ function runSelfTest() {
     writeFileSync(
       join(sessionDir, "probe.jsonl"),
       `${JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text: "mass ulw please respond" }] } })}\n` +
-        `${JSON.stringify({ type: "custom_message", customType: MASS_ULW_CUSTOM_TYPE, display: false, content: "<omo-mass-ulw-pointer>mass-ulw/SKILL.md</omo-mass-ulw-pointer>" })}\n`,
+        `${JSON.stringify({ type: "custom_message", customType: MASS_ULW_CUSTOM_TYPE, display: false, content: "<omo-mass-ulw-mode>mass-ulw/SKILL.md</omo-mass-ulw-mode>" })}\n`,
     )
     const probed = inspectSession(sandbox.agentDir)
     if (probed.userTexts.length !== 1 || probed.userTexts[0] !== "mass ulw please respond") {
@@ -137,7 +137,7 @@ function main() {
     )
     const run = spawnSync(
       resolvedSenpi,
-      ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", "mass ulw please orchestrate the docs refresh"],
+      ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1", "run mass ulw on the docs refresh"],
       {
         cwd: sandbox.cwd,
         env: { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, OMO_SENPI_QA: "1" },
@@ -150,7 +150,7 @@ function main() {
     const missingMarkers = REQUIRED_POINTER_MARKERS.filter((marker) => !transcript.includes(marker))
     const session = inspectSession(sandbox.agentDir)
     const pointerInjected = run.status === 0 && missingMarkers.length === 0
-    const userTextClean = session.userTexts.length > 0 && session.userTexts.every((text) => !text.includes("<omo-mass-ulw-pointer>"))
+    const userTextClean = session.userTexts.length > 0 && session.userTexts.every((text) => !text.includes("<omo-mass-ulw-mode>"))
     const hiddenInjectionOk =
       session.hiddenPointers.length === 1 &&
       session.visiblePointers.length === 0 &&
