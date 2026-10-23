@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process"
-import { realpathSync } from "node:fs"
-import { updateUsageAnswer } from "./bin/lib/update-args.js"
+import { chmodSync, realpathSync, renameSync, rmSync } from "node:fs"
+import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
@@ -13,6 +13,8 @@ export type ProbeOwner = (path: string, platform: NodeJS.Platform) => PackageOwn
 /** Runs one ownership query; undefined when the tool is missing, fails, or prints nothing. */
 export type RunOwnerQuery = (command: string, args: readonly string[]) => string | undefined
 export type CompiledUpdateResult = { readonly output: string; readonly exitCode: number; readonly stream?: "stdout" | "stderr" }
+/** Downloads `url` and puts it at `destination` as release `version`; throws when anything fails. */
+export type ReplaceBinary = (url: string, destination: string, platform: NodeJS.Platform, version: string) => Promise<void>
 
 // omo-ai publishes betas as `5.0.0-0.beta.90` while the GitHub release is tagged `v5.0.0-beta.90`.
 export function releaseVersionOf(omoAiVersion: string): string {
@@ -67,6 +69,34 @@ export function replaceCommand(url: string, destination: string, platform: NodeJ
   }
   const next = posixQuote(`${destination}.new`)
   return `curl -fsSL ${posixQuote(url)} -o ${next} && chmod +x ${next} && mv -f ${next} ${posixQuote(destination)}`
+}
+
+/**
+ * What `replaceCommand` does, in-process: download next to the binary, prove the download is the release
+ * it claims to be by running its `--version`, then swap it in by rename (never overwrite a running
+ * executable). A failure before the swap leaves the installed binary untouched.
+ */
+export const downloadAndSwapBinary: ReplaceBinary = async (url, destination, platform, version) => {
+  const next = `${destination}.new`
+  try {
+    const response = await fetch(url, { headers: { "User-Agent": "omo" }, signal: AbortSignal.timeout(600_000) })
+    if (!response.ok) throw new Error(`download answered ${response.status}`)
+    await Bun.write(next, response)
+    chmodSync(next, 0o755)
+    // An inherited BUN_BE_BUN (exported by the `bun` CLI to its children) makes a compiled binary answer as bun.
+    const { BUN_BE_BUN: _asBun, ...env } = process.env
+    const probe = spawnSync(next, ["--version"], { encoding: "utf8", env, timeout: 120_000, windowsHide: true })
+    if (probe.status !== 0 || !probe.stdout.startsWith(`omo ${version} `)) {
+      throw new Error(`the downloaded binary did not report omo ${version} (${(probe.stdout || probe.stderr || String(probe.error ?? "")).trim().split("\n")[0]})`)
+    }
+    if (platform === "win32") {
+      rmSync(`${destination}.old`, { force: true })
+      renameSync(destination, `${destination}.old`)
+    }
+    renameSync(next, destination)
+  } finally {
+    rmSync(next, { force: true })
+  }
 }
 
 const runOwnerQuery: RunOwnerQuery = (command, args) => {
@@ -125,6 +155,8 @@ export async function compiledUpdate(options: {
   readonly fetchReleases: FetchReleases
   readonly args?: readonly string[]
   readonly probeOwner?: ProbeOwner
+  /** Installs the newer release; without it (or with --dry-run / --print) the replace command is printed. */
+  readonly replaceBinary?: ReplaceBinary
 }): Promise<CompiledUpdateResult> {
   const usage = options.args === undefined ? undefined : updateUsageAnswer(options.args)
   if (usage !== undefined) return { output: usage.text, exitCode: usage.exitCode, stream: usage.stream }
@@ -142,6 +174,16 @@ export async function compiledUpdate(options: {
     return { output: `omo update could not resolve a release (${reason}). Download ${asset} from ${RELEASES_URL}`, exitCode: 1 }
   }
   if (target === undefined) return { output: `omo ${current} is the newest ${current.includes("-") ? "beta" : "stable"} release`, exitCode: 0 }
-  const command = replaceCommand(`${RELEASES_URL}/download/v${target}/${asset}`, options.destination, options.platform)
-  return { output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`, exitCode: 0 }
+  const url = `${RELEASES_URL}/download/v${target}/${asset}`
+  const command = replaceCommand(url, options.destination, options.platform)
+  if (options.replaceBinary === undefined || (options.args !== undefined && isPrintOnlyUpdate(options.args))) {
+    return { output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`, exitCode: 0 }
+  }
+  try {
+    await options.replaceBinary(url, options.destination, options.platform, target)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    return { output: `omo update could not install ${target} (${reason}). Replace this binary by hand with:\n${command}`, exitCode: 1, stream: "stderr" }
+  }
+  return { output: `omo updated ${current} -> ${target} (${options.destination}). Restart omo to use it.`, exitCode: 0 }
 }

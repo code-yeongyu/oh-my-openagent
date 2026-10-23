@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { answerCompiledFastPath } from "../compile-entry"
-import { compiledUpdate, releaseAssetName, RELEASES_URL, replaceCommand } from "../compiled-update"
+import { compiledUpdate, releaseAssetName, RELEASES_URL, type ReplaceBinary, replaceCommand } from "../compiled-update"
 
 afterEach(() => {
   process.exitCode = 0
@@ -8,10 +8,13 @@ afterEach(() => {
 
 const ASSET = releaseAssetName(undefined, "linux", "x64")
 const DESTINATION = "/opt/omo-release/omo"
-const AVAILABLE = `omo 9.9.10 is available (running 9.9.9). Replace this binary with:\n${replaceCommand(`${RELEASES_URL}/download/v9.9.10/${ASSET}`, DESTINATION, "linux")}`
+const ASSET_URL = `${RELEASES_URL}/download/v9.9.10/${ASSET}`
+const COMMAND = replaceCommand(ASSET_URL, DESTINATION, "linux")
+const AVAILABLE = `omo 9.9.10 is available (running 9.9.9). Replace this binary with:\n${COMMAND}`
 
-async function releaseUpdate(args: string[] | undefined) {
+async function releaseUpdate(args: string[] | undefined, replace?: ReplaceBinary) {
   let lookups = 0
+  const installs: Parameters<ReplaceBinary>[] = []
   const result = await compiledUpdate({
     omoAiVersion: "9.9.9",
     releaseTarget: undefined,
@@ -23,8 +26,12 @@ async function releaseUpdate(args: string[] | undefined) {
       return [{ tag_name: "v9.9.10", assets: [{ name: ASSET }] }]
     },
     ...(args === undefined ? {} : { args }),
+    replaceBinary: async (...call) => {
+      installs.push(call)
+      await replace?.(...call)
+    },
   })
-  return { result, lookups }
+  return { result, lookups, installs }
 }
 
 describe("compiled omo update argument handling", () => {
@@ -45,16 +52,40 @@ describe("compiled omo update argument handling", () => {
     expect(lookups).toBe(0)
   })
 
-  const printed = [undefined, ["update"], ["update", "self"], ["update", "--self"], ["update", "--dry-run"], ["update", "--print"]]
-  for (const args of printed) {
-    test(`#given ${args?.join(" ") ?? "no arguments"} #then it prints the newer release and its replace command, unchanged`, async () => {
-      const { result, lookups } = await releaseUpdate(args)
+  const printOnly = [["update", "--dry-run"], ["update", "--print"], ["update", "self", "--print"]]
+  for (const args of printOnly) {
+    test(`#given ${args.join(" ")} #then it prints the newer release and its replace command and installs nothing`, async () => {
+      const { result, lookups, installs } = await releaseUpdate(args)
       expect(result.exitCode).toBe(0)
       expect(result.output).toBe(AVAILABLE)
       expect(result.stream ?? "stdout").toBe("stdout")
       expect(lookups).toBe(1)
+      expect(installs).toEqual([])
     })
   }
+
+  const installing = [undefined, ["update"], ["update", "self"], ["update", "--self"]]
+  for (const args of installing) {
+    test(`#given ${args?.join(" ") ?? "no arguments"} #then it installs the newer release over the running binary`, async () => {
+      const { result, lookups, installs } = await releaseUpdate(args)
+      expect(result.exitCode).toBe(0)
+      expect(result.stream ?? "stdout").toBe("stdout")
+      expect(result.output).not.toContain(COMMAND)
+      expect(lookups).toBe(1)
+      expect(installs).toEqual([[ASSET_URL, DESTINATION, "linux", "9.9.10"]])
+    })
+  }
+
+  test("#given the install fails #then it exits 1 on stderr with the reason and the manual replace command", async () => {
+    const { result, installs } = await releaseUpdate(["update"], async () => {
+      throw new Error("download answered 503")
+    })
+    expect(installs).toHaveLength(1)
+    expect(result.exitCode).toBe(1)
+    expect(result.stream).toBe("stderr")
+    expect(result.output).toContain("download answered 503")
+    expect(result.output).toEndWith(`\n${COMMAND}`)
+  })
 })
 
 describe("compiled fast path update argument handling", () => {

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**`omo update` on the release binary now installs the update.** It used to only print a curl-and-mv command, although `omo update --help` says only `--dry-run` / `--print` print. It now downloads the release asset next to the binary, checks that the download reports the target version, and swaps it in by rename; `--dry-run` and `--print` still only print. If the download, check or swap fails, the installed binary is left alone, and the command exits 1 with the reason and the manual command. Package-manager installs are still refused as before.
+
 **The engine publishes its OpenTelemetry schema artifact.** `telemetry-schema.json` describes exactly what an OTel client of the engine may send, generated from the event schemas and kept byte-exact by a drift gate, so the telemetry collector can pin and enforce it. It is separate from the anonymous PostHog events, which are unchanged ([#10980](https://github.com/code-yeongyu/oh-my-openagent/pull/10980)).
 
 **Reading the end of a long session takes 42 ms and 68 MB instead of 40 s and 1.8 GB.** `session_read`, `session_search` and `session_info` page through OpenCode's message API instead of loading the whole session: on a 23,000-message session, `session_read` with `limit: 2, from_end: true` dropped from 39.6 s and 1,848 MB peak memory to 42 ms and 68 MB, and a search that runs out its 60-second timeout now stops reading when it returns, where it used to read another 228 MB in the background ([#10738](https://github.com/code-yeongyu/oh-my-openagent/issues/10738), [#10741](https://github.com/code-yeongyu/oh-my-openagent/pull/10741)).
