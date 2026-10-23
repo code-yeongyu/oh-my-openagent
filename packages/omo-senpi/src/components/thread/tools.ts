@@ -28,6 +28,7 @@ import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
+import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostView, type ThreadHostViewRequest, type ThreadToolSurfaceOptions } from "./tools/ports"
@@ -172,14 +173,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
 
   // Fuzzy candidates follow the exact ladder's scope: the caller's workspace unless all_scope.
   const fuzzyCandidates = (entries: ThreadAddressEntry[], allScope: boolean | undefined) => allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
-  const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value) => {
+  const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value, _operationId, callerId) => {
     const entries = resolveEntries(options, current)
     if (value.name !== undefined) { const conflict = checkNameConflict(entries, value.name); if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult }
     const skills = value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
     if (skills?.kind === "invalid") return failure("invalid_arguments", `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`, "Pass skill names as listed by the skill index.", { invalid: skills.names })
     const loaded = skills?.kind === "ok" ? skills.names : undefined
     const session = await options.host.openSession({ cwd: value.cwd, forkFrom: value.fork_from, name: value.name, ...(loaded === undefined ? {} : { initialSkills: loaded }) })
-    return { kind: "ok", thread: { ...summary(session), ...(loaded === undefined ? {} : { requested_skills: loaded }) }, deduplicated: false }
+    return recordThreadCreator(options, current, callerId, { kind: "ok", thread: { ...summary(session), ...(loaded === undefined ? {} : { requested_skills: loaded }) }, deduplicated: false })
   }) }
   const list: AnyTool = {
     ...metadata("thread_list"),
@@ -311,10 +312,14 @@ async function deliverThroughGateway(
   return { kind: "ok", thread, resolved_by: resolvedBy, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }
 }
 
-/** Registers the seventeen tools; `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys. */
-export function registerThreadTools(pi: { registerTool(tool: Record<string, unknown>): void }, options: ThreadToolSurfaceOptions): { readonly dispose: () => void } {
+/**
+ * Registers the seventeen tools, and with `pi.on` the store extensions' session tools at each `session_start`
+ * (`tools/extension-tools.ts`); `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys.
+ */
+export function registerThreadTools(pi: ExtensionToolHost, options: ThreadToolSurfaceOptions, log: (line: string) => void = () => undefined): { readonly dispose: () => void } {
   const built = buildThreadTools(options)
   for (const tool of built.tools) pi.registerTool({ ...tool })
+  if (pi.on !== undefined) registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
   return { dispose: built.dispose }
 }
 
