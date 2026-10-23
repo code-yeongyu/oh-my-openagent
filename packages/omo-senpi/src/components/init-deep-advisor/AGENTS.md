@@ -1,12 +1,12 @@
 # init-deep-advisor component
 
-Session-start advisor that reads `.omo/init-deep.json` and proposes rerunning the `init-deep` skill when the repo has drifted since the snapshot (or was never initialized). UI-only: no UI, no proposal. Decision state (declines, cooldowns, last-proposed HEAD) lives under `<omo-state>/init-deep-advisor-state/`, keyed by a sha256 of the repo's realpathed git common dir, so worktrees of one repo share state.
+First-prompt advisor that reads `.omo/init-deep.json` and proposes rerunning the `init-deep` skill when the repo has drifted since the snapshot (or was never initialized). It arms only on the first real prompt of an interactive session (the onboarding entry rule from the #2197 fix), so background RPC sessions that open and close without a prompt never trigger it. UI-only: no UI, no proposal. Decision state (declines, cooldowns, last-proposed HEAD) lives under `<omo-state>/init-deep-advisor-state/`, keyed by a sha256 of the repo's realpathed git common dir, so worktrees of one repo share state.
 
 ## Anatomy
 
 | Path | Purpose |
 |------|---------|
-| `component.ts` | `session_start` (reason `startup` only) registration; preflight: hasUI, `omo-senpi-init-deep-advisor-disabled` flag, git repo check, onboarding-marker gate; lazy-imports the runtime (`omo-init-deep-advisor.js` when bundled). |
+| `component.ts` | `before_agent_start` registration (`previewSafe`, first `trigger: "prompt"` turn per session only, previews and extension/delivery turns excluded); preflight: hasUI, `sessionKind === "interactive"`, `omo-senpi-init-deep-advisor-disabled` flag, git repo check, onboarding-marker gate; lazy-imports the runtime (`omo-init-deep-advisor.js` when bundled). |
 | `runtime.ts` | The driver: decline/cooldown/head gates, `computeEligibility`, `ui.select` with 60s timeout (`Run now` / `Skip this time` / `Never in this project` / `Never anywhere`), emits `omo-init-deep-advisor:run` via `sendMessage` (followUp, triggerTurn) plus an `omo-init-deep-advisor:proposed` entry. |
 | `eligibility.ts` | Routes snapshot state to a trigger: missing snapshot -> coverage gap, invalid snapshot -> `snapshot-invalid`, valid -> drift thresholds; each eligible path names exactly one trigger. |
 | `drift.ts` | `computeDrift` (commits since snapshot SHA, touched-file ratio, churn LOC ratio, days since) and `shouldProposeRefresh`. Unresolvable snapshot SHA -> `{ kind: "stale" }`, always eligible. |
@@ -41,7 +41,7 @@ Suppression, in order: global decline, project decline, 7-day cooldown (`COOLDOW
 
 ## Lifecycle
 
-session_start(startup) -> preflight (UI, flag, git repo, onboarding marker older than process start) -> gates (declines, cooldown) -> eligibility -> record proposed HEAD -> `ui.select` -> on "Run now", followUp message telling the agent to read `<builtin-skills>/init-deep/SKILL.md`, plus the `:proposed` entry with a `suggestedMode` derived from whether `AGENTS.md` is git-tracked.
+before_agent_start(first real prompt, interactive session) -> preflight (UI, session kind, flag, git repo, onboarding marker older than process start) -> gates (declines, cooldown) -> eligibility -> record proposed HEAD -> `ui.select` -> on "Run now", followUp message telling the agent to read `<builtin-skills>/init-deep/SKILL.md`, plus the `:proposed` entry with a `suggestedMode` derived from whether `AGENTS.md` is git-tracked.
 
 ## Anti-patterns
 
