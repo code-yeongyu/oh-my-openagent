@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Preemptive compaction keeps its guard after a timed-out summary and rejects empty summaries.** Stale token usage no longer immediately re-fires compaction after an abandoned attempt. ([#8473](https://github.com/code-yeongyu/oh-my-openagent/pull/8473))
+
 **Reading the end of a long session takes 42 ms and 68 MB instead of 40 s and 1.8 GB.** `session_read`, `session_search` and `session_info` page through OpenCode's message API instead of loading the whole session: on a 23,000-message session, `session_read` with `limit: 2, from_end: true` dropped from 39.6 s and 1,848 MB peak memory to 42 ms and 68 MB, and a search that runs out its 60-second timeout now stops reading when it returns, where it used to read another 228 MB in the background ([#10738](https://github.com/code-yeongyu/oh-my-openagent/issues/10738), [#10741](https://github.com/code-yeongyu/oh-my-openagent/pull/10741)).
 
 **Automated Windows runs no longer send anonymous usage stats.** A run whose home folder is a temporary one, such as a CI job or a test runner, is recognised on Windows too, and a home folder that cannot be found now turns usage stats off rather than on. A real profile under the users folder is never treated as temporary. ([#10935](https://github.com/code-yeongyu/oh-my-openagent/pull/10935))
