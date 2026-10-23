@@ -30,7 +30,7 @@ export class WorkpoolError extends Error {
 export type WorkpoolItem = WorkpoolInput & {
   readonly item_id: ItemId
   readonly status: "queued" | "assigned" | "completed" | "error" | "cancelled"
-  readonly binding?: { readonly task_id: string; readonly run_epoch: number; readonly generation: number }
+  readonly binding?: { readonly task_id: string; readonly run_epoch: number; readonly generation: number; readonly admission_revision?: number }
   readonly delivery?: { readonly phase: "queued" | "dispatching" | "acknowledged"; readonly message_sha256?: string }
   readonly data?: Json
   readonly error?: { readonly code: string; readonly message: string }

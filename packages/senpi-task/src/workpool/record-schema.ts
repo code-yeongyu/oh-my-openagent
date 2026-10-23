@@ -34,7 +34,7 @@ export const WorkpoolRecordSchema = z.strictObject({
   items: z.array(z.strictObject({
     key: nonempty, input: z.json(), item_id: z.templateLiteral(["wi_", z.string()]).refine(id => /^wi_[0-9a-f]{32}$/.test(id)),
     status: z.enum(["queued", "assigned", "completed", "error", "cancelled"]),
-    binding: z.strictObject({ task_id: taskId, run_epoch: epoch, generation: z.number().int().positive() }).optional(),
+    binding: z.strictObject({ task_id: taskId, run_epoch: epoch, generation: z.number().int().positive(), admission_revision: z.number().int().positive().optional() }).optional(),
     delivery: z.strictObject({ phase: z.enum(["queued", "dispatching", "acknowledged"]), message_sha256: z.string().regex(/^[0-9a-f]{64}$/).optional() }).optional(),
     data: z.json().optional(), error: z.strictObject({ code: nonempty, message: z.string() }).optional(),
     yield_sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
