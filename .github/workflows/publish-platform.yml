@@ -556,7 +556,7 @@ jobs:
               # A fresh hosted runner reads the tool-cache Python cold: the first Python kernel start took
               # 3.2-9.5 s against a 10 s cell budget, and 0.25-0.4 s once warm (#10904). Import the stdlib
               # modules the kernel prelude loads before the smoke so its Python cell measures the kernel.
-              python -c "import ast, asyncio, base64, codecs, contextlib, contextvars, ctypes, dataclasses, gc, importlib, inspect, io, json, locale, math, os, queue, re, signal, subprocess, threading, time, traceback, types, typing, uuid, urllib.error, urllib.parse, urllib.request, concurrent.futures, pathlib"
+              bun script/qa/python-kernel-warmup.mjs
               bun script/qa/omo-native-eval-smoke.mjs "$BIN"
               ;;
             windows-arm64)
@@ -775,27 +775,61 @@ jobs:
             fi
           done
 
+      # A failed publish must fail the job (no continue-on-error), or `gh run rerun --failed` never retries
+      # it and publish-main only finds the gap at its registry check. Only the TLOG 409 is retried (at most twice): Sigstore can
+      # store an entry, answer npm's first POST with a 5xx, then refuse the re-POST of the same signature with
+      # TLOG_CREATE_ENTRY_ERROR "(409) an equivalent entry already exists", which aborts before the upload. A fresh
+      # publish signs anew, so the retry keeps provenance; only a second 409 falls back to no provenance.
+      - name: Write npm publish helper
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
+        run: |
+          cat > "$RUNNER_TEMP/npm-publish.sh" <<'HELPER'
+          set -uo pipefail
+          dist_tag="${1:-}"
+          args=(--access public --loglevel verbose)
+          if [ -n "$dist_tag" ]; then
+            args+=(--tag "$dist_tag")
+          fi
+          log="$(mktemp)"
+          trap 'rm -f "$log"' EXIT
+          is_tlog_409() {
+            grep -q "TLOG_CREATE_ENTRY_ERROR" "$log" && grep -q "equivalent entry already exists" "$log"
+          }
+          on_registry() {
+            local name version
+            name="$(node -p "require('./package.json').name")"
+            version="$(node -p "require('./package.json').version")"
+            [ "$(npm view "${name}@${version}" version 2>/dev/null)" = "$version" ]
+          }
+          NPM_CONFIG_PROVENANCE=true npm publish "${args[@]}" --provenance 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          [ "$status" -eq 0 ] && exit 0
+          is_tlog_409 || exit "$status"
+          on_registry && { echo "already on the registry after the TLOG 409"; exit 0; }
+          echo "::warning::Sigstore refused a re-sent transparency-log entry (409); retrying once with a fresh provenance signature"
+          NPM_CONFIG_PROVENANCE=true npm publish "${args[@]}" --provenance 2>&1 | tee "$log"
+          status=${PIPESTATUS[0]}
+          [ "$status" -eq 0 ] && exit 0
+          is_tlog_409 || exit "$status"
+          on_registry && { echo "already on the registry after the TLOG 409"; exit 0; }
+          echo "::warning::the provenance retry hit the same TLOG 409; publishing once more without provenance"
+          NPM_CONFIG_PROVENANCE=false npm publish "${args[@]}" --provenance=false
+          exit $?
+          HELPER
+
       - name: Publish oh-my-opencode-${{ matrix.platform }}
         if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
-        continue-on-error: true
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
-          NPM_CONFIG_PROVENANCE: true
         run: |
           cd "packages/oh-my-opencode-${{ matrix.platform }}"
-
-          if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
-          else
-            npm publish --access public --provenance --loglevel verbose
-          fi
+          bash "$RUNNER_TEMP/npm-publish.sh" "$DIST_TAG"
         timeout-minutes: 15
 
       - name: Publish oh-my-openagent-${{ matrix.platform }}
         if: always() && steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
-          NPM_CONFIG_PROVENANCE: true
         run: |
           cd "packages/oh-my-opencode-${{ matrix.platform }}"
 
@@ -805,11 +839,7 @@ jobs:
              '.name = $name | .description = $desc' \
              package.json > tmp.json && mv tmp.json package.json
 
-          if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
-          else
-            npm publish --access public --provenance --loglevel verbose
-          fi
+          bash "$RUNNER_TEMP/npm-publish.sh" "$DIST_TAG"
         timeout-minutes: 15
 
       - name: Write job summary

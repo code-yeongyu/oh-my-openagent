@@ -87,13 +87,14 @@ function optionalTotal(key: string, value: number | undefined): DelegationProper
 }
 
 // A reported zero cost is a fact; an absent cost is not a zero. `cost_usd` therefore ships only
-// alongside `cost_status: "reported"`, and a non-finite figure degrades to `invalid`.
+// alongside `cost_status: "reported"` or `"partial"` (a lower bound: some turns reported no cost),
+// and a non-finite figure degrades to `invalid`.
 function costOf(stats: TaskRunStats | undefined): DelegationProperties {
   const status = stats?.cost_status ?? "unavailable"
   const cost = stats?.cost_usd
-  if (status !== "reported") return { cost_status: status }
+  if (status !== "reported" && status !== "partial") return { cost_status: status }
   if (cost === undefined || !Number.isFinite(cost) || cost < 0) return { cost_status: "invalid" }
-  return { cost_status: "reported", cost_usd: cost }
+  return { cost_status: status, cost_usd: cost }
 }
 
 // The tracker measures active execution time; a reconciled record has only its timestamps, and a

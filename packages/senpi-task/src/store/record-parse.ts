@@ -1,11 +1,4 @@
-import {
-  BACKGROUND_MODES,
-  RESIDENCY_STATES,
-  TASK_STATUSES,
-  type BackgroundMode,
-  type TaskRecord,
-} from "../state"
-import { AWAITING_INPUT_REASONS } from "../state/types"
+import { RESIDENCY_STATES, TASK_STATUSES, type TaskRecord } from "../state"
 import { parseTaskId } from "../state/id"
 import {
   parseNotification,
@@ -26,6 +19,15 @@ import {
   readOptionalTaskStartFailureReason,
 } from "./start-failure-parse"
 import { parseRunStats } from "./run-stats-parse"
+import {
+  parseOptionalAwaitingInput,
+  parseOptionalCancelRequest,
+  parseOptionalClosingChild,
+  parseOptionalReviveDeliveryUncertainty,
+  parseOptionalStartQueued,
+  readOptionalBackgroundMode,
+  readOptionalPriorRunsCost,
+} from "./record-optional-fields-parse"
 import { parseOptionalProvisionalExit } from "./provisional-exit-parse"
 import { parseUncertainInputs } from "./input-effects-parse"
 import { parseOptionalParentModelFallback } from "./parent-model-fallback-parse"
@@ -86,6 +88,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const owner = parseOptionalOwner(value)
   const pendingSteering = parseOptionalPendingSteering(value, path, warnings)
   const runStats = value["run_stats"] === undefined ? undefined : parseRunStats(value["run_stats"])
+  const priorRunsCost = readOptionalPriorRunsCost(value)
   const taskSeq = readOptionalNumber(value, "task_seq")
   const configGeneration = readOptionalNumber(value, "config_generation")
   const backgroundMode = readOptionalBackgroundMode(value)
@@ -169,6 +172,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(failureReason === undefined ? {} : { failure_reason: failureReason }),
     ...(killed === undefined ? {} : { killed }),
     ...(runStats === undefined ? {} : { run_stats: runStats }),
+    ...(priorRunsCost === undefined ? {} : { prior_runs_cost_usd: priorRunsCost }),
     ...(taskSeq === undefined ? {} : { task_seq: taskSeq }),
     ...(configGeneration === undefined ? {} : { config_generation: configGeneration }),
     ...(backgroundMode === undefined ? {} : { background_mode: backgroundMode }),
@@ -188,71 +192,6 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(cancelRequested === undefined ? {} : { cancel_requested: cancelRequested }),
     ...(awaitingInput === undefined ? {} : { awaiting_input: awaitingInput }),
     ...(provisionalExit === undefined ? {} : { provisional_exit: provisionalExit }),
-  }
-}
-
-function parseOptionalAwaitingInput(record: Record<string, unknown>): TaskRecord["awaiting_input"] {
-  const value = record["awaiting_input"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("awaiting_input is not an object")
-  const reason = readString(value, "reason")
-  if (!(AWAITING_INPUT_REASONS as readonly string[]).includes(reason)) throw new Error(`awaiting_input.reason is not a known reason: ${reason}`)
-  return { reason: reason as NonNullable<TaskRecord["awaiting_input"]>['reason'], since: readString(value, "since") }
-}
-
-function parseOptionalCancelRequest(record: Record<string, unknown>): TaskRecord["cancel_requested"] {
-  const value = record["cancel_requested"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("cancel_requested is not an object")
-  const reason = readOptionalString(value, "reason")
-  return { requested_at: readString(value, "requested_at"), ...(reason === undefined ? {} : { reason }) }
-}
-
-function parseOptionalClosingChild(record: Record<string, unknown>): TaskRecord["fallback_closing_child"] {
-  const value = record["fallback_closing_child"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("fallback_closing_child is not an object")
-  const pid = readOptionalNumber(value, "pid")
-  const hostSession = parseOptionalHostSession(value)
-  const confirmation = readOptionalBoolean(value, "requires_confirmation")
-  return {
-    ...(pid === undefined ? {} : { pid }),
-    ...(hostSession === undefined ? {} : { host_session: hostSession }),
-    ...(confirmation === undefined ? {} : { requires_confirmation: confirmation }),
-  }
-}
-
-function parseOptionalStartQueued(record: Record<string, unknown>): TaskRecord["start_queued"] {
-  const value = record["start_queued"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("start_queued is not an object")
-  return {
-    model: readString(value, "model"),
-    queued_at: readString(value, "queued_at"),
-    queue_position: readNumber(value, "queue_position"),
-  }
-}
-
-function parseOptionalReviveDeliveryUncertainty(record: Record<string, unknown>): TaskRecord["revive_delivery_uncertain"] {
-  const value = record["revive_delivery_uncertain"]
-  if (value === undefined) return undefined
-  if (!isRecord(value)) throw new Error("revive_delivery_uncertain is not an object")
-  return {
-    run_epoch: readNumber(value, "run_epoch"),
-    message_sha256: readString(value, "message_sha256"),
-  }
-}
-
-function readOptionalBackgroundMode(record: Record<string, unknown>): BackgroundMode | undefined {
-  const mode = readOptionalString(record, "background_mode")
-  if (mode === undefined) return undefined
-  switch (mode) {
-    case "foreground":
-    case "background":
-    case "promoted":
-      return mode
-    default:
-      throw new Error(`background_mode must be one of ${BACKGROUND_MODES.join(", ")}`)
   }
 }
 

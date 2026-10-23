@@ -49,7 +49,7 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 |------|---------|------------|
 | `PermissionDenied` | The OS permission for capture, input or accessibility is missing | Grant it to the app that launches OmO; see [Set up your operating system](../guide/computer-use.md#set-up-your-operating-system) |
 | `Suspended` | The user pressed the stop chord (on macOS and X11 only a physical press counts; a posted or XTEST chord is ignored) or ran `/computer stop` | Stop acting; only the user runs `/computer resume` |
-| `StopPathUnavailable` | The global stop chord could not be armed, so input is refused | Use a host where the chord arms, or `allow_host_relay_only_stop` |
+| `StopPathUnavailable` | The global stop chord could not be armed, or cannot hear keys (`secure-input-active`: macOS Secure Event Input is on), so input is refused; an in-flight `typeText` stops at the next character, and a menu walk at the next menu level, with this code; no stop latches | Use a host where the chord arms, or `allow_host_relay_only_stop`; for `secure-input-active`, wait for the user to leave the password field |
 | `ScreenLocked` | The screen is locked | Unlock the session |
 | `BackgroundUnavailable` | The target refuses background delivery | Use accessibility actions or `delivery: "foreground"` |
 | `ControlRequired` | Foreground delivery, `raiseWindow`, or input on the desktop or a display without this session's live control grant | A consent-capable host confirms with the human, then calls `control.grant`; a bridge client (`--oneshot`, MCP) cannot grant, so target a window for background delivery |
