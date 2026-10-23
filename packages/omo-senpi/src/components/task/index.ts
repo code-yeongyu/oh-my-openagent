@@ -159,7 +159,8 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         },
         settings: engine.settings,
       })
-      engine.onStoreMutation(() => {
+      engine.onStoreMutation((change) => {
+        statusUi.observeRecord(change)
         statusUi.scheduleSync()
         dagRuntime.sync()
         void resumptionChannels.emitIfChanged().catch((error: unknown) => {

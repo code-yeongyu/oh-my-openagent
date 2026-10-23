@@ -78,6 +78,9 @@ pub enum StopPathReason {
     HostRelayNotAllowed,
     /// The macOS SkyLight receipt canary failed (reported by the backend).
     SkylightCanaryFailed,
+    /// macOS Secure Event Input is on (a focused password field, Secure
+    /// Keyboard Entry), so the stop chord cannot be heard until it ends.
+    SecureInputActive,
 }
 
 impl StopPathReason {
@@ -89,6 +92,7 @@ impl StopPathReason {
             Self::HeartbeatStale => "heartbeat-stale",
             Self::HostRelayNotAllowed => "host-relay-not-allowed",
             Self::SkylightCanaryFailed => "skylight-canary-failed",
+            Self::SecureInputActive => "secure-input-active",
         }
     }
 }
@@ -101,11 +105,13 @@ impl SupervisorStatus {
         match (self.stop_path, self.heartbeat_fresh) {
             (ActiveStopPath::None, _) => Some(match self.global_failure {
                 Some(StopPathFailure::AccessibilityDenied) => StopPathReason::AccessibilityDenied,
+                Some(StopPathFailure::SecureInput) => StopPathReason::SecureInputActive,
                 _ => StopPathReason::NoGlobalListener,
             }),
             (ActiveStopPath::HostRelay, _) if !policy.allow_host_relay_only => {
                 Some(match self.global_failure {
                     Some(StopPathFailure::AccessibilityDenied) => StopPathReason::AccessibilityDenied,
+                    Some(StopPathFailure::SecureInput) => StopPathReason::SecureInputActive,
                     _ => StopPathReason::HostRelayNotAllowed,
                 })
             }

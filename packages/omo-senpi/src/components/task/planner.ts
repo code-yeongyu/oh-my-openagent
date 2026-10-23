@@ -146,7 +146,7 @@ function unresolvableAgentTarget(
   const category = registry === undefined ? undefined : resolveCategory(agentName, omoConfig, registry)
   const categoryHint =
     category !== undefined && category.kind !== "not_found"
-      ? ` "${agentName}" is a category, not an agent — use category="${agentName}" instead.`
+      ? ` "${agentName}" is a category, not an agent: use category="${agentName}" instead.`
       : ""
   return {
     kind: "error",

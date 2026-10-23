@@ -59,18 +59,16 @@ export async function stopOwnedChildren(
 function cancelChild(context: LifecycleContext, taskId: string, reason: string): void {
   const before = context.store.load(taskId)
   if (before === null) return
-  const result = context.store.transition(taskId, {
-    type: "cancel", timestamp: nowIso(context),
-    error_message: withDroppedSteeringNotice(reason, before.pending_steering?.length ?? 0) ?? reason,
-  })
+  const result = context.store.transition(taskId, { type: "cancel", timestamp: nowIso(context), error_message: reason })
   // A child that settled on its own in the meantime keeps its own outcome: no cancelled event for it.
   if (!result.applied) return
+  // The cancel message and the steer_dropped event count the same queue: the one this mutate clears (#10866).
   let dropped = 0
   context.store.mutate(taskId, (fresh) => {
     dropped = fresh.pending_steering?.length ?? 0
     if (dropped === 0) return fresh
     const { pending_steering: _dropped, ...rest } = fresh
-    return rest
+    return { ...rest, error_message: withDroppedSteeringNotice(reason, dropped) }
   })
   if (dropped > 0) context.store.appendEvent(taskId, { type: "steer_dropped", payload: { count: dropped, reason: "cancelled" } })
   context.store.appendEvent(taskId, { type: "cancelled", payload: { previous_status: before.status, reason } })

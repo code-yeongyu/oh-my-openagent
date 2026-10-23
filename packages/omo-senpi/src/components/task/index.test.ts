@@ -93,7 +93,7 @@ function fakeUi(): CapturedUi {
   }
 }
 
-const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, dispose: () => {} }
+const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, observeRecord: () => {}, dispose: () => {} }
 const noopResumptionChannels = {
   emitSessionStart: () => Promise.resolve(),
   emitShutdown: () => Promise.resolve(),
