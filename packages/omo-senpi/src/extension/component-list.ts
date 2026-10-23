@@ -18,6 +18,7 @@ import { createMemoryComponent } from "../components/memory"
 import { createModelProfileComponent } from "../components/model-profile"
 import { createNativeBadgeComponent } from "../components/native-badge"
 import { createOnboardingComponent, createOnboardingScanComponent } from "../components/onboarding"
+import { createProcessIsolationComponent } from "../components/process-isolation"
 import { createQuestionGatesComponent } from "../components/question-gates"
 import { createSkillCommandsComponent } from "../components/skill-commands"
 import { createSidePanelComponent } from "../components/side-panel"
@@ -62,6 +63,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createBuiltinMcpsComponent(),
     createLspComponent(),
     createXSearchComponent(),
+    createProcessIsolationComponent(),
     createComputerUseComponent(),
     createFeedbackComponent(),
     createBrowserBridgeComponent(),

@@ -493,12 +493,14 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-memory-sync-runtime")')
     expect(main).toContain('import("#omo-feedback-runtime")')
     expect(main).toContain('import("#omo-claim-receipt-runtime")')
+    expect(main).toContain('import("#omo-process-isolation-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
     expect(manifest.imports).not.toHaveProperty("#omo-agent-toolkit-runtime")
     expect(manifest.imports).toEqual({
       "#omo-task-runtime": "./extensions/omo-task.js",
       "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
+      "#omo-process-isolation-runtime": "./extensions/omo-process-isolation.js",
       "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
       "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",

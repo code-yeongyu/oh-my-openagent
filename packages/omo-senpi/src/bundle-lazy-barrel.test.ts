@@ -16,6 +16,7 @@ const BUNDLE_FILES = [
   "memory-run-supervisor.mjs",
   "omo-init-deep-advisor.js",
   "omo-computer-use.js",
+  "omo-process-isolation.js",
   "omo-side-panel.js",
   "omo-onboarding-scan.js",
   "omo-memory-doctor.js",

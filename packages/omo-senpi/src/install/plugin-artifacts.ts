@@ -11,6 +11,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo.js"),
   join("extensions", "omo-task.js"),
   join("extensions", "omo-computer-use.js"),
+  join("extensions", "omo-process-isolation.js"),
   join("extensions", "omo-memory-doctor.js"),
   join("extensions", "omo-memory-memfs.js"),
   join("extensions", "omo-memory-palace.js"),

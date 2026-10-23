@@ -21,6 +21,7 @@ export async function checkExtensionCurrent(options = {}) {
     doriLayerOutput,
     doriReplayOutput,
     computerUseOutput,
+    processIsolationOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
     memoryPalaceOutput,
@@ -95,6 +96,8 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentClaimReceipt === undefined) return { ok: false, reason: "missing-output", output: claimReceiptOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
+  const currentProcessIsolation = await readBuiltEntry(processIsolationOutput)
+  if (currentProcessIsolation === undefined) return { ok: false, reason: "missing-output", output: processIsolationOutput }
   const currentGatewayStoreWorker = await readBuiltEntry(gatewayStoreWorkerOutput)
   if (currentGatewayStoreWorker === undefined) return { ok: false, reason: "missing-output", output: gatewayStoreWorkerOutput }
   const currentThreadSdk = await readBuiltEntry(threadSdkOutput)
@@ -127,6 +130,7 @@ export async function checkExtensionCurrent(options = {}) {
     feedbackOutputPath: join(tempRoot, "omo-feedback.js"),
     claimReceiptOutputPath: join(tempRoot, "omo-claim-receipt.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
+    processIsolationOutputPath: join(tempRoot, "omo-process-isolation.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
     threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
   }
@@ -158,6 +162,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentFeedback, expected.feedbackOutputPath, feedbackOutput],
       [currentClaimReceipt, expected.claimReceiptOutputPath, claimReceiptOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
+      [currentProcessIsolation, expected.processIsolationOutputPath, processIsolationOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
       [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
     ]) {

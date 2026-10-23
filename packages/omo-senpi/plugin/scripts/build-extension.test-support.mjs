@@ -31,6 +31,7 @@ export function outputPathsIn(root) {
     feedbackOutputPath: join(root, "omo-feedback.js"),
     claimReceiptOutputPath: join(root, "omo-claim-receipt.js"),
     computerUseOutputPath: join(root, "omo-computer-use.js"),
+    processIsolationOutputPath: join(root, "omo-process-isolation.js"),
     gatewayStoreWorkerOutputPath: join(root, "gateway-store-worker.mjs"),
     threadSdkOutputPath: join(root, "runtime", "thread-sdk", "sdk.js"),
   }

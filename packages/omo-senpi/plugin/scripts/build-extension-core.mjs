@@ -78,6 +78,10 @@ const onboardingScanRuntimeEntryPath = join(packageRoot, "src", "components", "o
 const onboardingScanRuntimeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-onboarding-scan.js")
 const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
 const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
+// The process-isolation guard (issue #6123) ships as its own entry: the bash hook imports it once
+// at extension registration, so omo.js carries only the wiring and the guard stays off its budget.
+const processIsolationEntryPath = join(packageRoot, "src", "components", "process-isolation", "runtime.ts")
+const processIsolationOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-process-isolation.js")
 const memoryDoctorEntryPath = join(packageRoot, "src", "components", "memory", "commands", "doctor-runtime.ts")
 const memoryMemfsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "memfs-runtime.ts")
 const memoryPalaceEntryPath = join(packageRoot, "src", "components", "memory", "palace", "runtime.ts")
@@ -136,6 +140,7 @@ const builtinModuleNames = builtinModules.filter((moduleName) => !moduleName.sta
 const externalSpecifiers = [
   "#omo-task-runtime",
   "#omo-computer-use-runtime",
+  "#omo-process-isolation-runtime",
   "#omo-memory-doctor-runtime",
   "#omo-memory-memfs-runtime",
   "#omo-memory-palace-runtime",
@@ -183,6 +188,7 @@ export const extensionBuildPaths = {
   doriLayerOutputPath,
   doriReplayOutputPath,
   computerUseOutputPath,
+  processIsolationOutputPath,
   memoryDoctorOutputPath,
   memoryMemfsOutputPath,
   memoryPalaceOutputPath,
@@ -232,6 +238,7 @@ export function resolveOutputs(options) {
     feedbackOutput: sibling(options.feedbackOutputPath, feedbackOutputPath, "omo-feedback.js"),
     claimReceiptOutput: sibling(options.claimReceiptOutputPath, claimReceiptOutputPath, "omo-claim-receipt.js"),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
+    processIsolationOutput: sibling(options.processIsolationOutputPath, processIsolationOutputPath, "omo-process-isolation.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
     gatewayRulesExtensionOutput: sibling(options.gatewayRulesExtensionOutputPath, gatewayRulesExtensionOutputPath, GATEWAY_RULES_EXTENSION_NAME),
   }
@@ -260,6 +267,7 @@ export async function buildExtension(options = {}) {
     doriLayerOutput,
     doriReplayOutput,
     computerUseOutput,
+    processIsolationOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
     memoryPalaceOutput,
@@ -301,6 +309,7 @@ export async function buildExtension(options = {}) {
   const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
   const claimReceiptInputs = await buildEntry(claimReceiptEntryPath, claimReceiptOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
+  const processIsolationInputs = await buildEntry(processIsolationEntryPath, processIsolationOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
   const gatewayRulesExtensionInputs = await buildEntry(gatewayRulesExtensionEntryPath, gatewayRulesExtensionOutput, buildDefines)
   const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, sdkExternalSpecifiers)
@@ -323,6 +332,7 @@ export async function buildExtension(options = {}) {
     doriLayerInputs,
     doriReplayInputs,
     computerUseInputs,
+    processIsolationInputs,
     memoryDoctorInputs,
     memoryMemfsInputs,
     memoryPalaceInputs,
