@@ -1,3 +1,7 @@
+import { realpathSync } from "node:fs"
+import * as os from "node:os"
+import { posix, win32 } from "node:path"
+
 import {
   createEventTelemetryClient,
   getDailyActiveCaptureState,
@@ -12,6 +16,7 @@ import {
 } from "@oh-my-opencode/telemetry-core/injected"
 import { createLazyPostHogTransportFactory } from "./lazy-posthog"
 import { isOmoTelemetryEnabled, type OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { isPathInside, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
@@ -28,6 +33,7 @@ import {
   getOmoNativeStateDir,
   hashSessionId,
 } from "./product-identity"
+import { loadEngineTables, readConnectedAccounts } from "./account-inventory"
 import { readOmoNativeInventory, type OmoNativeInventoryDiagnostic } from "./session-inventory"
 import { resolveSessionModelRegistry } from "./session-model-registry"
 
@@ -58,6 +64,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
   return {
     name: "omo-native-session",
     register(pi, ctx) {
+      void loadEngineTables()
       // Reading the inventory, loading omo config twice and building the PostHog client is ~14 ms of
       // analytics on the session_start dispatch path, and nothing in the session observes it. It
       // runs one tick past the first paint instead, still inside this session.
@@ -101,6 +108,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
         }
 
         const inventory = readOmoNativeInventory(resolveAgentHome({ env }), options.diagnostics)
+        const connectedAccounts = readConnectedAccounts(resolveAgentHome({ env }), env)
         const reason = sessionReason(payload)
         const timezone = readTimeZone(options.timeZone)
         client.captureEvent("session_started", {
@@ -111,6 +119,9 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           cpu_count: osProvider.cpus().length,
           memory_bucket: memoryBucket(osProvider.totalmem()),
           provider_count: inventory.providerCount,
+          signed_in_provider_count: inventory.signedInProviderCount,
+          configured_provider_count: inventory.configuredProviderCount,
+          connected_account_count: connectedAccounts,
           model_count: inventory.modelCount,
           providers: inventory.providers,
           reason,
@@ -214,11 +225,105 @@ function readTimeZone(provider: (() => string) | undefined): string | undefined 
 
 /** The one enablement decision: the env opt-out matrix plus the omo config gate for the event's cwd. */
 export function isOmoNativeTelemetryEnabled(
-  options: Pick<OmoNativeSessionOptions, "diagnostics" | "isConfigEnabled">,
+  options: Pick<OmoNativeSessionOptions, "diagnostics" | "isConfigEnabled"> & { readonly automationDeps?: TempDirDeps },
   eventCtx: unknown,
   env: TelemetryEnv,
 ): boolean {
-  return isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() }) && configEnabled(options, eventCtx, env)
+  return (
+    notAutomated(env, options.automationDeps) &&
+    isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() }) &&
+    configEnabled(options, eventCtx, env)
+  )
+}
+
+/** The automation check sits on the consent path, which must never throw: if it cannot decide, telemetry is off. */
+function notAutomated(env: TelemetryEnv, deps: TempDirDeps = {}): boolean {
+  try {
+    return automatedRunReason(env, deps) === undefined
+  } catch {
+    return false
+  }
+}
+
+const ALLOW_AUTOMATION_VALUES = ["1", "true", "yes"]
+
+/**
+ * Automated runs cannot hold a stable anonymous id (a CI job, a test runner, or a HOME inside the OS temp dir starts
+ * from nothing each time), so each one would count as a new person (#10934). Telemetry is off for them by default;
+ * `OMO_TELEMETRY_ALLOW_AUTOMATION=1` opts a deliberate run back in.
+ */
+export function automatedRunReason(
+  env: TelemetryEnv,
+  deps: TempDirDeps = {},
+): "ci" | "test_runner" | "ephemeral_home" | undefined {
+  if (ALLOW_AUTOMATION_VALUES.includes(env["OMO_TELEMETRY_ALLOW_AUTOMATION"]?.trim().toLowerCase() ?? "")) return undefined
+  const ci = env["CI"]?.trim().toLowerCase() ?? ""
+  if (ci !== "" && ci !== "0" && ci !== "false") return "ci"
+  if (env["NODE_ENV"]?.trim() === "test" || env["VITEST"] || env["JEST_WORKER_ID"]) return "test_runner"
+  const platform = deps.platform ?? process.platform
+  const home = (platform === "win32" ? env["USERPROFILE"] : env["HOME"])?.trim()
+  if (home && isInsideTempDir(home, env, deps)) return "ephemeral_home"
+  return undefined
+}
+
+/** What the temp-home check reads from the OS; injected only by tests that simulate another platform or filesystem. */
+export type TempDirDeps = PathContainmentOptions & {
+  readonly tmpdir?: () => string
+  /** The fixed POSIX temp roots checked besides os.tmpdir(); never used on win32. */
+  readonly posixTempRoots?: readonly string[]
+}
+
+const POSIX_TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
+const POSIX_USERS_DIRS = ["/Users", "/home", "/var/home"]
+const POSIX_ROOT_HOMES = ["/root", "/var/root"]
+
+/**
+ * Whether `path` (the HOME being classified) is a home that cannot hold a stable install id (#10934, #10935).
+ *
+ * - A HOME that cannot be resolved cannot hold anything either: it counts as ephemeral, so the check fails toward
+ *   telemetry OFF, never ON.
+ * - A real account profile, a direct child of the OS users directory (`/Users/<name>`, `/home/<name>`,
+ *   `C:\Users\<name>`) or root's home, is never ephemeral, whatever TMPDIR says (TMPDIR=/, =/Users, =the home).
+ *   The account home is taken from the path's shape, not from os.userInfo(): under Bun that reads HOME/USERPROFILE,
+ *   the very value being classified.
+ * - Otherwise it is ephemeral when it lies inside os.tmpdir() (or a fixed POSIX temp root), decided by the shared
+ *   path-containment helper: native realpath on both sides, case-insensitive on win32. A temp root that resolves to
+ *   a filesystem root is ignored.
+ */
+function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): boolean {
+  const windows = (deps.platform ?? process.platform) === "win32"
+  const paths = windows ? win32 : posix
+  const options: PathContainmentOptions = { platform: windows ? "win32" : (deps.platform ?? process.platform), ...(deps.realpath === undefined ? {} : { realpath: deps.realpath }) }
+  const realpath = deps.realpath ?? realpathSync.native
+  const resolve = (candidate: string): string | undefined => {
+    try {
+      return paths.normalize(realpath(candidate))
+    } catch {
+      return undefined
+    }
+  }
+  const same = (left: string, right: string): boolean => {
+    try {
+      return isPathInside(left, right, options) && isPathInside(right, left, options)
+    } catch {
+      return false
+    }
+  }
+  const target = resolve(path)
+  if (target === undefined) return true
+  const usersDirs = windows ? [win32.join(`${env["SystemDrive"]?.trim() || "C:"}\\`, "Users")] : POSIX_USERS_DIRS
+  const rootHomes = windows ? [] : POSIX_ROOT_HOMES
+  if (usersDirs.some((dir) => same(paths.dirname(target), dir)) || rootHomes.some((home) => same(target, home))) return false
+  const candidates = [(deps.tmpdir ?? os.tmpdir)(), ...(windows ? [] : (deps.posixTempRoots ?? POSIX_TEMP_ROOTS))]
+  return candidates.some((candidate) => {
+    const root = resolve(candidate)
+    if (root === undefined || paths.dirname(root) === root) return false
+    try {
+      return isPathInside(path, candidate, options)
+    } catch {
+      return false
+    }
+  })
 }
 
 function configEnabled(

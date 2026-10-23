@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import { loadEngineTables } from "./account-inventory"
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "bun:test"
@@ -11,7 +12,7 @@ import {
 } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { getSenpiTelemetryStateDir, SENPI_TELEMETRY_EVENT_NAME } from "./index"
-import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
+import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir, getOmoNativeInstallIdPath } from "./product-identity"
 import { createOmoNativeSessionComponent } from "./omo-native-session"
 import {
   FIXED_NOW,
@@ -254,7 +255,7 @@ describe("OmO Native session telemetry", () => {
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("identity"))
 
       // then
-      const installId = readFileSync(join(getOmoNativeStateDir(createEnabledEnv(agentDir)), "install-id"), "utf8").trim()
+      const installId = readFileSync(getOmoNativeInstallIdPath(createEnabledEnv(agentDir)), "utf8").trim()
       const installHash = createHash("sha256").update(installId).digest("hex")
       const native = recorder.messages.filter(({ event }) => event !== SENPI_TELEMETRY_EVENT_NAME)
       expect(native.length).toBeGreaterThan(0)
@@ -276,7 +277,7 @@ describe("OmO Native session telemetry", () => {
       writeInventory(agentDir)
       const recorder = createRecorder()
       const env = createEnabledEnv(agentDir)
-      const installIdPath = join(getOmoNativeStateDir(env), "install-id")
+      const installIdPath = getOmoNativeInstallIdPath(env)
       await register(agentDir, recorder).dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("before"))
       const firstId = readFileSync(installIdPath, "utf8").trim()
       rmSync(installIdPath)
@@ -325,7 +326,9 @@ describe("OmO Native session telemetry", () => {
         memory_bucket: "64_plus_gb",
         model_count: 3,
         provider_count: 2,
-        providers: "anthropic",
+        signed_in_provider_count: 0,
+        configured_provider_count: 2,
+        providers: "anthropic,custom",
         reason: "fork",
       })
       expect(Object.keys(captured?.properties ?? {}).sort()).toEqual([
@@ -442,6 +445,20 @@ describe("OmO Native session telemetry", () => {
       expect(properties).not.toHaveProperty("default_provider")
       expect(properties).not.toHaveProperty("default_model")
       expect(diagnostics.filter(({ event }) => event === "omo_native_inventory_read_failed")).toHaveLength(1)
+    })
+  })
+
+  it("#given linked accounts in auth.json #when session_started emits #then connected_account_count carries the kind counts and no account detail (#10919)", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      writeInventory(agentDir)
+      writeFileSync(join(agentDir, "auth.json"), JSON.stringify({ "chatgpt-subscription": { accounts: [{ name: "me@example.com" }, { name: "two" }] } }))
+      const recorder = createRecorder()
+      const pi = register(agentDir, recorder)
+      await loadEngineTables()
+      await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("accounts"))
+      const properties = recorder.messages.find(({ event }) => event === "session_started")?.properties
+      expect(properties).toMatchObject({ connected_account_count: "chatgpt-subscription:2" })
+      expect(JSON.stringify(properties)).not.toContain("example.com")
     })
   })
 

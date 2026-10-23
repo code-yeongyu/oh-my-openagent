@@ -4,7 +4,7 @@ import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
 import { taskSkillSummary } from "./skill-result"
-import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolDeps } from "./types"
+import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDeps } from "./types"
 
 type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
@@ -22,6 +22,7 @@ export function buildStartSpec(
   deps: TaskToolDeps,
   cwd: string,
   kernelTools?: KernelToolGrant,
+  parentModel?: TaskToolContext["model"],
 ): ResolvedManagerStartSpec {
   const ancestry = deps.resolveAncestry?.(parentSessionId)
   const loadSkills = deps.loadSkills ?? createFsSkillLoader()
@@ -45,6 +46,7 @@ export function buildStartSpec(
     ...("category" in target ? { category: target.category } : { subagent_type: target.subagentType }),
     ...(executionMode === undefined ? {} : { execution_mode: executionMode }),
     ...(params.model !== undefined && { model: params.model }),
+    ...(parentModel !== undefined && { parent_model: `${parentModel.provider}/${parentModel.id}` }),
     ...(params.name !== undefined && { name: params.name }),
     ...(params.description !== undefined && { description: params.description }),
     ...(params.run_in_background !== undefined && { run_in_background: params.run_in_background }),

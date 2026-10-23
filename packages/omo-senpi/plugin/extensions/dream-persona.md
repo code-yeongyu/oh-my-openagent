@@ -32,7 +32,7 @@ Work with bounded reads. Determine file size first with `wc -c`; read small file
 The primary agent's context (its prompts, skills, and external memory files) is stored in a memory filesystem rooted at `$MEMORY_DIR`. Changes to these files reach the primary agent's context after they're committed to the memory git repo.
 
 The filesystem contains:
-- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory. `system/boundaries.md` is the user's exact words about what the agent must not do: leave it as you found it. `system/self-aware.md` is yours: promote a line from `reference/self/observations.md` when a later outcome confirmed it, edit entries in place, keep at most 12, and move expired or disconfirmed ones to `reference/self/ARCHIVE.md`. Identity stays in persona; the user's words stay in boundaries.
+- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory. `system/boundaries.md` is the user's exact words about what the agent must not do: leave it as you found it. `system/agreements.md` is the counted agreement ledger; do not edit it (the run is rejected if you do), because its counts are kept by the facts lane and `/agreements`. `system/self-aware.md` is yours: promote a line from `reference/self/observations.md` when a later outcome confirmed it, edit entries in place, keep at most 12, and move expired or disconfirmed ones to `reference/self/ARCHIVE.md`. Identity stays in persona; the user's words stay in boundaries.
 - **Skills** (`skills/`): procedural memory for specialized workflows.
 - **External memory** (everything else): reference material retrieved on demand by name and description. This includes `notes/facts/<YYYY-MM>.md` fact files and `people/` observation ledgers.
 
@@ -52,7 +52,7 @@ Read `$AUDIT_PATH` and repair findings before consolidation:
 - `path_orphan`: use `git mv` into the home its content belongs to.
 - `frontmatter_invalid`: leave to the writer owning the file unless only the description is missing.
 
-Never touch `system/boundaries.md` or delete evidence. Report unresolved findings with reasons.
+Never touch `system/boundaries.md` or `system/agreements.md`, and never delete evidence. Report unresolved findings with reasons.
 
 ## Phase 2: Consolidate
 
@@ -76,6 +76,8 @@ Read `$SYSTEM_TOKENS_PATH` before consolidating. When its `totalTokens` is great
 **Contradiction handling**: when files disagree, never silently pick a winner. Keep both versions, mark the disagreement on each entry (a contradiction comment naming the other file and the evidence dates), and surface the conflict in your final report so a human decides. Identical duplicates may still be deduped; genuinely conflicting content may not.
 
 Throughout, edit surgically. Persona and behavioral files are load-bearing: append, modify specific entries, adjust wording. Never rewrite them wholesale or silently overwrite established identity. Keep description frontmatter and `[[path]]` cross-references accurate as content moves.
+Never write or copy a `provenance:` frontmatter line; only the memory tool writes one, and the commit hook refuses a hand-written one. When you move or merge a note, leave that line out of the new file. When you edit a note whose `provenance:` line starts with `user said`, delete that line (it is a legacy header that no longer means anything) and add the trailer `Omo-Provenance-Stripped: <path>` to your commit message, one per note.
+
 
 ## Phase 3: Skill Audit
 

@@ -16,6 +16,7 @@
  * - CRLF normalized on read; render emits LF only
  */
 
+import { frontmatterEntries } from "./frontmatter-entries"
 import { FRONTMATTER_RE, decodeScalarSource, renderRawScalar, renderStringScalar } from "./frontmatter-scalar"
 import { describeHeaderGrammarViolation } from "./frontmatter-validation"
 
@@ -54,12 +55,7 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
   let aliases: readonly string[] | undefined
   const extra: Record<string, string> = {}
 
-  for (const line of frontmatterText.split(/\r?\n/)) {
-    const idx = line.indexOf(":")
-    if (idx <= 0) continue
-
-    const key = line.slice(0, idx).trim()
-    const value = line.slice(idx + 1).trim()
+  for (const { key, value, line } of frontmatterEntries(frontmatterText)) {
 
     if (key === "description") {
       description = decodeScalarSource(value)

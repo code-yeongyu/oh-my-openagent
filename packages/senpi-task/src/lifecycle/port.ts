@@ -44,6 +44,8 @@ export type ResidentHandle = {
   // Rpc: SIGTERM then SIGKILL escalation. Host-session: abort + close_session, never a signal.
   // In-process: no-op (no OS process to signal).
   terminate(): Promise<void>
+  // From here no transport recovery may bring the child back; a host reached again only ends it (omo#9403).
+  markStopping?(): void
 }
 
 // The live view of which handles are resident in THIS process, plus pending-mail state. Records

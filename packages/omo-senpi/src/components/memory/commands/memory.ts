@@ -6,11 +6,11 @@
 
 import { parseMemoryFile, type GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { parseCommandArgs } from "./args"
 import { runMemoryUnlock } from "./memory-unlock"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 function isSystemMarkdown(path: string): boolean {
   return path.startsWith("system/") && path.endsWith(".md")
@@ -47,10 +47,9 @@ function renderNameSection(title: string, paths: readonly string[]): string[] {
   return ["", `## ${title}`, ...sorted.map((path) => `- ${path}`)]
 }
 
-export function registerMemoryCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("memory", {
-    description: "View committed memory: HEAD, system bodies, external names, and uncommitted changes; unlock re-checks and removes a stranded git lock.",
-    argumentHint: "[unlock <lock path> [--force]]",
+    ...LAZY_MEMORY_COMMANDS.memory,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
