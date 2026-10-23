@@ -1,6 +1,6 @@
 {
   "name": "@code-yeongyu/omo-senpi",
-  "version": "5.1.41",
+  "version": "5.1.44",
   "private": true,
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
@@ -16,6 +16,7 @@
     "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
     "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
     "#omo-feedback-runtime": "./extensions/omo-feedback.js",
+    "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
     "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js"
   },
   "keywords": [

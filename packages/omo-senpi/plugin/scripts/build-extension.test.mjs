@@ -1,5 +1,4 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { spawnSync } from "node:child_process"
 import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
@@ -15,6 +14,7 @@ import {
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
+import { runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture } from "./build-extension.test-support.mjs"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
 
@@ -28,6 +28,11 @@ const { sharedOutputs, mutableOutputs } = fixture
 // with other build/staging files. Keep the test bounded, but give the real two-build workload enough
 // headroom under suite contention instead of timing out before the freshness assertion runs.
 setDefaultTimeout(90_000)
+
+// Each external stage of the packed-sidecar test has its own cap, and the test's own timeout is derived from
+// them with room for the build, copies and cleanup, so a stalled stage always fails by name (#10911).
+const PACKED_STAGE_CAPS = { pack: 25_000, untar: 10_000, probe: 20_000 }
+const PACKED_TEST_TIMEOUT_MS = Object.values(PACKED_STAGE_CAPS).reduce((sum, cap) => sum + cap, 0) + 35_000
 
 afterEach(fixture.cleanupTest)
 afterAll(fixture.cleanupFile)
@@ -383,12 +388,12 @@ describe("checkExtensionCurrent", () => {
       await cp(join(pluginRoot, "package.json"), join(pkg, "package.json"))
       await cp(memorySyncOutputPath, join(pkg, "extensions", "omo-memory-sync.js"))
       for (const asset of MEMORY_SYNC_ASSET_NAMES) await cp(join(dirname(memorySyncOutputPath), asset), join(pkg, "extensions", asset))
-      const packed = spawnSync("npm", ["pack", "--silent", "--pack-destination", work], { cwd: pkg, encoding: "utf8", shell: process.platform === "win32" })
+      const packed = await runBoundedStage("npm pack", "npm", ["pack", "--silent", "--pack-destination", work], { cwd: pkg, shell: process.platform === "win32" }, PACKED_STAGE_CAPS.pack)
       expect(packed.status, packed.stderr).toBe(0)
       const tarball = join(work, packed.stdout.trim().split("\n").at(-1))
       const installed = join(work, "installed")
       await mkdir(installed)
-      const untar = spawnSync("tar", ["-xzf", tarball, "-C", installed], { encoding: "utf8" })
+      const untar = await runBoundedStage("tar", systemTar(), ["-xzf", tarball, "-C", installed], {}, PACKED_STAGE_CAPS.untar)
       expect(untar.status, untar.stderr).toBe(0)
       const root = join(installed, "package")
       const listed = await readdir(join(root, "extensions"))
@@ -400,13 +405,13 @@ describe("checkExtensionCurrent", () => {
         "await sidecar.checkSyncRuntime()",
         'console.log("sync-sidecar-ok")',
       ].join("\n"))
-      const run = spawnSync("node", [probe], { cwd: parse(process.cwd()).root, encoding: "utf8", shell: process.platform === "win32" })
+      const run = await runBoundedStage("node probe", "node", [probe], { cwd: parse(process.cwd()).root }, PACKED_STAGE_CAPS.probe)
       expect(run.stdout, run.stderr).toContain("sync-sidecar-ok")
       expect(run.status, run.stderr).toBe(0)
     } finally {
       await rm(work, { recursive: true, force: true })
     }
-  }, 60000)
+  }, PACKED_TEST_TIMEOUT_MS)
 
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
@@ -423,6 +428,7 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-thread-client-runtime")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
     expect(main).toContain('import("#omo-feedback-runtime")')
+    expect(main).toContain('import("#omo-claim-receipt-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
     expect(manifest.imports).not.toHaveProperty("#omo-agent-toolkit-runtime")
@@ -437,6 +443,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",
+      "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })

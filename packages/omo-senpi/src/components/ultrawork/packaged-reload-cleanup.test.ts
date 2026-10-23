@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { cleanUpReloadRun, ownsHostSocket, type ReloadHost } from "./packaged-reload-cleanup.test-support"
+import { cleanUpReloadRun, ownsHostSocket, type ReloadHost, reloadRootParent } from "./packaged-reload-cleanup.test-support"
 
 function fakeHost(): { host: ReloadHost; signals: NodeJS.Signals[] } {
   const signals: NodeJS.Signals[] = []
@@ -229,5 +229,15 @@ describe("ownsHostSocket", () => {
 
   it("#given the root only in another argument #when matched #then it is not owned", () => {
     expect(ownsHostSocket(["--cwd", join(root, "x"), "--socket", join(tmpdir(), "other.sock")], root)).toBe(false)
+  })
+})
+
+describe("reloadRootParent", () => {
+  it.skipIf(process.platform === "win32")("#given a short runner TMPDIR #when the reload root parent is chosen #then the runner's TMPDIR is used", () => {
+    expect(reloadRootParent("/tmp/lr.Ab12Cd")).toBe("/tmp/lr.Ab12Cd")
+  })
+
+  it.skipIf(process.platform === "win32")("#given a darwin-length TMPDIR #when the host's shard socket would not fit sun_path there #then it falls back to /tmp", () => {
+    expect(reloadRootParent("/var/folders/zz/zyxvpxvq6csfxvn_n0000000000000/T")).toBe("/tmp")
   })
 })

@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { doctorCoverageLines } from "./category-coverage.js"
+import { runDoctorModels } from "./model-chains.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
 import { doctorConfigLines } from "./config-doctor.js"
 import { runDaemonCommand } from "./daemon.js"
@@ -179,6 +180,10 @@ export async function runLauncher(args = process.argv.slice(2)) {
   if (command === "doctor") {
     // Doctor is a launch too: it reports only what the launch-time preparation could not fix.
     preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
+    if (args[1] === "--models") {
+      process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
+      return
+    }
     const [categoryCoverage, computerUse, configDiagnostics, gateway] = args[1] === "--reap"
       ? [[], [], [], []]
       : await Promise.all([

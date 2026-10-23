@@ -237,9 +237,14 @@ export const OmoMemoryAgentOverridesSchema = z.object({
 // Root settings schema
 // ---------------------------------------------------------------------------
 
+// How `agent: "auto"` derives the identity: "path" hashes the checkout path, "git" maps a linked
+// git worktree onto its main working tree so every worktree of one clone shares that memory.
+export const OmoMemoryAutoIdentitySchema = z.enum(["path", "git"])
+
 export const OmoMemorySettingsSchema = z.object({
   enabled: z.boolean().default(true),
   agent: z.string().min(1).default("auto"),
+  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
   // "direct" registers the memory tools as always-on ToolDefinitions; "search" opts in to the
   // extension-declared MCP server surfaced through senpi's tool_search catalog.
   reflection: OmoMemoryReflectionSchema.default({
@@ -284,6 +289,7 @@ export const OmoMemorySettingsSchema = z.object({
 export const OmoMemorySettingsLayerSchema = z.object({
   enabled: z.boolean().optional(),
   agent: z.string().min(1).optional(),
+  auto_identity: OmoMemoryAutoIdentitySchema.optional(),
   reflection: OmoMemoryReflectionLayerSchema.optional(),
   nudge: OmoMemoryNudgeLayerSchema.optional(),
   facts: OmoMemoryFactsLayerSchema.optional(),

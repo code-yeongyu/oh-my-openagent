@@ -1442,6 +1442,9 @@
           "display_name": {
             "type": "string"
           },
+          "caution": {
+            "type": "string"
+          },
           "family": {
             "type": "string",
             "enum": [
@@ -1598,6 +1601,14 @@
           "default": "auto",
           "type": "string",
           "minLength": 1
+        },
+        "auto_identity": {
+          "default": "path",
+          "type": "string",
+          "enum": [
+            "path",
+            "git"
+          ]
         },
         "reflection": {
           "default": {
@@ -2467,6 +2478,12 @@
       "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
     },
     "disabled_skills": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exclude_models": {
       "type": "array",
       "items": {
         "type": "string"
@@ -3849,6 +3866,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -4003,6 +4023,13 @@
             "agent": {
               "type": "string",
               "minLength": 1
+            },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
             },
             "reflection": {
               "type": "object",
@@ -4728,6 +4755,12 @@
           "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_models": {
           "type": "array",
           "items": {
             "type": "string"
@@ -6110,6 +6143,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -6264,6 +6300,13 @@
             "agent": {
               "type": "string",
               "minLength": 1
+            },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
             },
             "reflection": {
               "type": "object",
@@ -6989,6 +7032,12 @@
           "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_models": {
           "type": "array",
           "items": {
             "type": "string"
@@ -8371,6 +8420,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -8525,6 +8577,13 @@
             "agent": {
               "type": "string",
               "minLength": 1
+            },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
             },
             "reflection": {
               "type": "object",
@@ -9250,6 +9309,12 @@
           "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_models": {
           "type": "array",
           "items": {
             "type": "string"
@@ -10630,6 +10695,9 @@
                 "display_name": {
                   "type": "string"
                 },
+                "caution": {
+                  "type": "string"
+                },
                 "family": {
                   "type": "string",
                   "enum": [
@@ -10784,6 +10852,13 @@
               "agent": {
                 "type": "string",
                 "minLength": 1
+              },
+              "auto_identity": {
+                "type": "string",
+                "enum": [
+                  "path",
+                  "git"
+                ]
               },
               "reflection": {
                 "type": "object",
@@ -11509,6 +11584,12 @@
             "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
           },
           "disabled_skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exclude_models": {
             "type": "array",
             "items": {
               "type": "string"
@@ -12891,6 +12972,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -13045,6 +13129,13 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -13770,6 +13861,12 @@
                 "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude_models": {
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -15152,6 +15249,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -15306,6 +15406,13 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -16031,6 +16138,12 @@
                 "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude_models": {
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -17413,6 +17526,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -17567,6 +17683,13 @@
                   "agent": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
                   },
                   "reflection": {
                     "type": "object",
@@ -18292,6 +18415,12 @@
                 "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude_models": {
                 "type": "array",
                 "items": {
                   "type": "string"

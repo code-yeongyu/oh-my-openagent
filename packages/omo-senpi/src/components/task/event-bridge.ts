@@ -1,5 +1,5 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
-import { readSessionRole } from "@oh-my-opencode/senpi-task"
+import { readSessionContext, readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
@@ -156,14 +156,28 @@ export function wireEventBridge(
               engine.settings.process_runner !== "child-process" && engine.settings.resume_children !== false)
           ))
         : []
-      const summary = await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
-      const count = continuing.filter(({ record }) =>
-        !summary.failures.some((failure) => failure.task_id === record.task_id)).length
-      if (count > 0) {
-        const notice = `${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`
+      const ownTaskId = readSessionContext(pi)?.["task_id"]
+      const summary = await engine.lifecycle.suspendOnSessionShutdown({
+        parentSessionId: sessionId, reason, ...(ownTaskId === undefined || ownTaskId.length === 0 ? {} : { ownTaskId }),
+      })
+      const notify = (notice: string, level: "info" | "warning"): void => {
         if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
-        else liveContext.ui?.notify(notice, "info")
+        else liveContext.ui?.notify(notice, level)
       }
+      // A stopped owner's session can never be resumed, so nothing kept running there to collect.
+      if (summary.stopped_owner === undefined) {
+        const count = continuing.filter(({ record }) =>
+          !summary.failures.some((failure) => failure.task_id === record.task_id)
+          && engine.manager.get(record.task_id)?.status !== "cancelled").length
+        if (count > 0) notify(`${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`, "info")
+        continue
+      }
+      // Only a child that ever started can still be running; a pending one that failed to tear down never ran.
+      const unstopped = summary.failures.filter((failure) => {
+        const record = engine.manager.get(failure.task_id)
+        return record?.started_at !== undefined && (record.status === "running" || record.status === "cancelled")
+      }).length
+      if (unstopped > 0) notify(`${unstopped} child task(s) of stopped task ${summary.stopped_owner} could not be stopped and may still be running on the task host`, "warning")
     }
   })
 

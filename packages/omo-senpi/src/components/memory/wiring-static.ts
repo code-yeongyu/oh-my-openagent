@@ -44,6 +44,8 @@ export function registerMemoryStatic(input: {
   readonly ctx: ComponentContext
   readonly options: MemoryWiringOptions
   readonly promptCache: MemoryBlockCache
+  /** Set to the prompt handler's prebuild once registered; session bind calls it. */
+  readonly promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> }
   readonly nudgeWiring: ReturnType<typeof createMemoryNudgeWiring>
   readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
   readonly recallWiring: ReturnType<typeof createMemoryRecallWiring>
@@ -70,7 +72,7 @@ export function registerMemoryStatic(input: {
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
   const {
-    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, recallWiring, dreamTriggerWiring,
+    pi, ctx, options, promptCache, promptPrebuild, nudgeWiring, noticeWiring, recallWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
     activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
@@ -110,6 +112,7 @@ export function registerMemoryStatic(input: {
     },
     ...noticeInputs,
   })
+  promptPrebuild.current = (context) => promptHandler.prebuild(context)
   pi.on("before_agent_start", (payload, eventCtx) => {
     if (!isPreview(payload)) lastEventCtx.current = eventCtx
     return promptHandler(payload, eventCtx)

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto"
-import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs"
+import { close, closeSync, fsync, fsyncSync, mkdirSync, open, openSync, readFileSync, renameSync, rmSync, write, writeSync } from "node:fs"
+import { mkdir, readFile, rename, rm } from "node:fs/promises"
 import { dirname } from "node:path"
+import { promisify } from "node:util"
 
 /**
  * The two small JSON files the task host path keeps beside the shards (the agent-dir store index and
@@ -17,6 +19,18 @@ export interface DurableJsonFs {
 
 export const DURABLE_JSON_FS: DurableJsonFs = { read: readTextIfPresent, write: writeTextDurably }
 
+/**
+ * The same file contract for callers on the event loop: every syscall, the two fsyncs included, runs on
+ * the libuv pool, so a filesystem whose fsync stalls (a VM disk flushing other containers' writes took
+ * 95 s, #10846) delays only this write, never the timers, sockets and prompts of the process around it.
+ */
+export interface DurableJsonFsAsync {
+  readonly read: (path: string) => Promise<string | undefined> | string | undefined
+  readonly write: (path: string, text: string) => Promise<void> | void
+}
+
+export const DURABLE_JSON_FS_ASYNC: DurableJsonFsAsync = { read: readTextIfPresentAsync, write: writeTextDurablyAsync }
+
 // A holder of one of these files' locks rewrites and fsyncs the whole file, which a loaded host - a busy
 // Windows runner with a real-time scanner inspecting the staged file - stretches past a second while the
 // holder is alive and progressing. The record lock's default budget is sized for a sub-10ms record
@@ -29,6 +43,53 @@ export function readTextIfPresent(path: string): string | undefined {
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
     throw error
+  }
+}
+
+export async function readTextIfPresentAsync(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8")
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+    throw error
+  }
+}
+
+const openFd = promisify(open)
+const writeFd = promisify(write)
+const fsyncFd = promisify(fsync)
+const closeFd = promisify(close)
+
+/** `writeTextDurably` off the event loop, in the same order: staged write, fsync, rename, directory fsync. */
+export async function writeTextDurablyAsync(path: string, text: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
+  const staging = `${path}.${process.pid}.${randomUUID()}.tmp`
+  const fd = await openFd(staging, "w", 0o600)
+  try {
+    await writeFd(fd, text)
+    await fsyncFd(fd)
+  } finally {
+    await closeFd(fd)
+  }
+  try {
+    await rename(staging, path)
+  } catch (error) {
+    await rm(staging, { force: true })
+    throw error
+  }
+  await syncDirectoryAsync(dirname(path))
+}
+
+async function syncDirectoryAsync(directory: string): Promise<void> {
+  if (process.platform === "win32") return
+  const fd = await openFd(directory, "r")
+  try {
+    await fsyncFd(fd)
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : undefined
+    if (code !== "EINVAL" && code !== "ENOTSUP") throw error
+  } finally {
+    await closeFd(fd)
   }
 }
 

@@ -1,5 +1,6 @@
 import type { AgreementExtractionRecord, AgreementsPolicy, FactsKnownAgreement } from "../agreements/types"
 import type { GitCommitAuthor, GitMemoryRepo } from "../git"
+import { parseClaimReceipt, type ClaimReceipt } from "../provenance"
 import { applyFactsRecovery } from "./recovery"
 import {
   FactsPlanParentDirtyError,
@@ -15,9 +16,10 @@ export interface FactsPersonReference {
   readonly aliases: readonly string[]
 }
 
+// `receipt` is optional only for records written before #10488; the record tool always attaches one.
 export type FactsExtractionRecord =
-  | { readonly scope: "person"; readonly person: FactsPersonReference; readonly text: string; readonly date: string }
-  | { readonly scope: "project"; readonly text: string; readonly date: string }
+  | { readonly scope: "person"; readonly person: FactsPersonReference; readonly text: string; readonly date: string; readonly receipt?: ClaimReceipt }
+  | { readonly scope: "project"; readonly text: string; readonly date: string; readonly receipt?: ClaimReceipt }
 
 export interface FactsBatch {
   readonly batchId: string
@@ -114,21 +116,24 @@ export function parseFactsExtractionRecord(value: unknown, index: number): Facts
   const date = validDate(value.date)
   if (text === undefined) throw invalid(index, "text must be non-empty")
   if (date === undefined) throw invalid(index, "date must be YYYY-MM-DD")
+  const receipt = value.receipt === undefined ? undefined : parseClaimReceipt(value.receipt)
+  if (value.receipt !== undefined && receipt === undefined) throw invalid(index, "receipt is malformed")
+  const withReceipt = receipt === undefined ? {} : { receipt }
   if (value.scope === "project") {
     if ("person" in value) throw invalid(index, "project record must not carry person")
-    assertKeys(value, ["scope", "text", "date"], index)
-    return { scope: "project", text, date }
+    assertKeys(value, ["scope", "text", "date", "receipt"], index)
+    return { scope: "project", text, date, ...withReceipt }
   }
   if (value.scope !== "person") throw invalid(index, "scope must be person or project")
   if (!("person" in value)) throw invalid(index, "person record requires person")
-  assertKeys(value, ["scope", "person", "text", "date"], index)
+  assertKeys(value, ["scope", "person", "text", "date", "receipt"], index)
   if (!isRecord(value.person)) throw invalid(index, "person must be an object")
   assertKeys(value.person, ["name", "aliases"], index)
   const name = nonEmpty(value.person.name)
   if (name === undefined || !Array.isArray(value.person.aliases)) throw invalid(index, "person requires name and aliases")
   const aliases = value.person.aliases.map(nonEmpty)
   if (aliases.some((alias) => alias === undefined)) throw invalid(index, "person aliases must be non-empty strings")
-  return { scope: "person", person: { name, aliases: aliases as string[] }, text, date }
+  return { scope: "person", person: { name, aliases: aliases as string[] }, text, date, ...withReceipt }
 }
 
 function assertKeys(value: Record<string, unknown>, allowed: readonly string[], index: number): void {

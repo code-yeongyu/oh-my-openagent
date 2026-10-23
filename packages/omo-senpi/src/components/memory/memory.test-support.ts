@@ -29,6 +29,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
   return {
     enabled: true,
     agent: "auto",
+    auto_identity: "path",
     reflection: {
       enabled: true,
       trigger: { step_count: 25, on_compaction: true },

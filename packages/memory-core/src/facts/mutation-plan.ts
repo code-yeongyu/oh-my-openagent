@@ -7,6 +7,7 @@ import type { AgreementEvent } from "../agreements/mutate"
 import { AGREEMENTS_PATH, DEFAULT_AGREEMENTS_POLICY, type AgreementExtractionRecord, type AgreementsPolicy } from "../agreements/types"
 import type { GitIndexIdentity, GitMemoryRepo, GitPathState, GitWorktreeFileIdentity } from "../git"
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
+import { stampReceipt } from "../tools/claim-frontmatter"
 import {
   factsRoutingPaths,
   planFactsRouting,
@@ -14,6 +15,7 @@ import {
   type FactsAliasTie,
   type FactsPeopleRouting,
 } from "./person-routing"
+import { factDisplayText } from "./display"
 import type { FactsBatch, FactsExtractionRecord } from "./extraction"
 
 export interface FactsRecoveryPath {
@@ -109,6 +111,9 @@ async function renderFactsNote(
     ? { frontmatter: { description: `Explicit facts for ${relativePath.slice(-10, -3)}` }, body: "" }
     : parseMemoryFile(existing)
   const prefix = parsed.body.length === 0 || parsed.body.endsWith("\n") ? "" : "\n"
-  const bullets = records.map((record) => `- [${record.date}] ${record.text}`).join("\n")
-  return renderMemoryFile(parsed.frontmatter, `${parsed.body}${prefix}${bullets}\n`)
+  const bullets = records.map((record) => `- [${record.date}] ${factDisplayText(record)}`).join("\n")
+  const body = `${parsed.body}${prefix}${bullets}\n`
+  // Same header rule as every writer and the commit hook: a legacy user header is dropped, a user record becomes mixed.
+  const frontmatter = existing === undefined ? parsed.frontmatter : stampReceipt(parsed, parsed.frontmatter, body, undefined)
+  return renderMemoryFile(frontmatter, body)
 }

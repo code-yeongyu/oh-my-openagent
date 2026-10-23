@@ -4,6 +4,7 @@ import type { ChildExtensionEvent } from "../runners/child-extension-events"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import { subscribeEffectiveModel } from "./observed-model"
+import { observeParentModelFallback, type FailedTurn } from "./parent-model-fallback"
 import { subscribeTranscriptLog } from "./transcript-log"
 
 const MOTION_EVENTS: ReadonlySet<string> = new Set(["agent_start", "turn_start", "tool_execution_start"])
@@ -16,6 +17,7 @@ export function subscribeChildFacts(input: {
   readonly now: () => number
   readonly runStats: Map<string, RunStatsTracker>
   readonly fallbackExhaustions: WeakSet<ManagedChildHandle>
+  readonly failedTurns: WeakMap<ManagedChildHandle, FailedTurn>
   readonly reopen: () => Promise<void>
   // The child demonstrably moved (a run, turn or tool started): a "resumed, waiting for input"
   // flag stamped before it no longer holds (senpi#3266).
@@ -26,8 +28,10 @@ export function subscribeChildFacts(input: {
   const transcript = subscribeTranscriptLog(handle, input.store, taskId)
   runStats.set(taskId, createRunStatsTracker(now(), now))
   const effectiveModel = subscribeEffectiveModel(handle, { store: input.store, taskId, now })
+  const parentFallback = observeParentModelFallback({ handle, store: input.store, taskId, now, failedTurns: input.failedTurns })
   const stats = handle.subscribe((event) => {
     if (event.type === "retry_fallback_exhausted") input.fallbackExhaustions.add(handle)
+    parentFallback(event)
     if (MOTION_EVENTS.has(event.type)) input.onMotion?.()
     runStats.get(taskId)?.accept(event)
   })

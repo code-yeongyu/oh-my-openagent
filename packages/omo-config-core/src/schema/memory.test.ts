@@ -10,6 +10,7 @@ import {
 const FULL_DEFAULTS: OmoMemorySettings = {
   enabled: true,
   agent: "auto",
+  auto_identity: "path",
   reflection: {
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -66,6 +67,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
     const input: OmoMemorySettings = {
       enabled: false,
       agent: "backend-lead",
+      auto_identity: "git",
       reflection: {
         enabled: false,
         trigger: { step_count: 25, on_compaction: false },
@@ -361,6 +363,32 @@ describe("OmoMemorySettingsSchema defaults", () => {
 
     // then
     expect(parsed).toEqual(input)
+  })
+})
+
+describe("memory.auto_identity", () => {
+  test("#given a value outside path and git #when parsed on the block or its layer #then validation fails", () => {
+    // given
+    const input = { auto_identity: "repo" }
+
+    // when
+    const block = OmoMemorySettingsSchema.safeParse(input)
+    const layer = OmoMemorySettingsLayerSchema.safeParse(input)
+
+    // then
+    expect(block.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+    expect(layer.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+  })
+
+  test("#given git on a layer #when parsed #then the layer keeps it without materializing other defaults", () => {
+    // given
+    const input = { auto_identity: "git" }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual({ auto_identity: "git" })
   })
 })
 

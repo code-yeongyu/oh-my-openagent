@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { runInProcessMemoryChild, type InProcessMemoryChildState, type MemoryChildResult, type StartChildInput } from "./in-process-memory-child"
-import { createFactsRecordTool, FACTS_RECORD_TOOL_NAME } from "./facts-record-tool"
+import { createFactsRecordTool, FACTS_RECORD_TOOL_NAME, payloadExchanges } from "./facts-record-tool"
 import { createFactsAgreementTool, FACTS_AGREEMENT_TOOL_NAME, type FactsAgreementTool } from "./facts-agreement-tool"
 import { FACTS_AGREEMENTS_FILENAME } from "./facts-agreements"
 import type { FactsQueuedKey } from "./facts-failure-recording"
@@ -92,6 +92,8 @@ async function launchCandidate(
   })
   const tool = createFactsRecordTool({
     extractionPath, state,
+    // A text payload (onboarding session digests) has no proposal and reply turns, so it can never carry consent.
+    exchanges: typeof input.payload === "string" ? [] : payloadExchanges(input.payload),
     ...(guard === undefined ? {} : { maxBytes: FACTS_RECORD_BYTES, maxRecords: FACTS_RECORD_LIMIT, onFailure: guard.fail }),
     ...(input.recordLimits === undefined ? {} : input.recordLimits),
   })

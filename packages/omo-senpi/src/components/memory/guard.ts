@@ -5,6 +5,7 @@ import type { ToolCallEventResult } from "@code-yeongyu/senpi"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { registerReceiptReadGuard } from "./receipt-read-guard"
 import { TRANSIENT_DIRNAME } from "./transient-identity"
 
 const FILE_TOOL_NAMES = ["read", "write", "edit", "ls", "find", "grep", "glob"] as const
@@ -42,6 +43,7 @@ export function registerMemoryGuard(
 ): void {
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   const warnedBashSessions = new Set<string>()
+  registerReceiptReadGuard(pi)
 
   pi.on("tool_call", (payload, eventContext): ToolCallEventResult | undefined => {
     const context = options.getContext(eventContext)

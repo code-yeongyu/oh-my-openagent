@@ -26,6 +26,13 @@ export const OmoOpenCodeHarnessConfigSchema = z.record(z.string(), z.unknown())
  */
 export const OmoDisabledSkillsSchema = z.array(z.string())
 
+/**
+ * Models no category, agent, model profile or task pin may run. An entry is `provider/model` or a
+ * bare model id (any provider), `*` matches any run of characters, case-insensitively. Like
+ * `disabled_skills`, every layer's list is unioned (`collectExcludedModels`).
+ */
+export const OmoExcludedModelsSchema = z.array(z.string())
+
 export const OmoTypedHarnessConfigSchema = z.object({
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   gateway: OmoGatewaySectionSchema.optional(),
@@ -42,6 +49,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
 }).strict()
 
 export const OmoConfigProfileSchema = z.object({
@@ -59,6 +67,7 @@ export const OmoConfigProfileSchema = z.object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -82,6 +91,7 @@ export const OmoConfigSchema = z.object({
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -108,6 +118,7 @@ export const OmoConfigLayerSchema = z.object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),

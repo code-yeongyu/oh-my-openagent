@@ -1,5 +1,8 @@
 import { readdirSync, rmSync } from "node:fs"
-import { sep } from "node:path"
+import { tmpdir } from "node:os"
+import { join, sep } from "node:path"
+
+import { shardSocketPathForKey, validateBindPath } from "../../../../senpi-task/src/runners/rpc-host/shard-socket"
 
 export type ReloadHost = {
   readonly child: {
@@ -32,6 +35,15 @@ const DEFAULT_BUDGET_MS = 60_000
 const DEFAULT_TERM_GRACE_MS = 3_000
 const DEFAULT_KILL_WAIT_MS = 45_000
 export const RELOAD_CLEANUP_HOOK_TIMEOUT_MS = DEFAULT_BUDGET_MS + 5_000
+
+// The parent of a reload run's root. The runner's TMPDIR decides it whenever the host's shard socket
+// (`<root>/shards/p-<key>.sock` plus its bind siblings) still fits `sun_path` there. A longer parent, such as
+// darwin's ~48-byte /var/folders/.../T, falls back to /tmp so the host still binds inside the root (#10846).
+export function reloadRootParent(base: string = tmpdir()): string {
+  if (process.platform === "win32") return base
+  const root = join(base, "omo-ulw-reload-XXXXXX")
+  return validateBindPath(shardSocketPathForKey(join(root, "shards"), "p", "0".repeat(16))) ? base : "/tmp"
+}
 
 export function ownsHostSocket(launchArgs: readonly string[] | undefined, root: string): boolean {
   const index = launchArgs?.indexOf("--socket") ?? -1
