@@ -1,8 +1,7 @@
 //! The SkyLight receipt canary (AD-5): once per session before the first
 //! background action, deliver a marked keystroke into a real foreign dialog
 //! through the authenticated SkyLight keyboard path and require it back in
-//! the dialog's `text returned:` receipt, all inside a focus/cursor
-//! transaction.
+//! the dialog's `text returned:` receipt, all inside a focus transaction.
 //!
 //! The receipt vehicle is the keyboard leg, not the click leg: macOS 26
 //! ignores synthetic mouse clicks on `display dialog` alerts entirely (proved
@@ -14,12 +13,11 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::types::{DesktopPoint, FrontWindow};
+use senpi_desktop_core::types::FrontWindow;
 
 use super::held::{self, Held};
 use super::keys;
 use crate::ax;
-use crate::cursor;
 use crate::focus;
 use crate::input::MacInput;
 use crate::skylight;
@@ -86,7 +84,6 @@ struct Dialog {
 pub(super) fn run(input: &mut MacInput) -> CoreResult<CanaryResult> {
     skylight::require_spi()?;
     let front = focus::front_window()?;
-    let cursor_before = cursor::position(&input.source)?;
     let child = Command::new("/usr/bin/osascript")
         .args([
             "-e",
@@ -100,7 +97,7 @@ pub(super) fn run(input: &mut MacInput) -> CoreResult<CanaryResult> {
         .spawn()
         .map_err(|error| DesktopError::input_failed(format!("spawning the canary dialog failed: {error}")))?;
     let delivered = deliver_and_confirm(input, child);
-    let focus_restored = restore(input, front.as_ref(), cursor_before);
+    let focus_restored = restore(input, front.as_ref());
     let passed = delivered.is_ok() && focus_restored;
     input.settle_canary(passed);
     if passed {
@@ -175,9 +172,12 @@ fn deliver_and_confirm(input: &mut MacInput, mut child: std::process::Child) -> 
     }
 }
 
-/// Puts the front window and cursor back after the dialog; `true` when every
-/// restoration ran and the front window matches what was captured.
-fn restore(input: &mut MacInput, front: Option<&FrontWindow>, before: Option<DesktopPoint>) -> bool {
+/// Puts the front window back after the dialog; `true` when every restoration
+/// ran and the front window matches what was captured. The canary never moves
+/// the pointer, so a pointer that moved was moved by the human: it is left
+/// where they put it, because warping it back posts a global event on a path
+/// that runs without the control grant (#10788).
+fn restore(input: &mut MacInput, front: Option<&FrontWindow>) -> bool {
     let mut restored = true;
     if let Some(front) = front {
         restored &= focus::restore_key_focus(input, front).is_ok();
@@ -186,12 +186,6 @@ fn restore(input: &mut MacInput, front: Option<&FrontWindow>, before: Option<Des
             .ok()
             .flatten()
             .is_some_and(|after| after.pid == front.pid);
-    }
-    if let Some(before) = before {
-        if let Some(current) = cursor::position(&input.source).ok().flatten() {
-            let moved = (current.x - before.x).abs() > 0.5 || (current.y - before.y).abs() > 0.5;
-            restored &= !moved || cursor::warp(&input.source, before).is_ok();
-        }
     }
     restored
 }

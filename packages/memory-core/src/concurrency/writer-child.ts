@@ -1,4 +1,8 @@
-import { appendFile } from "../fs/resilient"
+import { join } from "node:path"
+
+import { appendFile, existsSync } from "../fs/resilient"
+import { provenDeadTakeoverFor } from "../locks/proven-dead-takeovers"
+import { traceTakeover } from "./takeover-trace.test-support"
 
 import { GitMemoryRepo } from "../git"
 import {
@@ -30,6 +34,9 @@ if (
 }
 
 const mode: WriterMode = modeValue
+// An externally terminated child never reaches this handler, so a missing "exit" line in the trace marks the kill.
+process.on("exit", (code) => traceTakeover(writerId, "exit", { code }))
+const indexLockPresent = (): boolean => existsSync(join(repoPath, ".git", "index.lock"))
 const count = Number.parseInt(countValue, 10)
 if (!Number.isInteger(count) || count < 1) throw new Error(`invalid writer count: ${countValue}`)
 
@@ -79,6 +86,8 @@ async function locked<T>(operation: () => Promise<T>): Promise<T> {
   const record = await createLockRecord("memory-write", { runId: `${writerId}-${acquisition}` })
   const isFirstNormalAcquisition = mode === "normal" && acquisition === 0
   acquisition += 1
+  const acquireStart = performance.now()
+  traceTakeover(writerId, "acquire-start", { acquisition, indexLock: indexLockPresent() })
 
   try {
     if (isFirstNormalAcquisition) {
@@ -86,6 +95,7 @@ async function locked<T>(operation: () => Promise<T>): Promise<T> {
         await acquireLock(lockPath, record)
       } catch (error) {
         if (!(error instanceof LockContentionError)) throw error
+        traceTakeover(writerId, "contended", { acquisition })
         await appendFile(contentionPath, `${writerId}\n`)
         process.stdout.write("contended\n")
         await acquireLock(lockPath, record, { waitTimeoutMs: 15_000, retryDelayMs: 5 })
@@ -95,8 +105,15 @@ async function locked<T>(operation: () => Promise<T>): Promise<T> {
     } else {
       await acquireLock(lockPath, record, { waitTimeoutMs: 15_000, retryDelayMs: 5 })
     }
+    traceTakeover(writerId, "acquired", {
+      acquisition,
+      ms: Math.round(performance.now() - acquireStart),
+      tookOverDeadOwnerPid: provenDeadTakeoverFor(lockPath, record.nonce)?.pid ?? null,
+      indexLock: indexLockPresent(),
+    })
 
     if (mode === "kill-holder" && acquisition === 2) {
+      traceTakeover(writerId, "kill-ready", { acquisition })
       process.stdout.write("kill-ready\n")
       // Hold the lock until the parent SIGKILLs this process. The parent owns our stdin pipe (it
       // spawns us with a piped stdin, already resumed above), so if the parent dies first the
@@ -118,6 +135,18 @@ async function locked<T>(operation: () => Promise<T>): Promise<T> {
 
 async function commit(task: WriterTask): Promise<void> {
   const relativePath = `concurrency/${task.writerId}-${task.index}.md`
+  const commitStart = performance.now()
+  traceTakeover(writerId, "commit-start", { task: `${task.writerId}-${task.index}` })
+  try {
+    await createNote(task, relativePath)
+  } catch (error) {
+    traceTakeover(writerId, "commit-error", { task: `${task.writerId}-${task.index}`, ms: Math.round(performance.now() - commitStart), error: String(error).slice(0, 300) })
+    throw error
+  }
+  traceTakeover(writerId, "commit-end", { task: `${task.writerId}-${task.index}`, ms: Math.round(performance.now() - commitStart) })
+}
+
+async function createNote(task: WriterTask, relativePath: string): Promise<void> {
   await runMemoryTool({
     repo,
     lock: (_domain, operation) => locked(operation),
@@ -132,9 +161,14 @@ async function commit(task: WriterTask): Promise<void> {
   })
 }
 
+traceTakeover(writerId, "ready", { mode })
 process.stdout.write("ready\n")
 await waitForMessage("go")
-if (mode === "recovery") await waitForMessage("begin-recovery")
+traceTakeover(writerId, "go")
+if (mode === "recovery") {
+  await waitForMessage("begin-recovery")
+  traceTakeover(writerId, "begin-recovery")
+}
 for (const task of tasksForWriter()) await commit(task)
 process.stdout.write(`done:${acquisition}\n`)
 process.stdin.pause()

@@ -166,6 +166,16 @@ node "$SKILL_DIR/scripts/report-tools.mjs" outcome briefing --session-dir "$SESS
 - `finish` stamps the finish time, the elapsed minutes from the session directory's start stamp, and the source and domain counts from `sources-ledger.md`.
 - `briefing` prints the closing block from the manifest and the ledger: sources and distinct domains, elapsed minutes, every deliverable with its status, the gate results, the residual defects, and the repair summary. That text is the closing briefing, pasted as printed, never filled in from memory.
 
+### Showing the report inline
+
+When the session has a tool that shows a self-contained HTML page inline in the conversation (`show_html_page` in OmO, `html_render` on hosts that offer it), the requester sees the report there first, after `verify` passes and before the closing briefing. A path to a file the requester has to go and open is not the first thing they read.
+
+- **Which page.** The gated `report.html` itself when the promised deliverable is a self-contained HTML report within the tool's size limit. Otherwise (a PDF, DOCX, LaTeX, or slide deliverable, or an HTML report over the limit) build an inline edition from the same `SYNTHESIS.md` and the same assets: the answer, the headline figures, the reference-compare pairs when the run has them, the key findings with their citations, the numbered sources, and the paths of the promised artifacts. Run `check` on the inline edition like any HTML deliverable.
+- **Self-contained.** No network: styles and scripts inline, no remote fonts, no CDN. Pass local images as absolute file paths (the tool inlines them) or as data URIs. Render it once at the reply width and at 390 px before showing it, and pass the measured height. When the session has the `visualize` skill, follow its inline-page constraints.
+- **Every tier, and always the report.** A light-tier chat answer with no promised document still ends with an inline page: the answer, its figures, the reference-compare pairs, and the sources. When the thing built is itself a page (an app, a 3D scene, a demo), show it too, but it never stands in for the report page, and a page that only links or redirects to a file is not a report.
+- **Not a manifest format.** The inline page never replaces or resolves a promised format; every manifest row still ends `delivered`, `blocked_capability`, `skipped`, or `failed` with its own artifact.
+- **No inline tool.** Deliver the artifact paths and the chat summary as before.
+
 ## 10. Command reference
 
 Invoke every command as `node "$SKILL_DIR/scripts/report-tools.mjs" <command>`. Exit codes for all of them: `0` pass, `1` semantic failure, `2` usage or IO error.

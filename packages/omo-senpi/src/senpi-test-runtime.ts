@@ -42,6 +42,17 @@ const authStorageModule = await import(
   pathToFileURL(join(senpiDistDir, "core", "auth-storage.js")).href
 ) as { AuthStorage: { inMemory(data?: Record<string, unknown>): SenpiAuthStorage } }
 
+// The process-wide MCP service a session's builtin attaches to. Its startup connects outlive
+// session_start (they race in the background), so a test that removes its HOME awaits them first.
+interface SenpiMcpServerSnapshot { readonly name: string; readonly lifecycleState: string; readonly generation: number | null; readonly pid: number | null }
+const mcpServiceModule = await import(
+  pathToFileURL(join(senpiDistDir, "core", "extensions", "builtin", "mcp", "service.js")).href
+) as { getMcpService(): {
+  whenAttachSettled(timeoutMs?: number): Promise<"settled" | "timeout">
+  getServerSnapshots(): readonly SenpiMcpServerSnapshot[]
+  getSnapshot(): { readonly connectionCount: number; readonly disposed: boolean }
+} }
+
 export const { Theme } = themeModule
 export const { ModelRegistry } = modelRegistryModule
 export const { ModelRuntime } = modelRuntimeModule
@@ -50,3 +61,4 @@ export const { DefaultResourceLoader } = resourceLoaderModule
 export const { SessionManager } = sessionManagerModule
 export const { SettingsManager } = settingsManagerModule
 export const { AuthStorage } = authStorageModule
+export const { getMcpService } = mcpServiceModule
