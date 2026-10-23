@@ -20,7 +20,7 @@ function countingExec(): { readonly exec: GitExec; readonly logCalls: () => numb
   return {
     exec: {
       run(argv, options) {
-        if (argv[0] === "log" && argv.includes("--diff-filter=d")) ranges.push(argv[argv.length - 2] ?? "")
+        if (argv.includes("log") && argv.includes("--diff-filter=d")) ranges.push(argv[argv.length - 2] ?? "")
         return real.run(argv, options)
       },
     },

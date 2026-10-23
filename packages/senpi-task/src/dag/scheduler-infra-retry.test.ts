@@ -4,14 +4,18 @@ import { createDagScheduler } from "./scheduler"
 import { RunnerError } from "../runners/in-process/runner-error"
 
 const fixtures: ReturnType<typeof infraFixture>[] = []
+// Every journal commit takes the run lock, appends the WAL, and rewrites the checkpoint on disk. Hosted
+// Windows runners measured ~110-160 ms per commit (#10711), so a case's commit count is its CI cost.
+const MAX_JOURNAL_COMMITS_PER_CASE = 150
 afterEach(() => {
   for (const fixture of fixtures.splice(0)) fixture.cleanup()
 })
 
-test("retries seven infrastructure-failed roots before skipping their 54 dependents", async () => {
-  // Given seven first-wave failures and the production incident's dependent count.
+test("retries seven infrastructure-failed roots so all their fan-in dependents run", async () => {
+  // Given the production incident's seven first-wave failures, each gating every dependent. The fan-in,
+  // not the incident's 54 dependents, is what a premature skip cascade would break.
   const roots = Array.from({ length: 7 }, (_, index) => `root-${index}`)
-  const dependents = Array.from({ length: 54 }, (_, index) => dagNode(`dependent-${index}`, roots))
+  const dependents = Array.from({ length: 7 }, (_, index) => dagNode(`dependent-${index}`, roots))
   const fixture = infraFixture((name, attempt) =>
     roots.includes(name) && attempt === 1 ? infrastructureFailure() : success())
   fixtures.push(fixture)
@@ -22,14 +26,14 @@ test("retries seven infrastructure-failed roots before skipping their 54 depende
 
   // Then every root is retried and every dependent executes.
   expect(result.status).toBe("completed")
-  expect(result.nodes.filter((node) => node.state === "completed")).toHaveLength(61)
+  expect(result.nodes.filter((node) => node.state === "completed")).toHaveLength(14)
   expect(roots.map((id) => fixture.starts.get(id))).toEqual(Array(7).fill(2))
   const events = fixture.store.readEvents(result.runId, 0, { limit: 1000 }).events
+  expect(events.length).toBeLessThanOrEqual(MAX_JOURNAL_COMMITS_PER_CASE)
   const retries = events.filter((event) => event.type === "dag.node.retried")
   expect(retries).toHaveLength(7)
   expect(retries.map((event) => event.automatic?.attempt)).toEqual(Array(7).fill(1))
   expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "node_flag")).toHaveLength(7)
-  // 61 real task-manager runs on a file store: ~3 s alone, past bun's 5 s default when the host is loaded.
 }, 30_000)
 
 test("exhausts two infrastructure retries and skips only that root's descendants", async () => {

@@ -20,6 +20,7 @@ const expectedNativeEvents = new Set([
   "computer_use_activation",
   "computer_use_permission_denied",
   "computer_use_engine_error",
+  "handoff_hint",
   "kibitzer_summary",
   "parallelism_summary",
   "process_crashed",
@@ -27,7 +28,7 @@ const expectedNativeEvents = new Set([
 ])
 
 // Session-conditional events the scripted scenario cannot produce: `kibitzer_summary` is emitted only
-// when the memory sidecar actually woke, which needs recall enabled and a committed memory corpus, and
+// when the memory sidecar actually woke; `handoff_hint` needs a 200k-token session left idle past its cache lifetime, which needs recall enabled and a committed memory corpus, and
 // `process_crashed` only when an earlier process left a crash record on disk. `session_summary` is held
 // here only until a live capture proves it: by the code it is flushed at the drive's clean shutdown (after
 // the third settled turn the drive ends stdin, and session_shutdown flushes the open window, registered
@@ -39,6 +40,7 @@ const conditionalNativeEvents = new Set([
   "computer_use_activation",
   "computer_use_permission_denied",
   "computer_use_engine_error",
+  "handoff_hint",
   "kibitzer_summary",
   "process_crashed",
   "session_summary",

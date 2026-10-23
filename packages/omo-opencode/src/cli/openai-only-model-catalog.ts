@@ -1,13 +1,14 @@
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig, ProviderAvailability } from "./model-fallback-types"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 const OPENAI_ONLY_AGENT_OVERRIDES: Record<string, AgentConfig> = {
-  explore: { model: "openai/gpt-6-luna-fast", variant: "low" },
-  librarian: { model: "openai/gpt-6-luna-fast", variant: "low" },
+  explore: { model: `openai/${LATEST_MODEL_BY_FAMILY.gptLunaFast}`, variant: "low" },
+  librarian: { model: `openai/${LATEST_MODEL_BY_FAMILY.gptLunaFast}`, variant: "low" },
 }
 
 const OPENAI_ONLY_CATEGORY_OVERRIDES: Record<string, CategoryConfig> = {
   artistry: { model: "openai/gpt-5.6-sol", variant: "xhigh" },
-  quick: { model: "openai/gpt-6-luna-fast" },
+  quick: { model: `openai/${LATEST_MODEL_BY_FAMILY.gptLunaFast}` },
   "visual-engineering": { model: "openai/gpt-5.6-sol", variant: "high" },
 }
 

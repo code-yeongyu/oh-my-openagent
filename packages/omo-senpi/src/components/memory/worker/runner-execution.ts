@@ -1,5 +1,6 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
+import { memoryHookChecker } from "./spawn-supervisor-support"
 
 import {
   GitMemoryRepo,
@@ -46,7 +47,7 @@ export async function executeReflectionRun(input: {
   const { run, resolution, loaded, options } = input
   const repo = new GitMemoryRepo({ dir: options.identity.paths.repo, agentId: options.identity.id })
   if (!existsSync(join(options.identity.paths.repo, ".git"))) {
-    await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir) } })
+    await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } })
   }
   let worktree: ReflectionWorktree | undefined
   try {
