@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// Flags the "coloured accent edge on a rounded card" slop tell in CSS, Tailwind and JSX.
+// Flags coloured one-side bars on any box and accent outlines on rounded cards in CSS, Tailwind and JSX.
 // Usage: bun check-accent-stripes.ts [--json] <file-or-dir>...   Exit 0 clean, 1 findings, 2 usage.
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"

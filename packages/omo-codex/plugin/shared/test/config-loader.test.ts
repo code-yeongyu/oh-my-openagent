@@ -7,6 +7,7 @@ import { parse } from "jsonc-parser"
 
 import { runMigrations, type MigrationBoundary } from "../../../../omo-config-core/src/index.ts"
 import { createLegacyConfigMigrationPlans } from "../../../../omo-opencode/src/config-migration/index.ts"
+import { doriSectionRename } from "../../../../omo-opencode/src/config-migration/dori-section-rename.ts"
 
 import { getCodexOmoConfig, runCodexStartupMigration } from "../src/config-loader.ts"
 
@@ -49,6 +50,7 @@ function writeOpenCodeConfig(homeDir: string): void {
 function runOpenCodeMigration(homeDir: string, cwd: string, onBoundary?: (boundary: MigrationBoundary) => void): void {
 	runMigrations({
 		discover: () => createLegacyConfigMigrationPlans({
+			doriSectionRename,
 			cwd,
 			environment: { HOME: homeDir, XDG_CONFIG_HOME: join(homeDir, ".config") },
 			homeDir,

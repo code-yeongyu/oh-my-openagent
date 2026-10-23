@@ -92,7 +92,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
   }
 
   function engineFor(target: GatewayStore, cwd: string = agentDir): GatewayEngine {
-    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now })
+    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now, senderProvenance: async () => ({ workspace: "unclassified", project: "fixture" }) })
   }
 
   const endpoints: GatewayEndpointPort = {

@@ -41,11 +41,11 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   // Both move on a reattach: a recovered transport is a new port, and a reopened session a new
   // routing handle on a possibly new host generation. The session PATH is the child's identity.
   let client: HostSessionPort = options.client
-  const identity = createHandleSessionIdentity(options.session)
   let openDisposition: HostSessionOpenDisposition = options.openDisposition
   const listeners = createHandleListeners({
     onListenerError: (error) => log("senpi-task early event replay listener failed", { taskId, error: String(error) }),
   })
+  const identity = createHandleSessionIdentity(options.session, options.durableSessionId, listeners.emitDurableSessionId)
   const waiters = createHandleWaiters()
   let reachedIdle = false
   let finalText: string | undefined

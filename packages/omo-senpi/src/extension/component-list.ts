@@ -2,6 +2,7 @@ import { createAstGrepComponent } from "../components/ast-grep"
 import { createBrowserBridgeComponent } from "../components/browser-bridge"
 import { createBuiltinMcpsComponent } from "../components/builtin-mcps"
 import { createBundledSkillsComponent } from "../components/bundled-skills"
+import { createClaimReceiptComponent } from "../components/claim-receipt"
 import { createClaudeCodeComponent } from "../components/claude-code"
 import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createComputerUseComponent } from "../components/computer-use"
@@ -54,6 +55,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createUlwLoopComponent(),
     createTodoFanoutReminderComponent(),
     createQuestionGatesComponent(),
+    createClaimReceiptComponent(),
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
     createAstGrepComponent(),

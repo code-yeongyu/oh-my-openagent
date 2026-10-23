@@ -322,7 +322,7 @@ Provider prompt.`,
 
       const result = loadAgentDefinitions([mdPath], "definition-file", "kiro")
 
-      expect(result["provider-agent"].model).toBe("kiro/claude-sonnet-4-6")
+      expect(result["provider-agent"].model).toBe("kiro/claude-sonnet-5-5")
     })
   })
 })

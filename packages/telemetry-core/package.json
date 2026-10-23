@@ -16,6 +16,10 @@
     ".": {
       "types": "./index.d.ts",
       "import": "./src/index.ts"
+    },
+    "./otlp": {
+      "types": "./src/otlp-entry.ts",
+      "import": "./src/otlp-entry.ts"
     }
   },
   "types": "./index.d.ts",
@@ -24,7 +28,12 @@
     "test": "bun test src/*.test.ts"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
     "@oh-my-opencode/utils": "workspace:*",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/api-logs": "0.223.0",
+    "@opentelemetry/context-async-hooks": "2.12.0",
+    "@opentelemetry/core": "2.12.0",
     "posthog-node": "^5.52.4"
   },
   "sideEffects": false

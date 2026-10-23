@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test"
+import { locales } from "../i18n/config"
 
 const VIEWPORTS = [
   { name: "iphone-se", width: 375, height: 667 },
@@ -9,7 +10,7 @@ const VIEWPORTS = [
   { name: "desktop-1920", width: 1920, height: 1080 },
 ] as const
 
-const LOCALES = ["en", "ko", "ja", "zh"] as const
+const LOCALES = locales
 
 async function assertNoHorizontalOverflow(page: Page) {
   const result = await page.evaluate(() => {
