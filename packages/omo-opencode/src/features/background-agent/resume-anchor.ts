@@ -4,7 +4,7 @@ import { stripInternalInitiatorMarkers } from "../../shared/internal-initiator-m
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { isRecord } from "../../shared/record-type-guard"
 import { messagesInDirectory } from "../../shared/session-route"
-import { withTimeout } from "../../shared/with-timeout"
+import { withTimeout } from "../../shared"
 import { isTerminalSessionStatus } from "./session-status-classifier"
 
 const SESSION_READ_TIMEOUT_MS = 5_000
