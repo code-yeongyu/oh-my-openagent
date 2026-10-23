@@ -287,5 +287,11 @@ describe("cold revival of a daemon-hosted child", () => {
     expect(result.opens).toBe(2)
     expect(result.peakAttachments).toBe(1)
     expect(result.transcriptRetained).toBe(true)
+    // omo#10778: the park still loaded on the host carries the finished status, set while attached
+    // (the host refuses a patch from a connection that does not hold the session), so a successor
+    // drops it; the revival flips it back to running before its message is delivered.
+    expect(result.parkedTaskStatus).toBe("completed")
+    expect(result.revivedTaskStatus).toBe("running")
+    expect(result.runningPublishedBeforeSend).toBe(true)
   })
 })

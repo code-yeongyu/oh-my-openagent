@@ -14,7 +14,7 @@ const GitEnvPrefixSchema = z
 const OmoGitMasterSettingsShape = {
   /** Opt in to an attribution footer in commit bodies (default: false). `true` uses the builtin footer text; a string replaces it. */
   commit_footer: z.union([z.boolean(), z.string()]),
-  /** @deprecated No-op kept for backward compatibility; omo never emits a Co-authored-by trailer. */
+  /** Add the `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` trailer once to every commit git-master writes (default: true). */
   include_co_authored_by: z.boolean(),
   /** Env assignments prefixed to every git command git-master runs, so git hooks can detect it (default: "GIT_MASTER=1"; "" disables). */
   git_env_prefix: GitEnvPrefixSchema,
@@ -24,7 +24,7 @@ export const OmoGitMasterSettingsLayerSchema = z.object(OmoGitMasterSettingsShap
 
 export const OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
   commit_footer: z.union([z.boolean(), z.string()]).default(false),
-  include_co_authored_by: z.boolean().default(false),
+  include_co_authored_by: z.boolean().default(true),
   git_env_prefix: GitEnvPrefixSchema.default("GIT_MASTER=1"),
 }).strict()
 

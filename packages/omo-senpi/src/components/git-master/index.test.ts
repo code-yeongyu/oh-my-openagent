@@ -7,7 +7,11 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { createGitMasterAttributionComponent } from "./index"
 
-const CO_AUTHOR_TRAILER_PATTERN = /Co-authored-by:/i
+const TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+
+function occurrences(text: string, needle: string): number {
+  return text.split(needle).length - 1
+}
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
   const logger: ComponentLogger = {
@@ -66,7 +70,7 @@ const defaultSettings = (): OmoGitMasterSettings => OmoGitMasterSettingsSchema.p
 const footerOptIn = (): OmoGitMasterSettings => OmoGitMasterSettingsSchema.parse({ commit_footer: true })
 
 describe("omo-senpi git-master attribution component", () => {
-  it("#given default settings #when a git-master SKILL.md read result arrives #then the env-prefix section rides the skill content and no footer is appended", async () => {
+  it("#given default settings #when a git-master SKILL.md read result arrives #then the env-prefix section rides the skill content and the co-author directive is appended once", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, defaultSettings())
@@ -77,16 +81,33 @@ describe("omo-senpi git-master attribution component", () => {
     // then
     expect(transform).toBeDefined()
     if (transform === undefined) return
-    expect(transform.content).toHaveLength(1)
+    expect(transform.content).toHaveLength(2)
     const text = transform.content[0]?.text ?? ""
-    expect(text).toContain("GIT COMMAND PREFIX (MANDATORY)")
     expect(text).toContain("GIT_MASTER=1 git status")
-    expect(text).toContain("NO EXCEPTIONS")
-    expect(text).not.toContain("Ultraworked with")
-    expect(text).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
+    expect(text).not.toContain(TRAILER)
+    const appended = appendedTextOf(transform)
+    expect(appended).toContain(`--trailer "${TRAILER}"`)
+    expect(appended).toContain("GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit")
   })
 
-  it("#given the footer opted in #when a git-master SKILL.md read result arrives #then only the footer directive is appended", async () => {
+  it("#given a read result that already carries the attribution directive #when it passes the hook again #then the directive is not appended a second time", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerWithSettings(pi, defaultSettings())
+    const first = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
+    payload.content = first?.content ?? []
+
+    // when
+    const second = await dispatchRead(pi, payload)
+
+    // then
+    expect(second?.content).toHaveLength(2)
+    const allText = (second?.content ?? []).map((item) => item.text ?? "").join("\n")
+    expect(occurrences(allText, `--trailer "${TRAILER}"`)).toBe(1)
+  })
+
+  it("#given the footer opted in #when a git-master SKILL.md read result arrives #then the directive carries the footer and the co-author trailer", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, footerOptIn())
@@ -100,9 +121,20 @@ describe("omo-senpi git-master attribution component", () => {
     expect(transform.content).toHaveLength(2)
     const appended = appendedTextOf(transform)
     expect(appended).toContain("Ultraworked with")
-    expect(appended).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
-    expect(appended).not.toContain("sisyphus-dev-ai")
-    expect(appended).not.toContain("users.noreply.github.com")
+    expect(appended).toContain(`--trailer "${TRAILER}"`)
+  })
+
+  it("#given the co-author turned off #when a git-master SKILL.md read result arrives #then no co-author identity reaches the model", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerWithSettings(pi, OmoGitMasterSettingsSchema.parse({ include_co_authored_by: false }))
+
+    // when
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+
+    // then
+    expect(transform?.content).toHaveLength(1)
+    expect(transform?.content[0]?.text ?? "").not.toContain("sisyphus-dev-ai")
   })
 
   it("#given both attribution settings disabled and the env prefix disabled #when a git-master SKILL.md read result arrives #then the result is untouched", async () => {
@@ -230,10 +262,9 @@ describe("omo-senpi git-master attribution component", () => {
     const appended = appendedTextOf(transform)
     expect(appended).toContain("Shipped with omo")
     expect(appended).not.toContain("Ultraworked with")
-    expect(appended).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
   })
 
-  it("#given the deprecated co-author flag enabled without the footer or env prefix #when a git-master SKILL.md read result arrives #then the result is untouched", async () => {
+  it("#given the co-author enabled without the footer or env prefix #when a git-master SKILL.md read result arrives #then only the co-author directive is appended and the skill text is untouched", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(
@@ -245,7 +276,9 @@ describe("omo-senpi git-master attribution component", () => {
     const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
 
     // then
-    expect(transform).toBeUndefined()
+    expect(transform?.content).toHaveLength(2)
+    expect(transform?.content[0]?.text).toBe("# Git Master\n\nMode Gate...")
+    expect(transform === undefined ? "" : appendedTextOf(transform)).toContain(`git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" --trailer "${TRAILER}"`)
   })
 
   it("#given a Windows-style skill path with the footer opted in #when the read result arrives #then the directive is still appended", async () => {
