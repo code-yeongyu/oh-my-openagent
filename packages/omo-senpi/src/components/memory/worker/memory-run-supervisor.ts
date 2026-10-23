@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { maybeKillAt } from "@oh-my-opencode/memory-core"
+import { runMemoryHook } from "@oh-my-opencode/memory-core/memory-hook"
 
 import {
   CHILD_EXIT_FILENAME,
@@ -230,7 +231,9 @@ async function runSupervisor(runDir: string): Promise<void> {
 }
 const args = process.argv.slice(2)
 try {
-  if (args[0] === "--child-bootstrap") {
+  if (args[0] === "--memory-hook") {
+    process.exitCode = runMemoryHook(args.slice(1), process.cwd())
+  } else if (args[0] === "--child-bootstrap") {
     if (args[1] === undefined) throw new TypeError("run directory is required")
     await runChildBootstrap(args[1])
   } else {

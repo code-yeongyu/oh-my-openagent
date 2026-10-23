@@ -13,9 +13,10 @@ Do these in order. Never show a page you have not looked at.
 
 1. **Data: load `data-scientist`.** Compute every figure with its engines (DuckDB or Polars), at the grain the reader needs, and follow its `references/visualization.md` for which chart answers which question. Keep the query: every number on the page must trace back to it.
 2. **Design: load `frontend`.** Use it for hierarchy, type, spacing and states. This page's constraints replace its design-system gate: the page brings no palette or fonts of its own and uses the theme the host injects (below).
-3. **Build one self-contained page** under the constraints below.
-4. **Preview and look.** Render with `html_preview` in dark and in light, at the reply's width and at 390 px. Read the screenshot and the console, fix what you see, and preview again. Where `html_preview` is not offered, open the page file in a browser through the `browser` skill and capture the same four views.
-5. **Show it** with `show_html_page` (OmO) or `html_render` (other hosts), with the height the preview measured. Then write only what the page does not already say.
+3. **Build one self-contained page** under the constraints below and the Draft guard in `frontend`.
+4. **Lint before you render.** Run `bun $SKILL_DIR/../frontend/scripts/perfection/check-accent-stripes.ts <page file>` (the script ships with `frontend`, next to this skill; write a page you built as a string to a file first). Exit 1 means a coloured edge bar or an accent outline is in the page: remove it and rerun. Nothing is previewed or shown until it exits 0.
+5. **Preview and look.** Render with `html_preview` in dark and in light, at the reply's width and at 390 px. Read the screenshot and the console, fix what you see, and preview again. Where `html_preview` is not offered, open the page file in a browser through the `browser` skill and capture the same four views.
+6. **Show it** with `show_html_page` (OmO) or `html_render` (other hosts), with the height the preview measured. Then write only what the page does not already say.
 
 ## Constraints of an inline page
 

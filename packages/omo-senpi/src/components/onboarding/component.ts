@@ -23,6 +23,11 @@ import { createOnboardingMemoryTools, type TuiOnboardingScan } from "./tui-memor
 export interface OnboardingComponentDependencies {
   claimOnboarding(stateDir: string, claimOwnerSeams?: ClaimOwnerSeams): boolean | Promise<boolean>
   isOnboardingComplete(stateDir: string): boolean
+  /**
+   * Read-only: whether `claimOnboarding` would take the claim now (a dead owner's claim is taken over).
+   * A preview asks this instead of claiming; omitted, it is `!isOnboardingComplete` (the plain claim's rule).
+   */
+  isOnboardingClaimable?(stateDir: string, claimOwnerSeams?: ClaimOwnerSeams): boolean | Promise<boolean>
   releaseOnboarding(stateDir: string): void
   /** Records a finished onboarding; omitted, a finished TUI turn records nothing (test fakes). */
   completeOnboarding?(stateDir: string): void
@@ -60,6 +65,7 @@ const defaultDependencies: OnboardingComponentDependencies = {
   claimOnboarding: claimWithOwner,
   completeOnboarding,
   isOnboardingComplete,
+  isOnboardingClaimable: claimableWithOwner,
   releaseOnboarding,
   resetOnboarding,
 }
@@ -76,6 +82,19 @@ async function claimWithOwner(stateDir: string, seams?: ClaimOwnerSeams): Promis
     return claimOnboarding(stateDir)
   }
   return runtime.claimOnboardingOwned(stateDir, seams)
+}
+
+// The same decision as `claimWithOwner`, read without writing: no claim, or one whose owner is gone.
+export async function claimableWithOwner(stateDir: string, seams?: ClaimOwnerSeams): Promise<boolean> {
+  if (isOnboardingCompletionRecorded(stateDir)) return false
+  let runtime
+  try {
+    runtime = await loadOnboardingScanRuntime()
+  } catch {
+    return !isOnboardingComplete(stateDir)
+  }
+  const state = await runtime.readOnboardingState(stateDir, seams)
+  return state.completedAt === null && !state.inProgress
 }
 
 export function isSessionStartEvent(v: unknown): v is SessionStartEvent {
@@ -117,6 +136,10 @@ export function createOnboardingComponent(
       })
       const withInventory = async (base: string): Promise<string> => {
         void history()
+        return inventoryText(base)
+      }
+      // The same addition without starting the history read, so a preview consumes no one-shot work.
+      const inventoryText = async (base: string): Promise<string> => {
         const result = injectedFacts !== undefined && dependencies.scan === undefined ? undefined : await inventoryScan()
         const facts = injected === undefined
           ? result?.inventory
@@ -215,23 +238,28 @@ export function createOnboardingComponent(
         }
       })
 
-      // Deliberately not previewSafe: previews must never acquire install-wide state.
+      // Preview-safe: a preview neither claims onboarding nor starts the background history read.
       pi.on("before_agent_start", async (event, ctx) => {
-        if (!isRecord(event) || event.trigger !== "prompt" || event.preview === true || !eligible(ctx)) return
+        if (!isRecord(event) || event.trigger !== "prompt" || !eligible(ctx)) return
+        const preview = event.preview === true
         const forced = force()
-        if (!(await claim(ctx, forced))) return
+        if (preview) {
+          if (pending !== undefined || claiming) return
+          if (!forced && !(await (dependencies.isOnboardingClaimable?.(stateDir, dependencies.claimOwnerSeams)
+            ?? !dependencies.isOnboardingComplete(stateDir)))) return
+        } else if (!(await claim(ctx, forced))) return
         if (ctx.sessionManager.getBranch().some((entry) =>
           entry.type === "custom_message" && entry.customType === "omo-onboarding:context")) return
         return {
           message: {
             customType: "omo-onboarding:context",
             display: false,
-            content: await withInventory(forced
+            content: await (preview ? inventoryText : withInventory)(forced
               ? `${tour} Tour using their message.`
               : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour}`),
           },
         }
-      })
+      }, { previewSafe: true })
 
       pi.on("agent_start", (_event, ctx) => {
         if (ownsRun(ctx) && pending) {

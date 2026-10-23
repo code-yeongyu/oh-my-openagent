@@ -1,4 +1,5 @@
 import type { BuiltinCategoryDefinition } from "./types"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 // Ported from packages/omo-opencode/src/tools/delegate-task/kimi-categories.ts.
 const WRITING_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -30,7 +31,7 @@ ANTI-AI-SLOP RULES (NON-NEGOTIABLE):
 export const KIMI_CATEGORIES = [
   {
     name: "writing",
-    config: { model: "google/gemini-4-argon", variant: "low" },
+    config: { model: `google/${LATEST_MODEL_BY_FAMILY.geminiPro}`, variant: "low" },
     description: "Documentation, prose, technical writing",
     promptAppend: WRITING_CATEGORY_PROMPT_APPEND,
   },

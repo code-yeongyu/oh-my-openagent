@@ -86,7 +86,13 @@ export function userTexts(entries: readonly unknown[]): string[] {
   return texts
 }
 
-function userText(entry: unknown): string | undefined {
+export function userText(entry: unknown): string | undefined {
+  const text = userTurnText(entry)
+  return text === undefined || text.trim().length === 0 ? undefined : text
+}
+
+/** The text of a real user turn, possibly empty (an image-only message); undefined for anything that is not a user turn. */
+export function userTurnText(entry: unknown): string | undefined {
   if (!isRecord(entry)) return undefined
   if (entry.type === "custom_message" || entry.type === "custom") return undefined
   if (entry.type !== "message") return undefined
@@ -94,8 +100,7 @@ function userText(entry: unknown): string | undefined {
   if (!isRecord(message)) return undefined
   if (message.role !== "user") return undefined
   if (typeof message.customType === "string" && EXCLUDED_CUSTOM_TYPES.has(message.customType)) return undefined
-  const text = textOf(message.content)
-  return text.trim().length === 0 ? undefined : text
+  return textOf(message.content)
 }
 
 export function textOf(content: unknown): string {

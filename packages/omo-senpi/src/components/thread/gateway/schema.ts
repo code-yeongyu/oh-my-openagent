@@ -1,3 +1,5 @@
+import { PROVENANCE_MIGRATION } from "./provenance-record"
+
 export class GatewaySchemaVersionError extends Error {
   readonly code = "gateway_schema_too_new"
   constructor(readonly found: number, readonly supported: number, scope = "Gateway") {
@@ -234,6 +236,8 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "CREATE UNIQUE INDEX bindings_one_active_thread ON bindings (platform, account_id, chat_id, thread_id) WHERE status = 'active'",
     "CREATE INDEX bindings_session ON bindings (session_durable_id, status)",
   ],
+  // v8: new deliveries require sender provenance; old envelopes are not rewritten.
+  PROVENANCE_MIGRATION,
 ]
 
 export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects"] as const

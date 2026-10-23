@@ -6,6 +6,7 @@ import { join, posix } from "node:path"
 import fixtureExpected from "./2026-08-reasoning-unification/fixture-expected.json"
 import fixtureInput from "./2026-08-reasoning-unification/fixture-input.json"
 import { createLegacyConfigMigrationPlans, executeLegacyConfigMigrationPlan } from "./index"
+import { doriSectionRename } from "./dori-section-rename"
 import {
   REASONING_UNIFICATION_MIGRATION_ID,
   transformReasoningUnification,
@@ -48,6 +49,7 @@ describe("2026-08 reasoning unification migration", () => {
 
     try {
       const plans = createLegacyConfigMigrationPlans({
+        doriSectionRename,
         backupTimestamp: "2026-08-01T00-00-00-000Z",
         cwd: homeDir,
         environment: { HOME: homeDir },

@@ -13,17 +13,27 @@ export function restoreEnvironment(snapshot: NodeJS.ProcessEnv): void {
 
 const fileBaselines = new Map<string, NodeJS.ProcessEnv>()
 
+// The environment object this test process started with. Assigning a plain object to process.env detaches
+// it: later key writes no longer reach the real environment that os.tmpdir() and child processes read, so
+// every later file in the process runs against stale values (#10846). Tests set and restore keys instead.
+const processEnvironment = process.env
+
 export function checkFileEnvironment(path: string): void {
   const baseline = fileBaselines.get(path)
   if (!baseline) throw new Error(`Missing test environment snapshot for ${path}`)
   fileBaselines.delete(path)
+  const replaced = process.env !== processEnvironment
+  if (replaced) process.env = processEnvironment
   const added = Object.keys(process.env).filter((key) => !Object.hasOwn(baseline, key)).sort()
   const removed = Object.keys(baseline).filter((key) => !Object.hasOwn(process.env, key)).sort()
   const changed = Object.keys(baseline).filter((key) => Object.hasOwn(process.env, key) && process.env[key] !== baseline[key]).sort()
   restoreEnvironment(baseline)
+  const problems: string[] = []
+  if (replaced) problems.push(`Test file ${path} replaced process.env with another object; set and restore keys instead (restoreEnvironment)`)
   if (added.length || removed.length || changed.length) {
-    throw new Error(`Test file ${path} leaked process.env: added [${added.join(", ")}]; removed [${removed.join(", ")}]; changed [${changed.join(", ")}]`)
+    problems.push(`Test file ${path} leaked process.env: added [${added.join(", ")}]; removed [${removed.join(", ")}]; changed [${changed.join(", ")}]`)
   }
+  if (problems.length > 0) throw new Error(problems.join("\n"))
 }
 
 export function installEnvironmentIntegrityCheck(): void {

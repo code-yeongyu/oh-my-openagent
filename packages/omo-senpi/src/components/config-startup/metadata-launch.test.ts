@@ -5,6 +5,8 @@ import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
+import { doriSectionRename } from "@oh-my-opencode/omo-opencode/config-migration/dori-section-rename"
+
 import { createConfigStartupComponent, runSenpiStartupMigration } from "./index"
 
 // Migration contract (#10428): the OpenCode config migration runs at the first session, never on a
@@ -32,7 +34,7 @@ describe("config-startup migration gate", () => {
     { argv: [...plugin, "-p", "hi", "--name", "-h"], migrates: true },
     { argv: [...plugin, "--append-system-prompt", "--help"], migrates: true },
     { argv: [...plugin, "--mode", "rpc", "--multi-session", "--help"], migrates: true },
-  ])("#given a legacy OpenCode config on disk #when the extension registers for $argv #then it is moved only when a session can start ($migrates)", ({ argv, migrates }) => {
+  ])("#given a legacy OpenCode config on disk #when the extension registers for $argv #then it is moved only when a session can start ($migrates)", async ({ argv, migrates }) => {
     // given
     const home = mkdtempSync(join(tmpdir(), "omo-metadata-launch-"))
     homes.push(home)
@@ -46,12 +48,13 @@ describe("config-startup migration gate", () => {
     const component = createConfigStartupComponent({
       argv,
       loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
+      prepareDoriSectionRename: async () => ({ rename: doriSectionRename }),
       resolveCwd: () => home,
-      runMigration: ({ cwd }) => runSenpiStartupMigration({ cwd, environment, homeDir: home }),
+      runMigration: ({ cwd, doriSectionRename: rename }) => runSenpiStartupMigration({ cwd, doriSectionRename: rename, environment, homeDir: home }),
     })
 
     // when
-    component.register(new FakeExtensionAPI(), context)
+    await component.register(new FakeExtensionAPI(), context)
 
     // then
     expect(existsSync(join(home, ".omo", "omo.jsonc"))).toBe(migrates)

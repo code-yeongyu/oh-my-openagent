@@ -4,7 +4,6 @@ import { isAbsolute, relative, sep } from "node:path"
 
 import { validateMemoryPath } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { selectRecentDreamConversations } from "../dream-selector"
 import { resolveDreamTriggerSettings } from "../dream-trigger"
 import { parseCommandArgs } from "./args"
@@ -16,13 +15,13 @@ import {
   type MemoryCommandContext,
   type MemoryCommandDeps,
 } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 const MODE_FLAGS = ["auto", "recent", "conversation", "from"] as const
 
-export function registerDreamCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerDreamCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("dream", {
-    description: "Request a manual multi-conversation memory dream run.",
-    argumentHint: "[--auto | --recent N | --conversation <ids> | --from transcript:<path>] [--to <doc>] [focus]",
+    ...LAZY_MEMORY_COMMANDS.dream,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
