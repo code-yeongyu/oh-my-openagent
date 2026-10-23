@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { categoryGateModels } from "../../category/builtins"
 import { listTaskCategories } from "./categories"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 function requiredAnnotation(name: string): string {
   const gateModels = categoryGateModels(name)
@@ -20,7 +21,7 @@ describe("gated category listing", () => {
       const entry = entryFor("architect", {})
 
       // then
-      expect(entry?.description).toContain("(requires claude-fable-5-1)")
+      expect(entry?.description).toContain(FABLE_55_RELEASED ? "(requires claude-fable-5-5 or claude-fable-5-1)" : "(requires claude-fable-5-1)")
     })
 
     test("#when the categories are listed #then ultrabrain carries its required model annotation", () => {

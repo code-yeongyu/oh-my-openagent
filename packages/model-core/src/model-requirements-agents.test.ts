@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
+import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("AGENT_MODEL_REQUIREMENTS", () => {
   test("oracle has gpt-5.6-sol xhigh as primary", () => {
@@ -96,16 +97,25 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("prometheus uses Fable 5.1 xhigh, then Opus 5.5 max, before Kimi K3 max", () => {
+  test("prometheus uses Fable 5.5 (once released) then 5.1 xhigh, then Opus 5.5 max, before Kimi K3 max", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
     // when
-    const [primary, opusFallback, kimiFallback] = prometheus.fallbackChain
+    const chain = prometheus.fallbackChain
 
-    // then
-    expect(prometheus.fallbackChain).toHaveLength(3)
-    expect(primary).toEqual({
+    // then: the 5.5 rung exists only once FABLE_55_RELEASED is true
+    const fableRungs = FABLE_55_RELEASED ? 2 : 1
+    const [fableFallback, opusFallback, kimiFallback] = chain.slice(fableRungs - 1)
+    expect(chain).toHaveLength(fableRungs + 2)
+    if (FABLE_55_RELEASED) {
+      expect(chain[0]).toEqual({
+          providers: ["anthropic", "github-copilot", "opencode"],
+          model: "claude-fable-5-5",
+          variant: "xhigh",
+        })
+    }
+    expect(fableFallback).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
           variant: "xhigh",
@@ -122,16 +132,25 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("metis uses Fable 5.1 max, then Opus 5 max, then Kimi K3 max", () => {
+  test("metis uses Fable 5.5 (once released) then 5.1 max, then Opus 5.5 max, then Kimi K3 max", () => {
     // given
     const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
     // when
-    const [primary, opusFallback, kimiFallback] = metis.fallbackChain
+    const chain = metis.fallbackChain
 
-    // then
-    expect(metis.fallbackChain).toHaveLength(3)
-    expect(primary).toEqual({
+    // then: the 5.5 rung exists only once FABLE_55_RELEASED is true
+    const fableRungs = FABLE_55_RELEASED ? 2 : 1
+    const [fableFallback, opusFallback, kimiFallback] = chain.slice(fableRungs - 1)
+    expect(chain).toHaveLength(fableRungs + 2)
+    if (FABLE_55_RELEASED) {
+      expect(chain[0]).toEqual({
+          providers: ["anthropic", "github-copilot", "opencode"],
+          model: "claude-fable-5-5",
+          variant: "max",
+        })
+    }
+    expect(fableFallback).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
           variant: "max",

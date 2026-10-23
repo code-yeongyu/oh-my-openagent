@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
+import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("category routing policy", () => {
   test("visual-engineering prioritizes Argon low, Fable 5.1 max, Opus max, then Kimi K3 max", () => {
@@ -17,6 +18,11 @@ describe("category routing policy", () => {
         model: "gemini-4-argon",
         variant: "low",
       },
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -201,6 +207,11 @@ describe("category routing policy", () => {
       }
     ])
     expect(artistryChain).toEqual([
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+
 export const APPLIED_TYPE = "omo-model-profile:applied"
 export const UNKNOWN_TYPE = "omo-model-profile:unknown"
 export const UNAVAILABLE_TYPE = "omo-model-profile:unavailable"
@@ -12,6 +14,12 @@ export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-nor
 // The refresh token the fixture OAuth lane in model-profile-e2e-mock-provider.ts refuses to
 // exchange (kept literal on both sides: the mock runs inside the senpi process, this file in node).
 export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
+
+// Mirrors FABLE_55_RELEASED in packages/model-core/src/fable-55-launch.ts (this file runs in plain
+// node): while it is false the Daily · Heavy 5.5 rung is absent, so 5.1 runs even when 5.5 is served.
+const FABLE_55_RELEASED = /export const FABLE_55_RELEASED = true\b/.test(
+  readFileSync(new URL("../../../model-core/src/fable-55-launch.ts", import.meta.url), "utf8"),
+)
 
 export const SCENARIOS = {
   "geeky-normal-api-sol": {
@@ -45,6 +53,18 @@ export const SCENARIOS = {
     cliModel: undefined,
     registerProviders: ["anthropic"],
     expect: { model: "claude-fable-5-1", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
+  },
+  "daily-heavy-fable55": {
+    omoConfig: { model_profile: "daily-heavy" },
+    mockModels: ["mock-1", "claude-fable-5-1", "claude-fable-5-5"],
+    registerProviders: ["anthropic", "opencode"],
+    expect: { model: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
+  },
+  "daily-heavy-fable55-gateway-unavailable": {
+    omoConfig: { model_profile: "daily-heavy" },
+    mockModels: ["mock-1", "anthropic/claude-fable-5-5"],
+    registerProviders: ["opengateway"],
+    expect: { model: "mock-1", notice: UNAVAILABLE_TYPE },
   },
   "geeky-normal-sol": {
     omoConfig: { model_profile: "geeky-normal" },

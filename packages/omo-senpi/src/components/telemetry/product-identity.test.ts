@@ -160,6 +160,22 @@ describe("OmO Native product identity", () => {
     })
   })
 
+  test("#given provisional Fable 5.5 #when masked #then only the exact model id is exportable", () => {
+    // given / when / then
+    expect(maskProviderAndModel("anthropic-subscription", "claude-fable-5-5")).toEqual({
+      provider: "anthropic-subscription",
+      model_id: "claude-fable-5-5",
+    })
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-5")).toEqual({
+      provider: "custom",
+      model_id: "claude-fable-5-5",
+    })
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-5-private")).toEqual({
+      provider: "custom",
+      model_id: "custom",
+    })
+  })
+
   test("#given a publicly known model routed through an unknown gateway provider #when masked #then the model id is exported while the provider stays custom", () => {
     // given: users route shipped models through OpenRouter, LiteLLM, or a self-hosted gateway.
     // The gateway name is user-configured and private; the model id is a public product name.

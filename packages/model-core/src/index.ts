@@ -1,6 +1,7 @@
 export * from "./model-requirements"
 export * from "./latest-models"
 export * from "./model-family-detectors"
+export * from "./fable-55-launch"
 export * from "./model-capability-aliases"
 export * from "./model-capability-heuristics"
 export * from "./model-capability-guardrails"

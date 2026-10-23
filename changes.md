@@ -53,6 +53,35 @@ Since 5.1.35 the anonymous `distinct_id` was read from the install-id file under
 
 `docs/reference/senpi-telemetry.md` regenerates the schema block and adds the disclosure row.
 
+## 2026-10-21 - Launch-gated Fable 5.5 routing preparation (#10798)
+
+Every builtin Fable 5.1 chain/profile rung gains a provisional Fable 5.5 rung
+immediately ahead of it, with the same providers and max/xhigh effort. The 5.1
+rung stays available, including the architect gate, and gateway copies cannot
+satisfy builtin rungs. Routing remains a separate final commit from recognition;
+launch requires verified catalog values, evaluation and adoption of a senpi
+release listing the model. No release date, price or unverified limit is assumed.
+
+While `FABLE_55_RELEASED` is false, `launchRungs` drops the 5.5 rung from every
+builtin chain and profile, `launchDefaultModelId` keeps the artistry/architect
+defaults on 5.1, the architect gate lists only 5.1, and the resolution pipeline
+skips a launch-gated default or rung. `fable-55-launch-gate.test.ts` walks every
+agent and category through model-core, delegate-core and getFirstFallbackModel on
+cold, null and warm caches and asserts none resolves to the provisional id.
+`FABLE_55_EFFORTS` records that the xhigh/max efforts on the 5.5 rungs are carried
+over from 5.1 (`measured: false`); once released, `launchRungs` throws on a 5.5 rung
+whose effort is not in `accepted`, and a test fails while `measured` is still false.
+The agent-model-matching guide shows today's 5.1 routing.
+
+## 2026-10-21 - Launch-gated Fable 5.5 recognition (#10798)
+
+Recognize the provisional `claude-fable-5-5` ID in supplemental model capabilities
+and the telemetry vocabulary, with family and refusal detection covered by the
+existing Fable predicates. `FABLE_55_LAUNCH` holds the provisional ID and all
+unverified capability and context values; limits remain unknown until the live
+listing is available, and runtime metadata takes precedence. Recognition alone
+does not change any routing defaults.
+
 ## 2026-10-21 - Memory counts how often a standing agreement had to be repeated (#10780)
 
 A person's standing instructions to the agent now live as one counted ledger, `system/agreements.md`: one line per agreement with a stable id (sha256 of the normalized text), a scope (`global` / `project`), who wrote it (`human` / `agent`), how many times it was broken, and a status. The facts extractor gets a second tool, `record_agreement`: when the person corrects something an existing agreement already covers, it reaffirms that id and the count goes up in the same facts commit; a reaffirm naming an id the extractor was not shown is refused. At `memory.agreements.needs_human_threshold` (default 3) an item turns NEEDS-HUMAN, and each newly flagged item is announced once: one `<memory_notice>` line to the agent and one `omo-memory:agreement-flagged` row to the person. At `max_items` (default 64) a new agreement evicts the oldest agent-written item that was never reaffirmed nor flagged, and the facts commit names it in an `Omo-Agreement-Evicted: <id>` trailer; when nothing is evictable the new agreement is refused and logged. Similar agreements are never merged, so two distinct rules always stay two lines.

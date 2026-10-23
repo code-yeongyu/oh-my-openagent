@@ -12,14 +12,18 @@
 // A model id that is NOT in this vocabulary - a fine-tune, an internal codename, any user-authored
 // name - is always `custom`. That boundary is the privacy contract published in
 // `docs/reference/senpi-telemetry.md`; changing it means changing that disclosure too.
+import { FABLE_55_LAUNCH } from "@oh-my-opencode/model-core"
+
 export const KNOWN_MODELS = Object.freeze({
   "alibaba-token-plan": Object.freeze(["qwen3.6-flash", "qwen3.8-max-preview"]),
   "alibaba-token-plan-cn": Object.freeze(["qwen3.8-max-preview"]),
   anthropic: Object.freeze([
+    FABLE_55_LAUNCH.id,
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-5-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
     "claude-sonnet-5-5",
   ]),
   "anthropic-api": Object.freeze([
+    FABLE_55_LAUNCH.id,
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-5-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
     "claude-sonnet-5-5",
   ]),
@@ -28,6 +32,7 @@ export const KNOWN_MODELS = Object.freeze({
   // older senpi still emits it, and dropping it would blank out that telemetry
   // rather than migrate it. Same for `openai-codex` / `chatgpt-subscription`.
   "anthropic-subscription": Object.freeze([
+    FABLE_55_LAUNCH.id,
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-5-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
     "claude-sonnet-5-5",
   ]),
@@ -37,6 +42,7 @@ export const KNOWN_MODELS = Object.freeze({
     "gpt-6-sol-fast", "gpt-6.1-sol", "gpt-6.1-sol-fast",
   ]),
   "claude-sdk-oauth": Object.freeze([
+    FABLE_55_LAUNCH.id,
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-5-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
     "claude-sonnet-5-5",
   ]),
@@ -45,6 +51,7 @@ export const KNOWN_MODELS = Object.freeze({
   google: Object.freeze(["gemini-3.1-pro", "gemini-3.6-flash", "gemini-4-argon"]),
   "google-vertex": Object.freeze(["gemini-4-argon"]),
   "github-copilot": Object.freeze([
+    FABLE_55_LAUNCH.id,
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-5-5", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5",
     "claude-sonnet-5-5", "gemini-3.1-pro", "gemini-4-argon", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol", "grok-4.6", "grok-4.7",
   ]),
@@ -60,6 +67,7 @@ export const KNOWN_MODELS = Object.freeze({
     "gpt-6-sol-fast", "gpt-6.1-sol", "gpt-6.1-sol-fast",
   ]),
   opencode: Object.freeze([
+    FABLE_55_LAUNCH.id,
     "claude-fable-5", "claude-fable-5-1", "claude-opus-4-6", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "claude-sonnet-5-5", "gemini-3.1-pro",
     "gemini-4-argon", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra", "gpt-6-luna", "gpt-6-sol", "grok-4.6", "kimi-k3",
   ]),
@@ -69,6 +77,7 @@ export const KNOWN_MODELS = Object.freeze({
   "qwen-token-plan": Object.freeze(["qwen3.6-flash", "qwen3.8-max-preview"]),
   "qwen-token-plan-cn": Object.freeze(["qwen3.8-max-preview"]),
   vercel: Object.freeze([
+    FABLE_55_LAUNCH.id,
     "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-5-5", "claude-opus-5", "claude-opus-5-5", "claude-sonnet-5", "claude-sonnet-5-5", "deepseek-v4-flash",
     "deepseek-v4-pro", "gemini-3.1-pro", "gemini-3.6-flash", "glm-5.2", "gpt-5.6-sol",
     "gpt-5.6-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6.1-sol", "grok-4.6", "kimi-k3", "mimo-v2.5-pro", "minimax-m2.7",
