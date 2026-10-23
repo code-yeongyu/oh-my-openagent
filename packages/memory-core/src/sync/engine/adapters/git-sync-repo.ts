@@ -2,14 +2,16 @@
 // is built with plumbing so it never depends on a clean tree: the tree is HEAD plus exactly the
 // rendered paths, assembled in a private index; the commit is authored `OmO Sync`; HEAD moves by
 // compare-and-swap (`update-ref <new> <old>`), so an agent commit landing meanwhile is kept and
-// the sync is rebuilt on top of it; finally only the committed paths' index entries are synced.
-// A person's uncaptured edits elsewhere stay dirty and unstaged.
+// the sync is rebuilt on top of it. Only the committed paths' index entries are then synced, by
+// `syncIndex` once the journal records the commit. A person's uncaptured edits elsewhere stay dirty
+// and unstaged.
 
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 
 import { existsSync, mkdir, rm } from "../../../fs/resilient"
 import { createNodeGitExec, type GitExec } from "../../../git/exec"
+import { withStrandedGitLockRecovery } from "../../../git/repo-lock-sweep"
 import { STABLE_LOG_OUTPUT } from "../../../git/stable-log-output"
 import type { SyncRepo } from "../ports"
 
@@ -18,6 +20,8 @@ const TIMEOUT_MS = 60_000
 const CAS_ATTEMPTS = 5
 /** Reconciliation looks for its trailer among recent history only. */
 const TRAILER_SCAN = 1_000
+/** git could not create a lock file because one exists; a compare-and-swap miss is a different failure. */
+const LOCK_FILE_EXISTS = /unable to create '[^']*\.lock'/i
 
 export class SyncCommitError extends Error {
   override readonly name = "SyncCommitError"
@@ -61,6 +65,12 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
       await rm(index, { force: true })
     }
   }
+  const moveHead = async (commit: string, parent: string | null): Promise<boolean> => {
+    const moved = await exec.run(["update-ref", "-m", "omo-sync", "HEAD", commit, parent ?? "0".repeat(40)], { cwd: root, timeoutMs: TIMEOUT_MS })
+    if (moved.code === 0) return true
+    if (LOCK_FILE_EXISTS.test(moved.stderr)) throw new SyncCommitError(`git update-ref failed (${moved.code}): ${moved.stderr.trim()}`)
+    return false
+  }
   return {
     root,
     gitDir,
@@ -78,12 +88,16 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
         const parent = await head()
         const tree = await treeOnto(parent, paths)
         const commit = await run(["commit-tree", tree, ...(parent === null ? [] : ["-p", parent]), "-F", "-"], author, message)
-        const moved = await exec.run(["update-ref", "-m", "omo-sync", "HEAD", commit, parent ?? "0".repeat(40)], { cwd: root, timeoutMs: TIMEOUT_MS })
-        if (moved.code !== 0) continue
-        if (paths.length > 0) await run(["reset", "-q", "HEAD", "--", ...paths])
+        // A lock file a crashed writer left behind goes through the same recovery as a memory write:
+        // reclaimed when its owner is proven dead, otherwise surfaced as StrandedGitLockError.
+        const moved = await withStrandedGitLockRecovery(root, () => moveHead(commit, parent))
+        if (!moved) continue
         return commit
       }
       throw new SyncCommitError(`HEAD kept moving; the sync commit was not recorded after ${CAS_ATTEMPTS} attempts`)
+    },
+    async syncIndex(paths) {
+      if (paths.length > 0) await withStrandedGitLockRecovery(root, () => run(["reset", "-q", "HEAD", "--", ...paths]))
     },
     async hasSyncCommit(range) {
       if ((await head()) === null) return false

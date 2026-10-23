@@ -5,7 +5,7 @@ use std::sync::Arc;
 use senpi_desktop_backend_fake::{RecordingSink, SinkOp};
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::protocol_params::TypeTextParams;
-use senpi_desktop_safety::StopSource;
+use senpi_desktop_safety::{FakeClock, StopPathId, StopSource, Supervisor, HEARTBEAT_FRESH_MS};
 use serde_json::json;
 
 use crate::request::Op;
@@ -66,6 +66,42 @@ fn type_text_stops_after_partial_delivery_and_releases_input() {
             .count(),
         1
     );
+}
+
+/// The stop path stops authorizing input after eight characters; the rest of
+/// the text must not be typed, and nothing latches a stop.
+fn assert_typing_halts_when_the_stop_path_fails(fail: fn(&Supervisor, &FakeClock)) {
+    // Given
+    let mut harness = harness(&json!({}));
+    let sink = harness.sink.clone();
+    let (supervisor, clock) = (Arc::clone(&harness.supervisor), Arc::clone(&harness.clock));
+    let failed = std::cell::Cell::new(false);
+    let text = "abcdefghijklmno";
+    let probe = || {
+        if !failed.get() && posted_text(&sink).chars().count() >= 8 {
+            failed.set(true);
+            fail(&supervisor, &clock);
+        }
+        false
+    };
+    // When
+    let reply = harness.worker.process(request(text), &probe);
+    // Then
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::StopPathUnavailable));
+    assert_eq!(posted_text(&harness.sink), &text[..8], "typing outlived its stop path");
+    assert_eq!(harness.audits()[0].text_delivered, Some(8));
+    assert_eq!(op_names(&harness).iter().filter(|&&name| name == "release").count(), 1);
+    assert!(!harness.supervisor.is_suspended(), "a dying stop path is not a user stop");
+}
+
+#[test]
+fn type_text_halts_when_the_stop_path_dies_mid_text() {
+    assert_typing_halts_when_the_stop_path_fails(|supervisor, _| supervisor.set_live(StopPathId::Global, false));
+}
+
+#[test]
+fn type_text_halts_when_the_stop_heartbeat_goes_stale_mid_text() {
+    assert_typing_halts_when_the_stop_path_fails(|_, clock| clock.advance(HEARTBEAT_FRESH_MS + 1));
 }
 
 #[test]

@@ -9,6 +9,7 @@ import { installHooks, resolveHooksDir } from "./hooks"
 import { COMMIT_MSG_HOOK_SCRIPT } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
 import { commit, createRepo, removeTempDirs, run, tempDir, writeFiles } from "./hooks.test-support"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 
 const VALID = "---\ndescription: Persona of the agent\n---\n\nbody\n"
 const LOCKED = "---\ndescription: Locked\nread_only: true\n---\n\nbody\n"
@@ -302,6 +303,8 @@ describe("post-commit mirror push", () => {
   async function createMirror(): Promise<string> {
     const dir = await tempDir("memory-mirror-")
     await run(["git", "init", "--bare", "--quiet", "--initial-branch=main"], dir)
+    // A push otherwise starts receive-pack's detached `maintenance run --auto --quiet --detach` (#10945).
+    disableFixtureAutoMaintenance(dir, true)
     return dir
   }
 

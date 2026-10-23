@@ -26,6 +26,9 @@ const NON_RETRYABLE = new Set([400, 401, 413])
 
 export type OtlpFetch = (url: string, init: RequestInit) => Promise<Response>
 
+/** `lost`: another process owns the batch now; `withdrawn`: telemetry consent ended. Either way nothing is sent. */
+export type AttemptGate = "send" | "lost" | "withdrawn"
+
 export type PostDeps = {
   readonly fetch: OtlpFetch
   readonly sleep: (ms: number, abort: AbortSignal) => Promise<void>
@@ -34,6 +37,8 @@ export type PostDeps = {
   readonly ingestKey: string
   readonly abort: AbortSignal
   readonly requestTimeoutMs: number
+  /** Runs right before every attempt, the first included. */
+  readonly beforeAttempt?: () => AttemptGate
 }
 
 export type PartialSuccess = { readonly rejected: number; readonly message: string }
@@ -43,6 +48,8 @@ export type PostOutcome =
   | { readonly kind: "rejected"; readonly status: number }
   | { readonly kind: "retry_later" }
   | { readonly kind: "aborted" }
+  | { readonly kind: "lost" }
+  | { readonly kind: "withdrawn" }
 
 type Attempt =
   | { readonly kind: "done"; readonly outcome: PostOutcome }
@@ -123,6 +130,8 @@ export async function postWithRetry(deps: PostDeps, signal: Signal, body: Uint8A
   if (body.byteLength > MAX_BODY_BYTES) return { kind: "rejected", status: 413 }
   for (let index = 0; ; index += 1) {
     if (deps.abort.aborted) return { kind: "aborted" }
+    const gate = deps.beforeAttempt?.() ?? "send"
+    if (gate !== "send") return { kind: gate }
     const result = await attempt(deps, signal, body)
     if (result.kind === "done") return result.outcome
     const backoff = BACKOFF_MS[index]

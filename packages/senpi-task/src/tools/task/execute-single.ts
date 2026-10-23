@@ -84,7 +84,7 @@ export async function runSpawn(
     const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
     const categorySuffix = categories && categories.length > 0
       ? started.error.code === "model_unavailable"
-        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
         : ` Available categories: ${categories.join(", ")}.`
       : ""
     return result(started.error.message + agentSuffix + categorySuffix, {

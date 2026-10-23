@@ -1,14 +1,13 @@
 /**
  * Subscription usage: how much of a plan's rolling windows the serving account has spent.
  *
- * This is the one part of the panel that leaves the machine, so the shapes here are written
- * for a cache that several sessions share rather than for a single session's memory.
+ * The numbers are the engine's (senpi polls the usage endpoints and keeps one record per account);
+ * these shapes are what the section draws from them.
  */
 
 /**
- * The providers that publish a usage endpoint; a key is also the cache key. The type is derived
- * from the list rather than written twice, and the list is the only place a third provider would
- * be added - it used to be spelled out separately in the cache, the poller and the section.
+ * The providers the section draws. The type is derived from the list rather than written twice, and
+ * the list is the only place a third provider would be added.
  */
 export const USAGE_PROVIDER_KEYS = ["claude", "codex"] as const
 
@@ -49,15 +48,3 @@ export interface PanelUsageEntry {
 }
 
 export type PanelUsageSnapshot = { readonly [K in PanelUsageProviderKey]?: PanelUsageEntry }
-
-/** One session's short-lived fetch claim in the shared cache. */
-export interface PanelUsageClaim {
-  readonly claimedAt: number
-  readonly account?: string
-  readonly token: string
-}
-
-/** The on-disk shape: the snapshot plus in-flight announcements that stop a stampede. */
-export interface PanelUsageCacheFile extends PanelUsageSnapshot {
-  readonly fetching?: { readonly [K in PanelUsageProviderKey]?: PanelUsageClaim }
-}
