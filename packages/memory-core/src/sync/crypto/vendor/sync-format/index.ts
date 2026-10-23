@@ -53,7 +53,7 @@ export {
   type SyncObjectRecord,
   verifyObject,
 } from "./object.ts";
-export { receiveKeyringChain } from "./receive.ts";
+export { createKeyringReceiver, type KeyringReceiver, receiveKeyringChain } from "./receive.ts";
 export {
   importSnapshot,
   type SnapshotAuthor,

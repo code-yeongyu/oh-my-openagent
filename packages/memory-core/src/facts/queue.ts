@@ -7,6 +7,7 @@ import { join } from "node:path"
 
 import type { MemoryIdentityPaths } from "../identity"
 import { isCanonicalEntry, type TranscriptEntry } from "../journal"
+import { leadOf } from "./queue-lead"
 import { createLockRecord, factsQueueLockPath, withLock } from "../locks"
 import {
   FACTS_QUEUE_VERSION,
@@ -96,6 +97,7 @@ export class FactsQueue {
         },
         enqueuedAt: at.toISOString(),
         entries: request.entries.slice(startIndex),
+        ...leadOf(request.entries, startIndex),
       }
 
       if (abortedNow()) return { enqueued: false, reason: "no-new-entries" }

@@ -18,6 +18,7 @@ import {
   memoryWriterLockPath,
   readAgreementsWorktree,
   renderAgreementsFile,
+  strippedLegacyUserHeader,
   sortAgreements,
   withLock,
   type AgreementItem,
@@ -25,16 +26,15 @@ import {
   type MemoryWriteLock,
 } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { hasGitRepo, openRepo } from "./repo"
 import { requireIdentity, respond, sessionIdOf, type MemoryCommandContext, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 const USAGE = "usage: /agreements [list] | add [--project] <agreement> | ack <id> | drop <id>"
 
-export function registerAgreementsCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerAgreementsCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("agreements", {
-    description: "List, add, acknowledge, or drop your standing agreements with the agent.",
-    argumentHint: "[list] | add [--project] <text> | ack <id> | drop <id>",
+    ...LAZY_MEMORY_COMMANDS.agreements,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
@@ -93,11 +93,14 @@ async function write(
         const next = change(agreementItemsOf(existing))
         if (next === undefined) {
           unknown = true
-          return []
+          return { affectedPaths: [] }
         }
         await mkdir(join(repo.dir, "system"), { recursive: true })
-        await writeFile(join(repo.dir, AGREEMENTS_PATH), renderAgreementsFile(existing, next), "utf8")
-        return [AGREEMENTS_PATH]
+        const rendered = renderAgreementsFile(existing, next)
+        await writeFile(join(repo.dir, AGREEMENTS_PATH), rendered, "utf8")
+        return strippedLegacyUserHeader(existing, rendered)
+          ? { affectedPaths: [AGREEMENTS_PATH], strippedPaths: [AGREEMENTS_PATH] }
+          : { affectedPaths: [AGREEMENTS_PATH] }
       },
     })
     deps.bustPromptCache()

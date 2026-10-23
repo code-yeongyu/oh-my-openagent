@@ -10,6 +10,7 @@ import {
 const FULL_DEFAULTS: OmoMemorySettings = {
   enabled: true,
   agent: "auto",
+  auto_identity: "path",
   reflection: {
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -44,6 +45,7 @@ const FULL_DEFAULTS: OmoMemorySettings = {
     tool_budget: 8,
     query_expansion: false,
   },
+  project_scope: { nudge: true, recall: true },
   projection: { max_entries_per_directory: 40, max_bytes: 24576 },
   compile_warn_tokens: 30000,
   agents: {},
@@ -66,6 +68,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
     const input: OmoMemorySettings = {
       enabled: false,
       agent: "backend-lead",
+      auto_identity: "git",
       reflection: {
         enabled: false,
         trigger: { step_count: 25, on_compaction: false },
@@ -100,6 +103,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         tool_budget: 8,
         query_expansion: false,
       },
+      project_scope: { nudge: false, recall: false },
       projection: { max_entries_per_directory: 12, max_bytes: 4096 },
       compile_warn_tokens: 50000,
       agents: {
@@ -361,6 +365,32 @@ describe("OmoMemorySettingsSchema defaults", () => {
 
     // then
     expect(parsed).toEqual(input)
+  })
+})
+
+describe("memory.auto_identity", () => {
+  test("#given a value outside path and git #when parsed on the block or its layer #then validation fails", () => {
+    // given
+    const input = { auto_identity: "repo" }
+
+    // when
+    const block = OmoMemorySettingsSchema.safeParse(input)
+    const layer = OmoMemorySettingsLayerSchema.safeParse(input)
+
+    // then
+    expect(block.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+    expect(layer.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+  })
+
+  test("#given git on a layer #when parsed #then the layer keeps it without materializing other defaults", () => {
+    // given
+    const input = { auto_identity: "git" }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual({ auto_identity: "git" })
   })
 })
 

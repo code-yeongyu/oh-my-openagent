@@ -87,6 +87,8 @@ For each learning that survived Phase 2, make surgical, well-placed changes.
 **Archiving retired context**: use the single non-system root file `ARCHIVE.md` when content should no longer be load-bearing but may still be useful as historical context. Shrink or remove the active source, then append a concise dated entry to `ARCHIVE.md`. Delete (don't archive) content the user asked to forget, sensitive or wrong content, or junk with no future-reference value.
 
 **Discovery paths**: when adding or moving content, update `[[path]]` cross-references so related files stay connected. Keep description frontmatter accurate.
+Never write or copy a `provenance:` frontmatter line; only the memory tool writes one, and the commit hook refuses a hand-written one. When you move or merge a note, leave that line out of the new file. When you edit a note whose `provenance:` line starts with `user said`, delete that line (it is a legacy header that no longer means anything) and add the trailer `Omo-Provenance-Stripped: <path>` to your commit message, one per note.
+
 
 ### Skills (only when a reusable workflow appears)
 
