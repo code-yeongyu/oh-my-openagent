@@ -221,14 +221,17 @@ function catalogEntry(entry) {
 // OpenCode serves a catalog provider as soon as it has a key, and a `provider.<id>` block for it
 // extends the catalog entry rather than replacing it (#10158). Every non-builtin provider that
 // OpenCode holds an API key for, or that a config block names, is looked up in the catalog.
-function withCatalog(config, opencodeAuth, builtin, home, env, notices) {
+function withCatalog(config, opencodeAuth, builtin, home, env, notices, notInCatalog = []) {
   const keyed = Object.keys(opencodeAuth).filter((id) => opencodeAuth[id]?.type === "api")
   const ids = [...new Set([...keyed, ...Object.keys(config)])].filter((id) => !builtin.has(id))
   if (ids.length === 0) return config
-  // Only an id that has no endpoint of its own depends on the catalog; a broken cache is worth a
-  // warning for that one alone, while a block with its own endpoint still extends the catalog when found.
+  // An id depends on the catalog when it has no endpoint of its own or no models of its own: a
+  // block with only `options.baseURL` still takes its models from the catalog, so a broken cache
+  // is worth a warning for it too, while a block with both still extends the catalog when found.
   const ownEndpoint = (id) => isPlainObject(config[id]) && (text(config[id].options?.baseURL) !== undefined || text(config[id].api) !== undefined)
-  const catalog = readOpencodeCatalog(home, env, ids.some((id) => !ownEndpoint(id)) ? notices : [])
+  const hasOwnModels = (id) => isPlainObject(config[id]) && isPlainObject(config[id].models) && Object.keys(config[id].models).length > 0
+  const dependsOnCatalog = (id) => !ownEndpoint(id) || !hasOwnModels(id)
+  const catalog = readOpencodeCatalog(home, env, ids.some(dependsOnCatalog) ? notices : [])
   if (catalog === undefined) {
     const missing = ids.filter((id) => !Object.hasOwn(config, id))
     if (missing.length > 0) notices.push(`NOTICE opencode: no models.dev catalog cache found, so ${missing.join(", ")} could not be described - if opencode serves them, run opencode once, then omo setup again`)
@@ -237,7 +240,16 @@ function withCatalog(config, opencodeAuth, builtin, home, env, notices) {
   const merged = { ...config }
   for (const id of ids) {
     const base = catalogEntry(catalog[id])
-    if (base === undefined) continue
+    if (base === undefined) {
+      // A keyed id with no config block of its own can only be described by the catalog; when the
+      // catalog was read and has no entry for it, say so here, so the credential stage's generic
+      // "a provider omo does not serve" is not the only word on it (#10172).
+      if (!Object.hasOwn(config, id)) {
+        notices.push(`NOTICE opencode: provider ${id} is not in OpenCode's models.dev catalog; not imported`)
+        notInCatalog.push(id)
+      }
+      continue
+    }
     const own = isPlainObject(config[id]) ? config[id] : {}
     const ownModels = isPlainObject(own.models) ? own.models : {}
     const models = { ...base.models }
@@ -256,13 +268,15 @@ export function planOpencodeProviders(options = {}) {
   const builtin = builtinProviderIds()
   // With no provider block, a bad auth.json is the credential stage's to report.
   const opencodeAuth = readOpencodeAuth(home, env, Object.keys(config).length > 0 ? notices : [])
-  const declared = withCatalog(config, opencodeAuth, builtin, home, env, notices)
+  // Keyed ids the catalog was read for but has no entry for; withCatalog already gave each its notice.
+  const notInCatalog = []
+  const declared = withCatalog(config, opencodeAuth, builtin, home, env, notices, notInCatalog)
   // auth.json is only a key source here; with no provider to describe it is the credential stage's alone.
-  if (Object.keys(declared).length === 0) return { providers: [], skipped: [], notices }
+  if (Object.keys(declared).length === 0) return { providers: [], skipped: notInCatalog.sort(), notices }
   const context = { builtin, opencodeAuth, notices }
   const providers = []
   // The ids declared but not carried; each one's reason is in `notices`.
-  const skipped = []
+  const skipped = [...notInCatalog]
   for (const [id, entry] of Object.entries(declared)) {
     const converted = convertProvider(id, entry, context)
     if (converted) providers.push(converted)
