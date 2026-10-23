@@ -2,7 +2,8 @@
 // its own recorded binding (#8017). These cases pin WHOSE workspace that rebind resolves: the
 // session's, never the host process's (#8556).
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,6 +11,7 @@ import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import { createMemoryBinding } from "./binding"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
+import type { SyncRunner } from "./sync-runner"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 const roots: string[] = []
@@ -27,6 +29,24 @@ function memoryRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-memory-rebind-home-"))
   roots.push(root)
   return join(root, "memory")
+}
+
+function linkedWorktree(): { readonly main: string; readonly worktree: string } {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-memory-rebind-git-")))
+  roots.push(root)
+  const main = join(root, "project")
+  const worktree = join(root, "project-feature")
+  mkdirSync(main)
+  const git = (args: readonly string[]): void => {
+    execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "-c", "commit.gpgsign=false", ...args], {
+      cwd: main,
+      stdio: "ignore",
+    })
+  }
+  git(["init", "--quiet", "--initial-branch=main"])
+  git(["commit", "--quiet", "--allow-empty", "-m", "init"])
+  git(["worktree", "add", "--quiet", "-b", "feature", worktree])
+  return { main, worktree }
 }
 
 function boundEntry(identity: string, repoPath: string): { type: string; customType: string; data: unknown } {
@@ -127,5 +147,115 @@ describe("memory identity rebind", () => {
     expect(memoryModuleSupervisor.refCount).toBe(before)
     expect(notifications).toEqual([{ message: expect.stringContaining("memory identity conflict"), level: "error" }])
     expect(ctx.logs.filter((entry) => entry.level === "warn" && entry.message.includes("failed closed"))).toHaveLength(1)
+  })
+})
+
+describe("memory identity with auto_identity git (#9659)", () => {
+  test("#given auto_identity git #when a fresh session starts in a linked worktree #then it binds and syncs the main checkout's identity", async () => {
+    // given
+    const { main, worktree } = linkedWorktree()
+    const env = { OMO_MEMORY_HOME: memoryRoot() }
+    const mainIdentity = resolveMemoryIdentity("auto", main, env)
+    const pi = new MemoryFakeExtensionAPI()
+    const notifications: Array<{ message: string; level: string }> = []
+    const before = memoryModuleSupervisor.refCount
+    // The bound identity also keys the end-to-end encrypted sync stream, so a worktree session
+    // must join the main checkout's stream, not open a per-worktree one.
+    const syncAcquired: Array<{ identity: string; repo: string }> = []
+    const syncRunner: SyncRunner = {
+      acquire: async (identity, paths) => {
+        syncAcquired.push({ identity, repo: paths.repo })
+      },
+      release: async () => {},
+      status: async () => null,
+      deviceName: () => undefined,
+    }
+    createMemoryComponent({
+      env,
+      loadConfig: () => loadedMemoryConfig(memorySettings({ auto_identity: "git" })),
+      now: () => 789,
+      resolveCwd: () => worktree,
+      syncRunner,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+
+    // when
+    await pi.dispatch("session_start", {}, sessionContext({ notifications, cwd: worktree }))
+
+    // then
+    expect(notifications).toEqual([])
+    expect(pi.entries).toEqual([{
+      customType: MEMORY_BINDING_CUSTOM_TYPE,
+      data: createMemoryBinding({ identity: mainIdentity.id, repoPath: mainIdentity.paths.repo, boundAt: 789 }),
+      options: { startupBookkeeping: true },
+    }])
+    expect(syncAcquired).toEqual([{ identity: mainIdentity.id, repo: mainIdentity.paths.repo }])
+    expect(memoryModuleSupervisor.refCount).toBe(before + 1)
+    memoryModuleSupervisor.release()
+  })
+
+  test("#given auto_identity git and an explicit agent name #when a session starts in a linked worktree #then it binds the explicit identity", async () => {
+    // given
+    const { worktree } = linkedWorktree()
+    const env = { OMO_MEMORY_HOME: memoryRoot() }
+    const explicit = resolveMemoryIdentity("backend-lead", worktree, env)
+    const pi = new MemoryFakeExtensionAPI()
+    const before = memoryModuleSupervisor.refCount
+    createMemoryComponent({
+      env,
+      loadConfig: () => loadedMemoryConfig(memorySettings({ agent: "backend-lead", auto_identity: "git" })),
+      now: () => 791,
+      resolveCwd: () => worktree,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+
+    // when
+    await pi.dispatch("session_start", {}, sessionContext({ cwd: worktree }))
+
+    // then
+    expect(pi.entries).toEqual([{
+      customType: MEMORY_BINDING_CUSTOM_TYPE,
+      data: createMemoryBinding({ identity: explicit.id, repoPath: explicit.paths.repo, boundAt: 791 }),
+      options: { startupBookkeeping: true },
+    }])
+    memoryModuleSupervisor.release()
+    expect(memoryModuleSupervisor.refCount).toBe(before)
+  })
+
+  test("#given auto_identity git and a worktree session already bound to its per-worktree identity #when it is rebound #then it keeps that identity without a conflict", async () => {
+    // given
+    const { worktree } = linkedWorktree()
+    const env = { OMO_MEMORY_HOME: memoryRoot() }
+    const perWorktree = resolveMemoryIdentity("auto", worktree, env)
+    const recorded = boundEntry(perWorktree.id, perWorktree.paths.repo)
+    const pi = new MemoryFakeExtensionAPI()
+    const notifications: Array<{ message: string; level: string }> = []
+    const before = memoryModuleSupervisor.refCount
+    createMemoryComponent({
+      env,
+      loadConfig: () => loadedMemoryConfig(memorySettings({ auto_identity: "git" })),
+      now: () => 790,
+      resolveCwd: () => worktree,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+
+    // when
+    await pi.dispatch("before_agent_start", {}, sessionContext({ entries: [recorded], notifications, cwd: worktree }))
+
+    // then
+    expect(notifications).toEqual([])
+    expect(pi.entries).toEqual([{
+      customType: MEMORY_BINDING_CUSTOM_TYPE,
+      data: { identity: perWorktree.id, repoPathHash: (recorded.data as { repoPathHash: string }).repoPathHash, boundAt: 790 },
+      options: { startupBookkeeping: true },
+    }])
+    expect(memoryModuleSupervisor.refCount).toBe(before + 1)
+    memoryModuleSupervisor.release()
   })
 })

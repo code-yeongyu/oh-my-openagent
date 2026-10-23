@@ -110,11 +110,16 @@ export class RpcProcessRunner {
         log("senpi-task rpc start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
       }
       const message = error instanceof Error ? error.message : String(error)
+      // The child's own model resolution is the authority admission defers to (#10863): a child that
+      // exited because it could not resolve its `--model` fails typed, carrying its own error.
+      const unresolvedModel = exitOutcome?.kind === "crashed" ? childUnresolvedModelError(exitOutcome.facts.stderrTail) : undefined
       // A child that died before its first prompt leaves its cause ONLY here: the classified exit is
       // otherwise folded into `message`, which is stderr-derived and gets sanitized away downstream.
       throw new RunnerError({
-        kind: spec.resumeSessionPath === undefined ? "child-prompt-failed" : "session_unavailable",
-        message,
+        kind: unresolvedModel !== undefined
+          ? "model_unavailable"
+          : spec.resumeSessionPath === undefined ? "child-prompt-failed" : "session_unavailable",
+        message: unresolvedModel === undefined ? message : `the child could not resolve its model: ${unresolvedModel}`,
         cause: error,
         rejected_while: exitOutcome === undefined ? "alive" : "exited",
         ...(exitOutcome === undefined
@@ -214,6 +219,17 @@ async function engineAcceptsFallbackChain(client: RpcProtocolClient): Promise<bo
   if (!response.success || response.command !== "get_protocol_info") return false
   const capabilities = (response.data as { readonly capabilities?: unknown }).capabilities
   return Array.isArray(capabilities) && capabilities.includes(RETRY_FALLBACK_COMMAND_CAPABILITY)
+}
+
+const ANSI_ESCAPE = /\u001B\[[0-?]*[ -/]*[@-~]/g
+// senpi's two `model_unresolved` startup diagnostics, printed before it exits 1 (core/model-resolver):
+// an unknown model, and an unknown provider in a `provider/model` pin. Both mean the child can't serve
+// the requested model, so both fail typed and let the start fallback chain move on.
+const SENPI_UNRESOLVED_MODEL =
+  /Model "[^"\n]+" not found\. Use --list-models to see available models\.|Unknown provider "[^"\n]+"\. Use --list-models to see available providers\/models\./
+
+function childUnresolvedModelError(stderrTail: string): string | undefined {
+  return SENPI_UNRESOLVED_MODEL.exec(stderrTail.replace(ANSI_ESCAPE, ""))?.[0]
 }
 
 function defaultSpawnChild(

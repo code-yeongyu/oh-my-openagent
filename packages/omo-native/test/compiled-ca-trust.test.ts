@@ -12,11 +12,28 @@ import {
   MAX_EXTRA_CA_BYTES,
   parseExtraCaCertificates,
 } from "../compiled-ca-trust"
+import { removeTreeSync } from "../../../test-support/remove-tree"
 
 const fixtures = join(import.meta.dir, "fixtures", "ca-trust")
 const withoutCaVariables = (env: NodeJS.ProcessEnv) => {
   const { NODE_EXTRA_CA_CERTS: _extra, NODE_USE_SYSTEM_CA: _system, OMO_EXTRA_CA_CERTIFICATES: _omo, ...rest } = env
   return rest
+}
+
+// A process still alive holds its executable and working files open, and Windows refuses to delete a
+// file that is open. livePids names every tracked process that has not exited yet, so a teardown can
+// prove nothing it started still holds the folder before it removes it.
+function livePids(pids: Iterable<number>): number[] {
+  const alive: number[] = []
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0)
+      alive.push(pid)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EPERM") alive.push(pid)
+    }
+  }
+  return alive
 }
 const fixture = (name: string) => readFileSync(join(fixtures, name), "utf8")
 
@@ -129,6 +146,8 @@ describe("compiled binary", () => {
   let dir = ""
   let server: Server
   let port = 0
+  // Every probe and every grandchild it reports. The teardown removes the folder only once all have exited.
+  const launched = new Set<number>()
 
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), "omo-ca-trust-"))
@@ -145,19 +164,19 @@ if (mode === "install") {
 if (mode === "daemon") {
   installEngineCaTrust()
   const child = spawnSync(process.execPath, ["install", port], { env: process.env, encoding: "utf8" })
-  console.log(child.stdout.trim()); process.exit(0)
+  console.error("grandchild " + child.pid); console.log(child.stdout.trim()); process.exit(0)
 }
 if (mode === "bun-be-bun-tls") {
   installEngineCaTrust()
   const code = 'require("node:https").get("https://localhost:' + port + '/",r=>{r.resume();console.log("ok "+r.statusCode)}).on("error",e=>console.log("error "+e.code))'
   const child = spawnSync(process.execPath, ["-e", code], { env: { ...process.env, BUN_BE_BUN: "1" }, encoding: "utf8" })
-  console.log(child.stdout.trim()); process.exit(0)
+  console.error("grandchild " + child.pid); console.log(child.stdout.trim()); process.exit(0)
 }
 if (mode === "bun-be-bun") {
   installEngineCaTrust()
   const code = 'const t=require("node:tls");console.log(t.getCACertificates("default").length-t.getCACertificates("bundled").length,t.getCACertificates("system").length)'
   const child = spawnSync(process.execPath, ["-e", code], { env: { ...process.env, BUN_BE_BUN: "1" }, encoding: "utf8" })
-  console.log(child.stdout.trim()); process.exit(0)
+  console.error("grandchild " + child.pid); console.log(child.stdout.trim()); process.exit(0)
 }
 request("https://localhost:" + port + "/", (r) => { r.resume(); console.log("ok " + r.statusCode) })
   .on("error", (e: NodeJS.ErrnoException) => console.log("error " + e.code)).end()
@@ -171,7 +190,8 @@ request("https://localhost:" + port + "/", (r) => { r.resume(); console.log("ok 
   })
   afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()))
-    rmSync(dir, { recursive: true, force: true })
+    expect(livePids(launched)).toEqual([])
+    removeTreeSync(dir)
   })
 
   const probe = (mode: string, env: NodeJS.ProcessEnv) =>
@@ -179,9 +199,17 @@ request("https://localhost:" + port + "/", (r) => { r.resume(); console.log("ok 
       const child = spawn(join(dir, "probe"), [mode, String(port)], {
         env: { ...withoutCaVariables(process.env), ...env },
       })
+      if (child.pid !== undefined) launched.add(child.pid)
       let out = ""
+      let err = ""
       child.stdout.on("data", (chunk) => (out += chunk))
-      child.on("close", () => resolve(out.trim()))
+      child.stderr.on("data", (chunk) => (err += chunk))
+      // "close" fires after the process exited and its pipes closed; the grandchild ran under spawnSync,
+      // so it exited before the probe could print its pid.
+      child.on("close", () => {
+        for (const match of err.matchAll(/^grandchild (\d+)$/gm)) launched.add(Number(match[1]))
+        resolve(out.trim())
+      })
     })
 
   test("#given the private CA only in OMO_EXTRA_CA_CERTIFICATES #then a plain compiled binary rejects it", async () => {
@@ -215,5 +243,20 @@ request("https://localhost:" + port + "/", (r) => { r.resume(); console.log("ok 
   test("#given a BUN_BE_BUN child #then it trusts the OS store", async () => {
     const [added, system] = (await probe("bun-be-bun", {})).split(" ").map(Number)
     expect(added).toBe(system ?? -1)
+  })
+})
+
+describe("livePids", () => {
+  test("#given a tracked child still running #then the teardown check names it, and after its exit it does not", async () => {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" })
+    const pid = child.pid ?? -1
+    try {
+      expect(livePids([pid])).toEqual([pid])
+    } finally {
+      const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+      child.kill()
+      await exited
+    }
+    expect(livePids([pid])).toEqual([])
   })
 })

@@ -8,7 +8,9 @@ import { join } from "node:path"
 
 import {
   findFactsBatchReceipt,
+  parseAgreementRecordsJsonl,
   parseFactsExtractionJsonl,
+  type AgreementExtractionRecord,
   MemorySecretError,
   type FactsFailureReason,
   type FactsPayload,
@@ -18,6 +20,7 @@ import {
 
 import type { ComponentLogger } from "../../extension/types"
 import { applyFactsWithRetries, resolveFactsPeopleRouting } from "./facts-batch-apply"
+import { FACTS_AGREEMENTS_FILENAME, resolveFactsAgreements } from "./facts-agreements"
 import { ledgerTargets } from "./facts-failure-recording"
 import { describe } from "./facts-run-storage"
 import type { FactsExtractorRunnerOptions, FactsLaunchResult, FactsRunLedger } from "./facts-runner-types"
@@ -63,20 +66,22 @@ export async function finalizeClaimedFactsRun(input: FinalizeClaimedFactsRunInpu
   }
 
   let records: ReturnType<typeof parseFactsExtractionJsonl>
+  let agreements: readonly AgreementExtractionRecord[]
   try {
     records = parseFactsExtractionJsonl(await readFile(join(runDir, "extraction.jsonl"), "utf8"))
+    agreements = parseAgreementRecordsJsonl(await readOptional(join(runDir, FACTS_AGREEMENTS_FILENAME)))
   } catch (error) {
     await fail("invalid_extraction", describe(error))
     return { status: "failed", runId }
   }
-  if (records.length === 0) {
+  if (records.length === 0 && agreements.length === 0) {
     await terminal.succeed(runDir, runId, "no_facts", batch)
     return { status: "no_facts", runId }
   }
 
   let applied
   try {
-    applied = await applyWithRetries(input, records)
+    applied = await applyWithRetries(input, records, agreements)
   } catch (error) {
     if (error instanceof MemorySecretError) {
       await fail("secret_like_content", error.message)
@@ -93,20 +98,37 @@ export async function finalizeClaimedFactsRun(input: FinalizeClaimedFactsRunInpu
     await fail("parent_dirty", applied.detail ?? "memory repository contains foreign state", "parent_dirty")
     return { status: "parent_dirty", runId }
   }
+  if (applied.outcome === "unchanged") {
+    await terminal.succeed(runDir, runId, "no_facts", batch)
+    return { status: "no_facts", runId }
+  }
   await terminal.succeed(runDir, runId, "committed", batch, applied.sha)
   return { status: "committed", runId, sha: applied.sha }
+}
+
+async function readOptional(path: string): Promise<string> {
+  try {
+    return await readFile(path, "utf8")
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return ""
+    throw error
+  }
 }
 
 function applyWithRetries(
   input: FinalizeClaimedFactsRunInput,
   records: ReturnType<typeof parseFactsExtractionJsonl>,
+  agreements: readonly AgreementExtractionRecord[],
 ) {
+  const config = input.options.loadConfig().config
   return applyFactsWithRetries({
     runDir: input.runDir,
     ledger: input.ledger,
     repo: input.repo,
     records,
-    people: resolveFactsPeopleRouting(input.options.loadConfig().config, input.identity.id),
+    agreements,
+    agreementsPolicy: resolveFactsAgreements(config, input.identity.id).policy,
+    people: resolveFactsPeopleRouting(config, input.identity.id),
     identity: input.identity,
     logger: input.logger,
     withWriterLock: input.withWriterLock,

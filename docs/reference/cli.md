@@ -163,6 +163,7 @@ bunx oh-my-openagent doctor
   - display count and screen-lock state;
   - the stop path, reported as not armed until computer use starts input, because the engine arms the stop chord only then.
   The probe sends only the read-only `engine.hello` and `capabilities` requests and is bounded by the doctor's timeout.
+- `omo doctor --models [--json]` (OmO Native) prints every task category and agent as a spawn resolves it right now: the model it runs first, the runtime retry chain in order, and every declared rung with its source (`built-in`, `omo.json`, `category:<name>`) and state (`runs first`, `fallback N`, `excluded by exclude_models`, `no login`, `not reached`), then the main session's `model_profile` lane. It uses the spawn resolvers and the engine's offline model list (credentials are not probed). It exits 1 when the resolver runtime cannot load and 2 on an option other than `--json`. See [`exclude_models`](./omo-json.md#exclude_models-native-harness) to keep a model out of every chain.
 
 ---
 

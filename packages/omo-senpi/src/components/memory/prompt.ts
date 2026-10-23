@@ -4,6 +4,7 @@ import {
   MemoryBlockCache,
   markMemoryBlock,
   replaceMemoryBlock,
+  type AgreementItem,
   type ExternalProjectionLimits,
 } from "@oh-my-opencode/memory-core"
 
@@ -23,6 +24,7 @@ export const MEMORY_NOTICE_CUSTOM_TYPE = "omo-memory:notice"
 export const MEMORY_NUDGE_METADATA_TOKEN = "user turns since your last memory save"
 export const MEMORY_PRESSURE_METADATA_TOKEN = "memory pressure:"
 export const MEMORY_SOUL_METADATA_TOKEN = "Soul updated by"
+export const MEMORY_AGREEMENT_METADATA_TOKEN = "Agreement NEEDS-HUMAN"
 
 export interface MemoryPromptSession {
   readonly id: string
@@ -51,11 +53,16 @@ export interface MemoryPromptInjectionOptions {
     sessionId: string,
     identity: string,
   ) => Promise<{ readonly sha: string } | undefined>
+  readonly resolveAgreementsNotice?: (
+    repo: GitMemoryRepo,
+    sessionId: string,
+    identity: string,
+  ) => Promise<readonly AgreementItem[] | undefined>
   /**
    * A notice input (the nudge count or the soul notice) failed or timed out. The turn goes on without
    * that notice; the failure is reported here, never thrown into the extension (#9667).
    */
-  readonly onNoticeInputFailed?: (input: "nudge" | "soul", sessionId: string, error: unknown) => void
+  readonly onNoticeInputFailed?: (input: "nudge" | "soul" | "agreements", sessionId: string, error: unknown) => void
 }
 
 /**
@@ -63,9 +70,17 @@ export interface MemoryPromptInjectionOptions {
  * rebuilds it), while session-volatile recall and maintenance notices return as a late hidden
  * custom message. Unbound/disabled sessions return undefined so the handler chain passes through.
  */
-export function createMemoryPromptHandler(
-  options: MemoryPromptInjectionOptions,
-): (payload: unknown, eventCtx?: unknown) => Promise<BeforeAgentStartEventResult | undefined> {
+export interface MemoryPromptHandler {
+  (payload: unknown, eventCtx?: unknown): Promise<BeforeAgentStartEventResult | undefined>
+  /**
+   * Compiles the block (and its pressure estimate) a new session's first prompt will need, at HEAD, so the prompt
+   * finds it ready: in this process, or persisted for the next. The prompt shares the in-flight compile instead of
+   * starting its own, so a prompt that arrives first is never slower than without the prebuild.
+   */
+  prebuild(context: MemoryIdentityContext): Promise<void>
+}
+
+export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions): MemoryPromptHandler {
   const cache = options.cache ?? new MemoryBlockCache()
   const pins = options.pins ?? createProjectionPins()
   const recordPin = options.recordPin ?? (() => undefined)
@@ -74,8 +89,29 @@ export function createMemoryPromptHandler(
   // this memo every prompt listed the tree and read every system blob again (one git process each):
   // 45 git spawns between Enter and the provider request in a 2.7k-commit identity.
   const pressureEstimates = new Map<string, number>()
+  const pressureInFlight = new Map<string, Promise<number>>()
+  // Persisted with the compiled block: a relaunch reads the estimate of a commit instead of listing its tree again.
+  // One estimate per revision is in flight at a time, so a prompt and a prebuild share it.
+  const estimatePressure = (repo: GitMemoryRepo, revision: string): Promise<number> => {
+    const known = pressureEstimates.get(revision)
+    if (known !== undefined) return Promise.resolve(known)
+    let pending = pressureInFlight.get(revision)
+    if (pending === undefined) {
+      // estimateSystemTokens throws on a failed read, so a stored estimate is always the commit's own.
+      pending = cache.remember(repo, "system-token-estimate", revision, async () =>
+        ({ value: String(await estimateSystemTokensCached(repo, revision, pressureEstimates)), persist: true }))
+        .then((stored) => {
+          const tokens = Number(stored)
+          pressureEstimates.set(revision, tokens)
+          return tokens
+        })
+      pressureInFlight.set(revision, pending)
+      void pending.finally(() => pressureInFlight.delete(revision)).catch(() => undefined)
+    }
+    return pending
+  }
   async function noticeInput<T>(
-    input: "nudge" | "soul",
+    input: "nudge" | "soul" | "agreements",
     sessionId: string,
     read: () => Promise<T | undefined> | undefined,
   ): Promise<T | undefined> {
@@ -86,7 +122,11 @@ export function createMemoryPromptHandler(
       return undefined
     }
   }
-  return async (payload, eventCtx) => {
+  const blockOptions = (context: MemoryIdentityContext) => {
+    const projection = options.resolveProjectionLimits?.(context.identity)
+    return { agentId: context.identity, ...(projection === undefined ? {} : { projection }) }
+  }
+  const handler = async (payload: unknown, eventCtx?: unknown): Promise<BeforeAgentStartEventResult | undefined> => {
     const preview = isRecord(payload) && payload.preview === true
     const systemPrompt = readSystemPrompt(payload)
     if (systemPrompt === undefined) return undefined
@@ -95,7 +135,10 @@ export function createMemoryPromptHandler(
     const context = options.resolveContext(session.id)
     if (context === undefined) return undefined
 
-    const repo = createRepo(context)
+    // One HEAD read per prompt: the nudge count, the soul notice and the pin all ask for it, and each read is
+    // a git process (about 10 ms). Each consumer bounds its git ranges by this HEAD, so a commit that lands
+    // during the prompt is seen by the next prompt instead of half-seen by this one.
+    const repo = withHeadReadOnce(createRepo(context))
     // A preview (senpi's prompt-cache prewarm) keeps only the systemPrompt: compose at the revision the
     // real turn will use, and record no pin, consume no watermark, announce no repin. The notice inputs
     // only feed the message a preview discards, so their reads (a git log each) are skipped too.
@@ -105,24 +148,22 @@ export function createMemoryPromptHandler(
     const soulNotice = preview
       ? undefined
       : await noticeInput("soul", session.id, () => options.resolveSoulNotice?.(repo, session.id, context.identity))
+    const flaggedAgreements = preview
+      ? undefined
+      : await noticeInput("agreements", session.id, () => options.resolveAgreementsNotice?.(repo, session.id, context.identity))
     const pinInput = { repo, sessionId: session.id, branch: session.branch, head: await repo.head() }
     const turn: ProjectionTurn = preview
       ? { revision: await pins.peek(pinInput) }
       : await pins.advance({ ...pinInput, record: recordPin })
     if (turn.repinned !== undefined && turn.repinned !== "first-turn") options.onRepin?.(session.id, turn.repinned)
-    const projection = options.resolveProjectionLimits?.(context.identity)
-    const block = await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, {
-      agentId: context.identity,
-      ...(projection === undefined ? {} : { projection }),
-    }, turn.revision)
+    const block = await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, blockOptions(context), turn.revision)
     const pressureBlock = await addMemoryPressureMetadata(
       block,
-      repo,
       turn.revision,
       options.resolveCompileWarnTokens?.(context.identity),
-      pressureEstimates,
+      (revision) => estimatePressure(repo, revision),
     )
-    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice, turn)
+    const notice = renderMemoryNotice(session.compactedMessageCount, nudgeTurns, soulNotice, turn, flaggedAgreements ?? [])
     const nextPrompt = replaceMemoryBlock(systemPrompt, markMemoryBlock(context.identity, pressureBlock))
     if (notice === undefined) return { systemPrompt: nextPrompt }
     return {
@@ -134,21 +175,29 @@ export function createMemoryPromptHandler(
       },
     }
   }
+  return Object.assign(handler, {
+    async prebuild(context: MemoryIdentityContext): Promise<void> {
+      const repo = createRepo(context)
+      const head = await repo.head()
+      if (head === null) return
+      await cache.compile(repo, `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`, blockOptions(context), head)
+      if (options.resolveCompileWarnTokens?.(context.identity) !== undefined) await estimatePressure(repo, head)
+    },
+  })
 }
 
 async function addMemoryPressureMetadata(
   block: string,
-  repo: GitMemoryRepo,
   revision: string | null,
   compileWarnTokens: number | undefined,
-  estimates: Map<string, number>,
+  estimate: (revision: string) => Promise<number>,
 ): Promise<string> {
   if (compileWarnTokens === undefined || revision === null) return block
-  const estimate = await estimateSystemTokensCached(repo, revision, estimates)
+  const tokens = await estimate(revision)
   const softThreshold = Math.floor(MEMORY_PRESSURE_SOFT_RATIO * compileWarnTokens)
-  if (estimate < softThreshold) return block
-  const percentage = Math.floor((estimate / compileWarnTokens) * 100)
-  const line = `- ${MEMORY_PRESSURE_METADATA_TOKEN} system/ ~${estimate}/${compileWarnTokens} tokens (${percentage}% of advisory); trim or demote stale system/ blocks via the memory tool or run /dream`
+  if (tokens < softThreshold) return block
+  const percentage = Math.floor((tokens / compileWarnTokens) * 100)
+  const line = `- ${MEMORY_PRESSURE_METADATA_TOKEN} system/ ~${tokens}/${compileWarnTokens} tokens (${percentage}% of advisory); trim or demote stale system/ blocks via the memory tool or run /dream`
   const metadataEnd = block.lastIndexOf("</memory_metadata>")
   if (metadataEnd < 0) return `${block}\n${line}`
   return `${block.slice(0, metadataEnd)}${line}\n${block.slice(metadataEnd)}`
@@ -163,6 +212,7 @@ function renderMemoryNotice(
   nudgeTurns: number | undefined,
   soulNotice: { readonly sha: string } | undefined,
   turn: ProjectionTurn,
+  flaggedAgreements: readonly AgreementItem[],
 ): string | undefined {
   const lines = [
     ...(compactedMessageCount === 0
@@ -175,6 +225,8 @@ function renderMemoryNotice(
       ? []
       : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${soulNotice.sha.slice(0, 7)} since your last run`]),
     ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision, turn.sources)]),
+    ...flaggedAgreements.map((item) =>
+      `- ${MEMORY_AGREEMENT_METADATA_TOKEN} (broken x${item.n}): "${item.text}" Do not break it again this session; if the task needs it, stop and ask your person.`),
   ]
   if (lines.length === 0) return undefined
   return ["<memory_notice>", ...lines, "</memory_notice>"].join("\n")
@@ -227,4 +279,21 @@ function countCompactedMessages(branch: readonly unknown[]): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+/** `repo` with `head()` answered by one shared read; every other member is the repository's own. */
+function withHeadReadOnce(repo: GitMemoryRepo): GitMemoryRepo {
+  let head: Promise<string | null> | undefined
+  return new Proxy(repo, {
+    get(target, property, receiver) {
+      if (property === "head") {
+        return () => (head ??= target.head().catch((error: unknown) => {
+          head = undefined
+          throw error
+        }))
+      }
+      const value = Reflect.get(target, property, receiver)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
 }

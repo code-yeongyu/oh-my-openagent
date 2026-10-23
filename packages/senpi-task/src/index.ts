@@ -91,6 +91,7 @@ export {
   toolCountSuffix,
 } from "./status-line"
 export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
+export { activeParentModelFallback } from "./manager/parent-model-rung"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,
@@ -143,6 +144,9 @@ export {
   resolveAvailableCategoryNames,
   resolveCategory,
 } from "./category"
+export { withoutExcludedFallbacks, withoutExcludedSelectors } from "./manager/exclude-fallbacks"
+export { withoutExcludedModels } from "./model-exclusion"
+export { resolveTaskAgents } from "./agents/task-agents"
 export type {
   BuiltinCategoryDefinition,
   CategoryModelSelection,

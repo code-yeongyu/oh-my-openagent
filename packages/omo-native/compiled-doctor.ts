@@ -6,6 +6,7 @@ import { doctorComputerUseLines } from "./bin/lib/computer-use-doctor.js"
 import { daemonReportLines } from "./bin/lib/daemon.js"
 import { reapStaleEngines, staleEngineReport, transientMemoryReport, warningsForSettings } from "./bin/lib/doctor.js"
 import { migrationReport } from "./bin/lib/doctor-migration.js"
+import { runDoctorModels } from "./bin/lib/model-chains.js"
 import { piConfigReport } from "./bin/lib/doctor-pi-config.js"
 import { launchSpecDoctorLines } from "./bin/lib/launch-spec-mode.js"
 import { needsSetupSuggestion, type detectHarnesses } from "./bin/lib/setup-detect.js"
@@ -71,6 +72,15 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
     return
   }
   const env = options.env ?? process.env
+  if (input.args?.[0] === "--models") {
+    process.exitCode = await runDoctorModels([...input.args.slice(1)], {
+      agentDir: canonicalAgentDir(env),
+      env,
+      loadRuntime: compiledDiagnosticRuntimeLoader(input.execDir),
+      loadEngine: loadCompiledCoverageEngine,
+    })
+    return
+  }
   let failed = false
   const lines: string[] = []
   for (const [label, artifact] of doctorArtifacts) {

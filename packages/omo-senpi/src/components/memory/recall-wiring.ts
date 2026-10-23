@@ -18,6 +18,7 @@ import {
   GitMemoryRepo,
   PendingNudges,
   RecallCorpusCache,
+  type RecallDocument,
   RecallLedger,
   planRecallQueries,
   selectRecallCandidates,
@@ -29,8 +30,11 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
-import { createRecallDrain, type PendingNudgesPort } from "./recall-drain"
 import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
+import { withProjectDocuments } from "./project-memory-nudge"
+import { createProjectSourceMentions } from "./project-recall-mentions"
+import { projectDocumentsOf, selectWithProjectSeats, type ProjectRecallCorpus } from "./project-recall-seats"
+import { createRecallDrain, type PendingNudgesPort } from "./recall-drain"
 import { createTranscriptMentionIndex } from "./recall-transcript-mentions"
 import {
   judgeTranscript,
@@ -72,6 +76,10 @@ export interface MemoryRecallWiringOptions {
   readonly env: Record<string, string | undefined>
   readonly createRepo?: (context: MemoryIdentityContext) => GitMemoryRepo
   readonly corpusCache?: RecallCorpusCache
+  /** Each child project this session touched, its notes under `@project/` paths (#10044); ranked apart from the bound memory. */
+  readonly projectCorpora?: (sessionId: string) => Promise<readonly ProjectRecallCorpus[]>
+  /** The readable file behind a qualified project note path; a note the transcript names there is not recalled again. */
+  readonly projectSource?: (sessionId: string, path: string) => string | undefined
   readonly ledgerFor?: (context: MemoryIdentityContext) => RecallLedger
   readonly pendingFor?: (context: MemoryIdentityContext) => PendingNudgesPort
   readonly drainQueued?: (sessionId: string, context: MemoryIdentityContext) => RecallNudge[]
@@ -123,6 +131,7 @@ const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as con
 export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): MemoryRecallWiring {
   const corpusCache = options.corpusCache ?? new RecallCorpusCache()
   const transcriptMentions = createTranscriptMentionIndex()
+  const projectSourceMentions = options.projectSource === undefined ? undefined : createProjectSourceMentions(options.projectSource)
   const createRepo = options.createRepo ?? defaultCreateRepo
   const ledgerFor = options.ledgerFor ?? ((context) => new RecallLedger(context.identityPaths.recallLedger))
   const pendingFor = options.pendingFor ?? ((context) => new PendingNudges(context.identityPaths.recallPending))
@@ -165,8 +174,11 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     if (queries.length === 0) return undefined
 
     const repo = createRepo(context)
-    const corpus = await corpusCache.load(repo)
-    if (corpus.documents.length === 0) return undefined
+    const own = await corpusCache.load(repo)
+    const projects = await options.projectCorpora?.(session.id) ?? []
+    const projectDocuments = projects.length === 0 ? [] : projectDocumentsOf(projects)
+    const allDocuments = withProjectDocuments(own.documents, projectDocuments)
+    if (allDocuments.length === 0) return undefined
 
     // Raw entries include tool calls/results that the judge's text-only window omits. The index
     // scans the bounded window per entry and caches by entry id, so a trigger costs only the new
@@ -174,16 +186,18 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     const excludePaths = transcriptMentions.excludedPaths({
       sessionId: session.id,
       entries: session.entries,
-      documents: corpus.documents,
+      documents: allDocuments,
     })
+    for (const path of projectSourceMentions?.excludedPaths(session.id, session.entries, projectDocuments) ?? []) excludePaths.add(path)
 
     const ledger = ledgerFor(context)
     const surfaced = await ledger.surfacedPaths(session.id)
-    const candidates = selectRecallCandidates(corpus.documents, queries, {
-      maxItems: recall.max_items,
-      surfaced,
-      excludePaths,
-    })
+    const candidates = selectWithProjectSeats(own.documents, projects, recall.max_items, (documents, extraQueries, identityId) =>
+      selectRecallCandidates(documents, [...queries, ...extraQueries], {
+        maxItems: recall.max_items,
+        surfaced: pathsInCorpus(surfaced, identityId),
+        excludePaths: pathsInCorpus(excludePaths, identityId),
+      }))
     if (candidates.length === 0) return undefined
     return {
       sessionId: session.id,
@@ -234,6 +248,11 @@ function defaultCreateRepo(context: MemoryIdentityContext): GitMemoryRepo {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+function pathsInCorpus(paths: ReadonlySet<string>, identityId: string | undefined): ReadonlySet<string> {
+  if (identityId === undefined) return paths
+  const prefix = `@project/${identityId}/`
+  return new Set([...paths].filter((path) => path.startsWith(prefix)).map((path) => path.slice(prefix.length)))
 }
 
 /**

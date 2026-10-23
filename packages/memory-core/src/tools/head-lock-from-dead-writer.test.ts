@@ -13,7 +13,6 @@ import { createLockRecord, memoryWriterLockPath, withLock } from "../locks"
 import { exitedWithin } from "../locks/process-liveness.test-support"
 import { runMemoryTool, type MemoryToolLock } from "./memory"
 import { removeTree } from "../../../../test-support/remove-tree"
-import { SAME_UID_GIT_UNINSPECTABLE } from "../git/host-scan-blind.test-support"
 
 // A holder scan answers within LSOF_ANSWER_BOUND_MS (60 s) on a loaded macOS host; the default 20 s
 // test budget would cut a correct but slow answer short.
@@ -45,7 +44,7 @@ async function repoWithZeroByteHeadLock(writerRecord: "dead writer" | "none") {
     expect(await exitedWithin(dead, 5_000)).toBe(true)
     await writeFile(memoryWriterLockPath(paths.locks), JSON.stringify({
       pid: dead.pid, process_start: "unavailable", hostname: hostname(), nonce: randomUUID(),
-      created_at: new Date().toISOString(), purpose: "memory-write",
+      created_at: new Date().toISOString(), purpose: "memory-write", git_activity_lock: true,
     }), "utf8")
   }
   const headLock = join(paths.repo, ".git", "HEAD.lock")
@@ -71,7 +70,7 @@ function strandedLockIn(error: unknown): StrandedGitLockError | undefined {
 }
 
 describe("a 0-byte HEAD.lock left by a memory writer killed mid-commit (omo #10199 field incident)", () => {
-  test.skipIf(process.platform === "win32" || SAME_UID_GIT_UNINSPECTABLE)("#given the writer that left it is proven dead #when the next memory write runs #then the lock is reclaimed and the write commits", async () => {
+  test.skipIf(process.platform === "win32")("#given the writer that left it is proven dead #when the next memory write runs #then the lock is reclaimed and the write commits", async () => {
     // #given
     const setup = await repoWithZeroByteHeadLock("dead writer")
 

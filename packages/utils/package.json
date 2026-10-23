@@ -13,6 +13,10 @@
       "types": "./src/atomic-write.ts",
       "import": "./src/atomic-write.ts"
     },
+    "./path-containment": {
+      "types": "./src/path-containment.ts",
+      "import": "./src/path-containment.ts"
+    },
     "./runtime": {
       "types": "./runtime.d.ts",
       "import": "./src/runtime/index.ts"
@@ -116,6 +120,7 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/model-core": "workspace:*",
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "js-yaml": "^5.4.2",
     "jsonc-parser": "^3.3.1"

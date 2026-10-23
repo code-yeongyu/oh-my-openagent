@@ -21,23 +21,38 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_activity_state_read_failed"
   | "telemetry_activity_state_write_failed"
   | "telemetry_capture_failed"
+  | "telemetry_consent_failed"
   | "telemetry_cpu_info_unavailable"
   | "telemetry_drop_flush_failed"
   | "telemetry_event_property_dropped"
   | "telemetry_event_property_rejected"
   | "telemetry_event_rejected"
   | "telemetry_events_dropped_by_consent"
+  | "telemetry_otlp_partial_success"
+  | "telemetry_otlp_send_failed"
   | "telemetry_posthog_import_failed"
   | "telemetry_posthog_init_failed"
-  | "telemetry_shutdown_failed";
+  | "telemetry_shutdown_failed"
+  | "telemetry_spool_purge_failed"
+  | "telemetry_spool_purge_refused"
+  | "telemetry_spool_purge_skipped"
+  | "telemetry_spool_sweep_failed"
+  | "telemetry_spool_write_failed";
 
 export type TelemetryDiagnosticErrorKind = "error" | "non_error";
+
+/** Why the opt-out purge left a spool-named entry in place: it deletes only regular files of the current user. */
+export type TelemetrySpoolEntryKind = "directory" | "symlink" | "foreign_owner" | "other";
 
 export type TelemetryDiagnosticInput = {
   readonly event: TelemetryDiagnosticEvent;
   readonly source: string;
   readonly error?: unknown;
   readonly errorKind?: TelemetryDiagnosticErrorKind;
+  /** `telemetry_spool_purge_skipped` only: what kind of spool-named entry the purge left in place. */
+  readonly entryKind?: TelemetrySpoolEntryKind;
+  /** `telemetry_spool_purge_failed` only: the errno code (never the path) of one spool file the opt-out purge could not delete. */
+  readonly errorCode?: string;
   readonly count?: number;
 };
 

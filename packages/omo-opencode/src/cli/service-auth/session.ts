@@ -8,8 +8,9 @@ import {
   parseReply, requestApi, RequestFailure, serviceOrigin, SignInError, tokenSchema,
 } from "./protocol"
 
-class SessionEnded extends SignInError {
-  constructor(message: string, readonly deviceRevoked: boolean) { super(message) }
+// `code` is the service's refusal code (one of the four that end a session), never its message.
+export class SessionEnded extends SignInError {
+  constructor(message: string, readonly deviceRevoked: boolean, readonly code: string) { super(message) }
 }
 
 // The service revokes the device row before answering reauth_required on refresh (token reuse);
@@ -51,7 +52,7 @@ export function createSession(options: {
         await store.clear()
         throw new SessionEnded(error.code === "reauth_required"
           ? "This session was ended because its refresh token was reused. Sign in again with omo login."
-          : "Sign in again with omo login.", DEVICE_REVOKING_REFUSALS.has(error.code))
+          : "Sign in again with omo login.", DEVICE_REVOKING_REFUSALS.has(error.code), error.code)
       }
       if ((error instanceof RequestFailure && error.notSent) ||
         (error instanceof ApiRefusal && error.status === 429 && error.code === "rate_limited")) {
@@ -66,6 +67,9 @@ export function createSession(options: {
     signal,
     async ready() { await store.read() },
     async save(value: Credentials) { await locked(() => store.write(value)) },
+    async update<T>(action: (current: Credentials | null) => Promise<T>): Promise<T> {
+      return locked(async () => action(await store.read()))
+    },
     async logout(): Promise<boolean> {
       return locked(async () => {
         try {

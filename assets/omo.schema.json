@@ -5,6 +5,45 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "git_owners": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -41,13 +80,13 @@
       },
       "additionalProperties": false
     },
-    "gateway": {
+    "dori": {
       "type": "object",
       "propertyNames": {
         "type": "string"
       },
       "additionalProperties": {},
-      "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+      "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
     },
     "$schema": {
       "type": "string"
@@ -1442,6 +1481,9 @@
           "display_name": {
             "type": "string"
           },
+          "caution": {
+            "type": "string"
+          },
           "family": {
             "type": "string",
             "enum": [
@@ -1598,6 +1640,14 @@
           "default": "auto",
           "type": "string",
           "minLength": 1
+        },
+        "auto_identity": {
+          "default": "path",
+          "type": "string",
+          "enum": [
+            "path",
+            "git"
+          ]
         },
         "reflection": {
           "default": {
@@ -1785,6 +1835,33 @@
           },
           "additionalProperties": false
         },
+        "agreements": {
+          "default": {
+            "enabled": true,
+            "needs_human_threshold": 3,
+            "max_items": 64
+          },
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "needs_human_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "max_items": {
+              "default": 64,
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 256
+            }
+          },
+          "additionalProperties": false
+        },
         "soul": {
           "default": {
             "edit_notice": true
@@ -1930,6 +2007,24 @@
             },
             "query_expansion": {
               "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "project_scope": {
+          "default": {
+            "nudge": true,
+            "recall": true
+          },
+          "type": "object",
+          "properties": {
+            "nudge": {
+              "default": true,
+              "type": "boolean"
+            },
+            "recall": {
+              "default": true,
               "type": "boolean"
             }
           },
@@ -2105,6 +2200,25 @@
                     "type": "integer",
                     "minimum": 50,
                     "maximum": 500
+                  }
+                },
+                "additionalProperties": false
+              },
+              "agreements": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "needs_human_threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 256
                   }
                 },
                 "additionalProperties": false
@@ -2426,12 +2540,57 @@
         "type": "string"
       }
     },
+    "exclude_models": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "[opencode]": {
       "$ref": "#/definitions/opencode"
     },
     "[native]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -2465,13 +2624,13 @@
           },
           "additionalProperties": false
         },
-        "gateway": {
+        "dori": {
           "type": "object",
           "propertyNames": {
             "type": "string"
           },
           "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+          "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -3803,6 +3962,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -3958,6 +4120,13 @@
               "type": "string",
               "minLength": 1
             },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
+            },
             "reflection": {
               "type": "object",
               "properties": {
@@ -4088,6 +4257,25 @@
               },
               "additionalProperties": false
             },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
+                }
+              },
+              "additionalProperties": false
+            },
             "soul": {
               "type": "object",
               "properties": {
@@ -4185,6 +4373,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -4352,6 +4552,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -4644,6 +4863,12 @@
           "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_models": {
           "type": "array",
           "items": {
             "type": "string"
@@ -4655,6 +4880,45 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -4688,13 +4952,13 @@
           },
           "additionalProperties": false
         },
-        "gateway": {
+        "dori": {
           "type": "object",
           "propertyNames": {
             "type": "string"
           },
           "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+          "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -6026,6 +6290,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -6181,6 +6448,13 @@
               "type": "string",
               "minLength": 1
             },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
+            },
             "reflection": {
               "type": "object",
               "properties": {
@@ -6311,6 +6585,25 @@
               },
               "additionalProperties": false
             },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
+                }
+              },
+              "additionalProperties": false
+            },
             "soul": {
               "type": "object",
               "properties": {
@@ -6408,6 +6701,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -6575,6 +6880,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -6871,6 +7195,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "exclude_models": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -6878,6 +7208,45 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -6911,13 +7280,13 @@
           },
           "additionalProperties": false
         },
-        "gateway": {
+        "dori": {
           "type": "object",
           "propertyNames": {
             "type": "string"
           },
           "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+          "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -8249,6 +8618,9 @@
               "display_name": {
                 "type": "string"
               },
+              "caution": {
+                "type": "string"
+              },
               "family": {
                 "type": "string",
                 "enum": [
@@ -8404,6 +8776,13 @@
               "type": "string",
               "minLength": 1
             },
+            "auto_identity": {
+              "type": "string",
+              "enum": [
+                "path",
+                "git"
+              ]
+            },
             "reflection": {
               "type": "object",
               "properties": {
@@ -8534,6 +8913,25 @@
               },
               "additionalProperties": false
             },
+            "agreements": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "needs_human_threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "max_items": {
+                  "type": "integer",
+                  "minimum": 8,
+                  "maximum": 256
+                }
+              },
+              "additionalProperties": false
+            },
             "soul": {
               "type": "object",
               "properties": {
@@ -8631,6 +9029,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -8798,6 +9208,25 @@
                         "type": "integer",
                         "minimum": 50,
                         "maximum": 500
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
                       }
                     },
                     "additionalProperties": false
@@ -9090,6 +9519,12 @@
           "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
         },
         "disabled_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_models": {
           "type": "array",
           "items": {
             "type": "string"
@@ -9107,6 +9542,45 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "workspaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "git_owners": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "formatOnMutation": {
             "type": "object",
             "properties": {
@@ -9139,6 +9613,14 @@
               }
             },
             "additionalProperties": false
+          },
+          "dori": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
           },
           "categories": {
             "type": "object",
@@ -10470,6 +10952,9 @@
                 "display_name": {
                   "type": "string"
                 },
+                "caution": {
+                  "type": "string"
+                },
                 "family": {
                   "type": "string",
                   "enum": [
@@ -10625,6 +11110,13 @@
                 "type": "string",
                 "minLength": 1
               },
+              "auto_identity": {
+                "type": "string",
+                "enum": [
+                  "path",
+                  "git"
+                ]
+              },
               "reflection": {
                 "type": "object",
                 "properties": {
@@ -10755,6 +11247,25 @@
                 },
                 "additionalProperties": false
               },
+              "agreements": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "needs_human_threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 8,
+                    "maximum": 256
+                  }
+                },
+                "additionalProperties": false
+              },
               "soul": {
                 "type": "object",
                 "properties": {
@@ -10852,6 +11363,18 @@
                     "maximum": 9007199254740991
                   },
                   "query_expansion": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "project_scope": {
+                "type": "object",
+                "properties": {
+                  "nudge": {
+                    "type": "boolean"
+                  },
+                  "recall": {
                     "type": "boolean"
                   }
                 },
@@ -11019,6 +11542,25 @@
                           "type": "integer",
                           "minimum": 50,
                           "maximum": 500
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "agreements": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "needs_human_threshold": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "max_items": {
+                          "type": "integer",
+                          "minimum": 8,
+                          "maximum": 256
                         }
                       },
                       "additionalProperties": false
@@ -11316,12 +11858,57 @@
               "type": "string"
             }
           },
+          "exclude_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "[opencode]": {
             "$ref": "#/definitions/opencode"
           },
           "[native]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -11355,13 +11942,13 @@
                 },
                 "additionalProperties": false
               },
-              "gateway": {
+              "dori": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
                 "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+                "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -12693,6 +13280,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -12848,6 +13438,13 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
+                  },
                   "reflection": {
                     "type": "object",
                     "properties": {
@@ -12978,6 +13575,25 @@
                     },
                     "additionalProperties": false
                   },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "soul": {
                     "type": "object",
                     "properties": {
@@ -13075,6 +13691,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -13242,6 +13870,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -13534,6 +14181,12 @@
                 "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude_models": {
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -13545,6 +14198,45 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -13578,13 +14270,13 @@
                 },
                 "additionalProperties": false
               },
-              "gateway": {
+              "dori": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
                 "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+                "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -14916,6 +15608,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -15071,6 +15766,13 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
+                  },
                   "reflection": {
                     "type": "object",
                     "properties": {
@@ -15201,6 +15903,25 @@
                     },
                     "additionalProperties": false
                   },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "soul": {
                     "type": "object",
                     "properties": {
@@ -15298,6 +16019,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -15465,6 +16198,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -15761,6 +16513,12 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "exclude_models": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "additionalProperties": false
@@ -15768,6 +16526,45 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -15801,13 +16598,13 @@
                 },
                 "additionalProperties": false
               },
-              "gateway": {
+              "dori": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
                 "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+                "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -17139,6 +17936,9 @@
                     "display_name": {
                       "type": "string"
                     },
+                    "caution": {
+                      "type": "string"
+                    },
                     "family": {
                       "type": "string",
                       "enum": [
@@ -17294,6 +18094,13 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "auto_identity": {
+                    "type": "string",
+                    "enum": [
+                      "path",
+                      "git"
+                    ]
+                  },
                   "reflection": {
                     "type": "object",
                     "properties": {
@@ -17424,6 +18231,25 @@
                     },
                     "additionalProperties": false
                   },
+                  "agreements": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "needs_human_threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "max_items": {
+                        "type": "integer",
+                        "minimum": 8,
+                        "maximum": 256
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "soul": {
                     "type": "object",
                     "properties": {
@@ -17521,6 +18347,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -17688,6 +18526,25 @@
                               "type": "integer",
                               "minimum": 50,
                               "maximum": 500
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "agreements": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_human_threshold": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "max_items": {
+                              "type": "integer",
+                              "minimum": 8,
+                              "maximum": 256
                             }
                           },
                           "additionalProperties": false
@@ -17980,6 +18837,12 @@
                 "description": "Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host."
               },
               "disabled_skills": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude_models": {
                 "type": "array",
                 "items": {
                   "type": "string"

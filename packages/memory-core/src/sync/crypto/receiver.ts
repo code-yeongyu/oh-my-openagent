@@ -1,9 +1,8 @@
 import type { SyncEntry } from "./entry.ts"
 import { frozenCopy } from "./frozen.ts"
 import type { ChainEntry } from "./vendor/sync-format/chain.ts"
-import { envelopeRefusal } from "./envelope.ts"
 import { foldRefusal, type ReceivedChain, type ReceiverRefusal } from "./vendor/sync-format/fold.ts"
-import { receiveKeyringChain } from "./vendor/sync-format/receive.ts"
+import { createKeyringReceiver, receiveKeyringChain } from "./vendor/sync-format/receive.ts"
 
 /**
  * The merged omo-service receiver (vendored sync-format), run over the client's entries so the
@@ -36,60 +35,96 @@ const wireOnce = (entry: SyncEntry): ChainEntry => {
 /** A receiver refusal, or the receiver refusing an already-verified history entry instead of this one. */
 export type ReceiverCheck = ReceiverRefusal | "receiver_seq_mismatch"
 
-/** The receiver's verdict for one entry of the pull a ReceiverPass was built for. */
-export type ReceiverPass = (entry: SyncEntry) => ReceiverCheck | null
-
 const firstRefusalAt = (received: ReceivedChain, entry: SyncEntry, ours: ReadonlySet<number>): ReceiverCheck | null => {
   if (received.ok || received.seq > entry.seq) return null
   return received.seq === entry.seq && ours.has(received.seq) ? received.reason : "receiver_seq_mismatch"
 }
 
-/**
- * The merged receiver run ONCE over the already-verified keyring `history` and the keyring entries of
- * `entries`, in order, up to the first malformed one or the first whose seq does not increase. Every seq in
- * that walk names exactly one entry, so the receiver's first refusal (reported by seq) names one entry too:
- * entries before it pass, it gets the reason, and nothing after it is ever reached. That equals running each
- * entry over the history plus every earlier entry of the pull, because the fold judges a record only by the
- * records before it; so a pull costs one pass, not one pass per entry. An entry whose seq does not increase
- * gets the receiver's own `seq_not_increasing`, and nothing after it joins the walk.
- * A batch entry's receiver checks read only its own fields and the sequence order, so it is folded alone
- * and its seq is compared with the last keyring seq before it. An entry the pass was not built for is refused.
- */
-export const receiverPass = async (history: ReadonlyArray<SyncEntry>, entries: ReadonlyArray<SyncEntry>): Promise<ReceiverPass> => {
-  const keyring: SyncEntry[] = []
-  const lastSeqBefore = new Map<SyncEntry, number>()
-  let replayed: SyncEntry | null = null
-  let lastSeq = history.reduce((max, entry) => Math.max(max, entry.seq), 0)
-  for (const entry of entries) {
-    if (envelopeRefusal(entry) !== null) break
-    if (entry.kind === "keyring") {
-      if (entry.seq <= lastSeq) {
-        replayed = entry
-        break
-      }
-      keyring.push(entry)
-      lastSeq = Math.max(lastSeq, entry.seq)
-    } else {
-      lastSeqBefore.set(entry, lastSeq)
-    }
-  }
-  const list = [...history.map(wireOnce), ...wire(keyring)]
-  const hasFork = keyring.some((entry) => entry.kind === "keyring" && entry.body.kind === "fork-resolution")
-  const received = hasFork ? await receiveKeyringChain(list) : foldRefusal(list)
-  const ours = new Set(keyring.map((entry) => entry.seq))
-  const inPull = new Set<SyncEntry>(keyring)
-  return (entry) => {
-    if (inPull.has(entry)) return firstRefusalAt(received, entry, ours)
-    if (entry === replayed) return received.ok ? "seq_not_increasing" : "receiver_seq_mismatch"
-    const before = lastSeqBefore.get(entry)
-    if (before === undefined) return "receiver_seq_mismatch"
-    if (entry.seq <= before) return "seq_not_increasing"
-    return firstRefusalAt(foldRefusal(wire([entry])), entry, new Set([entry.seq]))
-  }
+/** The merged receiver positioned right after an already-verified keyring history. */
+export type HistoryReceiver = {
+  /**
+   * The receiver's verdict for the next keyring entry. On null the receiver has folded the entry in, so
+   * it now belongs only to the state that goes on to verify that entry; any other caller drops it.
+   */
+  readonly keyring: (entry: SyncEntry) => Promise<ReceiverCheck | null>
+  /**
+   * The verdict for a batch entry after the history. A batch's receiver checks read only its own fields
+   * and the sequence order, so it is folded alone and its seq is compared with the last keyring seq; it
+   * never moves the receiver.
+   */
+  readonly batch: (entry: SyncEntry) => ReceiverCheck | null
 }
 
 /**
- * The test oracle for receiverPass: the receiver's refusal of `entry` appended after the already-verified
+ * The vendored incremental receiver folded once over `history`. If it refuses a verified history entry,
+ * the client and the receiver disagree, which must never happen, so every later entry is refused too.
+ */
+const positionedAfter = async (history: ReadonlyArray<SyncEntry>): Promise<HistoryReceiver> => {
+  const receiver = createKeyringReceiver()
+  let agrees = true
+  let lastSeq = 0
+  for (const entry of history) {
+    if ((await receiver.receive(wireOnce(entry))) !== null) {
+      agrees = false
+      break
+    }
+    lastSeq = entry.seq
+  }
+  return {
+    keyring: async (entry) => {
+      const [wired] = wire([entry])
+      if (!agrees || wired === undefined) return "receiver_seq_mismatch"
+      const refused = await receiver.receive(wired)
+      if (refused === null) lastSeq = entry.seq
+      return refused
+    },
+    batch: (entry) => {
+      if (!agrees) return "receiver_seq_mismatch"
+      if (entry.seq <= lastSeq) return "seq_not_increasing"
+      return firstRefusalAt(foldRefusal(wire([entry])), entry, new Set([entry.seq]))
+    },
+  }
+}
+
+const held = new WeakMap<object, HistoryReceiver>()
+
+/**
+ * The receiver positioned after `history`, the keyring entries `owner` (a verified chain state) has
+ * verified. A receiver the owner holds is taken, so no second state can move it, and checking one new
+ * entry then costs the same at any chain length; an owner holding none gets one folded over `history`
+ * once. Only four states hold none: a fresh state (empty history), an older state reused after its
+ * receiver moved on to the state after it (no production caller does this), the state left by an
+ * entry the receiver accepted but the client then refused (the receiver cannot be rewound), and a
+ * state whose receiver `passReceiver` moved to a copy (no production caller reuses it). Each of
+ * these refolds once, then appends cost the same again.
+ */
+export const takeReceiver = async (owner: object, history: ReadonlyArray<SyncEntry>): Promise<HistoryReceiver> => {
+  const kept = held.get(owner)
+  if (kept === undefined) return positionedAfter(history)
+  held.delete(owner)
+  return kept
+}
+
+/**
+ * Moves the receiver `from` holds to `to`, a state with the same verified keyring history, so a copy
+ * that only moves the head does not refold it. `from` holds none afterwards. Call it only when `to`
+ * has exactly `from`'s verified keyring history (as `atVerifiedHead` guarantees): it does not check
+ * this, and a receiver handed to a state with another history would judge entries against the wrong one.
+ */
+export const passReceiver = (from: object, to: object): void => {
+  const kept = held.get(from)
+  if (kept === undefined) return
+  held.delete(from)
+  held.set(to, kept)
+}
+
+/** Hands `receiver` to `owner`, the verified chain state whose keyring history it is positioned after. */
+export const holdReceiver = (owner: object, receiver: HistoryReceiver): void => {
+  held.set(owner, receiver)
+}
+
+/**
+ * The test oracle for the incremental receiver: the receiver's refusal of `entry` appended after the already-verified
  * keyring `history`, by folding the whole list; null only when the receiver accepts the whole list. A refusal at any other seq means the verified history and the
  * receiver disagree, which must never happen, so it refuses this entry too.
  */

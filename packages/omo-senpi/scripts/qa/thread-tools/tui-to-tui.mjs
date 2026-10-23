@@ -15,6 +15,11 @@ import { awaitToolResult, awaitTuiEndpoint, assistantTexts, callDirective, deliv
 const EPOCH_YEAR = 1970
 
 await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTui }) => {
+  Object.assign(scratch.env, {
+    OMO_PROVENANCE_WORKSPACE: "QA workspace",
+    OMO_PROVENANCE_PROJECT: "qa-project",
+    OMO_PROVENANCE_LANE: "qa-review",
+  })
   const alpha = await startTui("tui-alpha")
   const alphaEndpoint = await awaitTuiEndpoint(scratch, alpha)
   const beta = await startTui("tui-beta")
@@ -67,10 +72,21 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
       JSON.stringify(envelope).includes(senderEndpoint.durableId) && entry !== undefined,
       `envelope=${row.envelope.slice(0, 300)}`,
     )
-    // The header wraps at the terminal width, so it is matched with the layout whitespace removed.
+    const expectedFirstLine = `From QA workspace / qa-project / lane qa-review / session "${sender.label}"`
+    const message = entry.message ?? entry
+    const deliveredText = typeof message.content === "string" ? message.content : message.content.map((part) => part.text ?? "").join("")
+    report.assert(
+      `${direction}-sender-workspace-project`,
+      envelope.provenance?.workspace === "QA workspace" && envelope.provenance?.project === "qa-project"
+        && envelope.provenance?.lane === "qa-review" && envelope.provenance?.session === sender.label
+        && deliveredText.split("\n")[0] === expectedFirstLine
+        && deliveredText.split("\n")[1]?.includes('workspace="QA workspace" project="qa-project"'),
+      deliveredText.split("\n").slice(0, 2).join("\n"),
+    )
+    // The human display omits the machine header; verify that above from the target transcript.
     const flat = (text) => text.replace(/\s+/g, "")
     const screen = await target.waitScreen(
-      (text) => flat(text).includes("[OMO_GATEWAYv=1source=peer_agent") && flat(text).includes(`delivery=${deliveryId}`) && flat(text).includes(`sender_session=${senderEndpoint.durableId}`),
+      (text) => flat(text).includes(flat(expectedFirstLine)) && text.includes(token),
       { label: `${direction} provenance header visible on the target`, scope: "history", timeoutMs: 30_000 },
     ).catch((error) => error)
     report.assert(`${direction}-provenance-visible`, typeof screen === "string", typeof screen === "string" ? `header rendered: source=peer_agent sender_session=${senderEndpoint.durableId} delivery=${deliveryId}` : String(screen.message))

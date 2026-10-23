@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -15,6 +16,7 @@ type PostHogModule = typeof import("./posthog")
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
 const tempPaths: string[] = []
+let restoreTelemetryEnv: () => void
 
 async function importPostHogModule(): Promise<PostHogModule> {
   return import(`./posthog?test=${Date.now()}-${Math.random()}`)
@@ -75,6 +77,7 @@ function mockPostHogShutdownFailure(posthog: PostHogModule, capturedMessages: Ca
 
 describe("omo-codex posthog telemetry diagnostics", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     mock.restore()
     clearTelemetryEnv()
   })
@@ -91,6 +94,7 @@ describe("omo-codex posthog telemetry diagnostics", () => {
     for (const tempPath of tempPaths.splice(0)) {
       rmSync(tempPath, { recursive: true, force: true })
     }
+    restoreTelemetryEnv()
   })
 
   it("swallows capture failure and writes diagnostics", async () => {

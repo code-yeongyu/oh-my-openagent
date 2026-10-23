@@ -9,6 +9,7 @@
 // process per file. A memory repo with thousands of files moves HEAD on every memory write, and
 // reading it one `git show` per file from every live session was a machine-wide git storm.
 
+import type { CompiledBlockStoreModule } from "../compile/cache"
 import { join } from "node:path"
 
 import { readFile, realpathSync, stat } from "../fs/resilient"
@@ -124,7 +125,8 @@ export interface RecallCorpusCacheOptions {
   readonly termStore?: () => Promise<RecallTermStoreModule>
 }
 
-export interface RecallTermStoreModule {
+/** The recall-store sidecar: the persisted recall terms and the persisted compiled memory blocks. */
+export interface RecallTermStoreModule extends CompiledBlockStoreModule {
   readonly RecallTermPersistence: typeof RecallTermPersistence
 }
 

@@ -48,7 +48,7 @@ describe("omo-senpi skill-pointers queued prompts and session scope", () => {
         sessionManager: { getSessionId: () => "previous-session" },
       })
 
-      const prompt = "/skill:mass-ulw then ulw-loop"
+      const prompt = "/skill:ulw-plan then ulw-loop"
       const result = await dispatchInput(pi, prompt, "rpc", "steer", {
         sessionManager: { getSessionId: () => "new/session" },
       })

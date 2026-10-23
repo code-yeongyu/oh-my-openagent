@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { isGrantedProjectMemoryRead } from "./project-memory-grants"
 import { TRANSIENT_DIRNAME, isDurableIdentityRoot } from "./transient-identity"
 
 // Structural mirror of the Senpi filesystem policy API (senpi branch feat/extension-fs-policy:
@@ -90,6 +91,7 @@ function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): Filesystem
     },
     check(request: Readonly<FilesystemPolicyRequest>): FilesystemPolicyDecision {
       const target = resolve(request.canonicalPath)
+      if (request.operation === "read" && isGrantedProjectMemoryRead(context, target)) return { allow: true }
       if (ownRoots.some((root) => isWithin(root, target))) return { allow: true }
       if (deniedAreas.some((root) => isWithin(root, target))) {
         return {

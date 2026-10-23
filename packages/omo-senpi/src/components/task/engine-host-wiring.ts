@@ -54,7 +54,7 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
   })
 
   const hostRouting = { ...host.routing, storeDir: baseStore.stateDir }
-  const baseRunnerContext: RunnerBuildContext = { runtime, sharedParentTools: input.sharedParentTools, settings, kernelToolBindings: input.lifecycle.kernelToolBindings, agentDir: host.agentDir, onHostWarning: host.notices.add, hostRouting }
+  const baseRunnerContext: RunnerBuildContext = { runtime, sharedParentTools: input.sharedParentTools, settings, kernelToolBindings: input.lifecycle.kernelToolBindings, agentDir: host.agentDir, onHostWarning: host.notices.add, hostRouting, ...(input.omoConfig.exclude_models === undefined ? {} : { excludeModels: input.omoConfig.exclude_models }) }
   // One resolver for the whole session, so an ordinary spawn, a revival, a team member and a
   // workpool worker all inherit the SAME package-aware extension list (#8492).
   const resolveInheritedExtensions = createInheritedExtensionsResolver(baseRunnerContext)

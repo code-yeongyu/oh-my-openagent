@@ -8,7 +8,9 @@ import { join } from "node:path"
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { DeviceSync, EngineStatus, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
 
-import { SYNC_CLOSE_WAIT_EXCEEDED, SYNC_IDLE_NO_DEVICE_SESSION, SYNC_UNAVAILABLE, createSyncRunner, watchHeadLog } from "./sync-runner"
+import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
+import { createDeviceSessionResolver } from "./device-session/resolver"
+import { SYNC_CLOSE_WAIT_EXCEEDED, SYNC_CONFIG_INVALID, SYNC_IDLE_NO_DEVICE_SESSION, SYNC_UNAVAILABLE, createSyncRunner, watchHeadLog } from "./sync-runner"
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -148,6 +150,65 @@ test("a missing sync sidecar leaves the runner idle with a typed sync-unavailabl
   await runner.release(paths.repo)
 })
 
+test("an unloadable device account sidecar reports sync-unavailable with its reason, like the engine sidecar", async () => {
+  const paths = await identity()
+  const warned: { message: string; code: unknown }[] = []
+  const errors: string[] = []
+  const missing = Object.assign(new Error("Cannot find module '#omo-device-account-runtime'"), { code: "ERR_MODULE_NOT_FOUND" })
+  const runner = createSyncRunner({
+    logger: {
+      info: () => undefined,
+      warn: (message: string, meta?: Record<string, unknown>) => warned.push({ message, code: meta?.code }),
+      error: (message: string) => errors.push(message),
+    },
+    resolveSession: createDeviceSessionResolver({
+      source: lazyCliAccountSource({ env: {} }, async () => {
+        throw missing
+      }),
+      pinDir: join(paths.runtime, "pins"),
+      loadRuntime: () => Promise.reject(new Error("the engine sidecar is not reached when the account cannot load")),
+    }),
+    watchHead: () => () => undefined,
+  })
+  await runner.acquire("agent", paths, { enabled: true })
+  const status = await runner.status(paths.repo)
+  expect(status?.kind).toBe(SYNC_UNAVAILABLE)
+  expect(status !== null && "reason" in status ? status.reason : "").toContain("#omo-device-account-runtime")
+  expect(warned.map((w) => w.code)).toEqual([SYNC_UNAVAILABLE])
+  expect(errors).toEqual([])
+  await runner.release(paths.repo)
+})
+
+test("an invalid OMO_SERVICE_API_URL is reported as a configuration error naming the variable, not as an unavailable sidecar", async () => {
+  const paths = await identity()
+  const warned: unknown[] = []
+  const errors: { message: string; code: unknown; variable: unknown }[] = []
+  const runner = createSyncRunner({
+    logger: {
+      info: () => undefined,
+      warn: (_message: string, meta?: Record<string, unknown>) => warned.push(meta?.code),
+      error: (message: string, meta?: Record<string, unknown>) => errors.push({ message, code: meta?.code, variable: meta?.variable }),
+    },
+    resolveSession: createDeviceSessionResolver({
+      source: lazyCliAccountSource({ env: { OMO_SERVICE_API_URL: "not a url" } }),
+      pinDir: join(paths.runtime, "pins"),
+      loadRuntime: () => Promise.reject(new Error("the engine sidecar is not reached when the account cannot be built")),
+    }),
+    watchHead: () => () => undefined,
+  })
+  await runner.acquire("agent", paths, { enabled: true })
+  const status = await runner.status(paths.repo)
+  expect(status?.kind).toBe(SYNC_CONFIG_INVALID)
+  expect(status !== null && "variable" in status ? status.variable : undefined).toBe("OMO_SERVICE_API_URL")
+  expect(warned).toEqual([])
+  expect(errors).toHaveLength(1)
+  expect(errors[0]?.code).toBe(SYNC_CONFIG_INVALID)
+  expect(errors[0]?.variable).toBe("OMO_SERVICE_API_URL")
+  expect(errors[0]?.message).toContain("OMO_SERVICE_API_URL")
+  expect(errors[0]?.message).not.toContain("sidecar")
+  await runner.release(paths.repo)
+})
+
 test("a release followed at once by an acquire of the same repo waits for the close and keeps sync running", async () => {
   const paths = await identity()
   let leased = false
@@ -222,4 +283,38 @@ test("the runner answers device names from the session its resolver returned, an
   expect(runner.deviceName("device:dev-mini")).toBe("Mac mini")
   expect(runner.deviceName("device:other")).toBeUndefined()
   await runner.release(paths.repo)
+})
+
+test("a running engine whose device signs out (or is revoked) closes and leaves the runner idle", async () => {
+  const paths = await identity()
+  const fake = fakeOpen()
+  const lines: string[] = []
+  let wentIdle: () => void = () => undefined
+  const idle = new Promise<void>((resolve) => {
+    wentIdle = resolve
+  })
+  const recording = {
+    info: (m: string) => {
+      lines.push(m)
+      if (m === SYNC_IDLE_NO_DEVICE_SESSION) wentIdle()
+    },
+    warn: () => undefined,
+    error: () => undefined,
+  }
+  let endSignIn: () => void = () => undefined
+  const runner = createSyncRunner({
+    logger: recording,
+    resolveSession: async () => ({ ...session, onEnded: (notify) => { endSignIn = notify } }),
+    open: fake.open,
+    watchHead: () => () => undefined,
+  })
+  await runner.acquire("agent", paths, { enabled: true })
+  expect(fake.opened).toEqual([paths.repo])
+  endSignIn()
+  await Promise.race([idle, new Promise((_, reject) => setTimeout(() => reject(new Error("waited 5s for the runner to go idle after sign-out")), 5_000))])
+  expect(fake.closed).toEqual([paths.repo])
+  expect(await runner.status(paths.repo)).toBeNull()
+  expect(lines).toEqual([SYNC_IDLE_NO_DEVICE_SESSION])
+  await runner.release(paths.repo)
+  expect(fake.closed).toEqual([paths.repo])
 })

@@ -1,15 +1,19 @@
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
-import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
+import { isExcludedModel, type OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { withoutExcludedModels, type SenpiModelPort, type SenpiModelRegistryPort } from "@oh-my-opencode/senpi-task"
 import { parseAvailableModels } from "@oh-my-opencode/senpi-task/category-resolver"
 import { resolveReflectionModel, type ReflectionModelResolution, type ReflectionSessionModel } from "./worker/resolve-model"
 
 /** Facts may use only a user selection, never the built-in quick chain or registry ladder. */
 export function resolveFactsModel(
   config: OmoConfig,
-  registry: SenpiModelRegistryPort<SenpiModelPort> | undefined,
-  session: ReflectionSessionModel | undefined,
+  liveRegistry: SenpiModelRegistryPort<SenpiModelPort> | undefined,
+  liveSession: ReflectionSessionModel | undefined,
   identity: string,
 ): ReflectionModelResolution {
+  // exclude_models applies here as everywhere else: an excluded configured model is not found and
+  // an excluded session model is not inherited.
+  const registry = liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, config.exclude_models)
+  const session = liveSession !== undefined && isExcludedModel(`${liveSession.provider}/${liveSession.id}`, config.exclude_models) ? undefined : liveSession
   const configured = config.memory?.agents?.[identity]?.facts?.model ?? config.memory?.facts?.model
   const quick = config.categories?.quick
   const available = new Set(parseAvailableModels(registry?.getAvailable()).models)

@@ -19,6 +19,7 @@ import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensi
 import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, UNAVAILABLE_ENTRY_TYPE } from "./kibitzer/notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
+import { AGREEMENT_FLAGGED_ENTRY_TYPE } from "./agreement-notice"
 
 const roots: string[] = []
 afterEach(() => {
@@ -149,6 +150,7 @@ describe("createMemoryComponent", () => {
       "senpi-memory.health",
       "senpi-memory.reflection-parked",
       SOUL_UPDATED_ENTRY_TYPE,
+      AGREEMENT_FLAGGED_ENTRY_TYPE,
       RECALL_CUSTOM_TYPE,
       NUDGED_ENTRY_TYPE,
       GATE_ENTRY_TYPE,

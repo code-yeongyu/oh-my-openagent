@@ -36,6 +36,8 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
     createChild: engineChild(options.settings.enginePath),
     onError: (error) => options.onEngineError(engineErrorCode(error)),
     onPermissionRequired: options.onPermissionRequired,
+    // Full access is the consent for desktop input, headless included (#10788).
+    ...(options.fullAccess === undefined ? {} : { fullAccess: options.fullAccess }),
   })
   const handle = new ComputerHandle({ service, settings: () => options.settings })
   const deps: ComputerToolDeps = { handle, executeTool: options.executeTool, confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }) }

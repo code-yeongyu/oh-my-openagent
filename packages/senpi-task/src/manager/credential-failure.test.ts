@@ -85,6 +85,7 @@ describe("runtimeFallbackCandidates", () => {
     ["a Claude session limit", "You've hit your session limit \u00b7 resets 3pm (Asia/Seoul)"],
     ["an OpenCode Go monthly limit", "429 Monthly usage limit reached. It will reset in 2 days 8 hours"],
     ["a Codex usage limit", '429 {"type":"usage_limit_reached","message":"The usage limit has been reached"}'],
+    ["senpi's account limit text, which points at /model", "The anthropic-subscription account usage limit has been reached (resets 3:20am). Switch to another provider with /model, or configure another provider in retry.fallbackChains."],
   ])("#given %s on the first rung #when the candidates are computed #then other providers come first and the spent provider's rungs stay as the last resort", (_label, message) => {
     const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), message)
 
@@ -95,6 +96,29 @@ describe("runtimeFallbackCandidates", () => {
     const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), "You've hit your Fable weekly limit \u00b7 resets Oct 2, 9am")
 
     expect(candidates).toEqual({ remaining: [GO_M27, ZAI_GLM], skipped: [], limit: "model" })
+  })
+
+  describe("the parent session's model as the last rung (#10750)", () => {
+    const PARENT = rung("chatgpt-subscription", "gpt-6.1-sol")
+    const SPENT_PARENT = rung("opencode-go", "minimax-m2.7")
+    const withParent = (parent: ResolvedModelRecord): TaskRecord => ({ ...record(GO_M3, [ZAI_GLM, parent]), parent_model: parent.display })
+
+    test.each([
+      ["a usage limit", "429 Monthly usage limit reached. It will reset in 2 days 8 hours"],
+      ["a signed-out provider", "401: Unauthorized"],
+    ])("#given %s #when the candidates are computed #then the parent's model stays after the category rungs", (_label, message) => {
+      expect(runtimeFallbackCandidates(withParent(PARENT), message).remaining).toEqual([ZAI_GLM, PARENT])
+    })
+
+    test("#given a failure that is not a limit or a sign-in #when the candidates are computed #then the parent's model is not offered", () => {
+      expect(runtimeFallbackCandidates(withParent(PARENT), "500: upstream overloaded").remaining).toEqual([ZAI_GLM])
+    })
+
+    test("#given the parent runs on the account whose limit is spent #when the candidates are computed #then the parent's model is skipped", () => {
+      const candidates = runtimeFallbackCandidates(withParent(SPENT_PARENT), "429 Monthly usage limit reached. It will reset in 2 days 8 hours")
+
+      expect(candidates).toEqual({ remaining: [ZAI_GLM], skipped: [SPENT_PARENT], limit: "account" })
+    })
   })
 })
 

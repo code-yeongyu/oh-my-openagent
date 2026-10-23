@@ -41,10 +41,18 @@ function dropReason(record: FactsFailureRecord | undefined, now: Date): FactsSki
 }
 
 /**
- * PREFIX GATING: a conversation's entries are ordered by their snapshot boundary, and the first
- * dropped entry blocks every later entry of that SAME conversation. Launching past a gap would
- * consume a newer endpoint and strand the older one behind an advanced watermark - data loss.
- * Other conversations are unaffected; each one gates independently.
+ * PREFIX GATING: a conversation's entries are ordered by their snapshot boundary, and an entry in
+ * BACKOFF blocks every later entry of that SAME conversation, so a batch that is about to be
+ * retried still lands before its successors. Other conversations are unaffected.
+ *
+ * A PARKED entry does not block: parking is terminal until a manual `/facts retry`, and holding
+ * every later entry behind it stalled whole conversations forever (#10918). Moving past it loses
+ * nothing. Its queue file is retained (only `markConsumed` deletes one, and only its own keys),
+ * `listPending` still returns it, a successor's consumed watermark only anchors new enqueues past
+ * ranges that are already queued, and `markConsumed` never moves the watermark back when the
+ * parked range is retried later. Each fact line carries its own absolute date, so a retried older
+ * range adds the same dated lines it would have added in order; only a repeated person
+ * observation takes the older date while its count still grows.
  */
 export function selectLaunchable(
   entries: readonly FactsQueueEntry[],
@@ -71,7 +79,7 @@ export function selectLaunchable(
       const reason = blocked ? "blocked-by-predecessor" : dropReason(records.get(entryKey(entry)), now)
       if (reason === undefined) continue
       skipped[entryKey(entry)] = reason
-      blocked = true
+      if (reason !== "parked") blocked = true
     }
   }
   return { selected: entries.filter((entry) => skipped[entryKey(entry)] === undefined), skipped }

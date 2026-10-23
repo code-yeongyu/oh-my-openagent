@@ -1,3 +1,4 @@
+import { MEMORY_AUTHORITY_RULE } from "@oh-my-opencode/memory-core"
 import { describe, expect, test } from "bun:test"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -201,7 +202,7 @@ describe("createMemoryPromptHandler", () => {
       "BASE PROMPT",
       "",
       `<!-- senpi-memory:${IDENTITY}:begin -->`,
-      "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call.",
+      "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call. " + MEMORY_AUTHORITY_RULE,
       "",
       "<self>",
       "<projection>$MEMORY_DIR/system/persona.md</projection>",
@@ -443,6 +444,30 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.systemPrompt).toContain("FOREIGN EXTENSION TEXT")
     expect(result?.systemPrompt).toContain("BASE PROMPT")
     expect(result?.systemPrompt).toContain(`<!-- senpi-memory:${IDENTITY}:begin -->`)
+  }, 30_000)
+
+  test("#given the nudge and soul notices both read HEAD #when one prompt runs #then git is asked for HEAD once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async (noticeRepo) => {
+        await noticeRepo.head()
+        return undefined
+      },
+      resolveSoulNotice: async (noticeRepo) => {
+        await noticeRepo.head()
+        return undefined
+      },
+    }))
+
+    // when
+    await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
+
+    // then
+    expect(repo.headCalls).toBe(1)
   }, 30_000)
 
   test("#given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once", async () => {

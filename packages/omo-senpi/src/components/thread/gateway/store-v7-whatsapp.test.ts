@@ -20,7 +20,7 @@ function v6Fixture(path: string, extra: readonly string[]): void {
   const db = new Database(path)
   db.exec("PRAGMA foreign_keys = ON")
   db.exec("BEGIN")
-  const v6 = GATEWAY_MIGRATIONS.slice(0, -1)
+  const v6 = GATEWAY_MIGRATIONS.slice(0, 6)
   for (const step of v6) for (const statement of step) db.exec(statement)
   db.exec(`PRAGMA user_version = ${v6.length}`)
   db.exec("COMMIT")
@@ -134,7 +134,7 @@ test("#given an extension row orphaned on bindings (a pre-existing violation) #w
   const db = new Database(path)
   db.exec("PRAGMA busy_timeout = 0")
   try {
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(GATEWAY_MIGRATIONS.length - 1)
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(6)
     expect(db.query("SELECT * FROM alpha_refs").all()).toEqual([{ id: 1, binding_seq: 99 }])
   } finally { db.close() }
 })

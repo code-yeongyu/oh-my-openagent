@@ -12,7 +12,12 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 *.py text eol=lf
+*.sh text eol=lf
 
 # The vendored sync-format copy and its fixtures are checked byte for byte against a hash manifest
 # (memory-core sync/crypto/vendor-integrity.test.ts): no line-ending conversion on any platform.
 packages/memory-core/src/sync/crypto/vendor/** -text
+
+# Generated OpenTelemetry protobuf code, vendored byte-identical from the collector and pinned by its SHA256SUMS:
+# no line-ending conversion and no whitespace checks (the upstream generator leaves trailing blanks).
+packages/telemetry-core/src/otlp-proto/** -text -whitespace

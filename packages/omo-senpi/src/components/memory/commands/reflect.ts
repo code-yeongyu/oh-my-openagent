@@ -4,7 +4,6 @@
 // reserves a run immediately or writes the single pending request slot. There is
 // deliberately no --auto selector.
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { resolveReflectionTriggerConfig } from "../trigger-wiring"
 import { parseCommandArgs } from "./args"
 import {
@@ -14,6 +13,7 @@ import {
   type MemoryCommandContext,
   type MemoryCommandDeps,
 } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 function parseConversationIds(value: string | true | undefined): string[] | undefined {
   if (value === undefined || value === true) return undefined
@@ -21,10 +21,9 @@ function parseConversationIds(value: string | true | undefined): string[] | unde
   return ids.length > 0 ? ids : undefined
 }
 
-export function registerReflectCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerReflectCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("reflect", {
-    description: "Request a memory reflection run now, optionally scoped and focused.",
-    argumentHint: "[--recent N | --conversation <ids>] [focus]",
+    ...LAZY_MEMORY_COMMANDS.reflect,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")

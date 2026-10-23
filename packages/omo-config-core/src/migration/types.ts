@@ -80,6 +80,7 @@ export type RunMigrationOptions = {
   readonly mode?: "merge" | "replace-target"
   readonly onBoundary?: (boundary: MigrationBoundary) => void
   readonly pid?: number
+  readonly shouldRun?: MigrationPlan["shouldRun"]
   readonly sources: readonly MigrationSourceDescriptor[]
   readonly targetPath: string
   readonly transform: MigrationTransform
@@ -103,7 +104,7 @@ export type MigrationRunResult = {
 
 export type RunMigrationsOptions = Omit<
   RunMigrationOptions,
-  "id" | "mode" | "sources" | "targetPath" | "transform"
+  "id" | "mode" | "shouldRun" | "sources" | "targetPath" | "transform"
 > & {
   readonly afterMigrations?: (results: readonly MigrationRunResult[]) => void
   readonly discover: () => readonly MigrationPlan[]

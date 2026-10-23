@@ -1,5 +1,5 @@
 {
-  "description": "the host-relay ladder: no stop path -> StopPathUnavailable; start + heartbeat -> click ok; 2.1 s without a heartbeat (fake clock) -> StopPathUnavailable; stop -> Suspended; resume with a wrong token is refused.",
+  "description": "the host-relay ladder: no stop path -> StopPathUnavailable; start + heartbeat -> click ok; 2.1 s without a heartbeat (fake clock) -> StopPathUnavailable; stop -> Suspended; resume with a wrong token is refused; desktop input needs the human-confirmed control grant (#10788), granted after the capture, and a stop drops it.",
   "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
     "SENPI_DESKTOP_FAKE_CLOCK": "1"
@@ -215,6 +215,55 @@
             "/result/scale",
             "/result/frameId",
             "/result/coordinateHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 51,
+        "method": "control.grant",
+        "params": {
+          "reason": "desktop input after the human approved (#10788)",
+          "confirmationId": "confirm-1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 51,
+            "result": {
+              "active": true,
+              "reason": "desktop input after the human approved (#10788)",
+              "grantedAt": "2026-01-01T00:00:00.000Z"
+            }
+          },
+          "variable": [
+            "/result/grantedAt"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "control.grant",
+              "target": "control",
+              "delivery": "control",
+              "frameId": null,
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": 47,
+              "textSha256": "0000000000000000",
+              "keys": null
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/textSha256"
           ]
         }
       ]

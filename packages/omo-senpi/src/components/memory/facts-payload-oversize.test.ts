@@ -112,7 +112,7 @@ describe("facts oversize payload classification", () => {
     expect((await queue.listPending()).map((entry) => entry.conversationId)).toEqual(["session-2"])
   }, 30_000)
 
-  test("#given a parked oversize entry #when the same conversation queues a newer entry #then the newer entry stays blocked while others flow", async () => {
+  test("#given a parked oversize entry #when the same conversation queues a newer entry #then the newer entry flows while the parked one stays queued (#10918)", async () => {
     // given: an oversize entry parks, then the same conversation grows.
     const { root, identity, queue } = await fixture()
     await publish(queue, identity, "session-2", [message("m2", oversizeText())])
@@ -125,14 +125,14 @@ describe("facts oversize payload classification", () => {
     // when
     const result = await launch(root, identity, queue, { now: () => new Date(NOW.getTime() + 60_000) })
 
-    // then: session-2's newer entry is blocked by its parked predecessor; session-3 flows.
+    // then: a parked predecessor no longer holds session-2's newer entry back; it stays queued itself.
     expect(result.status).toBe("committed")
     const runs = (await readdir(join(identity.paths.facts, "runs"))).sort()
     const latest = JSON.parse(
       await readFile(join(identity.paths.facts, "runs", runs[runs.length - 1] ?? "missing", "ledger.json"), "utf8"),
     ) as FactsRunLedger
-    expect(latest.queued.map((key) => key.conversationId)).toEqual(["session-3"])
-    expect((await queue.listPending()).map((entry) => entry.range.end_message_id).sort()).toEqual(["m2", "m3"])
+    expect(latest.queued.map((key) => `${key.conversationId}/${key.end_message_id}`).sort()).toEqual(["session-2/m3", "session-3/m4"])
+    expect((await queue.listPending()).map((entry) => entry.range.end_message_id)).toEqual(["m2"])
   }, 30_000)
 
   test("#given a people payload larger than the cap #when a launch runs #then nothing launches, frontiers take a normal streak, and the warning names bytes vs cap", async () => {

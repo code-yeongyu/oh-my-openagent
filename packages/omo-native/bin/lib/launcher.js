@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { doctorCoverageLines } from "./category-coverage.js"
+import { runDoctorModels } from "./model-chains.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
 import { doctorConfigLines } from "./config-doctor.js"
 import { runDaemonCommand } from "./daemon.js"
@@ -179,26 +180,31 @@ export async function runLauncher(args = process.argv.slice(2)) {
   if (command === "doctor") {
     // Doctor is a launch too: it reports only what the launch-time preparation could not fix.
     preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
-    const [categoryCoverage, computerUse, configDiagnostics, gateway] = args[1] === "--reap"
+    if (args[1] === "--models") {
+      process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
+      return
+    }
+    const [categoryCoverage, computerUse, configDiagnostics, dori] = args[1] === "--reap"
       ? [[], [], [], []]
       : await Promise.all([
           doctorCoverageLines({ agentDir: canonicalAgentDir() }),
           doctorComputerUseLines(),
           doctorConfigLines(),
-          import("./gateway.js").then((hook) => hook.gatewayDoctorLines()),
+          import("./dori.js").then((hook) => hook.doriDoctorLines()),
         ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
       categoryCoverage,
       computerUse,
       configDiagnostics,
-      gateway,
+      dori,
     })
     return
   }
-  if (command === "gateway") {
-    const { runGatewayCommand } = await import("./gateway.js")
-    process.exitCode = await runGatewayCommand(args.slice(1))
+  if (command === "dori" || command === "gateway") {
+    if (command === "gateway") process.stderr.write("omo gateway is deprecated; use omo dori instead\n")
+    const { runDoriCommand } = await import("./dori.js")
+    process.exitCode = await runDoriCommand(args.slice(1))
     return
   }
   if (command === "setup") {

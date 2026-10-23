@@ -16,6 +16,8 @@ export interface ExternalProjectionInput {
   readonly limits: ExternalProjectionLimits
   /** Commit times could not be read, so names are in name order instead of newest first. */
   readonly recencyUnavailable?: boolean
+  /** Why the commit times could not be read, when `recencyUnavailable`. */
+  readonly recencyError?: string
 }
 
 export interface ExternalProjectionStats {

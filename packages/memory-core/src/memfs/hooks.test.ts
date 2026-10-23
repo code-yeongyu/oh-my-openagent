@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { existsSync, statSync } from "node:fs"
 import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import type { ClaimReceipt } from "../provenance"
+import { stampReceipt } from "../tools/claim-frontmatter"
+import { renderMemoryFile } from "./frontmatter"
 import { installHooks, resolveHooksDir } from "./hooks"
+import { COMMIT_MSG_HOOK_SCRIPT } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
 import { commit, createRepo, removeTempDirs, run, tempDir, writeFiles } from "./hooks.test-support"
 
@@ -37,7 +41,7 @@ describe("installHooks", () => {
     const installed = installHooks(dir)
 
     // then
-    expect(installed.map((hook) => hook.name)).toEqual(["pre-commit", "post-commit"])
+    expect(installed.map((hook) => hook.name)).toEqual(["pre-commit", "commit-msg", "post-commit"])
     expect(await readFile(hookPath, "utf8")).toBe(first)
     if (process.platform !== "win32") {
       for (const hook of installed) {
@@ -54,14 +58,14 @@ describe("installHooks", () => {
     const bashOnly = [/<<</, /echo -e/, /(^|[\s=(])\$'/, /disown/, /env bash/]
 
     // when
-    await writeFiles(dir, { "pre-commit": PRE_COMMIT_HOOK_SCRIPT, "post-commit": POST_COMMIT_HOOK_SCRIPT })
+    await writeFiles(dir, { "pre-commit": PRE_COMMIT_HOOK_SCRIPT, "commit-msg": COMMIT_MSG_HOOK_SCRIPT, "post-commit": POST_COMMIT_HOOK_SCRIPT })
 
     // then
-    for (const script of [PRE_COMMIT_HOOK_SCRIPT, POST_COMMIT_HOOK_SCRIPT]) {
+    for (const script of [PRE_COMMIT_HOOK_SCRIPT, COMMIT_MSG_HOOK_SCRIPT, POST_COMMIT_HOOK_SCRIPT]) {
       expect(script.startsWith("#!/bin/sh\n")).toBe(true)
       for (const construct of bashOnly) expect(script).not.toMatch(construct)
     }
-    for (const hook of ["pre-commit", "post-commit"]) {
+    for (const hook of ["pre-commit", "commit-msg", "post-commit"]) {
       expect((await run(["sh", "-n", hook], dir)).code).toBe(0)
     }
   })
@@ -105,6 +109,22 @@ describe("pre-commit hook", () => {
     // then
     expect(result.code).toBe(0)
     expect(await run(["git", "log", "--oneline"], dir).then((log) => log.stdout)).toContain("memory write")
+  })
+
+  it("#given a note stamped with a claim receipt by the memory tool #when it is committed #then the hook accepts the provenance header (#10488)", async () => {
+    // given: exactly what the memory tool writes for a user receipt and for a downgraded claim
+    const dir = await createRepo()
+    const stamp = (claim: ClaimReceipt): string => renderMemoryFile(stampReceipt(undefined, { description: "Cleanup" }, "body\n", claim), "body\n")
+
+    // when
+    const result = await commit(dir, {
+      "reference/approved.md": stamp({ source: "user", userQuote: "Yes delete it.", approves: "0123456789abcdef" }),
+      "reference/suggested.md": stamp({ source: "agent", downgraded: true }),
+    }, "memory write\n\nOmo-Writer: memory-tool")
+
+    // then
+    expect(result.stdout + result.stderr).not.toContain("unknown frontmatter key")
+    expect(result.code).toBe(0)
   })
 
   it("#given a read_only file from the server #when an unrelated file changes #then the commit still succeeds", async () => {

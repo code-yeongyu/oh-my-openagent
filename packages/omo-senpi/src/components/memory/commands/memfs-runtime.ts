@@ -7,6 +7,7 @@
 
 import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
+import { memoryHookChecker } from "../worker/spawn-supervisor-support"
 import { rm } from "@oh-my-opencode/memory-core/fs"
 
 import { MirrorSync, installHooks } from "@oh-my-opencode/memory-core"
@@ -89,7 +90,7 @@ const memfsRepair: MemfsSubcommand = async ({ deps, ctx, identity }) => {
   const repo = requireExistingRepo(deps, identity)
   if (typeof repo === "string") return respond(ctx, repo, "error")
 
-  const hooks = installHooks(repo.dir)
+  const hooks = installHooks(repo.dir, { checker: memoryHookChecker() })
   const repaired = await repairMissingSkillNameFrontmatter(repo.dir)
   const report = formatSkillNameFrontmatterRepairReport(repaired)
   const lines = [

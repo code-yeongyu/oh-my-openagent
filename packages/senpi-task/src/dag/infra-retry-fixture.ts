@@ -24,7 +24,9 @@ export function infraFixture(
   const project = fs.mkdtempSync(join(tmpdir(), "dag-infra-retry-"))
   const starts = new Map<string, number>()
   const taskStore = createTaskRecordStore({ project_dir: project })
-  const store = createDagFileStore({ project_dir: project })
+  // These cases assert retry semantics, not crash durability; fsync on every commit is the dominant cost
+  // on hosted Windows runners (#10711). Writes still go through the real file store.
+  const store = createDagFileStore({ project_dir: project }, { fsync: false })
   const runner: ManagedRunner = {
     start: async (spec) => {
       const attempt = (starts.get(spec.prompt) ?? 0) + 1

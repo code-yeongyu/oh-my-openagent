@@ -553,6 +553,10 @@ jobs:
               isolate
               assert_version_line
               assert_first_run_provisioned
+              # A fresh hosted runner reads the tool-cache Python cold: the first Python kernel start took
+              # 3.2-9.5 s against a 10 s cell budget, and 0.25-0.4 s once warm (#10904). Import the stdlib
+              # modules the kernel prelude loads before the smoke so its Python cell measures the kernel.
+              python -c "import ast, asyncio, base64, codecs, contextlib, contextvars, ctypes, dataclasses, gc, importlib, inspect, io, json, locale, math, os, queue, re, signal, subprocess, threading, time, traceback, types, typing, uuid, urllib.error, urllib.parse, urllib.request, concurrent.futures, pathlib"
               bun script/qa/omo-native-eval-smoke.mjs "$BIN"
               ;;
             windows-arm64)

@@ -1,25 +1,23 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
-import type { OmoConfig, OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import {
-  BUILTIN_AGENTS,
-  CURATED_READONLY_AGENT_NAMES,
   InProcessRunner,
-  ULW_REVIEWER_AGENT_NAMES,
   RpcHostRunner,
   RpcProcessRunner,
   createInProcessManagedRunner,
   createParentRegistrySessionContext,
   createRpcManagedRunner,
-  mapOmoConfigAgents,
   parseExtensionEntries,
   selectPackageExtensionPaths,
-  type AgentDefinition,
+  withoutExcludedFallbacks,
+  withoutExcludedSelectors,
   type KernelToolBindingRegistry,
   type ManagedRunner,
   type RpcChildHandle,
   type RpcRunnerSpec,
 } from "@oh-my-opencode/senpi-task"
 
+import { createRpcModelAdmission } from "@oh-my-opencode/senpi-task/rpc-model-admission"
 import { log } from "@oh-my-opencode/utils"
 
 import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
@@ -56,6 +54,9 @@ export interface RunnerBuildContext {
   // WHERE this session's `process` children open (its own task host) and the task store the index
   // records. The engine always passes it; the host runner cannot be built without it.
   readonly hostRouting?: TaskHostRouting
+  // omo.json exclude_models: an in-process child respawned or resumed on an excluded model fails
+  // model_unavailable instead of running it.
+  readonly excludeModels?: readonly string[]
 }
 
 export interface TaskRunnerFactories {
@@ -68,21 +69,7 @@ export const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
   process: buildProcessRunner,
 }
 
-export function resolveTaskAgents(config: OmoConfig): Readonly<Record<string, AgentDefinition>> {
-  const merged: Record<string, AgentDefinition> = { ...BUILTIN_AGENTS }
-  for (const [name, definition] of Object.entries(mapOmoConfigAgents(config))) {
-    merged[name] = { ...merged[name], ...definition }
-  }
-  for (const name of CURATED_READONLY_AGENT_NAMES) {
-    const definition = merged[name]
-    if (definition !== undefined) merged[name] = { ...definition, executionMode: "in-process" }
-  }
-  for (const name of ULW_REVIEWER_AGENT_NAMES) {
-    const definition = merged[name]
-    if (definition !== undefined) merged[name] = { ...definition, executionMode: "in-process" }
-  }
-  return merged
-}
+export { resolveTaskAgents } from "@oh-my-opencode/senpi-task"
 
 function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
   const inProcess = new InProcessRunner({
@@ -96,8 +83,9 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
   const context = createParentRegistrySessionContext(
     () => build.runtime.modelRegistry(),
     () => build.runtime.projectTrusted(),
+    () => build.excludeModels,
   )
-  return createInProcessManagedRunner(inProcess, context)
+  return withoutExcludedFallbacks(createInProcessManagedRunner(inProcess, context), build.excludeModels)
 }
 
 // Package discovery reads settings and stats every installed package root. On a stuck mount that
@@ -170,10 +158,15 @@ function buildProcessRunner(build: RunnerBuildContext): ManagedRunner {
   const resolveInheritedExtensions = build.resolveInheritedExtensions ?? createInheritedExtensionsResolver(build)
   return createRpcManagedRunner({
     async start(spec) {
-      if (spec.extensions !== undefined) return runner.start(spec)
-      return runner.start({ ...spec, extensions: await resolveInheritedExtensions() })
+      const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels)
+      if (filtered.extensions !== undefined) return runner.start(filtered)
+      return runner.start({ ...filtered, extensions: await resolveInheritedExtensions() })
     },
   })
+}
+
+function withoutExcludedRpcFallbacks(spec: RpcRunnerSpec, excludeModels: readonly string[] | undefined): RpcRunnerSpec {
+  return spec.fallbackModels === undefined ? spec : { ...spec, fallbackModels: withoutExcludedSelectors(spec.fallbackModels, excludeModels) }
 }
 
 /**
@@ -187,9 +180,10 @@ export function buildRespawnRunner(
   const runner = buildProcessChildRunner(build)
   const resolveInheritedExtensions = build.resolveInheritedExtensions ?? createInheritedExtensionsResolver(build)
   return {
-    start: async (spec) => runner.start(
-      spec.extensions === undefined ? { ...spec, extensions: await resolveInheritedExtensions() } : spec,
-    ),
+    start: async (spec) => {
+      const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels)
+      return runner.start(filtered.extensions === undefined ? { ...filtered, extensions: await resolveInheritedExtensions() } : filtered)
+    },
   }
 }
 
@@ -201,8 +195,10 @@ export function buildRespawnRunner(
  */
 export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunner | RpcProcessRunner {
   const inheritedExtensions = parseExtensionEntries(process.argv)
+  const modelAdmission = build.excludeModels === undefined ? {} : { modelAdmission: createRpcModelAdmission({ excludeModels: build.excludeModels }) }
   const perChild = new RpcProcessRunner({
     inheritedExtensions,
+    ...modelAdmission,
     ...(build.onHostWarning === undefined ? {} : { onWarning: build.onHostWarning }),
   })
   const platform = build.platform ?? process.platform
@@ -211,6 +207,7 @@ export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunne
   if (routing === undefined) throw new Error("omo-senpi task host runner built without the session's shard routing")
   const env = build.env ?? process.env
   return new RpcHostRunner({
+    ...modelAdmission,
     policy: build.settings.host_engine_policy,
     agentDir: build.agentDir ?? resolveAgentHome({ env }),
     env,

@@ -173,7 +173,7 @@ function buildRuntimeBundle(entry: string, outfile: string, name: string): void 
   if (result.status !== 0) throw new Error(`${name} runtime build failed with exit code ${result.status ?? 1}`)
 }
 
-function buildCategoryCoverageRuntime(outfile: string): void {
+export function buildCategoryCoverageRuntime(outfile: string): void {
   buildRuntimeBundle(CATEGORY_COVERAGE_ENTRY, outfile, "category-coverage")
   copyFileSync(COMPUTER_PRELUDE_ASSET_SOURCE, join(dirname(outfile), "assets.generated.json"))
 }

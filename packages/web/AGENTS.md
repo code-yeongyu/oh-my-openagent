@@ -70,6 +70,8 @@ bun run cf-typegen       # regenerate cloudflare-env.d.ts from wrangler.toml bin
 
 **Account and secret:** the Worker runs on the Sisyphus Labs Cloudflare account (moved 2026-10-09); `wrangler.toml` pins the account id and names the omo.dev zone routes by `zone_id`. The deploy workflow uses the `omo-production` GitHub environment, whose `CLOUDFLARE_API_TOKEN` can edit Workers scripts and the omo.dev zone's routes and nothing else (sisyphuslabs/common-infra `docs/cutover-workers.md`).
 
+**Build id and static assets:** the build id is the commit sha (`lib/build-id.mjs`), so `/_next/static/<sha>/` belongs to one commit. Re-deploying the same commit (a re-run, or a `workflow_dispatch` on the same sha) rebuilds that directory; if the rebuilt manifests are not byte-identical, the asset-retention guard stops the deploy with `Content-addressed asset changed bytes`. That is the guard failing safe, not a bug to bypass: deploy a new commit instead.
+
 ## RELATIONSHIP TO npm PACKAGE
 
 The npm package `oh-my-opencode` ships only `dist/`, `bin/`, and `postinstall.mjs` (see root `package.json` `files` field). `packages/web/` is **not** included in any npm publish — it is exclusively a separate Cloudflare deployment target.

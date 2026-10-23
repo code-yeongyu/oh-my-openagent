@@ -1,3 +1,4 @@
+import { excludedModelPattern } from "@oh-my-opencode/omo-config-core"
 import {
   resolveExplicitTaskPin,
   splitModelDecorators,
@@ -31,6 +32,25 @@ export type ExplicitPinResolution =
  * otherwise have ridden, and a malformed pin is a typed invalid_target.
  */
 export function resolveExplicitPin(
+  pin: string,
+  resolveRegistry: () => TaskModelRegistry | undefined,
+  resolveDefaultRoute: ResolveDefaultRoute | undefined,
+  excludeModels?: readonly string[],
+): ExplicitPinResolution {
+  const resolution = resolveLivePin(pin, resolveRegistry, resolveDefaultRoute)
+  if (resolution.kind !== "resolved") return resolution
+  const pattern = excludedModelPattern(resolution.canonical, excludeModels)
+  if (pattern === undefined) return resolution
+  return {
+    kind: "error",
+    error: {
+      code: "model_unavailable",
+      message: `The task model pin "${pin}" resolves to ${resolution.canonical}, which exclude_models in omo.json keeps out ("${pattern}").`,
+    },
+  }
+}
+
+function resolveLivePin(
   pin: string,
   resolveRegistry: () => TaskModelRegistry | undefined,
   resolveDefaultRoute: ResolveDefaultRoute | undefined,

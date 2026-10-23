@@ -117,10 +117,13 @@ describe("onboarding entry", () => {
   test("#given a preview pass #when dispatched directly #then it cannot consume state", async () => {
     const dir = freshDir()
     const h = createOnboardingHarness(dir)
-    expect(await h.prompt({ preview: true })).toEqual([undefined])
+    const preview = await h.prompt({ preview: true })
+    expect(preview).toEqual([{
+      message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
+    }])
     expect(isOnboardingComplete(dir)).toBe(false)
-    expect(h.pi.handlers.find((entry) => entry.event === "before_agent_start")?.options?.previewSafe).not.toBe(true)
-    expect((await h.prompt()).filter(Boolean)).toHaveLength(1)
+    expect(h.pi.handlers.find((entry) => entry.event === "before_agent_start")?.options?.previewSafe).toBe(true)
+    expect(await h.prompt()).toEqual(preview)
   })
 
   for (const excluded of ["headless", "worker", "disabled"]) {

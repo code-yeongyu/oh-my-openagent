@@ -16,6 +16,7 @@ import type { onRecallDocumentsEncoded, RecallTermAccess, StoredDocumentTerms } 
 import { isRecallTermSaveExcluded, trackRecallTermSave } from "./bm25-persist-gate"
 
 export { withRecallTermSavesExcluded } from "./bm25-persist-gate"
+export { CompiledBlockStore } from "../compile/block-persist"
 import { decodeRecallTermStore, encodeRecallTermStore } from "./bm25-store"
 import { seedRecallDocumentTerms, snapshotRecallDocumentTerms } from "./bm25-terms-transfer"
 import type { RecallDocument } from "./provider"

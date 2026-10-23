@@ -143,6 +143,7 @@ describe("omo config schema", () => {
       model_profiles: {
         capable: {
           display_name: "Capable",
+          caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
           family: "daily",
           tier: "normal",
           models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],
@@ -170,6 +171,7 @@ describe("omo config schema", () => {
     expect(results.config.data.model_profile).toBe("capable")
     expect(results.config.data.model_profiles?.capable).toEqual({
       display_name: "Capable",
+      caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
       family: "daily",
       tier: "normal",
       models: ["anthropic/claude-fable-5-1", { model: "openai/gpt-6-astra", reasoning: "high" }],

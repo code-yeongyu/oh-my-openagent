@@ -9,6 +9,8 @@ export type InputDispatchResult = { action: "continue" } | { action: "transform"
 export interface ExpectedPointer {
   readonly customType: string
   readonly skillName: string
+  // A binding form injects `<omo-*-mode>`; every other injection is a pointer.
+  readonly mode?: true
 }
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
@@ -62,7 +64,7 @@ export function expectPointerInjections(pi: FakeExtensionAPI, result: unknown, e
     if (typeof content !== "string") {
       throw new Error("expected a string skill-pointer message")
     }
-    expect(content).toContain(`<omo-${entry.skillName}-pointer>`)
+    expect(content).toStartWith(`<omo-${entry.skillName}-${entry.mode === true ? "mode" : "pointer"}>`)
     expect(content).toContain(`${entry.skillName}/SKILL.md`)
   }
 }

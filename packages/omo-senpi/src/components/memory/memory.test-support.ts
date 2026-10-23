@@ -29,6 +29,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
   return {
     enabled: true,
     agent: "auto",
+    auto_identity: "path",
     reflection: {
       enabled: true,
       trigger: { step_count: 25, on_compaction: true },
@@ -48,11 +49,13 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
       auto_select_max_chars: 150000,
     },
     people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+    agreements: { enabled: true, needs_human_threshold: 3, max_items: 64 },
     soul: { edit_notice: true },
     write_notice: { enabled: true },
     sync: { enabled: true },
     search: { enabled: true },
     recall: { enabled: true, max_items: 2, category: "quick", event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }, sidecar_max_tokens: 48000, max_concurrent_wakes: 2, tool_budget: 8, query_expansion: false },
+    project_scope: { nudge: true, recall: true },
     projection: { max_entries_per_directory: 40, max_bytes: 24576 },
     compile_warn_tokens: 30000,
     agents: {},

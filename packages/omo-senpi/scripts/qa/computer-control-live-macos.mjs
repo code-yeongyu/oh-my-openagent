@@ -34,6 +34,7 @@ import {
 	TARGET_TITLE,
 	toolResults,
 } from "./computer-control-live-macos-scenarios.mjs";
+import { desktopScenarios } from "./computer-control-live-macos-desktop.mjs";
 import { createSandbox, seedSandbox } from "./drive.mjs";
 import { isolatedChildEnv } from "./sandbox-child-env.mjs";
 
@@ -63,9 +64,12 @@ const scrubbedEnv = () =>
 	);
 
 // The target is a dialog owned by an osascript child of this driver: no AppleEvent reaches another app, and
-// closing it is killing that child.
+// closing it is killing that child. Its reply (`button returned:OK`) is how a desktop click is observed.
 let target;
+const targetState = { open: false, reply: "" };
 function openTarget() {
+	targetState.open = true;
+	targetState.reply = "";
 	target = spawn(
 		"osascript",
 		[
@@ -73,17 +77,31 @@ function openTarget() {
 			`display dialog "computer-control QA target" with title "${TARGET_TITLE}" giving up after 900`,
 		],
 		{
-			stdio: "ignore",
+			stdio: ["ignore", "pipe", "ignore"],
 		},
 	);
+	const child = target;
+	child.stdout.on("data", (chunk) => {
+		if (child === target) targetState.reply += chunk;
+	});
+	child.on("exit", () => {
+		if (child === target) targetState.open = false;
+	});
 }
 
 function closeTarget() {
 	target?.kill("SIGTERM");
 }
 
+async function dialogClosed(timeoutMs) {
+	const started = Date.now();
+	while (targetState.open && Date.now() - started < timeoutMs) {
+		await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+	}
+}
+
 // One senpi rpc session; `steps` is the mock provider's whole script across both prompts.
-function startSession(steps) {
+function startSession(steps, { preset = "ask", print } = {}) {
 	const sandbox = createSandbox();
 	seedSandbox(sandbox);
 	mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true });
@@ -100,14 +118,13 @@ function startSession(steps) {
 		[
 			"-e",
 			mockProviderEntry,
-			"--mode",
-			"rpc",
+			...(print === undefined ? ["--mode", "rpc"] : ["--mode", "json", "--print", print]),
 			"--provider",
 			"omo-mock",
 			"--model",
 			"mock-1",
 			"--permission-preset",
-			"ask",
+			preset,
 			"--permission",
 			"computer:read=allow",
 			"--permission",
@@ -127,7 +144,7 @@ function startSession(steps) {
 				PI_OFFLINE: "1",
 				OMO_SENPI_QA: "1",
 			},
-			stdio: ["pipe", "pipe", "pipe"],
+			stdio: [print === undefined ? "pipe" : "ignore", "pipe", "pipe"],
 			detached: true,
 		},
 	);
@@ -190,11 +207,13 @@ function startSession(steps) {
 				.map((event) => event.title),
 			stdout,
 			stderr,
+			target: { ...targetState },
 		};
 		rmSync(sandbox.root, { recursive: true, force: true });
 		return outcome;
 	};
-	return { sandbox, events, send, until, agentEnds, close };
+	const exited = new Promise((resolveExit) => child.on("exit", resolveExit));
+	return { sandbox, events, send, until, agentEnds, close, exited };
 }
 
 if (process.platform !== "darwin") {
@@ -231,12 +250,23 @@ const before = protectedFiles.map(digest);
 const report = [];
 openTarget();
 try {
-	for (const [name, scenario] of Object.entries(scenarios)) {
+	for (const [name, scenario] of Object.entries({ ...scenarios, ...desktopScenarios })) {
 		if (only !== undefined && !only.includes(name)) continue;
-		const session = startSession(scenario.steps);
+		let steps = scenario.steps;
+		if (typeof steps === "function") {
+			// Every desktop scenario gets a fresh dialog: an admitted click dismisses it.
+			closeTarget();
+			openTarget();
+			steps = steps();
+		}
+		const session = startSession(steps, scenario);
 		let error;
 		try {
-			await scenario.drive(session);
+			if (scenario.print === undefined) await scenario.drive(session);
+			else await session.exited;
+			// An admitted click dismisses the dialog; give osascript a moment to report it. A refused click
+			// leaves it open, which the bounded wait simply outlasts.
+			if (typeof scenario.steps === "function") await dialogClosed(3000);
 		} catch (caught) {
 			error = caught instanceof Error ? caught.message : String(caught);
 		}

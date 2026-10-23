@@ -90,6 +90,8 @@ export type ManagerStartSpec = {
   readonly subagent_type?: string
   readonly execution_mode?: ExecutionMode
   readonly model?: string
+  // `provider/model` the parent session runs at spawn; appended as a category child's last rung (#10750).
+  readonly parent_model?: string
   readonly name?: string
   readonly description?: string
   readonly team_run_id?: string

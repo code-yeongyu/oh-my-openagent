@@ -112,6 +112,7 @@ export const {
   rm,
   rmdir,
   stat,
+  statfs,
   unlink,
 } = promises
 

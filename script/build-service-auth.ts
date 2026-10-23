@@ -5,7 +5,7 @@ const target = `${root}packages/omo-native/bin/lib/service-auth.generated.js`
 
 export async function buildServiceAuth(check = false): Promise<void> {
   const result = await Bun.build({
-    entrypoints: [`${root}packages/omo-opencode/src/cli/service-auth/commands.ts`],
+    entrypoints: [`${root}packages/omo-native/launcher-commands.ts`],
     target: "node", format: "esm", minify: { whitespace: true, syntax: true },
   })
   if (!result.success) throw new Error("Service auth bundle failed", { cause: result.logs })

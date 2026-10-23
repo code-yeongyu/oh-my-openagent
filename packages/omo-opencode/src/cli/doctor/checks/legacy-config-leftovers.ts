@@ -2,6 +2,7 @@ import { posix, win32 } from "node:path"
 
 import { createLegacyConfigMigrationPlans } from "../../../config-migration"
 import type { ConfigMigrationPathOperations } from "../../../config-migration"
+import { doriSectionRename } from "../../../config-migration/dori-section-rename"
 import type { DoctorIssue } from "../framework/types"
 
 export type LegacyConfigLeftoverOptions = {
@@ -15,6 +16,7 @@ export function findLegacyConfigLeftovers(options: LegacyConfigLeftoverOptions):
   const pathOperations = options.pathOperations ?? (process.platform === "win32" ? win32 : posix)
   const paths = createLegacyConfigMigrationPlans({
     cwd: options.cwd,
+    doriSectionRename,
     environment: options.environment ?? process.env,
     homeDir: options.homeDir,
     pathOperations,

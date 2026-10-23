@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process"
+import { spawn, type ChildProcess } from "node:child_process"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -7,6 +7,9 @@ import { installHooks } from "./hooks"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
+// Every child `run` started, until it closes. A test that times out under load leaves its git (and the hook it runs)
+// writing into the temp root, so teardown stops these and waits for their pipes before removing anything (#10945).
+const liveChildren = new Map<ChildProcess, Promise<void>>()
 
 export interface RunResult {
   code: number
@@ -23,10 +26,24 @@ export function run(argv: readonly string[], cwd: string, env: NodeJS.ProcessEnv
     })
     let stdout = ""
     let stderr = ""
+    let streamError: Error | undefined
+    const keepFirst = (error: Error): void => {
+      streamError ??= error
+    }
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()))
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()))
-    child.on("error", reject)
-    child.on("close", (code) => resolvePromise({ code: code ?? 1, stdout, stderr }))
+    child.stdout.on("error", keepFirst)
+    child.stderr.on("error", keepFirst)
+    liveChildren.set(child, new Promise<void>((settle) => child.once("close", () => settle())))
+    child.on("error", (error) => {
+      liveChildren.delete(child)
+      reject(error)
+    })
+    child.on("close", (code) => {
+      liveChildren.delete(child)
+      if (streamError !== undefined) reject(streamError)
+      else resolvePromise({ code: code ?? 1, stdout, stderr })
+    })
   })
 }
 
@@ -36,14 +53,14 @@ export async function tempDir(prefix: string): Promise<string> {
   return dir
 }
 
-export async function createRepo(): Promise<string> {
+export async function createRepo(options: Parameters<typeof installHooks>[1] = {}): Promise<string> {
   const dir = await tempDir("memory-hooks-")
   await run(["git", "init", "--quiet"], dir)
   await run(["git", "symbolic-ref", "HEAD", "refs/heads/main"], dir)
   await run(["git", "config", "user.email", "agent@omo.local"], dir)
   await run(["git", "config", "user.name", "OmO Agent"], dir)
   await run(["git", "config", "commit.gpgsign", "false"], dir)
-  installHooks(dir)
+  installHooks(dir, options)
   return dir
 }
 
@@ -67,5 +84,8 @@ export async function commit(
 }
 
 export async function removeTempDirs(): Promise<void> {
+  const running = [...liveChildren]
+  for (const [child] of running) if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
+  await Promise.all(running.map(([, closed]) => closed))
   await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 }

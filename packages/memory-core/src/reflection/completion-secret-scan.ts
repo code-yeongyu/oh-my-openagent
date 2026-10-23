@@ -1,4 +1,5 @@
 import type { GitExecResult } from "../git"
+import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
 import { redactSecretLikeMaterial, scanSecretLikeMaterial } from "../sync/redact"
 
 export type CompletionGitRun = (argv: readonly string[], stdin?: string) => Promise<GitExecResult>
@@ -66,7 +67,7 @@ async function findCommitSecretFailure(run: CompletionGitRun, commit: string): P
  */
 async function listCommitFileVersions(run: CompletionGitRun, commit: string): Promise<DiffTreeRecord[]> {
   const result = await run([
-    "diff-tree", "-r", "-m", "--no-commit-id", "--no-renames", "--diff-filter=AMT", "--raw", "-z", commit,
+    ...STABLE_LOG_OUTPUT, "diff-tree", "-r", "-m", "--no-commit-id", "--no-renames", "--diff-filter=AMT", "--raw", "-z", commit,
   ])
   if (result.code !== 0) throw new Error(result.stderr.trim() || "git diff-tree failed")
   const parts = result.stdout.split("\0")
