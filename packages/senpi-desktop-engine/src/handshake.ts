@@ -95,7 +95,8 @@ function requestHello(enginePath: string, options: HelloOptions): Promise<unknow
 		};
 		const timer = setTimeout(() => {
 			settle({ ok: false, reason: `no engine.hello reply and exit within ${timeoutMs} ms` });
-			child.kill("SIGKILL");
+			// A child that never started has no pid; on Node < 24.22 / 26.10 its kill() signals our own process group.
+			if (child.pid !== undefined) child.kill("SIGKILL");
 		}, timeoutMs);
 
 		child.stderr.setEncoding("utf8");

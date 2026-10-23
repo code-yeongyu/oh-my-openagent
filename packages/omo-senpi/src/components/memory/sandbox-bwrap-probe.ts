@@ -6,6 +6,7 @@
  * so an existence check alone selects a sandbox that kills every child at spawn (issue #6873).
  */
 import { type ChildProcess, spawn } from "node:child_process"
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime"
 
 export type SandboxUsability =
   | { readonly usable: true }
@@ -82,7 +83,7 @@ async function runBwrapSmoke(executable: string): Promise<BwrapSmokeResult> {
     const stderrChunks: Buffer[] = []
     child.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk))
     const timeoutHandle = setTimeout(() => {
-      child.kill("SIGKILL")
+      signalSpawnedChild(child, "SIGKILL")
       finish({ exitCode: null, timedOut: true, stderr: "" })
     }, SMOKE_TIMEOUT_MS)
     child.once("error", (error) => finish({ exitCode: null, timedOut: false, errorMessage: error.message, stderr: "" }))

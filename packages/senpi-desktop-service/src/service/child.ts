@@ -127,7 +127,8 @@ export class EngineChild {
 	kill(): void {
 		if (!this.#alive) return;
 		this.#alive = false;
-		this.#process.kill();
+		// A child that never started has no pid; on Node < 24.22 / 26.10 its kill() signals our own process group.
+		if (this.#process.pid !== undefined) this.#process.kill();
 	}
 
 	#recordFailure(failure: string): void {

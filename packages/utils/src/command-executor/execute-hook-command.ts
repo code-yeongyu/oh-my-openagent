@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { getHomeDirectory } from "./home-directory";
 import { findBashPath, findZshPath } from "./shell-path";
+import { signalSpawnedChild } from "../runtime/child-signal";
 
 export interface CommandResult {
   exitCode: number;
@@ -174,10 +175,10 @@ export async function executeHookCommand(
             if (!(error instanceof Error)) {
               throw error;
             }
-            proc.kill(signal);
+            signalSpawnedChild(proc, signal);
           }
         } else {
-          proc.kill(signal);
+          signalSpawnedChild(proc, signal);
           if (signal === "SIGKILL") {
             killWindowsProcessTree();
           }

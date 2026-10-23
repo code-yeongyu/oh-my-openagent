@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime";
 
 export const MAX_JSON_RECORD_BYTES = 1024 * 1024;
 export const MAX_STDERR_BYTES = 64 * 1024;
@@ -108,12 +109,12 @@ export async function spawnSgRunner(input: SgRunnerInput): Promise<SgRunnerResul
       if (stopReason === null) stopReason = reason;
       if (child.exitCode !== null || child.signalCode !== null) return;
       if (process.platform === "win32") {
-        child.kill();
+        signalSpawnedChild(child);
         return;
       }
-      child.kill("SIGTERM");
+      signalSpawnedChild(child, "SIGTERM");
       killTimer = setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+        if (child.exitCode === null && child.signalCode === null) signalSpawnedChild(child, "SIGKILL");
       }, 1_000);
       killTimer.unref();
     };

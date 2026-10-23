@@ -3,6 +3,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { runtimeSlug } from "./sg-manifest"
+import { signalSpawnedChild } from "../runtime/child-signal"
 
 export const AST_GREP_BIN_DIR_ENV_KEY = "OMO_AST_GREP_BIN_DIR"
 export const KILL_GRACE_MS = 1_000
@@ -85,7 +86,7 @@ function defaultSpawnProcess(command: string, args: readonly string[], options: 
   })
   return {
     kill: () => {
-      if (!child.killed) child.kill()
+      if (!child.killed) signalSpawnedChild(child)
     },
     outcome,
   }

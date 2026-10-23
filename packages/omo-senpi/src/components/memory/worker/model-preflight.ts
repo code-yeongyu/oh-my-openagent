@@ -6,6 +6,7 @@ import type { SenpiLauncher } from "@oh-my-opencode/senpi-task"
 import { OMO_SENPI_DISABLED_ENV } from "../../../extension/disable-env"
 import type { MemoryModelChain } from "./memory-model-attempts"
 import type { ReflectionModelCandidate } from "./resolve-model"
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime"
 
 const PREFLIGHT_TIMEOUT_MS = 10_000
 const CATALOG_CACHE_TTL_MS = 2 * 60_000
@@ -141,7 +142,7 @@ async function probeChildModels(
   let timedOut = false
   const timeout = setTimeout(() => {
     timedOut = true
-    child.kill("SIGKILL")
+    signalSpawnedChild(child, "SIGKILL")
   }, timeoutMs)
   const code = await new Promise<number | null>((resolve, reject) => {
     child.once("error", reject)

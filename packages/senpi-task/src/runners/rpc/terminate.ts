@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process"
 
 import type { TerminateOptions } from "../types"
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime"
 
 const DEFAULT_SIGKILL_DELAY_MS = 5_000
 const PROCESS_EXIT_OBSERVATION_TIMEOUT_MS = 2_000
@@ -44,10 +45,10 @@ async function terminateDirectChild(child: ChildProcess, delay: number): Promise
     return
   }
   const exited = childExit(child)
-  child.kill("SIGTERM")
+  signalSpawnedChild(child, "SIGTERM")
   await waitForExitOrDelay(exited, delay)
   if (!hasExited(child)) {
-    child.kill("SIGKILL")
+    signalSpawnedChild(child, "SIGKILL")
     await waitForCondition(() => !hasExited(child), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
     return
   }
@@ -90,7 +91,7 @@ async function terminateWindowsProcessTree(child: ChildProcess, pid: number): Pr
     taskkill.once("close", () => resolve())
   })
   if (!hasExited(child)) {
-    child.kill("SIGKILL")
+    signalSpawnedChild(child, "SIGKILL")
   }
   await exited
 }

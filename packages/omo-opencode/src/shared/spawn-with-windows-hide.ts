@@ -1,6 +1,7 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { Readable } from "node:stream"
 import { spawn as bunSpawn } from "./bun-spawn-shim"
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime"
 
 export interface SpawnOptions {
   cwd?: string
@@ -60,11 +61,11 @@ export function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
     kill(signal?: NodeJS.Signals): void {
       try {
         if (!signal) {
-          proc.kill()
+          signalSpawnedChild(proc)
           return
         }
 
-        proc.kill(signal)
+        signalSpawnedChild(proc, signal)
       } catch (error) {
         if (!(error instanceof Error)) return
       }

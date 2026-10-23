@@ -6,6 +6,7 @@ import { createSpawnCommand, resolveServerBinary } from "@oh-my-opencode/lsp-cor
 import { resolveBunProjectCommand } from "@oh-my-opencode/lsp-core/lsp/bun-project-checks"
 import { callPackagedDaemonTool } from "../lsp/daemon-tool-client"
 import { extractMutatedFilePaths, MUTATION_TOOL_NAMES, runSingleFlight, type PostMutationEvent } from "../post-mutation/post-mutation"
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime"
 
 // Mutation formatting is intentionally opt-in through project markers and fail-open by default.
 export const formatOnMutationDefaults = { mode: "best-effort", maxFileBytes: 1_048_576, timeoutMs: 3_000 } as const
@@ -108,7 +109,7 @@ async function formatOne(filePath: string, formatter: Formatter, cwd: string, ti
   } catch {
     return { status: "missing", added: 0, removed: 0 }
   }
-  const exit = await Promise.race([childExit(child), new Promise<"timeout">(resolve => setTimeout(() => { child.kill("SIGKILL"); resolve("timeout") }, timeoutMs))])
+  const exit = await Promise.race([childExit(child), new Promise<"timeout">(resolve => setTimeout(() => { signalSpawnedChild(child, "SIGKILL"); resolve("timeout") }, timeoutMs))])
   if (exit === "spawn-failed") return { status: "missing", added: 0, removed: 0 }
   if (exit !== 0) { writeFileSync(filePath, before); return { status: "unchanged", added: 0, removed: 0 } }
   const after = readFileSync(filePath, "utf8")

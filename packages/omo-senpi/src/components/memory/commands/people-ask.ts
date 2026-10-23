@@ -13,6 +13,7 @@ import type { SenpiModelPort, SenpiModelRegistryPort } from "@oh-my-opencode/sen
 
 import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../worker/senpi-command"
 import { resolveReflectionModel } from "../worker/resolve-model"
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime"
 
 const QUICK_CATEGORY = "quick"
 const DEFAULT_DEADLINE_MS = 120_000
@@ -126,7 +127,7 @@ function runChild(
     const timer = setTimeout(() => {
       if (settled) return
       settled = true
-      child.kill("SIGKILL")
+      signalSpawnedChild(child, "SIGKILL")
       resolve(ABSTENTION_LINE)
     }, deadlineMs)
     timer.unref?.()

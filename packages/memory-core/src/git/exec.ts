@@ -129,15 +129,19 @@ function spawnGitCommand(
     let exitDrain: ReturnType<typeof setTimeout> | undefined
 
     let killTimer: ReturnType<typeof setTimeout> | undefined
+    // A child that never started has no pid; on Node < 24.22 / 26.10 its kill() signals our own process group.
+    const signalStarted = (signal: NodeJS.Signals) => {
+      if (child.pid !== undefined) child.kill(signal)
+    }
     const timer = setTimeout(() => {
       timedOut = true
-      child.kill("SIGTERM")
-      killTimer = setTimeout(() => child.kill("SIGKILL"), options.killGraceMs ?? GIT_KILL_GRACE_MS)
+      signalStarted("SIGTERM")
+      killTimer = setTimeout(() => signalStarted("SIGKILL"), options.killGraceMs ?? GIT_KILL_GRACE_MS)
     }, options.timeoutMs)
     let aborted = false
     const onAbort = () => {
       aborted = true
-      child.kill("SIGTERM")
+      signalStarted("SIGTERM")
     }
     if (options.signal?.aborted === true) onAbort()
     else options.signal?.addEventListener("abort", onAbort, { once: true })

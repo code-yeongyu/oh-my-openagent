@@ -1,6 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process"
 import { readdirSync, watch, writeFileSync } from "@oh-my-opencode/memory-core/fs"
 import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime"
 
 export type SupervisorRuntimePlatform = "posix" | "win32"
 export type CancelSupervisorDeadline = () => void
@@ -162,7 +163,7 @@ export function terminateSupervisorChildGracefully(
 ): void {
   if (platform === "win32") {
     recordSupervisorGracefulDeadline(wrapper.pid)
-    wrapper.kill()
+    signalSpawnedChild(wrapper)
   } else if (wrapper.pid !== undefined) signalSupervisorProcessGroup(wrapper.pid, "SIGTERM")
 }
 

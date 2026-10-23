@@ -121,6 +121,8 @@ export function killProcessTree(proc: ChildProcess, signal: NodeJS.Signals): voi
 		}
 	}
 
+	// A child that never started has no pid; on Node < 24.22 / 26.10 its kill() signals our own process group.
+	if (proc.pid === undefined) return;
 	try {
 		proc.kill(signal);
 	} catch (error) {

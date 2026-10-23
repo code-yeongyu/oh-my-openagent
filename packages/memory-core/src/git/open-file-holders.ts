@@ -118,7 +118,8 @@ export function runLsofBounded(argv: readonly string[], boundMs: number): Promis
     const bound = setTimeout(() => {
       if (settled) return
       settled = true
-      child.kill("SIGKILL")
+      // A child that never started has no pid; on Node < 24.22 / 26.10 its kill() signals our own process group.
+      if (child.pid !== undefined) child.kill("SIGKILL")
       resolveRun(null)
     }, boundMs)
   })

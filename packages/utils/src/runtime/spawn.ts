@@ -191,6 +191,9 @@ function wrapNodeProcess(proc: ReturnType<typeof nodeSpawn>): SpawnedProcess {
     pid: proc.pid,
     kill(signal?: NodeJS.Signals) {
       if (proc.killed || exitCode !== null) return
+      // A child that never started has no pid; on Node < 24.22 / 26.10 its kill() signals our own process group.
+      // (Guarded inline: the Node fallback loads this module directly, so it imports nothing relative.)
+      if (proc.pid === undefined) return
       proc.kill(signal)
     },
     ref() {

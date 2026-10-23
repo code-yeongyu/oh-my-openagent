@@ -72,7 +72,8 @@ export function runChild(command, args, options = {}) {
         const listener = () => {
           if (forward) {
             try {
-              child.kill(signal)
+              // A child that never started has no pid; on Node < 24.22 / 26.10 its kill() signals our own group.
+              if (child.pid !== undefined) child.kill(signal)
             } catch {
               // The child is already gone; its exit event carries the real answer.
             }

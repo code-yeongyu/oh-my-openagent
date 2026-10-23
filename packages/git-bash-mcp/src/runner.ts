@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { signalSpawnedChild } from "@oh-my-opencode/utils/runtime";
 
 export interface GitBashRunInput {
   readonly bashPath: string;
@@ -57,7 +58,7 @@ export async function runGitBashCommand(input: GitBashRunInput): Promise<GitBash
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
-      child.kill();
+      signalSpawnedChild(child);
     }, input.timeoutMs);
     timeout.unref();
 
