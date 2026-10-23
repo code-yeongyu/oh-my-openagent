@@ -41,6 +41,7 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
   return {
     task_id: handle.task_id,
     ...(handle.reconcileInputs === undefined ? {} : { reconcileInputs: handle.reconcileInputs }),
+    ...(handle.markStopping === undefined ? {} : { markStopping: () => handle.markStopping?.() }),
     kind,
     pid: handle.pid,
     abort: () => handle.abort(),

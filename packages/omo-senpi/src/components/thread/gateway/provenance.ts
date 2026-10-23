@@ -1,6 +1,6 @@
 import { GATEWAY_PROVENANCE_SENTENCE } from "./constants"
 import type { DeliverySender } from "./adapter"
-import type { DeliveryRow } from "./types"
+import type { DeliveryRow, Provenance } from "./types"
 
 function headerValue(value: string): string {
   const cleaned = value.replace(/[\s\[\]=]+/g, "_")
@@ -9,7 +9,13 @@ function headerValue(value: string): string {
 
 /** A JSON string whose brackets are escaped too, so a quoted value can never close the `[...]` header. */
 function quotedHeaderValue(value: string): string {
-  return JSON.stringify(value).replace(/\[/g, "\\u005b").replace(/\]/g, "\\u005d")
+  return JSON.stringify(value).replace(/\[/g, "\\u005b").replace(/\]/g, "\\u005d").replace(/[\u0080-\u009f\u2028\u2029]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
+}
+
+export function deliveryProvenanceLine(provenance: Provenance | undefined): string {
+  if (provenance === undefined) return "From (provenance not recorded)"
+  const label = (value: string) => quotedHeaderValue(value).slice(1, -1)
+  return `From ${label(provenance.workspace)} / ${label(provenance.project)}${provenance.lane === undefined ? "" : ` / lane ${label(provenance.lane)}`}${provenance.session === undefined ? "" : ` / session ${quotedHeaderValue(provenance.session)}`}`
 }
 
 function authorFields(row: DeliveryRow): string[] {
@@ -42,6 +48,12 @@ export function renderDeliveryText(row: DeliveryRow): string {
   const header = [
     "OMO_GATEWAY v=1",
     `source=${source}`,
+    ...(envelope.provenance === undefined ? [] : [
+      `workspace=${quotedHeaderValue(envelope.provenance.workspace)}`,
+      `project=${quotedHeaderValue(envelope.provenance.project)}`,
+      ...(envelope.provenance.lane === undefined ? [] : [`lane=${quotedHeaderValue(envelope.provenance.lane)}`]),
+      ...(envelope.provenance.session === undefined ? [] : [`session=${quotedHeaderValue(envelope.provenance.session)}`]),
+    ]),
     `actor=${headerValue(envelope.actor)}`,
     ...authorFields(row),
     `sender_session=${headerValue(senderSession)}`,
@@ -52,5 +64,7 @@ export function renderDeliveryText(row: DeliveryRow): string {
     `hop=${envelope.hop}`,
     ...(row.binding_id === null ? [] : [`binding=${headerValue(row.binding_id)}@${row.binding_revision ?? 0}`]),
   ].join(" ")
-  return `[${header}]\n${GATEWAY_PROVENANCE_SENTENCE}\n${JSON.stringify(row.body)}`
+  // One header line, workspace and project first: readers split the text as header, sentence, body. Every label is
+  // quoted with its brackets escaped, so the line still ends at the header's own `]`.
+  return `${deliveryProvenanceLine(envelope.provenance)} [${header}]\n${GATEWAY_PROVENANCE_SENTENCE}\n${JSON.stringify(row.body)}`
 }

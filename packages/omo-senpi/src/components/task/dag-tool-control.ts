@@ -67,7 +67,9 @@ export async function sendAction(deps: DagToolDeps, params: DagToolInput, runId:
   const sent = await deps.send(runId as DagRunId, nodeId.trim(), message)
   const text = sent.delivery === "uncertain"
     ? `uncertain: the host did not acknowledge the message to dag node ${sent.nodeId}; it may still be delivered. omo will confirm by itself; do not resend the same text. Effect id: ${sent.effectId}`
-    : `Delivered the message to dag node ${sent.nodeId} (${sent.delivery}).`
+    : sent.delivery === "queued"
+      ? `Queued the message for dag node ${sent.nodeId}; pending host delivery.`
+      : `Delivered the message to dag node ${sent.nodeId} (${sent.delivery}).`
   return toolResult(text, {
     kind: "sent",
     run_id: runId,

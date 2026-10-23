@@ -8,6 +8,11 @@ on:
       - .github/workflows/compiled-worker.yml
   workflow_dispatch:
 
+concurrency:
+  # One group per pull request, cancelled by its next push; other events get one group per commit.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

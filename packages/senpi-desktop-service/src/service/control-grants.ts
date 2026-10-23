@@ -10,9 +10,16 @@ export class ControlGrants {
 	#possiblyLive = 0;
 	/** How many sent grants a successful `control.revoke` has covered. */
 	#revoked = 0;
+	/** Whether the newest possibly-live grant came from full access rather than a human confirm (#10788). */
+	#automatic = false;
 
 	get possiblyLive(): boolean {
 		return this.#possiblyLive > this.#revoked;
+	}
+
+	/** A possibly-live grant that only full access authorized; it must not outlive full access. */
+	get automaticLive(): boolean {
+		return this.possiblyLive && this.#automatic;
 	}
 
 	/**
@@ -20,16 +27,20 @@ export class ControlGrants {
 	 * is lost to a cancel may still hold. A request cancelled before sending and an engine refusal
 	 * (`InputBusy`, `Suspended`, any engine error) granted nothing, so they stay uncounted (#9967).
 	 */
-	async grant(request: () => Promise<unknown>, cancelled: boolean): Promise<unknown> {
+	async grant(request: () => Promise<unknown>, cancelled: boolean, automatic = false): Promise<unknown> {
 		if (cancelled) return request();
 		this.#sent += 1;
 		const grant = this.#sent;
-		const before = this.#possiblyLive;
+		const before = { possiblyLive: this.#possiblyLive, automatic: this.#automatic };
 		this.#possiblyLive = grant;
+		this.#automatic = automatic;
 		try {
 			return await request();
 		} catch (error) {
-			if (error instanceof DesktopEngineRpcError && this.#possiblyLive === grant) this.#possiblyLive = before;
+			if (error instanceof DesktopEngineRpcError && this.#possiblyLive === grant) {
+				this.#possiblyLive = before.possiblyLive;
+				this.#automatic = before.automatic;
+			}
 			throw error;
 		}
 	}

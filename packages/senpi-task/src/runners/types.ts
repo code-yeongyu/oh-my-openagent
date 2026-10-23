@@ -52,6 +52,9 @@ export type RpcRunnerSpec = {
   // these back (per-child env or daemon session context) so ITS spawns count from here, not from 0.
   readonly depth?: number
   readonly root_session_id?: string
+  // The delegating turn's W3C traceparent, read back the same two ways (per-child env or daemon session
+  // context) so the child's turn spans continue the parent's trace.
+  readonly traceparent?: string
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void

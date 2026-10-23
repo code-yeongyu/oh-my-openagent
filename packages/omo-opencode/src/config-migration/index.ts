@@ -5,6 +5,7 @@ export {
 } from "./discovery"
 export {
   createLegacyConfigMigrationPlans,
+  DORI_SECTION_RENAME_MIGRATION_ID,
 } from "./migration-plans"
 export { executeLegacyConfigMigrationPlan } from "./migration-executor"
 export { transformConfigJsoncSources } from "./transform-config-jsonc"
@@ -16,6 +17,7 @@ export {
 export type { ExecuteLegacyConfigMigrationPlanOptions } from "./migration-executor"
 export type {
   CreateLegacyConfigMigrationPlansOptions,
+  DoriSectionRename,
   LegacyConfigMigrationPlan,
 } from "./migration-plans"
 export type {

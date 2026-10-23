@@ -9,6 +9,7 @@ import { Type, type Static } from "typebox"
 
 import type { WakeToolBudget } from "./budget"
 import type { KibitzerToolCaps } from "./caps"
+import { projectDocumentsOf, selectWithProjectSeats, type ProjectRecallCorpus } from "../../project-recall-seats"
 import { normalizeMemoryPath } from "./path-safety"
 import { boundedText, budgeted, okJson, okText, rejection, type KibitzerSidecarTool } from "./result"
 
@@ -52,6 +53,8 @@ export interface KibitzerMemoryToolInput {
   readonly searchedPaths: Set<string>
   /** `memory.recall.query_expansion`. Off, the tool has the two-field search it always had. */
   readonly queryExpansion?: boolean
+  /** The session's touched projects' notes (#10044), ranked apart from the bound memory and read beside it. */
+  readonly projectCorpora?: () => Promise<readonly ProjectRecallCorpus[]>
 }
 
 export interface KibitzerMemorySearchHit {
@@ -65,7 +68,10 @@ export function createKibitzerMemoryTool(
 ): KibitzerSidecarTool<typeof KibitzerMemoryParams | typeof KibitzerMemoryExpansionParams> {
   const queryExpansion = input.queryExpansion === true
   const cache = input.cache ?? new RecallCorpusCache()
-  const corpus = (): Promise<RecallCorpus> => cache.load(input.repo)
+  const corpus = async (): Promise<SearchCorpus> => {
+    const own = await cache.load(input.repo)
+    return { own, projects: await input.projectCorpora?.() ?? [] }
+  }
   return {
     name: KIBITZER_MEMORY_TOOL_NAME,
     label: "Kibitzer memory",
@@ -109,7 +115,12 @@ function readExpansions(params: ExpansionArguments): RecallQueryExpansions | str
   }
 }
 
-function search(query: string | undefined, added: ExpansionArguments | undefined, corpus: RecallCorpus, input: KibitzerMemoryToolInput) {
+interface SearchCorpus {
+  readonly own: RecallCorpus
+  readonly projects: readonly ProjectRecallCorpus[]
+}
+
+function search(query: string | undefined, added: ExpansionArguments | undefined, corpus: SearchCorpus, input: KibitzerMemoryToolInput) {
   if (query === undefined || query.trim().length === 0) return rejection("missing_argument", "search requires a non-empty query.")
   const parsedExpansions = added === undefined ? undefined : readExpansions(added)
   const expansionFallback = typeof parsedExpansions === "string" ? parsedExpansions : undefined
@@ -117,11 +128,13 @@ function search(query: string | undefined, added: ExpansionArguments | undefined
   // Invalid added terms never lose plain lexical recall: report the fallback in the successful result
   // so the sidecar can correct its next search without turning this search into a miss.
   // One over the cap tells us whether the page is truncated without a second selection pass.
-  const selected = selectRecallCandidates(corpus.documents, [query], {
-    maxItems: input.caps.memorySearchResults + 1,
-    surfaced: new Set(),
-    ...(expansions === undefined ? {} : { expansions }),
-  })
+  const pageProbe = input.caps.memorySearchResults + 1
+  const selected = selectWithProjectSeats(corpus.own.documents, corpus.projects, pageProbe, (documents, extraQueries) =>
+    selectRecallCandidates(documents, [query, ...extraQueries], {
+      maxItems: pageProbe,
+      surfaced: new Set(),
+      ...(expansions === undefined ? {} : { expansions }),
+    }))
   const truncated = selected.length > input.caps.memorySearchResults
   const results: KibitzerMemorySearchHit[] = selected.slice(0, input.caps.memorySearchResults).map((candidate) => ({
     path: candidate.path,
@@ -129,14 +142,16 @@ function search(query: string | undefined, added: ExpansionArguments | undefined
     excerpt: boundedText(candidate.excerpt, input.caps.memoryReadChars),
   }))
   for (const hit of results) input.searchedPaths.add(hit.path)
-  return okJson({ revision: corpus.revision, results, truncated, ...(expansionFallback === undefined ? {} : { expansion_fallback: expansionFallback }) })
+  return okJson({ revision: corpus.own.revision, results, truncated, ...(expansionFallback === undefined ? {} : { expansion_fallback: expansionFallback }) })
 }
 
-function read(path: string | undefined, corpus: RecallCorpus, caps: KibitzerToolCaps) {
+function read(path: string | undefined, corpus: SearchCorpus, caps: KibitzerToolCaps) {
   if (path === undefined) return rejection("missing_argument", "read requires a path.")
   const normalized = normalizeMemoryPath(path)
   if (!normalized.ok) return rejection(normalized.code, normalized.message, path)
-  const document = corpus.documents.find((candidate) => candidate.path === normalized.path)
+  const document = [corpus.own.documents, projectDocumentsOf(corpus.projects)]
+    .map((documents) => documents.find((candidate) => candidate.path === normalized.path))
+    .find((found) => found !== undefined)
   if (document === undefined) {
     return rejection("not_committed", `"${normalized.path}" is not a committed memory file at HEAD.`, normalized.path)
   }

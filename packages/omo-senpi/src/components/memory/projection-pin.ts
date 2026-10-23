@@ -11,12 +11,16 @@ import {
   projectedChangesBetween,
   revisionExists,
   type GitMemoryRepo,
+  type MemoryCommit,
   type ProjectedChanges,
 } from "@oh-my-opencode/memory-core"
 
 export const PROJECTION_PIN_ENTRY_TYPE = "omo-memory:projection-pin"
 export const MEMORY_CHANGES_METADATA_TOKEN = "Memory changed after this session's prompt was pinned to"
 const MAX_LISTED_PATHS = 20
+/** The trailer the sync engine writes on each sync commit: the principals whose batches it applied. */
+const SYNC_PRINCIPALS_TRAILER = "Sync-Principals"
+const UNKNOWN_DEVICE = "another device"
 
 export interface ProjectionPinRecord {
   readonly version: 1
@@ -32,6 +36,8 @@ export type ProjectionRepinReason = "first-turn" | "compaction" | "refresh" | "m
 export interface ProjectionTurn {
   readonly revision: string | null
   readonly changes?: ProjectedChanges
+  /** Devices whose synced commits brought these changes, by name; absent when none were synced. */
+  readonly sources?: readonly string[]
   readonly repinned?: ProjectionRepinReason
 }
 
@@ -54,20 +60,27 @@ export interface ProjectionPins {
   requestRefresh(): void
 }
 
-export function createProjectionPins(options: { readonly now?: () => number } = {}): ProjectionPins {
+export interface ProjectionPinsOptions {
+  readonly now?: () => number
+  /** A principal's device name from this device's local device list; unknown principals read "another device". */
+  readonly deviceName?: (principal: string) => string | undefined
+}
+
+export function createProjectionPins(options: ProjectionPinsOptions = {}): ProjectionPins {
   const now = options.now ?? Date.now
+  const deviceName = options.deviceName ?? (() => undefined)
   const live = new Map<string, { readonly record: ProjectionPinRecord; readonly epoch: number }>()
   let refreshEpoch = 0
   let refreshRequestedAtMs = Number.NEGATIVE_INFINITY
 
-  const resolve = async (repo: GitMemoryRepo, sessionId: string, branch: readonly unknown[]) => {
+  const resolve = async (repo: GitMemoryRepo, sessionId: string, branch: readonly unknown[], head: string | null) => {
     const compactionId = latestCompactionId(branch)
     const cached = live.get(sessionId)
     const state = cached?.record ?? readPinRecord(branch, sessionId)
     const staleByRefresh = cached === undefined
       ? state !== undefined && state.pinnedAtMs < refreshRequestedAtMs
       : cached.epoch < refreshEpoch
-    const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId)
+    const reason = staleByRefresh ? "refresh" : await repinReason(repo, state, cached === undefined, compactionId, head)
     return { compactionId, state, reason }
   }
 
@@ -77,11 +90,11 @@ export function createProjectionPins(options: { readonly now?: () => number } = 
       refreshRequestedAtMs = now()
     },
     async peek({ repo, sessionId, branch, head }): Promise<string | null> {
-      const { state, reason } = await resolve(repo, sessionId, branch)
+      const { state, reason } = await resolve(repo, sessionId, branch, head)
       return state === undefined || reason !== undefined ? head : state.revision
     },
     async advance({ repo, sessionId, branch, head, record }): Promise<ProjectionTurn> {
-      const { compactionId, state, reason } = await resolve(repo, sessionId, branch)
+      const { compactionId, state, reason } = await resolve(repo, sessionId, branch, head)
       if (state === undefined || reason !== undefined) {
         const fresh: ProjectionPinRecord = {
           version: 1,
@@ -98,13 +111,51 @@ export function createProjectionPins(options: { readonly now?: () => number } = 
 
       live.set(sessionId, { record: state, epoch: refreshEpoch })
       if (state.noticedThrough === head) return { revision: state.revision }
-      const changes = await projectedChangesBetween(repo, state.noticedThrough, head, { excludeSessionId: sessionId })
+      let rangeCommits: readonly MemoryCommit[] = []
+      const changes = await projectedChangesBetween(repo, state.noticedThrough, head, {
+        excludeSessionId: sessionId,
+        onCommits: (commits) => {
+          rangeCommits = commits
+        },
+      })
       const advanced: ProjectionPinRecord = { ...state, noticedThrough: head }
       live.set(sessionId, { record: advanced, epoch: refreshEpoch })
       record(advanced)
-      return isEmptyProjectedChanges(changes) ? { revision: state.revision } : { revision: state.revision, changes }
+      if (isEmptyProjectedChanges(changes)) return { revision: state.revision }
+      const sources = syncedSources(rangeCommits, changes, deviceName)
+      return sources.length === 0 ? { revision: state.revision, changes } : { revision: state.revision, changes, sources }
     },
   }
+}
+
+/** The paths the notice line actually shows (the first MAX_LISTED_PATHS, in group order). */
+function shownPaths(changes: ProjectedChanges): Set<string> {
+  return new Set([...changes.added, ...changes.updated, ...changes.removed].slice(0, MAX_LISTED_PATHS))
+}
+
+/** A device name as it may appear in the prompt: one line, no control characters, bounded. */
+function promptSafeName(name: string): string | undefined {
+  const clean = name.replace(/[\p{Cc}\p{Cf}\u2028\u2029]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 64)
+  return clean.length === 0 ? undefined : clean
+}
+
+/** Device names behind the sync commits in the range (read once, by the change scan) that touched a shown path. */
+function syncedSources(
+  commits: readonly MemoryCommit[],
+  changes: ProjectedChanges,
+  deviceName: (principal: string) => string | undefined,
+): string[] {
+  const listed = shownPaths(changes)
+  const names = new Set<string>()
+  for (const commit of commits) {
+    const principals = commit.trailers[SYNC_PRINCIPALS_TRAILER]
+    if (principals === undefined || !(commit.paths ?? []).some((path) => listed.has(path))) continue
+    for (const principal of principals.split(",").map((p) => p.trim()).filter((p) => p.length > 0)) {
+      const known = deviceName(principal)
+      names.add((known === undefined ? undefined : promptSafeName(known)) ?? UNKNOWN_DEVICE)
+    }
+  }
+  return [...names].sort((a, b) => a.localeCompare(b))
 }
 
 async function repinReason(
@@ -112,12 +163,14 @@ async function repinReason(
   state: ProjectionPinRecord | undefined,
   loadedFromBranch: boolean,
   compactionId: string | null,
+  head: string | null,
 ): Promise<ProjectionRepinReason | undefined> {
   if (state === undefined) return "first-turn"
   if (state.compactionId !== compactionId) return "compaction"
   if (!loadedFromBranch) return undefined
-  for (const revision of [state.revision, state.noticedThrough]) {
-    if (revision !== null && !(await revisionExists(repo, revision))) return "missing-revision"
+  // HEAD was just read, so a pinned revision equal to it exists; only an older one needs the object lookup.
+  for (const revision of new Set([state.revision, state.noticedThrough])) {
+    if (revision !== null && revision !== head && !(await revisionExists(repo, revision))) return "missing-revision"
   }
   return undefined
 }
@@ -149,7 +202,11 @@ function latestCompactionId(branch: readonly unknown[]): string | null {
   return null
 }
 
-export function renderProjectedChangesLine(changes: ProjectedChanges, pinnedRevision: string | null): string {
+export function renderProjectedChangesLine(
+  changes: ProjectedChanges,
+  pinnedRevision: string | null,
+  sources: readonly string[] = [],
+): string {
   const groups = [
     ["added", changes.added],
     ["updated", changes.updated],
@@ -166,7 +223,8 @@ export function renderProjectedChangesLine(changes: ProjectedChanges, pinnedRevi
     parts.push(`${verb} ${listed.join(", ")}`)
   }
   const pin = pinnedRevision === null ? "an empty memory repo" : pinnedRevision.slice(0, 7)
-  return `- ${MEMORY_CHANGES_METADATA_TOKEN} ${pin}: ${parts.join("; ")}. The prompt keeps the pinned copy; read a file when it matters now.`
+  const synced = sources.length === 0 ? "" : `, synced from ${sources.join(", ")}`
+  return `- ${MEMORY_CHANGES_METADATA_TOKEN} ${pin}: ${parts.join("; ")}${synced}. The prompt keeps the pinned copy; read a file when it matters now.`
 }
 
 function isNullableString(value: unknown): value is string | null {

@@ -31,6 +31,8 @@ export interface LiveTaskContext {
 export interface CapturedUi {
   notify(message: string, type?: "info" | "warning" | "error"): void
   setStatus(key: string, text: string | undefined): void
+  // senpi#2471: absent on engines before it, so the footer simply shows no subagent figure there.
+  setSubagentCost?(costUsd: number | undefined): void
   setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void
   select(title: string, options: string[], opts?: { signal?: unknown; timeout?: number }): Promise<string | undefined>
   confirm(title: string, message: string, opts?: { signal?: unknown; timeout?: number }): Promise<boolean>

@@ -14,7 +14,8 @@ const expectedToolSurface = [
 	{
 		name: "diagnostics",
 		title: "LSP Diagnostics",
-		description: "Get errors, warnings, and hints for a source file or directory.",
+		description:
+			"Get errors, warnings, and hints for a source file or directory. In a Bun project, a TypeScript directory is typechecked with `bun check`, plus `bun lint` when the installed Bun has it.",
 		inputSchema: {
 			type: "object",
 			properties: {

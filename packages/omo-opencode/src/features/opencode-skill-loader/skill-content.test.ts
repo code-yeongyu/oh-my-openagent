@@ -304,8 +304,8 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
 	})
 
-	it("should inject only the footer when both legacy flags are enabled", async () => {
-		// given: git-master skill with the footer opted in and the deprecated co-author flag set
+	it("should inject the footer and the co-author trailer when both flags are enabled", async () => {
+		// given: git-master skill with the footer and the co-author on
 		const skillNames = ["git-master"]
 		const options = {
 			gitMasterConfig: {
@@ -318,11 +318,11 @@ describe("resolveMultipleSkillsAsync", () => {
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: the footer is injected and no co-author trailer ever ships
+		// then: the footer and exactly one sisyphus-dev-ai trailer are injected
 		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master")
+		const gitMasterContent = result.resolved.get("git-master") ?? ""
 		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent).not.toMatch(/Co-authored-by:/i)
+		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
 		expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
 	})
 
@@ -346,23 +346,23 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
 	})
 
-	it("should NOT inject watermark by default when no config provided", async () => {
+	it("should inject only the co-author trailer by default when no config provided", async () => {
 		// given: git-master skill with NO config (default behavior)
 		const skillNames = ["git-master"]
 
 		// when: resolving without any gitMasterConfig
 		const result = await resolveMultipleSkillsAsync(skillNames)
 
-		// then: nothing is injected (default is OFF) and no GitHub-resolvable identity ships
+		// then: the footer stays off and the sisyphus-dev-ai trailer is on by default
 		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master")
+		const gitMasterContent = result.resolved.get("git-master") ?? ""
 		expect(gitMasterContent).not.toContain("Ultraworked with")
-		expect(gitMasterContent).not.toMatch(/Co-authored-by:/i)
+		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
 		expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
 	})
 
-	it("should inject nothing when only the deprecated co-author flag is enabled", async () => {
-		// given: git-master skill with the footer off and the deprecated co-author flag set
+	it("should inject only the co-author trailer when the footer is off", async () => {
+		// given: git-master skill with the footer off and the co-author on
 		const skillNames = ["git-master"]
 		const options = {
 			gitMasterConfig: {
@@ -375,10 +375,10 @@ describe("resolveMultipleSkillsAsync", () => {
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: nothing is injected
-		const gitMasterContent = result.resolved.get("git-master")
+		// then: only the trailer is injected
+		const gitMasterContent = result.resolved.get("git-master") ?? ""
 		expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent).not.toMatch(/Co-authored-by:/i)
+		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
 	})
 
 	it("should inject custom string footer when commit_footer is a string", async () => {

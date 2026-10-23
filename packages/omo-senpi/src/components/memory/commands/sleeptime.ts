@@ -6,9 +6,9 @@
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { resolveAgentReflectionSettings } from "../reflection-settings"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 export const SLEEPTIME_OVERRIDE_MARK = " [agent override]"
 
@@ -141,10 +141,9 @@ function mark(setting: ResolvedSleeptimeValue<unknown>): string {
   return setting.overridden ? SLEEPTIME_OVERRIDE_MARK : ""
 }
 
-export function registerSleeptimeCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerSleeptimeCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("sleeptime", {
-    description: "Show the resolved sleeptime memory settings for this identity.",
-    argumentHint: "",
+    ...LAZY_MEMORY_COMMANDS.sleeptime,
     handler: async (_args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")

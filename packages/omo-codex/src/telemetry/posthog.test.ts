@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -20,6 +21,7 @@ async function importPostHogModule(): Promise<PostHogModule> {
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
 const tempPaths: string[] = []
+let restoreTelemetryEnv: () => void
 
 function createDataHomePath(): string {
   const tempPath = mkdtempSync(join(tmpdir(), "omo-codex-posthog-"))
@@ -65,6 +67,7 @@ function setMatrix(
 
 describe("omo-codex posthog telemetry", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     mock.restore()
     clearTelemetryEnv()
     process.env.XDG_DATA_HOME = createDataHomePath()
@@ -83,6 +86,7 @@ describe("omo-codex posthog telemetry", () => {
     for (const tempPath of tempPaths.splice(0)) {
       rmSync(tempPath, { recursive: true, force: true })
     }
+    restoreTelemetryEnv()
   })
 
   it("matrix row 1 disabled when OMO_DISABLE_POSTHOG=1", async () => {

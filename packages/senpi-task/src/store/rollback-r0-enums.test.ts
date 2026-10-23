@@ -39,7 +39,8 @@ describe("R0 persisted enum compatibility", () => {
     "isolation.backend": IsolationBackendKindSchema.options,
     "spawn_spec.isolation.backend": IsolationBackendKindSchema.options,
     "run_stats.token_status": TOKEN_COVERAGE_STATUSES,
-    "run_stats.cost_status": COST_REPORT_STATUSES,
+    // "partial" is rewritten to "reported" by rollback preparation (rollback-cost-status.test.ts).
+    "run_stats.cost_status": COST_REPORT_STATUSES.filter((status) => status !== "partial"),
     "run_stats.duration_status": DURATION_SOURCE_STATUSES,
   })) {
     test(`#given current ${path} vocabulary #when read by R0 #then every value remains readable`, () => {

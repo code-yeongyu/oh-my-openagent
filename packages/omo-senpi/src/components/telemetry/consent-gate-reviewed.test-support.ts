@@ -24,10 +24,23 @@ const SUMMARY_STORE = "written only by the consent-checked session-summary recor
 
 export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   {
+    file: "lazy-posthog.ts", fn: "createLazyPostHogTransportFactory>=>>forward",
+    guard: "",
+    route: VIA_SESSION_CLIENT,
+    call: "target.capture(message)",
+    reason: "forwards only the captures admitted by the existing gated clients; the unchanged SDK fetch gate also checks delayed sends",
+  },
+  {
+    file: "lazy-posthog.ts", fn: "createLazyPostHogTransportFactory>=>>load>=>",
+    guard: "unless(module === undefined)",
+    call: "module.createDefaultPostHogTransport(apiKey)",
+    reason: "constructed only on the first admitted capture or a flush of its queue; receives the same consent-gated fetch and SDK options",
+  },
+  {
     file: "index.ts", fn: "recordSenpiDailyActive",
     guard: "",
     route: { kind: "callers", fn: "recordSenpiDailyActive" },
-    call: "recordDailyActive(options.transportFactory === undefined ? input : { ...input,)", reason: LEGACY_DAILY_ACTIVE,
+    call: "recordDailyActive(input)", reason: LEGACY_DAILY_ACTIVE,
   },
   {
     file: "index.ts", fn: "createSenpiTelemetryComponent>register>on(=>)",
@@ -46,6 +59,12 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     guard: "unless(state.isConsented?.() !== true) unless(properties.$session_id === OPTED_OUT_SESSION_HASH) if(isOmoNativeEventName(name))",
     route: GATE,
     call: "state.capture(name)", reason: FAN_IN,
+  },
+  {
+    file: "omo-native-component.ts", fn: "createOmoNativeTelemetryComponent>register>captureEvent>run(=>)",
+    guard: "",
+    route: VIA_FAN_IN,
+    call: "client.captureEvent(name)", reason: THROUGH_FAN_IN,
   },
   {
     file: "omo-native-component.ts", fn: "installCaptureFacade",
@@ -75,6 +94,12 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     guard: "",
     route: VIA_FAN_IN,
     call: "options.captureEvent(\"computer_use_engine_error\")", reason: THROUGH_FAN_IN,
+  },
+  {
+    file: "omo-native-handoff-hint.ts", fn: "registerOmoNativeHandoffHintTelemetry>on(=>)",
+    guard: "unless(event === undefined)",
+    route: VIA_FAN_IN,
+    call: "options.captureEvent(\"handoff_hint\")", reason: THROUGH_FAN_IN,
   },
   {
     file: "omo-native-crash.ts", fn: "captureProcessCrashes",
@@ -224,6 +249,16 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     file: "product-identity.ts", fn: "readOrCreateInstallId",
     guard: "unless(persisted !== undefined) unless(concurrentlyCreated !== undefined)",
     call: "writeFileSync(path)", reason: IDENTITY_FILES,
+  },
+  {
+    file: "product-identity.ts", fn: "resolveUserInstallId",
+    guard: "unless(legacy === canonical) unless(shared !== undefined) unless(adopted === undefined)",
+    call: "mkdirSync(dirname(canonical))", reason: IDENTITY_FILES,
+  },
+  {
+    file: "product-identity.ts", fn: "resolveUserInstallId",
+    guard: "unless(legacy === canonical) unless(shared !== undefined) unless(adopted === undefined)",
+    call: "writeFileSync(canonical)", reason: IDENTITY_FILES,
   },
   {
     file: "session-summary-store.ts", fn: "createSummaryStore>write",

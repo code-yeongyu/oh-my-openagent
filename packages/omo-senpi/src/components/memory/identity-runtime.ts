@@ -13,6 +13,7 @@ import type { ComponentLogger } from "../../extension/types"
 import { AGENT_DIR_ENV_NAMES, resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { SenpiOmoConfigResult } from "../config-resolution"
 import { ensureIdentityRuntimeDirs, type MemoryIdentityContext } from "./context"
+import { currentLaunchScope, withLaunchScope } from "./launch-facts"
 import { createReflectionRunIdFactory } from "./reflection-run-id"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
 import {
@@ -145,7 +146,14 @@ export function createIdentityRuntime(
     return runtimeDirsReady
   }
   const inFlight = new Set<Promise<void>>()
+  // Every launch runs in a scope bound to ITS run (launch-facts.ts): a trigger's own scope is kept
+  // when it is for this run; a queued follow-up or a reconcile gets a fresh scope of its own.
   const launch = (run: ReservedRun): Promise<void> => {
+    const scope = currentLaunchScope()
+    const owned = scope !== undefined && sameConversations(scope.conversationIds, run.request.conversationIds)
+    return owned ? launchInScope(run) : withLaunchScope({ conversationIds: run.request.conversationIds }, () => launchInScope(run))
+  }
+  const launchInScope = (run: ReservedRun): Promise<void> => {
     const tracked: Promise<void> = ensureRuntimeDirsOnce()
       .then(() => runner.launch(run))
       .then((result) => {
@@ -189,6 +197,10 @@ export function createIdentityRuntime(
  */
 function pinnedAgentDirEnv(agentDir: string): NodeJS.ProcessEnv {
   return Object.fromEntries(AGENT_DIR_ENV_NAMES.map((name) => [name, agentDir]))
+}
+
+function sameConversations(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id) => b.includes(id))
 }
 
 function describe(error: unknown): string {

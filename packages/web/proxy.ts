@@ -111,11 +111,13 @@ export const config = {
      * - Any path containing a dot (favicon.ico, *.webp, *.png, etc.)
      */
     "/((?!api|design|_next|_vercel|opengraph-image|twitter-image|icon|apple-icon|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\..*).+)",
+    // Locale-agnostic on purpose: Next.js needs a literal matcher, so the locale itself is
+    // checked against the registry by getLocaleSegment instead of a second hand-written list.
     "/installation.md",
-    "/:locale(en|ko|ja|zh)/installation.md",
+    "/:locale/installation.md",
     "/docs/installation.md",
     "/docs/guide/install.md",
-    "/:locale(en|ko|ja|zh)/docs/guide/install.md",
-    "/:locale(en|ko|ja|zh)/docs/installation.md",
+    "/:locale/docs/guide/install.md",
+    "/:locale/docs/installation.md",
   ],
 }

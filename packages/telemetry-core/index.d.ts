@@ -17,26 +17,42 @@ export type UuidV7Source = {
 };
 
 export type TelemetryDiagnosticEvent =
+  | "telemetry_buffer_overflow"
   | "telemetry_activity_state_read_failed"
   | "telemetry_activity_state_write_failed"
   | "telemetry_capture_failed"
+  | "telemetry_consent_failed"
   | "telemetry_cpu_info_unavailable"
   | "telemetry_drop_flush_failed"
   | "telemetry_event_property_dropped"
   | "telemetry_event_property_rejected"
   | "telemetry_event_rejected"
   | "telemetry_events_dropped_by_consent"
+  | "telemetry_otlp_partial_success"
+  | "telemetry_otlp_send_failed"
   | "telemetry_posthog_import_failed"
   | "telemetry_posthog_init_failed"
-  | "telemetry_shutdown_failed";
+  | "telemetry_shutdown_failed"
+  | "telemetry_spool_purge_failed"
+  | "telemetry_spool_purge_refused"
+  | "telemetry_spool_purge_skipped"
+  | "telemetry_spool_sweep_failed"
+  | "telemetry_spool_write_failed";
 
 export type TelemetryDiagnosticErrorKind = "error" | "non_error";
+
+/** Why the opt-out purge left a spool-named entry in place: it deletes only regular files of the current user. */
+export type TelemetrySpoolEntryKind = "directory" | "symlink" | "foreign_owner" | "other";
 
 export type TelemetryDiagnosticInput = {
   readonly event: TelemetryDiagnosticEvent;
   readonly source: string;
   readonly error?: unknown;
   readonly errorKind?: TelemetryDiagnosticErrorKind;
+  /** `telemetry_spool_purge_skipped` only: what kind of spool-named entry the purge left in place. */
+  readonly entryKind?: TelemetrySpoolEntryKind;
+  /** `telemetry_spool_purge_failed` only: the errno code (never the path) of one spool file the opt-out purge could not delete. */
+  readonly errorCode?: string;
   readonly count?: number;
 };
 
@@ -101,10 +117,29 @@ export type ConsentGatedFetchInput = {
   readonly fetch?: TelemetryFetch;
 };
 
+export type TurnSpanStatus = "ok" | "error";
+export type TurnSpanAttributes = Readonly<Record<string, string | number | boolean>>;
+export type TurnSpanStart = {
+  readonly attributes: TurnSpanAttributes;
+  readonly parentTraceparent?: string;
+};
+export type TurnSpanHandle = {
+  readonly traceId: string;
+  readonly spanId: string;
+  readonly traceparent: string;
+  readonly run: <T>(fn: () => T) => T;
+  readonly setAttributes: (attributes: TurnSpanAttributes) => void;
+  readonly end: (status: TurnSpanStatus) => void;
+};
+export type TurnTracing = {
+  readonly startTurn: (start: TurnSpanStart) => TurnSpanHandle | undefined;
+};
+
 export type TelemetryTransport = {
   readonly capture: (message: TelemetryCaptureMessage) => void;
   readonly flush?: () => Promise<void>;
   readonly shutdown: () => Promise<void>;
+  readonly traces?: TurnTracing;
 };
 
 export type TelemetryTransportFactory = (
@@ -240,3 +275,7 @@ export declare function writeTelemetryDiagnostic(
 ): void;
 export declare function cleanupTelemetryDiagnostics(options: WriteTelemetryDiagnosticOptions): void;
 export declare function recordDailyActive(input: RecordDailyActiveInput): Promise<void>;
+export declare function isTraceparent(value: unknown): value is string;
+export declare function publishTurnTraceparent(sessionId: string, traceparent: string): void;
+export declare function clearTurnTraceparent(sessionId: string, expected?: string): void;
+export declare function readTurnTraceparent(sessionId: string): string | undefined;

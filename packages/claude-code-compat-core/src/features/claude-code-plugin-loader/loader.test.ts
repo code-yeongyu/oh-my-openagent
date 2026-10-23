@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { restoreEnvironment } from "../../../../../test-support/environment-integrity"
 import {
   clearPluginComponentsCache,
   loadAllPluginComponents,
@@ -27,7 +28,7 @@ describe("loadAllPluginComponents", () => {
   })
 
   afterEach(() => {
-    process.env = { ...originalEnv }
+    restoreEnvironment(originalEnv)
     mock.restore()
   })
 

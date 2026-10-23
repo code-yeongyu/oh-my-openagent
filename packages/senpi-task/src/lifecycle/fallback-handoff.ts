@@ -31,6 +31,9 @@ export type FallbackRung = {
  * failed rung's outcome, and every identity of the closing child (pid, daemon session) moved off the
  * task's own fields so no reconciler mistakes it for this task's live child. It stays durable in
  * `fallback_closing_child` until the close ends it, so a parent that dies first leaves it an owner.
+ * Only the SELECTED route moves with the hop (`model`, `resolved_model`): `effective_model` stays the
+ * last route a child was observed running until the next rung's child reports its own (#10797), so a
+ * launch that never happens never leaves the record naming a model nothing ran on.
  */
 export function handOffToNextRung(record: TaskRecord, rung: FallbackRung): TaskRecord {
   const { pid: closingPid, runner_kind: _closedRunner, host_session: closingSession, provisional_exit: _exit, ...rest } = record

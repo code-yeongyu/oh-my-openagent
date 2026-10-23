@@ -1,4 +1,5 @@
 import { isAbsolute, relative, resolve, sep } from "node:path"
+import { AGREEMENTS_PATH } from "../agreements/types"
 import { readFile } from "../fs/resilient"
 import { createNodeGitExec, type GitExec } from "../git"
 import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
@@ -75,6 +76,11 @@ export async function validateCompletion(
       if (!isConfinedRepoPath(worktree.parent.dir, path) || path.split("/").includes(".git")) {
         return { status: "failed", detail: `Changed path escapes the memory repository: ${path}` }
       }
+    }
+    // Rename detection is off here on purpose: `git mv system/agreements.md elsewhere` must read as a deletion.
+    const ledger = await git(exec, worktree.dir, ["diff", "--no-renames", "--name-only", "-z", `${recordedBase}..${tipSha}`, "--", AGREEMENTS_PATH])
+    if (ledger.stdout.split("\0").some(Boolean)) {
+      return { status: "failed", detail: `Reflection may not modify ${AGREEMENTS_PATH}; agreements change only through the facts lane and /agreements` }
     }
     const frontmatterFailure = await findFrontmatterFailure(exec, worktree.dir, recordedBase, tipSha, changedPaths)
     if (frontmatterFailure !== null) return { status: "failed", detail: frontmatterFailure }

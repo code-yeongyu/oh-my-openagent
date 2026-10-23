@@ -11,14 +11,16 @@
  *
  * Creates:
  *   <name>/
- *     package.json          (Bun + Hono + Zod + Drizzle + Biome)
- *     tsconfig.json         (ultra-strict from tsconfig-strict.md)
- *     biome.json            (strict from tsconfig-strict.md)
+ *     package.json          (Bun + Hono + Zod + oxlint + oxfmt)
+ *     tsconfig.json         (static ultra-strict config copied from oxc/)
+ *     .oxlintrc.json         (strict rules and local copy plugin)
+ *     .oxfmtrc.json          (format defaults)
+ *     lint/oxlint-plugin/    (plain-JS rules and MIT license)
  *     src/index.ts          (minimal Hono entrypoint)
  *     .gitignore
  */
 
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { cpSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
@@ -44,8 +46,9 @@ Options:
   process.exit(positionals.length === 0 ? 2 : 0);
 }
 
-const name = positionals[0]!;
-const root = resolve(values.path!, name);
+const name = positionals[0];
+if (!name) throw new Error("Project name is required");
+const root = resolve(values.path ?? ".", name);
 
 if (existsSync(root)) {
   console.error(`Error: ${root} already exists`);
@@ -64,8 +67,12 @@ const pkg = {
   scripts: {
     dev: "bun --hot src/index.ts",
     start: "bun src/index.ts",
-    check: "bunx biome check . && bunx tsc --noEmit && bun test",
-    "check:fix": "bunx biome check --write .",
+    lint: "oxlint --type-aware --deny-warnings",
+    fmt: "oxfmt",
+    "fmt:check": "oxfmt --check",
+    typecheck: "tsc --noEmit",
+    check: "bun run lint && bun run fmt:check && bun run typecheck && bun test",
+    "check:fix": "oxlint --type-aware --fix && oxfmt",
     test: "bun test",
   },
   dependencies: {
@@ -73,85 +80,17 @@ const pkg = {
     zod: "^3.24.0",
   },
   devDependencies: {
-    "@biomejs/biome": "^1.9.0",
     "@types/bun": "latest",
+    oxfmt: "0.74.0",
+    oxlint: "1.89.0",
+    "oxlint-tsgolint": "7.0.2005",
     typescript: "^5.8.0",
   },
 };
 writeFileSync(join(root, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 
-// ── tsconfig.json (ultra-strict) ──
-const tsconfig = {
-  compilerOptions: {
-    strict: true,
-    noUncheckedIndexedAccess: true,
-    exactOptionalPropertyTypes: true,
-    noFallthroughCasesInSwitch: true,
-    forceConsistentCasingInFileNames: true,
-    verbatimModuleSyntax: true,
-    isolatedModules: true,
-    esModuleInterop: true,
-    resolveJsonModule: true,
-    target: "ESNext",
-    lib: ["ESNext"],
-    declaration: true,
-    declarationMap: true,
-    sourceMap: true,
-    outDir: "dist",
-    rootDir: "src",
-    module: "ESNext",
-    moduleResolution: "bundler",
-    types: ["bun-types"],
-    skipLibCheck: true,
-    noEmit: true,
-  },
-  include: ["src/**/*.ts"],
-  exclude: ["node_modules", "dist"],
-};
-writeFileSync(
-  join(root, "tsconfig.json"),
-  JSON.stringify(tsconfig, null, 2) + "\n",
-);
-
-// ── biome.json (strict) ──
-const biome = {
-  $schema: "https://biomejs.dev/schemas/1.9.0/schema.json",
-  organizeImports: { enabled: true },
-  formatter: {
-    enabled: true,
-    indentStyle: "space",
-    indentWidth: 2,
-    lineWidth: 100,
-  },
-  linter: {
-    enabled: true,
-    rules: {
-      recommended: true,
-      complexity: {
-        noBannedTypes: "error",
-        noExtraBooleanCast: "error",
-        noUselessConstructor: "error",
-        noUselessRename: "error",
-        noVoid: "error",
-      },
-      correctness: {
-        noUnusedVariables: "error",
-        noUnusedImports: "error",
-        useExhaustiveDependencies: "warn",
-      },
-      style: {
-        noNonNullAssertion: "error",
-        useConst: "error",
-        noParameterAssign: "error",
-      },
-      suspicious: {
-        noExplicitAny: "error",
-        noAssertion: "warn",
-      },
-    },
-  },
-};
-writeFileSync(join(root, "biome.json"), JSON.stringify(biome, null, 2) + "\n");
+// Copy the formatted strict configs and plugin documented in oxc-lint.md.
+cpSync(join(import.meta.dir, "oxc"), root, { recursive: true });
 
 // ── src/index.ts ──
 const indexTs = `import { Hono } from "hono";

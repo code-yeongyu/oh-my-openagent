@@ -21,6 +21,7 @@ import { classifyOversizePayload } from "./facts-oversize"
 import { admitOversizedFacts } from "./facts-oversized-budget"
 import { FactsTerminalWrites } from "./facts-terminal-writes"
 import { readFactsPeoplePayload } from "./facts-people-payload"
+import { readFactsAgreementsPayload, resolveFactsAgreements } from "./facts-agreements"
 import { launchFactsInProcess } from "./facts-in-process-launch"
 import { resolveFactsModel } from "./facts-model"
 import { readRunJson } from "./worker/run-artifacts"
@@ -142,7 +143,8 @@ export class FactsExtractorRunner {
       throw error
     }
     const people = await readFactsPeoplePayload(repo.dir)
-    const envelope = { version: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people } as const
+    const agreements = await readFactsAgreementsPayload(repo.dir, resolveFactsAgreements(loaded.config, this.options.identity.id))
+    const envelope = { version: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people, ...agreements } as const
     const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
     const oversizedModel = capped.oversized.length === 0 ? undefined
       : (await import("#omo-task-runtime")).findModelReference(childModelRegistry, resolution.model)

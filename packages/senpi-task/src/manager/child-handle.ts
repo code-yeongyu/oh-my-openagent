@@ -57,6 +57,8 @@ export type ManagedChildHandle = {
   // A daemon-session child the host swapped under its live routing handle: the record's session
   // identity is re-stamped from this event (F9); the child keeps running on the new transcript.
   onReplaced?(listener: (event: HostSessionReplaced) => void): () => void
+  // A daemon-session child whose durable id arrived after spawn: the record's child_session_id follows (#10873).
+  onDurableSessionId?(listener: (id: string) => void): () => void
   // A daemon-session child whose connection dropped and is being recovered (omo#9403).
   transportRecovering?(): boolean
   // A cancel was accepted: no transport recovery may bring this child back as running.
@@ -125,6 +127,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
       ? {
           onParked: (listener) => handle.onParked(listener),
           onReplaced: (listener) => handle.onReplaced(listener),
+          onDurableSessionId: (listener) => handle.onDurableSessionId(listener),
           transportRecovering: () => handle.transportRecovering(),
           markStopping: () => handle.markStopping(),
           stopWhenReachable: () => handle.stopWhenReachable(),

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { posix, win32 } from "node:path"
 
 import {
@@ -11,13 +11,23 @@ import {
 } from "@oh-my-opencode/omo-config-core"
 import {
   createLegacyConfigMigrationPlans,
+  DORI_SECTION_RENAME_MIGRATION_ID,
   type ConfigMigrationDiscoveryFileSystem,
   type ConfigMigrationPathOperations,
+  type CreateLegacyConfigMigrationPlansOptions,
+  type DoriSectionRename,
 } from "@oh-my-opencode/omo-opencode/config-migration"
 import { DEVIN_SWE2_SERVED_LANES, isUnservedDevinSWE2Selector } from "@oh-my-opencode/model-core"
 import { categoryShadowedAgentNames, categoryShadowMessage } from "@oh-my-opencode/senpi-task/category-shadow"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"
+import {
+  DORI_MIGRATION_RUNTIME_ARTIFACT,
+  loadDoriSectionRename,
+  mayDeclareLegacyGatewayKey,
+  NO_DORI_SECTION_RENAME,
+  type DoriSectionRenameLoader,
+} from "./dori-migration-loader"
 import { isMetadataOnlyLaunch } from "./metadata-launch"
 import { createOpenCodeRoutingNoticePlan } from "./opencode-routing-notice"
 
@@ -26,6 +36,7 @@ export type SenpiStartupMigrationOptions = {
   readonly clock?: MigrationClock
   readonly cwd: string
   readonly discoveryFileSystem?: ConfigMigrationDiscoveryFileSystem
+  readonly doriSectionRename: DoriSectionRename
   readonly env?: MigrationEnvironment
   readonly environment?: Readonly<Record<string, string | undefined>>
   readonly fileSystem?: MigrationFileSystem
@@ -47,15 +58,23 @@ export type SenpiStartupMigrationResult = {
 export interface ConfigStartupComponentOptions {
   readonly argv?: readonly string[]
   readonly loadConfig?: typeof loadSenpiOmoConfig
+  readonly prepareDoriSectionRename?: (options: DoriSectionRenamePreparationOptions) => Promise<PreparedDoriSectionRename>
   readonly resolveCwd?: () => string
   readonly runMigration?: (options: SenpiStartupMigrationOptions) => SenpiStartupMigrationResult
+}
+
+export type DoriSectionRenamePreparationOptions = Omit<SenpiStartupMigrationOptions, "doriSectionRename">
+
+export type PreparedDoriSectionRename = {
+  readonly error?: string
+  readonly rename: DoriSectionRename
 }
 
 type NotificationUi = {
   notify(message: string, type?: "info" | "warning" | "error"): void
 }
 
-function homeDirectory(options: SenpiStartupMigrationOptions): string {
+function homeDirectory(options: DoriSectionRenamePreparationOptions): string {
   const environment = options.environment ?? process.env
   return options.homeDir ?? environment["HOME"] ?? environment["USERPROFILE"] ?? ""
 }
@@ -64,6 +83,57 @@ function migratedSources(results: readonly MigrationRunResult[]): readonly strin
   return [...new Set(results.flatMap((result) => result.status === "migrated"
     ? result.preview?.backupMoves.map((move) => move.from) ?? []
     : []))].sort()
+}
+
+function legacyPlanOptions(
+  options: DoriSectionRenamePreparationOptions,
+  homeDir: string,
+): Omit<CreateLegacyConfigMigrationPlansOptions, "doriSectionRename"> {
+  return {
+    ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
+    cwd: options.cwd,
+    ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
+    environment: options.environment ?? process.env,
+    homeDir,
+    pathOperations: options.pathOperations ?? (options.platform === "win32" ? win32 : posix),
+    ...(options.platform === undefined ? {} : { platform: options.platform }),
+  }
+}
+
+/**
+ * Loads the gateway -> dori rename only when a config file it would rewrite still declares a `gateway` key, so
+ * startups with nothing to migrate never import its sidecar. A failed load reports why and skips the rename.
+ */
+export async function prepareDoriSectionRename(
+  options: DoriSectionRenamePreparationOptions,
+  load: DoriSectionRenameLoader = loadDoriSectionRename,
+): Promise<PreparedDoriSectionRename> {
+  const homeDir = homeDirectory(options)
+  if (homeDir.length === 0) return { rename: NO_DORI_SECTION_RENAME }
+  // A target that does not exist yet has nothing to rename; any other read or discovery failure counts as a yes, so
+  // an unreadable old config still reaches the real rename (and its error), never a silent skip.
+  const mayNeedRename = (path: string): boolean => {
+    try {
+      const text = options.fileSystem === undefined ? readFileSync(path, "utf-8") : options.fileSystem.readFileSync(path, "utf-8")
+      return mayDeclareLegacyGatewayKey(text)
+    } catch (error) {
+      return (error as NodeJS.ErrnoException | undefined)?.code !== "ENOENT"
+    }
+  }
+  let needed: boolean
+  try {
+    needed = createLegacyConfigMigrationPlans({ ...legacyPlanOptions(options, homeDir), doriSectionRename: NO_DORI_SECTION_RENAME })
+      .some((plan) => plan.id === DORI_SECTION_RENAME_MIGRATION_ID && mayNeedRename(plan.targetPath))
+  } catch {
+    needed = true
+  }
+  if (!needed) return { rename: NO_DORI_SECTION_RENAME }
+  try {
+    return { rename: await load() }
+  } catch (error) {
+    const cause = error instanceof Error ? error.message : String(error)
+    return { error: `gateway -> dori rename: ${DORI_MIGRATION_RUNTIME_ARTIFACT} failed to load (${cause}); reinstall omo`, rename: NO_DORI_SECTION_RENAME }
+  }
 }
 
 /** Runs the shared, lock-protected migration engine before Senpi reads its unified configuration. */
@@ -90,13 +160,8 @@ export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions):
       ...(options.pid === undefined ? {} : { pid: options.pid }),
       discover: () => [
         ...createLegacyConfigMigrationPlans({
-          ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
-          cwd: options.cwd,
-          ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
-          environment,
-          homeDir,
-          pathOperations,
-          ...(options.platform === undefined ? {} : { platform: options.platform }),
+          ...legacyPlanOptions(options, homeDir),
+          doriSectionRename: options.doriSectionRename,
         }),
         // Native-only: what it reports is what the native harness ignores.
         createOpenCodeRoutingNoticePlan({
@@ -139,13 +204,16 @@ export function createConfigStartupComponent(options: ConfigStartupComponentOpti
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   const runMigration = options.runMigration ?? runSenpiStartupMigration
+  const prepareDori = options.prepareDoriSectionRename ?? ((preparation) => prepareDoriSectionRename(preparation))
   const argv = options.argv ?? process.argv.slice(2)
   return {
     name: "config-startup",
-    register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+    async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
       if (isMetadataOnlyLaunch(argv)) return
       const cwd = resolveCwd()
-      const migration = runMigration({ cwd })
+      const dori = await prepareDori({ cwd })
+      const ran = runMigration({ cwd, doriSectionRename: dori.rename })
+      const migration = dori.error === undefined ? ran : { ...ran, error: ran.error === undefined ? dori.error : `${dori.error}; ${ran.error}` }
       const config = loadConfig({ cwd })
       const notices = notificationMessages(migration, config)
       let reported = false

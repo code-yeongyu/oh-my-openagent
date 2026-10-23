@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
 import type {
   TelemetryCaptureMessage,
   TelemetryTransportFactory,
@@ -17,6 +18,7 @@ type TransportCalls = {
 }
 
 let activePostHogModule: PostHogModule | null = null
+let restoreTelemetryEnv: () => void
 const originalConsoleError = console.error
 
 async function importPostHogModule(): Promise<typeof import("./posthog")> {
@@ -69,6 +71,7 @@ function createTransportCalls(): TransportCalls {
 
 describe("plugin load telemetry send path", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     clearTelemetryEnv()
   })
 
@@ -78,6 +81,7 @@ describe("plugin load telemetry send path", () => {
     activePostHogModule?.__resetTransportFactoryForTesting()
     activePostHogModule = null
     clearTelemetryEnv()
+    restoreTelemetryEnv()
   })
 
   it("#given plugin load #when telemetry is recorded #then it flushes and never shuts the client down", async () => {

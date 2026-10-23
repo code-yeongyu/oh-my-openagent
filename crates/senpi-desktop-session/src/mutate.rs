@@ -266,6 +266,8 @@ fn input_may_proceed(input_permission: &str) -> bool {
 }
 
 #[cfg(test)]
+mod desktop_grant_tests;
+#[cfg(test)]
 mod grant_tests;
 #[cfg(test)]
 mod permission_tests;

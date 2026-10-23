@@ -1,0 +1,191 @@
+{
+  "generated_by": "omo-telemetry apps/ingest/src/otlp.ts decode('logs', 'proto', body) at 6901123d66712d3f12bff985238ee332a5741624",
+  "request_base64": "CqoHCpACChsKDHNlcnZpY2UubmFtZRILCglvbW8tc2VucGkKGgoPc2VydmljZS52ZXJzaW9uEgcKBTEuMS4wCjkKE3NlcnZpY2UuaW5zdGFuY2UuaWQSIgogMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYKVgoQb21vLmluc3RhbGwuaGFzaBJCCkBhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiCigKEnRlbGVtZXRyeS5zZGsubmFtZRISChBvbW8tb3RlbC1taW5pbWFsChgKEm9tby5zY2hlbWEudmVyc2lvbhICGAMSlAUKEwoJb21vLXNlbnBpEgYzLjE3LjAStQIJFc0L3KzGbBgyGwoMb21vLnByb3ZpZGVyEgsKCWFudGhyb3BpYzIUCg5vbW8udHVybl9pbmRleBICGAMyGQoMb21vLmNvc3RfdXNkEgkhAAAAAAAA0D8yEgoMb21vLmlzX2Vycm9yEgIQADI4Cg5sb2cucmVjb3JkLnVpZBImCiQwMTkwZjAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEyUAoKc2Vzc2lvbi5pZBJCCkBhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhRQEAAABKEEv5LzV3s02mo86SnQ4ORzZSCADwZ6oLqQK3WRXNC9ysxmwYYhJvbW8udHVybl9jb21wbGV0ZWQSxwEJFc0L3KzGbBgyFQoLb21vLmZlYXR1cmUSBgoEZXZhbDI4Cg5sb2cucmVjb3JkLnVpZBImCiQwMTkwZjAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDIyUAoKc2Vzc2lvbi5pZBJCCkBhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhWRXNC9ysxmwYYhBvbW8uZmVhdHVyZV91c2VkEnsJFc0L3KzGbBgyGAoPb21vLnJlYXNvbl9jb2RlEgUKA29vbTI4Cg5sb2cucmVjb3JkLnVpZBImCiQwMTkwZjAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDNZFc0L3KzGbBhiE29tby5wcm9jZXNzX2NyYXNoZWQ=",
+  "worker_decoded": {
+    "signal": "logs",
+    "groups": [
+      {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "t": "s",
+              "v": "omo-senpi"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "t": "s",
+              "v": "1.1.0"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "t": "s",
+              "v": "0123456789abcdef0123456789abcdef"
+            }
+          },
+          {
+            "key": "omo.install.hash",
+            "value": {
+              "t": "s",
+              "v": "abababababababababababababababababababababababababababababababab"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "t": "s",
+              "v": "omo-otel-minimal"
+            }
+          },
+          {
+            "key": "omo.schema.version",
+            "value": {
+              "t": "i",
+              "v": "3"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0,
+        "schemaUrl": "",
+        "scopes": [
+          {
+            "name": "omo-senpi",
+            "version": "3.17.0",
+            "attributes": [],
+            "schemaUrl": "",
+            "items": [
+              {
+                "time": "1760000000123456789",
+                "eventName": "omo.turn_completed",
+                "body": null,
+                "attributes": [
+                  {
+                    "key": "omo.provider",
+                    "value": {
+                      "t": "s",
+                      "v": "anthropic"
+                    }
+                  },
+                  {
+                    "key": "omo.turn_index",
+                    "value": {
+                      "t": "i",
+                      "v": "3"
+                    }
+                  },
+                  {
+                    "key": "omo.cost_usd",
+                    "value": {
+                      "t": "d",
+                      "v": 0.25
+                    }
+                  },
+                  {
+                    "key": "omo.is_error",
+                    "value": {
+                      "t": "b",
+                      "v": false
+                    }
+                  },
+                  {
+                    "key": "log.record.uid",
+                    "value": {
+                      "t": "s",
+                      "v": "0190f000-0000-7000-8000-000000000001"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "t": "s",
+                      "v": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "flags": 1,
+                "traceId": {
+                  "kind": "hex",
+                  "hex": "4bf92f3577b34da6a3ce929d0e0e4736"
+                },
+                "spanId": {
+                  "kind": "hex",
+                  "hex": "00f067aa0ba902b7"
+                }
+              },
+              {
+                "time": "1760000000123456789",
+                "eventName": "omo.feature_used",
+                "body": null,
+                "attributes": [
+                  {
+                    "key": "omo.feature",
+                    "value": {
+                      "t": "s",
+                      "v": "eval"
+                    }
+                  },
+                  {
+                    "key": "log.record.uid",
+                    "value": {
+                      "t": "s",
+                      "v": "0190f000-0000-7000-8000-000000000002"
+                    }
+                  },
+                  {
+                    "key": "session.id",
+                    "value": {
+                      "t": "s",
+                      "v": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "flags": 0,
+                "traceId": {
+                  "kind": "none"
+                },
+                "spanId": {
+                  "kind": "none"
+                }
+              },
+              {
+                "time": "1760000000123456789",
+                "eventName": "omo.process_crashed",
+                "body": null,
+                "attributes": [
+                  {
+                    "key": "omo.reason_code",
+                    "value": {
+                      "t": "s",
+                      "v": "oom"
+                    }
+                  },
+                  {
+                    "key": "log.record.uid",
+                    "value": {
+                      "t": "s",
+                      "v": "0190f000-0000-7000-8000-000000000003"
+                    }
+                  }
+                ],
+                "droppedAttributesCount": 0,
+                "flags": 0,
+                "traceId": {
+                  "kind": "none"
+                },
+                "spanId": {
+                  "kind": "none"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

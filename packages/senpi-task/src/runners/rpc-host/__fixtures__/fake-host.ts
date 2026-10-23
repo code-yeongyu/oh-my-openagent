@@ -82,7 +82,8 @@ export interface FakeHost {
   cutConnections(): void
   crash(): void
   restart(): Promise<void>
-  waitForCommand(type: string): Promise<FakeHostCommand>
+  /** Subscribe before triggering; resolves on the `count`th future command of this type. */
+  waitForCommand(type: string, count?: number): Promise<FakeHostCommand>
   /** Resolve when exactly `count` connections are open - a detach observed, never polled for. */
   waitForConnections(count: number): Promise<void>
   stop(): Promise<void>
@@ -102,7 +103,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   const table = new FakeSessionTable({ transcripts: options.transcripts === true, sessionProcesses: options.sessionProcesses === true })
   const admissions = new FakeInputAdmissions()
   const commands: FakeHostCommand[] = []
-  const waiters: Array<{ readonly type: string; readonly resolve: (command: FakeHostCommand) => void }> = []
+  const waiters: Array<{ readonly type: string; remaining: number; readonly resolve: (command: FakeHostCommand) => void }> = []
   const sockets = new Set<Socket>()
   const connectionWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
   const withheld = new Set<string>()
@@ -118,6 +119,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     for (let index = waiters.length - 1; index >= 0; index--) {
       const waiter = waiters[index]
       if (waiter === undefined || waiter.type !== command.type) continue
+      if (--waiter.remaining > 0) continue
       waiters.splice(index, 1)
       waiter.resolve(command)
     }
@@ -280,9 +282,9 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
       await closeServer()
       await listen()
     },
-    waitForCommand: (type) =>
+    waitForCommand: (type, count = 1) =>
       new Promise<FakeHostCommand>((resolve) => {
-        waiters.push({ type, resolve })
+        waiters.push({ type, remaining: count, resolve })
       }),
     waitForConnections: (count) =>
       sockets.size === count

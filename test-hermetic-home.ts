@@ -29,6 +29,13 @@ export function installHermeticHome(): HermeticHome {
   const agentDir = join(home, ".omo", "agent")
   for (const name of AGENT_DIR_ENV_NAMES) delete process.env[name]
   process.env.PI_CODING_AGENT_DIR = agentDir
+  // The user skill roots follow these too: the OpenCode config dir falls back to os.homedir()/.config,
+  // which the HOME change above does not move, and a developer's shell may export any of them. Left
+  // alone, a user skill (a `ulw-plan` in ~/.config/opencode/skills) outranks the shared one (#10632).
+  process.env.XDG_CONFIG_HOME = join(home, ".config")
+  delete process.env.OPENCODE_CONFIG_DIR
+  delete process.env.CLAUDE_CONFIG_DIR
+  installHermeticSecrets()
   afterAll(async () => {
     // The temp-root teardown reads and removes the directory these hosts write into, so it waits for them
     // to exit, and it runs even when the shard check throws: a later preload afterAll does not run
@@ -39,6 +46,23 @@ export function installHermeticHome(): HermeticHome {
     }, runTestTempRootTeardown)
   })
   return { home, agentDir }
+}
+
+// The OS credential store ignores HOME: a test that reads sign-in state (memory sync reads the
+// `omo login` credentials on every session bind) would see the developer's real credentials and
+// could reach the live service. Each test process gets its own empty in-memory store instead.
+function installHermeticSecrets(): void {
+  const values = new Map<string, string>()
+  const keyOf = (key: { readonly service: string; readonly name: string }) => `${key.service}\u0000${key.name}`
+  Object.defineProperty(Bun, "secrets", {
+    value: {
+      get: async (key: { readonly service: string; readonly name: string }) => values.get(keyOf(key)) ?? null,
+      set: async (key: { readonly service: string; readonly name: string; readonly value: string }) => {
+        values.set(keyOf(key), key.value)
+      },
+      delete: async (key: { readonly service: string; readonly name: string }) => values.delete(keyOf(key)),
+    },
+  })
 }
 
 /** Runs the teardown after the check even when the check throws; when both throw, both errors are reported. */

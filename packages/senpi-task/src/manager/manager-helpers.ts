@@ -107,6 +107,7 @@ export function buildManagedSpec(input: {
   readonly plan: ResolvedChildPlan
   readonly cwd: string
   readonly stateDir: string
+  readonly traceparent?: string
 }): ManagedStartSpec {
   const { record, spec, plan, cwd, stateDir } = input
   const prompt = plan.promptAppend ? `${spec.prompt}\n\n${plan.promptAppend}` : spec.prompt
@@ -143,6 +144,7 @@ export function buildManagedSpec(input: {
     ...(spec.kernelTools !== undefined ? { kernelTools: spec.kernelTools } : {}),
     ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
     ...(memberEnv !== undefined ? { memberEnv } : {}),
+    ...(input.traceparent !== undefined ? { traceparent: input.traceparent } : {}),
   }
 }
 

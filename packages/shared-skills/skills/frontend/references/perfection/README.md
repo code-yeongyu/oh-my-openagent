@@ -67,7 +67,7 @@ During the audit loop, after Lighthouse scores pass, run a Design System Complia
 - **Spacing**: every margin/padding/gap value must be a multiple of the base unit (4px) and ideally use a declared token.
 - **Components**: any component used 2+ times must be documented in `DESIGN.md` Section 5. If it isn't, add it.
 - **Depth**: if `DESIGN.md` says "borders-only", there must be zero `box-shadow` declarations. If "tonal-shift", zero borders for surface separation.
-- **Accent stripes**: run `bun ../../scripts/perfection/check-accent-stripes.ts <src dirs>`. It flags a coloured one-side border (including a gradient `border-image`), a coloured `::before`/`::after` bar, an inset `box-shadow` stripe, or a hard-stop gradient band along one edge of a rounded surface, in CSS, Tailwind, inline styles, and styled-components, whether the stripe is decorative or marks selected/focused/active. Each finding is a violation — identity belongs to tonal surfaces, headings, glyphs, and spacing; state belongs to ink-alpha washes and glyphs. Keyboard `focus-visible` rings, input validation states, neutral hairlines, and table rules are exempt, and the script already skips them.
+- **Accent stripes**: run `bun ../../scripts/perfection/check-accent-stripes.ts <src dirs>`. It flags a coloured one-side border (including a gradient `border-image`), a coloured `::before`/`::after` bar, an inset `box-shadow` stripe, or a hard-stop gradient band along one edge of any box, rounded or square, and a 2px-or-wider accent outline (border or inset ring) on a rounded card, in CSS, Tailwind, inline styles, and styled-components, whether the stripe is decorative or marks selected/focused/active. Each finding is a violation — identity belongs to tonal surfaces, headings, glyphs, and spacing; state belongs to ink-alpha washes and glyphs. Keyboard `focus-visible` rings, input validation states, neutral hairlines, table rules, and a blockquote's neutral rule are exempt, and the script already skips them.
 
 A page that scores Lighthouse 100 but uses 14 undeclared hex codes and 8 magic spacing values is **NOT DONE**. The design system is the architecture — Lighthouse measures the performance of that architecture.
 
@@ -92,7 +92,7 @@ Quick audit via the cross-platform Python CLI (macOS, Linux, Windows):
 uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000
 uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000 --threshold 95
 uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000 --desktop-only
-bun $SKILL_DIR/scripts/perfection/check-accent-stripes.ts src/   # exit 1 = coloured edge stripe on a rounded surface
+bun $SKILL_DIR/scripts/perfection/check-accent-stripes.ts src/   # exit 1 = coloured one-side bar, or accent outline on a rounded card
 ```
 
 Or use the TypeScript approach directly in your test suite:

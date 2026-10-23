@@ -53,7 +53,7 @@ const jcsRecord = (value: object): string => {
 
 /** UTF-8 bytes of a canonical JSON value: the bytes every preimage and digest covers. */
 export const jcsBytes = (value: JsonValue): Uint8Array<ArrayBuffer> =>
-  new TextEncoder().encode(jcsCanonical(value));
+  new Uint8Array(new TextEncoder().encode(jcsCanonical(value)));
 
 const B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 

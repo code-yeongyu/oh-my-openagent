@@ -27,6 +27,7 @@ export function rollbackDetachedRevival(
       interrupt_cause: _freshInterruptCause,
       failure_reason: _freshFailureReason,
       run_stats: _freshStats,
+      prior_runs_cost_usd: _freshPriorRunsCost,
       killed: _freshKilled,
       terminal_at: _freshTerminalAt,
       revive_delivery_uncertain: _freshUncertain,
@@ -41,6 +42,8 @@ export function rollbackDetachedRevival(
       ...(prior.failure_kind === undefined ? {} : { failure_kind: prior.failure_kind }),
       ...(prior.failure_reason === undefined ? {} : { failure_reason: prior.failure_reason }),
       ...(prior.run_stats === undefined ? {} : { run_stats: prior.run_stats }),
+      // The undone revive folded prior.run_stats into this figure; the restored run_stats must not count twice.
+      ...(prior.prior_runs_cost_usd === undefined ? {} : { prior_runs_cost_usd: prior.prior_runs_cost_usd }),
       ...(prior.killed === undefined ? {} : { killed: prior.killed }),
       ...(prior.terminal_at === undefined ? {} : { terminal_at: prior.terminal_at }),
       // The epoch and the run it starts move together: restoring one without the other leaves every handle stale.

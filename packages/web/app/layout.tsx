@@ -53,12 +53,17 @@ export async function generateMetadata(): Promise<Metadata> {
         ko: "/ko",
         ja: "/ja",
         zh: "/zh",
+        es: "/es",
+        fr: "/fr",
+        de: "/de",
+        "pt-BR": "/pt-BR",
+        it: "/it",
       },
     },
     openGraph: {
       type: "website",
       locale: "en_US",
-      alternateLocale: ["ko_KR", "ja_JP", "zh_CN"],
+      alternateLocale: ["ko_KR", "ja_JP", "zh_CN", "es_ES", "fr_FR", "de_DE", "pt_BR", "it_IT"],
       url: primarySiteUrl,
       siteName: "OmO",
       title: "OmO — Your tool for real work. But it's an agent.",
@@ -113,6 +118,7 @@ export default function RootLayout({ children }: { readonly children: ReactNode 
     <html
       lang="en"
       className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
+      data-omo-build={process.env.OMO_WEB_BUILD_ID || undefined}
       suppressHydrationWarning
     >
       <head>

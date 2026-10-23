@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process"
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
-import { builtinModules } from "node:module"
-import { dirname, join } from "node:path"
+import { builtinModules, createRequire } from "node:module"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import {
@@ -74,16 +74,53 @@ const advisorRuntimeEntryPath = join(packageRoot, "src", "components", "init-dee
 const advisorRuntimeOutputPath = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? join(pluginRoot, "extensions", "omo-init-deep-advisor.js") : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "extensions", "omo-init-deep-advisor.js")
 const sidePanelRuntimeEntryPath = join(packageRoot, "src", "components", "side-panel", "runtime.ts")
 const sidePanelRuntimeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-side-panel.js")
+const onboardingScanRuntimeEntryPath = join(packageRoot, "src", "components", "onboarding", "scan-runtime.ts")
+const onboardingScanRuntimeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-onboarding-scan.js")
 const computerUseEntryPath = join(packageRoot, "src", "components", "computer-use", "runtime.ts")
 const computerUseOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-computer-use.js")
 const memoryDoctorEntryPath = join(packageRoot, "src", "components", "memory", "commands", "doctor-runtime.ts")
 const memoryMemfsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "memfs-runtime.ts")
 const memoryPalaceEntryPath = join(packageRoot, "src", "components", "memory", "palace", "runtime.ts")
+const deviceAccountEntryPath = join(packageRoot, "src", "components", "memory", "device-session", "account-runtime.ts")
+const memoryCommandsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "runtime.ts")
+const sessionHistoryEntryPath = join(packageRoot, "src", "components", "onboarding", "session-history", "runtime.ts")
+const recallStoreEntryPath = join(packageRoot, "src", "components", "memory", "recall-store-runtime.ts")
+const doriMigrationEntryPath = join(packageRoot, "src", "components", "config-startup", "dori-migration-runtime.ts")
+const telemetryPosthogEntryPath = join(packageRoot, "src", "components", "telemetry", "posthog-runtime.ts")
+// The sync engine sidecar carries the Loro runtime; its wasm is emitted beside it under this fixed name
+// (the engine's loader reads it relative to its own module), so omo.js never pulls Loro in.
+const memorySyncEntryPath = join(packageRoot, "src", "components", "memory", "sync-runtime.ts")
+export const MEMORY_SYNC_WASM_NAME = "loro_wasm_bg.wasm"
+// Every file the sync sidecar loads from beside itself; a build test fails on any undeclared asset.
+export const MEMORY_SYNC_ASSET_NAMES = [MEMORY_SYNC_WASM_NAME, "CaseFolding.txt"]
+// Where each asset comes from, for the freshness check.
+export function memorySyncAssetSources() {
+  return {
+    [MEMORY_SYNC_WASM_NAME]: loroWasmSourcePath(),
+    "CaseFolding.txt": join(repoRoot, "packages", "memory-core", "src", "sync", "item", "CaseFolding.txt"),
+  }
+}
+// The wasm the INSTALLED Loro package ships: the freshness check pins the committed copy to it, so a Loro
+// bump without a rebuild is reported stale instead of shipping an old binary.
+export function loroWasmSourcePath() {
+  return createRequire(join(repoRoot, "packages", "memory-core", "package.json")).resolve(`loro-crdt/bundler/${MEMORY_SYNC_WASM_NAME}`)
+}
 const threadClientEntryPath = join(packageRoot, "src", "components", "thread", "live-surface.ts")
+const feedbackEntryPath = join(packageRoot, "src", "components", "feedback", "runtime.ts")
+const claimReceiptEntryPath = join(packageRoot, "src", "components", "claim-receipt", "runtime.ts")
 const memoryDoctorOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-doctor.js")
 const memoryMemfsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-memfs.js")
 const memoryPalaceOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-palace.js")
+const deviceAccountOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-device-account.js")
+const memoryCommandsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-commands.js")
+const sessionHistoryOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-session-history.js")
+const recallStoreOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-recall-store.js")
+const doriMigrationOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-dori-migration.js")
+const telemetryPosthogOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-telemetry-posthog.js")
+const memorySyncOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-sync.js")
 const threadClientOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-thread-client.js")
+const feedbackOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-feedback.js")
+const claimReceiptOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-claim-receipt.js")
 // The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
 // same contract as the staged personas, so omo.js carries none of the ~29 KB of prelude text (#9113).
 export const COMPUTER_PRELUDE_ASSET_NAME = "assets.generated.json"
@@ -97,7 +134,16 @@ const externalSpecifiers = [
   "#omo-memory-doctor-runtime",
   "#omo-memory-memfs-runtime",
   "#omo-memory-palace-runtime",
+  "#omo-device-account-runtime",
+  "#omo-memory-commands-runtime",
+  "#omo-session-history-runtime",
+  "#omo-recall-store-runtime",
+  "#omo-dori-migration-runtime",
+  "#omo-telemetry-posthog-runtime",
+  "#omo-memory-sync-runtime",
   "#omo-thread-client-runtime",
+  "#omo-feedback-runtime",
+  "#omo-claim-receipt-runtime",
   "#omo-agent-toolkit-sdk",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
@@ -127,12 +173,22 @@ export const extensionBuildPaths = {
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
   sidePanelRuntimeOutputPath,
+  onboardingScanRuntimeOutputPath,
   rollbackRuntimeOutputPath,
   computerUseOutputPath,
   memoryDoctorOutputPath,
   memoryMemfsOutputPath,
   memoryPalaceOutputPath,
+  deviceAccountOutputPath,
+  memoryCommandsOutputPath,
+  sessionHistoryOutputPath,
+  recallStoreOutputPath,
+  doriMigrationOutputPath,
+  telemetryPosthogOutputPath,
+  memorySyncOutputPath,
   threadClientOutputPath,
+  feedbackOutputPath,
+  claimReceiptOutputPath,
   gatewayStoreWorkerOutputPath,
   gatewayRulesExtensionOutputPath,
 }
@@ -149,13 +205,23 @@ export function resolveOutputs(options) {
     supervisorOutput: sibling(options.supervisorOutputPath, supervisorOutputPath, "memory-run-supervisor.mjs"),
     advisorRuntimeOutput: sibling(options.advisorRuntimeOutputPath, advisorRuntimeOutputPath, "omo-init-deep-advisor.js"),
     sidePanelRuntimeOutput: sibling(options.sidePanelRuntimeOutputPath, sidePanelRuntimeOutputPath, "omo-side-panel.js"),
+    onboardingScanRuntimeOutput: sibling(options.onboardingScanRuntimeOutputPath, onboardingScanRuntimeOutputPath, "omo-onboarding-scan.js"),
     toolkitSdkOutput: sibling(options.toolkitSdkOutputPath, toolkitSdkOutputPath, join("runtime", "agent-toolkit-sdk", "sdk.js")),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
     memoryDoctorOutput: sibling(options.memoryDoctorOutputPath, memoryDoctorOutputPath, "omo-memory-doctor.js"),
     memoryMemfsOutput: sibling(options.memoryMemfsOutputPath, memoryMemfsOutputPath, "omo-memory-memfs.js"),
     memoryPalaceOutput: sibling(options.memoryPalaceOutputPath, memoryPalaceOutputPath, "omo-memory-palace.js"),
+    deviceAccountOutput: sibling(options.deviceAccountOutputPath, deviceAccountOutputPath, "omo-device-account.js"),
+    memoryCommandsOutput: sibling(options.memoryCommandsOutputPath, memoryCommandsOutputPath, "omo-memory-commands.js"),
+    sessionHistoryOutput: sibling(options.sessionHistoryOutputPath, sessionHistoryOutputPath, "omo-session-history.js"),
+    recallStoreOutput: sibling(options.recallStoreOutputPath, recallStoreOutputPath, "omo-recall-store.js"),
+    doriMigrationOutput: sibling(options.doriMigrationOutputPath, doriMigrationOutputPath, "omo-dori-migration.js"),
+    telemetryPosthogOutput: sibling(options.telemetryPosthogOutputPath, telemetryPosthogOutputPath, "omo-telemetry-posthog.js"),
+    memorySyncOutput: sibling(options.memorySyncOutputPath, memorySyncOutputPath, "omo-memory-sync.js"),
     threadClientOutput: sibling(options.threadClientOutputPath, threadClientOutputPath, "omo-thread-client.js"),
+    feedbackOutput: sibling(options.feedbackOutputPath, feedbackOutputPath, "omo-feedback.js"),
+    claimReceiptOutput: sibling(options.claimReceiptOutputPath, claimReceiptOutputPath, "omo-claim-receipt.js"),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
     gatewayRulesExtensionOutput: sibling(options.gatewayRulesExtensionOutputPath, gatewayRulesExtensionOutputPath, GATEWAY_RULES_EXTENSION_NAME),
@@ -178,6 +244,7 @@ export async function buildExtension(options = {}) {
     supervisorOutput,
     advisorRuntimeOutput,
     sidePanelRuntimeOutput,
+    onboardingScanRuntimeOutput,
     toolkitSdkOutput,
     threadSdkOutput,
     rollbackRuntimeOutput,
@@ -185,7 +252,16 @@ export async function buildExtension(options = {}) {
     memoryDoctorOutput,
     memoryMemfsOutput,
     memoryPalaceOutput,
+    deviceAccountOutput,
+    memoryCommandsOutput,
+    sessionHistoryOutput,
+    recallStoreOutput,
+    doriMigrationOutput,
+    telemetryPosthogOutput,
+    memorySyncOutput,
     threadClientOutput,
+    feedbackOutput,
+    claimReceiptOutput,
     gatewayStoreWorkerOutput,
     gatewayRulesExtensionOutput,
   } = resolveOutputs(options)
@@ -196,11 +272,21 @@ export async function buildExtension(options = {}) {
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
   const advisorRuntimeInputs = await buildEntry(advisorRuntimeEntryPath, advisorRuntimeOutput, buildDefines)
   const sidePanelRuntimeInputs = await buildEntry(sidePanelRuntimeEntryPath, sidePanelRuntimeOutput, buildDefines)
+  const onboardingScanRuntimeInputs = await buildEntry(onboardingScanRuntimeEntryPath, onboardingScanRuntimeOutput, buildDefines)
   const rollbackRuntimeInputs = await buildEntry(rollbackRuntimeEntryPath, rollbackRuntimeOutput, buildDefines, sdkExternalSpecifiers)
   const memoryDoctorInputs = await buildEntry(memoryDoctorEntryPath, memoryDoctorOutput, buildDefines)
   const memoryMemfsInputs = await buildEntry(memoryMemfsEntryPath, memoryMemfsOutput, buildDefines)
   const memoryPalaceInputs = await buildEntry(memoryPalaceEntryPath, memoryPalaceOutput, buildDefines)
+  const deviceAccountInputs = await buildEntry(deviceAccountEntryPath, deviceAccountOutput, buildDefines)
+  const memoryCommandsInputs = await buildEntry(memoryCommandsEntryPath, memoryCommandsOutput, buildDefines)
+  const sessionHistoryInputs = await buildEntry(sessionHistoryEntryPath, sessionHistoryOutput, buildDefines)
+  const recallStoreInputs = await buildEntry(recallStoreEntryPath, recallStoreOutput, buildDefines)
+  const doriMigrationInputs = await buildEntry(doriMigrationEntryPath, doriMigrationOutput, buildDefines)
+  const telemetryPosthogInputs = await buildEntry(telemetryPosthogEntryPath, telemetryPosthogOutput, buildDefines)
+  const memorySyncInputs = await buildEntry(memorySyncEntryPath, memorySyncOutput, buildDefines, externalSpecifiers, { assets: true })
   const threadClientInputs = await buildEntry(threadClientEntryPath, threadClientOutput, buildDefines)
+  const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
+  const claimReceiptInputs = await buildEntry(claimReceiptEntryPath, claimReceiptOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
   const gatewayRulesExtensionInputs = await buildEntry(gatewayRulesExtensionEntryPath, gatewayRulesExtensionOutput, buildDefines)
@@ -218,25 +304,40 @@ export async function buildExtension(options = {}) {
     supervisorInputs,
     advisorRuntimeInputs,
     sidePanelRuntimeInputs,
+    onboardingScanRuntimeInputs,
     toolkitSdkInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
     memoryDoctorInputs,
     memoryMemfsInputs,
     memoryPalaceInputs,
+    deviceAccountInputs,
+    memoryCommandsInputs,
+    sessionHistoryInputs,
+    recallStoreInputs,
+    doriMigrationInputs,
+    telemetryPosthogInputs,
+    memorySyncInputs,
     threadClientInputs,
+    feedbackInputs,
+    claimReceiptInputs,
     gatewayStoreWorkerInputs,
     gatewayRulesExtensionInputs,
     threadSdkInputs,
   }
 }
 
-async function buildEntry(entry, output, buildDefines, externals = externalSpecifiers) {
+// `assets`: the entry imports files (the Loro wasm) through Bun's file loader, which is a second output
+// that --outfile cannot write; --outdir with fixed names puts the entry at `output` and each asset beside it.
+async function buildEntry(entry, output, buildDefines, externals = externalSpecifiers, { assets = false } = {}) {
   await mkdir(dirname(output), { recursive: true })
   const metafile = `${output}.meta.json`
+  const target = assets
+    ? ["--outdir", dirname(output), "--entry-naming", basename(output), "--asset-naming", "[name].[ext]"]
+    : ["--outfile", output]
   try {
     runBuildCommand(resolveBunExecutable(), [
-      "build", entry, "--target", "node", "--format", "esm", "--outfile", output,
+      "build", entry, "--target", "node", "--format", "esm", ...target,
       "--minify-syntax", "--minify-whitespace", `--metafile=${metafile}`,
       ...Object.entries(buildDefines).flatMap(([name, value]) => ["--define", `${name}=${JSON.stringify(value)}`]),
       ...externals.flatMap((specifier) => ["--external", specifier]),

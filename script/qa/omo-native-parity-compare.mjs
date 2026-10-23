@@ -38,6 +38,9 @@ export const PARITY_STEPS = [
   { id: "lsp", tool: "lsp_diagnostics", arguments: { filePath: "sample.ts" } },
   { id: "apply-patch", tool: "apply_patch", arguments: { input: "*** Begin Patch\n*** Add File: added.ts\n+export const added = 42\n*** End Patch" } },
   { id: "memory", tool: "memory", arguments: { command: "create", reason: "parity", file_path: "reference/parity.md", description: "parity note", file_text: "parity 42" } },
+  // The note as the memory repository stored it: proves a memory write commits through the real pre-commit hook with the
+  // claim receipt header stamped (#10498 shipped a header the hook's key allowlist rejected, failing every write).
+  { id: "memory-note", tool: "eval", arguments: { language: "js", code: "const r = await tool.bash({ command: 'f=$(find \"$HOME\" -path \"*/repo/reference/parity.md\" 2>/dev/null | head -1); awk \"NR == 1 || !done { print } NR > 1 && /^---$/ { done = 1 }\" \"$f\"' }); print(r.text)", summary: "parity memory note" } },
   { id: "task", tool: "task", arguments: { prompt: "parity child", category: "quick", task_summary: "parity child", run_in_background: false } },
 ]
 
@@ -124,6 +127,7 @@ export function compareRuns(binary, npm) {
     const probe = run.results["ast-grep"]
     if (probe !== undefined && !probe.text.startsWith(AST_GREP_REGISTERED)) differences.push(`ast-grep: ${side} "${probe.text.slice(0, 200)}"`)
   }
+  for (const [side, run] of [["binary", binary], ["npm", npm]]) differences.push(...memoryReceiptFailures(side, run))
   for (const step of PARITY_STEPS) {
     const left = binary.results[step.id]
     const right = npm.results[step.id]
@@ -141,4 +145,14 @@ export function compareRuns(binary, npm) {
     for (const warning of run.extensionFailures) differences.push(`${side}: ${warning}`)
   }
   return differences
+}
+
+// A memory write must succeed on every distribution, and the stored note must carry the claim receipt header; two sides
+// failing the same way are not "in parity".
+export function memoryReceiptFailures(side, run) {
+  const write = run.results["memory"]
+  const note = run.results["memory-note"]
+  if (write === undefined || write.isError) return [`memory: ${side} failed "${(write?.text ?? "no result").slice(0, 200)}"`]
+  if (note === undefined || note.isError || !/^provenance: /m.test(note.text)) return [`memory-note: ${side} note has no provenance header "${(note?.text ?? "no result").slice(0, 200)}"`]
+  return []
 }

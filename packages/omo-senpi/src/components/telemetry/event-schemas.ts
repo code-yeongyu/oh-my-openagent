@@ -53,6 +53,7 @@ export const COMPUTER_USE_PERMISSIONS = Object.freeze([
   "capture", "input", "ax", "read", "exec",
 ] as const)
 export const COMPUTER_USE_PERMISSION_SCOPES = Object.freeze(["os", "tier"] as const)
+export const HANDOFF_HINT_ACTIONS = Object.freeze(["shown", "accepted", "dismissed"] as const)
 export const COMPUTER_USE_PLATFORMS = Object.freeze(["darwin", "linux", "win32", "other"] as const)
 
 export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
@@ -72,6 +73,9 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     memory_bucket: enumProperty(["lt_8_gb", "8_15_gb", "16_31_gb", "32_63_gb", "64_plus_gb"] as const),
     model_count: NUMBER_PROPERTY,
     provider_count: NUMBER_PROPERTY,
+    configured_provider_count: NUMBER_PROPERTY,
+    connected_account_count: STRING_PROPERTY,
+    signed_in_provider_count: NUMBER_PROPERTY,
     providers: STRING_PROPERTY,
     reason: enumProperty(["startup", "reload", "new", "resume", "fork"] as const),
     // Device-reported IANA zone. A timezone signal, never a country signal: countries share zones,
@@ -146,6 +150,17 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     backend: enumProperty(COMPUTER_USE_BACKENDS),
     code: enumProperty(COMPUTER_USE_ENGINE_ERROR_CODES),
     host_platform: enumProperty(COMPUTER_USE_PLATFORMS),
+  }),
+  handoff_hint: Object.freeze({
+    "$session_id": STRING_PROPERTY,
+    action: enumProperty(HANDOFF_HINT_ACTIONS),
+    context_tokens: NUMBER_PROPERTY,
+    fresh_usd: NUMBER_PROPERTY,
+    model_id: enumProperty([...new Set(Object.values(KNOWN_MODELS).flat()), "custom"] as const),
+    next_reply_usd: NUMBER_PROPERTY,
+    provider: enumProperty([...KNOWN_PROVIDERS, "custom"] as const),
+    saving_usd: NUMBER_PROPERTY,
+    subscription: BOOLEAN_PROPERTY,
   }),
   kibitzer_summary: KIBITZER_SUMMARY_SCHEMA,
   parallelism_summary: PARALLELISM_SUMMARY_SCHEMA,

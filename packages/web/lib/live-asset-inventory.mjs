@@ -2,7 +2,8 @@ import { AssetRetentionError } from "./asset-retention.ts"
 
 /**
  * `acceptMissingHistory` (a non-empty operator reason, only ever passed for a workflow_dispatch run) waives ONE
- * refusal: a live deployment that identifies itself (data-dpl-id) but has no asset history. That is the first deploy
+ * refusal: a live deployment that identifies itself (data-omo-build, or data-dpl-id from deployments made before the
+ * build id moved to the commit) but has no asset history. That is the first deploy
  * after a deployment made outside the retention pipeline (the 2026-10-09 account move deployed with
  * cutover-target-deploy.yml). Every other check still applies: every recorded asset must download and have the right
  * MIME type.
@@ -62,7 +63,7 @@ export async function liveAssetInventory(origin, { acceptMissingHistory = "" } =
     const reader = new HTMLRewriter()
       .on("html", {
         element(e) {
-          advertisedHistory ||= e.hasAttribute("data-dpl-id")
+          advertisedHistory ||= e.hasAttribute("data-omo-build") || e.hasAttribute("data-dpl-id")
         },
       })
       .on("link[href]", {

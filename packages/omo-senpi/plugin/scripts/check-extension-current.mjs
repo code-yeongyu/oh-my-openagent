@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto"
 import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { artifactsMatch } from "./build-artifact.mjs"
-import { buildExtension, COMPUTER_PRELUDE_ASSET_NAME, extensionBuildPaths, GATEWAY_STORE_WORKER_NAME, resolveOutputs, THREAD_SDK_RELATIVE_PATH } from "./build-extension-core.mjs"
+import { buildExtension, COMPUTER_PRELUDE_ASSET_NAME, extensionBuildPaths, GATEWAY_STORE_WORKER_NAME, memorySyncAssetSources, resolveOutputs, THREAD_SDK_RELATIVE_PATH } from "./build-extension-core.mjs"
 import { findStaleRuntimePersona } from "./persona-artifacts.mjs"
 
 export async function checkExtensionCurrent(options = {}) {
@@ -14,13 +15,23 @@ export async function checkExtensionCurrent(options = {}) {
     supervisorOutput,
     advisorRuntimeOutput,
     sidePanelRuntimeOutput,
+    onboardingScanRuntimeOutput,
     toolkitSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
     memoryDoctorOutput,
     memoryMemfsOutput,
     memoryPalaceOutput,
+    deviceAccountOutput,
+    memoryCommandsOutput,
+    sessionHistoryOutput,
+    recallStoreOutput,
+    doriMigrationOutput,
+    telemetryPosthogOutput,
+    memorySyncOutput,
     threadClientOutput,
+    feedbackOutput,
+    claimReceiptOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
   } = resolveOutputs(options)
@@ -40,14 +51,42 @@ export async function checkExtensionCurrent(options = {}) {
   if (currentAdvisorRuntime === undefined) return { ok: false, reason: "missing-output", output: advisorRuntimeOutput }
   const currentSidePanelRuntime = await readBuiltEntry(sidePanelRuntimeOutput)
   if (currentSidePanelRuntime === undefined) return { ok: false, reason: "missing-output", output: sidePanelRuntimeOutput }
+  const currentOnboardingScanRuntime = await readBuiltEntry(onboardingScanRuntimeOutput)
+  if (currentOnboardingScanRuntime === undefined) return { ok: false, reason: "missing-output", output: onboardingScanRuntimeOutput }
   const currentMemoryDoctor = await readBuiltEntry(memoryDoctorOutput)
   const currentMemoryMemfs = await readBuiltEntry(memoryMemfsOutput)
   const currentMemoryPalace = await readBuiltEntry(memoryPalaceOutput)
+  const currentDeviceAccount = await readBuiltEntry(deviceAccountOutput)
+  const currentMemoryCommands = await readBuiltEntry(memoryCommandsOutput)
+  const currentSessionHistory = await readBuiltEntry(sessionHistoryOutput)
+  const currentRecallStore = await readBuiltEntry(recallStoreOutput)
+  const currentDoriMigration = await readBuiltEntry(doriMigrationOutput)
+  const currentTelemetryPosthog = await readBuiltEntry(telemetryPosthogOutput)
   const currentThreadClient = await readBuiltEntry(threadClientOutput)
+  const currentFeedback = await readBuiltEntry(feedbackOutput)
+  const currentClaimReceipt = await readBuiltEntry(claimReceiptOutput)
+  const currentMemorySync = await readBuiltEntry(memorySyncOutput)
+  if (currentMemorySync === undefined) return { ok: false, reason: "missing-output", output: memorySyncOutput }
+  // Each committed sidecar asset must be byte-identical to its source: the wasm to the INSTALLED Loro
+  // package's (a Loro bump without a rebuild would leave a stale binary beside new glue).
+  for (const [name, source] of Object.entries(memorySyncAssetSources())) {
+    const assetOutput = join(dirname(memorySyncOutput), name)
+    const current = await readFile(assetOutput).catch(() => undefined)
+    if (current === undefined) return { ok: false, reason: "missing-output", output: assetOutput }
+    if (sha256(current) !== sha256(await readFile(source))) return { ok: false, reason: "stale-output", output: assetOutput }
+  }
   if (currentMemoryDoctor === undefined) return { ok: false, reason: "missing-output", output: memoryDoctorOutput }
   if (currentMemoryMemfs === undefined) return { ok: false, reason: "missing-output", output: memoryMemfsOutput }
   if (currentMemoryPalace === undefined) return { ok: false, reason: "missing-output", output: memoryPalaceOutput }
+  if (currentDeviceAccount === undefined) return { ok: false, reason: "missing-output", output: deviceAccountOutput }
+  if (currentMemoryCommands === undefined) return { ok: false, reason: "missing-output", output: memoryCommandsOutput }
+  if (currentSessionHistory === undefined) return { ok: false, reason: "missing-output", output: sessionHistoryOutput }
+  if (currentRecallStore === undefined) return { ok: false, reason: "missing-output", output: recallStoreOutput }
+  if (currentDoriMigration === undefined) return { ok: false, reason: "missing-output", output: doriMigrationOutput }
+  if (currentTelemetryPosthog === undefined) return { ok: false, reason: "missing-output", output: telemetryPosthogOutput }
   if (currentThreadClient === undefined) return { ok: false, reason: "missing-output", output: threadClientOutput }
+  if (currentFeedback === undefined) return { ok: false, reason: "missing-output", output: feedbackOutput }
+  if (currentClaimReceipt === undefined) return { ok: false, reason: "missing-output", output: claimReceiptOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
   const currentGatewayStoreWorker = await readBuiltEntry(gatewayStoreWorkerOutput)
@@ -63,12 +102,22 @@ export async function checkExtensionCurrent(options = {}) {
     supervisorOutputPath: join(tempRoot, "memory-run-supervisor.mjs"),
     advisorRuntimeOutputPath: join(tempRoot, "omo-init-deep-advisor.js"),
     sidePanelRuntimeOutputPath: join(tempRoot, "omo-side-panel.js"),
+    onboardingScanRuntimeOutputPath: join(tempRoot, "omo-onboarding-scan.js"),
     toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
     memoryPalaceOutputPath: join(tempRoot, "omo-memory-palace.js"),
+    deviceAccountOutputPath: join(tempRoot, "omo-device-account.js"),
+    memoryCommandsOutputPath: join(tempRoot, "omo-memory-commands.js"),
+    sessionHistoryOutputPath: join(tempRoot, "omo-session-history.js"),
+    recallStoreOutputPath: join(tempRoot, "omo-recall-store.js"),
+    doriMigrationOutputPath: join(tempRoot, "omo-dori-migration.js"),
+    telemetryPosthogOutputPath: join(tempRoot, "omo-telemetry-posthog.js"),
+    memorySyncOutputPath: join(tempRoot, "omo-memory-sync.js"),
     threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
+    feedbackOutputPath: join(tempRoot, "omo-feedback.js"),
+    claimReceiptOutputPath: join(tempRoot, "omo-claim-receipt.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
     threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
@@ -84,10 +133,20 @@ export async function checkExtensionCurrent(options = {}) {
       [currentSupervisor, expected.supervisorOutputPath, supervisorOutput],
       [currentAdvisorRuntime, expected.advisorRuntimeOutputPath, advisorRuntimeOutput],
       [currentSidePanelRuntime, expected.sidePanelRuntimeOutputPath, sidePanelRuntimeOutput],
+      [currentOnboardingScanRuntime, expected.onboardingScanRuntimeOutputPath, onboardingScanRuntimeOutput],
       [currentMemoryDoctor, expected.memoryDoctorOutputPath, memoryDoctorOutput],
       [currentMemoryMemfs, expected.memoryMemfsOutputPath, memoryMemfsOutput],
       [currentMemoryPalace, expected.memoryPalaceOutputPath, memoryPalaceOutput],
+      [currentDeviceAccount, expected.deviceAccountOutputPath, deviceAccountOutput],
+      [currentMemoryCommands, expected.memoryCommandsOutputPath, memoryCommandsOutput],
+      [currentSessionHistory, expected.sessionHistoryOutputPath, sessionHistoryOutput],
+      [currentRecallStore, expected.recallStoreOutputPath, recallStoreOutput],
+      [currentDoriMigration, expected.doriMigrationOutputPath, doriMigrationOutput],
+      [currentTelemetryPosthog, expected.telemetryPosthogOutputPath, telemetryPosthogOutput],
+      [currentMemorySync, expected.memorySyncOutputPath, memorySyncOutput],
       [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
+      [currentFeedback, expected.feedbackOutputPath, feedbackOutput],
+      [currentClaimReceipt, expected.claimReceiptOutputPath, claimReceiptOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
       [currentThreadSdk, expected.threadSdkOutputPath, threadSdkOutput],
@@ -120,4 +179,8 @@ async function readBuiltEntry(output) {
     if (isErrno(error, "ENOENT")) return undefined
     throw error
   }
+}
+
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex")
 }

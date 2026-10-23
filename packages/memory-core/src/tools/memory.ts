@@ -6,6 +6,8 @@ import { parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../mem
 import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
+import type { ClaimReceipt } from "../provenance"
+import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatter"
 import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
 import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
@@ -22,6 +24,8 @@ export type MemoryCommand =
 export interface MemoryToolProvenance {
   readonly sessionId: string
   readonly userTurns: number
+  /** Verified by the harness against the session's user messages before the write; never model-supplied. */
+  readonly claim?: ClaimReceipt
 }
 
 export interface MemoryToolParams {
@@ -61,7 +65,7 @@ export interface RunMemoryToolOptions {
   params: MemoryToolParams
 }
 
-type AppliedCommand = { affectedPaths: string[] }
+type AppliedCommand = { affectedPaths: string[]; strippedPaths?: string[] }
 
 export async function runMemoryTool(options: RunMemoryToolOptions): Promise<MemoryToolResult> {
   const { repo, lock } = options
@@ -76,7 +80,7 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
       ...(params.provenance === undefined ? {} : { provenance: params.provenance }),
       successLabel: `Memory ${params.command}`,
       noChangesMessage: `${params.command} made no changes`,
-      apply: async () => (await applyCommand(repo.dir, params)).affectedPaths,
+      apply: async () => applyCommand(repo.dir, params),
     })
     return {
       message: `${result.message}${describeRepairs(repairs)}`,
@@ -101,7 +105,7 @@ async function applyCommand(root: string, params: MemoryToolParams): Promise<App
     case "update_description": return updateDescription(root, params)
     case "apply_patch": {
       const input = required(params.input, "input", "apply_patch")
-      return { affectedPaths: await applyMemoryPatch(root, input) }
+      return applyMemoryPatch(root, input, params.provenance?.claim)
     }
   }
 }
@@ -112,7 +116,7 @@ async function create(root: string, params: MemoryToolParams): Promise<AppliedCo
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   if (existsSync(path)) throw toolError(`create: block already exists at ${source}`)
   await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, renderMemoryFile({ description }, params.file_text ?? ""), "utf8")
+  await writeFile(path, renderMemoryFile(stampReceipt(undefined, { description }, params.file_text ?? "", params.provenance?.claim), params.file_text ?? ""), "utf8")
   return affected(root, path)
 }
 
@@ -125,8 +129,8 @@ async function strReplace(root: string, params: MemoryToolParams): Promise<Appli
   const index = file.body.indexOf(oldString)
   if (index < 0) throw toolError("str_replace: old_string was not found in the target memory block")
   const body = file.body.slice(0, index) + newString + file.body.slice(index + oldString.length)
-  await writeFile(path, renderMemoryFile(file.frontmatter, body), "utf8")
-  return affected(root, path)
+  await writeFile(path, renderMemoryFile(stampReceipt(file, file.frontmatter, body, params.provenance?.claim), body), "utf8")
+  return affected(root, path, file)
 }
 
 async function insert(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
@@ -140,8 +144,8 @@ async function insert(root: string, params: MemoryToolParams): Promise<AppliedCo
   const lines = file.body.length > 0 ? file.body.split("\n") : []
   const line = Math.max(1, Math.floor(params.insert_line))
   lines.splice(Math.min(line - 1, lines.length), 0, ...text.split("\n"))
-  await writeFile(path, renderMemoryFile(file.frontmatter, lines.join("\n")), "utf8")
-  return affected(root, path)
+  await writeFile(path, renderMemoryFile(stampReceipt(file, file.frontmatter, lines.join("\n"), params.provenance?.claim), lines.join("\n")), "utf8")
+  return affected(root, path, file)
 }
 
 async function remove(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
@@ -165,10 +169,11 @@ async function move(root: string, params: MemoryToolParams): Promise<AppliedComm
   const oldPath = validateMemoryPath(root, oldSource, { fieldName: "old_path" })
   const newPath = validateMemoryPath(root, newSource, { fieldName: "new_path" })
   if (existsSync(newPath)) throw toolError(`rename: destination already exists at ${newSource}`)
-  await loadEditable(oldPath, oldSource)
+  const loaded = await loadEditable(oldPath, oldSource)
   await mkdir(dirname(newPath), { recursive: true })
   await rename(oldPath, newPath)
-  return { affectedPaths: [relativePath(root, oldPath), relativePath(root, newPath)] }
+  if (isLegacyUserHeader(readHeader(loaded.frontmatter))) await writeFile(newPath, renderMemoryFile(stampReceipt(loaded, loaded.frontmatter, loaded.body, undefined), loaded.body), "utf8")
+  return { affectedPaths: [relativePath(root, oldPath), relativePath(root, newPath)], ...(isLegacyUserHeader(readHeader(loaded.frontmatter)) ? { strippedPaths: [relativePath(root, oldPath)] } : {}) }
 }
 
 async function updateDescription(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
@@ -176,8 +181,8 @@ async function updateDescription(root: string, params: MemoryToolParams): Promis
   const description = acceptableDescription(params.description, "update_description")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   const file = await loadEditable(path, source)
-  await writeFile(path, renderMemoryFile({ ...file.frontmatter, description }, file.body), "utf8")
-  return affected(root, path)
+  await writeFile(path, renderMemoryFile(stampReceipt(file, { ...file.frontmatter, description }, file.body, params.provenance?.claim), file.body), "utf8")
+  return affected(root, path, file)
 }
 
 function acceptableDescription(value: string | undefined, command: MemoryCommand): string {
@@ -231,8 +236,10 @@ async function collectFiles(directory: string, root: string): Promise<string[]> 
   return paths
 }
 
-function affected(root: string, path: string): AppliedCommand {
-  return { affectedPaths: [relativePath(root, path)] }
+// `prior` is the note before an edit; every edit drops a legacy user header (stampReceipt), so it is reported here.
+function affected(root: string, path: string, prior?: ParsedMemoryFile): AppliedCommand {
+  const relative = relativePath(root, path)
+  return isLegacyUserHeader(prior === undefined ? undefined : readHeader(prior.frontmatter)) ? { affectedPaths: [relative], strippedPaths: [relative] } : { affectedPaths: [relative] }
 }
 
 function relativePath(root: string, path: string): string {

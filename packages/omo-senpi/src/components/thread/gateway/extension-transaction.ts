@@ -20,7 +20,7 @@ export class ExtensionTransactionBusyError extends Error {
   }
 }
 
-export function extensionTransaction(ctx: ops.StoreContext, name: string, now: number, resolveTarget: GatewayResolve) {
+export function extensionTransaction(ctx: ops.StoreContext, name: string, now: number, resolveTarget: GatewayResolve, senderProvenance: GatewayEngineOptions["senderProvenance"]) {
   let active = true
   // Helpers that are running right now. A joined helper can hold a savepoint open across an await,
   // so a statement run in that gap would land inside it and vanish with a data refusal's rollback.
@@ -91,6 +91,7 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
   const engine = createGatewayEngine({
     store,
     endpoints,
+    senderProvenance,
     resolve: async (address, request) => {
       const result = await resolveTarget(address, request)
       return result.kind === "error" ? result : { kind: "ok", target: { ...result.target, endpoint: null, liveness: "dead" } }

@@ -1527,6 +1527,35 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Wait for every published package on the registry
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+          # ONE 60-minute deadline shared by every package, probe time included (each probe is capped at
+          # 15 s): well inside the job's 120-minute timeout, so a missing package fails with its name.
+          REGISTRY_WAIT_DEADLINE_SECONDS: "3600"
+        run: |
+          set -euo pipefail
+          # npm answers every publish with 202 "being processed": 5.1.38's oh-my-openagent printed
+          # "+ oh-my-openagent@5.1.38" at 10:09Z and was served only from 10:34Z, while this job only
+          # waited on omo-ai. Read EVERY main and platform package back at its exact version (no-cache),
+          # or fail naming what is missing and why.
+          # Platform packages come from package.json optionalDependencies (--platform-packages), the
+          # one list the release-platform test holds equal to build-binaries PLATFORMS, so this step
+          # cannot drift from the platforms that are built and published.
+          if [ "${LAZYCODEX_ONLY}" = "true" ]; then
+            node script/wait-registry-versions.mjs "lazycodex-ai@$VERSION"
+          else
+            # omo-ai carries its own version (a prerelease spells it differently from the wrappers).
+            SPECS=("oh-my-opencode@$VERSION" "oh-my-openagent@$VERSION" "omo-ai@$OMO_AI_VERSION")
+            if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
+              SPECS+=("lazycodex-ai@$VERSION")
+            fi
+            node script/wait-registry-versions.mjs --platform-packages "$VERSION" "${SPECS[@]}"
+          fi
+
       - name: Wait for omo-ai registry readiness
         if: inputs.lazycodex_only != true
         env:

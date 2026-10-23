@@ -33,11 +33,32 @@ function createGlobalSessionSdkClient(serverUrl: URL | undefined) {
   })
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${operation} timed out after ${ms}ms`)), ms)),
-  ])
+// The timeout aborts the operation's signal as well as rejecting, so reads stop instead of running on
+// in the background. A caller abort (the tool call being cancelled) stops them the same way.
+async function runWithAbortableTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  ms: number,
+  name: string,
+  callerSignal?: AbortSignal,
+): Promise<T> {
+  const controller = new AbortController()
+  const signal = callerSignal ? AbortSignal.any([callerSignal, controller.signal]) : controller.signal
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`${name} timed out after ${ms}ms`)
+      controller.abort(error)
+      reject(error)
+    }, ms)
+  })
+  const running = operation(signal)
+  // After a timeout the operation still rejects with our own abort reason; the race has already settled.
+  running.catch(() => undefined)
+  try {
+    return await Promise.race([running, timedOut])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 type SessionManagerToolDeps = {
@@ -99,14 +120,14 @@ export function createSessionManagerTools(
         let sessionIDs = sessions.map((s) => s.id)
 
         if (args.from_date || args.to_date) {
-          sessionIDs = await resolvedDeps.filterSessionsByDate(sessionIDs, args.from_date, args.to_date)
+          sessionIDs = await resolvedDeps.filterSessionsByDate(sessionIDs, args.from_date, args.to_date, _context.abort)
         }
 
         if (args.limit && args.limit > 0) {
           sessionIDs = sessionIDs.slice(0, args.limit)
         }
 
-        return await resolvedDeps.formatSessionList(sessionIDs)
+        return await resolvedDeps.formatSessionList(sessionIDs, _context.abort)
       } catch (e) {
         return `Error: ${describeSessionError(e)}`
       }
@@ -128,16 +149,14 @@ export function createSessionManagerTools(
           return `Session not found: ${args.session_id}`
         }
 
-        let messages = await resolvedDeps.readSessionMessages(args.session_id)
+        const messages = await resolvedDeps.readSessionMessages(args.session_id, {
+          limit: args.limit,
+          fromEnd: args.from_end,
+          signal: _context.abort,
+        })
 
         if (messages.length === 0) {
           return `Session not found: ${args.session_id}`
-        }
-
-        if (args.limit && args.limit > 0) {
-          messages = args.from_end
-            ? messages.slice(-args.limit)
-            : messages.slice(0, args.limit)
         }
 
         const todos = args.include_todos ? await resolvedDeps.readSessionTodos(args.session_id) : undefined
@@ -162,9 +181,9 @@ export function createSessionManagerTools(
         const resultLimit = args.limit && args.limit > 0 ? args.limit : 20
 
         const skipped: SkippedSession[] = []
-        const searchOperation = async (): Promise<SearchResult[]> => {
+        const searchOperation = async (signal: AbortSignal): Promise<SearchResult[]> => {
           if (args.session_id) {
-            return resolvedDeps.searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
+            return resolvedDeps.searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit, signal)
           }
 
           const allSessions = await resolvedDeps.getAllSessions(MAX_SESSIONS_TO_SCAN)
@@ -172,13 +191,15 @@ export function createSessionManagerTools(
 
           const allResults: SearchResult[] = []
           for (const sid of sessionsToScan) {
+            signal.throwIfAborted()
             if (allResults.length >= resultLimit) break
 
             const remaining = resultLimit - allResults.length
             try {
-              const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining)
+              const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining, signal)
               allResults.push(...sessionResults)
             } catch (error) {
+              signal.throwIfAborted()
               skipped.push({ id: sid, reason: describeSessionError(error) })
             }
           }
@@ -186,7 +207,7 @@ export function createSessionManagerTools(
           return allResults.slice(0, resultLimit)
         }
 
-        const results = await withTimeout(searchOperation(), SEARCH_TIMEOUT_MS, "Search")
+        const results = await runWithAbortableTimeout(searchOperation, SEARCH_TIMEOUT_MS, "Search", _context.abort)
 
         return resolvedDeps.formatSearchResults(results) + formatSkippedSessions(skipped)
       } catch (e) {
@@ -202,7 +223,7 @@ export function createSessionManagerTools(
     },
     execute: async (args: SessionInfoArgs, _context) => {
       try {
-        const info = await resolvedDeps.getSessionInfo(args.session_id)
+        const info = await resolvedDeps.getSessionInfo(args.session_id, _context.abort)
 
         if (!info) {
           return `Session not found: ${args.session_id}`

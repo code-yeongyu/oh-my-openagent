@@ -10,6 +10,7 @@ import {
 import { type ChildFactory, engineChildFactory } from "./child";
 import { ControlGrants } from "./control-grants";
 import { deadline } from "./deadline";
+import { FullAccessConsent, isGlobalInput } from "./global-input";
 import { type Listener, NotificationHub, type Unsubscribe } from "./notifications";
 import { isDesktopCapabilities, isStopPathStatus, parseHello, parseSessionOpened } from "./parse";
 import { type CallOptions, DesktopEngineRpcError, DesktopServiceError, RpcClient } from "./rpc-client";
@@ -25,6 +26,8 @@ import type { Connection, DesiredSession, DesktopSessionOpenParams } from "./ses
 
 export interface DesktopServiceOptions {
 	readonly createChild?: ChildFactory;
+	/** The session's live full-access decision (#10022); absent counts as not full access. */
+	readonly fullAccess?: () => boolean;
 }
 
 /**
@@ -37,13 +40,16 @@ export class DesktopService {
 	#lifecycle: Promise<unknown> = Promise.resolve();
 	#connection: Connection | undefined;
 	#desired: DesiredSession | undefined;
-	#lastStopPath: StopPathStatus | undefined;
 	readonly #grants = new ControlGrants();
+	readonly #consent: FullAccessConsent;
+	/** The user's stop, held by the host: only a stop sets it and only a successful resume clears it (#10788). */
+	#stopLatched = false;
 
 	constructor(options: DesktopServiceOptions = {}) {
 		this.#createChild = options.createChild ?? engineChildFactory();
+		this.#consent = new FullAccessConsent(this.#grants, options.fullAccess ?? (() => false));
 		this.#hub.onStopPathChange((status) => {
-			this.#lastStopPath = status;
+			if (status.suspended) this.#stopLatched = true;
 		});
 	}
 
@@ -89,9 +95,11 @@ export class DesktopService {
 
 	async call(method: EngineMethod, params: unknown, options: CallOptions = {}): Promise<unknown> {
 		const connection = await this.#live();
+		await this.#consent.fence(connection);
 		const request = () => connection.rpc.request(method, params, options);
 		if (method === "control.grant") return this.#grants.grant(request, options.signal?.aborted === true);
 		if (method === "control.revoke") return this.#grants.revoke(request);
+		if (isGlobalInput(method, params)) return this.#consent.send(connection, method, params, options);
 		return request();
 	}
 
@@ -140,7 +148,9 @@ export class DesktopService {
 
 	async resume(): Promise<StopPathStatus> {
 		const connection = await this.#live();
-		return this.#stopPath(connection, "stopPath.resume", { token: connection.resumeToken });
+		const status = await this.#stopPath(connection, "stopPath.resume", { token: connection.resumeToken });
+		if (!status.suspended) this.#stopLatched = false;
+		return status;
 	}
 
 	/** Closes the session and lets the engine exit at EOF; kills it after `CLOSE_TIMEOUT_MS`. */
@@ -226,8 +236,8 @@ export class DesktopService {
 			await this.#stopPath(connection, "stopPath.start", { chord: desired.chord });
 			connection.armedChord = desired.chord;
 		}
-		if (this.#lastStopPath?.suspended === true) {
-			// A restart must not lift the user's stop latch.
+		if (this.#stopLatched) {
+			// A restart must not lift the user's stop latch; the new child's own status never clears it.
 			await this.#stopPath(connection, "stopPath.stop", { source: "host-relay" });
 		}
 		return capabilities;
@@ -245,7 +255,7 @@ export class DesktopService {
 	async #stopPath(connection: Connection, method: EngineMethod, params: object): Promise<StopPathStatus> {
 		const status = await connection.rpc.request(method, params);
 		if (!isStopPathStatus(status)) throw malformed(method);
-		this.#lastStopPath = status;
+		if (status.suspended) this.#stopLatched = true;
 		return status;
 	}
 

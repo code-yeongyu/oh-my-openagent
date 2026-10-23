@@ -207,8 +207,25 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   const replaceWatches = new Map<string, () => void>()
 
   function watchReplaced(taskId: string, handle: ManagedChildHandle, epoch: number): void {
-    const stop = handle.onReplaced?.((event) => replaceOwned(taskId, handle, epoch, event))
-    if (stop !== undefined) replaceWatches.set(taskId, stop)
+    const stopReplaced = handle.onReplaced?.((event) => replaceOwned(taskId, handle, epoch, event))
+    const stopDurable = handle.onDurableSessionId?.((id) => stampDurableId(taskId, handle, epoch, id))
+    if (stopReplaced === undefined && stopDurable === undefined) return
+    replaceWatches.set(taskId, () => {
+      stopReplaced?.()
+      stopDurable?.()
+    })
+  }
+
+  // The open's own state read did not return the durable id, so this run stamped none at spawn; the
+  // first id its handle learns is this run's, and replaces whatever the record still carries from a
+  // predecessor run (a relaunch onto a new transcript, #10892). Each handle stamps once: a later report
+  // from the same handle is stale, and a known id moves only through replaceOwned (#10873).
+  const stampedDurableIds = new WeakSet<ManagedChildHandle>()
+  function stampDurableId(taskId: string, handle: ManagedChildHandle, epoch: number, id: string): void {
+    if (stampedDurableIds.has(handle) || ownedRecord(ports, taskId, handle, epoch) === null) return
+    stampedDurableIds.add(handle)
+    ports.store.mutate(taskId, (fresh) =>
+      fresh.child_session_id === id ? fresh : { ...fresh, child_session_id: id, updated_at: nowIso(ports.now) })
   }
 
   function release(taskId: string): void {

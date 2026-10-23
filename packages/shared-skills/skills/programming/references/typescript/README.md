@@ -1,5 +1,5 @@
 
-# TypeScript Programmer
+# TypeScript / JavaScript Programmer
 
 Modern TypeScript. Type-strict, stack-first, async-correct.
 
@@ -17,7 +17,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 |---|---|---|
 | Runtime | Bun (native TS, single binary) | ts-node, tsx |
 | Package manager | `pnpm` | npm, yarn (unless workspace requires it) |
-| Linter + formatter | Biome | ESLint, Prettier |
+| Linter + formatter | **oxlint + oxfmt**, with both local copy rules | New ESLint, Prettier, or Biome setups; retain them only in repositories already using them |
 | Type checker | `tsc --noEmit` with strict config | skip type checking |
 | Web framework | Hono | Express |
 | Validation | Zod | joi, yup, class-validator |
@@ -125,7 +125,9 @@ bun run ../../scripts/typescript/new-project.ts my-api
 bun run ../../scripts/typescript/new-project.ts my-api --path ./projects
 ```
 
-Creates: `package.json` (Hono + Zod + Biome), `tsconfig.json` (ultra-strict), `biome.json`, `src/index.ts`, `.gitignore`. Works on macOS, Linux, Windows.
+Creates: `package.json` (Hono + Zod + oxlint + oxfmt + oxlint-tsgolint), strict `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `lint/oxlint-plugin/` including its MIT license, `src/index.ts`, and `.gitignore`. Works on macOS, Linux, Windows.
+
+**Use oxlint + oxfmt with `no-em-dash-copy` and `require-suppression-reason` by default for TS and JS.** Load [oxc-lint.md](oxc-lint.md) for the complete setup. Use `--type-aware` with its installed companion where supported; keep `tsc --noEmit` as the type gate. Rewrite paired em dashes as parenthetical or comma-delimited asides, not colon chains.
 
 For manual setup: `bunx tsc --init`, then load `tsconfig-strict.md` for the full strict config.
 
@@ -145,7 +147,8 @@ Load on demand — not all at once.
 
 | Need | Load |
 |---|---|
-| Strict tsconfig + Biome config | `tsconfig-strict.md` |
+| Strict tsconfig | `tsconfig-strict.md` |
+| Default oxlint + oxfmt configs, rule mappings, and local JS plugin | `oxc-lint.md` |
 | Type patterns (branded, as const, satisfies, narrowing, assertNever) | `type-patterns.md` |
 | Data modeling (type vs interface vs Zod, readonly, parse-don't-validate) | `data-modeling.md` |
 | Error handling (Result, typed errors, union vs throw) | `error-handling.md` |
@@ -171,11 +174,11 @@ Violations caught by `../../scripts/typescript/check-no-excuse-rules.ts`. Run af
 | `empty-catch` | `catch { }` or `catch (e) { }` with empty body | `// no-excuse-ok: catch` |
 | `catch-without-narrowing` | `catch (e)` used without `instanceof` or re-throw | `// no-excuse-ok: catch` |
 
-Biome enforces additional rules (noExplicitAny, noNonNullAssertion, noDefaultExport, useImportType). The script catches what Biome cannot.
+Oxlint enforces explicit-any, non-null-assertion, default-export, and type-only-import rules; see [the verified mapping](oxc-lint.md). The audit script retains the checks not covered by those rules, including assertion and enum bans and catch narrowing.
 
 ## In tests
 
-Tests are strict too, with these exceptions (configure in `biome.jsonc` overrides):
+Tests are strict too, with these exceptions (configure in `.oxlintrc.json` overrides):
 
 | In tests you may | Why |
 |---|---|
@@ -192,4 +195,4 @@ When editing an existing file that doesn't follow these rules: **write new code 
 
 ## Activation
 
-This skill activates whenever you are writing or modifying any `.ts` or `.tsx` file. Even one-off scripts get the strict treatment.
+This reference applies to `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, and `.cjs`. JavaScript uses the same lint, formatting, and copy rules; TypeScript-only syntax and compiler gates apply to TS or checked JS projects. Even one-off scripts get the strict treatment.

@@ -1,5 +1,5 @@
 //! Unit tests: the guard decisions, the key tables, release-all bookkeeping,
-//! and the never-suppress-local-input source contract.
+//! and the never-suppress-local-input and grant-free canary source contracts.
 
 use foreign_types::ForeignType;
 use senpi_desktop_core::backend::{Modifiers, MouseButton, PointerEvent};
@@ -138,4 +138,16 @@ fn release_all_drains_every_posted_down_through_its_route() {
     let drained_buttons = held.take_buttons();
     assert_eq!(drained_buttons.len(), 2);
     assert!(held.is_empty(), "release_all leaves nothing held");
+}
+
+/// Security contract (#10788): the receipt canary runs before a background
+/// window action, which needs no control grant, so nothing it does may reach
+/// a global route: no cursor warp, no HID-tap post, no global key route. A
+/// pointer the human moved during the probe stays where they put it.
+#[test]
+fn the_grant_free_canary_has_no_global_emission_route() {
+    let source = include_str!("canary.rs");
+    for global in ["cursor::", "CGEventTapLocation", "global::", "KeyRoute::Global", ".post("] {
+        assert!(!source.contains(global), "canary.rs reaches a global route through {global}");
+    }
 }

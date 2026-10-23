@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
+import * as resilient from "../../fs/resilient"
+import * as durable from "../../journal/fsync"
 import { creatorAnchor, type PinCandidate } from "./anchor.ts"
 import { appendEntries, emptyChain } from "./chain.ts"
 import * as cryptoIndex from "./index.ts"
@@ -13,6 +15,7 @@ import { forgetTrustAnchor, loadTrustAnchor, pinTrustAnchor, TrustPinError } fro
 
 const dirs: string[] = []
 afterEach(() => {
+  mock.restore()
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 const stateDir = (): string => {
@@ -26,6 +29,14 @@ const provenCandidate = async (): Promise<PinCandidate> => {
   const outcome = await appendEntries(emptyChain(ACCOUNT, fixtureAnchor()), mainChain(), createRejectionCounter())
   if (!outcome.ok || outcome.state.pin === null) throw new Error("the fixture creator walk proves no pin")
   return outcome.state.pin
+}
+
+const otherCandidate = async (): Promise<PinCandidate> => {
+  const keyring = await newDeviceKeyring()
+  const other = await genesisEntry(ACCOUNT, keyring, "W".repeat(43), newRecoveryCredential())
+  const walked = await appendEntries(emptyChain(ACCOUNT, creatorAnchor(ACCOUNT, keyring)), [other], createRejectionCounter())
+  if (!walked.ok || walked.state.pin === null) throw new Error("other root walk")
+  return walked.state.pin
 }
 
 const pinned = async (dir: string) => pinTrustAnchor(dir, ACCOUNT, await provenCandidate())
@@ -92,6 +103,15 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     await expectNoAnchor(stateDir(), "no_pin")
   })
 
+  test("an account directory without its pin is corrupt and cannot be replaced", async () => {
+    const dir = stateDir()
+    const accountDir = dirname(pinPath(dir))
+    mkdirSync(accountDir, { recursive: true })
+    await expectNoAnchor(dir, "corrupt_pin")
+    await expect(pinTrustAnchor(dir, ACCOUNT, await provenCandidate())).rejects.toMatchObject({ problem: "corrupt_pin" })
+    expect(readdirSync(accountDir)).toEqual([])
+  })
+
   test.each([
     ["truncated", (pin: string) => pin.slice(0, pin.length / 2)],
     ["garbage", () => "\u0000\u00ff not json"],
@@ -117,5 +137,49 @@ describe("a pin file that is missing or does not parse is no anchor, never a fal
     writeFileSync(join(candidate, "pin.json"), '{"version":1,"acc')
     await expectNoAnchor(dir, "no_pin")
     expect(readdirSync(join(dir, "trust-anchor"))).toEqual([])
+  })
+})
+
+describe("publishing the pin is durable, and a lost race is decided by the winner's pin", () => {
+  test("the pin file and its directory are fsynced before the publishing rename, the parent after it", async () => {
+    const dir = stateDir()
+    const root = join(dir, "trust-anchor")
+    const [syncFile, syncDirectory, rename] = [durable.syncJournalFile, durable.syncJournalDirectory, resilient.rename]
+    const calls: string[] = []
+    const name = (path: unknown) => (relative(root, String(path)) || ".").split(sep).join("/").replace(/\.\d+\.[0-9a-f]{12}\.tmp/, ".tmp")
+    spyOn(durable, "syncJournalFile").mockImplementation(async (path) => {
+      calls.push(`file ${name(path)}`)
+      await syncFile(path)
+    })
+    spyOn(durable, "syncJournalDirectory").mockImplementation(async (path) => {
+      calls.push(`dir ${name(path)}`)
+      await syncDirectory(path)
+    })
+    spyOn(resilient, "rename").mockImplementation(async (from, to) => {
+      calls.push(`rename ${name(from)} ${name(to)}`)
+      await rename(from, to)
+    })
+    await pinned(dir)
+    const key = dirname(relative(root, pinPath(dir)))
+    expect(calls).toEqual([`file ${key}.tmp/pin.json`, `dir ${key}.tmp`, `rename ${key}.tmp ${key}`, "dir ."])
+  })
+
+  test.each([
+    ["a different root is a typed conflict", otherCandidate, { problem: "pin_conflict" }],
+    ["the same root returns the winner's pin", provenCandidate, null],
+  ] as const)("losing the publishing race to %s", async (_name, winnerCandidate, refusal) => {
+    const dir = stateDir()
+    const [winner, loser] = [await winnerCandidate(), await provenCandidate()]
+    const rename = resilient.rename
+    spyOn(resilient, "rename").mockImplementationOnce(async (from, to) => {
+      await pinTrustAnchor(dir, ACCOUNT, winner)
+      await rename(from, to)
+    })
+    const lost = pinTrustAnchor(dir, ACCOUNT, loser)
+    if (refusal !== null) await expect(lost).rejects.toMatchObject(refusal)
+    else expect((await lost).genesisDigest).toBe(loser.genesisDigest)
+    const loaded = await loadTrustAnchor(dir, ACCOUNT)
+    expect(loaded.ok && loaded.anchor.genesisDigest).toBe(winner.genesisDigest)
+    expect(readdirSync(join(dir, "trust-anchor"))).toEqual([dirname(relative(join(dir, "trust-anchor"), pinPath(dir)))])
   })
 })

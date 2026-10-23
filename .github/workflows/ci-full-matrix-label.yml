@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   full-matrix:
-    if: github.event.label.name == 'ci:full-matrix'
+    if: github.event.label.name == 'ci:full-matrix' || github.event.label.name == 'run-full-ci'
     # Only matching labels enter this group; bot labels cannot cancel it.
     concurrency:
       group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}-full-matrix

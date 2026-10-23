@@ -65,8 +65,9 @@ describe("runConfigMigrate", () => {
     // then
     expect(exitCode).toBe(0)
     const report = JSON.parse(lines.join("\n")) as { migrations: Array<{ readonly movePlan: unknown[]; readonly transform?: unknown }> }
-    expect(report.migrations[0]?.transform).toBeDefined()
-    expect(report.migrations[0]?.movePlan).toHaveLength(1)
+    const legacy = report.migrations.find((migration) => migration.movePlan.length > 0)
+    expect(legacy?.transform).toBeDefined()
+    expect(legacy?.movePlan).toHaveLength(1)
   })
 
   test("#given a dry run completed first #when non-dry migration runs twice #then the second exits successfully with nothing to migrate", () => {

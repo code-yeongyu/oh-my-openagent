@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec } from "../git"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 import { validateCompletion } from "./completion-validation"
 import { createReflectionWorktree, type ReflectionWorktree } from "./worktree"
 import { removeTree } from "../../../../test-support/remove-tree"
@@ -27,6 +28,9 @@ async function fixture(seedFiles: Record<string, string> = {}) {
   await repo.init({
     seedFiles: Object.entries(seedFiles).map(([relativePath, content]) => ({ relativePath, content })),
   })
+  // Configure the shared repo BEFORE the worktree exists: the completion gate snapshots the common git config at creation
+  // and refuses any later change as tampering with git administration files.
+  disableFixtureAutoMaintenance(repo.dir)
   const worktree = await createReflectionWorktree(repo, "run-1", join(root, "worktrees"))
   return { repo, worktree }
 }

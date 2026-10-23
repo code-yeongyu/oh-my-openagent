@@ -150,6 +150,45 @@ describe("facts extraction JSONL validation", () => {
     expect(operation).toThrow("project record must not carry person")
   }, 30_000)
 
+  test("#given a project record whose person is an empty placeholder #when validated #then the record is kept without the person (#10918)", () => {
+    // given: GPT-family models fill the optional person field instead of omitting it.
+    const placeholders: unknown[] = [
+      null,
+      {},
+      { name: "", aliases: [] },
+      { name: "   ", aliases: ["", " "] },
+      { name: "N/A", aliases: [] },
+      { name: null, aliases: null },
+      "",
+      "none",
+      "N/A",
+    ]
+
+    // when
+    const parsed = placeholders.map((placeholder, index) => parseFactsExtractionRecord({ ...project(), person: placeholder }, index))
+
+    // then
+    expect(parsed).toEqual(placeholders.map(() => project()))
+  })
+
+  test("#given a project record whose person carries a real name #when validated #then it is still refused", () => {
+    // given: a two-letter name such as the Korean surname Na is a real person, never a placeholder.
+    const values = [
+      { ...project(), person: { name: "Mina", aliases: [] } },
+      { ...project(), person: { name: "", aliases: ["Min"] } },
+      { ...project(), person: "Mina" },
+      { ...project(), person: { name: "", aliases: [], extra: true } },
+      { ...project(), person: { name: "Na", aliases: [] } },
+      { ...project(), person: "Na" },
+    ]
+
+    // when
+    const outcomes = values.map((value, index) => () => parseFactsExtractionRecord(value, index))
+
+    // then
+    for (const outcome of outcomes) expect(outcome).toThrow("project record must not carry person")
+  })
+
   test("#given a person record missing person #when parsed #then the whole extraction is rejected", () => {
     // given
     const raw = JSON.stringify({ scope: "person", text: "Mina prefers Bun.", date: "2026-08-10" })

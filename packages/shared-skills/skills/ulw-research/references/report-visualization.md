@@ -25,6 +25,7 @@ A report that ships with none of these is incomplete. The static gate raises `re
 | A product, interface, or page the report discusses | A screenshot captured while reading the source, through the browser skill | PNG |
 | A concept that has no data and no structure, a cover | The image-generation skill, only when it helps the reader understand | PNG |
 | A source video or talk | An embed (web) or a still frame plus link and timestamp (paginated) | iframe or PNG |
+| A reproduction of a visual source (a clip rebuilt in 3D, an interface rebuilt from a screenshot, a figure redrawn) | Reference-compare pairs: a real source frame next to the output rendered at the same moment and viewpoint | PNG per pair |
 
 Image generation never draws data, numbers, diagrams with labels, or anything the reader could mistake for evidence. Its caption says it is an illustration.
 
@@ -86,6 +87,27 @@ pdftocairo -svg arch.pdf "$SESSION_DIR/assets/arch.svg"   # for an HTML report; 
 - Capture product and page screenshots through the browser skill while the source is open, at a readable width, and crop to the part the claim is about. Caption with the source and the access date.
 - Embed a video in a web report with the platform's embed and a timestamp; in a paginated report, use a still frame from the moment the claim refers to, with the link and timestamp in the caption.
 
+### Reference compare (visual reproductions)
+
+When the deliverable reproduces a visual source (recreate a clip in 3D, rebuild an interface from a screenshot, redraw a figure), the source is the test oracle. An output checked only against itself looks finished to its author and wrong to anyone who has seen the original, so the run compares the two directly and shows the comparison.
+
+1. **Pick the moments.** Choose 4 to 8 moments that carry the identity of the source: the start and end state, the peak of each motion, distinctive poses, camera framings, and the shot the requester pointed at. Record each in `$SESSION_DIR/compare/moments.json` with its timestamp (or region, for a still), what it shows, and the camera or viewport.
+2. **Extract real frames from the source.** For a video, download only the sections you need, then cut one frame per moment. Run the download as a background job; a long download outlives a single tool call.
+   ```bash
+   mkdir -p "$SESSION_DIR/compare"
+   uvx yt-dlp -f 'bv*[height<=720]/b[height<=720]' --download-sections '*<start>-<end>' --force-keyframes-at-cuts --remux-video mp4 -o "$SESSION_DIR/compare/source-<start>.%(ext)s" '<url>'
+   ffmpeg -y -v error -ss <seconds into the section> -i "$SESSION_DIR/compare/source-<start>.mp4" -frames:v 1 "$SESSION_DIR/compare/ref-<n>.png"
+   ```
+   For an image, use the original file. For a page or interface, capture it through the browser skill at the viewport the output targets. Never substitute a thumbnail, a generated image, or a description for the real frame.
+3. **Render the output at the same moment and viewpoint.** Match the time into the motion, the camera position and field of view, the framing, and the aspect ratio. For a 3D scene, move the camera to the source shot instead of capturing the scene's default camera. Save `out-<n>.png`.
+4. **Compose each pair.** Reference on the left, output on the right, scaled to the same height:
+   ```bash
+   ffmpeg -y -v error -i "$SESSION_DIR/compare/ref-<n>.png" -i "$SESSION_DIR/compare/out-<n>.png" -filter_complex "[0:v]scale=-2:540[a];[1:v]scale=-2:540[b];[a][b]hstack=inputs=2" "$SESSION_DIR/compare/pair-<n>-r<round>.png"
+   ```
+5. **Critique every pair by looking at it.** Open each pair image and write `$SESSION_DIR/compare/critique-r<round>.md`: per pair, every visible difference ranked by how much a viewer would notice it (silhouette and proportions, pose and orientation, motion path and timing, camera and framing, scale against the surroundings, color and lighting, missing or extra elements), each with its likely cause and the fix.
+6. **Fix and compare again.** Fix the largest differences first, re-render the same moments, compose the next round, and critique again. Stop after 3 rounds or after 2 rounds that close no listed difference, the same bound the repair loop uses; every difference still open becomes a residual gap in the report.
+7. **Put the comparison in the report.** A "Reference comparison" section holds the final pair for each moment as a captioned figure: the moment and timestamp, the source with attribution and link, what now matches, and what still differs. The first-round pairs go in the correction log next to their final pairs, so the reader sees what the comparison changed. Alt text describes both halves.
+
 ### Generated illustrations
 
 Use the image-generation skill only for a cover or a concept illustration that helps the reader, prompted from the design spec's palette and register. Never let generated images carry text, numbers, or logos the reader could read as fact.
@@ -123,4 +145,5 @@ The static gate (`report-tools check`) enforces the machine-checkable rows; visu
 | Each major quantitative finding has a chart and each structural finding has a diagram | visual QA |
 | Diagram and chart text renders in the spec font and is legible at phone width | visual QA |
 | Source videos and screenshots are embedded or linked with attribution where the topic has them | visual QA |
+| A visual reproduction carries reference-compare pairs (final and first round) and a critique for every pair | visual QA |
 | Generated illustrations carry no fake data or text and are captioned as illustrations | visual QA |

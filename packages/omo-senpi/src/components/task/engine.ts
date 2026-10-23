@@ -1,5 +1,6 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { OmoTaskSettingsSchema, type OmoConfig, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
+import { readTurnTraceparent } from "@oh-my-opencode/telemetry-core"
 import { log } from "@oh-my-opencode/utils"
 import {
   createCompletionNotifier,
@@ -37,6 +38,7 @@ import {
 } from "./category-config-generation"
 import { createCategoryUnavailableWarningPlanner } from "./category-unavailable-warning"
 import { createTaskStoreChain } from "./engine-store-chain"
+import type { StoreMutation } from "./store-mutation-observer"
 import { createEngineKernelTools } from "./engine-kernel-tools"
 import { composeEngineHostWiring } from "./engine-host-wiring"
 import { createEngineLiveness } from "./engine-liveness"
@@ -90,7 +92,7 @@ export interface TaskEngine {
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
   // Subscribe to every store mutation (spawn/transition/replace/remove). The UI status sync attaches
   // here so the footer/widget refresh on background task activity. Returns an unsubscribe.
-  onStoreMutation(listener: () => void): () => void
+  onStoreMutation(listener: (change: StoreMutation) => void): () => void
 }
 
 export interface ComposeTaskEngineDeps {
@@ -249,6 +251,8 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     resolveInheritedExtensions,
     rpcRespawnRunner: buildRespawnRunner(runnerContext),
     executionModeGate: host.executionModeGate,
+    // A process child continues the trace of the parent turn that delegated it (telemetry todo 41).
+    traceparentFor: readTurnTraceparent,
     cwd: deps.cwd,
     destruction: {
       destroyResidentTask: (taskId, cause) =>
