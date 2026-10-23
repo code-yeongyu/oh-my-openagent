@@ -112,6 +112,10 @@ type RpcRespawnRunner = {
 
 type TaskManagerImplOptions = TaskManagerOptions & {
   readonly rpcRespawnRunner?: RpcRespawnRunner
+  // Test seam (#10344): a launch slower than the report window is reported as still starting, and its
+  // outcome lands on the record (#10042). A test that must observe the launch's own outcome widens the
+  // window here instead of racing the default one.
+  readonly startReportWindowMs?: number
 }
 
 type LaunchOutcome =
@@ -513,7 +517,7 @@ class TaskManagerImpl implements TaskManager {
 
     if (lease !== undefined) {
       const launching = this.#trackLaunch(finalRecord.task_id, context)
-      const reported = await settledWithin(launching, START_REPORT_WINDOW_MS)
+      const reported = await settledWithin(launching, this.#options.startReportWindowMs ?? START_REPORT_WINDOW_MS)
       if (!reported.settled) {
         launching.catch((error: unknown) => {
           log("senpi-task start still admitting failed", { taskId: finalRecord.task_id, error: String(error) })

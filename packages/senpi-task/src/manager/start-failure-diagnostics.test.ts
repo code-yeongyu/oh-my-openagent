@@ -99,7 +99,14 @@ describe("TaskManager start failure diagnostics", () => {
         return child
       },
     })
-    const { manager, store } = makeManager({ process: createRpcManagedRunner(rpcRunner) })
+    // The launch's own cleanup (a real taskkill on Windows) can outlast the default report window on a
+    // busy machine, which would report the task as still starting instead of the launch's outcome
+    // (#10344). Give the manager a window the launch can't miss so the test always takes the
+    // start_failed path.
+    const { manager, store } = makeManager({
+      process: createRpcManagedRunner(rpcRunner),
+      startReportWindowMs: 4_000,
+    })
 
     // when
     const result = await manager.start({
