@@ -199,7 +199,7 @@ describe("deferred session_start work", () => {
     expect(ran).toBe(1)
   })
 
-  it("#given the init-deep advisor #when session_start fires #then its preflight is scheduled instead of running on the dispatch path", async () => {
+  it("#given the init-deep advisor #when session_start fires without a prompt #then nothing is scheduled and its preflight never runs", async () => {
     // given
     const scheduled: Scheduled[] = []
     const pi = new FakeExtensionAPI()
@@ -215,7 +215,34 @@ describe("deferred session_start work", () => {
       logger: silentLogger,
       scheduleStartupWork: recordingScheduler(scheduled),
     })(pi)
-    await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, { ui: {}, hasUI: false })
+    await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, { ui: {}, hasUI: true })
+
+    // then
+    expect(advisorRuns).toBe(0)
+    expect(scheduled).toHaveLength(0)
+  })
+
+  it("#given the init-deep advisor #when the first real prompt fires #then its preflight is scheduled instead of running on the dispatch path", async () => {
+    // given
+    const scheduled: Scheduled[] = []
+    const pi = Object.assign(new FakeExtensionAPI(), { sessionKind: "interactive" as const })
+    let advisorRuns = 0
+    const advisor = createInitDeepAdvisorComponent({
+      runAfterPreflight: async () => {
+        advisorRuns += 1
+      },
+    })
+
+    // when
+    await composeOmoSenpiExtension([advisor], {
+      logger: silentLogger,
+      scheduleStartupWork: recordingScheduler(scheduled),
+    })(pi)
+    await pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", trigger: "prompt", prompt: "Fix the failing test" },
+      { ui: {}, hasUI: false },
+    )
 
     // then
     expect(advisorRuns).toBe(0)
