@@ -31,6 +31,8 @@ export const componentContext: ComponentContext = {
 }
 
 export class AdvisorFakeExtensionAPI extends FakeExtensionAPI {
+  // Mirrors the onboarding test harness: a session is interactive unless a test says otherwise.
+  sessionKind: "interactive" | "worker" = "interactive"
   readonly appendEntry = mockFn((_customType: string, _data?: unknown): void => {})
 }
 
