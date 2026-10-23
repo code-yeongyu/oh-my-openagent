@@ -1,10 +1,10 @@
 import { existsSync } from "../fs/resilient"
-import { mkdir, rm, writeFile } from "../fs/resilient"
-import { dirname, join } from "node:path"
+import { lstat, mkdir, readdir, realpath, rm, writeFile } from "../fs/resilient"
+import { basename, dirname, join } from "node:path"
 import { withGitLockRetry, withSerializedGitConfigMutation } from "./config-lock"
 import { NO_AUTO_MAINTENANCE } from "./no-auto-maintenance"
 import { withStrandedGitLockRecovery } from "./repo-lock-sweep"
-import { DirtyRepoError, NoEffectiveChangesError } from "./errors"
+import { DirtyRepoError, InvalidGitPathError, NoEffectiveChangesError } from "./errors"
 import { commitJudgedByOutcome } from "./commit-outcome"
 import { createNodeGitExec, type GitExec, type GitExecResult } from "./exec"
 import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
@@ -154,7 +154,7 @@ export class GitMemoryRepo {
   async status(paths: readonly string[] = []): Promise<string> {
     const normalized = normalizePathspecs(paths)
     const suffix = normalized.length > 0 ? ["--", ...normalized] : []
-    return (await this.git(["-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
+    return (await this.git(["--literal-pathspecs", "-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
   }
 
   head(): Promise<string | null> { return this.reads.head() }
@@ -168,7 +168,7 @@ export class GitMemoryRepo {
   log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> { return this.reads.log(options) }
 
   /**
-   * Roll index and worktree back to HEAD for the given pathspecs after a refused
+   * Roll index and worktree back to HEAD for the given paths after a refused
    * staging: paths tracked at HEAD are restored on both sides (`git restore
    * --source=HEAD --staged --worktree`), and paths new at HEAD are unstaged and
    * removed, so a refused tool call leaves no trace behind.
@@ -177,13 +177,44 @@ export class GitMemoryRepo {
     const normalized = normalizePathspecs(paths)
     if (normalized.length === 0) return
     const atHead = new Set(await this.lsTree("HEAD"))
-    const tracked = normalized.filter((path) => atHead.has(path))
-    const untracked = normalized.filter((path) => !atHead.has(path))
+    const physicalEntry = async (path: string): Promise<string | undefined> => {
+      try {
+        const full = join(this.dir, path)
+        await lstat(full)
+        const parent = await realpath(dirname(full))
+        const name = basename(full)
+        const foldedName = name.normalize("NFC").toLowerCase()
+        const entries = await readdir(parent)
+        const entry = entries.find(candidate => candidate === name)
+          ?? entries.find(candidate => candidate.normalize("NFC").toLowerCase() === foldedName)
+        return entry === undefined ? undefined : join(parent, entry)
+      } catch (error) {
+        if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return undefined
+        throw error
+      }
+    }
+    const headPath = async (path: string): Promise<string> => {
+      if (atHead.has(path)) return path
+      const foldedPath = path.normalize("NFC").toLowerCase()
+      const candidates = [...atHead].filter(candidate => candidate.normalize("NFC").toLowerCase() === foldedPath)
+      if (candidates.length === 0) return path
+      const entry = await physicalEntry(path)
+      if (entry === undefined) return path
+      const matches: string[] = []
+      for (const candidate of candidates) if (await physicalEntry(candidate) === entry) matches.push(candidate)
+      if (matches.length > 1) throw new InvalidGitPathError(`Memory path has multiple tracked HEAD aliases: ${path}`)
+      return matches[0] ?? path
+    }
+    const canonical = [...new Set(await Promise.all(normalized.map(headPath)))]
+    const tracked = canonical.filter((path) => atHead.has(path))
+    const untracked = canonical.filter((path) => !atHead.has(path))
     if (tracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...tracked]))
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "-c", "core.autocrlf=false", "restore", "--source=HEAD", "--staged", "--worktree", "--", ...tracked]))
     }
     for (const path of untracked) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["rm", "-q", "--cached", "--ignore-unmatch", "--", path]))
+      // Restoring a tracked entry can make an initially missing case alias resolvable again.
+      if (atHead.has(await headPath(path))) continue
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "rm", "-q", "--cached", "--ignore-unmatch", "--", path]))
       await rm(join(this.dir, path), { force: true })
     }
   }
@@ -191,10 +222,10 @@ export class GitMemoryRepo {
   /** Undo staged entries only; the working tree is left exactly as it is. */
   async unstage(tracked: readonly string[], untracked: readonly string[]): Promise<void> {
     if (tracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["restore", "--source=HEAD", "--staged", "--", ...tracked]))
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "restore", "--source=HEAD", "--staged", "--", ...tracked]))
     }
     if (untracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["rm", "-q", "--cached", "-f", "--ignore-unmatch", "--", ...untracked]))
+      await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "rm", "-q", "--cached", "-f", "--ignore-unmatch", "--", ...untracked]))
     }
   }
 
@@ -246,7 +277,7 @@ export class GitMemoryRepo {
   }
 
   private async stage(paths: readonly string[]): Promise<void> {
-    await withStrandedGitLockRecovery(this.dir, () => this.git(["add", "-A", "--", ...paths]))
+    await withStrandedGitLockRecovery(this.dir, () => this.git(["--literal-pathspecs", "add", "-A", "--", ...paths]))
   }
 
   private async hasPathChanges(paths: readonly string[]): Promise<boolean> {
