@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -174,6 +174,34 @@ describe("gateway rules prompt handler", () => {
 })
 
 describe("gateway component activation", () => {
+  test.each([
+    { key: "dori", expected: 1 },
+    { key: "gateway", expected: 0 },
+  ])("#given $key config #when the default loader activates rules #then stores opened equals $expected", async ({ key, expected }) => {
+    const h = (harness = createGatewayHarness())
+    const store = h.store()
+    await store.registerStoreExtension({ name: GATEWAY_RULES_EXTENSION_NAME, migrations: GATEWAY_RULES_MIGRATIONS, moduleUrl })
+    const homeDir = mkdtempSync(join(tmpdir(), "omo-dori-rules-config-"))
+    const previousHome = process.env.HOME
+    mkdirSync(join(homeDir, ".omo"))
+    writeFileSync(join(homeDir, ".omo", "omo.jsonc"), JSON.stringify({ [key]: { scopes: [{ id: "team" }] } }))
+    let opened = 0
+    process.env.HOME = homeDir
+    try {
+      const handler = componentHandler(createGatewayComponent({
+        agentDir: () => h.agentDir,
+        createStore: () => { opened += 1; return store },
+        resolveModuleUrl: () => moduleUrl,
+      }))
+      await handler(payload("BASE PROMPT"), sessionCtx("unbound"))
+      expect(opened).toBe(expected)
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME
+      else process.env.HOME = previousHome
+      rmSync(homeDir, { recursive: true, force: true })
+    }
+  })
+
   test("#given no gateway config #when the handler runs #then it returns undefined and never opens a store", async () => {
     // given
     let storeCreations = 0

@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../../../test-support/telemetry-env.test-helpers"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -8,6 +9,7 @@ import { tmpdir } from "node:os"
 const originalXdgDataHome = process.env.XDG_DATA_HOME
 const originalOmoDisablePostHog = process.env.OMO_DISABLE_POSTHOG
 const originalOmoSendAnonymousTelemetry = process.env.OMO_SEND_ANONYMOUS_TELEMETRY
+let restoreTelemetryEnv: () => void
 
 function resetEnv(): void {
   if (originalXdgDataHome === undefined) {
@@ -27,8 +29,13 @@ function resetEnv(): void {
   }
 }
 
+beforeEach(() => {
+  restoreTelemetryEnv = isolateTelemetryEnv()
+})
+
 afterEach(() => {
   resetEnv()
+  restoreTelemetryEnv()
 })
 
 describe("checkTelemetry", () => {

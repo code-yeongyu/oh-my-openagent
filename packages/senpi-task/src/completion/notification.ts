@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { isolationDetails, isolationLine } from "../isolation/details"
 import { messageability } from "../state"
 import type { TaskRecord } from "../state"
+import { activeParentModelFallback } from "../manager/parent-model-rung"
+import { describeParentModelFallback } from "../parent-model-fallback-text"
 import { formatTargetWithModel } from "../status-line"
 import { formatRunDuration } from "../tools/run-stats-format"
 import {
@@ -45,6 +47,8 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
       : { fallback_models: record.fallback_models }),
     ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
     ...(record.effective_model === undefined ? {} : { effective_model: record.effective_model }),
+    ...(record.parent_model === undefined ? {} : { parent_model: record.parent_model }),
+    ...(activeParentModelFallback(record) === undefined ? {} : { parent_model_fallback: activeParentModelFallback(record) }),
     duration_ms: durationMs(record),
     ...(runStats === undefined ? {} : { run_stats: runStats }),
     final_response: finalResponse.text,
@@ -150,8 +154,11 @@ function completionDetailLines(detail: CompletionDetails, width: number | undefi
   const resultPrefix = 'result:"'
   const resultFilePrefix = "result_file:"
   const nextPrefix = "next:"
+  const parentModelPrefix = "model_note:"
+  const parentModel = describeParentModelFallback(detail.parent_model_fallback, detail.parent_model)
   return [
     ...summaryLines,
+    ...(parentModel === undefined ? [] : [`${parentModelPrefix}${excerptForWidth(parentModel, width, parentModelPrefix, "")}`]),
     ...(response.length === 0
       ? []
       : [`${resultPrefix}${excerptForWidth(response, width, resultPrefix, '"')}"`]),

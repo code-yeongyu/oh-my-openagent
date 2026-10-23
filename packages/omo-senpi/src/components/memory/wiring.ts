@@ -15,6 +15,10 @@ import { createConfiguredFactsApplier, publishSessionFactsApplier } from "./fact
 import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
 import { createPressureDreamAdmission } from "./pressure-dream-admission"
 import { createMemoryRecallWiring, createSharedRecallCorpusCache } from "./recall-wiring"
+import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
+import { memoryBlockBuild } from "./memory-block-build"
+import type { MemoryIdentityContext } from "./context"
+import { createProjectMemoryScope } from "./project-memory-nudge"
 import { branchEntryCount, sessionIdFrom } from "./wiring-context"
 import { createMemoryUserActivity } from "./user-activity"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
@@ -30,7 +34,21 @@ import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
-  const promptCache = new MemoryBlockCache()
+  // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
+  // in the lazily loaded recall-store sidecar). Keyed by the build, so an upgrade never reads an older build's bytes.
+  const blockBuild = memoryBlockBuild()
+  const promptCache = new MemoryBlockCache(blockBuild === undefined ? {} : {
+    store: loadRecallStoreRuntime,
+    build: blockBuild,
+    onStoreError: (error) => options.logger?.warn("omo-senpi persisted memory block unavailable; compiling instead", {
+      error: error instanceof Error ? error.message : String(error),
+    }),
+    onDegraded: ({ revision, reasons }) => options.logger?.warn("omo-senpi memory block compiled from incomplete git reads; used for this turn only, not persisted", {
+      revision,
+      reasons,
+    }),
+  })
+  const promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> } = {}
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
   const userActivity = createMemoryUserActivity(options.env)
@@ -75,11 +93,22 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // One corpus cache for both: the sidecar's read-only memory tool reads the corpus the candidates came from.
   const corpusCache = (options.createCorpusCache ?? createSharedRecallCorpusCache)(options.logger)
 
+  const projectScope = createProjectMemoryScope({
+    resolveContext,
+    switches: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory).project_scope,
+    fallbackCwd: options.cwd,
+    env: options.env,
+    corpusCache,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+
   const recallWiring = createMemoryRecallWiring({
     resolveContext,
     resolveSettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
     env: options.env,
     corpusCache,
+    projectCorpora: projectScope.recallCorpora,
+    projectSource: projectScope.sourceFor,
     drainQueued: (sessionId, context) => deliveryRef.current?.drainForPrompt(sessionId, context) ?? [],
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
@@ -143,6 +172,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   return {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       userActivity.register(pi)
+      projectScope.register(pi)
       const applyFacts = createConfiguredFactsApplier(options, (sessionId) => resolveContext(sessionId ?? activeSession.current ?? ""))
       reflectionLive.registerRpc(pi, resolveContext, applyFacts)
       publishSessionFactsApplier(applyFacts)
@@ -153,6 +183,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         resolveContext: (sessionId) => userActivity.hasInput(sessionId) ? resolveContext(sessionId) : undefined,
         recall: recallWiring,
         corpusCache,
+        projectScope,
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
         sendMessage: (message, sendOptions) => pi.sendMessage(message, sendOptions),
         appendEntry: (customType, data) => pi.appendEntry?.(customType, data),
@@ -166,6 +197,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         ctx,
         options,
         promptCache,
+        promptPrebuild,
         nudgeWiring,
         noticeWiring,
         recallWiring,
@@ -207,6 +239,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
 
     async afterBind(pi, sessionId, identity, eventCtx): Promise<void> {
+      // Off the prompt path: a NEW session's first prompt shares this compile of HEAD, or reads what it persisted.
+      // A resumed session is pinned to its recorded revision, which may not be HEAD; it gets no prebuild.
+      if (branchEntryCount(eventCtx) === 0) void promptPrebuild.current?.(identity).catch((error: unknown) => {
+        options.logger?.warn("omo-senpi memory block prebuild failed; the first prompt compiles it", {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
       activeSession.current = sessionId
       userActivity.reset(sessionId)
       pressureDreamAdmission.reset(sessionId)
@@ -247,6 +286,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await shutdownDrain.raceDetached(input, "status-settle", () => reflectionLive.settled())
       // A recall ranking saves the repository's terms into its `.git` after the prompt; let that write finish.
       await shutdownDrain.raceDetached(input, "recall-store-settle", () => corpusCache.settled())
+      await shutdownDrain.raceDetached(input, "memory-block-settle", () => promptCache.settled())
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
       // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
       // drain deadline: both are started and raced against it, and whichever loses keeps running

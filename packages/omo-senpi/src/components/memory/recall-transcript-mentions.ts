@@ -53,11 +53,13 @@ export interface TranscriptMentionIndex {
 
 interface MentionMatcher {
   readonly path: string
-  readonly pattern: RegExp
+  /** The path as it appears inside a JSON string. */
+  readonly needle: string
 }
 
 interface MatcherSet {
   readonly documents: readonly MentionDocument[]
+  readonly paths: ReadonlySet<string>
   readonly matchers: readonly MentionMatcher[]
   /** False when any path could straddle the array seam, which forces the whole-window scan. */
   readonly perEntrySafe: boolean
@@ -68,36 +70,55 @@ interface SessionMentions {
   readonly byEntryId: Map<string, ReadonlySet<string>>
 }
 
-/** The exact matcher the whole-window scan used before this index existed. */
+/** The transcript delimiters a mention may end at (JSON-escaped whitespace and quotes included), not filename suffixes. */
+const MENTION_END = /[\s"'\x60\])}>:;,!?]/
+const JSON_ESCAPE_AFTER_BACKSLASH = /["nrtbf]/
+
 function mentionMatcher(path: string): MentionMatcher {
-  const escaped = JSON.stringify(path).slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  // Close at transcript delimiters (including JSON-escaped whitespace), not filename suffixes.
-  return { path, pattern: new RegExp(`${escaped}(?=$|[\\s"'\x60\\])}>:;,!?]|\\\\["nrtbf])`) }
+  return { path, needle: JSON.stringify(path).slice(1, -1) }
+}
+
+/** `RegExp(\`${escaped}(?=$|[\s"'\x60\])}>:;,!?]|\\["nrtbf])\`).test(json)` without compiling one pattern per path. */
+function mentions(json: string, needle: string): boolean {
+  for (let at = json.indexOf(needle); at >= 0; at = json.indexOf(needle, at + 1)) {
+    const end = at + needle.length
+    if (end === json.length) return true
+    const next = json[end] ?? ""
+    if (MENTION_END.test(next)) return true
+    if (next === "\\" && JSON_ESCAPE_AFTER_BACKSLASH.test(json[end + 1] ?? "")) return true
+  }
+  return false
 }
 
 function buildMatcherSet(documents: readonly MentionDocument[]): MatcherSet {
   const matchers = documents.map((document) => mentionMatcher(document.path))
   const perEntrySafe = documents.every((document) => !ARRAY_SEAMS.some((seam) => document.path.includes(seam)))
-  return { documents, matchers, perEntrySafe }
+  return { documents, paths: new Set(documents.map((document) => document.path)), matchers, perEntrySafe }
 }
 
 function mentionsIn(json: string, matchers: readonly MentionMatcher[]): Set<string> {
-  const mentions = new Set<string>()
+  const found = new Set<string>()
   for (const matcher of matchers) {
-    if (matcher.pattern.test(json)) mentions.add(matcher.path)
+    if (mentions(json, matcher.needle)) found.add(matcher.path)
   }
-  return mentions
+  return found
 }
 
 /**
- * The pre-index behaviour, kept as the fallback for seam-unsafe corpora and as the differential
- * oracle in tests: one serialized window, one RegExp.test per document.
+ * The pre-index behaviour, kept as the differential oracle in tests: one serialized window, one
+ * RegExp.test per document.
  */
 export function excludedPathsByWindowScan(
   window: readonly unknown[],
   documents: readonly MentionDocument[],
 ): Set<string> {
-  return mentionsIn(JSON.stringify(window), buildMatcherSet(documents).matchers)
+  const json = JSON.stringify(window)
+  const found = new Set<string>()
+  for (const document of documents) {
+    const escaped = JSON.stringify(document.path).slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    if (new RegExp(`${escaped}(?=$|[\\s"'\x60\\])}>:;,!?]|\\\\["nrtbf])`).test(json)) found.add(document.path)
+  }
+  return found
 }
 
 function entryId(entry: unknown): string | undefined {
@@ -115,7 +136,7 @@ class BranchMentionIndex implements TranscriptMentionIndex {
     const window = input.entries.slice(-RECALL_PATH_ENTRY_WINDOW)
     if (!matcherSet.perEntrySafe) return mentionsIn(JSON.stringify(window), matcherSet.matchers)
 
-    const session = this.sessionFor(input.sessionId, input.documents)
+    const { session, added } = this.sessionFor(input.sessionId, matcherSet)
     const excluded = new Set<string>()
     const live = new Set<string>()
     for (let index = 0; index < window.length; index += 1) {
@@ -125,13 +146,15 @@ class BranchMentionIndex implements TranscriptMentionIndex {
         for (const path of mentionsIn(JSON.stringify(entry) ?? "", matcherSet.matchers)) excluded.add(path)
         continue
       }
-      let mentions = session.byEntryId.get(id)
-      if (mentions === undefined) {
-        mentions = mentionsIn(JSON.stringify(entry) ?? "", matcherSet.matchers)
-        session.byEntryId.set(id, mentions)
+      let found = session.byEntryId.get(id)
+      if (found === undefined) {
+        found = mentionsIn(JSON.stringify(entry) ?? "", matcherSet.matchers)
+      } else if (added.length > 0) {
+        found = new Set([...found, ...mentionsIn(JSON.stringify(entry) ?? "", added)])
       }
+      session.byEntryId.set(id, found)
       live.add(id)
-      for (const path of mentions) excluded.add(path)
+      for (const path of found) excluded.add(path)
     }
 
     for (const id of [...session.byEntryId.keys()]) {
@@ -147,14 +170,17 @@ class BranchMentionIndex implements TranscriptMentionIndex {
     return matcherSet
   }
 
-  private sessionFor(sessionId: string, documents: readonly MentionDocument[]): SessionMentions {
+  /** The session's cache, carried to this corpus, and the corpus paths its cached sets have not been tested for. */
+  private sessionFor(
+    sessionId: string,
+    matcherSet: MatcherSet,
+  ): { readonly session: SessionMentions; readonly added: readonly MentionMatcher[] } {
     const existing = this.sessions.get(sessionId)
     const session = existing ?? { documents: undefined, byEntryId: new Map<string, ReadonlySet<string>>() }
-    // A moved HEAD can retire, add or rename paths, so cached per-entry sets no longer describe the
-    // corpus; the whole session cache is dropped rather than reconciled.
-    if (session.documents !== documents) {
-      session.byEntryId.clear()
-      session.documents = documents
+    let added: readonly MentionMatcher[] = []
+    if (session.documents !== matcherSet.documents) {
+      added = this.reconcile(session, matcherSet)
+      session.documents = matcherSet.documents
     }
     if (existing !== undefined) this.sessions.delete(sessionId)
     this.sessions.set(sessionId, session)
@@ -163,7 +189,22 @@ class BranchMentionIndex implements TranscriptMentionIndex {
       if (oldest.done === true) break
       this.sessions.delete(oldest.value)
     }
-    return session
+    return { session, added }
+  }
+
+  /**
+   * Carries the cached sets to a moved HEAD. A mention depends only on the entry and the path, so every
+   * cached set stays exact for the paths both corpora share: removed paths leave it, and the paths the new
+   * corpus added are returned for this same call to test against each cached entry still in the window.
+   */
+  private reconcile(session: SessionMentions, matcherSet: MatcherSet): readonly MentionMatcher[] {
+    if (session.documents === undefined) return []
+    const previous = new Set(session.documents.map((document) => document.path))
+    for (const [id, found] of session.byEntryId) {
+      const kept = [...found].filter((path) => matcherSet.paths.has(path))
+      if (kept.length !== found.size) session.byEntryId.set(id, new Set(kept))
+    }
+    return matcherSet.matchers.filter((matcher) => !previous.has(matcher.path))
   }
 }
 

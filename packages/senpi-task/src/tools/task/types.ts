@@ -19,6 +19,8 @@ import type { TaskToolParamsStatic } from "./params"
 export type TaskToolContext = {
   readonly cwd: string
   readonly sessionManager: { getSessionId(): string }
+  // The model the parent session runs right now: a category child's last fallback rung (#10750).
+  readonly model?: { readonly provider: string; readonly id: string } | undefined
   readonly getPromptCacheSafeWaitSeconds?: () => number | undefined
   // Transient parent JS kernel-tool capability, present only while a live JavaScript eval owns this
   // tool call. Read structurally (readKernelToolsCapability) so the engine pin may predate it.
