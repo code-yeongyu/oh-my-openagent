@@ -11,6 +11,7 @@ import {
   createLegacyConfigMigrationPlans,
   executeLegacyConfigMigrationPlan,
 } from "./index"
+import { doriSectionRename } from "./dori-section-rename"
 
 describe("legacy config migration plans", () => {
   test("#given user, profile, config.jsonc, project, and sidecar fixtures #when planning and executing #then distinct group markers and exact backup destinations preserve every source", () => {
@@ -43,6 +44,7 @@ describe("legacy config migration plans", () => {
     try {
       // when
       const plans = createLegacyConfigMigrationPlans({
+        doriSectionRename,
         backupTimestamp: timestamp,
         cwd: projectDir,
         environment: { HOME: homeDir, XDG_CONFIG_HOME: join(homeDir, ".config") },
@@ -110,6 +112,7 @@ describe("legacy config migration plans", () => {
 
     try {
       const plans = createLegacyConfigMigrationPlans({
+        doriSectionRename,
         backupTimestamp: "2026-07-27T12-34-56-789Z",
         cwd: homeDir,
         environment: { HOME: homeDir, XDG_CONFIG_HOME: join(homeDir, ".config") },

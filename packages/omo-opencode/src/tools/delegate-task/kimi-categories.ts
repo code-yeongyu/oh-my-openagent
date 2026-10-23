@@ -1,4 +1,5 @@
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 const WRITING_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on WRITING / PROSE tasks.
@@ -29,7 +30,7 @@ ANTI-AI-SLOP RULES (NON-NEGOTIABLE):
 export const KIMI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
     name: "writing",
-    config: { model: "google/gemini-4-argon", variant: "low" },
+    config: { model: `google/${LATEST_MODEL_BY_FAMILY.geminiPro}`, variant: "low" },
     description: "Documentation, prose, technical writing",
     promptAppend: WRITING_CATEGORY_PROMPT_APPEND,
   },

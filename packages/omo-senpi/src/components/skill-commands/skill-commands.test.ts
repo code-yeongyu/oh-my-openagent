@@ -186,4 +186,32 @@ describe("skill-commands ahead of the keyword components", () => {
       fixture.cleanup()
     }
   })
+
+  // #10822: the binding slash forms must survive this component's rewrite to /skill:<name>. The command loads the
+  // skill body; the mode blocks (first reads, workflow-only dispatch) and unconditional companions ride with it,
+  // and a question keeps the command alone.
+  test("#given the real component order #when /mass-ulw, /mass-ulw research or /ulw-research is submitted #then they bind", async () => {
+    const fixture = skillsFixture(["mass-ulw", "ulw-research"])
+    try {
+      for (const [text, expected] of [
+        ["/mass-ulw research the gateway options", ["omo-mass-ulw-mode", "omo-ulw-research-mode", "omo-browser-pointer", "omo-ultimate-browsing-pointer"]],
+        ["/ulw-research the gateway options", ["omo-ulw-research-mode", "omo-browser-pointer", "omo-ultimate-browsing-pointer"]],
+        ["/mass-ulw split the docs refresh", ["omo-mass-ulw-mode"]],
+        ["/mass-ulw is this the right tool?", []],
+      ] as const) {
+        const pi = hostWith([...LOADED, { name: "skill:mass-ulw", description: "Mass.", source: "skill" }, { name: "skill:ulw-research", description: "Research.", source: "skill" }])
+        await registerSkillCommands(pi, fixture.dir)
+        await createSkillPointersComponent().register(pi, context(pi))
+
+        const submitted = await submit(pi, text)
+
+        const contents = pi.messages.map((call) => String(call.message["content"]))
+        expect({ text, rewritten: submitted.text.startsWith("/skill:"), tags: contents.map((content) => /^<([a-z-]+)>/.exec(content)?.[1]) }).toEqual({ text, rewritten: true, tags: [...expected] })
+        // A companion of a bound parent carries no "if the user is asking" condition.
+        for (const content of contents) expect({ text, conditional: content.includes("If the user of this session is asking") }).toEqual({ text, conditional: false })
+      }
+    } finally {
+      fixture.cleanup()
+    }
+  })
 })

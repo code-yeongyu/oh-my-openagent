@@ -1,0 +1,521 @@
+{
+  "metadata": {
+    "title": "OmO",
+    "description": "Sua ferramenta para o trabalho real. Mas é um agente. O OmO transforma seus tokens em resultados que importam."
+  },
+  "nav": {
+    "brand": "OmO",
+    "features": "Recursos",
+    "docs": "Docs",
+    "manifesto": "Manifesto",
+    "install": "Instalar",
+    "githubStars": "{count} estrelas no GitHub",
+    "openMenu": "Abrir menu",
+    "closeMenu": "Fechar menu",
+    "primary": "Principal"
+  },
+  "footer": {
+    "brand": "OmO",
+    "copyright": "© {year} Sisyphus Labs · Código-fonte disponível sob SUL-1.0",
+    "product": "Produto",
+    "community": "Comunidade",
+    "legal": "Legal",
+    "docs": "Docs",
+    "manifesto": "Manifesto",
+    "releases": "Versões",
+    "github": "GitHub",
+    "discord": "Discord",
+    "x": "X @justsisyphus",
+    "privacy": "Privacidade",
+    "terms": "Termos",
+    "language": "Idioma"
+  },
+  "landing": {
+    "hero": {
+      "title": "Sua ferramenta para o trabalho real.",
+      "titleHighlight": "Mas é um agente.",
+      "subcopy": "Transforme seus tokens em resultados que importam.\nPesquisa em dez mil fontes. Uma apresentação que as pessoas realmente entendem.\nTrabalho da empresa, experimentos, backends, frontends, código.\nO que você precisar que seja feito.",
+      "getStarted": "Começar",
+      "readManifesto": "Ler o manifesto",
+      "downloadDesktop": "Baixar o app para desktop",
+      "installLabel": "Um comando, uma ferramenta"
+    },
+    "command": {
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "copyAria": "Copiar comando de instalação",
+      "copiedStatus": "Comando de instalação copiado"
+    },
+    "install": {
+      "tabsLabel": "Comando de instalação para o seu sistema",
+      "windows": "Windows",
+      "tabs": {
+        "unix": "macOS, Linux, WSL",
+        "powershell": "PowerShell",
+        "cmd": "CMD"
+      },
+      "next": "Depois, abra um novo terminal e execute omo.",
+      "onComputer": "Execute isso no seu computador Mac, Linux ou Windows."
+    },
+    "proof": {
+      "label": "Números ao vivo",
+      "githubStars": "Estrelas no GitHub",
+      "totalDownloads": "Total de downloads",
+      "monthlyDownloads": "Downloads mensais"
+    },
+    "secret": {
+      "lead": "Preferíamos que você nunca precisasse ler o que está abaixo.",
+      "body": "Foque no seu trabalho.\nO OmO cuida da tecnologia.\nQuanto mais você usa, mais ele se adapta a você.",
+      "reveal": "Ainda curioso? Isto é para você."
+    },
+    "ultrawork": {
+      "title": "ultrawork",
+      "body": "Não precisa estudar. Se uma tarefa parecer difícil, adicione a palavra ultrawork ao seu prompt. O agente decide como atacá-la e chega ao melhor resultado sozinho.",
+      "promptPrefix": "deixe o relatório trimestral realmente legível",
+      "keyword": "ultrawork",
+      "step1": "lê toda a base de código antes de tocar em uma linha",
+      "step2": "planeja e comprova cada passo antes de avançar",
+      "step3": "verifica o resultado na superfície real e para"
+    },
+    "multiModel": {
+      "title": "Combine modelos sem pensar nisso.",
+      "body": "Use os modelos de ponta que você adora junto com os mais baratos. Basta entrar. Cada modelo já vem com um prompt de sistema ajustado para ele, para você nunca escolher o errado.",
+      "caption": "Perfis ajustados incluídos no OmO"
+    },
+    "ulw": {
+      "title": "Centenas de agentes trabalhando para você. Uma palavra-chave.",
+      "body": "Digite mass ulw e todo o trabalho vira um grafo de agentes: pesquisa profunda em milhares de fontes, um pipeline completo de machine learning, uma migração que ninguém quer fazer. Cada parte roda em paralelo no modelo ideal e é verificada antes de qualquer coisa ser dada como pronta."
+    },
+    "kibitzer": {
+      "title": "Kibitzer. Seu agente não esquece de você, nem do seu trabalho.",
+      "body": "Um modelo pequeno e barato fica ao lado do agente principal mais caro, lê o que você já fez e dá um toque nele antes que repita um erro. O modelo caro mantém o foco; você para de se explicar de novo.",
+      "sidecar": "Kibitzer · modelo pequeno",
+      "main": "Agente principal · modelo de ponta",
+      "memory": "memória",
+      "nudge": "toque",
+      "scene": "Um Kibitzer pequeno e barato roda em loop observando e lendo a memória ao lado do loop independente do agente principal caro, inserindo um lembrete para rodar o teste de migração antes de publicar.",
+      "cheapLoop": "Modelo pequeno e barato · loop independente",
+      "expensiveLoop": "Modelo de ponta caro · loop principal",
+      "watch": "Observar",
+      "read": "Ler memória",
+      "judge": "Julgar",
+      "memoryNote": "Migração anterior: a produção quebrou quando o teste foi pulado.",
+      "watchAgain": "Continuar observando",
+      "turn": "turno {turn}",
+      "plan": "Planejar mudança no schema",
+      "act": "Agir · escrever a migração",
+      "skip": "Verificar · pular teste de migração",
+      "testFirst": "Verificar · rodar teste de migração antes",
+      "ship": "Publicar a mudança",
+      "nextTurn": "Voltar ao plano · próximo turno",
+      "reason": "Da última vez isso quebrou a produção. Rode o teste de migração primeiro."
+    },
+    "skills": {
+      "title": "Skills de alta qualidade. Só as que você precisa.",
+      "body": "Seu modelo é inteligente, mas ainda sabe pouco sobre como resolver problemas do mundo real. O OmO traz o conhecimento que falta em forma de skills e carrega só o que a tarefa exige."
+    },
+    "crafted": {
+      "title": "E tudo mais que você tocar foi lapidado.",
+      "body": "Você não vai ver a maior parte disso. Essa é a ideia.",
+      "docs": "Veja os detalhes na documentação",
+      "item1Name": "Chamadas de ferramentas em modo código",
+      "item1Desc": "Chamadas de ferramentas independentes rodam juntas em um pequeno programa, sem uma ida e volta lenta para cada uma.",
+      "item2Name": "Absorção de chamadas de ferramentas",
+      "item2Desc": "Dezenas de chamadas de leitura, busca e consulta viram um único passo. Menos turnos, menos espera, menos tokens.",
+      "item3Name": "Correção de chamadas de ferramentas",
+      "item3Desc": "Argumentos malformados são corrigidos antes da execução, para que um erro de digitação nunca desperdice um turno.",
+      "item4Name": "Team mode",
+      "item4Desc": "Um agente líder coordena uma equipe de especialistas em paralelo quando o trabalho é grande o bastante para ser dividido.",
+      "item5Name": "Monitores, não polling",
+      "item5Desc": "Esperar por um build, um deploy ou um arquivo vira uma assinatura de evento. O agente continua trabalhando e acorda quando fica pronto.",
+      "item6Name": "Objetivos que sobrevivem",
+      "item6Desc": "Trabalhos longos salvam checkpoints com evidências; se a sessão reiniciar, ela retoma de onde parou.",
+      "item7Name": "Hot-reload de tudo",
+      "item7Desc": "Configurações, skills e prompts recarregam ao vivo. Sem reiniciar para testar uma mudança.",
+      "item8Name": "Uso do computador",
+      "item8Desc": "O agente lê a tela e a árvore de acessibilidade de apps nativos no macOS, Linux e Windows, e então clica e digita em segundo plano, sem roubar seu foco nem seu cursor. Um atalho de parada o suspende; só você retoma.",
+      "stage": {
+        "roundTrip": "uma ida e volta",
+        "oneStep": "1 passo",
+        "repaired": "corrigido antes de rodar",
+        "splits": "divide o trabalho",
+        "parallel": "trabalhando em paralelo",
+        "waiting": "aguardando · 0 polls",
+        "woke": "acordou",
+        "goalProgress": "objetivo · 3 de 4 verificados",
+        "resumes": "reinício → retoma no passo 4",
+        "saved": "salvo",
+        "reloaded": "recarregado · sem reiniciar",
+        "background": "em segundo plano",
+        "focusKept": "clicou · seu foco não mudou",
+        "stageLabel": "Uma única célula demonstrando o detalhe selecionado"
+      }
+    },
+    "platforms": {
+      "titlePrefix": "E do seu",
+      "body": "Fale com seu agente onde você já está. Ele envia mensagens como você, não como um bot, em todas as plataformas que você usa.",
+      "footnote": "Em breve. As plataformas de mensagens estão sendo integradas uma a uma.",
+      "titleSuffix": ""
+    },
+    "reviews": {
+      "eyebrow": "Dos usuários",
+      "title": "O que as pessoas dizem.",
+      "review1": {
+        "text": "Me fez cancelar minha assinatura do Cursor. Coisas inacreditáveis estão acontecendo na comunidade open source.",
+        "author": "Arthur Guiot"
+      },
+      "review2": {
+        "text": "Se o Claude Code faz em 7 dias o que um humano faz em 3 meses, o OmO faz em 1 hora.",
+        "author": "B, Pesquisador Quant"
+      },
+      "review3": {
+        "text": "Vocês deveriam colocar isso no core e contratar ele. Sério. É muito, muito, muito bom.",
+        "author": "Henning Kilset"
+      }
+    },
+    "cta": {
+      "eyebrow": "Instalar",
+      "title": "Um comando. Depois, de volta ao trabalho.",
+      "subtitle": "Instale o OmO, abra seu projeto e descreva a tarefa. É só isso.",
+      "installNow": "Instalar agora",
+      "readTheDocs": "Ler a documentação"
+    },
+    "dori": {
+      "eyebrow": "Spoiler",
+      "title": "Alguém andou trabalhando enquanto você dorme.",
+      "body": "Não é o OmO. É um novo contratado da mesma equipe. Ele não bate ponto, e você paga a ele em tokens.",
+      "cta": "Conheça o Dori",
+      "alt": "Dori, um cachorrinho branco de desenho segurando uma pedra, espiando na parte inferior da página"
+    },
+    "dag": {
+      "region": "OmO para desktop com o grafo de workflow aberto",
+      "windowTitle": "OmO — pesquisa de mercado, 12k fontes",
+      "threads": "Threads",
+      "thread1": "pesquisa de mercado, 12k fontes",
+      "thread2": "treinar o modelo de ranking",
+      "thread3": "entregar o deck de investidores",
+      "workflow": "Workflow",
+      "status": {
+        "pending": "na fila",
+        "running": "em execução",
+        "completed": "concluído"
+      },
+      "assistantPlanning": "planejando 10 nós em 5 ondas",
+      "assistantRunning": "em execução",
+      "assistantDone": "execução concluída — 10/10 verificados",
+      "wave": "Onda",
+      "done": "concluído",
+      "running": "em execução",
+      "fit": "Ajustar grafo",
+      "center": "Centralizar onda ativa"
+    }
+  },
+  "docs": {
+    "mobileHeader": "Docs do OmO",
+    "searchPlaceholder": "Buscar nos docs...",
+    "install": {
+      "title": "Instalar o OmO",
+      "description": "Instale o OmO com um comando no macOS, Linux, WSL e Windows."
+    }
+  },
+  "manifesto": {
+    "badge": "Manifesto",
+    "meta": {
+      "author": "Q Kim",
+      "date": "14 de set. de 2026",
+      "series": "Esta série é atualizada conforme o mundo muda."
+    },
+    "hero": {
+      "title": "Manifesto Ultrawork",
+      "subtitle": "Construímos as ferramentas de hoje e as de amanhã,\npara você manter a cabeça no seu trabalho."
+    },
+    "chapters": {
+      "yourWork": {
+        "title": "Seu trabalho",
+        "p1": "Você liga o notebook. Abre o Slack.\nTodo dia sentamos diante de um teclado e um mouse e fazemos o mesmo trabalho que todo mundo.\nSó que não é o mesmo.\nTodo dia, misturamos ali um pouco da nossa própria sabedoria e experiência.",
+        "p2": "Ninguém mais tem a sua sabedoria e experiência.\nÉ isso que dá valor ao seu trabalho.",
+        "p3": "Seu trabalho importa.\nNão porque você revirou pilhas de material, montou um experimento e escreveu o código.\nPorque a sua sabedoria e experiência entraram nele.\nO resto foram só suas mãos se movendo."
+      },
+      "ourTool": {
+        "title": "A ferramenta que construímos",
+        "p1": "Os agentes de hoje podem agir em seu nome.",
+        "p2": "Eles leem dezenas de vezes mais do que você jamais conseguiria,\njogam todo o conhecimento humano na questão de como construir aquilo\ne trabalham 24 horas por dia.",
+        "p3": "Então deveria ser simples.\nVocê coloca tokens de qualidade e poder computacional,\ne sai um ótimo trabalho.",
+        "p4": "É isso que a ferramenta de hoje precisa ser.",
+        "p5": "Qual harness, quais manias de cada modelo, quais skills...\nnada disso deveria ser problema seu.",
+        "p6": "Quando a sua sabedoria encontra tokens de qualidade, isso deveria compilar direto em um bom trabalho.",
+        "p7": "Essa é a ferramenta que estamos construindo.\nEla pega os seus tokens de qualidade e os transforma em um ótimo trabalho."
+      },
+      "ourThinking": {
+        "title": "O que pensamos",
+        "p1": "Os agentes de hoje podem agir em seu nome,\nmas não têm a sua sabedoria nem a sua experiência.",
+        "p2": "Dê a eles tudo o que você sabe, e mais um pouco.\nO que você aprendeu vivendo como ser humano\nainda não vai sair dos poucos caracteres que um agente usa para entender o mundo.",
+        "p3Link": "Já vivemos em um mundo onde a IA resolve um Problema do Prêmio do Milênio,",
+        "p3Rest": "\ne até mesmo essa prova nasceu de uma semente, uma única linha de sabedoria humana.",
+        "p4": "Valorizamos a sua sabedoria e experiência.\nE a de todas as outras pessoas, na mesma medida.",
+        "p5": "Nossa ferramenta pega a sabedoria e a experiência de alguém, e como essa pessoa chegou lá,\ne entrega nas suas mãos, ainda viva.",
+        "p6": "O nosso próprio pensamento chega até você como sabedoria viva.\nSob o nome de um agente. Sob o nome de uma ferramenta.",
+        "p7": "O seu pensamento pode chegar a outra pessoa da mesma forma.\nAssim, todo mundo pode dedicar seu tempo aos problemas que realmente importam para si,\ne resolvê-los.\nAcreditamos que podemos construir esse mundo."
+      },
+      "tomorrow": {
+        "title": "A ferramenta de amanhã",
+        "p1": "Quando todos compartilharem o que sabem,\nquando as pessoas pensarem nos inúmeros problemas que importam para elas e os lançarem no mundo,\ne os computadores simplesmente voltarem com as respostas,",
+        "p2": "nós apareceremos de novo, com a ferramenta de amanhã,\npara você poder se concentrar mais uma vez."
+      }
+    },
+    "closing": {
+      "lead": "Então não pense demais,",
+      "title": "só ulw ulw",
+      "button": "Obter o OmO"
+    },
+    "legacyNote": "Em <date>19 de janeiro de 2026</date>, dissemos que um agente que faz você ler o código dele é uma ferramenta mal construída. <link>Leia a versão antiga</link>"
+  },
+  "manifestoLegacy": {
+    "badge": "Manifesto",
+    "hero": {
+      "title": "Manifesto Ultrawork",
+      "subtitle": "A Filosofia da Engenharia de Alta Produtividade"
+    },
+    "bottleneck": "> HUMANO NO LOOP = GARGALO",
+    "autonomousCar": "Imagine um carro autônomo que obriga você a assumir o volante a cada 30 segundos. Você chamaria isso de \"autônomo\"? Não. Chamaria de assistência de direção. Mal supera o piloto automático.",
+    "whyDifferent": "Por que programar seria diferente?",
+    "micromanagement": "Aceitamos uma versão de \"programação com IA\" em que um chatbot escreve 20 linhas e espera você consertá-las. Ninguém chamaria isso de automação. É microgerenciamento.",
+    "painPoints": {
+      "fixing": "Consertar código deixado pela metade pela IA",
+      "syntax": "Corrigir erros de sintaxe manualmente",
+      "copyPasting": "Copiar e colar contexto de um lado para o outro",
+      "reviewing": "Revisar cada linha em busca de alucinações"
+    },
+    "notCollaboration": "Isso não é \"colaboração humano-IA\". É a IA falhando em fazer o trabalho dela.",
+    "premise": "O {linkText} foi criado sob a premissa de que o humano deve ser o arquiteto, não o corretor ortográfico.",
+    "premiseLinkText": "OmO",
+    "indistinguishable": {
+      "title": "Código Indistinguível",
+      "subtitle": "O código escrito por um agente deve ser indistinguível do código escrito por um engenheiro sênior.",
+      "items": {
+        "patterns": "Segue os padrões e a arquitetura existentes na base de código",
+        "errorHandling": "Trata erros e casos extremos sem precisar pedir",
+        "tests": "Escreve testes que realmente testam o comportamento, não apenas cobertura",
+        "noSlop": "Sem lixo de IA, ou seja, sem excesso de engenharia nem abstrações que ninguém pediu",
+        "comments": "Comenta apenas quando agrega valor, nunca para repetir o óbvio"
+      },
+      "quote": "\"Se você consegue distinguir se um commit foi feito por um humano ou por um agente, o agente falhou.\""
+    },
+    "tokenCost": {
+      "title": "Custo de Tokens vs. Produtividade",
+      "description": "Não ligamos para o consumo de tokens. Ligamos para o resultado. Se gastar $5 em tokens economiza uma hora de engenharia, é um ROI de 20x.",
+      "parallelAgents": "Agentes em paralelo explorando múltiplas soluções",
+      "completeWork": "Trabalho completo sem intervenção humana",
+      "selfVerification": "Verifica o próprio trabalho antes de dar como concluído",
+      "however": "Porém...",
+      "optimizeDescription": "Otimizamos a eficiência onde importa. Não limitando o modelo, mas:",
+      "cheaperModels": "Usando modelos mais baratos para tarefas rotineiras",
+      "avoidingRedundant": "Não explorando o mesmo caminho duas vezes",
+      "intelligentCaching": "Guardando em cache o que aprendeu entre sessões",
+      "stoppingExactly": "Parando assim que houver contexto suficiente"
+    },
+    "cognitiveLoad": {
+      "title": "Minimize a Carga Cognitiva Humana",
+      "subtitle": "O humano só deve precisar dizer o que quer. Todo o resto é trabalho do agente.",
+      "ultrawork": {
+        "badge": "Abordagem 1",
+        "title": "Ultrawork",
+        "subtitle": "É só dizer \"ulw\" e sair.",
+        "steps": {
+          "analyze": "Lê a base de código para entender o contexto",
+          "breakdown": "Divide a tarefa em etapas atômicas",
+          "execute": "Faz a implementação",
+          "verify": "Verifica em relação aos requisitos",
+          "commit": "Faz o commit das alterações"
+        },
+        "footer": "Zero intervenção. Apenas resultados."
+      },
+      "plannerExecutor": {
+        "badge": "Abordagem 2",
+        "title": "Planejador + Executor",
+        "subtitle": "Quando você quer controle estratégico.",
+        "plannerTitle": "Ultrawork Planner",
+        "plannerDescription": "Entrevista você, pesquisa a base de código e escreve um plano de trabalho detalhado.",
+        "executorTitle": "/ulw-execute",
+        "executorDescription": "Executa o plano aprovado na mesma sessão, delegando por categoria e acompanhando o progresso onda por onda.",
+        "footer": "Você arquiteta. Os agentes executam. Nada acontece fora da sua vista."
+      }
+    },
+    "principles": {
+      "predictable": {
+        "title": "Previsível",
+        "description": "Mesmas entradas, mesma saída. Sem surpresas e sem liberdades criativas que você não pediu."
+      },
+      "continuous": {
+        "title": "Contínuo",
+        "description": "O trabalho sobrevive a uma sessão travada ou a uma semana fora, porque o agente mantém o estado e você não precisa fazer isso."
+      },
+      "delegatable": {
+        "title": "Delegável",
+        "description": "Entregue uma tarefa com critérios de aceitação claros, como faria com um colega capaz. Ele se corrige quando algo dá errado e só escala quando necessário."
+      }
+    },
+    "coreLoop": {
+      "title": "O Loop Principal",
+      "features": {
+        "planner": {
+          "feature": "Entrevista de planejamento",
+          "purpose": "Extrair o que você realmente quer antes de construir qualquer coisa"
+        },
+        "planConsultant": {
+          "feature": "Consultor de plano",
+          "purpose": "Capturar ambiguidades antes que virem bugs"
+        },
+        "planReviewer": {
+          "feature": "Barreira de revisão do plano",
+          "purpose": "Verificar se o plano está completo antes da execução"
+        },
+        "orchestrator": {
+          "feature": "Orquestrador",
+          "purpose": "Coordenar o trabalho para você não precisar microgerenciar"
+        },
+        "todoContinuation": {
+          "feature": "Continuação de Tarefas",
+          "purpose": "Forçar a conclusão, evitar mentiras de \"já terminei\""
+        },
+        "categorySystem": {
+          "feature": "Sistema de Categorias",
+          "purpose": "Direcionar cada tarefa ao modelo certo para você nunca precisar escolher um"
+        },
+        "backgroundAgents": {
+          "feature": "Agentes em Segundo Plano",
+          "purpose": "Pesquisar em paralelo sem bloquear você"
+        },
+        "wisdomAccumulation": {
+          "feature": "Acúmulo de Sabedoria",
+          "purpose": "Aprender com o trabalho, não repetir erros"
+        }
+      }
+    },
+    "future": {
+      "title": "O Futuro que Estamos Construindo",
+      "items": {
+        "focus": "Desenvolvedores pensam no que construir, não em como fazer uma IA construir",
+        "quality": "Qualidade de código que não depende de quem o escreveu",
+        "complexity": "Projetos complexos tão fáceis quanto os simples",
+        "promptEngineering": "\"Engenharia de prompt\" se torna obsoleta"
+      },
+      "quote1": "\"O agente deve ser invisível. Como eletricidade, como água encanada.\"",
+      "quote2": "\"Você aperta o interruptor. A luz acende. Você não pensa na rede elétrica.\""
+    },
+    "finalCta": {
+      "title": "só ulw ulw",
+      "button": "Obter o OmO"
+    },
+    "archive": {
+      "eyebrow": "Versão antiga · 19 de jan. de 2026",
+      "note": "Escrito quando não ler o código ainda era chamado de loucura, e todo mundo ficava sentado na frente do agente.",
+      "back": "Ler a versão atual"
+    }
+  },
+  "download": {
+    "metadata": {
+      "title": "Baixar o OmO para desktop",
+      "description": "Baixe o app para desktop do OmO para macOS, Windows ou Linux. Todos os instaladores são listados com seu tamanho e checksum SHA-256."
+    },
+    "eyebrow": "App para desktop",
+    "title": "Baixar o OmO",
+    "lead": "O app para desktop do OmO para seu Mac, PC com Windows ou máquina Linux. Selecionamos o instalador ideal para o seu computador e listamos todas as opções abaixo, cada uma com seu checksum.",
+    "channel": {
+      "label": "Canal de lançamento",
+      "stable": "Estável",
+      "beta": "Beta",
+      "betaNote": "As versões beta chegam antes das estáveis e são menos polidas."
+    },
+    "detecting": "Buscando o instalador ideal para o seu computador…",
+    "arch": {
+      "mac-arm64": "Apple silicon",
+      "mac-x64": "Intel",
+      "win-x64": "64 bits",
+      "linux-x64": "64 bits",
+      "linux-arm64": "ARM64"
+    },
+    "kinds": {
+      "dmg": "Imagem de disco (.dmg)",
+      "exe": "Instalador (.exe)",
+      "deb": "Pacote Debian (.deb)",
+      "appimage": "AppImage"
+    },
+    "primary": {
+      "button": "Baixar para {os}",
+      "meta": "OmO {version} · {arch} · {size}",
+      "metaNoSize": "OmO {version} · {arch}",
+      "intelPrompt": "Não é um Mac com Apple silicon?",
+      "intelLink": "Baixar para Mac com Intel",
+      "released": "Lançado em {date}",
+      "notes": "Notas da versão"
+    },
+    "noInstaller": {
+      "title": "Ainda não há instalador para o seu sistema",
+      "body": "Esta versão não tem um instalador para o seu computador. Tudo o que ela inclui está listado abaixo."
+    },
+    "phone": {
+      "title": "O OmO para desktop precisa de um computador",
+      "body": "Abra esta página no seu computador Mac, Windows ou Linux para baixar. Os instaladores estão listados abaixo."
+    },
+    "coming": {
+      "title": "Disponível em {date}",
+      "body": "O app para desktop ainda não é público. Até lá, você pode instalar o OmO pela linha de comando.",
+      "cli": "Instalar pela linha de comando"
+    },
+    "unavailable": {
+      "title": "Os downloads estão indisponíveis no momento",
+      "body": "Não foi possível carregar a lista de downloads. Tente novamente em alguns minutos ou instale o OmO pela linha de comando.",
+      "cli": "Instalar pela linha de comando"
+    },
+    "all": {
+      "title": "Todos os downloads",
+      "sha": "SHA-256",
+      "missing": "Ainda não disponível nesta versão",
+      "linuxPick": "No Linux, escolha o .deb para Ubuntu e Debian: ele é instalado pelo gerenciador de pacotes e o app avisa quando sai uma nova versão. Escolha o AppImage para outras distribuições: ele roda sem instalar (requer FUSE) e se atualiza sozinho."
+    },
+    "verify": {
+      "title": "Verifique seu download",
+      "body": "Cada instalador tem um checksum SHA-256. Após baixar, calcule o checksum do arquivo e compare com o listado acima. Os mesmos checksums estão no arquivo SHA256SUMS desta versão.",
+      "checksums": "SHA256SUMS desta versão",
+      "macos": "macOS",
+      "windows": "Windows (PowerShell)",
+      "linux": "Linux",
+      "mismatch": "Se os dois valores forem diferentes, exclua o arquivo e baixe novamente. Não o abra."
+    },
+    "supported": {
+      "title": "Sistemas compatíveis",
+      "macos": "macOS 14 ou posterior, Apple silicon e Intel",
+      "windows": "Windows 11, 64 bits",
+      "linux": "Ubuntu 24.04, 64 bits (.deb ou AppImage)"
+    },
+    "os": {
+      "macos": "macOS",
+      "windows": "Windows",
+      "linux": "Linux"
+    }
+  },
+  "support": {
+    "metadata": {
+      "title": "Obtenha ajuda com o OmO",
+      "description": "Relate um problema com o OmO ou peça ajuda à comunidade."
+    },
+    "eyebrow": "Suporte",
+    "title": "Obtenha ajuda com o OmO",
+    "lead": "Encontrou um problema ou tem alguma dúvida? Abra uma issue no GitHub ou pergunte no Discord da comunidade.",
+    "leadWithReport": "Seu relatório do app OmO está abaixo. Envie como uma issue no GitHub ou leve para o Discord da comunidade.",
+    "report": {
+      "heading": "Seu relatório",
+      "titleLabel": "Título",
+      "bodyLabel": "Detalhes",
+      "copy": "Copiar relatório",
+      "copied": "Copiado"
+    },
+    "actions": {
+      "openIssue": "Abrir issue no GitHub",
+      "openIssueNote": "A issue abre no GitHub já preenchida com o seu relatório. Confira antes de enviar: as issues do GitHub são públicas. Se o relatório tiver um zip de diagnóstico, anexe-o lá.",
+      "discord": "Perguntar no Discord"
+    },
+    "privacy": "Esta página não salva seu relatório, mas ele foi enviado para omo.dev no link aberto pelo app. Ele só chega ao GitHub quando você mesmo envia a issue."
+  }
+}

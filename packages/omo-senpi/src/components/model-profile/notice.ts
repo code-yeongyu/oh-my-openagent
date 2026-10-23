@@ -50,7 +50,8 @@ export function noticeContent(
       const reasoning = resolution.reasoning !== undefined ? ` ${resolution.reasoning}` : ""
       const skipped = resolution.skipped.length > 0 ? ` (skipped: ${resolution.skipped.join(", ")})` : ""
       const auth = authFailures.length > 0 ? `; ${authFailureNote(authFailures, mode)}` : ""
-      return `OmO Native: model profile ${profileLabel(resolution.profile)} selected ${model}${reasoning}${skipped}${auth}; ${MID_SESSION_NOTE}`
+      const caution = resolution.profile.caution !== undefined ? ` **${resolution.profile.caution}**` : ""
+      return `OmO Native: model profile ${profileLabel(resolution.profile)} selected ${model}${reasoning}${skipped}${auth}; ${MID_SESSION_NOTE}${caution}`
     }
     case "unavailable":
       if (authFailures.length > 0) {
