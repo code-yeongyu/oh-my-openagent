@@ -438,7 +438,7 @@ Runs on senpi 2026.10.27-1, which tightens shell permission checks. ([#11364](ht
 
 **Held packaging-test directories are recorded without failing cleanup.** The packed memory-sync probe and abandoned-root sweep share one best-effort removal guard, with no retries. Every held root is printed in the test log; Windows diagnostics are bounded to 30 seconds and include the holder's pid, image and parent pid when identified, or the diagnostic failure. Unrelated filesystem errors and unrecorded leaks still fail. ([#11218](https://github.com/code-yeongyu/oh-my-openagent/pull/11218), part of [#11135](https://github.com/code-yeongyu/oh-my-openagent/issues/11135))
 
-**Teammode explains how to get MultiAgentV2 on a v1-only Codex session.** Instead of only reporting that teammode is unavailable, it says once that a new session gets the V2 transport after the model's catalog entry is pinned to `multi_agent_version = "v2"` or `codex features enable multi_agent_v2` runs. ([#10717](https://github.com/code-yeongyu/oh-my-openagent/pull/10717))
+**Teammode explains how to get MultiAgentV2 on a v1-only Codex session.** Instead of only reporting that teammode is unavailable, it says once that a new session gets the V2 transport after the model's entry is pinned to `multi_agent_version = "v2"` in a user-owned catalog that `model_catalog_json` names. ([#10717](https://github.com/code-yeongyu/oh-my-openagent/pull/10717))
 
 ## [5.1.45] - 2026-10-24
 
