@@ -150,7 +150,7 @@ const handlers = {
 			return { team, member: team.members.find((m) => m.id === memberId) };
 		});
 		const delivery = isMultiAgentV2(team)
-			? `Send this with spawn_agent using only task_name "${member.taskName}", message <bootstrap>, and fork_turns "none"; then bind-agent --agent-path "${member.agentPath}"`
+			? `Send this with spawn_agent using task_name "${member.taskName}", an exact LazyCodex agent_type for the member's slice when the spawn schema exposes it (lazycodex-worker-low/medium/high by difficulty; explorer for read-only search), message <bootstrap>, and fork_turns "none"; then bind-agent --agent-path "${member.agentPath}"`
 			: `Send this as the new thread's first message (title the thread "${member.threadTitle}")`;
 		process.stdout.write(`added member ${memberId} to team ${sessionId}.\n\n${delivery}:\n---\n${buildMemberPrompt(team, memberId)}\n---\n`);
 	},

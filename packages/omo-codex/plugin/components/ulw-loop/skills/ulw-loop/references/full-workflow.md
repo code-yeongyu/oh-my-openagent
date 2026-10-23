@@ -48,7 +48,7 @@ Size each worker to the task. Put the intended role, rigor level, and specialty 
 
 For reviewer work, use a self-contained reviewer assignment, tight scope, and explicit verification in `message`. Never spawn a context-only child for review.
 
-Difficulty is orthogonal to LIGHT/HEAVY rigor. Tier roles bind via `agent_type` (v1); the deployed v2 spawn schema omits it — state the tier inside `message` there.
+Difficulty is orthogonal to LIGHT/HEAVY rigor. Tier roles bind via an exact installed LazyCodex `agent_type` whenever the spawn schema exposes it, including V2; never use generic `worker` or `default`. Omit `model`, `reasoning_effort`, and `service_tier` so the role TOML supplies them. If `agent_type` is not exposed, stop and report incompatible role routing.
 
 Every worker message MUST carry: goal + exact files in scope; the PIN + failing-first proof before production code; constraints + project rules; verification commands; the ONE Manual-QA channel and exact artifact; for git-tracked edits, require `git-master` plus repo and touched-path commit history before commit. Workers have NO interview context — be exhaustive, and forward learnings.
 
