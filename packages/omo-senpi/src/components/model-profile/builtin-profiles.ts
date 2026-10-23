@@ -1,8 +1,9 @@
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 /**
  * A model profile is a named, ordered model chain a human picks by lane
- * ("Daily · Normal", "Geeky · Heavy") instead of by model id. It is not the
+ * ("Daily · Normal", "Obsessive · Heavy") instead of by model id. It is not the
  * `profiles` key in omo.json: that one is a VSCode-style config-layer overlay
  * activated by `OMO_PROFILE`.
  *
@@ -40,6 +41,8 @@ export type ModelProfileTier = "normal" | "heavy"
 export type BuiltinModelProfile = {
   readonly displayName: string
   readonly description: string
+  /** One-line warning a picker renders in bold; set only where a lane must warn the user off. */
+  readonly caution?: string
   /** Picker axes: every builtin is a lane. */
   readonly family: ModelProfileFamily
   readonly tier: ModelProfileTier
@@ -67,8 +70,8 @@ const KIMI_PROVIDERS = ["kimi-coding", "kimi-for-coding", "moonshotai", "opencod
 const GLM_PROVIDERS = ["zai", "zai-coding-cn", "opencode-go"] as const
 const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as const
 // GPT-6.1 Sol and its Fast tier are served only on the two OpenAI lanes (not Copilot or OpenCode Zen),
-// so their rungs list just those; the rung behind them (GPT-5.6 Sol in Geeky · Normal) keeps the
-// profile on every GPT provider.
+// so their rungs list just those; Obsessive · Normal heads with GPT-6 Astra on every GPT provider and
+// falls back through those two-lane rungs to GPT-5.6 Sol, which keeps the profile on every GPT provider.
 const GPT_6_1_PROVIDERS = ["chatgpt-subscription", "openai"] as const
 
 // Key order is the order a picker renders. `deep` is deliberately NOT an id: builtin
@@ -84,9 +87,9 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     displayName: "Daily · Normal",
     description: "Gets any task done without fuss.",
     models: [
-      { providers: [...CLAUDE_PROVIDERS], model: "claude-opus-5-5", variant: "medium" },
-      { providers: [...KIMI_PROVIDERS], model: "kimi-k3", variant: "max" },
-      { providers: [...GLM_PROVIDERS], model: "glm-5.3", variant: "max" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeOpus, variant: "medium" },
+      { providers: [...KIMI_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.kimi, variant: "max" },
+      { providers: [...GLM_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
     ],
   },
   "daily-heavy": {
@@ -94,24 +97,27 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     tier: "heavy",
     displayName: "Daily · Heavy",
     description: "Gets any task done, after thinking it over from more sides.",
-    models: [{ providers: [...CLAUDE_PROVIDERS], model: "claude-fable-5-1", variant: "xhigh" }],
+    models: [{ providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "xhigh" }],
   },
   "geeky-normal": {
     family: "geeky",
     tier: "normal",
-    displayName: "Geeky · Normal",
-    description: "Works on one task and thinks it through.",
+    displayName: "Obsessive · Normal",
+    description: "Obsessive focus on one hard task.",
+    caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
     models: [
-      { providers: [...GPT_6_1_PROVIDERS], model: "gpt-6.1-sol-fast", variant: "medium" },
-      { providers: [...GPT_6_1_PROVIDERS], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "medium" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
       { providers: [...GPT_PROVIDERS], model: "gpt-5.6-sol", variant: "medium" },
     ],
   },
   "geeky-heavy": {
     family: "geeky",
     tier: "heavy",
-    displayName: "Geeky · Heavy",
-    description: "Works on one task and thinks it over from every side.",
-    models: [{ providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "high" }],
+    displayName: "Obsessive · Heavy",
+    description: "Obsessive focus on one hard task, checked from every side.",
+    caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
+    models: [{ providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" }],
   },
 })

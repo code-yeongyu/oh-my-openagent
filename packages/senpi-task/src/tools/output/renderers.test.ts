@@ -41,6 +41,24 @@ function snapshot(overrides: Partial<TaskSnapshot> = {}): TaskSnapshot {
 }
 
 describe("task_output model text (#9722)", () => {
+  test("#given a child that moved onto its parent's model #when rendered #then the text names the parent model, the model that gave out, and the interrupted call (#10750)", () => {
+    const text = taskOutputModelText(snapshot({
+      parent_model: "chatgpt-subscription/gpt-6.1-sol",
+      parent_model_fallback: {
+        from_model: "anthropic-subscription/claude-opus-5-5",
+        reason: "usage_limit",
+        resets: "3:20am",
+        interrupted_tools: ["bash"],
+        at: "2026-10-21T01:00:00.000Z",
+      },
+    }))
+
+    for (const fact of ["chatgpt-subscription/gpt-6.1-sol", "anthropic-subscription/claude-opus-5-5", "3:20am", "bash"]) {
+      expect(text).toContain(fact)
+    }
+    expect(taskOutputModelText(snapshot())).not.toContain("chatgpt-subscription/gpt-6.1-sol")
+  })
+
   test("#given an honoured pin whose resolved display carries the suffix #when rendered #then it shows one model, never a false mismatch", () => {
     // given: the plan's display is the raw pin; the child's effective model is its canonical base
     const snap = snapshot({

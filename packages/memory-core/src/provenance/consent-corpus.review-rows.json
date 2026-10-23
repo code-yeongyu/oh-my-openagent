@@ -1,0 +1,1284 @@
+[
+  {
+    "phrase": "Actually, also remove Z.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Actually, no.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Also run the tests.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Cancel that.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Changed my mind.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "DON'T",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "Disregard that.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Do NOT",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "Do it now.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Don't delete the prod database yet",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "Don’t",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "Don’t delete the prod database yet.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "Forget it.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Hold on.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "I guess remove plugins X and Y, meh",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "If it fails, tell me.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Ignore that.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Just kidding.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Leave them.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Never ever",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "Never mind",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Never mind.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Nevermind.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "No.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Nobody asked you to remove plugins X and Y.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "Nooo.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Not yet",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Not yet.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Nvm",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Nvm.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "On second thought, keep them.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Please don't.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Please remove plugins X and Y now.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "QUESTION",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "Remove plugins X and Y, keep them.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "Remove plugins X and Y. Actually, no.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "Remove plugins X and Y. No.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Remove plugins X and Y. Now. Okay keep them.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "Remove plugins X and Y. Thanks. Never mind.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Remove plugins X and Y. Then keep them.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "Run tests before you push.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Scratch that.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "Should I remove plugins X and Y",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "Should we remove plugins X and Y? I'm not sure.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "Thanks!!",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "Thanks, but don't.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "Thanks.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Thanks. Never mind.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "Thanks. Thanks.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "Thanks?",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "Then push it.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Undo that.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "Who said remove plugins X and Y",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "X가 아니라 Y",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "You suggested remove plugins X and Y. No.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "You’re suggesting I delete the prod database",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "can I",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "can we",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "compile",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md",
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "could we",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "create",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md",
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "custom",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md",
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "delete",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "do I",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "don't",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "en",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "every retraction",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "execute",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "facts",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "forget it",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md",
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "forget that",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "ignore it",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "ignore that",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md",
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "inferred",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "insert",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "is a bad idea",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "jk",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "maybe ... later",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "memory",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "mixed",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "never said",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "no",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "normalize",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "not",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "or",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "plugins X and Y. Now",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "provenance",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "provenance.claim",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "recall",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "receipt",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "refusal in the next sentence",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "remove plugins X and Y",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "remove plugins X and Y is a terrible idea.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "remove plugins X and Y. Then",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "rename",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "should I",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "should we",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "suggestion",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "test.each",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "thinking about whether to delete",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "tools",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "verified",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "what those quoted words themselves say",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "when in doubt",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "when in doubt, it stays a suggestion",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "yes",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-4c5ab30933-1792323021996.md"
+    ]
+  },
+  {
+    "phrase": "you suggested",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "ㄴㄴ",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "고마워",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "그대로 둬",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "그리고 Y도 정리해",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "그만큼",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "그만큼 중요해",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "그만해",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "기다려",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "까",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "까요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "끝나면 알려줘",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "나",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "나요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "냅둬",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "노노",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "놔둬",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "다시 생각해보니 그냥 둬",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md",
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "돼",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "됐",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md",
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md",
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "됐어요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "되나",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "될까",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "마라",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "말 것",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "말라",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "말라고 했잖아",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "말아줘",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "맙",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "맙시다",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "멈춰",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "백업 다 됐어",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "백업 됐으면 플러그인 X 지워",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "백업은 이미 됐어",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "백업은 이미 완료됐어",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "백업은 이미 완료됐으니 플러그인 X 지워",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "스톱",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "싫다",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "싫어",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "싫어요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아냐",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아뇨",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md",
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "아뇨 그건 두세요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "아뇨.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "아니",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md",
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아니 잠깐",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아니.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아니라",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "아니라니까",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아니면",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "아니면 Y도 지워",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "아니면 말고",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아니야",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아니에요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아니요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아닙니다",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "아직 ... 하지 마",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "안 돼",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "안돼",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "안에 있는 것도 지워",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "없던",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5f557dff37-1792369999214.md"
+    ]
+  },
+  {
+    "phrase": "없던 걸로 해",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "완료됐어",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "일단",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "일단 그거부터 해",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "잘됐다",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "잠깐",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "잠깐만",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "잠시",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "잠시만",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "줄래",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "지우지 마세요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "지우지 맙시다",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md",
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "지울지 고민중",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "지워 주세요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "지워도 돼",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "지워도 되나",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "지워줄래",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "취소",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "취소된 것도 지워",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지우지 말 것",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지우지 말라고 했잖아",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 관둬",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 그냥 둬",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 놉",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 농담이야",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 다음에 하자",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 되돌려",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 아뇨",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 주세요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 패스",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워 필요 없어",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-0f4147b789-1792377389794.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워. 아뇨",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-2f2436fd0e-1792366943758.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워. 아니 하지 마",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워. 아니.",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워. 아니야",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워. 잠깐",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워도 될까요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md"
+    ]
+  },
+  {
+    "phrase": "플러그인 X 지워줘",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-05532e6a2e-1792338753718.md",
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "하지 마",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-5cd61a65e7-1792355957485.md"
+    ]
+  },
+  {
+    "phrase": "하지 마세요",
+    "sources": [
+      "code-yeongyu_oh-my-openagent#10498-c4d3a536ea-1792359253048.md"
+    ]
+  }
+]

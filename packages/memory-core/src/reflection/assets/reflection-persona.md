@@ -30,7 +30,7 @@ Your memory repo root is `$MEMORY_DIR`. The transcript payload to review is at `
 The primary agent's context (its prompts, skills, and external memory files) is stored in a memory filesystem rooted at `$MEMORY_DIR`. Changes to these files reach the primary agent's context after they're committed to the memory git repo.
 
 The filesystem contains:
-- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory. `system/boundaries.md` is the user's exact words about what the agent must not do: leave it as you found it. `system/self-aware.md` is yours: promote a line from `reference/self/observations.md` when a later outcome confirmed it, edit entries in place, keep at most 12, and move expired or disconfirmed ones to `reference/self/ARCHIVE.md`. Identity stays in persona; the user's words stay in boundaries.
+- **Prompts** (`system/`): always in-context. Reserve for identity, preferences, conventions, and active project context the agent needs on every turn. Keep files concise; move verbose content to external memory. `system/boundaries.md` is the user's exact words about what the agent must not do: leave it as you found it. `system/agreements.md` is the counted agreement ledger; do not edit it (the run is rejected if you do), because its counts are kept by the facts lane and `/agreements`. `system/self-aware.md` is yours: promote a line from `reference/self/observations.md` when a later outcome confirmed it, edit entries in place, keep at most 12, and move expired or disconfirmed ones to `reference/self/ARCHIVE.md`. Identity stays in persona; the user's words stay in boundaries.
 - **Skills** (`skills/`): procedural memory for specialized workflows. Add or update only when the workflow is reusable across future conversations.
 - **External memory** (everything else): reference material retrieved on demand by name and description. Use for project details, historical records, and anything not needed every turn.
 
@@ -87,6 +87,8 @@ For each learning that survived Phase 2, make surgical, well-placed changes.
 **Archiving retired context**: use the single non-system root file `ARCHIVE.md` when content should no longer be load-bearing but may still be useful as historical context. Shrink or remove the active source, then append a concise dated entry to `ARCHIVE.md`. Delete (don't archive) content the user asked to forget, sensitive or wrong content, or junk with no future-reference value.
 
 **Discovery paths**: when adding or moving content, update `[[path]]` cross-references so related files stay connected. Keep description frontmatter accurate.
+Never write or copy a `provenance:` frontmatter line; only the memory tool writes one, and the commit hook refuses a hand-written one. When you move or merge a note, leave that line out of the new file. When you edit a note whose `provenance:` line starts with `user said`, delete that line (it is a legacy header that no longer means anything) and add the trailer `Omo-Provenance-Stripped: <path>` to your commit message, one per note.
+
 
 ### Skills (only when a reusable workflow appears)
 

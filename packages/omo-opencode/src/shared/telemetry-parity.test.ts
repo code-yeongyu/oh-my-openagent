@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -23,6 +24,7 @@ const EXPECTED_DISTINCT_ID_FOR_PARITY_HOST =
 
 let activePostHogModule: PostHogModule | null = null
 const originalXdgDataHome = process.env.XDG_DATA_HOME
+let restoreTelemetryEnv: () => void
 
 async function importPostHogModule(): Promise<typeof import("./posthog")> {
   return import(`./posthog?parity=${Date.now()}-${Math.random()}`)
@@ -96,6 +98,10 @@ async function captureWithEnv(
   return captured
 }
 
+beforeEach(() => {
+  restoreTelemetryEnv = isolateTelemetryEnv()
+})
+
 afterEach(() => {
   resetPostHogModuleTestSeams()
   delete process.env.OMO_DISABLE_POSTHOG
@@ -106,6 +112,7 @@ afterEach(() => {
   } else {
     process.env.XDG_DATA_HOME = originalXdgDataHome
   }
+  restoreTelemetryEnv()
 })
 
 describe("telemetry before/after parity", () => {

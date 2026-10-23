@@ -2,6 +2,8 @@ import { spawn } from "node:child_process"
 import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
+import { holdGitActivityShared } from "./git-activity-lock"
+import { recordGitTimeout } from "./timeout-diagnostics"
 
 export interface GitExecOptions {
   cwd: string
@@ -87,11 +89,26 @@ function isGitNotFoundFromEnoent(error: unknown): error is GitNotFoundError {
   return (error.cause as NodeJS.ErrnoException).code === "ENOENT"
 }
 
-function runGitCommand(
+async function runGitCommand(
   executable: string,
   argv: readonly string[],
   options: GitExecOptions,
   environment: NodeJS.ProcessEnv,
+): Promise<GitExecResult> {
+  const activity = await holdGitActivityShared(options.cwd)
+  try {
+    return await spawnGitCommand(executable, argv, options, environment, activity?.fd)
+  } finally {
+    await activity?.release()
+  }
+}
+
+function spawnGitCommand(
+  executable: string,
+  argv: readonly string[],
+  options: GitExecOptions,
+  environment: NodeJS.ProcessEnv,
+  activityFd: number | undefined,
 ): Promise<GitExecResult> {
   return new Promise((resolve, reject) => {
     const hasStdin = options.stdin !== undefined
@@ -102,7 +119,8 @@ function runGitCommand(
       cwd: options.cwd,
       env: environment,
       shell: false,
-      stdio: [hasStdin ? "pipe" : "ignore", "pipe", "pipe"],
+      // fd 3 carries the git-activity lock into git and every process it starts (omo #10322).
+      stdio: [hasStdin ? "pipe" : "ignore", "pipe", "pipe", ...(activityFd === undefined ? [] : [activityFd])],
       windowsHide: true,
     })
     const stdout: Buffer[] = []
@@ -114,6 +132,7 @@ function runGitCommand(
     let killTimer: ReturnType<typeof setTimeout> | undefined
     const timer = setTimeout(() => {
       timedOut = true
+      recordGitTimeout(environment, child.pid, argv, options.cwd, options.timeoutMs)
       child.kill("SIGTERM")
       killTimer = setTimeout(() => child.kill("SIGKILL"), options.killGraceMs ?? GIT_KILL_GRACE_MS)
     }, options.timeoutMs)
