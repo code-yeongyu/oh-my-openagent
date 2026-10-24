@@ -30,6 +30,7 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 | **Atlas** | claude-sonnet-5 | 0.1 | primary | kimi-k3 → gpt-5.6-sol medium → minimax-m3 → MiniMax-M3 → minimax-m2.7 | Todo-list orchestrator |
 | **Prometheus** | claude-fable-5 xhigh | (override-only) | primary | kimi-k3 max | Strategic planner (interview); built via `buildPrometheusAgentConfig` (not in `agentSources`) |
 | **Sisyphus-Junior** | claude-sonnet-5 | 0.1 (`SISYPHUS_JUNIOR_DEFAULTS`) | subagent | kimi-k3 → gpt-5.6-sol medium → minimax-m3 → MiniMax-M3 → minimax-m2.7 → big-pickle | Category-spawned executor |
+| **Argus** | gpt-6-astra high | 0.1 | subagent | gpt-5.6-sol xhigh → claude-opus-5-5 max → gemini-3.1-pro high → glm-5.2 | Security & vulnerability auditor (read-only) |
 
 ## TOOL RESTRICTIONS
 
@@ -43,6 +44,7 @@ Defined in [`src/shared/agent-tool-restrictions.ts`](../shared/agent-tool-restri
 | Multimodal-Looker | ALL except read |
 | Atlas | task, call_omo_agent |
 | Momus | write, edit, task |
+| Argus | write, edit, apply_patch, task, call_omo_agent |
 | Prometheus | enforces `.md`-only writes via `prometheus-md-only` hook (path-based, not tool-based) |
 
 ## TEAM-MODE ELIGIBILITY
@@ -53,7 +55,7 @@ Authoritative registry: [`AGENT_ELIGIBILITY_REGISTRY`](../features/team-mode/typ
 |---------|--------|
 | `eligible` | sisyphus, atlas, sisyphus-junior |
 | `conditional` | hephaestus (lacks `teammate: "allow"` permission by default — see D-36 / `tool-config-handler.ts`; use `subagent_type: "sisyphus"` instead) |
-| `hard-reject` | oracle, librarian, explore, multimodal-looker, metis, momus, prometheus (each with a specific rejection message) |
+| `hard-reject` | oracle, librarian, explore, multimodal-looker, metis, momus, prometheus, argus (each with a specific rejection message) |
 
 Read-only agents are rejected at TeamSpec parse time. For those, the lead delegates via `task` (delegate-task) instead. See [`team-mode/AGENTS.md`](../features/team-mode/AGENTS.md).
 

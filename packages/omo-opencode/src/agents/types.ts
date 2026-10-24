@@ -168,7 +168,8 @@ export type BuiltinAgentName =
   | "metis"
   | "momus"
   | "atlas"
-  | "sisyphus-junior";
+  | "sisyphus-junior"
+  | "argus";
 
 export type OverridableAgentName = "build" | BuiltinAgentName;
 

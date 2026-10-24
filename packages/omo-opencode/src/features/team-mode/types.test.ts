@@ -255,8 +255,8 @@ describe("team-mode types", () => {
     )
 
     // then
-    expect(entries).toHaveLength(11)
-    expect(verdictCounts).toEqual({ eligible: 3, conditional: 1, "hard-reject": 7 })
+    expect(entries).toHaveLength(12)
+    expect(verdictCounts).toEqual({ eligible: 3, conditional: 1, "hard-reject": 8 })
     expect(AGENT_ELIGIBILITY_REGISTRY.hephaestus.rejectionMessage).toBe(
       "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
     )

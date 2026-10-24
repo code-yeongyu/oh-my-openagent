@@ -275,6 +275,7 @@ describe("AGENT_DISPLAY_NAMES", () => {
       explore: "explore",
       "multimodal-looker": "multimodal-looker",
       "council-member": "council-member",
+      argus: "Argus - Security Auditor",
     }
 
     // when checking the constant
