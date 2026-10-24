@@ -7,10 +7,10 @@
 // text.txt only. Nothing here touches the network: the caller supplies the html or text.
 // Plain Node ESM, node: builtins and sibling imports only.
 
-import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { sha256Of } from "./cli-support.mjs"
 import { parseHtml, PROSE_TAGS, proseText } from "./html-lite.mjs"
 import { splitSentences } from "./sentence-split.mjs"
 
@@ -123,8 +123,6 @@ export function findAcronyms(text, sentences) {
 		.sort((a, b) => a.span[0] - b.span[0])
 		.map((entry) => ({ acronym: entry.acronym, expansion: entry.expansion, sentence_id: sentenceIdAt(sentences, entry.span[0]), span: entry.span }))
 }
-
-const sha256Of = (content) => createHash("sha256").update(content).digest("hex")
 
 function snapshotText(input) {
 	if (Array.isArray(input.pages)) return input.pages.join("\f")

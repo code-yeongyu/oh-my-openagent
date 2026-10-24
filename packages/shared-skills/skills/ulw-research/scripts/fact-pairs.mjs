@@ -8,35 +8,31 @@
 // hedge-position heuristic fired, or when the source hedges and the sentence's last six tokens do
 // not. No model, no IO: the readers run as separate lanes. Plain Node ESM; no Hangul here.
 
-import { proseSentences } from "./fidelity-binding.mjs"
-import { lexiconChecks } from "./fidelity-lexicon.mjs"
+import { isExemptKind, proseSentences } from "./fidelity-binding.mjs"
+import { isKoreanTerm, lexicalPattern, lexiconChecks } from "./fidelity-lexicon.mjs"
 import { sentenceKey } from "./fidelity-state.mjs"
 import { buildContext } from "./gates-static.mjs"
 import { parseHtml, proseText } from "./html-lite.mjs"
 import { HEDGES } from "./lexicon.mjs"
 import { normalizeText } from "./text-normalize.mjs"
 
-const KOREAN = /[\uAC00-\uD7A3]/u
-const EXEMPT_KINDS = new Set(["opinion", "recommendation"])
+/** Every pair kind the producers below emit; consumers count and schema pairs by this list. */
+export const PAIR_KINDS = Object.freeze(["quote", "claim", "translation"])
 const TAIL = 6
 
-const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-const lang = (text) => (KOREAN.test(text) ? "ko" : "en")
+const lang = (text) => (isKoreanTerm(text) ? "ko" : "en")
 /** Sentence text with its fact spans cut out, so a Korean value does not make an English sentence Korean. */
 const outsideFacts = (sentence) => sentence.facts.reduceRight((text, fact) => text.slice(0, fact.start - sentence.start) + text.slice(fact.end - sentence.start), sentence.text)
 
-/** Latin hedges match whole words; Korean hedges match as substrings, one syllable as a token. */
-const HEDGE_RES = HEDGES.map((term) => {
-	if (!KOREAN.test(term)) return new RegExp(`(?<![\\p{L}\\p{N}])${escape(term).replace(/ /g, "\\s+")}(?![\\p{L}\\p{N}])`, "giu")
-	return [...term].length >= 2 ? new RegExp(escape(term), "gu") : new RegExp(`(?<=^|[\\s\\p{P}])${escape(term)}`, "gu")
-})
+/** Latin hedges match whole words ("exact"); Korean hedges match as substrings, one syllable as a token prefix ("stem"). */
+const HEDGE_RES = HEDGES.map((term) => lexicalPattern(term, isKoreanTerm(term) ? "stem" : "exact"))
 
 /** Hedge terms that are also month names; capitalized and followed by a date number, they are months. */
 const MONTH_WORDS = new Set(["may"])
 
 /** A capitalized Latin match after the first word is a name or a month ("in May"), not a hedge. */
 const isHedgeAt = (text, match) => {
-	if (!/^\p{Lu}/u.test(match[0]) || KOREAN.test(match[0])) return true
+	if (!/^\p{Lu}/u.test(match[0]) || isKoreanTerm(match[0])) return true
 	if (match.index !== 0) return false
 	// At the start of a text a capital is only sentence case, so the word still hedges - unless it is a
 	// month name followed by a date number ("May 2024 sales rose.").
@@ -85,7 +81,7 @@ function claimIdsFor(ctx, block, sentence) {
 }
 
 function exempt(ctx, node) {
-	return EXEMPT_KINDS.has(node.attrs["data-kind"]) || Boolean(ctx.util.closest(node, (cur) => EXEMPT_KINDS.has(cur.attrs?.["data-kind"])))
+	return isExemptKind(node.attrs["data-kind"]) || Boolean(ctx.util.closest(node, (cur) => isExemptKind(cur.attrs?.["data-kind"])))
 }
 
 /** Lexicon routing for every fact span of one quote group in one sentence. */
@@ -100,11 +96,11 @@ function lexiconRouted(group, sentence) {
 	return lexiconChecks(probes).forceStrong.length > 0
 }
 
-function quotePairs(sentence, rows, filled, slug, reportLang) {
+function quotePairs(sentence, rows, slug, reportLang) {
 	const groups = new Map()
 	for (const fact of sentence.facts) {
 		const row = rows.get(fact.id)
-		if (!row?.quote || (filled && !filled.has(fact.id))) continue
+		if (!row?.quote) continue
 		const group = groups.get(row.quote) ?? { quote: row.quote, row, rows, facts: [], ids: [] }
 		group.facts.push(fact)
 		if (!group.ids.includes(fact.id)) group.ids.push(fact.id)
@@ -140,11 +136,11 @@ function claimPairs(ctx, block, sentence, byClaim, slug, reportLang) {
 		}))
 }
 
-function translationPair(node, rows, filled, slug, reportLang) {
+function translationPair(node, rows, slug, reportLang) {
 	const id = node.attrs["data-translates"]
 	const row = rows.get(id)
 	const text = proseText(node)
-	if (!row?.quote || text === "" || (filled && !filled.has(id))) return null
+	if (!row?.quote || text === "") return null
 	return {
 		kind: "translation",
 		sentence_key: sentenceKey(slug, [id]),
@@ -161,13 +157,11 @@ function translationPair(node, rows, filled, slug, reportLang) {
  * @param {string} html the filled report
  * @param {{ rows: object[] }} ledger
  * @param {{ claims: object[] } | object[] | null} claims indexClaims(...) output or its claims array
- * @param {{ fact_id: string }[]} [fillMap] fact fill's map; when given, only facts it filled are paired
  * @returns {object[]} pairs with pair_id P1, P2, ... in document order
  */
-export function extractPairs(html, ledger, claims, fillMap) {
+export function extractPairs(html, ledger, claims) {
 	const ctx = buildContext(parseHtml(html), {})
 	const rows = new Map((ledger?.rows ?? []).map((row) => [row.fact_id, row]))
-	const filled = Array.isArray(fillMap) ? new Set(fillMap.map((entry) => entry.fact_id)) : null
 	const byClaim = claimMap(claims)
 	const htmlLang = ctx.all.find((node) => node.tag === "html")?.attrs.lang
 	const reportLang = htmlLang ? htmlLang.toLowerCase().split("-")[0] : null
@@ -178,12 +172,12 @@ export function extractPairs(html, ledger, claims, fillMap) {
 		if (!findings) continue
 		const slug = slugOf(block.scope)
 		for (const sentence of block.sentences) {
-			out.push(...quotePairs(sentence, rows, filled, slug, reportLang), ...claimPairs(ctx, block, sentence, byClaim, slug, reportLang))
+			out.push(...quotePairs(sentence, rows, slug, reportLang), ...claimPairs(ctx, block, sentence, byClaim, slug, reportLang))
 		}
 		for (const node of ctx.util.descendants(block.owner)) {
 			if (node.attrs?.["data-translates"] === undefined || seenSpans.has(node)) continue
 			seenSpans.add(node)
-			const pair = translationPair(node, rows, filled, slug, reportLang)
+			const pair = translationPair(node, rows, slug, reportLang)
 			if (pair) out.push(pair)
 		}
 	}

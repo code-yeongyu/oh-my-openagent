@@ -6,10 +6,10 @@
 // and the claim-kind checks (data-claim-kind, unsupported_verification) are fidelity-claims.mjs.
 // No model, no network.
 
-import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { join, resolve, sep } from "node:path"
 
+import { sha256Of } from "./cli-support.mjs"
 import { sameValue, unitKey } from "./fidelity-binding.mjs"
 import { claimChecks } from "./fidelity-claims.mjs"
 import { STRUCTURAL, clip, traceChecks } from "./fidelity-trace.mjs"
@@ -222,7 +222,7 @@ function sourceChecks(ctx, rows, cited, sourcesDir, flag) {
 		const [metaPath, textPath] = [join(sourcesDir, id, "meta.json"), join(sourcesDir, id, "text.txt")]
 		if (!existsSync(metaPath) || !existsSync(textPath)) continue
 		meta.set(id, JSON.parse(readFileSync(metaPath, "utf8")))
-		const actual = createHash("sha256").update(readFileSync(textPath)).digest("hex")
+		const actual = sha256Of(readFileSync(textPath))
 		if (meta.get(id).sha256 !== actual) flag("snapshot_hash_mismatch", ctx.body, `${id}/text.txt changed after its snapshot was pinned`)
 	}
 	return meta

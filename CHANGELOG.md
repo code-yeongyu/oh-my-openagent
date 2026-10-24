@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**The ulw-research proofread lane returns edits that are checked before they land.** The writing lane hands back `polish-edits.json`; `fact polish-apply` applies each edit only when it changes text nodes alone and keeps every number, hedge, qualifier, link, and claim id, `fact polish-diff` backstops hand edits, and `fact pairs --changed-since` sends every sentence polish rewrote back to the meaning readers. ([#11160](https://github.com/code-yeongyu/oh-my-openagent/pull/11160), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))
+
 **The stale-reflection-lock test leaves no background writer behind when removing its temporary root.** Its teardown closes the memory wiring and awaits facts reconciliation and maintenance before removal, so a late lock publication cannot recreate the directory and make the temp-leak guard blame another test. ([#11225](https://github.com/code-yeongyu/oh-my-openagent/pull/11225))
 
 **ulw-research ships a Markdown block model for checking Markdown and post deliverables.** It splits a Markdown report into headings, paragraphs, list items, table rows, code blocks and quotes with exact text offsets, and sorts sections with the same classifier as the HTML checks; an unclosed code fence is reported instead of passing silently, and no check uses it yet. The HTML checks now also treat a section headed exactly "Closing" as the closing section. ([#11153](https://github.com/code-yeongyu/oh-my-openagent/pull/11153), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))
