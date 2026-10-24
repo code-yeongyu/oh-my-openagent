@@ -1,29 +1,25 @@
-// fact-commands.mjs - the `fact` subcommands of report-tools: add, quote, retract, export, fill,
-// derive, and verify (fact-commands-verify.mjs). Every value reaches the ledger from a source
+// fact-commands.mjs - the `fact` subcommands of report-tools: add, quote, retract, export, derive,
+// fill (fact-commands-fill.mjs), verify (fact-commands-verify.mjs), pairs and meaning-check
+// (fact-commands-meaning.mjs), polish-apply and polish-diff (fact-commands-polish.mjs). Every value reaches the ledger from a source
 // snapshot through a deterministic locator or from a declared derivation; nothing here accepts a
 // typed value. add and quote print the row with 60 chars of source context on each side (JSON
 // with --json). Exit 0 ok, 1 semantic failure (fact_not_located, fill errors, a refused
 // derivation), 2 usage. node: builtins and sibling imports only.
 
-import { createHash } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, extname, join, resolve } from "node:path"
+import { join, resolve } from "node:path"
 
-import { CliError, parseArgs, writeJsonAtomic } from "./cli-support.mjs"
-import { DEFECT_CODES } from "./contracts.mjs"
+import { CliError, parseArgs, sha256Of } from "./cli-support.mjs"
 import { derive } from "./fact-derive.mjs"
-import { fill } from "./fact-fill.mjs"
 import { addRow, readLedger, retractRow, supersedeRow, writeLedger } from "./fact-ledger.mjs"
 import { locateFind, locateMatch, locatePageLine, locateTable } from "./fact-locate.mjs"
 import { QUALIFIER_FORMS } from "./fidelity-lexicon.mjs"
-import { readState, writeState } from "./fidelity-state.mjs"
 import { exportRows } from "./fidelity-values.mjs"
 import { pointedFlag, sessionDirOf, snapshotOf } from "./source-commands.mjs"
 
 const CONTEXT = 60
 const BOOLEANS = ["json", "csv", "md", "inline", "view", "replace-failed", "disjoint"]
 const QUALIFIER_OF = new Map(Object.entries(QUALIFIER_FORMS).flatMap(([term, forms]) => forms.map((form) => [form, term])))
-const sha256Of = (content) => createHash("sha256").update(content).digest("hex")
 const slug = (text) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) || "fact"
 
 function readText(path) {
@@ -158,44 +154,6 @@ function runExport(args) {
 	return { json: { command: "fact export", status: "pass", exitCode: 0, data: { out: resolve(args.flags.out), format: args.flags.csv ? "csv" : "json", sha256: sha256Of(text), coverage } }, summary: coverage, exitCode: 0 }
 }
 
-/** The inline edition: local stylesheets and scripts inlined, relative image paths made absolute. */
-function inlineAssets(html, baseDir) {
-	const local = (ref) => !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(ref)
-	return html
-		.replace(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi, (tag) => {
-			const href = /\bhref=["']([^"']+)["']/i.exec(tag)?.[1]
-			return href && local(href) ? `<style>${readText(resolve(baseDir, href))}</style>` : tag
-		})
-		.replace(/<script\b([^>]*)\bsrc=["']([^"']+)["']([^>]*)><\/script>/gi, (tag, pre, src, post) => (local(src) ? `<script${pre}${post}>${readText(resolve(baseDir, src))}</script>` : tag))
-		.replace(/(<img\b[^>]*\bsrc=["'])([^"']+)(["'])/gi, (tag, pre, src, post) => (local(src) && !src.startsWith("/") ? `${pre}${resolve(baseDir, src)}${post}` : tag))
-}
-
-function runFill(args) {
-	const [source] = args.positionals
-	const { flags } = args
-	if (!source || (flags.out === undefined && !flags.view)) throw new CliError("usage: fact fill <src> (--out <path> | --view) [--format html|md|tex] [--inline] [--replace-failed]")
-	const format = flags.format ?? ({ ".md": "md", ".tex": "tex" }[extname(source).toLowerCase()] ?? "html")
-	if (!["html", "md", "tex"].includes(format)) throw new CliError("--format must be html, md, or tex")
-	if (flags.inline && format !== "html") throw new CliError("--inline applies to the html edition only")
-	const sessionDir = sessionDirOf(flags)
-	const state = flags["replace-failed"] ? readState(sessionDir) : null
-	const result = fill(readText(source), readLedger(sessionDir), { format: format === "tex" ? "md" : format, view: flags.view === true, ...(state ? { replaceFailed: state } : {}) })
-	const warnings = result.warnings
-	if (result.out === null) {
-		const defects = result.errors.map((error) => ({ ...error, severity: DEFECT_CODES[error.code]?.severity ?? "blocker", hint: DEFECT_CODES[error.code]?.hint ?? null }))
-		return { json: { command: "fact fill", status: "fail", exitCode: 1, defects, warnings }, summary: `fact fill: FAIL - ${defects.length} error(s), nothing written`, exitCode: 1 }
-	}
-	const out = flags.inline ? inlineAssets(result.out, dirname(resolve(source))) : result.out
-	if (flags.view) return { text: out, summary: `fact fill --view: ${result.fillMap.length} pointer(s), ${warnings.length} warning(s)`, exitCode: 0 }
-	writeFileSync(flags.out, out)
-	if (state) writeState(sessionDir, state)
-	const artifact = sha256Of(out)
-	const map = `${resolve(flags.out)}.fill-map.json`
-	writeJsonAtomic(map, { schemaVersion: 1, format, artifact: resolve(flags.out), artifact_sha256: artifact, entries: result.fillMap })
-	const data = { out: resolve(flags.out), map, artifact_sha256: artifact, occurrences: result.fillMap.length, warnings }
-	return { json: { command: "fact fill", status: "pass", exitCode: 0, defects: [], data }, summary: `fact fill: wrote ${flags.out} (${result.fillMap.length} pointer(s))`, exitCode: 0 }
-}
-
 function runDerive(args) {
 	const { flags } = args
 	const op = args.required("op")
@@ -218,6 +176,8 @@ function runDerive(args) {
 
 export async function runFact(argv) {
 	const [sub, ...rest] = argv
+	if (sub === "pairs" || sub === "meaning-check") return (await import("./fact-commands-meaning.mjs")).runFactMeaning(sub, rest)
+	if (sub === "polish-apply" || sub === "polish-diff") return (await import("./fact-commands-polish.mjs")).runFactPolish(sub, rest)
 	const args = parseArgs(rest, { booleans: BOOLEANS })
 	switch (sub) {
 		case "add":
@@ -229,12 +189,12 @@ export async function runFact(argv) {
 		case "export":
 			return runExport(args)
 		case "fill":
-			return runFill(args)
+			return (await import("./fact-commands-fill.mjs")).runFactFill(args)
 		case "derive":
 			return runDerive(args)
 		case "verify":
 			return (await import("./fact-commands-verify.mjs")).runFactVerify(args)
 		default:
-			throw new CliError("usage: fact <add|quote|retract|export|fill|verify|derive> ...")
+			throw new CliError("usage: fact <add|quote|retract|export|fill|verify|derive|pairs|meaning-check|polish-apply|polish-diff> ...")
 	}
 }

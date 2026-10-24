@@ -83,6 +83,7 @@ const FIDELITY_MAJORS = [
 	"qualifier_dropped",
 	"unbound_sentence",
 	"meaning_drift_confirmed",
+	"meaning_unverified",
 	"polish_edit_rejected",
 	"polish_hedging_decreased",
 	"polish_text_churn",

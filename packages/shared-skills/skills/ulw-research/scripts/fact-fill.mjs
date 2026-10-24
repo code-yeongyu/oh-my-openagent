@@ -10,7 +10,8 @@ import { failureCount, markReplaced, sentenceKey } from "./fidelity-state.mjs"
 import { findPlaceholders, lead, qualifiedText, renderBlockquote, renderQuote, renderValueHtml, subSpan, valueParts } from "./placeholder.mjs"
 import { splitSentences } from "./sentence-split.mjs"
 
-const FORMATS = Object.freeze(["html", "md"])
+/** The output formats fill renders. */
+export const FILL_FORMATS = Object.freeze(["html", "md"])
 const TRANSLATION = Object.freeze({
 	html: /^\s*<span data-translates="(Q\d+)">[\s\S]*?<\/span>/u,
 	md: /^\s*<!-- translates: (Q\d+) -->[^\n]*/u,
@@ -166,7 +167,7 @@ function assemble(text, parts, context) {
  */
 export function fill(sourceText, ledger, options = {}) {
 	const format = options.format ?? "html"
-	if (!FORMATS.includes(format)) throw new TypeError(`format must be one of ${FORMATS.join(", ")}`)
+	if (!FILL_FORMATS.includes(format)) throw new TypeError(`format must be one of ${FILL_FORMATS.join(", ")}`)
 	const rows = new Map(ledger.rows.map((row) => [row.fact_id, row]))
 	const found = findPlaceholders(sourceText)
 	const errors = []
