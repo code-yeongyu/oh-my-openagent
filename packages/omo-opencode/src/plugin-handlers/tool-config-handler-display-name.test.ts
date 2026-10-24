@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { OhMyOpenCodeConfig } from "../config";
-import { applyToolConfig } from "./tool-config-handler";
+import { PROMETHEUS_BASH_PERMISSION, applyToolConfig } from "./tool-config-handler";
 
 function createDisplayNameParams(displayName: string): {
 	readonly config: Record<string, unknown>;
@@ -21,7 +21,7 @@ function createDisplayNameParams(displayName: string): {
 }
 
 describe("applyToolConfig with custom display names", () => {
-	it("#given prometheus has custom displayName #when tool config applies #then bash remains denied", () => {
+	it("#given prometheus has custom displayName #when tool config applies #then bash stays scoped to the scaffold script", () => {
 		// given
 		const displayName = "Prometheus Custom Planner";
 		const params = createDisplayNameParams(displayName);
@@ -33,7 +33,7 @@ describe("applyToolConfig with custom display names", () => {
 		const agent = params.agentResult[displayName] as {
 			permission: Record<string, unknown>;
 		};
-		expect(agent.permission.bash).toBe("deny");
+		expect(agent.permission.bash).toEqual({ ...PROMETHEUS_BASH_PERMISSION });
 		expect(agent.permission.interactive_bash).toBe("deny");
 		expect(agent.permission.task).toBe("allow");
 	});
