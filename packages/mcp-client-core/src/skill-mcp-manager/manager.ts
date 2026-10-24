@@ -30,6 +30,11 @@ export function buildSkillMcpClientKey(info: SkillMcpClientInfo, options?: Skill
   return `${authorityKey}::cdp=${options.cdpUrl}`
 }
 
+function isReconnectableOperationError(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return normalized.includes("not connected") || normalized.includes("transport closed")
+}
+
 export class SkillMcpManager {
   private readonly state: SkillMcpManagerState
 
@@ -108,21 +113,24 @@ export class SkillMcpManager {
   }
 
   async listTools(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Tool[]> {
-    const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listTools()
-    return result.tools
+    return await this.withOperationRetry(info, context.config, options, async (client) => {
+      const result = await client.listTools()
+      return result.tools
+    })
   }
 
   async listResources(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Resource[]> {
-    const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listResources()
-    return result.resources
+    return await this.withOperationRetry(info, context.config, options, async (client) => {
+      const result = await client.listResources()
+      return result.resources
+    })
   }
 
   async listPrompts(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Prompt[]> {
-    const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listPrompts()
-    return result.prompts
+    return await this.withOperationRetry(info, context.config, options, async (client) => {
+      const result = await client.listPrompts()
+      return result.prompts
+    })
   }
 
   async callTool(
@@ -198,7 +206,7 @@ export class SkillMcpManager {
           continue
         }
 
-        if (!errorMessage.includes("not connected")) {
+        if (!isReconnectableOperationError(errorMessage)) {
           throw lastError
         }
 
