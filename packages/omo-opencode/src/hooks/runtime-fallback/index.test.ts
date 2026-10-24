@@ -8,6 +8,7 @@ import {
 } from "../../shared/delegated-child-session-bootstrap"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared"
 import {
   _resetForTesting as resetClaudeCodeSessionState,
   subagentSessions,
@@ -635,7 +636,9 @@ describe("runtime-fallback", () => {
         system?: string
         tools?: Record<string, boolean>
       } | undefined
-      expect(promptBody?.parts?.[0]?.text).toBe("persisted child task prompt")
+      expect(promptBody?.parts?.[0]?.text).toBe(
+        `persisted child task prompt\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}`,
+      )
       expect(promptBody?.system).toBe("persisted delegated child system prompt")
       expect(promptBody?.tools?.question).toBe(false)
       expect(promptBody?.tools?.call_omo_agent).toBe(true)
@@ -1023,6 +1026,70 @@ describe("runtime-fallback", () => {
   })
 
   describe("session lifecycle", () => {
+    test("#given an SDK-shaped session without model metadata #when the first chat message silently stops #then the configured fallback is dispatched", async () => {
+      // given
+      const sessionID = "test-session-first-chat-silent-stop"
+      const promptInputs: unknown[] = []
+      const ctx = createMockPluginInput({
+        session: {
+          messages: async (args) => {
+            const query = unsafeTestValue<{ query?: { limit?: number } }>(args).query
+            const userMessage = {
+              info: { id: "message-user", sessionID, role: "user" },
+              parts: [{ type: "text", text: "retry this" }],
+            }
+            const assistantMessage = {
+              info: {
+                id: "message-silent-stop",
+                sessionID,
+                role: "assistant",
+                finish: "unknown",
+                tokens: {
+                  input: 0,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 0, write: 0 },
+                },
+              },
+              parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+            }
+            return { data: query?.limit === 1 ? [assistantMessage] : [userMessage, assistantMessage] }
+          },
+          promptAsync: async (args) => {
+            promptInputs.push(args)
+            return {}
+          },
+        },
+      })
+      const hook = createRuntimeFallbackHook(ctx, {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
+      })
+      SessionCategoryRegistry.register(sessionID, "test")
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID } },
+        },
+      })
+
+      // when
+      await hook["chat.message"]?.(
+        { sessionID, model: { providerID: "anthropic", modelID: "claude-opus-4-5" } },
+        { message: {}, parts: [{ type: "text", text: "retry this" }] },
+      )
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID } },
+      })
+
+      // then
+      expect(promptInputs).toHaveLength(1)
+      expect(promptInputs[0]).toMatchObject({
+        path: { id: sessionID },
+        body: { model: { providerID: "openai", modelID: "gpt-5.4" } },
+      })
+    })
+
     test("should create state on session.created", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
       const sessionID = "test-session-create"
@@ -1665,7 +1732,7 @@ describe("runtime-fallback", () => {
 
       const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
         message: {},
-        parts: [],
+        parts: [{ type: "text", text: OMO_RUNTIME_FALLBACK_RETRY_MARKER }],
       }
       await hook["chat.message"]?.(
         {
