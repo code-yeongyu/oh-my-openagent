@@ -177,15 +177,23 @@ export function handleMessageUpdatedSessionState(args: {
   const role = info?.role as string | undefined;
 
   if (sessionID && role === "user") {
-    const isCompactionMessage = agent ? isCompactionAgent(agent) : false;
+    // fix: compaction-part-marker — a marker row carries the WORKING agent plus a
+    // compaction part; the agent-name check alone let its pin model poison the
+    // stored session model (observed 2026-09-27T23:37Z).
+    const eventParts = (args.props?.parts ?? (info as { parts?: unknown } | undefined)?.parts) as
+      | Array<{ type?: string }>
+      | undefined
+    const hasCompactionPart =
+      Array.isArray(eventParts) && eventParts.some((part) => part?.type === "compaction")
+    const isCompactionMessage = hasCompactionPart || (agent ? isCompactionAgent(agent) : false)
     if (agent && !isCompactionMessage) {
-      updateSessionAgent(sessionID, agent);
+      updateSessionAgent(sessionID, agent)
     }
-    const providerID = info?.providerID as string | undefined;
-    const modelID = info?.modelID as string | undefined;
+    const providerID = info?.providerID as string | undefined
+    const modelID = info?.modelID as string | undefined
     if (providerID && modelID && !isCompactionMessage) {
-      args.noteSessionModel(sessionID, { providerID, modelID });
-      setSessionModel(sessionID, { providerID, modelID });
+      args.noteSessionModel(sessionID, { providerID, modelID })
+      setSessionModel(sessionID, { providerID, modelID })
     }
   }
 

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A session no longer continues on its compaction model after a compaction.** With `agents.<name>.compaction.model` set, the compaction marker row carries the working agent's name and the summarizer's model, and the agent-name check let the compaction context injector and the session lifecycle take that model as the session's working model. A row with a `compaction` part is no longer used as the working model, and the checkpoint taken before compaction skips the model the summarize request is running on. ([#10120](https://github.com/code-yeongyu/oh-my-openagent/issues/10120), [#10211](https://github.com/code-yeongyu/oh-my-openagent/pull/10211))
+
 **The stale-reflection-lock test leaves no background writer behind when removing its temporary root.** Its teardown closes the memory wiring and awaits facts reconciliation and maintenance before removal, so a late lock publication cannot recreate the directory and make the temp-leak guard blame another test. ([#11225](https://github.com/code-yeongyu/oh-my-openagent/pull/11225))
 
 **ulw-research ships a Markdown block model for checking Markdown and post deliverables.** It splits a Markdown report into headings, paragraphs, list items, table rows, code blocks and quotes with exact text offsets, and sorts sections with the same classifier as the HTML checks; an unclosed code fence is reported instead of passing silently, and no check uses it yet. The HTML checks now also treat a section headed exactly "Closing" as the closing section. ([#11153](https://github.com/code-yeongyu/oh-my-openagent/pull/11153), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))
