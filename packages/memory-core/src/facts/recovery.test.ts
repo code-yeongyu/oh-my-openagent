@@ -134,6 +134,19 @@ describe("facts path-state recovery ownership", () => {
     expect((await repo.log()).filter((commit) => commit.trailers["Omo-Facts-Batch"] === recovery.batchId)).toHaveLength(0)
   }, 30_000)
 
+  test("names the foreign path in the detail when an untracked file blocks recovery", async () => {
+    const { dir, repo } = await fixture()
+    const recovery = await planFactsMutation(repo, batch(), undefined)
+    await mkdir(join(dir, "notes", "facts"), { recursive: true })
+    await writeFile(join(dir, "notes", "facts", "foreign-draft.md"), "foreign draft\n")
+
+    const result = await applyFactsRecovery(repo, recovery, 1, AUTHOR)
+
+    expect(result.outcome).toBe("parent_dirty")
+    if (result.outcome !== "parent_dirty") throw new Error("expected parent_dirty")
+    expect(result.detail).toContain("notes/facts/foreign-draft.md")
+  }, 30_000)
+
   test("preserves every path when one member of a multi-path batch is foreign", async () => {
     const { dir, repo } = await fixture()
     const recovery = await planFactsMutation(repo, batch([
