@@ -23,6 +23,10 @@ export interface EventState {
   agentColorsByName: Record<string, string>
   /** Part type registry keyed by partID (text, reasoning, tool, ...) */
   partTypesById: Record<string, string>
+  /** Rendered text baseline per part ID; snapshots are diffed against it so interleaved tool results or sibling parts cannot re-print or splice earlier lines */
+  partTextById: Record<string, string>
+  /** Rendered reasoning baseline per part ID (same dedup contract as partTextById) */
+  reasoningTextById: Record<string, string>
   /** Whether a THINK block is currently open in output */
   inThinkBlock: boolean
   /** Tracks streamed reasoning text to avoid duplicates */
@@ -64,6 +68,8 @@ export function createEventState(): EventState {
     currentMessageRole: null,
     agentColorsByName: {},
     partTypesById: {},
+    partTextById: {},
+    reasoningTextById: {},
     inThinkBlock: false,
     lastReasoningText: "",
     hasPrintedThinkingLine: false,
