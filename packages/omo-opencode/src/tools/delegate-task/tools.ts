@@ -74,7 +74,7 @@ const delegateTaskArgsSchema = {
   task_id: tool.schema
     .string()
     .optional()
-    .describe("Continuation session id (`ses_...`) from task metadata; not a background task id (`bg_...`)."),
+    .describe("Continuation session id (`ses_...`) from prior task metadata ONLY. NEVER invent or generate this value; omit it entirely to spawn a new subagent. Not a background task id (`bg_...`)."),
   command: tool.schema.string().optional().describe("The command that triggered this task"),
 }
 
