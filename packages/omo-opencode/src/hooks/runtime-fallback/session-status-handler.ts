@@ -92,9 +92,10 @@ export function createSessionStatusHandler(
 
     let state = sessionStates.get(sessionID)
     if (!state) {
-      const initialModel = resolveFallbackBootstrapModel({
+      const initialModel = await resolveFallbackBootstrapModel({
         sessionID,
         source: "session.status",
+        ctx: deps.ctx,
         eventModel: model,
         resolvedAgent,
         pluginConfig,

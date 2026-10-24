@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Runtime fallback bootstraps an unknown session model from the last substantive user prompt before using configured agent defaults.** Compaction rows and synthetic retry continuations are ignored, while real retry-marked prompts retain their selected model. ([#10125](https://github.com/code-yeongyu/oh-my-openagent/pull/10125))
+
 **The stale-reflection-lock test leaves no background writer behind when removing its temporary root.** Its teardown closes the memory wiring and awaits facts reconciliation and maintenance before removal, so a late lock publication cannot recreate the directory and make the temp-leak guard blame another test. ([#11225](https://github.com/code-yeongyu/oh-my-openagent/pull/11225))
 
 **ulw-research ships a Markdown block model for checking Markdown and post deliverables.** It splits a Markdown report into headings, paragraphs, list items, table rows, code blocks and quotes with exact text offsets, and sorts sections with the same classifier as the HTML checks; an unclosed code fence is reported instead of passing silently, and no check uses it yet. The HTML checks now also treat a section headed exactly "Closing" as the closing section. ([#11153](https://github.com/code-yeongyu/oh-my-openagent/pull/11153), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))

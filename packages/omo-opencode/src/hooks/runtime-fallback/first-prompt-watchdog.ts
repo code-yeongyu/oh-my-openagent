@@ -156,9 +156,10 @@ export function createFirstPromptWatchdog(
 
     let state = deps.sessionStates.get(sessionID)
     if (!state) {
-      const initialModel = resolveFallbackBootstrapModel({
+      const initialModel = await resolveFallbackBootstrapModel({
         sessionID,
         source: SOURCE,
+        ctx: deps.ctx,
         eventModel: model,
         resolvedAgent,
         pluginConfig: deps.pluginConfig,

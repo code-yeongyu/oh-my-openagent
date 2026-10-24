@@ -268,9 +268,10 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     if (!state) {
-      const initialModel = resolveFallbackBootstrapModel({
+      const initialModel = await resolveFallbackBootstrapModel({
         sessionID,
         source: "session.error",
+        ctx: deps.ctx,
         eventModel: resolveEventModel(props),
         resolvedAgent,
         pluginConfig,
