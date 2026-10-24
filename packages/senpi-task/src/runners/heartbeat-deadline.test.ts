@@ -83,7 +83,7 @@ for (const kind of ["stdio", "host"] as const) {
     await clock.advance(0)
     expect(h.handle.lastSeen()).toBe(9_000)
     await h.handle.dispose()
-    expect(clock.pending()).toBe(0)
+    clock.assertNoPendingTimers()
   })
 
   test(`#given ${kind} three heartbeat misses #when the bound expires #then the record errors with transcript and action and cannot resurrect`, async () => {

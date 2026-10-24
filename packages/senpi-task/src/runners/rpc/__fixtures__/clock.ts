@@ -1,12 +1,13 @@
-import { spyOn } from "bun:test"
+import { expect, spyOn } from "bun:test"
 
 /** Runs timer callbacks in registration order and drains their promise reactions at each boundary. */
 export function fakeClock() {
   let now = 0
-  const timers = new Map<object, { at: number; interval?: number; callback: () => void }>()
+  const timers = new Map<object, { at: number; delay: number; stack: string; interval?: number; callback: () => void }>()
   const install = (callback: () => void, ms: number, interval?: number) => {
     const id = { unref() {} }
-    timers.set(id, { at: now + ms, interval, callback })
+    const stack = (new Error().stack ?? "").split("\n").slice(1, 9).join("\n")
+    timers.set(id, { at: now + ms, delay: ms, stack, interval, callback })
     return id
   }
   const timeout = spyOn(globalThis, "setTimeout").mockImplementation(
@@ -21,6 +22,12 @@ export function fakeClock() {
   return {
     now: () => now,
     pending: () => timers.size,
+    assertNoPendingTimers() {
+      const details = [...timers.values()].map((timer) =>
+        `${timer.interval === undefined ? "timeout" : "interval"} delay=${timer.delay}ms\n${timer.stack}`,
+      ).join("\n")
+      expect(timers.size, details).toBe(0)
+    },
     async advance(ms: number) {
       const end = now + ms
       for (;;) {

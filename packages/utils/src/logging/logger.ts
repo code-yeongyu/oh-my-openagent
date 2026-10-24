@@ -2,6 +2,10 @@ import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 
+// Buffered logging runs outside a caller's virtual clock; cancellation must use the same timer owner.
+const scheduleTimeout = globalThis.setTimeout
+const cancelTimeout = globalThis.clearTimeout
+
 export const DEFAULT_MAX_LOG_FILE_SIZE_BYTES = 50 * 1024 * 1024
 export const DEFAULT_MAX_LOG_FILE_BACKUPS = 2
 export const DEFAULT_LOG_FLUSH_INTERVAL_MS = 500
@@ -85,7 +89,7 @@ export function createLogger(options: LoggerOptions): BoundLogger {
 
   function scheduleFlush(): void {
     if (flushTimer) return
-    flushTimer = setTimeout(() => {
+    flushTimer = scheduleTimeout(() => {
       flushTimer = null
       flush()
     }, flushIntervalMs)
@@ -113,7 +117,7 @@ export function createLogger(options: LoggerOptions): BoundLogger {
   function _setLoggerForTesting(overrides: LoggerTestOverrides): void {
     buffer = []
     if (flushTimer) {
-      clearTimeout(flushTimer)
+      cancelTimeout(flushTimer)
       flushTimer = null
     }
     if (overrides.filePath !== undefined) logFile = overrides.filePath
@@ -127,14 +131,14 @@ export function createLogger(options: LoggerOptions): BoundLogger {
     maxLogFileBackups = maxLogFileBackupsDefault
     buffer = []
     if (flushTimer) {
-      clearTimeout(flushTimer)
+      cancelTimeout(flushTimer)
       flushTimer = null
     }
   }
 
   function _flushForTesting(): void {
     if (flushTimer) {
-      clearTimeout(flushTimer)
+      cancelTimeout(flushTimer)
       flushTimer = null
     }
     flush()
