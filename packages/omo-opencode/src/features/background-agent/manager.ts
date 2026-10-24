@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { captureResumeAnchor, resumedTurnFinished } from "./resume-anchor"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
@@ -1388,6 +1389,10 @@ The fallback retry session is now created and can be inspected directly.
         // Yield one turn so a same-turn second resume observes the reservation before this task flips to running.
         await Promise.resolve()
         return await this.startResumedTask(existingTask, input, resumeSnapshot, concurrencyKey)
+      } catch (error) {
+        // The continuation never started: expire the finished task as if it had not been resumed.
+        if (!this.shutdownTriggered) this.scheduleTaskRemoval(existingTask.id)
+        throw error
       } finally {
         this.resumesAwaitingAdmission.delete(existingTask.id)
       }
@@ -1421,8 +1426,22 @@ The fallback retry session is now created and can be inspected directly.
     }).catch((error: unknown) => {
       this.logger("[background-agent] Queued resume was not admitted:", { taskId: existingTask.id, error: error instanceof Error ? error.message : String(error) })
       if (this.shutdownTriggered || existingTask.status !== "pending" || existingTask.pendingResume !== resumeToken) return
+      const failure: BackgroundTask = {
+        ...existingTask,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+        completedAt: new Date(),
+        pendingResume: undefined,
+      }
       existingTask.pendingResume = undefined
       this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, "unavailable")
+      this.markForNotification(failure)
+      this.enqueueNotificationForParent(failure.parentSessionId, () => this.notifyParentSession(failure)).catch((notificationError: unknown) => {
+        this.logger("[background-agent] Failed to notify on queued resume error:", {
+          taskId: failure.id,
+          error: notificationError instanceof Error ? notificationError.message : String(notificationError),
+        })
+      })
     })
     return existingTask
   }
@@ -1433,6 +1452,20 @@ The fallback retry session is now created and can be inspected directly.
       return existingTask
     }
     if (!existingTask.sessionId) throw new Error(`Task has no sessionID: ${existingTask.id}`)
+    // The session still holds earlier output. Record what it holds right before the
+    // continuation is sent; completion must then be proven by output beyond it.
+    const { status, pendingResume } = existingTask
+    try {
+      const anchor = await captureResumeAnchor(this.client, existingTask.sessionId, existingTask.cwd ?? this.directory, input.prompt)
+      if (this.shutdownTriggered || this.tasks.get(existingTask.id) !== existingTask ||
+        existingTask.status !== status || existingTask.pendingResume !== pendingResume) {
+        throw new Error(`Task ${existingTask.id} changed while its continuation was being prepared`)
+      }
+      existingTask.resumeAnchor = anchor
+    } catch (error) {
+      this.concurrencyManager.release(concurrencyKey)
+      throw error
+    }
     existingTask.pendingResume = undefined
     existingTask.originalPrompt ??= existingTask.prompt
     existingTask.prompt = input.prompt
@@ -2664,6 +2697,13 @@ The task was re-queued on a fallback model after a retryable failure.
     if (task.status !== "running") {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
       return false
+    }
+    if (task.resumeAnchor) {
+      const finished = await resumedTurnFinished(this.client, task, task.cwd ?? this.directory)
+      if (!finished || task.status !== "running" || this.shutdownTriggered || this.tasks.get(task.id) !== task) {
+        log("[background-agent] Resumed task has not finished its continuation, skipping:", { taskId: task.id, source })
+        return false
+      }
     }
 
     // Reserve a notification-preparation slot for the parent BEFORE flipping the

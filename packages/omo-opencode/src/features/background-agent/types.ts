@@ -105,6 +105,15 @@ export interface BackgroundTask {
   consecutiveMissedPolls?: number
   /** Number of consecutive idle polls where the session still ended on an errored assistant turn */
   consecutiveErroredIdlePolls?: number
+  /** Messages the session had when the task was last resumed; completion needs output beyond them */
+  resumeAnchor?: ResumeAnchor
+}
+
+export interface ResumeAnchor {
+  readonly sessionID: string
+  readonly messageIDs: ReadonlySet<string>
+  /** The continuation prompt; completion counts only output after its user message */
+  readonly prompt: string
 }
 
 export interface BackgroundTaskSnapshot {

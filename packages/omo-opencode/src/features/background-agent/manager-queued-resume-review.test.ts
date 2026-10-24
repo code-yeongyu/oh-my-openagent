@@ -45,7 +45,7 @@ function createResumeFixture(busy = false) {
         status: async () => ({ data: busy ? { child: { type: "busy" } } : {} }),
         promptAsync,
         abort: async () => ({}),
-        messages: async () => ({ data: [] }),
+        messages: async () => ({ data: [{ info: { id: "msg_launch", role: "user" } }] }),
       } },
     }),
     config: { defaultConcurrency: 1 },

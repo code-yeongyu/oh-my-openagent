@@ -9,6 +9,7 @@ import type {
 } from "./dynamic-truncator-types"
 import { log } from "./logger"
 import { normalizeSDKResponse } from "./normalize-sdk-response"
+import { withTimeout } from "./with-timeout"
 
 // Hard ceiling on how long `session.messages()` is allowed to block inside
 // `fetchContextWindowUsage`. Without it, a stuck OpenCode RPC (observed when
@@ -16,9 +17,6 @@ import { normalizeSDKResponse } from "./normalize-sdk-response"
 // promise pending forever and every hook that calls `truncator.truncate(...)`
 // would hang on it (issue #4086).
 export const DEFAULT_CONTEXT_WINDOW_USAGE_FETCH_TIMEOUT_MS = 5_000;
-
-declare function setTimeout(callback: () => void, delay?: number): ReturnType<typeof globalThis.setTimeout>
-declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
 
 interface AssistantMessageInfo {
 	role: "assistant";
@@ -114,27 +112,6 @@ export async function getContextWindowUsage(
 	return usagePromise
 }
 
-function withFetchTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
-	if (timeoutMs <= 0) {
-		return operation
-	}
-	let timeoutID: ReturnType<typeof globalThis.setTimeout> | undefined
-	const timeoutPromise = new Promise<never>((_, reject) => {
-		timeoutID = setTimeout(
-			() =>
-				reject(
-					new Error(
-						`[dynamic-truncator] session.messages timed out after ${timeoutMs}ms`,
-					),
-				),
-			timeoutMs,
-		)
-	})
-	return Promise.race([operation, timeoutPromise]).finally(() => {
-		if (timeoutID !== undefined) clearTimeout(timeoutID)
-	})
-}
-
 async function fetchContextWindowUsage(
 	ctx: PluginInput,
 	sessionID: string,
@@ -143,11 +120,12 @@ async function fetchContextWindowUsage(
 	const fetchTimeoutMs =
 		contextWindowUsageFetchTimeoutMsForTesting ?? DEFAULT_CONTEXT_WINDOW_USAGE_FETCH_TIMEOUT_MS
 	try {
-		const response = await withFetchTimeout(
+		const response = await withTimeout(
 			ctx.client.session.messages({
 				path: { id: sessionID },
 			}),
 			fetchTimeoutMs,
+			`[dynamic-truncator] session.messages timed out after ${fetchTimeoutMs}ms`,
 		);
 
 		const messages = normalizeSDKResponse(response, [] as MessageWrapper[], { preferResponseOnMissingData: true })
