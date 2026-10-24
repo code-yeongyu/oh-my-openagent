@@ -37,6 +37,7 @@ import {
   isGptNativeSisyphusModel,
   isGrok45Model,
   isGrok46Model,
+  isGrok47Model,
   isKimiK2CodeModel,
   isKimiK2Model,
   isKimiK3Model,
@@ -76,7 +77,7 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
   if (isClaudeOpus48Model(model)) return "claude-opus-4-8";
   if (isClaudeOpus47Model(model)) return "claude-opus-4-7";
   if (isGlmModel(model)) return "glm-5-2";
-  if (isGrok45Model(model) || isGrok46Model(model)) return "grok-4";
+  if (isGrok45Model(model) || isGrok46Model(model) || isGrok47Model(model)) return "grok-4";
   return "fallback";
 }
 

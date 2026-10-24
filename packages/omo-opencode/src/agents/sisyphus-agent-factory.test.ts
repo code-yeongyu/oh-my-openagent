@@ -56,6 +56,11 @@ describe("createSisyphusAgent", () => {
         ["anthropic/claude-fable-5", "claude-fable-5"],
         ["xai/grok-4.6", "grok-4"],
         ["x-ai/grok-4.5", "grok-4"],
+        ["xai/grok-4.7", "grok-4"],
+        ["cursor/grok-4.7", "grok-4"],
+        ["grok-4-7", "grok-4"],
+        ["openrouter/x-ai/grok-4.7", "grok-4"],
+        ["xai/grok-4.70", "fallback"],
         ["zai/glm-5.2", "glm-5-2"],
         ["google/gemini-3.1-pro", "fallback"],
       ];
@@ -139,25 +144,33 @@ describe("createSisyphusAgent", () => {
     });
   });
 
-  describe("#given Grok 4.5/4.6 Sisyphus models", () => {
+  describe("#given Grok 4.5/4.6/4.7 Sisyphus models", () => {
     test("#when creating agents #then uses the Grok-native prompt with high effort and no thinking", () => {
       // given
-      const models = ["xai/grok-4.6", "x-ai/grok-4.5"];
+      const models = ["xai/grok-4.6", "x-ai/grok-4.5", "xai/grok-4.7", "cursor/grok-4.7", "grok-4-7"];
+      const claudePrompt = createSisyphusAgent("anthropic/claude-sonnet-4-6").prompt;
 
       for (const model of models) {
         // when
         const agent = createSisyphusAgent(model);
 
-        // then - grok 4.5/4.6 route to the shared grok variant, not the default prompt
-        expect(agent.prompt).not.toBe(createSisyphusAgent("anthropic/claude-sonnet-4-6").prompt);
+        // then - grok 4.5/4.6/4.7 route to the shared grok variant, not the default prompt
+        expect(agent.prompt).not.toBe(claudePrompt);
         expect(agent.reasoningEffort).toBe("high");
         expect(agent.thinking).toBeUndefined();
       }
+
+      // the shared body names the running minor version, so the three releases are not interchangeable
+      const grok47Prompt = createSisyphusAgent("xai/grok-4.7").prompt;
+      expect(grok47Prompt).toBe(createSisyphusAgent("cursor/grok-4.7").prompt);
+      expect(grok47Prompt).toBe(createSisyphusAgent("grok-4-7").prompt);
+      expect(grok47Prompt).not.toBe(createSisyphusAgent("xai/grok-4.6").prompt);
+      expect(grok47Prompt).not.toBe(createSisyphusAgent("x-ai/grok-4.5").prompt);
     });
 
     test("#when creating agents for other grok ids #then keeps the fallback family", () => {
       // given
-      const models = ["x-ai/grok-4.20", "xai/grok-4-1-fast-reasoning", "x-ai/grok-code-fast-1"];
+      const models = ["x-ai/grok-4.20", "xai/grok-4-1-fast-reasoning", "x-ai/grok-code-fast-1", "xai/grok-4.70"];
       const grokPrompt = createSisyphusAgent("xai/grok-4.6").prompt;
 
       for (const model of models) {
@@ -165,8 +178,13 @@ describe("createSisyphusAgent", () => {
         const agent = createSisyphusAgent(model);
 
         // then - unrecognized grok ids fall back to the default family
+        expect(resolveSisyphusPromptFamily(model)).toBe("fallback");
         expect(agent.prompt).not.toBe(grokPrompt);
         expect(agent.reasoningEffort).toBeUndefined();
+        expect(agent.thinking).toEqual({
+          type: "enabled",
+          budgetTokens: 32000,
+        });
       }
     });
   });

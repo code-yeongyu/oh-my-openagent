@@ -15,6 +15,7 @@ import {
   isGpt6AstraModel,
   isGrok45Model,
   isGrok46Model,
+  isGrok47Model,
   isKimiK2CodeModel,
   isKimiK2Model,
   isKimiK27Model,
@@ -238,6 +239,7 @@ describe("model family detectors", () => {
     expect(isGrok45Model("grok-4-5")).toBe(true)
     expect(isGrok45Model("openrouter/grok-4.5-fast")).toBe(true)
     expect(isGrok45Model("xai/grok-4.6")).toBe(false)
+    expect(isGrok45Model("xai/grok-4.7")).toBe(false)
     expect(isGrok45Model("xai/grok-4")).toBe(false)
     expect(isGrok45Model("x-ai/grok-4.20")).toBe(false)
     expect(isGrok45Model("xai/grok-4-1-fast-reasoning")).toBe(false)
@@ -250,10 +252,27 @@ describe("model family detectors", () => {
     expect(isGrok46Model("grok-4-6")).toBe(true)
     expect(isGrok46Model("openrouter/grok-4.6-fast")).toBe(true)
     expect(isGrok46Model("xai/grok-4.5")).toBe(false)
+    expect(isGrok46Model("xai/grok-4.7")).toBe(false)
     expect(isGrok46Model("xai/grok-4")).toBe(false)
     expect(isGrok46Model("x-ai/grok-4.20")).toBe(false)
     expect(isGrok46Model("xai/grok-4-1-fast-reasoning")).toBe(false)
     expect(isGrok46Model("x-ai/grok-code-fast-1")).toBe(false)
+  })
+
+  test("#given Grok 4.7 model ids #then detects Grok 4.7 only", () => {
+    expect(isGrok47Model("xai/grok-4.7")).toBe(true)
+    expect(isGrok47Model("x-ai/grok-4.7")).toBe(true)
+    expect(isGrok47Model("grok-4-7")).toBe(true)
+    expect(isGrok47Model("cursor/grok-4.7")).toBe(true)
+    expect(isGrok47Model("openrouter/x-ai/grok-4.7")).toBe(true)
+    expect(isGrok47Model("openrouter/grok-4.7-fast")).toBe(true)
+    expect(isGrok47Model("xai/grok-4.6")).toBe(false)
+    expect(isGrok47Model("xai/grok-4.5")).toBe(false)
+    expect(isGrok47Model("xai/grok-4")).toBe(false)
+    expect(isGrok47Model("xai/grok-4.70")).toBe(false)
+    expect(isGrok47Model("x-ai/grok-4.20")).toBe(false)
+    expect(isGrok47Model("xai/grok-4-1-fast-reasoning")).toBe(false)
+    expect(isGrok47Model("x-ai/grok-code-fast-1")).toBe(false)
   })
 
   test("#given MiniMax model ids #then detects MiniMax family only", () => {
