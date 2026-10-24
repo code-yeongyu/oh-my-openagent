@@ -301,7 +301,7 @@ function createTeamToolContext(
     omoConfig: engine.omoConfig,
     cwd: engine.runtime.cwd(),
     agentNames: new Set(Object.keys(engine.agents)),
-    ...(engine.ancestry === undefined ? {} : { ancestry: engine.ancestry }),
+    resolveAncestry: engine.resolveAncestry,
   }
   const baseService = createTeamService(serviceDeps)
   const stateDir = {

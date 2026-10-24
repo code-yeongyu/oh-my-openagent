@@ -27,6 +27,7 @@ export type SpawnMembersInput = {
   readonly teamRunId: string
   readonly manager: TeamRuntimeManagerPort
   readonly leadSessionId: string
+  readonly rootSessionId?: string
   readonly spawnDepth: number
   readonly maxParallel: number
   readonly deadlineAt: number
@@ -141,7 +142,7 @@ function buildMemberStartSpec(
   return {
     prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
-    root_session_id: input.leadSessionId,
+    root_session_id: input.rootSessionId ?? input.leadSessionId,
     depth: input.spawnDepth,
     name: memberTaskName(input.teamRunId, member.name),
     execution_mode: "process",

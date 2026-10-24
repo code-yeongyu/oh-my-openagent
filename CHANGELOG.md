@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Nested team members retain the original session tree.** A child session leading a team now gives each member its own session as parent and the original tree root, with depth increasing from the lead. Persisted member ancestry is preserved when rebuilding a respawn. ([#11229](https://github.com/code-yeongyu/oh-my-openagent/pull/11229))
+
 **Nested in-process tasks retain their original session tree.** A child's own tasks now record the tree root and increasing depth, so nested delegation obeys `max_depth` instead of restarting at depth 1. The root session's own view now also covers its nested in-process descendants: the footer, `/tasks`, the default `task_output` list, and `task_send` and cancel. Process-mode descendants already appeared there. ([#11226](https://github.com/code-yeongyu/oh-my-openagent/pull/11226))
 
 **ulw-research can check that a report's sentences keep the meaning of their sources.** It pairs each report sentence with the quote, claim or original text it rests on, and records drift only when two independent readers name the same kind of change; a single reader's flag is kept as a minor warning. A pair no reader judged, or a pair that needs the strong reader and only got the cheap one, is reported as unverified instead of passing as clean. Nothing in the CLI runs it yet. ([#11151](https://github.com/code-yeongyu/oh-my-openagent/pull/11151), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))
