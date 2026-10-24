@@ -78,4 +78,10 @@ describe("x-search conditional skill staging", () => {
 
     assert.equal(target.endsWith(join("plugin", "skills-conditional", "x-search", "SKILL.md")), true)
   })
+
+  test("#given OMO_X_SEARCH_SKILL_TARGET #when resolving the target #then it wins over the plugin root", () => {
+    const target = resolveTargetSkill({ OMO_X_SEARCH_SKILL_TARGET: join("/scratch", "SKILL.md"), OMO_SENPI_PLUGIN_OUTPUT: join("/staged", "plugin") })
+
+    assert.equal(target, join("/scratch", "SKILL.md"))
+  })
 })

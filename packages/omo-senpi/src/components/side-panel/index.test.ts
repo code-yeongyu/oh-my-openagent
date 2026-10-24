@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { join } from "node:path"
 
 import { OmoSidePanelSettingsSchema, type OmoSidePanelSettings } from "@oh-my-opencode/omo-config-core"
 
@@ -17,6 +19,8 @@ import { createSidePanelComponent } from "./index"
 import type { PanelMemory, PanelMemoryIdentity, PanelTimers } from "./types"
 import { SIDE_PANEL_DIFF_COMMAND } from "./constants"
 import type { PanelTaskRecord } from "./data/task-records"
+import { claimRegularModeNotice, REGULAR_MODE_NOTICE_MARKER } from "./regular-mode-notice"
+import { testTempDir } from "../../../test-support/temp-dir"
 
 interface WidgetCall {
   readonly key: string
@@ -268,6 +272,12 @@ function mounted(
   }
   const tui = fakeTui()
   const notices: string[] = []
+  // The latest anchor: a remount registers a fresh one, and an earlier one is stale by design.
+  const attachWith = (candidate: unknown): void => {
+    const factory = [...widgets].reverse().find((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY)?.content
+    if (typeof factory !== "function") throw new Error("anchor factory missing")
+    ;(factory as (tui: unknown, theme: unknown) => unknown)(candidate, undefined)
+  }
   const host = hostContext(widgets, {
     model: { id: "anthropic/claude-opus-5" },
     getContextUsage: () => ({ tokens: 29_000, contextWindow: 1_000_000, percent: 2.9 }),
@@ -296,12 +306,8 @@ function mounted(
     advance: (ms: number) => {
       clock += ms
     },
-    attach: (): void => {
-      // The latest anchor: a remount registers a fresh one, and an earlier one is stale by design.
-      const factory = [...widgets].reverse().find((call) => call.key === SIDE_PANEL_ANCHOR_WIDGET_KEY)?.content
-      if (typeof factory !== "function") throw new Error("anchor factory missing")
-      ;(factory as (tui: unknown, theme: unknown) => unknown)(tui, undefined)
-    },
+    attach: (): void => attachWith(tui),
+    attachWith,
   }
 }
 
@@ -1022,6 +1028,71 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   })
   return { promise, resolve }
 }
+
+describe("side panel regular-mode notice", () => {
+  test("#given the panel is on and the renderer exposes no layout seam #when the anchor attaches #then the notice shows once and the claim is install-wide", async () => {
+    // given: regular TUI mode - the default tuiMode - hands the panel a renderer without the seam
+    const stateDir = testTempDir("omo-10560-")
+    const harness = mounted({ loadSettings: () => settings({ enabled: true }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attachWith({ requestRender() {}, terminal: { columns: 200 } })
+
+    // then
+    expect(harness.notices).toHaveLength(1)
+    expect(existsSync(join(stateDir, REGULAR_MODE_NOTICE_MARKER))).toBe(true)
+
+    // when: the next session of the same install attaches the same regular renderer
+    await harness.pi.dispatch("session_shutdown", {}, harness.host)
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attachWith({ requestRender() {}, terminal: { columns: 200 } })
+
+    // then: the claim is install-wide, so the notice never repeats
+    expect(harness.notices).toHaveLength(1)
+  })
+
+  test("#given a fullscreen renderer with a layout root #when the anchor attaches #then no notice is shown and nothing is claimed", async () => {
+    // given
+    const stateDir = testTempDir("omo-10560-")
+    const harness = mounted({ loadSettings: () => settings({ enabled: true }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attach()
+
+    // then
+    expect(harness.notices).toHaveLength(0)
+    expect(existsSync(join(stateDir, REGULAR_MODE_NOTICE_MARKER))).toBe(false)
+  })
+
+  test("#given the panel is off #when a session starts #then no notice is shown", async () => {
+    // given
+    const stateDir = testTempDir("omo-10560-")
+    const harness = mounted({ loadSettings: () => settings({ enabled: false }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+
+    // then
+    expect(harness.notices).toHaveLength(0)
+    expect(existsSync(join(stateDir, REGULAR_MODE_NOTICE_MARKER))).toBe(false)
+  })
+
+  test("#given the notice was already claimed for the install #when a regular session attaches #then the notice stays silent", async () => {
+    // given
+    const stateDir = testTempDir("omo-10560-")
+    claimRegularModeNotice(stateDir)
+    const harness = mounted({ loadSettings: () => settings({ enabled: true }), regularNoticeStateDir: stateDir })
+
+    // when
+    await harness.pi.dispatch("session_start", {}, harness.host)
+    harness.attachWith({ requestRender() {}, terminal: { columns: 200 } })
+
+    // then
+    expect(harness.notices).toHaveLength(0)
+  })
+})
 
 describe("side panel lifecycle and guards", () => {
   test("#given a mounted column #when a switch is only announced #then the column stays", async () => {

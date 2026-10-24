@@ -3,6 +3,7 @@ import { once } from "node:events"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
+import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createLiveThreadSurface, parseHostStatusAll, TUI_ENDPOINT_COMMANDS, type HostEndpointReport } from "./live-surface"
@@ -20,9 +21,9 @@ function tempDir(prefix: string): string {
   return directory
 }
 
-async function listen(server: Server, socketPath: string, sockets: Set<Socket>): Promise<void> {
+async function listen(server: Server, socketPath: string, sockets: Set<Socket>, address = socketPath): Promise<void> {
   const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
-  server.listen(socketPath)
+  server.listen(address)
   await listening
   cleanups.push(async () => {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
@@ -112,7 +113,9 @@ function sessionControl(frame: Frame, controls: TerminalControls): Record<string
 async function hostEndpoint(socketPath: string, replies: Readonly<Record<string, unknown>> = {}): Promise<{ readonly frames: Frame[] }> {
   const frames: Frame[] = []
   const sockets = new Set<Socket>()
-  const server = createServer((socket) => {
+  // An rpc_host listens on the transport its logical path names: a hashed pipe behind a raw secret on win32.
+  const transport = fakeHostTransport(socketPath)
+  const server = createServer((socket) => transport.authenticate(socket, () => {
     sockets.add(socket)
     socket.once("close", () => sockets.delete(socket))
     let buffer = ""
@@ -127,10 +130,10 @@ async function hostEndpoint(socketPath: string, replies: Readonly<Record<string,
       const data = Object.hasOwn(replies, type) ? replies[type] : type === "list_sessions"
         ? { sessions: [{ sessionId: "rpc-1", durableSessionId: "dur-host", cwd: process.cwd(), name: "host-thread", status: "open", kind: "interactive" }] }
         : frame.type === "wake" ? { admitted: [] } : {}
-      socket.end(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data })}\n`)
+      socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data })}\n`)
     })
-  })
-  await listen(server, socketPath, sockets)
+  }))
+  await listen(server, socketPath, sockets, transport.listenAddress)
   return { frames }
 }
 
@@ -178,8 +181,8 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const threads = threadsOf(await w.run("thread_list", { all_scope: true }))
 
     // then
-    expect(threads.find((thread) => thread.thread_id === "dur-tui")).toMatchObject({ name: "my-tui", surface: "tui", alive: true, status: "live", created_at: "2026-09-28T04:19:00.000Z", endpoint: { kind: "tui", socket: tui, routing_id: "dur-tui" } })
-    expect(threads.find((thread) => thread.thread_id === "dur-host")).toMatchObject({ surface: "daemon", endpoint: { kind: "rpc_host", socket: legacy, routing_id: "rpc-1" } })
+    expect(threads.find((thread) => thread.thread_id === "dur-tui")).toMatchObject({ name: "my-tui", surface: "tui", alive: true, status: "live", created_at: "2026-09-28T04:19:00.000Z", endpoint: { kind: "tui", socket: tui, routing_id: "dur-tui", durable_session_id: "dur-tui" } })
+    expect(threads.find((thread) => thread.thread_id === "dur-host")).toMatchObject({ surface: "daemon", endpoint: { kind: "rpc_host", socket: legacy, routing_id: "rpc-1", durable_session_id: "dur-host" } })
     expect(terminal.rejected.count).toBe(0)
     expect(terminal.frames.map((frame) => frame.type).sort()).toEqual(["get_protocol_info", "list_sessions"])
     expect(terminal.frames.some((frame) => "observe" in frame)).toBe(false)
@@ -326,10 +329,10 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const w = surfaceFor(legacy, [{ socket: legacy, reachable: true, session_paths: [], endpoint_kind: "rpc_host", alive: true, reason: null }, { socket: tui, reachable: true, session_paths: [], endpoint_kind: "tui", alive: true, reason: null }])
 
     // when
-    const tuiWake = await w.surface.gateway.wake({ kind: "tui", socket: tui, routing_id: "dur-tui" }, ["d1"])
-    const hostWake = await w.surface.gateway.wake({ kind: "rpc_host", socket: legacy, routing_id: "rpc-1" }, ["d2"])
-    const liveness = await w.surface.gateway.classifyLiveness?.({ kind: "tui", socket: tui, routing_id: "dur-tui" })
-    const release = await (w.surface.gateway.releaseSession?.({ kind: "tui", socket: tui, routing_id: "dur-tui" }, { reason: "takeover" }) ?? Promise.resolve(undefined)).then(() => "released", (error: unknown) => (error instanceof Error ? error.message : String(error)))
+    const tuiWake = await w.surface.gateway.wake({ kind: "tui", socket: tui, routing_id: "dur-tui", durable_session_id: "dur-tui" }, ["d1"])
+    const hostWake = await w.surface.gateway.wake({ kind: "rpc_host", socket: legacy, routing_id: "rpc-1", durable_session_id: "dur-host" }, ["d2"])
+    const liveness = await w.surface.gateway.classifyLiveness?.({ kind: "tui", socket: tui, routing_id: "dur-tui", durable_session_id: "dur-tui" })
+    const release = await (w.surface.gateway.releaseSession?.({ kind: "tui", socket: tui, routing_id: "dur-tui", durable_session_id: "dur-tui" }, { reason: "takeover" }) ?? Promise.resolve(undefined)).then(() => "released", (error: unknown) => (error instanceof Error ? error.message : String(error)))
 
     // then
     expect(tuiWake).toEqual({ admitted: [{ delivery_id: "d1", kind: "started" }] })
@@ -345,7 +348,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
   test("#given a host whose release reply says released but names no session path #when the session is released #then it is a failed release, not a success to relaunch from", async () => {
     const dir = tempDir("thr-tui-")
     const legacy = join(dir, "rpc.sock")
-    const endpoint = { kind: "rpc_host", socket: legacy, routing_id: "rpc-1" } as const
+    const endpoint = { kind: "rpc_host", socket: legacy, routing_id: "rpc-1", durable_session_id: "dur-host" } as const
     await hostEndpoint(legacy, { release_session: { released: true, attachments: 0, dropped: { deliveries: [], user_messages: [] } } })
     const w = surfaceFor(legacy, [{ socket: legacy, reachable: true, session_paths: [], endpoint_kind: "rpc_host", alive: true, reason: null }])
     expect(await w.surface.gateway.releaseSession?.(endpoint, { reason: "takeover" })).toEqual({ success: false, error: "release_failed" })

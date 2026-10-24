@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 const isWin32 = process.platform === "win32"
 const driverPath = fileURLToPath(new URL("./task-rpc-e2e.mjs", import.meta.url))
@@ -73,7 +74,9 @@ async function terminateProcessTree(child: ChildProcess): Promise<void> {
     child.kill("SIGKILL")
     return
   }
-  const killer = spawn("taskkill.exe", ["/pid", String(pid), "/T", "/F"], {
+  const args = windowsTreeKillArgs(pid)
+  if (args.length === 0) return
+  const killer = spawn("taskkill.exe", args, {
     stdio: "ignore",
     windowsHide: true,
   })
