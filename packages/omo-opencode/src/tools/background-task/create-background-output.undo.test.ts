@@ -90,6 +90,7 @@ describe("createBackgroundOutput undo regression", () => {
     // #given
     const task = createTask()
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: id => (id === task.id ? task : undefined),
     }
     const tool = createBackgroundOutput(manager, createMockClient())

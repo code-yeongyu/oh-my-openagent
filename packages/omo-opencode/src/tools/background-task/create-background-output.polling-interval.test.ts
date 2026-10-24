@@ -46,6 +46,7 @@ describe("background_output blocking poll interval", () => {
     let pollCount = 0
     const task = createTask()
     const manager: BackgroundOutputManager = {
+      getTaskBySessionId: () => undefined,
       getTask: (id: string) => {
         if (id !== task.id) return undefined
         pollCount += 1
