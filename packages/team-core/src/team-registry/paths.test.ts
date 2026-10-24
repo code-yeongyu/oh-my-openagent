@@ -7,7 +7,7 @@ import path from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { TeamModeConfigSchema } from "../config"
-import { discoverTeamSpecs, ensureBaseDirs, getInboxDir, getRuntimeStateDir, getTasksDir, getWorktreeDir, resolveBaseDir } from "./paths"
+import { discoverTeamSpecs, ensureBaseDirs, getInboxDir, getRuntimeStateDir, getTasksDir, getTeamSpecPath, getWorktreeDir, resolveBaseDir } from "./paths"
 
 const logCalls: Array<[string, unknown?]> = []
 
@@ -77,6 +77,20 @@ describe("paths", () => {
     expect(inboxPath).toThrow("team path escapes base directory")
     expect(tasksPath).toThrow("team path escapes base directory")
     expect(worktreePath).toThrow("team path escapes base directory")
+  })
+
+  test("#given team names contain traversal #when spec paths are built #then they are rejected before escaping scope roots", () => {
+    // given
+    const baseDir = "/tmp/omo-contained"
+    const projectRoot = "/tmp/project-contained"
+
+    // when
+    const userSpecPath = () => getTeamSpecPath(baseDir, "../../escape", "user")
+    const projectSpecPath = () => getTeamSpecPath(baseDir, "../../escape", "project", projectRoot)
+
+    // then
+    expect(userSpecPath).toThrow("team path escapes base directory")
+    expect(projectSpecPath).toThrow("team path escapes base directory")
   })
 
   test("discoverTeamSpecs prefers project scope", async () => {
