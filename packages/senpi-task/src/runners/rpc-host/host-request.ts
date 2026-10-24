@@ -1,10 +1,5 @@
-import { createHash } from "node:crypto"
-import { readFile } from "node:fs/promises"
-import { createConnection } from "node:net"
-import { win32 } from "node:path"
-
-const WINDOWS_PIPE_PREFIX = "\\\\.\\pipe\\senpi-rpc-"
-const WINDOWS_SECRET_BYTES = 32
+import { resolveAgentHome } from "../../agent-home"
+import { authenticateRpcHost, authRequiredError, resolveRpcSocketTransport, RpcIdentityError, withRpcSocket } from "./socket-client"
 
 export type HostReply = Readonly<Record<string, unknown>>
 
@@ -15,68 +10,27 @@ export type HostReply = Readonly<Record<string, unknown>>
  * runner uses the logical socket path directly on POSIX and its authenticated named-pipe transport
  * on Windows.
  */
-export async function askHost(socket: string, request: HostReply, timeoutMs: number): Promise<HostReply | undefined> {
-  const transport = await resolveTransport(socket)
+export async function askHost(socket: string, request: HostReply, timeoutMs: number, options: { readonly keyRoot?: string; readonly agentDir?: string } = {}): Promise<HostReply | undefined> {
+  const transport = await resolveRpcSocketTransport(socket)
   if (transport === undefined) return undefined
-  return new Promise((resolve) => {
-    const connection = createConnection(transport.address)
-    let buffer = ""
-    let settled = false
-    const finish = (reply: HostReply | undefined): void => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeout)
-      connection.destroy()
-      resolve(reply)
-    }
-    const timeout = setTimeout(() => finish(undefined), timeoutMs)
-    connection.setEncoding("utf8")
-    connection.once("connect", () => {
-      if (transport.secret !== undefined) connection.write(transport.secret)
-      connection.write(`${JSON.stringify(request)}\n`)
-    })
-    connection.on("data", (chunk: string) => {
-      buffer += chunk
-      for (let newline = buffer.indexOf("\n"); newline !== -1; newline = buffer.indexOf("\n")) {
-        const reply = replyTo(buffer.slice(0, newline), request.id)
-        buffer = buffer.slice(newline + 1)
-        if (reply !== undefined) return finish(reply)
+  const agentDir = options.agentDir ?? resolveAgentHome({ env: process.env })
+  const keyRoot = options.keyRoot ?? (process.env.SENPI_RPC_KEY_ROOT?.trim() || agentDir)
+  try {
+    return await withRpcSocket(transport.address, { timeoutMs, secret: transport.secret }, async (send) => {
+      if (process.platform !== "win32") {
+        const info = await authenticateRpcHost(send, socket, keyRoot, request.type === "get_protocol_info" ? request : undefined)
+        if (request.type === "get_protocol_info") return info
       }
+      const reply = await send(request)
+      if (reply.success === false && (reply.errorCode ?? reply.error) === "auth_required") throw authRequiredError(socket)
+      return reply
     })
-    connection.once("error", () => finish(undefined))
-    connection.once("close", () => finish(undefined))
-  })
+  } catch (error) {
+    if (error instanceof RpcIdentityError) throw error
+    return undefined
+  }
 }
 
 export function isRecord(value: unknown): value is HostReply {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-async function resolveTransport(
-  socket: string,
-): Promise<{ readonly address: string; readonly secret?: Buffer } | undefined> {
-  if (process.platform !== "win32") return { address: socket }
-  let secret: Buffer
-  try {
-    secret = await readFile(`${socket}.secret`)
-  } catch {
-    return undefined
-  }
-  if (secret.length !== WINDOWS_SECRET_BYTES) return undefined
-  const canonical = win32.normalize(socket).toLowerCase()
-  const name = createHash("sha256")
-    .update(Buffer.concat([Buffer.from(canonical, "utf8"), secret]))
-    .digest("hex")
-    .slice(0, 32)
-  return { address: `${WINDOWS_PIPE_PREFIX}${name}`, secret }
-}
-
-function replyTo(line: string, id: unknown): HostReply | undefined {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(line)
-  } catch {
-    return undefined
-  }
-  return isRecord(parsed) && parsed.id === id ? parsed : undefined
 }

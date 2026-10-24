@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { windowsTreeKillArgs } from "../../../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 interface TaskkillResult {
   status: number | null
@@ -16,8 +17,10 @@ export interface ProcessGroupRuntime {
 const defaultRuntime: ProcessGroupRuntime = {
   platform: process.platform,
   runTaskkill: async (pid) => {
+    const args = windowsTreeKillArgs(pid)
+    if (args.length === 0) return { status: 0 }
     return await new Promise<TaskkillResult>((resolve) => {
-      const child = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      const child = spawn("taskkill", args, {
         stdio: "ignore",
         windowsHide: true,
       })
