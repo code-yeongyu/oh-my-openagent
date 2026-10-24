@@ -41,14 +41,18 @@ export function propagateResult(result) {
  *
  * Windows has no POSIX signals: `process.on("SIGTERM")` never fires there and `subprocess.kill`
  * would terminate the child abruptly, so nothing is forwarded and the wait is the whole behavior.
+ *
+ * `onBeforeSignalExit()` runs synchronously just before this process re-raises the signal on itself,
+ * the one path where the returned promise never settles, so callers can release what they hold.
  */
 export function runChild(command, args, options = {}) {
-  const env = options.env ?? process.env
+  const { onBeforeSignalExit, ...spawnOptions } = options
+  const env = spawnOptions.env ?? process.env
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: "inherit",
       windowsHide: true,
-      ...options,
+      ...spawnOptions,
     })
 
     let settled = false
@@ -86,6 +90,7 @@ export function runChild(command, args, options = {}) {
               // Every listener for this signal has to go, not just this module's: the re-raise only
               // terminates the process when nothing is left to handle it.
               process.removeAllListeners(signal)
+              onBeforeSignalExit?.()
               process.kill(process.pid, signal)
             })
           }, graceMs(env))
