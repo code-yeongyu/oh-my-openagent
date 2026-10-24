@@ -18,6 +18,9 @@ export function describeAgreementsToolViolation(
   const itemsBefore = readAgreementsBody(before)
   const humanBefore = itemsBefore.filter((item) => item.by === "human")
   if (after === undefined) {
+    if (before !== undefined && parseAgreementsLedger(parseMemoryFile(before).body).receipts.length > 0) {
+      return "agreement event receipts cannot be removed by memory tools"
+    }
     if (humanBefore.length > 0) return "system/agreements.md holds agreements your person wrote; only they can remove them (/agreements drop)"
     const flagged = itemsBefore.find((item) => item.status === "needs-human")
     if (flagged !== undefined) return `agreement ${flagged.id} is flagged as needing your person; only they can drop it (/agreements drop)`
@@ -31,6 +34,10 @@ export function describeAgreementsToolViolation(
     return `system/agreements.md is not a valid memory file: ${error instanceof Error ? error.message : String(error)}`
   }
   if (parsed.diagnostics.length > 0) return `system/agreements.md is malformed: ${parsed.diagnostics.join("; ")}`
+  const priorReceipts = before === undefined ? [] : parseAgreementsLedger(parseMemoryFile(before).body).receipts
+  if (JSON.stringify([...priorReceipts].sort()) !== JSON.stringify([...parsed.receipts].sort())) {
+    return "agreement event receipts are maintained by the facts extractor and cannot be edited by memory tools"
+  }
   const counted = describeCountTampering(itemsBefore, parsed.items)
   if (counted !== undefined) return counted
   const humanAfter = new Map(parsed.items.filter((item) => item.by === "human").map((item) => [item.id, item]))

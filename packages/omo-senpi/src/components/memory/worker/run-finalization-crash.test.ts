@@ -22,7 +22,7 @@ import type { ReservationRunLedger } from "./reservation-run-ledger"
 afterEach(cleanupFinalizationFixtures)
 
 describe("reflection finalization crash recovery", () => {
-  test("#given a secret-bearing tip with an oversized description #when finalized #then the gate records failed without an escaping exception", async () => {
+  test("#given a secret-bearing tip with an oversized description #when finalized #then the note is dropped, nothing lands, and no exception escapes", async () => {
     const item = await fixture(false)
     const warnings: Readonly<Record<string, unknown>>[] = []
     await writeFile(join(item.worktree.dir, "system/learned.md"),
@@ -45,13 +45,19 @@ describe("reflection finalization crash recovery", () => {
       warn: (_message, fields) => { warnings.push(fields) },
     }, item.runDir, item.ledger)
 
-    expect(result).toMatchObject({ outcome: "failed", reason: "completion_validation" })
-    expect(result?.detail).toContain("secret_like_content: system/learned.md")
+    // The run's only entry is invalid, so the gate drops it and the run settles with nothing to merge (#10528).
+    expect(result).toMatchObject({ outcome: "no_changes" })
+    expect(result?.detail).toContain("Dropped 1 invalid memory entry: system/learned.md")
+    expect(result?.detail).not.toContain("synthetic-fixture-value")
     expect(warnings).toHaveLength(1)
     expect(warnings[0]?.error).toContain("secret-like content")
-    expect(JSON.parse(await readFile(join(item.runDir, "final.json"), "utf8"))).toMatchObject({ outcome: "failed" })
+    expect(JSON.parse(await readFile(join(item.runDir, "final.json"), "utf8"))).toMatchObject({ outcome: "no_changes" })
     expect((await item.store.readState()).active).toBeUndefined()
-    expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
+    // git grep exits 1 for "not found"; any other code is a git error, not proof.
+    const landed = await createNodeGitExec().run(["grep", "-q", "synthetic-fixture-value", "HEAD"], { cwd: item.worktree.parent.dir, timeoutMs: 30_000 })
+    expect(landed.code).toBe(1)
+    // The refused run still advances the cursor, so this conversation is not replayed into the same refusal.
+    expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
   })
 
   test("#given a committed oversized description #when the recorded outcome finalizes #then preflight runs before validation and the gate passes", async () => {

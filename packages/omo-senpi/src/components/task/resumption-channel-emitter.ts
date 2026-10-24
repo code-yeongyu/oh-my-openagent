@@ -7,7 +7,7 @@ import {
   type TaskRecord,
 } from "@oh-my-opencode/senpi-task"
 
-import type { SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import { isTerminal, taskStatusDescription } from "./status-row-format"
 
 export const RESUMPTION_CHANNEL_STATE_EVENT = "wake_source_state"
@@ -22,6 +22,7 @@ type ResumptionChannel = {
 type ResumptionChannelEmitterManager = {
   list(scope: ListScope): readonly ListedTask[]
   wasBackground(taskId: string): boolean
+  readonly workpools?: { ownedTaskIds(): ReadonlySet<string> }
 }
 
 type OwnedTeamMemberResolver = (
@@ -43,6 +44,7 @@ export type ResumptionChannelEmitterDeps = {
   readonly stateDir: StateDirConfig
   readonly settings: OmoTaskSettings
   readonly isOwnedTeamMember?: OwnedTeamMemberResolver
+  readonly logger?: Pick<ComponentLogger, "warn">
 }
 
 export function createResumptionChannelEmitter(
@@ -62,16 +64,37 @@ export function createResumptionChannelEmitter(
     const sessionId = deps.sessionId()
     if (sessionId === undefined) return []
     const channels: ResumptionChannel[] = []
+    // A workpool worker is claimed without a terminal notification, yet it is this session's child work (#10782).
+    // An unreadable pool store must not cost this emission: it is logged once, and every record it can no longer
+    // classify stays counted, so a store failure can delay "done" but never announce it while workers run.
+    // The pool store is read once per snapshot, not once per record.
+    let poolStoreReadable = true
+    let poolTaskIds: ReadonlySet<string> | undefined
+    const ownedByPool = (taskId: string): boolean => {
+      if (!poolStoreReadable) return false
+      if (poolTaskIds === undefined) {
+        try {
+          poolTaskIds = deps.manager.workpools?.ownedTaskIds() ?? new Set()
+        } catch (error) {
+          poolStoreReadable = false
+          deps.logger?.warn("resumption channels: workpool store unreadable, unclassified tasks stay counted this round", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+          return false
+        }
+      }
+      return poolTaskIds.has(taskId)
+    }
     for (const { record } of deps.manager.list({ scope: "parent-session", session_id: sessionId })) {
       if (isTerminal(record.status)) continue
-      const background = deps.manager.wasBackground(record.task_id)
+      const background = deps.manager.wasBackground(record.task_id) || ownedByPool(record.task_id)
       const owned = background
         ? false
         : await resolveOwnedTeamMember(record, sessionId, {
             stateDir: deps.stateDir,
             taskSettings: deps.settings,
           })
-      if (!background && !owned) continue
+      if (!background && !owned && poolStoreReadable) continue
       channels.push({
         id: record.task_id,
         description: taskStatusDescription(record),
@@ -89,6 +112,8 @@ export function createResumptionChannelEmitter(
     lastIds = idsOf(channels)
     deps.pi.events?.emit(RESUMPTION_CHANNEL_STATE_EVENT, {
       source: RESUMPTION_CHANNEL_SOURCE,
+      // senpi#3864: children's work keeps the parent's lifecycle off "done" until it is delivered.
+      kind: "children",
       activeCount: channels.length,
       items: channels,
       channels,

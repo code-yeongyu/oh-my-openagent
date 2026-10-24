@@ -54,8 +54,8 @@ function skipSpaces(source, at) {
 	return at
 }
 
-/** Read `<name attrs...>` starting just after `<`. */
-function readTag(source, start) {
+/** Read `<name attrs...>` starting just after `<`; the one attribute parser (any quoting). */
+export function readTag(source, start) {
 	const end = source.length
 	let at = start
 	while (at < end && !isSpace(source[at]) && source[at] !== ">" && source[at] !== "/") at++

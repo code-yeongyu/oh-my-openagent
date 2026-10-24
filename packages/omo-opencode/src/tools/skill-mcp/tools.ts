@@ -5,6 +5,7 @@ import { parseSkillMcpArguments } from "./parse-skill-mcp-arguments"
 import type { SkillMcpArgs } from "./types"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import { skillMcpClientInfo } from "../skill/skill-mcp-authority"
 
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
@@ -147,13 +148,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         throw new Error("No active session available for skill MCP call.")
       }
 
-      const info: SkillMcpClientInfo = {
-        serverName: args.mcp_name,
-        skillName: found.skill.name,
-        sessionID,
-        scope: found.skill.scope,
-        directory: toolContext.directory,
-      }
+      const info: SkillMcpClientInfo = skillMcpClientInfo(found.skill, args.mcp_name, sessionID, toolContext.directory)
 
       const context: SkillMcpServerContext = {
         config: found.config,
@@ -168,7 +163,10 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       switch (operation.type) {
         case "tool": {
           const result = await manager.callTool(info, context, operation.name, parsedArgs, cdpOptions)
-          output = JSON.stringify(result, null, 2)
+          if (result.isError === true) {
+            throw new Error(`MCP tool "${operation.name}" failed: ${JSON.stringify(result, null, 2)}`)
+          }
+          output = JSON.stringify(result.structuredContent !== undefined ? result : result.content, null, 2)
           break
         }
         case "resource": {
@@ -186,7 +184,8 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
           break
         }
       }
-      return applyGrepFilter(output, args.grep)
+      const notice = manager.getEnvironmentNotice?.(info)
+      return [applyGrepFilter(output, args.grep), notice].filter(Boolean).join("\n\n")
     },
   })
 }
