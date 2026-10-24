@@ -2,7 +2,9 @@ import { createTelemetryClient as createInjectedTelemetryClient, type CreateTele
 import { createDefaultPostHogTransport } from "./posthog-transport"
 import type { TelemetryClient } from "./types"
 
-export { createDefaultPostHogTransport } from "./posthog-transport"
+export { createDefaultPostHogTransport, type PostHogTransportOptions } from "./posthog-transport"
+export { TelemetryDeliveryError } from "./telemetry-delivery-error"
+export { createImmediateSender } from "./posthog-immediate-send"
 export { isTelemetryClientEnabled, type TelemetryClientEnabledInput } from "./injected-client"
 
 export function createTelemetryClient(

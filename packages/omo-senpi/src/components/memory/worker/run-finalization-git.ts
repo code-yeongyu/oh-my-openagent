@@ -4,12 +4,14 @@ import { join } from "node:path"
 import {
   cleanupReflectionWorktree,
   createLockRecord,
+  describeDroppedEntries,
   integrateValidatedReflection,
   maybeKillAt,
   memoryWriterLockPath,
   probeLegacyAutoRunReceipt,
   probeReflectionIntegration,
   preflightReflectionDescriptions,
+  readDroppedTrailers,
   validateCompletion,
   validateDreamTokenBudget,
   withLock,
@@ -84,12 +86,15 @@ export async function resolveFinalizationDecision(
         validatedChangedPaths: validated.changedPaths,
       })
     } else if (validation.status === "no_changes") {
-      const decision = { outcome: "no_changes" as const }
+      // Every entry the run wrote was refused: say so instead of reading as "nothing to do".
+      const note = validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
+      const decision = { outcome: "no_changes" as const, ...(note === undefined ? {} : { detail: note }) }
       await updateRunLedger(ledgerPath, {
         finalizePhase: "validated",
         validatedTipSha: validation.tipSha,
         validatedChangedPaths: [],
         finalizeOutcome: decision.outcome,
+        ...(note === undefined ? {} : { finalizeDetail: note }),
       })
       await cleanupAndRecord(context, ledger, runDir)
       return decision
@@ -147,6 +152,9 @@ export async function resolveFinalizationDecision(
     await checkpointDecision(ledgerPath, decision)
     return decision
   }
+  // Read from the validated commit's trailers, so a run resumed after the validated checkpoint still reports them.
+  const dropped = await readDroppedTrailers(worktree.exec, worktree.dir, ledger.baseSha, validated.tipSha)
+  const droppedNote = dropped.length > 0 ? describeDroppedEntries(dropped) : undefined
   const integrated = await integrateValidatedReflection(worktree, {
     mode,
     runId: ledger.runId,
@@ -160,7 +168,9 @@ export async function resolveFinalizationDecision(
     : {}
   const decision: DurableFinalizationDecision = {
     outcome: integrated.outcome,
-    ...(integrated.detail === undefined ? {} : { detail: integrated.detail }),
+    ...(integrated.detail === undefined && droppedNote === undefined
+      ? {}
+      : { detail: [integrated.detail, droppedNote].filter(Boolean).join("; ") }),
     ...(integrated.integrationSha === undefined ? {} : { integrationSha: integrated.integrationSha }),
     ...budget,
   }

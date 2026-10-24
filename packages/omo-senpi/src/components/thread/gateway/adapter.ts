@@ -17,6 +17,7 @@ export type GatewayEndpointRef = {
   readonly kind: GatewayEndpointKind
   readonly socket: string
   readonly routing_id: string | null
+  readonly durable_session_id: string
 }
 
 export type ExternalAdmissionKind = "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "already_admitted"

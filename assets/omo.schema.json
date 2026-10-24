@@ -1659,6 +1659,7 @@
             "merge": "auto",
             "category": "quick",
             "timeout_minutes": 15,
+            "max_concurrent_runs": 1,
             "sandbox": "auto"
           },
           "type": "object",
@@ -1702,6 +1703,12 @@
             },
             "timeout_minutes": {
               "default": 15,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_concurrent_runs": {
+              "default": 1,
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -2359,6 +2366,11 @@
         "enabled": {
           "default": true,
           "type": "boolean"
+        },
+        "rawTurnSampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       },
       "additionalProperties": false
@@ -4163,6 +4175,11 @@
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
                 },
+                "max_concurrent_runs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "sandbox": {
                   "type": "string",
                   "enum": [
@@ -4710,6 +4727,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -6491,6 +6513,11 @@
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
                 },
+                "max_concurrent_runs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "sandbox": {
                   "type": "string",
                   "enum": [
@@ -7038,6 +7065,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -8819,6 +8851,11 @@
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
                 },
+                "max_concurrent_runs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "sandbox": {
                   "type": "string",
                   "enum": [
@@ -9366,6 +9403,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -11153,6 +11195,11 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "max_concurrent_runs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "sandbox": {
                     "type": "string",
                     "enum": [
@@ -11700,6 +11747,11 @@
             "properties": {
               "enabled": {
                 "type": "boolean"
+              },
+              "rawTurnSampleRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
               }
             },
             "additionalProperties": false
@@ -13481,6 +13533,11 @@
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "max_concurrent_runs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "sandbox": {
                         "type": "string",
                         "enum": [
@@ -14028,6 +14085,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -15809,6 +15871,11 @@
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "max_concurrent_runs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "sandbox": {
                         "type": "string",
                         "enum": [
@@ -16356,6 +16423,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -18137,6 +18209,11 @@
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "max_concurrent_runs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "sandbox": {
                         "type": "string",
                         "enum": [
@@ -18684,6 +18761,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false

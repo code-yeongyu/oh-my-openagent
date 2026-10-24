@@ -158,12 +158,16 @@ prefixes when identity is needed.
 `;
 const reviewWorkCodexGatePattern = new RegExp(reviewWorkCodexGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
-const ulwResearchOriginalDeliveryGates = "Reading the source markup is not visual QA; inspect the pixels.\n4. **Proofread gate: `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo.";
-const ulwResearchCodexDeliveryGate = "Reading the source markup is not visual QA; inspect the pixels.";
+const ulwResearchProofreadGate = "**Proofread gate: `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo.";
+// The shared skill numbers the proofread gate right after the Visual QA item the Codex edition ends on.
+const ulwResearchVisualQaItemPattern = /^(\d+)\. \*\*Visual QA\.\*\*[^\n]*inspect the pixels\.$/m;
 
 export function removeCodexSkillOverlays(skillName, content) {
 	if (skillName === "ulw-research") {
-		return content.replace(ulwResearchCodexDeliveryGate, ulwResearchOriginalDeliveryGates);
+		return content.replace(
+			ulwResearchVisualQaItemPattern,
+			(item, numeral) => `${item}\n${Number(numeral) + 1}. ${ulwResearchProofreadGate}`,
+		);
 	}
 	if (skillName === "ulw-execute") {
 		return content

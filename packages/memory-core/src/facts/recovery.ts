@@ -8,6 +8,7 @@ import { PROVENANCE_STRIPPED_TRAILER, strippedLegacyUserHeader } from "../tools/
 import type { FactsApplyRecovery } from "./mutation-plan"
 import { FactsMutationTransaction, FactsOwnershipLostError } from "./recovery-mutation"
 import { captureOwnedFactsState, sameFactsOwnedState } from "./recovery-ownership"
+import { upgradeAgreementRecovery, type AgreementRecoveryInput } from "./agreement-recovery"
 
 export type FactsRecoveryResult =
   | { readonly outcome: "committed"; readonly sha: string; readonly affectedPaths: readonly string[] }
@@ -25,18 +26,26 @@ export async function applyFactsRecovery(
   recovery: FactsApplyRecovery,
   recordCount: number,
   author: GitCommitAuthor,
+  agreementInput?: AgreementRecoveryInput,
 ): Promise<FactsRecoveryResult> {
   const observed = await captureOwnedFactsState(repo, recovery)
   if (observed === undefined) return { outcome: "parent_dirty" }
   const boundary = await captureOwnedFactsState(repo, recovery)
   if (boundary === undefined || !sameFactsOwnedState(observed, boundary)) return { outcome: "parent_dirty" }
-  const transaction = new FactsMutationTransaction(repo, recovery, boundary)
+  const effective = await upgradeAgreementRecovery(repo, recovery, agreementInput)
+  let transaction = new FactsMutationTransaction(repo, recovery, boundary)
   try {
     await transaction.restorePreState()
+    if (effective !== recovery) {
+      // Publish only after removing old partial writes. A restart then sees either the old
+      // envelope's pre-state or the new envelope's pre/post-state, never an unowned third image.
+      await agreementInput?.publishRecovery?.(effective)
+      transaction = new FactsMutationTransaction(repo, effective, new Map(effective.paths.map((entry) => [entry.path, entry.pre])))
+    }
     await transaction.applyPostState()
     const result = await repo.commitPrepared(
-      recovery.paths.map((entry) => entry.path),
-      commitMessage(recovery.batchId, recordCount, await strippedHeaderPaths(repo, recovery), await evictedAgreementIds(repo, recovery)),
+      effective.paths.map((entry) => entry.path),
+      commitMessage(effective.batchId, recordCount, await strippedHeaderPaths(repo, effective), await evictedAgreementIds(repo, effective)),
       author,
     )
     return { outcome: "committed", sha: result.sha, affectedPaths: recovery.paths.map((entry) => entry.path) }
