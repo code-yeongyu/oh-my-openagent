@@ -35,3 +35,4 @@ export {
   withRecallWakeLease,
 } from "./recall-wake-domain"
 export type { RecallWakeLease, RecallWakeLeaseOptions } from "./recall-wake-domain"
+export { acquireReflectionRunLease } from "./reflection-run-domain"

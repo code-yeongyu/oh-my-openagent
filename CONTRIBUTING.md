@@ -21,6 +21,7 @@ First off, thanks for taking the time to contribute! This document provides guid
   - [Adding a New Hook](#adding-a-new-hook)
   - [Adding a New Tool](#adding-a-new-tool)
   - [Adding a New MCP Server](#adding-a-new-mcp-server)
+- [Security](#security)
 - [QA Discipline](#qa-discipline)
 - [Pull Request Process](#pull-request-process)
   - [PR Checklist](#pr-checklist)
@@ -324,6 +325,10 @@ export function createMyHook(deps: { logger: Logger }) {
 2. Register it inside `createBuiltinMcps()` in `packages/omo-opencode/src/mcp/index.ts`
 3. Add the MCP name to `McpNameSchema` in `packages/omo-opencode/src/mcp/types.ts`
 4. Document in README if it requires external setup
+
+## Security
+
+Report suspected vulnerabilities privately, as described in [`SECURITY.md`](SECURITY.md), never in a public issue or pull request. If your change touches a trust boundary (credentials, config loading, tool permissions, the installer or update path, or the engine's RPC endpoints), say in the PR body what it could weaken and how you checked it.
 
 ## QA Discipline
 

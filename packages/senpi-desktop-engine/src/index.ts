@@ -1,4 +1,9 @@
 export {
+	DesktopLaunchContextError,
+	DesktopLaunchRefusal,
+	type DesktopLaunchRefusalReason,
+} from "./launch-refusal";
+export {
 	DesktopEngineAbiMismatchError,
 	DesktopEngineHandshakeError,
 	type DesktopEngineSpawner,

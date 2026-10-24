@@ -1,9 +1,8 @@
 import { execFile } from "node:child_process"
 import { createConnection, type Socket } from "node:net"
-import { randomUUID } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
-import { join, resolve } from "node:path"
-import { StringDecoder } from "node:string_decoder"
+import { resolve } from "node:path"
+import { authenticateRpcHost, authRequiredError, resolveRpcSocketTransport, withRpcSocket } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveThreadSocket } from "./live-surface-paths"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -11,13 +10,15 @@ import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../memory/worke
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
 import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegistryEndpoints, type EndpointKind, type RegistryEndpoint } from "./endpoint-registry"
-import type { EndpointLiveness, ExternalAdmissionKind, GatewayEndpointPort, GatewayEndpointRef, GatewayWakeReply, ReleaseSessionReply } from "./gateway/adapter"
+import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./gateway/adapter"
+import { releaseReply, wakeReply } from "./gateway-replies"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { answerUiRequest } from "./ui-answer"
+import { fencedCommand } from "./attachment-fence"
 
-type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorData?: unknown }
+type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorCode?: unknown; readonly errorData?: unknown }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
 function dataRecord(frame: RpcFrame, command: unknown): Record<string, unknown> {
   if (frame.success === false && command === "set_thinking_level" && typeof frame.error === "string" && /^Thinking level .+ is not supported by the active model\.$/.test(frame.error)) {
@@ -46,14 +47,24 @@ export const HOST_STATUS_ALL_ARGS = ["host", "status", "--all", "--include-worke
 /**
  * Marks a read-only listing as an observation (senpi `OBSERVE_REQUEST_FIELD`): without it the supervisor
  * counts the connection as an attachment, so every thread tool call would reset each shard's idle window
- * and no shard would ever idle out. Never sent on a request that acts on a session.
+ * and no shard would ever idle out. A request that acts on a session never carries it itself, but on an
+ * rpc_host its connection still opens with an observing `get_protocol_info` (the auth challenge and capability
+ * probe, `requestFrame`); the session command is then held by `attach_session` (`attachment-fence.ts`) when
+ * the host advertises it.
  */
 const OBSERVE = { observe: true } as const
 
 /** The commands any terminal control endpoint answers, an older one included (senpi before its session controls). */
 export const TUI_ENDPOINT_COMMANDS: ReadonlySet<string> = LEGACY_TUI_COMMANDS
 
-type RequestOptions = { readonly timeoutMs?: number; readonly secret?: Uint8Array }
+type RequestOptions = {
+  readonly timeoutMs?: number
+  readonly secret?: Uint8Array
+  readonly keyRoot: () => string
+  readonly durableSessionId?: string
+  readonly openedName?: string
+  readonly rpcHost?: boolean
+}
 
 /**
  * One request, one correlated response. The multi-session host writes other lines on the same
@@ -65,35 +76,24 @@ type RequestOptions = { readonly timeoutMs?: number; readonly secret?: Uint8Arra
  * 32-byte secret, which is written before the request. The correlation id is written last: no
  * command field can overwrite it.
  */
-async function requestFrame(socketPath: string, command: Record<string, unknown>, connect: ThreadSocketConnect, options: RequestOptions = {}): Promise<RpcFrame> {
-  const id = randomUUID()
-  return await new Promise((resolve, reject) => {
-    const socket = connect(socketPath)
-    let buffer = ""
-    // One streaming decoder per connection: a character split across two reads stays whole.
-    const decoder = new StringDecoder("utf8")
-    const timer = setTimeout(() => { socket.destroy(); reject(new Error("thread RPC request timed out")) }, options.timeoutMs ?? REQUEST_TIMEOUT_MS)
-    const finish = (error?: Error, value?: RpcFrame) => { clearTimeout(timer); socket.destroy(); error === undefined ? resolve(value as RpcFrame) : reject(error) }
-    socket.once("error", (error) => finish(error))
-    socket.once("close", () => finish(new Error(`thread RPC connection closed before the ${String(command.type)} response arrived`)))
-    socket.once("connect", () => {
-      if (options.secret !== undefined) socket.write(Buffer.from(options.secret))
-      socket.write(`${JSON.stringify({ ...command, id })}\n`)
-    })
-    socket.on("data", (chunk) => {
-      buffer += decoder.write(chunk)
-      let newline = buffer.indexOf("\n")
-      while (newline >= 0) {
-        const line = buffer.slice(0, newline)
-        buffer = buffer.slice(newline + 1)
-        newline = buffer.indexOf("\n")
-        if (line.trim() === "") continue
-        let frame: unknown
-        try { frame = JSON.parse(line) } catch (error) { finish(error instanceof Error ? error : new Error(String(error))); return }
-        if (!record(frame) || frame.id !== id) continue
-        finish(undefined, frame as RpcFrame)
-        return
+async function requestFrame(socketPath: string, command: Record<string, unknown>, connect: ThreadSocketConnect, options: RequestOptions): Promise<RpcFrame> {
+  return await withRpcSocket(socketPath, { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS }, async (request) => {
+    if (options.rpcHost !== true) return await request(command)
+    const protocolRequest = command.type === "get_protocol_info" ? command : undefined
+    const info = options.secret === undefined
+      ? await authenticateRpcHost(request, socketPath, options.keyRoot, protocolRequest)
+      : await request(protocolRequest ?? { type: "get_protocol_info", observe: true })
+    if (command.type === "get_protocol_info") return info
+    // An older host that refuses get_protocol_info advertises nothing: it gets today's unfenced request, as askHost does.
+    const protocol = info.success === true && record(info.data) ? info.data : {}
+    const capabilities = new Set(Array.isArray(protocol.capabilities) ? protocol.capabilities : [])
+    return await fencedCommand(request, socketPath, command, capabilities, options.durableSessionId, async () => {
+      const result = await request(command)
+      if (command.type === "open_session" && result.success === true && options.openedName?.trim()) {
+        const opened = dataRecord(result, "open_session")
+        dataRecord(await request({ type: "set_session_name", sessionId: opened.sessionId, name: options.openedName }), "set_session_name")
       }
+      return result
     })
   })
 }
@@ -171,6 +171,7 @@ function engineHostStatusAll(env: Readonly<Record<string, string | undefined>>):
 }
 
 export type LiveThreadSurfaceOptions = {
+  readonly keyRoot?: string
   /** Socket already resolved by a synchronous registrar before the runtime is loaded. */
   readonly socket?: string
   readonly env?: Readonly<Record<string, string | undefined>>
@@ -192,30 +193,6 @@ export type LiveThreadSurface = ThreadHost & Required<Pick<ThreadHost, "endpoint
 function isConnectRefusal(error: unknown): boolean {
   const code = record(error) ? error.code : undefined
   return code === "ENOENT" || code === "ECONNREFUSED"
-}
-
-/** senpi's `release_session` frame as the adapter's union: the success payload, or the refusal code with its `errorData`. */
-function releaseReply(frame: RpcFrame): ReleaseSessionReply {
-  if (frame.success === true && record(frame.data) && frame.data.released === true && typeof frame.data.session_path === "string") {
-    return { success: true, data: frame.data as Extract<ReleaseSessionReply, { success: true }>["data"] }
-  }
-  const error = typeof frame.error === "string" ? frame.error : "release_failed"
-  return record(frame.errorData)
-    ? { success: false, error, errorData: frame.errorData as NonNullable<Extract<ReleaseSessionReply, { success: false }>["errorData"]> }
-    : { success: false, error }
-}
-
-const EXTERNAL_ADMISSION_KINDS: ReadonlySet<string> = new Set<ExternalAdmissionKind>(["started", "queued", "steered", "turn_conflict", "held_draft", "already_admitted"])
-
-function wakeReply(data: { readonly admitted?: unknown }): GatewayWakeReply {
-  if (!Array.isArray(data.admitted)) return { admitted: [] }
-  return {
-    admitted: data.admitted.flatMap((entry: unknown) =>
-      record(entry) && typeof entry.delivery_id === "string" && typeof entry.kind === "string" && EXTERNAL_ADMISSION_KINDS.has(entry.kind)
-        ? [{ delivery_id: entry.delivery_id, kind: entry.kind as ExternalAdmissionKind }]
-        : [],
-    ),
-  }
 }
 
 /**
@@ -256,19 +233,31 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
 
   const kindOf = (socket: string): EndpointKind => kinds.get(resolve(socket)) ?? (isTuiControlSocket(socket) ? "tui" : "rpc_host")
 
-  const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number): Promise<RpcFrame> => {
+  const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string, openedName?: string): Promise<RpcFrame> => {
     const tui = kindOf(socket) === "tui"
     if (tui && !LEGACY_TUI_COMMANDS.has(type) && !(await learnTuiCommands(socket)).has(type)) throw new Error(`unsupported:${type}`)
-    if (!exists(socket)) throw new Error(`host_unavailable:${socket}`)
+    let dial = connect
     let secret: Uint8Array | undefined
     if (tui) {
+      if (!exists(socket)) throw new Error(`host_unavailable:${socket}`)
       try { secret = readSecret(socket) } catch { throw new Error(`host_unavailable:${socket}`) }
+    } else {
+      const transport = await resolveRpcSocketTransport(socket)
+      if (transport === undefined || (process.platform !== "win32" && !exists(socket))) throw new Error(`host_unavailable:${socket}`)
+      secret = transport.secret
+      if (transport.address !== socket) dial = () => connect(transport.address)
     }
-    return await requestFrame(socket, { type, ...data }, connect, { timeoutMs: timeoutMs ?? (tui ? TUI_REQUEST_TIMEOUT_MS : undefined), secret })
+    const frame = await requestFrame(socket, { type, ...data }, dial, {
+      timeoutMs: timeoutMs ?? (tui ? TUI_REQUEST_TIMEOUT_MS : undefined), secret, durableSessionId, openedName,
+      rpcHost: !tui,
+      keyRoot: () => options.keyRoot ?? (env.SENPI_RPC_KEY_ROOT?.trim() || resolveAgentHome({ env })),
+    })
+    if (frame.success === false && (frame.errorCode ?? frame.error) === "auth_required") throw authRequiredError(socket)
+    return frame
   }
-  const callOn = async <T>(socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number): Promise<T> =>
-    dataRecord(await callFrame(socket, type, data, timeoutMs), type) as T
-  const call = <T>(type: string, data: Record<string, unknown> = {}): Promise<T> => callOn<T>(legacy, type, data)
+  const callOn = async <T>(socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string): Promise<T> =>
+    dataRecord(await callFrame(socket, type, data, timeoutMs, durableSessionId), type) as T
+  const call = <T>(type: string, data: Record<string, unknown> = {}, durableSessionId?: string): Promise<T> => callOn<T>(legacy, type, data, undefined, durableSessionId)
 
   const enumerate = async (): Promise<readonly KnownEndpoint[]> => {
     const [reports, recorded] = await Promise.all([statusAll().catch(() => undefined), registry().catch(() => [] as readonly RegistryEndpoint[])])
@@ -347,21 +336,21 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     return { sessions: listed.flatMap((endpoint) => endpoint.sessions), hosts: listed.map((endpoint) => endpoint.host), disk: listed.flatMap((endpoint) => endpoint.disk) }
   }
 
-  const sessionMethods = (socket: string | undefined, send: <T>(type: string, data?: Record<string, unknown>) => Promise<T>): ThreadSessionPort => ({
+  const sessionMethods = (socket: string | undefined, send: <T>(type: string, data?: Record<string, unknown>, durableSessionId?: string) => Promise<T>): ThreadSessionPort => ({
     getMessages: async (sessionId) => (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId) => send("get_state", { sessionId }),
-    prompt: (sessionId, message, options) => send("prompt", { sessionId, message, ...options }),
-    interrupt: (sessionId, turnId) => send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }),
-    setSessionName: async (sessionId, name) => { await send("set_session_name", { sessionId, name }) },
-    setModel: (sessionId, provider, modelId) => send("set_model", { sessionId, provider, modelId }),
+    prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
+    interrupt: (sessionId, turnId, durableId) => send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }, durableId),
+    setSessionName: async (sessionId, name, durableId) => { await send("set_session_name", { sessionId, name }, durableId) },
+    setModel: (sessionId, provider, modelId, durableId) => send("set_model", { sessionId, provider, modelId }, durableId),
     getAvailableModels: async (sessionId) => {
       const { models } = await send<{ models: Awaited<ReturnType<ThreadHost["getAvailableModels"]>> }>("get_available_models", { sessionId })
       return models.map(({ provider, id, name }) => ({ provider, id, ...(name === undefined ? {} : { name }) }))
     },
-    setThinkingLevel: async (sessionId, level, scope) => { await send("set_thinking_level", { sessionId, level, ...(scope === "turn" ? { scope } : {}) }) },
+    setThinkingLevel: async (sessionId, level, scope, durableId) => { await send("set_thinking_level", { sessionId, level, ...(scope === "turn" ? { scope } : {}) }, durableId) },
     getAvailableThinkingLevels: async (sessionId) => (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
-    wake: async (sessionId, deliveryIds) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] })),
-    releaseSession: async (sessionId, release) => releaseReply(await callFrame(socket ?? legacy, "release_session", { sessionId, ...release })),
+    wake: async (sessionId, deliveryIds, durableId) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] }, durableId)),
+    releaseSession: async (sessionId, release, durableId) => releaseReply(await callFrame(socket ?? legacy, "release_session", { sessionId, ...release }, undefined, durableId)),
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -386,16 +375,16 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     wake: async (endpoint, deliveryIds) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
       const target = endpoint.kind === "rpc_host" && endpoint.routing_id !== null ? { sessionId: endpoint.routing_id } : {}
-      return wakeReply(await callOn<{ admitted?: unknown }>(endpoint.socket, "wake", { ...target, delivery_ids: [...deliveryIds] }))
+      return wakeReply(await callOn<{ admitted?: unknown }>(endpoint.socket, "wake", { ...target, delivery_ids: [...deliveryIds] }, undefined, endpoint.durable_session_id))
     },
     releaseSession: async (endpoint, request) => {
       if (endpoint.kind !== "rpc_host" || endpoint.routing_id === null) throw new Error("unsupported:release_session")
-      return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId: endpoint.routing_id, ...request }))
+      return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId: endpoint.routing_id, ...request }, undefined, endpoint.durable_session_id))
     },
     classifyLiveness: liveness,
     respondUi: async (endpoint, answer) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
-      return await answerUiRequest(callFrame, endpoint, answer)
+      return await answerUiRequest((socket, type, data) => callFrame(socket, type, data, undefined, endpoint.durable_session_id), endpoint, answer)
     },
   }
 
@@ -418,7 +407,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     },
     listSessions: async () => (await listView()).sessions,
     listView,
-    endpoint: (socket) => sessionMethods(socket, (type, data) => callOn(socket, type, data)),
+    endpoint: (socket) => sessionMethods(socket, (type, data, durableId) => callOn(socket, type, data, undefined, durableId)),
     gateway,
     /**
      * `open_session` answers with the ROUTING id and a state that carries neither the durable id
@@ -435,11 +424,9 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
       // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field.
-      const { initialSkills, ...openParams } = params as Record<string, unknown> & { readonly initialSkills?: readonly string[] }
-      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...openParams, retain_on_disconnect: true, ...(initialSkills === undefined ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }) })
+      const { initialSkills, name, ...openParams } = params
+      const result = dataRecord(await callFrame(legacy, "open_session", { ...openParams, retain_on_disconnect: true, ...(initialSkills === undefined ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }) }, undefined, undefined, name), "open_session") as { sessionId: string; state: ThreadHostSession }
       const routingId = result.sessionId
-      const name = (params as { readonly name?: string }).name
-      if (name !== undefined && name.trim() !== "") await call("set_session_name", { sessionId: routingId, name })
       const { sessions } = await call<{ sessions: readonly ThreadHostSession[] }>("list_sessions", OBSERVE)
       const listed = sessions.find((session) => session.sessionId === routingId)
       return { ...result.state, ...(listed ?? {}), sessionId: routingId, socket: legacy, endpoint_kind: "rpc_host" }

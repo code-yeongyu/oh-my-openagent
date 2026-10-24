@@ -1,8 +1,8 @@
 // /facts -- read-only view of the facts pipeline, plus the ONLY manual unpark path.
 //
 // `/facts retry` clears failure records and triggers one reconcile/launch attempt. It never
-// touches queue files or either watermark: parking is a launch-gating fact, not queue state,
-// so unparking must not move data. There is no automatic unparking anywhere in the pipeline.
+// changes either watermark. The store restores parked files to the hot queue under its
+// lock before clearing their records. There is no automatic unparking.
 
 import { FactsFailureStore, type FactsFailureFilter } from "@oh-my-opencode/memory-core"
 

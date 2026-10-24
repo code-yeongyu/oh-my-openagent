@@ -11,6 +11,7 @@ import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
 import { GitPathStateStore } from "./path-state"
 import { authorFlags, commandError, normalizePathspecs, normalizeSeedPath } from "./repo-arguments"
 import { runMemoryRepoMaintenance } from "./repo-maintenance"
+import { ensureRepoConfigDefaults } from "./repo-config-defaults"
 import { PathCommitTimes } from "./repo-commit-times"
 import { GitRevisionReads } from "./repo-revision-reads"
 import { assertNoUnrelatedChanges } from "./repo-status"
@@ -237,12 +238,8 @@ export class GitMemoryRepo {
     })
   }
 
-  private async ensureIdentity(authorName: string): Promise<void> {
-    if ((await this.configGet("omo.agentId")) !== this.agentId) await this.configSet("omo.agentId", this.agentId)
-    if (!(await this.configGet("user.email"))) await this.configSet("user.email", `${this.agentId}@omo.local`)
-    if (!(await this.configGet("user.name"))) await this.configSet("user.name", authorName)
-    if ((await this.configGet("commit.gpgsign")) === null) await this.configSet("commit.gpgsign", "false")
-    if ((await this.configGet("gc.auto")) === null) await this.configSet("gc.auto", "0")
+  private ensureIdentity(authorName: string): Promise<void> {
+    return ensureRepoConfigDefaults(this, { result: (argv, stdin) => this.gitResult(argv, stdin) }, authorName)
   }
 
   private async stage(paths: readonly string[]): Promise<void> {

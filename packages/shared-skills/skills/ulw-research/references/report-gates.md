@@ -1,6 +1,6 @@
 # Report-Gates Defect Glossary
 
-This reference catalogs every defect code the report gates (`static`, `layout`, `visual`, `proofread`) can raise, their severity and impact, and how to repair them.
+This reference catalogs every defect code the report gates (`static`, `fidelity`, `layout`, `visual`, `proofread`) can raise, their severity and impact, and how to repair them.
 
 ## Defect Codes by Category
 
@@ -29,6 +29,56 @@ This reference catalogs every defect code the report gates (`static`, `layout`, 
 | `missing_required_section` | blocker | true | A section explicitly required by the brief (e.g., via `--require-section`) is absent. | Add the section the brief requires (matched by --require-section). |
 | `missing_promised_deliverable` | blocker | true | A deliverable (e.g., a slide deck, a chart, a data file) is promised in the brief but not delivered, not marked blocked_capability, and not skipped with a reason. | Produce the promised deliverable or record it as blocked_capability or skipped with a reason. |
 
+### Fidelity Gate (Facts, Quotes & Meaning)
+
+Raised only by the fidelity verifier (the fact ledger, fill, verify, meaning, and polish steps), never by `check`. Until that verifier ships in an edition, the manifest records `fidelity: not_run`.
+
+| Code | Severity | Integrity | What It Detects | How to Fix |
+|------|----------|-----------|-----------------|-----------|
+| `unresolved_placeholder` | blocker | true | A fact or quote placeholder is left in the artifact, names an unknown ledger id, is malformed, or uses an unsupported mode. | Register the fact with fact add or remove the sentence; a placeholder is never filled with a guess. |
+| `value_mismatch` | blocker | true | A displayed value differs from its ledger row's rendering, or a stored derived value differs from exact recomputation (a hand edit after fill). | Re-run fact fill; never edit a filled value by hand. |
+| `unit_mismatch` | blocker | true | A displayed, adjacent, or header unit conflicts with the ledger row's unit or scale. | Re-run fact fill, or derive a converted row with fact derive --op convert. |
+| `quote_not_verbatim` | blocker | true | A quotation bound to a quote row does not match the source snapshot contiguously after normalization, or a rendered cut is not the registered cut. | Re-insert the quote through its {{Q<n>}} placeholder; after a second failure the sentence is replaced by the quote. |
+| `claim_status_invalid` | blocker | true | A sentence's claim binding names an unknown claim, a refuted or unresolved claim outside Gaps and Contradictions, or a high-risk claim absent from the verified claims. | The claim id is unknown, refuted, unresolved, or not in verified-claims; move the sentence to Gaps or Contradictions, or remove it. |
+| `incompatible_operands` | blocker | true | A derivation's operands differ in unit, population, period, or accounting basis where the operation requires them to match; derive refuses and writes no row. | The operands differ in unit, population, period, or basis for this operation; fix the rows or declare the operation that fits. |
+| `pointer_label_mismatch` | blocker | true | A placeholder's label differs from the referenced ledger row's label (a typo guard on the id). | The placeholder's label is not the row's label; check the id, then the label. |
+| `quote_anchor_unresolved` | blocker | true | A quote cut's from or to anchor is absent, occurs more than once, or appears in reverse order in the quote. | A from or to anchor is missing or occurs more than once in the quote; pick unique anchor words. |
+| `unit_duplicated` | blocker | true | A unit-bearing placeholder is followed by another copy of its own unit. | The unit after the placeholder repeats the row's unit; use :value or remove the unit. |
+| `polish_diff_fail` | blocker | true | The polish pass changed protected fact spans, numerals or units, tickers, table rows, or any markup byte (including every attribute, comments, and script/style/template content). | Revert to the pre-polish artifact and apply text-node edits only; markup changes require the full fidelity gates. |
+| `fidelity_interview_incomplete` | blocker | true | A fidelity field in the brief is still pending or missing when a fidelity command runs. | A fidelity field is pending or missing in brief.md; answer the open question or record its default, then rerun. |
+| `derived_not_allowed` | blocker | true | A placeholder resolves to a derived, converted, or assumed row while the brief allows no derived numbers. | The brief allows no derived or assumed numbers; cite a source row directly or change the brief with the requester. |
+| `source_outside_floor` | blocker | true | A ledger row's source lies outside the source floor the brief records (pointed sources only, or the allowed source classes). | The row's source is outside the source floor the brief records; use a source the brief allows or remove the fact. |
+| `snapshot_hash_mismatch` | blocker | true | A pinned source snapshot's text no longer hashes to its recorded hash, or indexed slices no longer equal the snapshot text. | The source snapshot changed after it was pinned; re-snapshot the source and re-register its rows. |
+| `chart_value_untraceable` | blocker | true | A chart data label, axis tick, or chart data file does not match the ledger-backed data the chart declares, or the chart declares no data source. | A chart value, tick, or data file does not match its ledger-backed data source; re-render the chart from the exported data. |
+| `quote_unbound` | blocker | true | A direct quotation in the report has no ledger quote row behind it; a citation marker alone does not bind it. | A direct quotation has no ledger quote row; register it with fact quote and insert it through its placeholder. |
+| `edition_unverified` | blocker | true | A delivered edition has no fact verify record whose artifact hash matches the delivered source. | The delivered file has no matching fact verify record; run fact verify on that edition and record it with --verified-by. |
+| `untraceable_number` | major | false | A number or date in prose or a table cell resolves to no ledger row and is not structural; a citation does not exempt it. | Replace the typed number with a {{F<n>}} placeholder backed by a ledger row, or register it as assumed with a rationale. |
+| `unsupported_verification` | major | false | A fact bound to a `verified` mark (`data-claim-kind="verified"`, from a `{{V:F<n>:label}}` placeholder) cites a row whose own locator artifact does not sit in a recorded command-output snapshot, or the mark binds no fact of its own. Another command row in the same sentence never counts. Unmarked prose is never raised here. | A sentence marked verified (data-claim-kind="verified") cites a row that is not recorded command output; cite the recorded output row or drop the verified mark. |
+| `claim_kind_mismatch` | major | false | A fact bound to a claim kind cites a row of a kind that claim kind does not accept, a fact sits under marks of two different kinds (nested marks), a mark binds no fact of its own, or a mark names an unknown kind; the kinds are in [fidelity-claim-kinds.md](fidelity-claim-kinds.md). | An element marked with a claim kind (data-claim-kind) cites a row that kind does not accept, or the kind is unknown; cite a row of that kind or fix the mark (references/fidelity-claim-kinds.md). |
+| `conflicting_readings` | major | false | Two active ledger rows with the same value and unit but different periods or qualifiers are cited as one fact. | Two ledger rows with different periods or qualifiers are cited as one fact; split the sentence or retire one row. |
+| `hedge_dropped` | major | false | A hedge, condition, or negation class present in the source quote is absent from the report sentence. | Restore the qualifier the source uses (estimated, about, not yet). |
+| `direction_flipped` | major | false | The source states an increase and the sentence a decrease, or the reverse. | The source states the opposite direction; rewrite from the quote. |
+| `causality_added` | major | false | The sentence carries a causal connective that no supporting quote or claim statement contains. | The source states no cause; state the correlation or quote the source. |
+| `qualifier_dropped` | major | false | A bounding or approximation qualifier recorded on the ledger row (up to, at least, about) is absent near the value in the sentence. | The source bounds this value (up to, at least, about); restore the qualifier or use :q. |
+| `unbound_sentence` | major | false | A findings sentence carries no fact, quote, citation marker, or claim binding and is not marked as opinion or recommendation. | Bind the sentence to a fact, a quote, a citation, or a claim-graph node with data-claim. |
+| `meaning_drift_confirmed` | major | false | Two independent meaning readers flag the same drift kind on the same sentence and quote pair. | Two independent readers found the same drift; rewrite from the quote or dispute with a reason. |
+| `polish_edit_rejected` | major | false | A proposed polish edit changes a protected number, hedge, qualifier, link, or claim id. | The edit changed a number, a hedge, a qualifier, a link, or a claim id; re-propose the language fix only. |
+| `polish_hedging_decreased` | major | false | The polish pass removed a hedge the source grounds. | The polish pass removed qualifiers; restore them. |
+| `polish_text_churn` | major | false | More than half of the visible prose changed during the polish pass (`POLISH_CHURN_LIMIT` in `scripts/polish-rules.mjs`). | More than half the text changed during polish; the pass composed instead of proofreading. |
+| `snapshot_mismatch` | major | false | An operation that needs one collection window uses operands from unequal windows or observations outside the window. | The operands come from different collection windows; use rows from one window or state the windows separately. |
+| `join_integrity_fail` | major | false | A table row combines facts from different source observation rows, or a declared observation id contradicts the row's lineage. | A table row combines facts from different source observations; keep each row to one observation or split it. |
+| `quote_stale_version` | major | false | The quoted source revision differs from the revision the report targets for the same scope. | The quoted source revision differs from the revision the report targets; re-snapshot the target revision or date the quote. |
+| `quote_fuzzy_match` | minor | false | An exact quote match failed but a candidate with similarity of at least 0.95 and identical protected tokens exists (OCR noise); diagnostic only. | The source text is OCR-noisy; confirm the snapshot and prefer the raw document. |
+| `name_outside_quote` | minor | false | An uppercase Latin token of 2 to 6 letters in the sentence is absent from the supporting source text and that source's acronym table. | A name in the sentence is not in the cited quote; add the source or remove the name. |
+| `verification_claim_unmarked` | minor | false | A sentence reads as a first-person run ("we ran", "we have run", "I ran", "we executed", "we verified by", "by running" after we/our, or the Korean rule in fidelity-claim-kinds.md) and cites a fact not marked `verified` (or cites none and its block is unmarked). A warning only; it never blocks. | The sentence reads as a check we ran but carries no verified mark; mark it {{V:F<n>:label}} on a recorded command-output row, or reword it. |
+| `scope_widened_warn` | minor | false | The sentence uses a broader scope term than the quote's narrow term, and no supporting fact carries the broad scope. | The sentence uses a broader scope word than the quote; confirm the scope or narrow it. |
+| `particle_unverified` | minor | false | A particle after a filled value could not be checked against the value's final reading. | The particle after this value could not be checked; read it aloud and fix it by hand if wrong. |
+| `fallback_without_entity` | minor | false | A quote that replaced a twice-failed sentence has no entity for its attribution line. | The replacement quote has no entity for attribution; set one on the row. |
+| `meaning_drift_warn` | minor | false | One meaning reader flags a change of scope, subject, or certainty without independent agreement. | A separate reader found the sentence changes scope, subject, or certainty; rewrite from the quote. |
+| `polish_edit_unlocated` | minor | false | A polish edit's before-text matches zero or several places in the current text. | The edit's before-text was not found exactly once; re-propose against the current text. |
+| `polish_link_changed` | minor | false | The polish pass altered or removed an href link target, or an internal target stopped resolving. | A link was altered or removed during polish; restore it. |
+| `polish_name_changed` | minor | false | A ledger-backed proper noun present before polish is absent afterward. | A proper noun changed during polish; restore it. |
+
 ### Layout Gate (Rendering & Presentation)
 
 | Code | Severity | Integrity | What It Detects | How to Fix |
@@ -46,12 +96,26 @@ Gates emit a manifest-level outcome with one of three statuses:
 | Status | Meaning |
 |--------|---------|
 | `pass` | All checks passed; no defects raised. |
-| `fail` | One or more defects raised (blocker, major, or minor severity). Repair is required before delivery. |
+| `fail` | At least one blocker defect was raised. Major and minor defects alone leave the gate at `pass`; they still go to the repair loop. |
 | `not_run` | The gate was not invoked (e.g., no probe file provided for layout, no visual inspection conducted). |
 
 ### Layout Gate Probe File Requirement
 
 The `layout` gate only runs when a probe file (a rendering artifact: PDF, PNG, or HTML snapshot) is provided alongside the manifest. If no probe file is available, the manifest records `layout: not_run` and the gate does not emit defects.
+
+## Polish Text-Node Contract
+
+Polish edits change text nodes only; markup changes go through the full fidelity gates, not polish.
+
+The primary rule is a whole-document skeleton comparison. Both gates scan the pre-polish and the polished document with the same tokenizer (`scripts/html-markup.mjs`) and require the skeleton to be byte-identical in document order: every tag token, comment, bogus comment, the frozen content of `script`, `style` and `template`, and every character reference of a text node (`&` up to the first `;` or non-name character). An accepted edit carries no `<`, `>` or `&` and may not touch a character reference, so an edited span holds no skeleton token and a legitimate polish never moves this sequence. Any difference names the first differing token and its byte offset: `polish-apply` refuses the edit, and `polish-diff` reports the blocker `polish_diff_fail` ("skeleton changed at token ..."). The character guards below are the early, actionable refusals; this comparison is what makes the guarantee complete, so a hand edit from `R&amp;D` to `R&lt;D` is blocked even though no edit was involved.
+
+An edit's `before` and `after` may not contain `<`, `>` or `&` at all. `polish-apply` refuses such an edit before any other check, as `polish_edit_rejected` with the reason `edit contains markup characters (<, >, &): route this section through the full fidelity gates`, so the refusal is visible, never a silent drop. The rule holds whatever the tokenizer models: an edit without these characters cannot create, alter, close or escape a tag, comment, bogus comment, CDATA section, entity or script. The characters alone are not enough, because a located region can start right after an existing `&` or inside a character reference: `polish-apply` also refuses, as `edit touches a character reference: route this section through the full fidelity gates`, any edit whose located region overlaps a character reference or opens one. Literal `&` and `<` in prose are entities in the source (`R&amp;D`, `p &lt; 0.05`) and stay usable only by leaving their bytes untouched: the proofread lane narrows an edit to the words around an entity or tag (`budget grew` to `budget rose`), never one that spans it. Wording that cannot be fixed without touching an entity or markup goes through the full fidelity gates.
+
+Before comparing, both gates refuse with `polish_diff_fail` ("ambiguous markup: ...") any document holding a construct the polish tokenizer does not model exactly: `</` followed by a non-letter (`</>` included), `<!--` inside a `script` or `style` element, `<![CDATA[`, `<?`, `--!>`, or `<` inside a tag or attribute value. Renderer output contains none of these. The tokenizer still follows the HTML spec for the bogus comment (`</` + non-letter, `<?`, `<!` up to the next `>`), the abrupt comment closes `<!-->` and `<!--->`, and the script-data escaped and double-escaped states.
+
+The shared rule in `scripts/polish-rules.mjs` runs per edit against the current and original report in `polish-apply`, and against the whole document in `polish-diff`. The sequence of opening and closing tags, every attribute name and value (including `href`, `id`, `class`, and `style`), comments, declarations, and all content of `script`, `style`, and `template` elements must be byte-identical. Attribute reordering, different quoting, tag case, whitespace inside a tag, and a self-closing slash are markup changes too. Any difference raises the blocker `polish_diff_fail`; apply rejects it with reason `markup changed`.
+
+Text nodes remain subject to the existing fact-span, number/unit, ticker, hedge, qualifier, name, and churn checks. Protected numbers, tickers, and required hedges cannot migrate between text nodes. A text edit inside an existing fact span is still a fact-span change, including under `aria-hidden`. Script/style/template content is frozen through the end of input when unclosed. No CSS or HTML visibility model is used by polish.
 
 ## Lineage and Citation Markers
 
@@ -62,7 +126,7 @@ Defect codes and their hints are delivered via the outcome manifest under `resid
 
 Citations within reports follow one of two lineage modes:
 
-- **inline**: Source marks appear as `[Sn]` or `[Rn]` hyperlinks inline with the cited text.
+- **inline**: Source marks appear as `[Sn]`, `[Source n]`, or `[^n]` hyperlinks inline with the cited text.
 - **section**: Sources are listed in a dedicated section with numbered entries ([S1], [S2], etc.).
 
 Both modes are valid; choose based on the report's narrative flow.

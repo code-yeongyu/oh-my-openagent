@@ -90,6 +90,20 @@ describe("createEngineUsageSource", () => {
     expect(source.snapshot().claude?.accountState).toBeUndefined()
   })
 
+  test("#given a stored login but the engine serves through an env token #when only the env record exists #then the env record is drawn", () => {
+    const limits = engine([record("env", 55)])
+    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth("work", ["work"]), now: () => NOW, onChange: () => {} })
+
+    expect(source.snapshot().claude?.windows?.[0]?.percent).toBe(55)
+  })
+
+  test("#given a stored login with its own record and an env record #when the panel reads #then the stored login's record wins", () => {
+    const limits = engine([record("env", 55), record("work", 41)])
+    const source = createEngineUsageSource({ limits, readCredentials: () => claudeAuth("work", ["work"]), now: () => NOW, onChange: () => {} })
+
+    expect(source.snapshot().claude?.windows?.[0]?.percent).toBe(41)
+  })
+
   test("#given the pool rotated #when the turn refreshes #then the new serving account's record is drawn, and stop unsubscribes", () => {
     const limits = engine([record("work", 41), record("home", 7)])
     let pinned = "work"

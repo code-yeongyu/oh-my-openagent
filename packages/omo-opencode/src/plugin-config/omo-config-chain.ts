@@ -16,6 +16,7 @@ export type OmoOpenCodeConfigView = {
   /** Where the view sits in its file (`[opencode].`, `profiles.<P>.`), so a diagnostic names the full key. */
   readonly keyPrefix: string
   readonly path: string
+  readonly scope?: "project" | "user"
 }
 
 export type OmoOpenCodeConfigChain = {
@@ -56,7 +57,7 @@ function appendViews(
 ): void {
   for (const layer of layers) {
     const config = select(layer.config)
-    if (Object.keys(config).length > 0) views.push({ config, keyPrefix, path: layer.source.path })
+    if (Object.keys(config).length > 0) views.push({ config, keyPrefix, path: layer.source.path, scope: layer.source.scope })
   }
 }
 

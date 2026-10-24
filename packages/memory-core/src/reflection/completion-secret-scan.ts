@@ -29,24 +29,48 @@ export async function findSecretLikeFailure(
   baseSha: string,
   tipSha: string,
 ): Promise<string | null> {
-  const revList = await run(["rev-list", "--reverse", `${baseSha}..${tipSha}`])
-  if (revList.code !== 0) throw new Error(revList.stderr.trim() || "git rev-list failed")
-  for (const commit of revList.stdout.split(/\r?\n/).filter(Boolean)) {
-    const failure = await findCommitSecretFailure(run, commit)
-    if (failure !== null) return failure
-  }
-  return null
+  return (await findSecretLikeFailures(run, baseSha, tipSha))[0]?.detail ?? null
 }
 
-async function findCommitSecretFailure(run: CompletionGitRun, commit: string): Promise<string | null> {
+export interface SecretLikeFailure {
+  /** The repository path whose file name or content matched; the submodule path for a gitlink. */
+  readonly path: string
+  /** The refusal text; never the matched value. */
+  readonly detail: string
+}
+
+/** Every failing file version of every commit in the range, earliest commit first, one entry per version. */
+export async function findSecretLikeFailures(
+  run: CompletionGitRun,
+  baseSha: string,
+  tipSha: string,
+): Promise<SecretLikeFailure[]> {
+  const revList = await run(["rev-list", "--reverse", `${baseSha}..${tipSha}`])
+  if (revList.code !== 0) throw new Error(revList.stderr.trim() || "git rev-list failed")
+  const failures: SecretLikeFailure[] = []
+  for (const commit of revList.stdout.split(/\r?\n/).filter(Boolean)) {
+    failures.push(...(await findCommitSecretFailures(run, commit)))
+  }
+  return failures
+}
+
+async function findCommitSecretFailures(run: CompletionGitRun, commit: string): Promise<SecretLikeFailure[]> {
   const records = await listCommitFileVersions(run, commit)
-  const submodule = records.find((record) => record.dstMode === SUBMODULE_MODE)
-  if (submodule !== undefined) return `secret_like_content: ${redactSecretLikeMaterial(submodule.path)} (submodule, file type)`
+  const failures: SecretLikeFailure[] = []
+  const flagged = new Set<string>()
+  const flag = (path: string, detail: string): void => {
+    if (flagged.has(path)) return
+    flagged.add(path)
+    failures.push({ path, detail })
+  }
+  for (const submodule of records.filter((record) => record.dstMode === SUBMODULE_MODE)) {
+    flag(submodule.path, `secret_like_content: ${redactSecretLikeMaterial(submodule.path)} (submodule, file type)`)
+  }
   const introduced = records.filter((record) => !ZERO_SHA.test(record.dstSha))
   for (const record of introduced) {
     const hit = scanSecretLikeMaterial(record.path)[0]
     if (hit !== undefined) {
-      return `secret_like_content: ${redactSecretLikeMaterial(record.path)} (${hit.class}, file name) @${commit.slice(0, 7)}`
+      flag(record.path, `secret_like_content: ${redactSecretLikeMaterial(record.path)} (${hit.class}, file name) @${commit.slice(0, 7)}`)
     }
   }
   const blobRecords = introduced.filter((record) => SCANNED_BLOB_MODES.has(record.dstMode))
@@ -55,9 +79,9 @@ async function findCommitSecretFailure(run: CompletionGitRun, commit: string): P
     const content = blobs.get(record.dstSha)
     if (content === undefined) continue
     const hit = scanSecretLikeMaterial(content)[0]
-    if (hit !== undefined) return `secret_like_content: ${record.path} (${hit.class}) @${commit.slice(0, 7)}`
+    if (hit !== undefined) flag(record.path, `secret_like_content: ${redactSecretLikeMaterial(record.path)} (${hit.class}) @${commit.slice(0, 7)}`)
   }
-  return null
+  return failures
 }
 
 /**

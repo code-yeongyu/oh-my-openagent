@@ -49,7 +49,7 @@ Understand the current memory landscape before changing anything. Start with the
 Read `$AUDIT_PATH` and repair findings before consolidation:
 - `link_dangling`: point at the file now holding the content, or remove a link whose target is gone for good; report which.
 - `content_duplicate`: merge into the more specific home and leave a one-line pointer in the other.
-- `path_orphan`: use `git mv` into the home its content belongs to.
+- `path_orphan`: use `git mv` into the home its content belongs to. If the file has no frontmatter (the finding says so), add a one-line `description:` frontmatter in the same commit as the move; a bare move of such a file is refused by completion validation and would be dropped. If you cannot write an honest description, leave the file where it is.
 - `frontmatter_invalid`: leave to the writer owning the file unless only the description is missing.
 
 Never touch `system/boundaries.md` or `system/agreements.md`, and never delete evidence. Report unresolved findings with reasons.

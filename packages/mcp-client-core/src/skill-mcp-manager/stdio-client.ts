@@ -6,6 +6,7 @@ import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { redactSensitiveData } from "./error-redaction"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
 import { log } from "../logger"
+import { connectWithPolicySignal, McpEnvironmentPolicyChangedError } from "./policy-connection"
 
 type StdioClientFactory = (
   clientInfo: { name: string; version: string },
@@ -67,7 +68,7 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
 
   const command = getStdioCommand(config, info.serverName)
   const args = config.args ?? []
-  const mergedEnv = createCleanMcpEnvironment(config.env)
+  const mergedEnv = params.environment ?? createCleanMcpEnvironment(config.env)
 
   registerProcessCleanup(state)
 
@@ -85,13 +86,14 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
   )
 
   try {
-    await client.connect(transport)
+    await connectWithPolicySignal(client, transport, params.policySignal)
   } catch (error) {
     await closeStdioResourceIgnoringFailure(() => transport.close(), {
       resource: "transport",
       serverName: info.serverName,
       phase: "connect-failure",
     })
+    if (error instanceof McpEnvironmentPolicyChangedError) throw error
 
     const errorMessage = error instanceof Error ? error.message : String(error)
     const fullCommand = `${command} ${args.join(" ")}`

@@ -152,8 +152,9 @@ afterEach(async () => {
 describe("getOrCreateClient env var expansion", () => {
   describe("#given a scope-sensitive stdio skill MCP config", () => {
     test.each([
-      ["opencode-project", "Authorization:Bearer "],
-      ["local", "Authorization:Bearer "],
+      // Ungranted project references stay literal for later grants (#10693).
+      ["opencode-project", "Authorization:Bearer ${SLACK_USER_TOKEN}"],
+      ["local", "Authorization:Bearer ${SLACK_USER_TOKEN}"],
       ["user", "Authorization:Bearer xoxp-scope-token"],
       ["builtin", "Authorization:Bearer xoxp-scope-token"],
     ] satisfies Array<[NonNullable<SkillMcpClientInfo["scope"]>, string]>) (
@@ -181,6 +182,9 @@ describe("getOrCreateClient env var expansion", () => {
         // then
         expect(createdStdioTransports).toHaveLength(1)
         expect(createdStdioTransports[0]?.options.args?.[4]).toBe(expectedAuthorizationHeader)
+        if (scope === "opencode-project" || scope === "local") {
+          expect(createdStdioTransports[0]?.options.env?.SLACK_USER_TOKEN).toBeUndefined()
+        }
       },
     )
 

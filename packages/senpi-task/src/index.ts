@@ -673,4 +673,4 @@ export type {
 
 export * from "./tools/team"
 export { createEvalHandleHost, type EvalHandleHostDeps } from "./eval-handles"
-export { isPriorityAliasOf } from "./runners/pinned-model-equivalence"
+export { isPriorityAliasOf, type PriorityPairingRegistry } from "./runners/pinned-model-equivalence"

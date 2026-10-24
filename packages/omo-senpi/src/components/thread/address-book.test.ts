@@ -241,7 +241,7 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
 
   test("#given a terminal endpoint listing its one session by durable id #when assembled #then the entry is a tui thread on that endpoint", () => {
     const entries = assembleAddressBook([{ socket: "/a/rpc/tui/t-0123456789abcdef.sock", endpoint_kind: "tui", alive: true, result: { sessions: [{ sessionId: "dur-tui", cwd: "/w", name: "my-tui", kind: "interactive", created_at: HEADER_TIME, updated_at: LAST_TIME }] } }], [])
-    expect(entries).toEqual([expect.objectContaining({ durable_id: "dur-tui", routing_id: "dur-tui", name: "my-tui", surface: "tui", alive: true, created_at: HEADER_TIME, updated_at: LAST_TIME, endpoint: { kind: "tui", socket: "/a/rpc/tui/t-0123456789abcdef.sock", routing_id: "dur-tui" } })])
+    expect(entries).toEqual([expect.objectContaining({ durable_id: "dur-tui", routing_id: "dur-tui", name: "my-tui", surface: "tui", alive: true, created_at: HEADER_TIME, updated_at: LAST_TIME, endpoint: { kind: "tui", socket: "/a/rpc/tui/t-0123456789abcdef.sock", routing_id: "dur-tui", durable_session_id: "dur-tui" } })])
   })
 
   test("#given a suspended terminal the engine reports live_unresponsive #when assembled #then its session degrades to disk truth with error_note live_unresponsive and alive false, and the gateway sees it as live_unresponsive (not dead)", () => {
@@ -250,7 +250,7 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
     const disk = readDiskSession(path, socket)
     if (disk === null) throw new Error("fixture did not parse")
     const entries = assembleAddressBook([{ socket, endpoint_kind: "tui", alive: false, reason: "live_unresponsive", error: "live_unresponsive" }], [disk])
-    expect(entries).toEqual([expect.objectContaining({ durable_id: "dur-stopped", status: "resumable", alive: false, error_note: "live_unresponsive", name: "my-tui", created_at: HEADER_TIME, updated_at: LAST_TIME, surface: "tui", endpoint: { kind: "tui", socket, routing_id: null } })])
+    expect(entries).toEqual([expect.objectContaining({ durable_id: "dur-stopped", status: "resumable", alive: false, error_note: "live_unresponsive", name: "my-tui", created_at: HEADER_TIME, updated_at: LAST_TIME, surface: "tui", endpoint: { kind: "tui", socket, routing_id: null, durable_session_id: "dur-stopped" } })])
     expect(toGatewayAddressEntries(entries)[0]).toMatchObject({ thread_id: "dur-stopped", liveness: "live_unresponsive", endpoint: { kind: "tui" } })
   })
 

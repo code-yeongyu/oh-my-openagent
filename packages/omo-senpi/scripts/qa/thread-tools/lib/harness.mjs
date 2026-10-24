@@ -42,7 +42,37 @@ const { PINNED_HOST_CLIENT_CAPABILITIES } = await import(join(SENPI_RPC, "host-l
 const { RPC_CLIENT_CAPABILITIES_ENV } = await import(join(SENPI_RPC, "custom-capability.ts"))
 
 export const { startFakeModelServer, writeMockModelsJson, hermeticEnv } = qaEnv
-export const { installCleanupHooks, cleanupAllAndWait, trackChild, trackCloser, shouldDetachChildren } = qaCleanup
+export const { trackChild, trackCloser, shouldDetachChildren } = qaCleanup
+
+/**
+ * Stops for detached hosts whose state lives inside a scratch dir. Senpi's scratch closer is registered
+ * first and runs first, so a host stopped by a later closer writes its shutdown state into a tree that
+ * was already removed. These run before it, on the normal path (`cleanupAllAndWait`) and on an abort
+ * (`installCleanupHooks`); each is also a tracked closer, as the last line of defence.
+ */
+const hostStops = new Set()
+
+function stopHosts() {
+  for (const stop of hostStops) stop()
+  hostStops.clear()
+}
+
+/** Senpi's exit and signal hooks, preceded by host stops: listeners run in registration order. */
+export function installCleanupHooks() {
+  process.once("exit", stopHosts)
+  for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stopHosts)
+  qaCleanup.installCleanupHooks()
+}
+
+export function trackHostStop(stop) {
+  hostStops.add(stop)
+  trackCloser(stop)
+}
+
+export async function cleanupAllAndWait(timeoutMs) {
+  stopHosts()
+  await qaCleanup.cleanupAllAndWait(timeoutMs)
+}
 
 /**
  * Variables a supervised omo/senpi session (desktop host, `omo --mode rpc` child) carries about
@@ -218,7 +248,7 @@ export function trackDesktopManagedHost(socketPath) {
       for (const survivor of pgrepPids(socketPath)) terminate(Number(survivor))
     }
   }
-  trackCloser(stop)
+  trackHostStop(stop)
   return { stop, observe, pid: () => observedPid }
 }
 
@@ -541,8 +571,8 @@ export function stopOwnedShardHosts(scratchDir) {
     if (owned) rmSync(root, { recursive: true, force: true })
   }
   // A short scratch path (a bare `/tmp` run, no TMPDIR) keeps the shard in its PRIMARY root,
-  // `<agentDir>/rpc/shards`, inside the scratch dir. That tree and its meta are gone once the run
-  // cleans up, so the supervisor is found by its argv: a `--socket` inside this run's scratch dir
+  // `<agentDir>/rpc/shards`, inside the scratch dir. That tree and its meta may already be gone (a
+  // caller that runs after cleanup), so the supervisor is found by its argv: a `--socket` inside this run's scratch dir
   // belongs to this run and to nothing else. `[-]` keeps pgrep from reading the pattern as a flag.
   const inTree = `[-]-socket ${scratchDir}/`
   for (const signal of ["SIGTERM", "SIGKILL"]) {

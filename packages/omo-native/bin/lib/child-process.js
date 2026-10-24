@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { StringDecoder } from "node:string_decoder"
 
 // POSIX launchers prefer execve and leave no wrapper. This async fallback remains for Windows
 // and missing/failed execve.
@@ -15,6 +16,9 @@ const HANDLED_SIGNALS = [
 // The engine's own shutdown drains in ~1.5-2.5s. Ten seconds is the ceiling before the launcher
 // stops waiting on a child that is not going to leave and reports the death it was asked for.
 const DEFAULT_GRACE_MS = 10_000
+
+const STDERR_TAIL_CHARS = 64 * 1024
+const STDERR_DRAIN_MS = 500
 
 function graceMs(env) {
   const configured = Number(env.OMO_SIGNAL_GRACE_MS)
@@ -43,13 +47,25 @@ export function propagateResult(result) {
  * would terminate the child abruptly, so nothing is forwarded and the wait is the whole behavior.
  */
 export function runChild(command, args, options = {}) {
-  const env = options.env ?? process.env
+  const { captureStderr = false, ...spawnOptions } = options
+  const env = spawnOptions.env ?? process.env
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: "inherit",
       windowsHide: true,
-      ...options,
+      ...spawnOptions,
+      // A captured stderr is still shown live; the caller also gets its tail to classify the failure.
+      ...(captureStderr ? { stdio: ["inherit", "inherit", "pipe"] } : {}),
     })
+    let stderr = ""
+    if (captureStderr) {
+      // The decoder keeps a multi-byte character split across chunks whole; the echo stays raw bytes.
+      const decoder = new StringDecoder("utf8")
+      child.stderr.on("data", (chunk) => {
+        process.stderr.write(chunk)
+        stderr = (stderr + decoder.write(chunk)).slice(-STDERR_TAIL_CHARS)
+      })
+    }
 
     let settled = false
     let graceTimer
@@ -98,7 +114,25 @@ export function runChild(command, args, options = {}) {
     child.on("error", (error) => settle(() => reject(error)))
     // A child that died of the forwarded signal needs no special case: `propagateResult` turns a
     // signaled result into this process dying by the same signal, which is exactly right.
-    child.on("exit", (status, signal) => settle(() => resolve({ status, signal })))
+    const finish = (status, signal) => settle(() => resolve(captureStderr ? { status, signal, stderr } : { status, signal }))
+    child.on("exit", (status, signal) => {
+      if (!captureStderr || child.stderr.readableEnded) {
+        finish(status, signal)
+        return
+      }
+      // The pipe usually ends right after exit. A grandchild that inherited it can hold it open, so the
+      // drain is bounded and the result never waits on a process the manager left behind.
+      const drained = () => {
+        clearTimeout(drainTimer)
+        finish(status, signal)
+      }
+      const drainTimer = setTimeout(() => {
+        child.stderr.off("end", drained)
+        child.stderr.destroy()
+        finish(status, signal)
+      }, STDERR_DRAIN_MS)
+      child.stderr.once("end", drained)
+    })
   })
 }
 

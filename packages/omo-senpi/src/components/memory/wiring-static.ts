@@ -20,6 +20,7 @@ import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
 import type { createMemoryNoticeWiring } from "./memory-notice-wiring"
 import type { KibitzerComposition } from "./kibitzer"
 import type { createMemoryRecallWiring } from "./recall-wiring"
+import { recoverStaleReflectionHolder } from "./reflection-stale-active"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
 import { registerMemoryToolSurface } from "./tools"
 import {
@@ -220,8 +221,20 @@ export function registerMemoryStatic(input: {
         if (result.status === "active") {
           void runtime.launch(result.run)
           await onReflectionLaunch?.(identity.identity, result.run)
+          return { disposition: "reserved", runId: result.run.runId }
         }
-        return { disposition: result.status === "active" ? "reserved" : "pending", runId: result.run.runId }
+        // The lock may be held by a run whose host died after this session reconciled (#10377).
+        const recovery = await recoverStaleReflectionHolder({
+          reflectionDir: identity.identityPaths.reflection,
+          reconcile: () => runtime.reconcile(),
+          ...(options.reflectionHolderSeams === undefined ? {} : { seams: options.reflectionHolderSeams }),
+        })
+        return {
+          disposition: "pending",
+          runId: result.run.runId,
+          ...(recovery.verdict.state === "dead" && recovery.notice === undefined ? { recoveredRunId: recovery.verdict.runId } : {}),
+          ...(recovery.notice === undefined ? {} : { stuck: recovery.notice }),
+        }
       },
     },
     dreamSink: { request: (request) => dreamTriggerWiring.requestManualDream(request) },

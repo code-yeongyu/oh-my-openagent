@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
+import { removeTestRootBestEffort, skippedTestRoots } from "./test-support/held-test-root.mjs"
 import reportOnlyPrefixesByOwner from "./test-temp-leak-report-only.json"
 import { isOsCreatedTempEntry, reportOnlyOwner as ownerIn } from "./test-temp-leak-match"
 
@@ -48,11 +49,15 @@ function isAbandoned(root: string): boolean {
 // A run that is killed (SIGKILL, a CI timeout, a crash) never reaches its afterAll, so its root stays
 // behind. Each root records its owner's pid; a later run removes the roots whose owner is gone. A live
 // pid, including a reused one, keeps its root, so a concurrent suite's root is never touched.
-function removeAbandonedRunRoots(osTempDir: string): void {
+export function removeAbandonedRunRoots(
+  osTempDir: string,
+  removeRoot?: (root: string) => void,
+): void {
   for (const entry of readdirSync(osTempDir)) {
     if (!entry.startsWith(RUN_ROOT_PREFIX)) continue
     const root = join(osTempDir, entry)
-    if (isAbandoned(root)) rmSync(root, { recursive: true, force: true, maxRetries: 3 })
+    if (!isAbandoned(root)) continue
+    removeTestRootBestEffort(root, removeRoot ? { remove: removeRoot } : {})
   }
 }
 
@@ -82,7 +87,8 @@ export function markTestInfrastructureDir(path: string): void {
 function leftoverEntries(): string[] {
   try {
     return readdirSync(runRoot)
-      .filter((entry) => !infrastructureEntries.has(entry) && !isOsCreatedTempEntry(entry))
+      .filter((entry) => !infrastructureEntries.has(entry) && !isOsCreatedTempEntry(entry)
+        && !skippedTestRoots.has(join(runRoot, entry)))
       .sort()
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
@@ -104,21 +110,10 @@ function reportKnownLeaks(entries: readonly string[]): void {
   console.warn(`Known temp leaks, report-only until their owners are fixed (#9766):\n${lines.join("\n")}`)
 }
 
-const WINDOWS_HELD_HANDLE_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY"])
-
-// Windows releases a child's file handles asynchronously, so the root can still be held when the run ends.
-// That is not a leak: the next run's removeAbandonedRunRoots() deletes it once this process is gone.
+// A recorded held child directory can also keep its containing run root locked.
+// Keep that removal best-effort too; neither record establishes why the handle remains open.
 function removeRunRoot(): void {
-  try {
-    rmSync(runRoot, { recursive: true, force: true, maxRetries: 3 })
-  } catch (error) {
-    const code = error instanceof Error && "code" in error ? error.code : undefined
-    if (process.platform === "win32" && typeof code === "string" && WINDOWS_HELD_HANDLE_CODES.has(code)) {
-      console.warn(`Test temp root ${runRoot} is still held (${code}); the next run removes it.`)
-      return
-    }
-    throw error
-  }
+  removeTestRootBestEffort(runRoot)
 }
 
 /**

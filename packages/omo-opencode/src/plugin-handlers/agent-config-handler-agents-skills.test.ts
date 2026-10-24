@@ -88,7 +88,8 @@ describe("applyAgentConfig .agents skills", () => {
     })
 
     // then
-    expect(discoverProjectAgentsSkillsSpy).toHaveBeenCalledWith(directory)
+    expect(discoverProjectAgentsSkillsSpy).toHaveBeenCalled()
+    expect(discoverProjectAgentsSkillsSpy.mock.calls[0]?.[0]).toBe(directory)
     expect(discoverGlobalAgentsSkillsSpy).toHaveBeenCalled()
   })
 

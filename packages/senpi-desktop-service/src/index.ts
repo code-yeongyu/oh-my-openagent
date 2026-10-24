@@ -1,3 +1,4 @@
+export { DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-engine";
 export {
 	ComputerRunError,
 	type ComputerRunErrorReason,

@@ -10,6 +10,7 @@ const CAUSES: Readonly<Record<string, string>> = {
   handoff_parked: "handed off",
   host_draining: "host draining",
   store_index_unavailable: "task store unavailable",
+  session_quit: "session quit",
 }
 
 export function recoveryPresentation(record: {

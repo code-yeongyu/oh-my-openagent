@@ -144,7 +144,7 @@ export class FactsExtractorRunner {
     }
     const people = await readFactsPeoplePayload(repo.dir)
     const agreements = await readFactsAgreementsPayload(repo.dir, resolveFactsAgreements(loaded.config, this.options.identity.id))
-    const envelope = { version: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people, ...agreements } as const
+    const envelope = { version: 1, agreementEventVersion: 1, identity: this.options.identity.id, today: this.now().toISOString().slice(0, 10), ...people, ...agreements } as const
     const capped = selectCappedFactsBatch({ entries, envelope, now: this.now() })
     const oversizedModel = capped.oversized.length === 0 ? undefined
       : (await import("#omo-task-runtime")).findModelReference(childModelRegistry, resolution.model)

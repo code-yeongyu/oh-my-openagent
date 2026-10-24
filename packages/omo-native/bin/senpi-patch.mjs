@@ -7,10 +7,9 @@ import { prepareInstalledEngine, preparePluginLaunchSpec, writeEnginePreparedSta
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
-// `bun add -g` has just linked the bin back to omo.js, whose `#!/usr/bin/env node` cannot start
-// where node is not on PATH; this postinstall runs right after that link (on bun when node is
-// missing), so it restores the bun launcher shim before anything launches `omo` (#9293). Quiet and
-// fail-open, and a no-op outside a POSIX bun-global install, so it runs before the engine work.
+// Prepare the package-owned entrypoint before a Bun-only machine's first launch (#9293).
+// Bun owns the global bin symlinks; this restores only our legacy marked regular wrappers.
+// It cannot undo a link error Bun recorded before postinstall began (#11019).
 ensureBunBinShim({ scriptPath: join(packageRoot, "bin", "omo.js") })
 const require = createRequire(join(packageRoot, "package.json"))
 let senpiRoot = process.env.OMO_SENPI_PATCH_ROOT

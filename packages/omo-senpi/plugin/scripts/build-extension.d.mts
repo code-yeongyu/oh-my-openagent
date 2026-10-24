@@ -20,6 +20,7 @@ export interface BuildExtensionOptions {
   telemetryPosthogOutputPath?: string
   memorySyncOutputPath?: string
   threadClientOutputPath?: string
+  telemetryRecoveryOutputPath?: string
   feedbackOutputPath?: string
   claimReceiptOutputPath?: string
   computerUseOutputPath?: string
@@ -44,6 +45,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   telemetryPosthogInputs: string[]
   memorySyncInputs: string[]
   threadClientInputs: string[]
+  telemetryRecoveryInputs: string[]
   feedbackInputs: string[]
   claimReceiptInputs: string[]
   computerUseInputs: string[]

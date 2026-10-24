@@ -186,6 +186,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     stopUnreached: stop.stopUnreached,
     recoveryEnded: (adopted) => {
       stop.recoveryEnded(adopted)
+      if (adopted) teardown.republishStatus()
       if (adopted) void inputEffects.reconcile().catch(error => log("senpi-task input reconciliation failed", { taskId, error: String(error) }))
     },
     continueInput: (command) => inputEffects.send(command, identified => client.send(toHostInput(identified))),

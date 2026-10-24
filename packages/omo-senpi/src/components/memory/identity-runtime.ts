@@ -1,4 +1,4 @@
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import {
   ReflectionReservationStore,
@@ -114,6 +114,7 @@ export function createIdentityRuntime(
 
   const runner = new SenpiSubprocessRunner({
     identity: asMemoryIdentity(identity),
+    memoryRoot: dirname(dirname(identity.durableRoot)),
     reservation: store,
     logger: deps.logger,
     resolveModelRegistry: deps.resolveModelRegistry,

@@ -43,8 +43,6 @@ export interface PanelUsageEntry {
   readonly updatedAt?: number
   /** Panel-sized explanation of the last failure; previous windows stay on screen beside it. */
   readonly error?: string
-  /** Shared backoff deadline: every session reads it, so one 429 does not become many. */
-  readonly retryAt?: number
 }
 
 export type PanelUsageSnapshot = { readonly [K in PanelUsageProviderKey]?: PanelUsageEntry }

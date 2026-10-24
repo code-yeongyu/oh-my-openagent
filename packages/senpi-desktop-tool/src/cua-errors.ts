@@ -1,4 +1,5 @@
 import type { PermissionDeniedData } from "@oh-my-opencode/senpi-desktop-protocol";
+import type { DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-service";
 
 // Engine error codes and run failures as gajae-code's `COMPUTER_*` codes, each with its recovery hint.
 const ENGINE_TO_COMPUTER: Readonly<Record<string, string>> = {
@@ -55,6 +56,11 @@ export interface ComputerFailure {
 	readonly settingsUrl?: string;
 	readonly app?: string;
 	readonly relaunchRequired?: boolean;
+	readonly reason?: DesktopLaunchContextError["reason"];
+}
+
+export function launchContextFailure(error: DesktopLaunchContextError): ComputerFailure {
+	return { code: "COMPUTER_LAUNCH_CONTEXT_REQUIRED", message: error.message, reason: error.reason };
 }
 
 export function computerFailure(

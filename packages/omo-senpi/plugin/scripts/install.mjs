@@ -14,7 +14,7 @@ import { dirname as dirname4, join as join5, resolve as resolve4 } from "node:pa
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-// packages/omo-senpi/src/components/agent-home/resolve-agent-home.ts
+// packages/senpi-task/src/agent-home.ts
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -39,7 +39,6 @@ function resolveAgentHome(options) {
     return brandedHome;
   return join(homeDir, ".senpi", "agent");
 }
-
 // packages/omo-senpi/src/install/local-launcher.ts
 import { chmodSync, existsSync as existsSync2, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir as homedir2 } from "node:os";
@@ -303,6 +302,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "loro_wasm_bg.wasm"),
   join4("extensions", "CaseFolding.txt"),
   join4("extensions", "omo-thread-client.js"),
+  join4("extensions", "omo-telemetry-recovery.js"),
   join4("extensions", "omo-feedback.js"),
   join4("extensions", "omo-claim-receipt.js"),
   join4("extensions", "assets.generated.json"),

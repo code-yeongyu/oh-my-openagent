@@ -56,6 +56,9 @@ export function createPanelHostSurface(deps: PanelHostSurfaceDeps): PanelHostSur
   let urlHook: InstalledUrlHook | undefined
   // The renderer a widget block fell back on, so a later layout seam on it can still be taken.
   let widgetHost: unknown
+  // A mode switch can revisit the no-seam branch; the runtime's install-wide claim is what keeps
+  // the notice to one showing ever, and this flag keeps it to one callback per surface.
+  let regularModeNotified = false
 
   /**
    * Claim the host's URL activation callback, which is the only path a mouse click has into an
@@ -100,6 +103,10 @@ export function createPanelHostSurface(deps: PanelHostSurfaceDeps): PanelHostSur
     installUrlHook(candidate)
     if (!isHostTui(candidate)) {
       deps.logger.debug?.("side-panel: renderer does not expose the layout seam, using a widget block")
+      if (!regularModeNotified) {
+        regularModeNotified = true
+        deps.onRegularModeFallback?.()
+      }
       mountWidget(candidate)
       return
     }

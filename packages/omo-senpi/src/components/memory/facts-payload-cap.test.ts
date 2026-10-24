@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { readFile } from "node:fs/promises"
+import { readFile, readdir } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
@@ -112,7 +112,7 @@ describe("facts payload byte cap", () => {
     expect(Object.keys(consumed.consumed).sort()).toEqual(["session-1", "session-2", "session-3"])
   }, 60_000)
 
-  test("#given a conversation whose older entry exceeds the cap #when it parks #then it stays queued and unconsumed while the newer entry ships on its own (#10918)", async () => {
+  test("#given a conversation whose older entry exceeds the cap #when it parks #then it waits unconsumed in the dead-letter store while the newer entry ships on its own (#10918)", async () => {
     // given
     const { root, identity, queue } = await fixture()
     const older = message("m2", "y".repeat(MAX_FACTS_PAYLOAD_BYTES))
@@ -130,6 +130,8 @@ describe("facts payload byte cap", () => {
     expect(ledgers.map((ledger) => ledger.queued.map((key) => `${key.conversationId}/${key.end_message_id}`))).toEqual([["session-1/m1"], ["session-2/m3"]])
     const failures = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
     expect(failures.entries).toMatchObject([{ conversationId: "session-2", end_message_id: "m2", state: "parked", lastReason: "payload_entry_oversize" }])
-    expect((await queue.listPending()).map((entry) => `${entry.conversationId}/${entry.range.end_message_id}`)).toEqual(["session-2/m2"])
+    // Parked bytes leave the hot queue for the parked/ dead-letter store (#11002); they are kept for /facts retry, not consumed.
+    expect(await queue.listPending()).toEqual([])
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 60_000)
 })

@@ -36,6 +36,7 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
       merge: "auto",
       category: "quick",
       timeout_minutes: 15,
+      max_concurrent_runs: 1,
       sandbox: "auto",
     },
     nudge: { enabled: true, every_user_turns: 10 },

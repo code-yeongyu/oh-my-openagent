@@ -1,5 +1,5 @@
 import { appendFile } from "@oh-my-opencode/memory-core/fs"
-import { parseAgreementRecord } from "@oh-my-opencode/memory-core"
+import { parseAgreementRecord, validateAgreementSource, type FactsPayload } from "@oh-my-opencode/memory-core"
 import { Type, type Static } from "typebox"
 
 import type { FactsRecordTool, FactsRecordToolResult } from "./facts-record-tool"
@@ -14,6 +14,10 @@ const FactsAgreementParams = Type.Object({
   applies: Type.Optional(Type.Union([Type.Literal("global"), Type.Literal("project")])),
   text: Type.Optional(Type.String()),
   date: Type.String(),
+  source: Type.Object({
+    sessionId: Type.String({ description: "sessionId of the payload entry containing the user's correction." }),
+    messageId: Type.String({ description: "source_message_id of that user message, from entries, never lead context." }),
+  }, { additionalProperties: false }),
 }, { additionalProperties: false })
 
 type FactsAgreementParams = Static<typeof FactsAgreementParams>
@@ -32,6 +36,7 @@ export type FactsAgreementTool = Omit<FactsRecordTool, "parameters" | "execute">
 type FactsAgreementToolInput = {
   readonly extractionPath: string
   readonly knownIds: ReadonlySet<string>
+  readonly payload: FactsPayload
   readonly onFailure?: (reason: string) => void
   readonly state?: { readonly cancelled: boolean }
 }
@@ -53,6 +58,7 @@ export function createFactsAgreementTool(input: FactsAgreementToolInput): FactsA
       if (count >= AGREEMENT_RECORD_LIMIT) return reject(`the agreement limit (${AGREEMENT_RECORD_LIMIT}) has been reached`)
       try {
         const record = parseAgreementRecord(params, count)
+        validateAgreementSource(record, { ...input.payload, agreementEventVersion: 1 })
         if (record.action === "reaffirm" && !input.knownIds.has(record.id)) {
           return reject(`no agreement has id ${record.id}; use one of the ids in the payload's agreements, or action "new"`)
         }

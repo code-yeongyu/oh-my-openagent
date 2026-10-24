@@ -58,6 +58,7 @@ export function createMemoryRunSupervisorIc8Harness() {
         version: 1,
         runId: "run-ic8",
         kind: "reflection",
+        memoryRoot: runDir,
         command: process.execPath,
         args: [childFixture, mode, runDir],
         cwd: runDir,

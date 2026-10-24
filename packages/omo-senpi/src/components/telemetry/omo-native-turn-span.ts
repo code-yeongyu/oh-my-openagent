@@ -7,7 +7,7 @@ import {
   type TurnTracing,
 } from "@oh-my-opencode/telemetry-core"
 
-import { maskModel } from "./omo-native-turns"
+import { maskProviderAndModel } from "./product-identity"
 
 /**
  * The `gen_ai.provider.name` well-known values for our provider ids (D-P VALUE table); an id with no
@@ -52,7 +52,7 @@ export type OmoNativeTurnSpans = {
 }
 
 function modelAttributes(model: TurnModel): TurnSpanAttributes {
-  const masked = maskModel(model.provider, model.modelId)
+  const masked = maskProviderAndModel(model.provider, model.modelId)
   return {
     "gen_ai.provider.name": GEN_AI_PROVIDER_NAMES[masked.provider] ?? masked.provider,
     "omo.provider": masked.provider,
@@ -96,7 +96,7 @@ export function createOmoNativeTurnSpans(options: OmoNativeTurnSpansOptions): Om
           "omo.turn.index": input.turnIndex,
           ...(input.model === undefined ? {} : {
             ...modelAttributes(input.model),
-            "gen_ai.request.model": maskModel(input.model.provider, input.model.modelId).model_id,
+            "gen_ai.request.model": maskProviderAndModel(input.model.provider, input.model.modelId).model_id,
           }),
         },
         ...(parent === undefined ? {} : { parentTraceparent: parent }),
@@ -114,8 +114,8 @@ export function createOmoNativeTurnSpans(options: OmoNativeTurnSpansOptions): Om
       if (input.response !== undefined) {
         open.handle.setAttributes({
           ...modelAttributes(input.response),
-          ...(open.requestModelSet ? {} : { "gen_ai.request.model": maskModel(input.response.provider, input.response.modelId).model_id }),
-          "gen_ai.response.model": maskModel(input.response.provider, input.responseModelId ?? input.response.modelId).model_id,
+          ...(open.requestModelSet ? {} : { "gen_ai.request.model": maskProviderAndModel(input.response.provider, input.response.modelId).model_id }),
+          "gen_ai.response.model": maskProviderAndModel(input.response.provider, input.responseModelId ?? input.response.modelId).model_id,
         })
       }
       close(input.failed ? "error" : "ok")

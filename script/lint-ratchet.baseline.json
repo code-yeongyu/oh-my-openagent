@@ -66,7 +66,7 @@
     "typescript/no-non-null-assertion": 8
   },
   "packages/memory-core/src/git/exec.ts": {
-    "typescript/no-non-null-assertion": 5
+    "typescript/no-non-null-assertion": 4
   },
   "packages/memory-core/src/git/path-state.ts": {
     "typescript/no-non-null-assertion": 4

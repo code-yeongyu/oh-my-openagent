@@ -3,6 +3,7 @@ import { once } from "node:events"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
+import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAll, type HostEndpointReport } from "./live-surface"
 import { createGatewayStore } from "./gateway/store"
@@ -12,6 +13,8 @@ type Frame = Record<string, unknown>
 type Answer = (frame: Frame) => Record<string, unknown>
 
 const cleanups: Array<() => Promise<void>> = []
+// An rpc_host listens on the transport its logical path names (a hashed pipe on win32), so dials are recorded by logical path.
+const logicalAddress = new Map<string, string>()
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
 
 function tempDir(prefix: string): string {
@@ -24,7 +27,9 @@ function tempDir(prefix: string): string {
 async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly frames: Frame[] }> {
   const frames: Frame[] = []
   const sockets = new Set<Socket>()
-  const server: Server = createServer((socket) => {
+  const transport = fakeHostTransport(socketPath)
+  logicalAddress.set(transport.listenAddress, socketPath)
+  const server: Server = createServer((socket) => transport.authenticate(socket, () => {
     sockets.add(socket)
     socket.once("close", () => sockets.delete(socket))
     let buffer = ""
@@ -34,12 +39,13 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
       if (newline < 0) return
       const frame = JSON.parse(buffer.slice(0, newline)) as Frame
       buffer = buffer.slice(newline + 1)
+      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
       frames.push(frame)
-      socket.end(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
+      socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
     })
-  })
+  }))
   const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
-  server.listen(socketPath)
+  server.listen(transport.listenAddress)
   await listening
   cleanups.push(async () => {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
@@ -91,7 +97,7 @@ function world(options: { readonly reports: () => readonly HostEndpointReport[] 
     env: { SENPI_RPC_SOCKET: options.legacy },
     statusAll: async () => { statusCalls.count += 1; return options.reports() },
     registry: async () => [],
-    connect: (path) => { dialed.push(path); return createConnection(path) },
+    connect: (path) => { dialed.push(logicalAddress.get(path) ?? path); return createConnection(path) },
     ...(options.now === undefined ? {} : { now: options.now }),
   })
   const stateDirectory = tempDir("thr-state-")

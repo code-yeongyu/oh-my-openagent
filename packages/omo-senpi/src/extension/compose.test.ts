@@ -444,3 +444,38 @@ async function captureDefaultLoggerOutput(
     else process.env.OMO_DEBUG = previous
   }
 }
+
+describe("idle-injection retire on session_shutdown (#10782)", () => {
+  it("#given a queued injection whose failure receipt throws #when session_shutdown fires #then the error is logged and later shutdown handlers still run", async () => {
+    // given a component that queues an injection with a throwing receipt and also listens for shutdown
+    const pi = new FakeExtensionAPI()
+    const logger = createRecordingLogger()
+    let laterHandlerRan = false
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "throwing-receipt",
+        register(api, ctx) {
+          ctx.idleCoordinator?.enqueue({
+            key: "task:st_24",
+            source: "task-completion",
+            content: "st_24 completed",
+            onDeliveryFailed: () => {
+              throw new Error("receipt failed")
+            },
+          })
+          api.on("session_shutdown", () => {
+            laterHandlerRan = true
+          })
+        },
+      },
+    ]
+    await composeOmoSenpiExtension(components, { logger })(pi)
+
+    // when
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" })
+
+    // then
+    expect(laterHandlerRan).toBe(true)
+    expect(logger.entries.some((entry) => entry.level === "warn" && entry.message.includes("receipt failed on shutdown"))).toBe(true)
+  })
+})

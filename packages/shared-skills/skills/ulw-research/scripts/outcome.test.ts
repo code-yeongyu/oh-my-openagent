@@ -258,6 +258,35 @@ describe("readManifest and writeManifest", () => {
 		writeFileSync(file, "{not json")
 		expect(() => readManifest(file)).toThrow(OutcomeError)
 	})
+
+	test("#given a manifest file written before the fidelity gate (four gates) #when read and written back #then it loads and the file gains fidelity not_run", () => {
+		// given
+		const dir = sessionDir()
+		const file = join(dir, MANIFEST_FILENAME)
+		const old = {
+			schemaVersion: 1,
+			sessionDir: dir,
+			startedAt: START_LOCAL.toISOString(),
+			finishedAt: null,
+			elapsedMinutes: null,
+			lane: "no-format",
+			interview: null,
+			deliverables: [{ format: "pdf", status: "pending", promised: true, updatedAt: START_LOCAL.toISOString() }],
+			renders: [],
+			gates: { static: "pass", layout: "not_run", visual: "fail", proofread: "not_run" },
+			residualDefects: [],
+			repair: null,
+			sources: null,
+		}
+		writeFileSync(file, JSON.stringify(old))
+		// when
+		const manifest = readManifest(file)
+		writeManifest(file, manifest)
+		// then
+		const written = JSON.parse(readFileSync(file, "utf8"))
+		expect(written.gates).toEqual({ static: "pass", fidelity: "not_run", layout: "not_run", visual: "fail", proofread: "not_run" })
+		expect(written.schemaVersion).toBe(1)
+	})
 })
 
 describe("round trip in a stamped session dir", () => {

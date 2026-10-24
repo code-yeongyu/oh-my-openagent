@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { TaskRecord } from "../state"
 import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { markSuspensionReason } from "./host-session-record"
 import type { ResidentHandle } from "./port"
 import { stopOwnedChildren, stoppedOwnerTask } from "./stopped-owner"
 import { withinTeardownBudget, type TeardownStep } from "./teardown-budget"
@@ -49,6 +50,11 @@ export async function suspendOnSessionShutdown(
     }
     try {
       await suspendHandle(context, handle, input.reason)
+      // senpi#3493: a quit-parked record must say WHY it is still "running" - the owning session
+      // exited, so nothing revives the child until that session resumes and task_output can present
+      // it as "resuming (session quit)" instead of a bare running record. Other shutdown reasons
+      // keep today's behavior (a reload revives through the new generation; the opt-out disposes).
+      if (input.reason === "quit") markSuspensionReason(context, handle.task_id, "session_quit")
       if (handle.kind === "in-process") suspendedInProcess += 1
       else suspendedRpc += 1
     } catch (error) {
@@ -64,6 +70,7 @@ export async function suspendOnSessionShutdown(
       context.dequeuePending(record.task_id)
       context.store.transition(record.task_id, { type: "persist_only", timestamp: nowIso(context) })
       context.store.appendEvent(record.task_id, { type: "suspended", payload: { reason: input.reason } })
+      if (input.reason === "quit") markSuspensionReason(context, record.task_id, "session_quit")
       suspendedPending += 1
     } catch (error) {
       failures.push({ task_id: record.task_id, error: String(error) })

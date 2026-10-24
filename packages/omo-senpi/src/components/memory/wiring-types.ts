@@ -1,4 +1,5 @@
 import type { RecallCorpusCache } from "@oh-my-opencode/memory-core"
+import type { ActiveHolderSeams } from "./reflection-stale-active"
 
 import type { ComponentContext, ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
@@ -37,6 +38,8 @@ export interface MemoryWiringOptions {
   readonly refreshStatus?: typeof refreshMemoryStatus
   /** Injectable animation timers; tests drive frames without touching the wall clock. */
   readonly footerTimers?: MemoryFooterTimers
+  /** Process-liveness and hostname seams for the stale reflection lock check (#10377). */
+  readonly reflectionHolderSeams?: ActiveHolderSeams
   /** A sync principal's device name for the memory notice's "synced from"; production passes the sync runner's. */
   readonly deviceName?: (principal: string) => string | undefined
   /** A memory repository's sync status for the footer and its notice; production passes the sync runner's. */

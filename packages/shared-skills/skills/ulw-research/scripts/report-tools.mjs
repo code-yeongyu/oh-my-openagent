@@ -20,6 +20,15 @@ export const COMMANDS = Object.freeze([
 	"outcome finish",
 	"outcome briefing",
 	"format-extract",
+	"fact add",
+	"fact quote",
+	"fact retract",
+	"fact export",
+	"fact fill",
+	"fact verify",
+	"fact derive",
+	"source snapshot",
+	"claims index",
 ])
 
 export async function run(argv) {
@@ -36,6 +45,12 @@ export async function run(argv) {
 			return runOutcome(rest)
 		case "format-extract":
 			return runFormatExtract(rest)
+		case "fact":
+			return (await import("./fact-commands.mjs")).runFact(rest)
+		case "source":
+			return (await import("./source-commands.mjs")).runSource(rest)
+		case "claims":
+			return (await import("./source-commands.mjs")).runClaims(rest)
 		case "--help":
 		case "help":
 			if (rest.includes("--json")) return { json: { commands: COMMANDS }, exitCode: 0 }

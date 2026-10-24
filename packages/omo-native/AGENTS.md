@@ -31,10 +31,12 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
     resident wrapper. Windows, missing execve and thrown execve retain async `runChild`. The fallback forwards `SIGTERM`/`SIGHUP`, waits up to
     `OMO_SIGNAL_GRACE_MS` (default 10s), then re-raises an ignored signal. It waits for `SIGINT`
     without forwarding it twice. Never use `spawnSync` for these long-lived handoffs.
-  - `bun-bin-shim.js` — `ensureBunBinShim`: keeps the user-facing bun-global bin an sh shim that
-    execs bun directly (POSIX only, fail-open). Every launch repairs it, under node or bun, and so
-    does postinstall (`bin/senpi-patch.mjs`), which bun runs on itself right after `bun add -g`
-    relinks the bin when node is not on PATH (#9293)
+  - `bun-bin-shim.js` — `ensureBunBinShim`: prepares a shell/JS prelude in the package-owned
+    entrypoint for direct Bun startup (POSIX Bun-global installs only, fail-open). Launch and
+    trusted postinstall prepare it, preserving Bun-only startup (#9293). Both global bin paths
+    remain Bun-owned symlinks; only marked legacy wrappers for this install are restored to links
+    (#11019). Windows/npm keep the shipped Node shebang. A first manual upgrade from an older
+    shim can fail before the new code runs; one new-version launch migrates it for the next update.
   - `doctor.js` — diagnostics plus stale-orphan detection: `classifyEngineProcesses` splits live
     engines into stale (interactive, PPID 1), attached and managed (`--mode`), and
     `reapStaleEngines` terminates ONLY explicitly named pids that are still stale at request time.
@@ -48,6 +50,7 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
     `category-coverage-entry.ts`. Fail-open: any error prints no line and omits the row.
   - `config-doctor.js` - doctor's `WARN config: <file>: <key> ignored (...)` lines, one per key the omo.json loader dropped and one per file it did not load, from `configDoctorLines` (`config-doctor-runtime.ts`) through the same staged runtime bundle; the compiled entry imports it directly. A runtime that cannot load prints `WARN config: diagnostics unavailable: <reason>`.
   - `dori.js` - the hook for the separately installed `dori-extension` package: `omo dori ...` (and the one-release deprecated alias `omo gateway`) and the doctor dori rows load its `dori-extension/host` entry from omo's own install, lazily (only for `omo dori`, or for doctor when the user config has a `dori` section), after checking the manifest name, `doriExtension.hostContract`, and that the host entry's realpath stays inside the package; they check its `HOST_CONTRACT_VERSION`, and hand it argv, stdio, env, cwd, the agent dir, home, the relaunch argv, `pluginRoot` (`<packageRoot>/plugin`) and `threadSdkUrl` (the `file:` URL of `<pluginRoot>/runtime/thread-sdk/sdk.js`; the doctor call gets the last two as well). omo ships no dori code; the package validates its own section, omo-config-core keeps only a permissive `dori` key, and the config migration moves a legacy `gateway` section to `dori`.
+  - `self-update.js` / `update-lock.js` - `omo update` for npm/bun installs. On Windows a manager failure that reports a held file (EPERM/EBUSY, `NtSetInformationFile`) is retried with backoff; if it stays held, the report names the file, the processes holding it (CIM list filtered to `omo-ai`, `@code-yeongyu/*` and the held package in the global `node_modules`; EACCES is a permission failure, never retried) and one action, a bare EPERM counts only for a rename/unlink/rmdir, and only a failed run whose install can no longer be read reinstalls the previous version once; any readable version is kept (#10090).
   - `package-paths.js`, `provider-map.json`, `legacy-bun-global-migration.js`
 - **agent state lives in ONE canonical directory: `~/.omo/agent`.** `bin/lib/agent-dir.js` owns that answer (`canonicalAgentDir`), and the launcher, `omo doctor`, `omo setup` and the locally installed launcher (`packages/omo-senpi/src/install/local-launcher.ts`) all resolve it from there - never by composing their own default. An explicit `OMO_CODING_AGENT_DIR` (or legacy `SENPI_CODING_AGENT_DIR` / `PI_CODING_AGENT_DIR`) still wins, and `adoptLegacyFlatState` carries state left in the pre-unification flat `~/.omo` layout forward once, so unifying the location never reads as another reset.
 - `bin/omo-agent-toolkit.js` - internal delegate to the staged toolkit runtime, NOT an npm bin

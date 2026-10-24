@@ -674,7 +674,17 @@ successful reflection clears the backoff. `/reflect` ignores it, so you can alwa
 | `reflection.merge`         | `"auto"` | `auto` or `integration` merge strategy                     |
 | `reflection.category`      | `"quick"`| Task executor category for the reflection child            |
 | `reflection.timeout_minutes`| `15`    | Hard timeout for a reflection run                          |
+| `reflection.max_concurrent_runs` | `1` | Concurrent reflection/dream children across memory identities |
 | `reflection.sandbox`       | `"auto"` | `auto`, `required`, or `off`                               |
+
+Reflection and dream supervisors share FIFO slots under
+`<OMO_MEMORY_HOME>/runtime/locks` (the default memory home is `~/.omo/memory`).
+Queued work waits without a timeout and is not dropped. Queue time does not
+consume the execution budget: admission shifts both durable deadlines before
+starting the child; model fallback attempts share the remaining execution budget.
+Set `max_concurrent_runs` consistently in the shared user configuration for all
+sessions using that memory home. This machine setting cannot be overridden for an
+individual identity. Separate memory homes have separate queues.
 
 #### Nudge
 

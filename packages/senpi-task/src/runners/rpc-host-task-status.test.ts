@@ -83,4 +83,45 @@ describe("a daemon-hosted task publishes its status to the host", () => {
     // then
     expect(publishedStatus(world, sessionPath)).toBe("completed")
   })
+
+  test("#given a finished resident child #when the host restarts and the child reattaches to its reopened session #then the host session publishes completed again", async () => {
+    // given
+    const { world, parent, taskId, sessionPath } = await finishedChild()
+    const republished = world.host.waitForCommand("set_session_context")
+
+    // when - the restarted host reopens the session from its transcript, with an empty context
+    world.host.crash()
+    await world.host.restart()
+    await within(republished, "the completed mark re-sent after the reattach")
+    const handle = parent.manager.getResidentHandle(taskId)
+    if (handle?.getEntries === undefined) throw new Error("the finished child has no live host-session handle")
+    await handle.getEntries()
+
+    // then
+    expect(publishedStatus(world, sessionPath)).toBe("completed")
+  })
+
+  test("#given a child that resumes on its own before its finished turn is recorded #when the record reopens #then the host session publishes running", async () => {
+    // given
+    const world = await startHostWorld({ transcripts: true })
+    worlds.push(world)
+    const parent = world.connect("parent-a")
+    await parent.startChildren(1)
+    const session = world.host.sessions()[0]
+    if (session === undefined) throw new Error("the child did not start on the host")
+    const running = (async () => {
+      await patchSeen(world.host, "completed")
+      while (taskStatusOf(world.host.commands.filter((command) => command.type === "set_session_context").at(-1)?.payload.patch) !== "running") {
+        await world.host.waitForCommand("set_session_context")
+      }
+    })()
+
+    // when - the turn's end and the child's own next run arrive together, before the terminal write
+    world.host.completeTurn(session.routingId, "DONE")
+    world.host.emitRecord(session.routingId, { type: "agent_start" })
+
+    // then
+    await within(running, "running published after the completed mark")
+    expect(publishedStatus(world, session.sessionPath)).toBe("running")
+  })
 })

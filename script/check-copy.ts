@@ -89,9 +89,9 @@ export function findUnexplainedSuppressions(content: string, path: string): { li
     const typescript = /^\s*\*?\s*@ts-(?:expect-error|ignore|nocheck)(?![\w-])([\s\S]*)$/.exec(comment.text)
     const biome = /^\s*\*?\s*biome-ignore(?:-all|-start)?(?![\w-])([\s\S]*)$/.exec(comment.text)
     if (!lint && !typescript && !biome) continue
-    const reason = lint ? /--\s*\S/.test(lint[1]!)
-      : typescript ? !!typescript[1]!.replace(/^[\s:-]+/, "").trim()
-      : /:\s*\S/.test(biome![1]!)
+    const reason = lint ? /--\s*\S/.test(lint[1] ?? "")
+      : typescript ? !!(typescript[1] ?? "").replace(/^[\s:-]+/, "").trim()
+      : /:\s*\S/.test(biome?.[1] ?? "")
     if (reason) continue
     let above = ownLines.get(comment.start.line - 1)
     while (above && (directive.test(above.text) || /^[\s*]*$/.test(above.text))) {

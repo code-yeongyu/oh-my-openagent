@@ -33,6 +33,7 @@ export class FactsPlanParentDirtyError extends Error {
 
 export interface FactsApplyRecovery {
   readonly version: 1
+  readonly agreementEventVersion?: 1
   readonly batchId: string
   readonly headBeforeApply: string
   readonly recordsHash: string
@@ -85,6 +86,7 @@ export async function planFactsMutation(
   }
   return {
     version: 1,
+    ...(agreementRecords.length === 0 ? {} : { agreementEventVersion: 1 as const }),
     batchId: batch.batchId,
     headBeforeApply,
     recordsHash: factsRecordsHash(batch.records, batch.agreements),

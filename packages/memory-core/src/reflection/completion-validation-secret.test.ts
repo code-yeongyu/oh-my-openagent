@@ -52,9 +52,20 @@ async function writeAt(dir: string, path: string, content: string): Promise<void
   await writeFile(join(dir, path), content)
 }
 
+/** A refused entry is dropped so the run's other entries can land; its refusal text is the dropped reason. */
 async function failureDetail(result: Awaited<ReturnType<typeof validateCompletion>>): Promise<string> {
-  expect(result.status).toBe("failed")
-  return result.status === "failed" ? result.detail : ""
+  expect(result.status).not.toBe("failed")
+  const dropped = "dropped" in result ? result.dropped : undefined
+  expect(dropped?.length).toBe(1)
+  return dropped?.[0]?.reason ?? ""
+}
+
+/** The branch is merged --no-ff with its whole history, so an introduced secret must be gone from every commit, not only the tip. */
+async function expectScrubbed(result: Awaited<ReturnType<typeof validateCompletion>>, dir: string, base: string, needle: string) {
+  expect(["valid", "no_changes"]).toContain(result.status)
+  expect("dropped" in result ? result.dropped : undefined).toBeUndefined()
+  const log = await createNodeGitExec().run(["log", "--format=%H", "--name-only", "-p", `${base}..HEAD`], { cwd: dir, timeoutMs: 30_000 })
+  expect(log.stdout).not.toContain(needle)
 }
 
 describe("reflection completion secret screening", () => {
@@ -111,7 +122,7 @@ describe("reflection completion secret screening", () => {
     expect(await repo.head()).toBe(base)
   })
 
-  it("#given a two-commit branch whose tip is clean but whose first commit carried a credential #when validated #then it fails naming the introducing commit", async () => {
+  it("#given a two-commit branch whose tip is clean but whose first commit carried a credential #when validated #then the branch is rewritten without the secret", async () => {
     // given
     const { repo, worktree } = await fixture()
     const base = await repo.head()
@@ -124,10 +135,9 @@ describe("reflection completion secret screening", () => {
     // when
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
-    // then: a --no-ff merge would carry commit 1 into main history, so the tip being clean is not enough
-    const detail = await failureDetail(result)
-    expect(detail).toBe(`secret_like_content: reference/z.md (credential_assignment) @${first.slice(0, 7)}`)
-    expect(detail).not.toContain("abc123456")
+    // then: a --no-ff merge would carry commit 1 into main history, so the branch is rewritten without it
+    await expectScrubbed(result, worktree.dir, worktree.baseSha, "abc123456")
+    expect(first).not.toBe("")
     expect(await repo.head()).toBe(base)
   })
 
@@ -157,7 +167,7 @@ describe("reflection completion secret screening", () => {
     expect(result.status).toBe("valid")
   })
 
-  it("#given a merge commit whose resolution introduces a credential and a later commit removes it #when validated #then it fails naming the merge commit", async () => {
+  it("#given a merge commit whose resolution introduces a credential and a later commit removes it #when validated #then the branch is rewritten without the secret", async () => {
     // given
     const { repo, worktree } = await fixture({ "reference/m.md": "---\ndescription: M\n---\n\nbase\n" })
     const base = await repo.head()
@@ -180,9 +190,8 @@ describe("reflection completion secret screening", () => {
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
     // then
-    const detail = await failureDetail(result)
-    expect(detail).toBe(`secret_like_content: reference/m.md (credential_assignment) @${mergeSha.slice(0, 7)}`)
-    expect(detail).not.toContain("abc123456")
+    await expectScrubbed(result, worktree.dir, worktree.baseSha, "abc123456")
+    expect(mergeSha).not.toBe("")
     expect(await repo.head()).toBe(base)
   })
 
@@ -206,7 +215,7 @@ describe("reflection completion secret screening", () => {
     expect(result.status).toBe("valid")
   })
 
-  it("#given a non-markdown blob carrying a key in a deleted-then-restored history #when validated #then it fails naming the introducing commit", async () => {
+  it("#given a non-markdown blob carrying a key in a deleted-then-restored history #when validated #then the branch is rewritten without the secret", async () => {
     // given
     const { repo, worktree } = await fixture()
     const base = await repo.head()
@@ -220,8 +229,8 @@ describe("reflection completion secret screening", () => {
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
     // then
-    const detail = await failureDetail(result)
-    expect(detail).toBe(`secret_like_content: reference/data.json (openai_key) @${first.slice(0, 7)}`)
+    await expectScrubbed(result, worktree.dir, worktree.baseSha, "sk-proj-AAAABBBBCCCCDDDD")
+    expect(first).not.toBe("")
     expect(await repo.head()).toBe(base)
   })
 
@@ -275,7 +284,7 @@ describe("reflection completion secret screening", () => {
     expect(detail).not.toContain("abc123456")
   })
 
-  it("#given a secret-like name renamed away before the tip #when validated #then the introducing commit is still named", async () => {
+  it("#given a secret-like name renamed away before the tip #when validated #then the branch is rewritten without the secret", async () => {
     // given
     const { worktree } = await fixture()
     await writeAt(worktree.dir, `reference/${XOXB}.md`, "---\ndescription: T\n---\n\nclean body\n")
@@ -288,12 +297,11 @@ describe("reflection completion secret screening", () => {
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
     // then
-    const detail = await failureDetail(result)
-    expect(detail).toBe(`secret_like_content: reference/***.md (vendor_token, file name) @${first.slice(0, 7)}`)
-    expect(detail).not.toContain(XOXB)
+    await expectScrubbed(result, worktree.dir, worktree.baseSha, XOXB)
+    expect(first).not.toBe("")
   })
 
-  it("#given a type change to a symlink whose target is an evaded credential #when validated #then it fails naming the type-change commit", async () => {
+  it("#given a type change to a symlink whose target is an evaded credential #when validated #then the branch is rewritten without the secret", async () => {
     // given: the tracked file is replaced on disk by a symlink, so the commit is a T record and
     // the destination blob IS the symlink target string
     const { worktree } = await fixture({ "reference/link.txt": "clean\n" })
@@ -308,8 +316,7 @@ describe("reflection completion secret screening", () => {
     const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
 
     // then
-    const detail = await failureDetail(result)
-    expect(detail).toBe(`secret_like_content: reference/link.txt (credential_assignment) @${first.slice(0, 7)}`)
-    expect(detail).not.toContain("abc123456")
+    await expectScrubbed(result, worktree.dir, worktree.baseSha, "abc123456")
+    expect(first).not.toBe("")
   })
 })

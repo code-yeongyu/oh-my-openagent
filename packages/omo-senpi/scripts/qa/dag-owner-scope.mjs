@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, seedSandbox, credentialDigest } from "./drive.mjs"
 import { SESSION_A, SESSION_B, seedRun, snapshot } from "./dag-owner-scope-fixture.mjs"
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, "../../../..")
@@ -105,7 +106,8 @@ function launch(options, sandbox, env, sessionFile, phase, processes) {
 
 export function signalTree(pid, signal) {
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(pid), "/T", signal === "SIGKILL" ? "/F" : "/T"], { stdio: "ignore" })
+    const args = windowsTreeKillArgs(pid).filter((arg) => signal === "SIGKILL" || arg !== "/F")
+    if (args.length > 0) spawnSync("taskkill", args, { stdio: "ignore", windowsHide: true })
     return
   }
   try { process.kill(-pid, signal) } catch (error) { if (error.code !== "ESRCH") throw error }
@@ -228,7 +230,7 @@ export async function run(options) {
     rmSync(sandbox.root, { recursive: true, force: true })
     facts.cleanup = { exits: receipts, processScanExit: scan.exit, survivors, sandboxRemoved: !existsSync(sandbox.root),
       ownedTransport: "stdio pipes only, including fixture readiness fd 3; no driver server or socket",
-      survivorCheck: process.platform === "win32" ? "owned pid liveness (taskkill /T tree termination)" : "owned pid liveness plus ps scan for the sandbox root",
+      survivorCheck: process.platform === "win32" ? "owned pid liveness (creation-time-checked tree termination)" : "owned pid liveness plus ps scan for the sandbox root",
       protectedCredentialsUnchanged: credentialsAfter.every((digest, i) => digest === credentialsBefore[i]),
       observationLimit: "Protected credential/config digest only; no claim of a whole-home audit." }
     facts.ok = !facts.error && facts.selection?.ok === true && scan.exit === 0 && survivors.length === 0 && facts.cleanup.sandboxRemoved && facts.cleanup.protectedCredentialsUnchanged

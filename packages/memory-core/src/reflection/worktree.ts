@@ -2,7 +2,7 @@ import { existsSync } from "../fs/resilient"
 import { mkdir, readFile, rm } from "../fs/resilient"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
-import { validateCompletion } from "./completion-validation"
+import { describeDroppedEntries, validateCompletion } from "./completion-validation"
 import { preflightReflectionDescriptions, type DescriptionPreflightWarn } from "./description-preflight"
 import { cleanupReflectionWorktree, integrateValidatedReflection } from "./worktree-integration"
 
@@ -115,9 +115,10 @@ export async function finalizeReflectionWorktree(
   try {
     await preflightReflectionDescriptions(worktree, worktree.baseSha, worktree.exec, options.warn)
     const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+    const droppedNote = "dropped" in validation && validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
     if (validation.status !== "valid") {
       status = validation.status
-      detail = "detail" in validation ? validation.detail : undefined
+      detail = "detail" in validation ? validation.detail : droppedNote
     } else if (options.mode === "auto" && options.allowedPaths !== undefined
       && validation.changedPaths.some((path) => !options.allowedPaths?.includes(path))) {
       detail = `Dream document maintenance changed paths outside its target: ${validation.changedPaths.join(", ")}`
@@ -130,7 +131,7 @@ export async function finalizeReflectionWorktree(
         withWriterLock: options.withWriterLock,
       })
       status = integrated.outcome
-      detail = integrated.detail
+      detail = [integrated.detail, droppedNote].filter(Boolean).join("; ") || undefined
     }
   } catch (error) {
     detail = errorMessage(error)

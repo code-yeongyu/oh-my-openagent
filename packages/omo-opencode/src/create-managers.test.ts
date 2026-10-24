@@ -174,7 +174,10 @@ describe("createManagers", () => {
     tuiMirrorStopCount = 0
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    for (const manager of registeredCleanupManagers.splice(0)) {
+      await manager.shutdown()
+    }
     dispatchOpenClawEvent.mockRestore()
   })
 

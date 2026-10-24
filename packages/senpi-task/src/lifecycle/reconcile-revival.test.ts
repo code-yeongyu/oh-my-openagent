@@ -325,6 +325,30 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(after.revival_deferred_reason).toBe("model_unavailable")
   })
 
+  test("#given a child parked by its session quitting #when the resume defers its revival #then the deferral supersedes the stale quit marker (senpi#3493)", async () => {
+    // given
+    const harness = injectedHarness({
+      onRespawn: async () => ({
+        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+      }),
+    })
+    const record = withV1(harness.store, seedRecord(harness.store, {
+      task_id: "st_1000009b", parent_session_id: parentSessionId, status: "running",
+      residency_state: "persisted_only", execution_mode: "in-process",
+    }))
+    harness.store.mutate(record.task_id, (fresh) => ({ ...fresh, suspension_reason: "session_quit" }))
+    persistSession(harness.store, record.task_id)
+
+    // when
+    await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+    // then
+    const after = harness.store.load(record.task_id)
+    if (after === null) throw new Error("record vanished")
+    expect(after.suspension_reason).toBe("revival_deferred")
+    expect(after.revival_deferred_reason).toBe("model_unavailable")
+  })
+
   test("#given retryable respawn failure and rollback lock failure #when reconciled #then the outcome loudly names the failed rollback", async () => {
     // given
     const backing = tempStore()

@@ -76,6 +76,7 @@ export type ManagedStartSpec = {
 
 export type ManagedRunner = {
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle>
+  settleTeardowns?(): Promise<void>
   // Rebuild a persisted child from its session transcript without replaying its prompt. Optional
   // until the mode adapters grow their resume paths (todo 10); start-only fakes keep compiling.
   resume?(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle>

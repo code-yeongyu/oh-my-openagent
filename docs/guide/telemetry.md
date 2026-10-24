@@ -24,7 +24,7 @@ OmO sends anonymous usage data so we can see which features people use and what 
 
 ## How you are counted
 
-OmO creates a random install id on your computer and stores it there. It is not built from your name, hardware or accounts. Each computer is also identified by a one-way hash of its name; the name itself is never sent. Session ids are scrambled on your computer before they are sent, so sessions can't be matched across machines. No personal profile is built. The service that receives the data may work out an approximate country from the connection.
+OmO creates a random, pseudonymous install id on your computer and stores it there. It is not built from your name, hardware or accounts. Each computer is also identified by a one-way hash of its name; the name itself is never sent. Session ids are scrambled on your computer before they are sent, so sessions can't be matched across machines. No personal profile is built. The service that receives the data may work out an approximate country from the connection.
 
 ## Turn it off
 

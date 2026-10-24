@@ -2,6 +2,7 @@ import type { CreatedHooks } from "../create-hooks"
 import { parseGoalCommand } from "../hooks/goal/command-arguments"
 import { log } from "../shared/logger"
 import { stopContinuation } from "./stop-continuation"
+import type { SkillMcpManager } from "../features/skill-mcp-manager"
 
 type CommandExecuteBeforeInput = {
   command: string
@@ -52,6 +53,8 @@ function hasPartsOutput(value: unknown): value is CommandExecuteBeforeOutput {
 export function createCommandExecuteBeforeHandler(args: {
   directory: string
   hooks: CreatedHooks
+  mcpManager?: SkillMcpManager
+  notify?: (message: string) => void
 }): (
   input: CommandExecuteBeforeInput,
   output: CommandExecuteBeforeOutput,
@@ -59,6 +62,14 @@ export function createCommandExecuteBeforeHandler(args: {
   const { directory, hooks } = args
 
   return async (input, output): Promise<void> => {
+    if (input.command.toLowerCase() === "omo-mcp-env-grant") {
+      const [id, ...names] = input.arguments.trim().split(/\s+/)
+      if (!id || !args.mcpManager) throw new Error("Usage: /omo-mcp-env-grant <id> [NAME...]")
+      const message = await args.mcpManager.grantEnvironment(id, names)
+      output.parts.push({ type: "text", text: message, synthetic: true })
+      args.notify?.(message)
+      return
+    }
     await hooks.autoSlashCommand?.["command.execute.before"]?.(input, output)
 
     const normalizedCommand = input.command.toLowerCase()

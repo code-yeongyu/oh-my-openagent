@@ -49,7 +49,9 @@ test("#given the shipped SDK without its dori sidecar #when it is imported with 
   for (const namespace of DORI_TOOLKIT_NAMESPACES) expect(off.keys).not.toContain(namespace)
   const on = await importKeys(bare, "1")
   expect(on.code).not.toBe(0)
-  expect(on.stderr).toContain("dori/layer2.js")
+  for (const stderr of [on.stderr.replaceAll("\\", "/"), on.stderr.replaceAll("/", "\\")]) {
+    expect(stderr.replaceAll("\\", "/")).toContain("dori/layer2.js")
+  }
 }, 30_000)
 
 test("#given the shipped SDK with its dori sidecar #when it is imported with the gate on #then the namespaces come from the sidecar", async () => {

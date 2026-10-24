@@ -18,14 +18,19 @@ import { PROSE_TAGS, proseText, selectorPath } from "./html-lite.mjs"
 const CITATION_MARKER = /\[S\d+\]|\[Source\s*\d+\]|\[\uCD9C\uCC98[^\]]*\]|\[\^\d+\]/i
 const ANCHOR_HREF = /^#(?:s|src|source|ref|fn)/i
 const ANCHOR_TEXT = /^\[(?:\uCD9C\uCC98|Source\s*\d+|S\d+)\]$/i
-/** Closing ("how this report was made") heading; Korean alternates cover the same register. */
-export const CLOSING_HEADING = /\b(?:method(?:ology)?|how)\b|\uB4B7\uBA74|\uBC29\uBC95|\uC5B4\uB5BB\uAC8C|\uB9CC\uB4E4\uC5B4/i
+/**
+ * Closing ("how this report was made") heading; Korean alternates cover the same register. A
+ * heading that is exactly "Closing" (or the Korean word for it) also counts; a heading that only
+ * starts with it ("Closing the gap") does not.
+ */
+export const CLOSING_HEADING = /\b(?:method(?:ology)?|how)\b|\uB4B7\uBA74|\uBC29\uBC95|\uC5B4\uB5BB\uAC8C|\uB9CC\uB4E4\uC5B4|^\s*(?:closing|\uB9C8\uBB34\uB9AC)\s*$/i
 export const SOURCES_HEADING = /references|sources|bibliography|\uCD9C\uCC98|\uCC38\uACE0\s*(?:\uBB38\uD5CC|\uC790\uB8CC)/i
-const OTHER_KINDS = [
+/** Section kinds after sources and closing, in match order; HTML and Markdown share this table. */
+export const OTHER_KINDS = Object.freeze([
 	["toc", /\b(?:contents|toc)\b|\uBAA9\uCC28/i],
 	["appendix", /appendix|\uBD80\uB85D/i],
 	["glossary", /glossary|\uC6A9\uC5B4/i],
-]
+])
 const TEXT_SKIP = new Set(["code", "pre", "kbd", "samp", "script", "style", "svg", "template", "noscript"])
 const HEADING_TAG = /^h[1-6]$/
 /** The one sanctioned severity override: section-level lineage demotes unsourced_number. */
@@ -75,9 +80,25 @@ function findBody(doc) {
 	return doc
 }
 
-function sectionKind(text, closingTest) {
+/**
+ * Closing-heading test for both editions: CLOSING_HEADING plus the spec's optional pattern.
+ * @param {RegExp|string|null} [pattern]
+ * @returns {(text: string) => boolean}
+ */
+export function closingTest(pattern) {
+	const extra = pattern ? toRegExp(pattern) : null
+	return (text) => CLOSING_HEADING.test(text) || Boolean(extra?.test(text))
+}
+
+/**
+ * Section kind of an h2 heading text: sources, closing, toc, appendix, glossary, or null.
+ * @param {string} text
+ * @param {(text: string) => boolean} isClosing
+ * @returns {string|null}
+ */
+export function sectionKind(text, isClosing) {
 	if (SOURCES_HEADING.test(text)) return "sources"
-	if (closingTest(text)) return "closing"
+	if (isClosing(text)) return "closing"
 	return OTHER_KINDS.find(([, re]) => re.test(text))?.[0] ?? null
 }
 
@@ -111,7 +132,6 @@ function walkBody(ctx, node, state) {
 export function buildContext(doc, options) {
 	const lineageMode = options.lineageMode ?? "inline"
 	if (!LINEAGE_MODES.includes(lineageMode)) throw new TypeError(`lineageMode must be one of ${LINEAGE_MODES.join(", ")}`)
-	const closingPattern = options.closingPattern ? toRegExp(options.closingPattern) : null
 	const all = descendants(doc)
 	const styleBlocks = all.filter((node) => node.tag === "style").map((node) => ({ node, css: node.raw ?? "" }))
 	const styleAttrs = all.filter((node) => node.attrs.style).map((node) => ({ node, css: node.attrs.style }))
@@ -130,7 +150,7 @@ export function buildContext(doc, options) {
 		requireSections: (options.requireSections ?? []).map(toRegExp),
 		baseDir: options.baseDir ?? null,
 		fs: options.fs ?? nodeFs,
-		isClosing: (text) => CLOSING_HEADING.test(text) || Boolean(closingPattern?.test(text)),
+		isClosing: closingTest(options.closingPattern),
 		util: { classTokens, closest, descendants, hasCitation, citationMarker: CITATION_MARKER },
 		kindOf: (scope) => (scope.closingH3 ? "closing" : (scope.section?.kind ?? null)),
 		defect(code, node, message) {

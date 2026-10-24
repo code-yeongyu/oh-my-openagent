@@ -5,6 +5,7 @@ import type { GitMemoryRepo } from "../git"
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
 import { stampReceipt } from "../tools/claim-frontmatter"
 import { parseAgreementsLedger, serializeAgreementsLedger } from "./format"
+import { legacyAgreementEvents, serializeAgreementEvents } from "./events"
 import { AGREEMENTS_DESCRIPTION, AGREEMENTS_PATH, type AgreementItem, type FactsKnownAgreement } from "./types"
 
 export async function readAgreementsWorktree(repoDir: string): Promise<string | undefined> {
@@ -25,10 +26,13 @@ export function agreementItemsOf(content: string | undefined): readonly Agreemen
   return content === undefined ? [] : parseAgreementsLedger(parseMemoryFile(content).body).items
 }
 
-export function renderAgreementsFile(existing: string | undefined, items: readonly AgreementItem[]): string {
+export function renderAgreementsFile(existing: string | undefined, items: readonly AgreementItem[], receipts?: readonly string[]): string {
   const parsed = existing === undefined ? undefined : parseMemoryFile(existing)
-  const unparsed = parsed === undefined ? [] : parseAgreementsLedger(parsed.body).unparsed
-  const serialized = serializeAgreementsLedger(items, unparsed)
+  const ledger = parsed === undefined ? undefined : parseAgreementsLedger(parsed.body)
+  // The first journal snapshots pre-upgrade dates; later ack/drop must not seed modern dates.
+  const prior = ledger?.receipts ?? []
+  const kept = receipts ?? (prior.length === 0 ? legacyAgreementEvents(ledger?.items ?? []) : prior)
+  const serialized = serializeAgreementsLedger(items, [...(ledger?.unparsed ?? []), ...serializeAgreementEvents(kept)])
   const body = serialized.length === 0 ? "" : `${serialized}\n`
   // Neither ledger writer (/agreements, the facts lane) is the memory tool, so the header follows the rule the hooks
   // enforce on every other writer: a user-record header is lowered to "mixed" and a legacy one is dropped.

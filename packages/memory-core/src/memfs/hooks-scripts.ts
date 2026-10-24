@@ -16,22 +16,43 @@ import { getPostCommitHookScript } from "../sync/mirror"
  * format-character normalisation exists here (that is the authoritative TypeScript gates'
  * job), and ERE has no `\\b`, `(?:...)` or `\\S`, so boundaries and alternations are spelled out.
  */
-export const HOOK_SECRET_PATTERNS = [
+/**
+ * ERE cannot look ahead, so the reference-value exclusion of sync/redact.ts runs as a second stage: each
+ * match printed by grep -o is filtered, case-insensitively, through an exclude expression, and only a match
+ * that survives counts. The exclusion is anchored to the match's OWN keyword and separator and must consume
+ * the whole value, so a reference-looking tail after a real value (password=hunter2:true) or a literal after
+ * a reference (process.env.X||hunter2) is still refused. The token list mirrors REFERENCE_TOKEN in
+ * sync/redact.ts; single-quoted forms are left out because the expression is embedded in single quotes, which
+ * only makes the hook stricter.
+ */
+const END = "[],<>})\"]*$"
+const REFERENCE_TOKEN =
+  "(process\\.env\\.[A-Za-z_][A-Za-z0-9_]*|os\\.environ(\\.get\\(|\\[)?(\"[A-Za-z0-9_]*\")?[])]*|" +
+  "env\\.[A-Za-z_][A-Za-z0-9_]*|\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}|\\$[A-Za-z_][A-Za-z0-9_]*|\\{\\{([^}]*\\}\\})?|\\[(redacted|filtered)\\]|(redacted|filtered)|" +
+  "(bearer|changeme|placeholder|example|none|null|undefined|true|false))"
+const MATCH_START = "^[^A-Za-z0-9_]?"
+
+export const HOOK_SECRET_PATTERNS: ReadonlyArray<{ readonly class: string; readonly ere: string; readonly exclude?: string }> = [
   { class: "aws_access_key", ere: "(^|[^A-Za-z0-9_])AKIA[0-9A-Z]{16}([^A-Za-z0-9_]|$)" },
   {
     class: "credential_assignment",
     ere: "(^|[^A-Za-z0-9_])([Bb][Ee][Aa][Rr][Ee][Rr]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][-_]?[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd])[[:space:]]*[=:][[:space:]]*[^[:space:]]{1,255}",
+    exclude: `${MATCH_START}[A-Za-z_-]+[[:space:]]*[=:][[:space:]]*${REFERENCE_TOKEN}${END}`,
   },
   {
     class: "authorization_header",
     ere: "(^|[^A-Za-z0-9_])[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn][[:space:]]*:[[:space:]]*[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]]+[^[:space:]]{1,255}",
+    // TS stops the Bearer value at a quote, bracket or comma, so a value starting with one is never a hit there either.
+    exclude: `${MATCH_START}authorization[[:space:]]*:[[:space:]]*bearer[[:space:]]+([]<>,})"]|${REFERENCE_TOKEN}${END})`,
   },
   { class: "openai_key", ere: "(^|[^A-Za-z0-9_])sk-(proj-)?[-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
   { class: "vendor_token", ere: "(^|[^A-Za-z0-9_])(ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
-] as const
+]
 
-const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere }) => [
-  `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`,
+const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, exclude }) => [
+  exclude === undefined
+    ? `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`
+    : `      if printf '%s' "$blob" | grep -E -o -e '${ere}' | grep -E -v -i -e '${exclude}' | grep -q .; then`,
   `        printf 'memory pre-commit: %s contains secret-like content (${patternClass})\\n' "$p"`,
   "      fi",
 ].join("\n")).join("\n")

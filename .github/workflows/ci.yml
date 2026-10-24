@@ -786,6 +786,9 @@ jobs:
           # The installer embeds the required-artifact list, so a stale copy demands files the
           # plugin no longer ships and refuses to install. Nothing else in CI reads it.
           node packages/omo-senpi/plugin/scripts/build-install.mjs --check
+          # The merge gate reads this map at the base tip to tell whether a PR can change a committed
+          # bundle; it is traced from the three generators above, so a stale map is a red build.
+          bun run bundle-inputs:check
 
       - name: Run Senpi compatibility tests
         id: senpi-tests-posix

@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto"
 
 import { normalizeObservationText } from "../facts/person-routing"
+import { parseAgreementEventLine } from "./events"
 import type { AgreementAuthor, AgreementItem, AgreementScope, AgreementStatus } from "./types"
 
 export interface AgreementsLedgerParse {
   readonly items: readonly AgreementItem[]
   readonly diagnostics: readonly string[]
   readonly unparsed: readonly string[]
+  readonly receipts: readonly string[]
 }
 
 const LINE_RE = /^-\s+\[(global|project)\]\s+(.+?)\s*(?:<!--\s*(.*?)\s*-->)?\s*$/
@@ -25,10 +27,16 @@ export function parseAgreementsLedger(body: string): AgreementsLedgerParse {
   const items: AgreementItem[] = []
   const diagnostics: string[] = []
   const unparsed: string[] = []
+  const receipts = new Set<string>()
   const seen = new Set<string>()
   for (const [index, raw] of body.split(/\r?\n/).entries()) {
     const line = raw.trim()
     if (line.length === 0) continue
+    const receipt = parseAgreementEventLine(line)
+    if (receipt !== undefined) {
+      receipts.add(receipt)
+      continue
+    }
     const match = LINE_RE.exec(line)
     const scope = match?.[1]
     const text = match?.[2]?.trim()
@@ -51,7 +59,7 @@ export function parseAgreementsLedger(body: string): AgreementsLedgerParse {
     seen.add(parsed.id)
     items.push(parsed)
   }
-  return { items, diagnostics, unparsed }
+  return { items, diagnostics, unparsed, receipts: [...receipts] }
 }
 
 export function serializeAgreementsLedger(items: readonly AgreementItem[], unparsed: readonly string[] = []): string {

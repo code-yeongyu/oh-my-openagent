@@ -17,6 +17,7 @@ import {
 import { runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture } from "./build-extension.test-support.mjs"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
+import { removeTestRootBestEffort } from "../../../../test-support/held-test-root.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
@@ -281,6 +282,13 @@ describe("checkExtensionCurrent", () => {
     expect(threadClientInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
   })
 
+  test("#given lazy session-summary recovery #when bundle inputs are inspected #then the recovery sweep is confined to its sidecar", async () => {
+    const { mainInputs, telemetryRecoveryInputs } = await sharedOutputs()
+    const suffix = "/components/telemetry/session-summary-recovery.ts"
+    expect(mainInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+    expect(telemetryRecoveryInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+  })
+
   test("#given the split extension build #when palace inputs are inspected #then the /palace and /people runtime loads only from the lazy entry", async () => {
     const { mainInputs, memoryPalaceInputs } = await sharedOutputs()
     for (const suffix of [
@@ -456,7 +464,7 @@ describe("checkExtensionCurrent", () => {
       expect(run.stdout, run.stderr).toContain("sync-sidecar-ok")
       expect(run.status, run.stderr).toBe(0)
     } finally {
-      await rm(work, { recursive: true, force: true })
+      removeTestRootBestEffort(work)
     }
   }, PACKED_TEST_TIMEOUT_MS)
 
@@ -478,6 +486,8 @@ describe("checkExtensionCurrent", () => {
     const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
     const task = await readFile(outputs.taskOutputPath, "utf8")
+    // The ack-gated immediate sender is loaded by the PostHog transport, which ships in the PostHog sidecar.
+    const posthog = await readFile(outputs.telemetryPosthogOutputPath, "utf8")
     const manifest = JSON.parse(await readFile(join(pluginRoot, "package.json"), "utf8"))
 
     expect(main).toContain('import("#omo-task-runtime")')
@@ -490,6 +500,8 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-dori-migration-runtime")')
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
+    expect(main).toContain('import("#omo-telemetry-recovery-runtime")')
+    expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
     expect(main).toContain('import("#omo-feedback-runtime")')
     expect(main).toContain('import("#omo-claim-receipt-runtime")')
@@ -512,6 +524,8 @@ describe("checkExtensionCurrent", () => {
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
+      "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
+      "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
     })
   })

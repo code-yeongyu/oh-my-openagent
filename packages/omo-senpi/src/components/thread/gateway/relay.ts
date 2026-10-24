@@ -208,6 +208,10 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         }
         await release(own)
         const malformed = reply.error === "invalid_response" || reply.error === "question_incomplete"
+        if (reply.error === "host_draining") {
+          return failure("stale_token", "The session's host is draining and could not take the answer: host_draining", { session: claim.session_durable_id, reason: reply.error },
+            "The session's host is handing its sessions over; the question stays pending. Answer it again once the host is back.")
+        }
         return failure(
           malformed ? "invalid_arguments" : "stale_token",
           `The session refused the answer: ${reply.error}`,

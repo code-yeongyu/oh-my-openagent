@@ -47,8 +47,9 @@ function dropReason(record: FactsFailureRecord | undefined, now: Date): FactsSki
  *
  * A PARKED entry does not block: parking is terminal until a manual `/facts retry`, and holding
  * every later entry behind it stalled whole conversations forever (#10918). Moving past it loses
- * nothing. Its queue file is retained (only `markConsumed` deletes one, and only its own keys),
- * `listPending` still returns it, a successor's consumed watermark only anchors new enqueues past
+ * nothing. Its queue file moves to the `parked/` dead-letter store (never deleted; `/facts retry`
+ * restores it to the hot queue), the enqueue anchor still reads it there, a successor's consumed
+ * watermark only anchors new enqueues past
  * ranges that are already queued, and `markConsumed` never moves the watermark back when the
  * parked range is retried later. Each fact line carries its own absolute date, so a retried older
  * range adds the same dated lines it would have added in order; only a repeated person

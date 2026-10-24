@@ -19,6 +19,7 @@ export type { JsonRpcError, JsonRpcId, JsonRpcResponse, JsonRpcResult, McpToolDe
 
 const SERVER_NAME = "lsp";
 const SERVER_VERSION = "0.1.0";
+const PROTOCOL_VERSIONS: readonly string[] = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
 export interface HandleLspMcpRequestOptions {
 	readonly signal?: AbortSignal;
@@ -114,6 +115,8 @@ function describeTool(tool: (typeof LSP_MCP_TOOLS)[number]): McpToolDescriptor {
 }
 
 function requestedProtocolVersion(params: unknown): string {
-	if (!isPlainRecord(params) || typeof params["protocolVersion"] !== "string") return "2024-11-05";
-	return params["protocolVersion"];
+	const requested = isPlainRecord(params) ? params["protocolVersion"] : undefined;
+	return typeof requested === "string" && PROTOCOL_VERSIONS.includes(requested)
+		? requested
+		: "2025-06-18";
 }

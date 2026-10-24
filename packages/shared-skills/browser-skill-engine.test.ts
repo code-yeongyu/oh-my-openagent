@@ -1,794 +1,352 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import {
-  BROWSER_CONFIRMATION_POLICY,
-  BrowserActionDeclinedError,
-  BrowserEngineRefusal,
-  BrowserNotConnectedError,
-  BrowserUserStoppedError,
-  guardOmowright,
-} from "./skills/browser/scripts/omowright.mjs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { BuiltinBrowserUnavailableError, guardOmowright } from "./skills/browser/scripts/omowright.mjs"
 
 type Json = Record<string, unknown>
 
-class DaemonError extends Error {
-  readonly code: string
-  constructor(code: string, message = code) {
-    super(message)
-    this.name = "BskRpcError"
-    this.code = code
-  }
-}
-
-interface SessionScript {
-  readonly descriptors?: Json[]
-  readonly html?: string
-  readonly failOn?: { readonly method: string; readonly error: Error }
-}
-
-function fakeSession(script: SessionScript = {}) {
+function fakeRaw() {
   const calls: Array<[string, ...unknown[]]> = []
-  const descriptors = [...(script.descriptors ?? [])]
-  const record = async (method: string, ...args: unknown[]) => {
-    calls.push([method, ...args])
-    if (script.failOn?.method === method) throw script.failOn.error
-    return { ok: true }
-  }
-  const session = {
-    sessionId: "ckhg",
-    stopped: false,
-    calls,
-    navigate: (...args: unknown[]) => record("navigate", ...args),
-    back: (...args: unknown[]) => record("back", ...args),
-    click: (...args: unknown[]) => record("click", ...args),
-    press: (...args: unknown[]) => record("press", ...args),
-    fill: (...args: unknown[]) => record("fill", ...args),
-    observe: async () => ({ tree: "tree" }),
-    getHtml: async (options: unknown) => {
-      calls.push(["getHtml", options])
-      return { html: script.html ?? "" }
-    },
-    evaluate: async (expression: string) => {
-      calls.push(["evaluate", expression])
-      return { ok: true, value: descriptors.shift() ?? null }
-    },
-    tool: async (name: string, params: unknown) => {
-      calls.push(["tool", name, params])
-      return { ok: true }
-    },
-    tabList: async () => ({
-      tabs: [
-        { id: 3, url: "https://other.example/", title: "Other", active: false },
-        { id: 7, url: "https://shop.example/cart", title: "Cart", favicon_url: "https://shop.example/f.ico", active: true },
-      ],
-    }),
-    stop: async () => {
-      calls.push(["stop"])
-      session.stopped = true
-      return null
-    },
-  }
-  return session
-}
-
-function fakeRaw(connect: () => Promise<unknown>) {
-  const connectCalls: unknown[] = []
+  const record =
+    (name: string, result: unknown = { from: name }) =>
+    async (...args: unknown[]) => {
+      calls.push([name, ...args])
+      return result
+    }
   const raw = {
-    connectCalls,
-    launched: [] as string[],
-    connectBrowserSkill: async (options?: unknown) => {
-      connectCalls.push(options)
-      return connect()
-    },
-    snapshotSessions: [] as unknown[],
-    bskSnapshot: async (session: unknown) => {
-      raw.snapshotSessions.push(session)
-      return { tree: "tree", refs: {}, css: {} }
-    },
-    connectPipe: async () => {
-      raw.launched.push("connectPipe")
-      return {}
-    },
-    connectCloakProfile: async () => {
-      raw.launched.push("connectCloakProfile")
-      return {}
-    },
-    connect: async () => {
-      raw.launched.push("connect")
-      return {}
-    },
-    createCua: () => {
-      raw.launched.push("createCua")
-      return {}
-    },
-    emulate: async () => {
-      raw.launched.push("emulate")
-    },
-    futureLauncher: async () => {
-      raw.launched.push("futureLauncher")
-    },
-    compactSnapshot: (tree: string) => tree.trim(),
-    bskDoctor: async () => ({ ready: true }),
-    BskRpcError: DaemonError,
+    calls,
+    connectBrowserSkill: record("connectBrowserSkill"),
+    connectPipe: record("connectPipe"),
+    connectCloakProfile: record("connectCloakProfile"),
+    connect: record("connect"),
+    createCua: record("createCua"),
+    emulate: record("emulate"),
+    bskSnapshot: record("bskSnapshot"),
+    bskDoctor: record("bskDoctor"),
     DEVICE_PRESETS: { phone: { width: 390 } },
   }
   return raw
 }
 
-type AskVariant = "ask_user_question" | "request_user_input" | "none"
-
-function deferred() {
-  let resolve!: () => void
-  const promise = new Promise<void>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
-
-function assertQuestionShape(tool: AskVariant, args: Json): void {
-  const questions = args.questions as Array<Json>
-  const question = questions[0] as Json
-  const options = question.options as Array<Json>
-  const waits = tool === "request_user_input" ? args.wait_for_answer : args.waitForAnswer
-  if (waits !== true) throw new Error("the question must pause the cell until answered")
-  if (questions.length !== 1) throw new Error("exactly one question")
-  if (String(question.header).length > 12 || String(question.header).length === 0) throw new Error("header must be 1-12 characters")
-  if (options.length < 2 || options.length > (tool === "request_user_input" ? 3 : 4)) throw new Error("option count outside the tool's range")
-  if (tool === "request_user_input" && !/^[a-z][a-z0-9]*(_[a-z0-9]+)*$/.test(String(question.id))) throw new Error("id must be snake_case")
-  if (tool === "request_user_input" && options.some((option) => typeof option.description !== "string")) throw new Error("codex options need a description")
-}
-
-function fakeHost(options: { ask?: AskVariant; answers?: string[]; status?: string } = {}) {
+function fakeHost(answer?: (args: Json) => Json) {
   const log: Array<{ tool: string; args: Json }> = []
-  const events: Json[] = []
-  let stopped = false
-  let held: ReturnType<typeof deferred> | undefined
-  const answers = [...(options.answers ?? [])]
-  const askVariant = options.ask ?? "ask_user_question"
   return {
     log,
-    events,
-    setStopped: (value: boolean) => {
-      stopped = value
-    },
-    holdAnswers: () => {
-      held = deferred()
-      return held
-    },
     async listTools(): Promise<string[]> {
-      return ["omo_browser_bridge", ...(askVariant === "none" ? [] : [askVariant])]
+      return ["omo_desktop_toolkit"]
     },
     async callTool(tool: string, args: Json): Promise<Json> {
       log.push({ tool, args })
-      if (tool === "omo_browser_bridge") {
-        if (args.op === "state") events.push(args.data as Json)
-        if (args.op === "stopped") stopped = true
-        return { details: { ok: true, stopped } }
-      }
-      assertQuestionShape(tool as AskVariant, args)
-      if (held) await held.promise
-      const question = (args.questions as Array<Json>)[0] as Json
-      const answer = answers.shift() ?? "Don't allow"
-      const status = options.status ?? "answered"
-      if (tool === "request_user_input") {
-        return { details: { status, answers: { [String(question.id)]: { answers: [answer] } }, unanswered: [] } }
-      }
-      return { details: { status, answers: { [String(question.question)]: answer }, unanswered: [] } }
+      return answer === undefined ? { details: { ok: false, reason: "unavailable" } } : answer(args)
     },
   }
 }
 
-const statusActions = (events: Json[]) => events.map((event) => [event.status, event.action ?? null])
-const asked = (host: ReturnType<typeof fakeHost>) => host.log.filter((entry) => entry.tool !== "omo_browser_bridge")
+const RAW_EXPORTS = ["connectBrowserSkill", "connectPipe", "connectCloakProfile", "connect", "createCua", "emulate", "bskSnapshot", "bskDoctor", "DEVICE_PRESETS"] as const
 
-async function connected(host: ReturnType<typeof fakeHost> | undefined, script: SessionScript = {}, env: Json = { OMO_BROWSER_ENGINE: "connected" }) {
-  const session = fakeSession(script)
-  const raw = fakeRaw(async () => session)
-  const guarded = guardOmowright(raw, { env, host })
-  const guardedSession = await guarded.connectBrowserSkill({ name: "task", focused: false })
-  return { session, raw, guarded, guardedSession }
-}
+describe("inside OmO Desktop the library is the terminal's, plus the app's built-in browser", () => {
+  test("#given no OMO_BROWSER_ENGINE #when the library loads #then it is the raw library", () => {
+    const raw = fakeRaw()
 
-describe("browser engine selection", () => {
-  test("#given no OMO_BROWSER_ENGINE #when the skill connects #then today's behaviour: the raw session, no events, no questions", async () => {
-    const host = fakeHost()
-    const session = fakeSession()
-    const raw = fakeRaw(async () => session)
-
-    const guarded = guardOmowright(raw, { env: {}, host })
-    const got = await guarded.connectBrowserSkill({ name: "task" })
-    await got.click("#send")
-
-    expect(guarded).toBe(raw)
-    expect(got).toBe(session)
-    expect(host.log).toEqual([])
-    expect(session.calls.map((call) => call[0])).toEqual(["click"])
+    expect(guardOmowright(raw, { env: {}, host: fakeHost() })).toBe(raw)
   })
 
-  test("#given the user's browser is not connected #when the skill connects #then a Connect-your-browser error and never another browser", async () => {
-    const host = fakeHost()
-    const raw = fakeRaw(async () => {
-      throw new DaemonError("no_browser_connected", "no extension attached")
+  for (const engine of ["builtin", "connected", "none", "something-new"]) {
+    test(`#given OMO_BROWSER_ENGINE=${engine} #when the library loads #then every export is the terminal's own, and connectBuiltinBrowser is added`, () => {
+      const raw = fakeRaw()
+
+      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: engine }, host: fakeHost() }) as unknown as Record<string, unknown>
+
+      for (const name of RAW_EXPORTS) expect(library[name]).toBe(raw[name])
+      expect(typeof library.connectBuiltinBrowser).toBe("function")
     })
 
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host })
-    const error = await guarded.connectBrowserSkill({ name: "task" }).then(() => undefined, (cause: unknown) => cause)
+    test(`#given OMO_BROWSER_ENGINE=${engine} #when the agent starts its own browser or the user's #then it runs as in the terminal and nothing is asked of the app`, async () => {
+      const raw = fakeRaw()
+      const host = fakeHost()
+      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: engine }, host })
 
-    expect(error).toBeInstanceOf(BrowserNotConnectedError)
-    expect(raw.connectCalls).toHaveLength(1)
-    expect(raw.launched).toEqual([])
-    expect(statusActions(host.events)).toEqual([["connect_failed", null]])
-    expect(host.events[0]?.reason).toBe("no_browser_connected")
-  })
+      expect(await library.connectPipe({ headless: true })).toEqual({ from: "connectPipe" })
+      expect(await library.connectBrowserSkill({ name: "task" })).toEqual({ from: "connectBrowserSkill" })
 
-  test.each(["no_daemon", "unsupported"])("#given the daemon is unavailable (%s) #when the skill connects #then the same connect error, no fallback", async (code) => {
-    const raw = fakeRaw(async () => {
-      throw new DaemonError(code)
+      expect(raw.calls).toEqual([["connectPipe", { headless: true }], ["connectBrowserSkill", { name: "task" }]])
+      expect(host.log).toEqual([])
     })
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host: fakeHost() })
-
-    const error = await guarded.connectBrowserSkill({}).then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserNotConnectedError)
-    expect(raw.launched).toEqual([])
-  })
-
-  test("#given a connect failure that is not about the browser #when the skill connects #then the daemon's own error is kept", async () => {
-    const original = new DaemonError("permission_denied")
-    const raw = fakeRaw(async () => {
-      throw original
-    })
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host: fakeHost() })
-
-    const error = await guarded.connectBrowserSkill({}).then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBe(original)
-  })
-
-  test("#given the app's built-in browser #when the skill connects #then BrowserSkill is never called and the model is told to use the app's tools", async () => {
-    const raw = fakeRaw(async () => fakeSession())
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host: fakeHost() })
-
-    const error = await guarded.connectBrowserSkill({}).then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserEngineRefusal)
-    expect((error as BrowserEngineRefusal).code).toBe("browser_engine_builtin")
-    expect(raw.connectCalls).toEqual([])
-  })
-
-  test("#given browser access is off #when the skill connects #then a refusal that says so and nothing is called", async () => {
-    const raw = fakeRaw(async () => fakeSession())
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "none" }, host: fakeHost() })
-
-    const error = await guarded.connectBrowserSkill({}).then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserEngineRefusal)
-    expect((error as BrowserEngineRefusal).code).toBe("browser_engine_none")
-    expect(raw.connectCalls).toEqual([])
-  })
-
-  test("#given an engine value nobody defined #when the skill connects #then it is refused, never read as unset", async () => {
-    const raw = fakeRaw(async () => fakeSession())
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "chrome" }, host: fakeHost() })
-
-    const error = await guarded.connectBrowserSkill({}).then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserEngineRefusal)
-    expect((error as BrowserEngineRefusal).code).toBe("browser_engine_unsupported")
-    expect(raw.connectCalls).toEqual([])
-  })
-
-})
-
-describe("the owned browser and every other way to reach a browser", () => {
-  const creators = ["connectPipe", "connectCloakProfile", "connect"] as const
-  const engines = ["none", "connected", "builtin", "chrome"] as const
-
-  for (const engine of engines) {
-    for (const creator of creators) {
-      test(`#given ${engine} #when ${creator} is called #then no owned browser starts and the refusal names the engine`, async () => {
-        const raw = fakeRaw(async () => fakeSession())
-        const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: engine }, host: fakeHost() })
-
-        const error = await (guarded as unknown as Record<string, () => Promise<unknown>>)[creator]?.().then(() => undefined, (cause: unknown) => cause)
-
-        expect(error).toBeInstanceOf(BrowserEngineRefusal)
-        expect((error as BrowserEngineRefusal).code).toBe("browser_engine_owned_blocked")
-        expect((error as BrowserEngineRefusal & { engine?: string }).engine).toBe(engine)
-        expect(raw.launched).toEqual([])
-      })
-    }
   }
-
-  test("#given an engine is chosen #when an export the guard does not know is called #then it is refused instead of passed through", async () => {
-    const raw = fakeRaw(async () => fakeSession())
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host: fakeHost() }) as unknown as Record<string, () => Promise<unknown>>
-
-    const future = await guarded.futureLauncher?.().then(() => undefined, (cause: unknown) => cause)
-    const page = await guarded.emulate?.().then(() => undefined, (cause: unknown) => cause)
-    const driver = await guarded.createCua?.().then(() => undefined, (cause: unknown) => cause)
-
-    expect(future).toBeInstanceOf(BrowserEngineRefusal)
-    expect((future as BrowserEngineRefusal).code).toBe("browser_engine_export_blocked")
-    expect(page).toBeInstanceOf(BrowserEngineRefusal)
-    expect(driver).toBeInstanceOf(BrowserEngineRefusal)
-    expect(raw.launched).toEqual([])
-  })
-
-  test("#given an engine is chosen #when setup, error classes, pure helpers and data are used #then they still work", async () => {
-    const raw = fakeRaw(async () => fakeSession())
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "none" }, host: fakeHost() })
-
-    expect(await guarded.bskDoctor()).toEqual({ ready: true })
-    expect(guarded.BskRpcError).toBe(DaemonError)
-    expect(guarded.compactSnapshot("  tree  ")).toBe("tree")
-    expect(guarded.DEVICE_PRESETS).toEqual({ phone: { width: 390 } })
-  })
-
-  test("#given no engine is chosen #when the owned browser is launched #then terminal use is exactly as before", async () => {
-    const raw = fakeRaw(async () => fakeSession())
-
-    const guarded = guardOmowright(raw, { env: {}, host: fakeHost() })
-    await guarded.connectPipe()
-    await guarded.connectCloakProfile()
-
-    expect(guarded).toBe(raw)
-    expect(raw.launched).toEqual(["connectPipe", "connectCloakProfile"])
-  })
 })
 
-describe("browser state events", () => {
-  test("#given a navigate and a click #when the session is used and stopped #then the app sees each step in order with the tab", async () => {
-    const host = fakeHost()
-    const { guardedSession } = await connected(host)
-
-    await guardedSession.navigate("https://shop.example/cart", { waitUntil: "load" })
-    await guardedSession.click("#next")
-    await guardedSession.stop()
-
-    expect(statusActions(host.events)).toEqual([
-      ["started", null],
-      ["acting", "navigate"],
-      ["navigated", "navigate"],
-      ["idle", "navigate"],
-      ["acting", "click"],
-      ["idle", "click"],
-      ["stopped", null],
-    ])
-    expect(host.events.every((event) => event.engine === "connected")).toBe(true)
-    expect(host.events[2]?.tab).toEqual({ id: 7, url: "https://shop.example/cart", title: "Cart", favicon: "https://shop.example/f.ico" })
-  })
-
-  test("#given an action the daemon rejects #when it fails #then the app is told why and the error reaches the model unchanged", async () => {
-    const host = fakeHost()
-    const original = new DaemonError("not_found", "stale ref")
-    const { guardedSession } = await connected(host, { failOn: { method: "fill", error: original } })
-
-    const error = await guardedSession.fill("#name", "x").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBe(original)
-    expect(statusActions(host.events)).toEqual([["started", null], ["acting", "fill"], ["failed", "fill"]])
-    expect(host.events[2]?.reason).toBe("not_found")
-  })
-
-  test("#given the app cannot take events #when the skill acts #then the action still happens", async () => {
-    const { session, guardedSession } = await connected(undefined)
-
-    await guardedSession.navigate("https://example.com/")
-    await guardedSession.click("#next")
-
-    expect(session.calls.map((call) => call[0])).toContain("navigate")
-    expect(session.calls.map((call) => call[0])).toContain("click")
-  })
-
-  test("#given the event bridge throws #when the skill acts #then the action still happens", async () => {
-    const host = fakeHost()
-    const failing = { ...host, callTool: async () => { throw new Error("bridge down") }, listTools: async () => ["omo_browser_bridge"] }
-    const { session, guardedSession } = await connected(failing as unknown as ReturnType<typeof fakeHost>)
-
-    await guardedSession.click("#next")
-
-    expect(session.calls.map((call) => call[0])).toContain("click")
-  })
-})
-
-describe("confirmation before irreversible actions", () => {
-  test("#given the policy constant #when read #then it names the one policy", () => {
-    expect(BROWSER_CONFIRMATION_POLICY).toBe("ask-before-irreversible")
-  })
-
-  test("#given a pay button #when the model clicks it #then a question is asked and the click waits for the answer", async () => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const hold = host.holdAnswers()
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: "Pay now" }] })
-
-    const clicking = guardedSession.click("#pay")
-    await Promise.resolve()
-    await Promise.resolve()
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(asked(host)).toHaveLength(1)
-    expect(session.calls.map((call) => call[0])).not.toContain("click")
-    expect(statusActions(host.events).at(-1)).toEqual(["awaiting_confirmation", "click"])
-
-    hold.resolve()
-    await clicking
-
-    expect(session.calls.map((call) => call[0])).toContain("click")
-  })
-
-  test("#given the user says no #when the model clicks a payment control #then the click never happens and the refusal is typed", async () => {
-    const host = fakeHost({ answers: ["Don't allow"] })
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: "Place order" }] })
-
-    const error = await guardedSession.click("#order").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserActionDeclinedError)
-    expect((error as BrowserActionDeclinedError).code).toBe("user_declined")
-    expect(session.calls.map((call) => call[0])).not.toContain("click")
-  })
-
-  test.each(["cancelled", "timed_out", "unavailable"])("#given the question ends as %s #when the model clicks a delete control #then nothing is clicked", async (status) => {
-    const host = fakeHost({ answers: ["Allow"], status })
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: "Delete account" }] })
-
-    const error = await guardedSession.click("#delete").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserActionDeclinedError)
-    expect(session.calls.map((call) => call[0])).not.toContain("click")
-  })
-
-  test("#given an answer that is not exactly Allow #when asked #then it counts as no", async () => {
-    const host = fakeHost({ answers: ["Allow, but only after I look"] })
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: "Send message" }] })
-
-    const error = await guardedSession.click("#send").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserActionDeclinedError)
-    expect(session.calls.map((call) => call[0])).not.toContain("click")
-  })
-
-  test("#given the engine has no question tool #when the model clicks a send control #then it fails closed", async () => {
-    const host = fakeHost({ ask: "none" })
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: "Send message" }] })
-
-    const error = await guardedSession.click("#send").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserActionDeclinedError)
-    expect((error as BrowserActionDeclinedError).code).toBe("confirmation_unavailable")
-    expect(session.calls.map((call) => call[0])).not.toContain("click")
-  })
-
-  test("#given no kernel host at all #when the model clicks a pay control #then it fails closed", async () => {
-    const { session, guardedSession } = await connected(undefined, { descriptors: [{ tag: "button", text: "Pay now" }] })
-
-    const error = await guardedSession.click("#pay").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserActionDeclinedError)
-    expect((error as BrowserActionDeclinedError).code).toBe("confirmation_unavailable")
-    expect(session.calls.map((call) => call[0])).not.toContain("click")
-  })
-
-  test.each(["ask_user_question", "request_user_input"] as const)("#given the %s question tool #when the user allows #then the click goes through", async (ask) => {
-    const host = fakeHost({ ask, answers: ["Allow"] })
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: "Publish post" }] })
-
-    await guardedSession.click("#publish")
-
-    expect(asked(host)[0]?.tool).toBe(ask)
-    expect(session.calls.map((call) => call[0])).toContain("click")
-  })
-
-  test.each([
-    "Send message",
-    "Publish post",
-    "Post comment",
-    "Pay now",
-    "Place order",
-    "Subscribe",
-    "Delete account",
-    "Remove item",
-    "Cancel subscription",
-    "Close account",
-    "결제하기",
-    "삭제",
-  ])("#given a %s control #when clicked #then the user is asked first", async (label) => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: label }] })
-
-    await guardedSession.click("#control")
-
-    expect(asked(host)).toHaveLength(1)
-  })
-
-  test.each(["Next page", "Search", "Sign in", "Add to cart", "Show details", "Open menu"])("#given a %s control #when clicked #then nothing is asked", async (label) => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: label }] })
-
-    await guardedSession.click("#control")
-
-    expect(asked(host)).toHaveLength(0)
-    expect(session.calls.map((call) => call[0])).toContain("click")
-  })
-
-  test("#given a daemon ref #when the model clicks it #then the control is read from its markup before the click", async () => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { session, guardedSession } = await connected(host, { html: '<button type="submit">Place order</button>' })
-
-    await guardedSession.click("@e7")
-
-    expect(session.calls[0]).toEqual(["getHtml", { ref: "@e7", maxBytes: 4096 }])
-    expect(asked(host)).toHaveLength(1)
-  })
-
-  test("#given Enter in a form that sends #when pressed #then the user is asked, and other keys are not", async () => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { session, guardedSession } = await connected(host, {
-      descriptors: [{ tag: "input", text: "", form: { action: "https://mail.example/send", method: "post", submitLabels: ["Send message"] } }],
-    })
-
-    await guardedSession.press("Tab")
-    expect(asked(host)).toHaveLength(0)
-    expect(session.calls.map((call) => call[0])).toEqual(["press"])
-
-    await guardedSession.press("Enter")
-    expect(asked(host)).toHaveLength(1)
-    expect(session.calls.map((call) => call[0])).toEqual(["press", "evaluate", "press"])
-  })
-
-  test("#given typing into a field #when the model fills it #then nothing is asked", async () => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host)
-
-    await guardedSession.fill("#note", "hello")
-
-    expect(asked(host)).toHaveLength(0)
-    expect(session.calls.map((call) => call[0])).toEqual(["fill"])
-  })
-})
-
-describe("the user stops browser use", () => {
-  test("#given the user pressed Stop #when an action is rejected as user_aborted #then the model is told, and no new session starts this turn", async () => {
-    const host = fakeHost()
-    const session = fakeSession({ failOn: { method: "click", error: new DaemonError("user_aborted") } })
-    const raw = fakeRaw(async () => session)
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host })
-    const guardedSession = await guarded.connectBrowserSkill({ name: "task" })
-
-    const error = await guardedSession.click("#next").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserUserStoppedError)
-    expect((error as BrowserUserStoppedError).code).toBe("user_stopped")
-    expect(host.log.some((entry) => entry.tool === "omo_browser_bridge" && entry.args.op === "stopped")).toBe(true)
-    expect(host.events.some((event) => event.status === "user_stopped")).toBe(true)
-
-    const again = await guarded.connectBrowserSkill({ name: "retry" }).then(() => undefined, (cause: unknown) => cause)
-    expect(again).toBeInstanceOf(BrowserUserStoppedError)
-    expect(raw.connectCalls).toHaveLength(1)
-  })
-
-  test("#given the user stopped browser use #when they send a new message #then a session may start again", async () => {
-    const host = fakeHost()
-    host.setStopped(true)
-    const session = fakeSession()
-    const raw = fakeRaw(async () => session)
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host })
-
-    const blocked = await guarded.connectBrowserSkill({}).then(() => undefined, (cause: unknown) => cause)
-    expect(blocked).toBeInstanceOf(BrowserUserStoppedError)
-
-    host.setStopped(false)
-    const allowed = await guarded.connectBrowserSkill({})
-
-    expect(allowed.sessionId).toBe("ckhg")
-    expect(raw.connectCalls).toHaveLength(1)
-  })
-})
-
-describe("what the policy cannot be bypassed through", () => {
-  test("#given the user stopped browser use from the app #when the model acts on the live session #then the action is not performed", async () => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host)
-    host.setStopped(true)
-
-    const error = await guardedSession.click("#next").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserUserStoppedError)
-    expect(session.calls.map((call) => call[0])).not.toContain("click")
-    expect(session.calls.map((call) => call[0])).toContain("stop")
-  })
-
-  test("#given a script that clicks #when the model evaluates it #then the user is asked first, and a no stops it", async () => {
-    const host = fakeHost({ answers: ["Don't allow"] })
-    const { session, guardedSession } = await connected(host)
-
-    const error = await guardedSession.evaluate("document.querySelector('button.buy').click()").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserActionDeclinedError)
-    expect(asked(host)).toHaveLength(1)
-    expect(session.calls.map((call) => call[0])).not.toContain("evaluate")
-  })
-
-  test.each(["document.title", "[...document.querySelectorAll('a')].map((a) => a.href)", "fetch('/api/items')"])("#given a read-only script (%s) #when evaluated #then nothing is asked", async (expression) => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host)
-
-    await guardedSession.evaluate(expression)
-
-    expect(asked(host)).toHaveLength(0)
-    expect(session.calls.map((call) => call[0])).toContain("evaluate")
-  })
-
-  test("#given a script that posts with the user's cookies #when evaluated #then the user is asked", async () => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { guardedSession } = await connected(host)
-
-    await guardedSession.evaluate("fetch('/api/messages', { method: 'POST', body: '{}' })")
-
-    expect(asked(host)).toHaveLength(1)
-  })
-
-  test("#given the daemon's raw tool entry #when it names click, press or evaluate #then it is refused, and read tools pass", async () => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host)
-
-    const refused = await guardedSession.tool("click", { selector: "#pay" }).then(() => undefined, (cause: unknown) => cause)
-    await guardedSession.tool("screenshot", {})
-
-    expect(refused).toBeInstanceOf(BrowserEngineRefusal)
-    expect(session.calls.filter((call) => call[0] === "tool").map((call) => call[1])).toEqual(["screenshot"])
-  })
-
-  test("#given the page snapshot helper #when it runs on a guarded session #then it reads through the raw session and asks nothing", async () => {
-    const host = fakeHost()
-    const { session, raw, guarded, guardedSession } = await connected(host)
-
-    await guarded.bskSnapshot(guardedSession, { interactive: true })
-
-    expect(raw.snapshotSessions).toEqual([session])
-    expect(asked(host)).toHaveLength(0)
-  })
-
-  test("#given a click at screenshot coordinates #when the target cannot be read #then the user is asked", async () => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { session, guardedSession } = await connected(host)
-
-    await guardedSession.click({ captureId: "c1", x: 10, y: 20 })
-
-    expect(asked(host)).toHaveLength(1)
-    expect(session.calls.map((call) => call[0])).toContain("click")
-  })
-
-  test("#given the page cannot be inspected #when the model clicks #then it asks instead of guessing", async () => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const session = fakeSession()
-    session.evaluate = async () => {
-      throw new DaemonError("cdp_failed")
+describe("the app's built-in browser", () => {
+  test("#given app refusals including user Stop #when acquiring or refreshing #then only genuine unavailability permits fallback", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-toolkit-refusal-"))
+    try {
+      const tokenFile = join(dir, "browser.token")
+      writeFileSync(tokenFile, "test-token")
+      for (const reason of ["user_stopped", "permission_denied", "toString", "unavailable", "timeout", "invalid_grant"]) {
+        for (const refresh of [false, true]) {
+          let acquireCount = 0
+          let authorizer: { resolveAuthorization: (options: { forceRefresh: boolean }) => Promise<string> } | undefined
+          const capture = (options: { authorizer: typeof authorizer }) => { authorizer = options.authorizer }
+          const raw = {
+            ...fakeRaw(),
+            connect: async (_url: string, options: { client: { authorizer: typeof authorizer } }) => { capture(options.client); return {} },
+            CdpClient: class {
+              constructor(options: { authorizer: typeof authorizer }) { capture(options) }
+            },
+            BrowserConnection: class { async initialize() { return this } },
+          }
+          const host = fakeHost(() => ({
+            details: refresh && acquireCount++ === 0
+              ? { ok: true, grant: { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile } }
+              : { ok: false, reason },
+          }))
+          const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
+          const error = await (refresh
+            ? library.connectBuiltinBrowser().then(() => {
+              if (authorizer === undefined) throw new Error("no authorizer attached")
+              return authorizer.resolveAuthorization({ forceRefresh: true })
+            })
+            : library.connectBuiltinBrowser()).then(() => undefined, (cause: unknown) => cause)
+          expect(error).toBeInstanceOf(BuiltinBrowserUnavailableError)
+          expect((error as BuiltinBrowserUnavailableError).reason).toBe(reason)
+          expect(/connectBrowserSkill|connectPipe/.test((error as Error).message)).toBe(["unavailable", "timeout", "invalid_grant"].includes(reason))
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
-    const raw = fakeRaw(async () => session)
-    const guarded = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host })
-    const guardedSession = await guarded.connectBrowserSkill({})
-
-    await guardedSession.click("#mystery")
-
-    expect(asked(host)).toHaveLength(1)
   })
 
-  test.each(["Control+Enter", "Meta+Enter"])("#given %s #when pressed #then the user is asked, since that chord sends in chat apps", async (chord) => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { guardedSession } = await connected(host, { descriptors: [{ tag: "textarea", text: "" }] })
-
-    await guardedSession.press(chord)
-
-    expect(asked(host)).toHaveLength(1)
+  test("#given a missing or unreadable token file #when acquiring #then the failure is typed and no browser attaches", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-toolkit-token-"))
+    try {
+      // Reading a directory is rejected even under a privileged test user, unlike chmod-based fixtures.
+      for (const tokenFile of [join(dir, "missing.token"), dir]) {
+        const raw = fakeRaw()
+        const host = fakeHost(() => ({ details: { ok: true, grant: { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile } } }))
+        const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
+        const error = await library.connectBuiltinBrowser().then(() => undefined, (cause: unknown) => cause)
+        expect(error).toBeInstanceOf(BuiltinBrowserUnavailableError)
+        expect((error as BuiltinBrowserUnavailableError).reason).toBe("invalid_grant")
+        expect(raw.calls).toEqual([])
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  test("#given Shift+Enter in a message box #when pressed #then nothing is asked, since it only adds a line", async () => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "textarea", text: "", editable: true }] })
-
-    await guardedSession.press("Shift+Enter")
-
-    expect(asked(host)).toHaveLength(0)
-    expect(session.calls.map((call) => call[0])).toContain("press")
+  // Security contract (#10602 review LOW 1): a grant must name its endpoint. Without one, CdpClient falls back to
+  // 127.0.0.1:9222 and would send the app's bearer token to whatever browser listens there.
+  test("#given a grant without a usable endpoint #when acquiring or refreshing #then invalid_grant, the token is never sent, and the endpoint is unchanged", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-toolkit-endpoint-"))
+    try {
+      const tokenFile = join(dir, "browser.token")
+      writeFileSync(tokenFile, "secret-token")
+      const goodEndpoint = "http://127.0.0.1:41234/toolkit/browser"
+      for (const endpoint of [undefined, "", 9222, null]) {
+        for (const onRefresh of [false, true]) {
+          let acquireCount = 0
+          const cdpUrls: unknown[] = []
+          let authorize: (options?: { forceRefresh?: boolean }) => Promise<string> = async () => ""
+          const host = fakeHost(() => ({ details: { ok: true, grant: onRefresh && acquireCount++ === 0
+            ? { endpoint: goodEndpoint, tokenFile }
+            : { endpoint, tokenFile } } }))
+          const raw = {
+            ...fakeRaw(),
+            CdpClient: class {
+              constructor(options: { cdpUrl: unknown; authorizer: { resolveAuthorization: typeof authorize } }) {
+                cdpUrls.push(options.cdpUrl)
+                authorize = options.authorizer.resolveAuthorization
+              }
+              set cdpUrl(value: unknown) { cdpUrls.push(value) }
+            },
+            BrowserConnection: class { async initialize() { return { connected: true } } },
+          }
+          const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
+          const error = await (onRefresh
+            ? library.connectBuiltinBrowser().then(() => authorize({ forceRefresh: true }))
+            : library.connectBuiltinBrowser()
+          ).then(() => undefined, (cause: unknown) => cause)
+          expect(error).toBeInstanceOf(BuiltinBrowserUnavailableError)
+          expect((error as BuiltinBrowserUnavailableError).reason).toBe("invalid_grant")
+          expect(cdpUrls).toEqual(onRefresh ? [goodEndpoint] : [])
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  test.each([
-    ["a textarea composer", { tag: "textarea", text: "", editable: true }],
-    ["a contenteditable composer", { tag: "div", text: "", editable: true }],
-    ["a role=textbox composer", { tag: "div", text: "", editable: true }],
-    ["a composer inside a POST form", { tag: "textarea", text: "", editable: true, form: { action: "/comments", method: "post", submitLabels: ["Go"] } }],
-  ])("#given Enter in %s #when pressed #then the user is asked, since that sends in many apps", async (_name, descriptor) => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { session, guardedSession } = await connected(host, { descriptors: [descriptor] })
-
-    await guardedSession.press("Enter")
-
-    expect(asked(host)).toHaveLength(1)
-    expect(session.calls.map((call) => call[0])).toContain("press")
+  test("#given concurrent refreshes #when both force a refresh at once #then one acquire runs and both get the same token for the same endpoint", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-toolkit-inflight-"))
+    try {
+      const firstToken = join(dir, "first.token")
+      const secondToken = join(dir, "second.token")
+      const thirdToken = join(dir, "third.token")
+      writeFileSync(firstToken, "first-token")
+      writeFileSync(secondToken, "second-token")
+      writeFileSync(thirdToken, "third-token")
+      const grants = [
+        { endpoint: "http://127.0.0.1:41000/toolkit/browser", tokenFile: firstToken },
+        { endpoint: "http://127.0.0.1:42000/toolkit/browser", tokenFile: secondToken },
+        { endpoint: "http://127.0.0.1:43000/toolkit/browser", tokenFile: thirdToken },
+      ]
+      let release: () => void = () => {}
+      const held = new Promise<void>((resolve) => { release = resolve })
+      let acquireCount = 0
+      const host = {
+        log: [] as Json[],
+        async listTools(): Promise<string[]> { return ["omo_desktop_toolkit"] },
+        async callTool(_tool: string, args: Json): Promise<Json> {
+          host.log.push(args)
+          const grant = grants[acquireCount++]
+          if (acquireCount > 1) await held
+          return { details: { ok: true, grant } }
+        },
+      }
+      let endpoint: unknown
+      let authorize: (options?: { forceRefresh?: boolean }) => Promise<string> = async () => ""
+      const raw = {
+        ...fakeRaw(),
+        CdpClient: class {
+          constructor(options: { cdpUrl: unknown; authorizer: { resolveAuthorization: typeof authorize } }) {
+            endpoint = options.cdpUrl
+            authorize = options.authorizer.resolveAuthorization
+          }
+          set cdpUrl(value: unknown) { endpoint = value }
+        },
+        BrowserConnection: class { async initialize() { return { connected: true } } },
+      }
+      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
+      await library.connectBuiltinBrowser()
+      const both = Promise.all([authorize({ forceRefresh: true }), authorize({ forceRefresh: true })])
+      release()
+      expect(await both).toEqual(["Bearer second-token", "Bearer second-token"])
+      expect(endpoint).toBe(grants[1]?.endpoint)
+      expect(host.log).toHaveLength(2)
+      expect(await authorize({ forceRefresh: true })).toBe("Bearer third-token")
+      expect(endpoint).toBe(grants[2]?.endpoint)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  test("#given a No on Enter in a message box #when pressed #then the message is not sent", async () => {
-    const host = fakeHost({ answers: ["Don't allow"] })
-    const { session, guardedSession } = await connected(host, { descriptors: [{ tag: "div", text: "", editable: true }] })
-
-    const error = await guardedSession.press("Enter").then(() => undefined, (cause: unknown) => cause)
-
-    expect(error).toBeInstanceOf(BrowserActionDeclinedError)
-    expect(session.calls.map((call) => call[0])).not.toContain("press")
+  test("#given a refreshed grant on another endpoint #when authorization refreshes during connect or later #then endpoint and token rotate together", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-toolkit-refresh-"))
+    try {
+      const firstToken = join(dir, "first.token")
+      const nextToken = join(dir, "next.token")
+      writeFileSync(firstToken, "first-token")
+      writeFileSync(nextToken, "next-token")
+      for (const duringConnect of [true, false]) {
+        let acquireCount = 0
+        let endpoint = ""
+        let authorize: (options?: { forceRefresh?: boolean }) => Promise<string> = async () => ""
+        const initialEndpoint = "http://127.0.0.1:41234/toolkit/browser"
+        const refreshedEndpoint = "http://127.0.0.1:42345/toolkit/browser"
+        const host = fakeHost(() => ({ details: { ok: true, grant: acquireCount++ === 0
+          ? { endpoint: initialEndpoint, tokenFile: firstToken }
+          : { endpoint: refreshedEndpoint, tokenFile: nextToken } } }))
+        const initialize = async () => {
+          if (duringConnect) {
+            expect(await authorize({ forceRefresh: true })).toBe("Bearer next-token")
+            expect(endpoint).toBe(refreshedEndpoint)
+          }
+          return { connected: true }
+        }
+        const raw = {
+          ...fakeRaw(),
+          connect: async (url: string, options: { client: { authorizer: { resolveAuthorization: typeof authorize } } }) => {
+            endpoint = url
+            authorize = options.client.authorizer.resolveAuthorization
+            return await initialize()
+          },
+          CdpClient: class {
+            constructor(options: { cdpUrl: string; authorizer: { resolveAuthorization: typeof authorize } }) {
+              endpoint = options.cdpUrl
+              authorize = options.authorizer.resolveAuthorization
+            }
+            set cdpUrl(value: string) { endpoint = value }
+          },
+          BrowserConnection: class { initialize = initialize },
+        }
+        const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host })
+        expect(await library.connectBuiltinBrowser()).toEqual({ connected: true })
+        if (!duringConnect) {
+          expect(await authorize()).toBe("Bearer first-token")
+          expect(await authorize({ forceRefresh: true })).toBe("Bearer next-token")
+          expect(endpoint).toBe(refreshedEndpoint)
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  test("#given Enter in a search box inside a GET form #when pressed #then nothing is asked", async () => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host, {
-      descriptors: [{ tag: "input", text: "", editable: true, form: { action: "/search", method: "get", submitLabels: ["Search"] } }],
-    })
+  test("#given the app grants it #when connectBuiltinBrowser runs #then OmOWright attaches to the granted endpoint with the token file's token, and re-acquires on refresh", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-toolkit-test-"))
+    try {
+      const tokenFile = join(dir, "browser.token")
+      writeFileSync(tokenFile, "first-token\n", { mode: 0o600 })
+      const grant = { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile }
+      const host = fakeHost(() => ({ details: { ok: true, grant } }))
+      const attached: Array<{ url: string; options: { client: { authorizer: { resolveAuthorization: (o?: { forceRefresh?: boolean }) => Promise<string> } } } }> = []
+      const raw = {
+        ...fakeRaw(),
+        CdpClient: class {
+          constructor(options: { cdpUrl: string; authorizer: typeof attached[number]["options"]["client"]["authorizer"] }) {
+            attached.push({ url: options.cdpUrl, options: { client: { authorizer: options.authorizer } } })
+          }
+        },
+        BrowserConnection: class { async initialize() { return { kind: "connection" } } },
+      }
+      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "connected" }, host }) as unknown as { connectBuiltinBrowser: () => Promise<unknown> }
 
-    await guardedSession.press("Enter")
-
-    expect(asked(host)).toHaveLength(0)
-    expect(session.calls.map((call) => call[0])).toContain("press")
+      expect(await library.connectBuiltinBrowser()).toEqual({ kind: "connection" })
+      expect(attached[0]?.url).toBe(grant.endpoint)
+      const first = attached[0]
+      if (first === undefined) throw new Error("no client attached")
+      const authorizer = first.options.client.authorizer
+      expect(await authorizer.resolveAuthorization()).toBe("Bearer first-token")
+      writeFileSync(tokenFile, "rotated-token\n", { mode: 0o600 })
+      expect(await authorizer.resolveAuthorization({ forceRefresh: true })).toBe("Bearer rotated-token")
+      expect(host.log).toEqual([
+        { tool: "omo_desktop_toolkit", args: { op: "acquire", toolkit: "browser" } },
+        { tool: "omo_desktop_toolkit", args: { op: "acquire", toolkit: "browser" } },
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
-  test("#given Enter on a daemon ref to a contenteditable composer #when pressed #then the user is asked, and a plain button is not", async () => {
-    const editable = fakeHost({ answers: ["Allow"] })
-    const composer = await connected(editable, { html: '<div contenteditable="true" role="textbox"></div>' })
-    await composer.guardedSession.press("Enter", { target: "@e4" })
-    expect(asked(editable)).toHaveLength(1)
+  test("#given the app does not offer it #when connectBuiltinBrowser runs #then one plain error says why and that the other browsers work as usual, and no browser is attached", async () => {
+    for (const [details, reason] of [
+      [{ ok: false, reason: "unavailable" }, "unavailable"],
+      [{ ok: false, reason: "timeout" }, "timeout"],
+      [undefined, "unavailable"],
+    ] as const) {
+      const raw = fakeRaw()
+      const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host: fakeHost(() => (details === undefined ? {} : { details })) }) as unknown as {
+        connectBuiltinBrowser: () => Promise<unknown>
+      }
 
-    const plain = fakeHost()
-    const button = await connected(plain, { html: "<button>Next</button>" })
-    await button.guardedSession.press("Enter", { target: "@e5" })
-    expect(asked(plain)).toHaveLength(0)
-  })
-})
+      const error = await library.connectBuiltinBrowser().then(() => undefined, (cause: unknown) => cause)
 
-describe("what else a cooperating session could do by accident", () => {
-  test.each(["observe", "snapshot", "get_html", "screenshot", "tab_list", "console", "network"])("#given the daemon's raw %s tool #when called #then it is a read and passes", async (name) => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host)
-
-    await guardedSession.tool(name, {})
-
-    expect(session.calls.filter((call) => call[0] === "tool").map((call) => call[1])).toEqual([name])
+      expect((error as { code?: string }).code).toBe("browser_builtin_unavailable")
+      expect((error as { reason?: string }).reason).toBe(reason)
+      expect(raw.calls).toEqual([])
+    }
   })
 
-  test.each(["click", "press", "evaluate", "fill", "select", "wheel", "tab_close", "navigate", "some_future_acting_tool"])("#given the daemon's raw %s tool #when called #then it is refused, since only reads are allowed through it", async (name) => {
-    const host = fakeHost()
-    const { session, guardedSession } = await connected(host)
+  test("#given a kernel without the app's toolkit #when connectBuiltinBrowser runs #then the same plain error, nothing attached", async () => {
+    const raw = fakeRaw()
+    const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: "builtin" }, host: undefined }) as unknown as { connectBuiltinBrowser: () => Promise<unknown> }
 
-    const error = await guardedSession.tool(name, {}).then(() => undefined, (cause: unknown) => cause)
+    const error = await library.connectBuiltinBrowser().then(() => undefined, (cause: unknown) => cause)
 
-    expect(error).toBeInstanceOf(BrowserEngineRefusal)
-    expect((error as BrowserEngineRefusal).code).toBe("browser_tool_blocked")
-    expect(session.calls.filter((call) => call[0] === "tool")).toEqual([])
-  })
-
-  test("#given a script that beacons data out #when evaluated #then the user is asked, since sendBeacon always posts", async () => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { guardedSession } = await connected(host)
-
-    await guardedSession.evaluate("navigator.sendBeacon('/track', data)")
-
-    expect(asked(host)).toHaveLength(1)
-  })
-
-  test.each(["Submit", "Submit order", "Confirm purchase", "Checkout", "Transfer funds", "Approve request", "Merge pull request", "Sign contract", "승인", "송금"])("#given a %s control #when clicked #then the user is asked first", async (label) => {
-    const host = fakeHost({ answers: ["Allow"] })
-    const { guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: label }] })
-
-    await guardedSession.click("#control")
-
-    expect(asked(host)).toHaveLength(1)
-  })
-
-  test.each(["Sign in", "Sign up", "Log in", "Continue", "Learn more"])("#given a %s control #when clicked #then nothing is asked", async (label) => {
-    const host = fakeHost()
-    const { guardedSession } = await connected(host, { descriptors: [{ tag: "button", text: label }] })
-
-    await guardedSession.click("#control")
-
-    expect(asked(host)).toHaveLength(0)
+    expect((error as { code?: string }).code).toBe("browser_builtin_unavailable")
+    expect(raw.calls).toEqual([])
   })
 })

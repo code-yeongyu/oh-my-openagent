@@ -11,6 +11,7 @@ import {
   releaseLock,
 } from "../locks"
 import { runMemoryTool } from "../tools/memory"
+import { windowsTreeKillArgs } from "./windows-process-tree.mjs"
 
 // Subprocess fixture for omo #10177 crash-consistency coverage. Unlike writer-child.ts (which
 // parks BETWEEN commits before the parent SIGKILLs it), the kill-mid-commit mode SIGKILLs itself
@@ -105,8 +106,12 @@ async function waitExit(child: ReturnType<typeof spawn>): Promise<void> {
 async function killGitTree(git: ReturnType<typeof spawn>): Promise<void> {
   const exited = git.exitCode !== null || git.signalCode !== null ? Promise.resolve() : waitExit(git)
   if (process.platform === "win32") {
-    const taskkill = spawn("taskkill", ["/F", "/T", "/PID", String(git.pid)], { stdio: "ignore", windowsHide: true })
-    await waitExit(taskkill)
+    if (git.pid === undefined) return
+    const args = windowsTreeKillArgs(git.pid)
+    if (args.length > 0) {
+      const taskkill = spawn("taskkill", args, { stdio: "ignore", windowsHide: true })
+      await waitExit(taskkill)
+    }
   } else git.kill("SIGKILL")
   await exited
 }
