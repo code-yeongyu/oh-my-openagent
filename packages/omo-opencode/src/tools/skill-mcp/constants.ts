@@ -4,6 +4,6 @@ export const SKILL_MCP_DESCRIPTION = `Invoke MCP server operations from skill-em
 
 export const BUILTIN_MCP_TOOL_HINTS: Record<string, string[]> = {
   context7: ["context7_resolve-library-id", "context7_query-docs"],
-  websearch: ["websearch_web_search_exa"],
+  websearch: ["websearch_web_search_exa", "websearch_web_search", "websearch_web_fetch"],
   grep_app: ["grep_app_searchGitHub"],
 }
