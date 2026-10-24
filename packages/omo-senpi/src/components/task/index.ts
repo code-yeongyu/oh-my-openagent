@@ -30,7 +30,7 @@ import { registerTaskCommands } from "./commands"
 import { registerDagCommands } from "./dag-commands"
 import { createDagReloadSource } from "./dag-reload-source"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
-import { createDagTool } from "./dag-tool"
+import { registerDagTool } from "./register-workflow-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { registerEvalHandleHost } from "./eval-handle-host"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
@@ -253,25 +253,6 @@ function registerTaskTools(
   registerEvalHandleHost(pi, engine)
 }
 
-function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: DagRuntime): void {
-  const sessionId = (): string => engine.runtime.sessionId() ?? ""
-  const rootSessionId = (): string => {
-    const id = sessionId()
-    return engine.resolveAncestry(id)?.rootSessionId ?? id
-  }
-  pi.registerTool({
-    ...createDagTool({
-      manager: runtime.manager,
-      parentSessionId: sessionId,
-      rootSessionId,
-      wait: runtime.wait,
-      cancel: runtime.cancel,
-      retry: runtime.retry,
-      send: runtime.send,
-      amend: runtime.amend,
-    }),
-  })
-}
 
 export function wireDagLifecycle(
   pi: SenpiExtensionAPI,

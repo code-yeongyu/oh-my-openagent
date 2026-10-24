@@ -20,7 +20,7 @@ const RETRY_MS = 5_000
 
 type Episode = {
   readonly epoch: number
-  readonly deadline: number
+  deadline: number
   busy: boolean
   expiring: boolean
   deadlineAttempted: boolean
@@ -113,12 +113,18 @@ export function startLiveParentRecovery(
       const outcome = outcomes.find((entry) => entry.task_id === record.task_id)
       if (outcome?.kind === "deferred" && outcome.reason !== undefined) {
         const reason = outcome.reason
+        // A stopped run holds its child, so its suspension budget restarts instead of running out.
+        const runPaused = reason === "run_paused"
+        if (runPaused) {
+          episode.deadline = context.now() + LIVE_PARENT_SUSPENSION_BUDGET_MS
+          episode.deadlineAttempted = false
+        }
         const deferred = context.store.mutate(record.task_id, (fresh) =>
           eligible(fresh) && fresh.notification.run_epoch === episode.epoch
-            ? { ...fresh, revival_deferred_reason: reason }
+            ? { ...fresh, revival_deferred_reason: reason, ...(runPaused ? { recovery_deadline_at: episode.deadline } : {}) }
             : fresh,
         )
-        if (deferred !== null && (expired || outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(reason))) {
+        if (!runPaused && deferred !== null && (expired || outcome.permanent === true || PERMANENT_REVIVAL_REASONS.has(reason))) {
           await expireSuspendedChild(context, deferred, () => owned(deferred))
         }
       }
@@ -180,7 +186,7 @@ export function startLiveParentRecovery(
         )
       }
       if (episode.expiring) continue
-      if (context.now() >= episode.deadline
+      if (record.revival_deferred_reason !== "run_paused" && context.now() >= episode.deadline
         && context.registry.get(record.task_id) === undefined
         && (episode.deadlineAttempted ? !episode.busy || retry
           : episode.busy || (reconcilingRuns > 0 && record.residency_state === "resident"))) {

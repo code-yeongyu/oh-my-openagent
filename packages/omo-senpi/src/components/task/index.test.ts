@@ -34,6 +34,7 @@ const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
   "context",
   "session_start",
+  "session_hold_changed",
   "session_before_reload",
   "session_resumed",
   "session_before_switch",

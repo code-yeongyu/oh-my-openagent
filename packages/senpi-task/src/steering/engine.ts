@@ -77,6 +77,8 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       return { kind: "not_continuable", task_id: record.task_id,
         reason: [record.error_message, record.final_response].filter(Boolean).join("\n\n"), suggestion: TASK_OUTPUT_SUGGESTION }
     }
+    const held = port.sendWhileRunHeld?.(record, input.message)
+    if (held !== undefined) return held
 
     const deliverAs = input.deliverAs ?? DEFAULT_SEND_DELIVERY
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)

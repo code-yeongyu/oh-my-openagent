@@ -1,4 +1,5 @@
 import type { TaskManager } from "../manager/types"
+import type { ResumeCredential } from "../pause/admission-barrier"
 import type { TaskRecord } from "../state"
 import type { DagJournal } from "./journal"
 import type { DagPersistedNode } from "./manager"
@@ -37,7 +38,10 @@ export type DagNodeWithResult = DagNode & {
   readonly resultArtifact?: DagNodeResultArtifact
 }
 
+export { countDagNodes as countNodes } from "./counts"
+
 export type SchedulerContext = {
+  readonly resumeCredential?: ResumeCredential
   readonly infrastructureRetries: InfrastructureRetries
   readonly taskManager: TaskManager
   readonly journal: DagJournal<DagRunRecordV1>
@@ -128,20 +132,4 @@ export function repeatableSignal(): { readonly wait: () => Promise<void>; readon
       current.resolve()
     },
   }
-}
-
-export function countNodes(nodes: readonly DagNode[]): DagNodeCounts {
-  const counts = {
-    total: nodes.length,
-    pending: 0,
-    blocked: 0,
-    scheduled: 0,
-    running: 0,
-    completed: 0,
-    failed: 0,
-    cancelled: 0,
-    skipped: 0,
-  }
-  for (const node of nodes) counts[node.state] += 1
-  return counts
 }

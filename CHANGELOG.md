@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A user Stop pauses the workflow run it started instead of cancelling it.** DAG nodes, workpool workers and task children hold where they are; a message to the paused run or Resume continues it from where it stopped. ([#10808](https://github.com/code-yeongyu/oh-my-openagent/pull/10808), fixes [#6752](https://github.com/code-yeongyu/oh-my-openagent/issues/6752))
+
 **ulw-research ships a fact ledger, a fidelity state file and a claim index for research reports.** They give each research run a machine-readable record of its facts and verified claims; nothing in the CLI uses them yet. ([#11046](https://github.com/code-yeongyu/oh-my-openagent/pull/11046), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009); batch [#11148](https://github.com/code-yeongyu/oh-my-openagent/pull/11148))
 
 **Windows dori sidecar paths pass the extension's path checks.** The omo-senpi tests accept the Windows form of the sidecar path, so the Windows suite no longer fails on a correct path. ([#11111](https://github.com/code-yeongyu/oh-my-openagent/pull/11111), fixes [#11110](https://github.com/code-yeongyu/oh-my-openagent/issues/11110))

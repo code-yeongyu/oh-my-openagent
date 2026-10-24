@@ -30,6 +30,8 @@ export type SteeringPort = {
   // True while the task's launch is still being admitted by its host (#10042): no live handle yet, and
   // the launch drains whatever is queued once the child starts.
   isLaunching?(taskId: string): boolean
+  // The child's run admission is stopped: the send is held in the child (no turn). Undefined: send normally.
+  sendWhileRunHeld?(record: TaskRecord, message: string): Promise<SendOutcome> | undefined
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
@@ -87,6 +89,8 @@ export type SendOutcome =
     }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
+  // The child's run is stopped: the message is held in the child and delivered when the run resumes.
+  | { readonly kind: "held"; readonly task_id: string; readonly pause_seq: number; readonly entry_id: string }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was delivered. */
   | { readonly kind: "stale"; readonly task_id: string; readonly run_epoch: number; readonly reason: string }

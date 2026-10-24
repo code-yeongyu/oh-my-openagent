@@ -1,11 +1,12 @@
 import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
+import { RELEASE_RUN_FENCE, type EnginePauseState, type EngineRunHoldContext, type RunRef } from "../../../../senpi-task/src/pause/ports"
 
 // Structural slice of senpi's ExtensionContext the task runtime reads. ExtensionContext satisfies it;
 // tests pass a tiny fake. `ui` lives on ExtensionContext (event/command contexts), NOT ExtensionAPI,
 // so it is captured here on entry and cleared on switch/shutdown (the todo-18 bridge constraint).
 // modelRegistry is the CONCRETE senpi ModelRegistry: the planner reads it through its structural port,
 // and in-process children reuse this exact instance so they inherit the parent's live provider set.
-export interface LiveTaskContext {
+export interface LiveTaskContext extends EngineRunHoldContext {
   readonly cwd?: string
   readonly modelRegistry?: ChildModelRegistry
   readonly loadedExtensionPaths?: readonly string[]
@@ -58,7 +59,7 @@ function asParentServiceTier(value: unknown): ParentServiceTier | undefined {
 export class TaskRuntimeContext {
   #cwd: string
   #modelRegistry: ChildModelRegistry | undefined
-  #modelContext: Pick<LiveTaskContext, "model"> | undefined
+  #modelContext: Pick<LiveTaskContext, "model" | "getPauseState" | "fenceRun" | typeof RELEASE_RUN_FENCE> | undefined
   #loadedExtensionPaths: readonly string[] = []
   #parentServiceTier: ParentServiceTier | undefined
   #idle = true
@@ -113,6 +114,25 @@ export class TaskRuntimeContext {
     if (typeof model === "string") return model
     if (typeof model !== "object" || model === null || !("id" in model)) return undefined
     return typeof model.id === "string" ? model.id : undefined
+  }
+
+  getPauseState(): EnginePauseState | undefined {
+    return this.#modelContext?.getPauseState?.()
+  }
+
+  fenceRun(runRef: RunRef): void {
+    const context = this.#modelContext
+    if (context?.fenceRun === undefined) throw new Error("engine run fences are unavailable")
+    context.fenceRun(runRef)
+  }
+
+  // Feature-detected: an engine without it keeps the fence until the next human input or
+  // resume_session. Answers whether the engine released it.
+  releaseRunFence(runRef: RunRef): boolean {
+    const release = this.#modelContext?.[RELEASE_RUN_FENCE]
+    if (release === undefined) return false
+    release(runRef)
+    return true
   }
 
   loadedExtensionPaths(): readonly string[] {

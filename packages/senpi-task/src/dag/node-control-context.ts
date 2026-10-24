@@ -16,6 +16,8 @@ export const DAG_NODE_CONTROL_ERROR_CODES = [
   "node_not_retryable",
   "node_has_no_task",
   "node_not_continuable",
+  "run_paused_by_user",
+  "run_not_user_paused",
 ] as const
 
 export type DagNodeControlErrorCode = (typeof DAG_NODE_CONTROL_ERROR_CODES)[number]

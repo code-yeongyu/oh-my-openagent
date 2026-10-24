@@ -55,11 +55,18 @@ import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "./terminal-observers"
 import { admitAdapter } from "./engine-admission"
+import { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
+import type { ChildPausePort, ChildCreationPort } from "../../../../senpi-task/src/pause/ports"
+import type { TaskPauseMethods } from "../../../../senpi-task/src/manager/run-pause"
+import { createEngineRunPause } from "./engine-run-pause"
+import { nativeChildPausePort } from "../../../../senpi-task/src/pause/native-child-pause"
 
 export { admitAdapter } from "./engine-admission"
 
 export interface TaskEngine {
-  readonly manager: TaskManager
+  readonly runPause?: ReturnType<typeof createEngineRunPause>
+  readonly admissionBarrier: AdmissionBarrier
+  readonly manager: TaskManager & TaskPauseMethods
   // The session's package-aware inherited extension list, shared with every child-launch producer.
   readonly resolveInheritedExtensions: () => Promise<readonly string[]>
   readonly lifecycle: TaskLifecycle
@@ -96,6 +103,9 @@ export interface TaskEngine {
 }
 
 export interface ComposeTaskEngineDeps {
+  readonly admissionBarrier?: AdmissionBarrier
+  readonly childPausePort?: ChildPausePort
+  readonly childCreationPort?: ChildCreationPort
   readonly pi: SenpiExtensionAPI
   readonly omoConfig: OmoConfig
   readonly cwd: string
@@ -126,6 +136,7 @@ export type { RunnerBuildContext, TaskRunnerFactories } from "./engine-runners"
  * Construction order breaks the store<->manager and lifecycle<->manager cycles via late binding.
  */
 export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
+  const admissionBarrier = deps.admissionBarrier ?? new AdmissionBarrier()
   const settings: OmoTaskSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
   const ancestry = readSessionAncestry(deps.pi, deps.env ?? process.env)
   const resolveAncestry: ResolveAncestry = (sessionId) =>
@@ -237,6 +248,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     settings,
   })
   const manager = createTaskManager({
+    onPausedChild: (record, owner, childSeq) => runPause.notePausedChild(record, owner, childSeq),
+    admissionBarrier,
+    childPausePort: deps.childPausePort ?? nativeChildPausePort,
+    ...(deps.childCreationPort === undefined ? {} : { childCreationPort: deps.childCreationPort }),
     // An in-process child's task tool shares this manager; its owner connection is still ours.
     onChildExtensionEvent: (event, owner) => deps.pi.events?.emit(TASK_CHILD_EXTENSION_EVENT, {
       parent_session_id: runtime.sessionId(), root_session_id: owner.root_session_id, event,
@@ -270,8 +285,11 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     }),
   })
   managerRef = manager
+  const runPause = createEngineRunPause({ stateDir: baseStore.stateDir, manager, barrier: admissionBarrier, runtime })
 
   return {
+    runPause,
+    admissionBarrier,
     manager,
     resolveInheritedExtensions,
     lifecycle,

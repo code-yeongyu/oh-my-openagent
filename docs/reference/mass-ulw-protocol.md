@@ -53,13 +53,13 @@ The `lane` distinction: `boundary` marks state transitions and run lifecycle, jo
 seq. `activity` is the live-telemetry lane name used by stream classification; the actual
 `DagActivityEvent` payloads are unsequenced and travel on `omo.dag.activity`, never here.
 
-The 17 journaled payload types (`DAG_RUN_EVENT_TYPES`), with their fields beyond the envelope:
+The 26 journaled payload types (`DAG_RUN_EVENT_TYPES`), with their fields beyond the envelope:
 
 | `type` | Payload fields |
 | --- | --- |
 | `dag.run.created` | `runKey`, `name`, `definitionFingerprint`, `nodeCount`, `edgeCount` |
 | `dag.run.started` | `generation` |
-| `dag.run.paused` | `reason?` |
+| `dag.run.paused` | `reason?`, `pauseSeq?` (set with `reason: "user_stop"`) |
 | `dag.run.resumed` | `generation` |
 | `dag.run.completed` | `counts` (node-state counters) |
 | `dag.run.failed` | `error` (`{code, message, nodeId?, at}`), `counts` |
@@ -74,9 +74,18 @@ The 17 journaled payload types (`DAG_RUN_EVENT_TYPES`), with their fields beyond
 | `dag.definition.amended` | `previousFingerprint`, `fingerprint`, `changedNodeIds`, `addedNodeIds`, `invalidatedNodeIds` |
 | `dag.diagnostic.added` | `diagnostic` (`route_fallback` \| `node_flag` \| `missing_skill` \| `run_flag` \| `journal_corrupt`). `missing_skill` includes `nodeId` + `skill`; `journal_corrupt` includes `path` and optional `runId` |
 | `dag.stream.overflow` | `droppedCount`, `recoverAfterSeq` (see the recovery rules below) |
+| `dag.guidance.added` | `guidance` (`{id, revision, scope, text, state, createdAt, editedAt?, deliveries}`), on a run the user stopped |
+| `dag.guidance.edited` | `guidance` |
+| `dag.guidance.removed` | `guidance` |
+| `dag.guidance.dispatching` | `guidance` (frozen; delivery to the node's child has started) |
+| `dag.guidance.delivered` | `guidance` (every target child holds it; `deliveries` names each `taskId` and `entryId`) |
+| `dag.node.cancel_requested` | `nodeId` |
+| `dag.node.retry-staged` | `nodeIds` (retried when the user resumes the run) |
+| `dag.node.pause-recovered` | `nodeId`, `childSeq` |
+| `dag.node.pause-lost` | `nodeId`, `error` (`lost_while_paused`) |
 
-Node states: `pending`, `blocked`, `scheduled`, `running`, `completed`, `failed`, `cancelled`,
-`skipped`. Run statuses: `pending`, `running`, `paused`, `completed`, `failed`, `cancelled`.
+Node states: `pending`, `blocked`, `scheduled`, `running`, `paused` (its child is held by the user's
+Stop), `completed`, `failed`, `cancelled`, `skipped`. Run statuses: `pending`, `running`, `paused`, `completed`, `failed`, `cancelled`.
 `counts` carries `total` plus one counter per node state.
 
 ### `omo.dag.heartbeat`

@@ -46,6 +46,7 @@ export const DAG_NODE_STATES = [
   "blocked",
   "scheduled",
   "running",
+  "paused",
   "completed",
   "failed",
   "cancelled",
@@ -126,6 +127,7 @@ export const DAG_NODE_ERROR_CODES = [
   "task_cancelled",
   "resume_task_missing",
   "resume_task_orphaned",
+  "lost_while_paused",
   "journal_corrupt",
 ] as const
 
@@ -219,6 +221,7 @@ export type DagBottleneck = {
 }
 
 export type DagNodeCounts = {
+  readonly paused?: number
   readonly total: number
   readonly pending: number
   readonly blocked: number
@@ -231,6 +234,7 @@ export type DagNodeCounts = {
 }
 
 export type DagRunSnapshot = {
+  readonly pause?: { readonly reason: "user_stop"; readonly pauseSeq: number }
   readonly schemaVersion: 1
   readonly runId: DagRunId
   readonly runKey: string

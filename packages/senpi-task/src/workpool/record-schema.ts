@@ -28,6 +28,7 @@ export const WorkpoolRecordSchema = z.strictObject({
     }),
   }),
   status: z.enum(["open", "closing", "cancelled"]),
+  hold: z.strictObject({ reason: z.literal("user_stop"), pauseSeq: z.number().int().positive() }).optional(),
   // Plain-data worker tool names only; no closure, descriptor or generation is ever persisted.
   kernel_tool_names: z.array(nonempty).optional(),
   aggregate: z.strictObject({ generation: z.number().int().positive(), delivered: z.boolean(), accepted: z.boolean().optional() }).optional(),
@@ -35,11 +36,11 @@ export const WorkpoolRecordSchema = z.strictObject({
     key: nonempty, input: z.json(), item_id: z.templateLiteral(["wi_", z.string()]).refine(id => /^wi_[0-9a-f]{32}$/.test(id)),
     status: z.enum(["queued", "assigned", "completed", "error", "cancelled"]),
     binding: z.strictObject({ task_id: taskId, run_epoch: epoch, generation: z.number().int().positive() }).optional(),
-    delivery: z.strictObject({ phase: z.enum(["queued", "dispatching", "acknowledged"]), message_sha256: z.string().regex(/^[0-9a-f]{64}$/).optional() }).optional(),
+    delivery: z.strictObject({ phase: z.enum(["queued", "dispatching", "acknowledged"]), message_sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(), entry_ids: z.array(nonempty).optional() }).optional(),
     data: z.json().optional(), error: z.strictObject({ code: nonempty, message: z.string() }).optional(),
     yield_sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   })),
   workers: z.array(z.strictObject({
-    task_id: taskId, run_epoch: epoch, status: z.enum(["busy", "idle"]), completed_turns: epoch, idle_since: z.number().nonnegative(),
+    task_id: taskId, run_epoch: epoch, status: z.enum(["busy", "idle", "paused"]), completed_turns: epoch, idle_since: z.number().nonnegative(),
   })),
 }) satisfies z.ZodType<WorkpoolRecord>

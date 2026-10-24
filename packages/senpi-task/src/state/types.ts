@@ -37,6 +37,7 @@ export type IsolationRecord = TaskIsolationSpec & {
 export const TASK_STATUSES = [
   "pending",
   "running",
+  "paused",
   "completed",
   "error",
   "cancelled",

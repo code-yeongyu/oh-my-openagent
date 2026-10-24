@@ -14,6 +14,7 @@ import type { TransportRecoveryOptions } from "./transport-recovery"
 import type { CatalogModelIdentity } from "../pinned-model-equivalence"
 import type { TaskRecord } from "../../state"
 import type { HostTurnReconciliation, InputEffectStatus, ReconciledTurnNotice } from "./reconcile-turn"
+import type { TaskParentWire } from "../task-parent-control"
 
 /**
  * What a child handle needs FROM a daemon session and what it exposes TO the manager. The seam is
@@ -39,6 +40,8 @@ export interface HostSessionPort {
   readonly socketPath: string
   readonly transportGone: Promise<unknown>
   send(command: HostSessionCommand): Promise<void>
+  // The run hold commands over this connection; absent on ports that cannot carry them.
+  taskParentWire?(): TaskParentWire
   getState(): Promise<HostSessionLiveness>
   onEvent(listener: ChildEventListener): () => void
   onExtensionEvent?(listener: ChildExtensionListener): () => void

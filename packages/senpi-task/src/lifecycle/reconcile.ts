@@ -232,6 +232,8 @@ async function reattachLegacyRecord(
   }
   if (!respawned.ok) {
     reservation.release()
+    // A stopped run keeps its child: nothing launched, and the run's Resume restores it.
+    if (respawned.code === "run_paused") return { task_id: record.task_id, kind: "deferred", reason: "run_paused" }
     await markLost(context, record.task_id, `reattach failed: ${respawned.reason}`)
     return { task_id: record.task_id, kind: "lost", reason: respawned.reason }
   }

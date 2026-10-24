@@ -1,5 +1,6 @@
 // allow: SIZE_OK - the wait/attach contract keeps ownership checks, terminal projection, and waiter bookkeeping on one surface so no caller can observe a half-applied terminal state.
 import type { TaskRunStats } from "../state/types"
+import { countDagNodes as countNodes } from "./counts"
 import { subscribeDagJournal, type DagJournalListener } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
 import type { DagFileStore } from "./store"
@@ -241,6 +242,7 @@ function readCancelReason(store: DagFileStore, runId: DagRunId): string {
 
 function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
   return {
+    ...(record.pause === undefined ? {} : { pause: record.pause }),
     schemaVersion: 1,
     runId: record.runId,
     runKey: record.runKey,
@@ -263,20 +265,4 @@ function projectSnapshot(record: DagRunRecordV1): DagRunSnapshot {
     counts: countNodes(record.nodes),
     ...(record.leaseHolderPid === undefined ? {} : { leaseHolderPid: record.leaseHolderPid }),
   }
-}
-
-function countNodes(nodes: readonly DagNode[]): DagNodeCounts {
-  const counts = {
-    total: nodes.length,
-    pending: 0,
-    blocked: 0,
-    scheduled: 0,
-    running: 0,
-    completed: 0,
-    failed: 0,
-    cancelled: 0,
-    skipped: 0,
-  }
-  for (const node of nodes) counts[node.state] += 1
-  return counts
 }

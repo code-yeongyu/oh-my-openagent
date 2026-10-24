@@ -152,6 +152,7 @@ export type TaskToolItemDetail = {
 }
 
 export type TaskToolDetails = {
+  readonly pause_seq?: number
   readonly task_id: string
   readonly run_epoch?: number
   readonly status: string

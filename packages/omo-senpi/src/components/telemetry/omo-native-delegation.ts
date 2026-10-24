@@ -108,6 +108,7 @@ function startReasonOf(
       return "revive_after_lost"
     case "pending":
     case "running":
+    case "paused":
     case undefined:
       // The prior terminal happened in a process that is gone (or before this subscription): the
       // epoch proves a resume, but its prior outcome is not knowable here and is never guessed.

@@ -15,6 +15,8 @@ import type {
 } from "@oh-my-opencode/senpi-task/dag"
 
 import type { DagToolDefinitionInput } from "./dag-tool-params"
+import type { Guidance } from "../../../../senpi-task/src/pause/guidance"
+import type { PausedDagGuideCommand } from "../../../../senpi-task/src/dag/paused-controls"
 
 // Tool-level error vocabulary. Node target failures nest under invalid_definition and carry the
 // task-tool validation code verbatim, so the model sees one vocabulary across task and dag. The
@@ -33,6 +35,10 @@ export type DagToolErrorCode =
   | "amend_running_node"
   | "invalid_amendment"
   | "run_still_active"
+  | "run_paused_by_user"
+  | "run_not_user_paused"
+  | "guidance_frozen"
+  | "guidance_not_found"
 
 export type DagToolNodeError = {
   readonly node_id: string
@@ -51,12 +57,13 @@ export type DagToolError = {
 }
 
 /** How the engine delivered a send: steered into a live turn, revived a resident child, or queued. */
-export type DagToolSendDelivery = "steer" | "revive" | "queued" | "uncertain"
+export type DagToolSendDelivery = "steer" | "revive" | "queued" | "uncertain" | "guidance" | "held"
 
 export type DagToolSendOutcome = {
   readonly nodeId: string
-  readonly taskId: string
+  readonly taskId?: string
   readonly delivery: DagToolSendDelivery
+  readonly guidanceId?: string
   readonly effectId?: string
   readonly queuePosition?: number
 }
@@ -74,6 +81,7 @@ export type DagToolDetails =
   | { readonly kind: "waited"; readonly run_id: string; readonly result: DagRunResult }
   | { readonly kind: "detached"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | { readonly kind: "cancelled"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
+  | { readonly kind: "node_cancelled"; readonly run_id: string; readonly node_id: string; readonly snapshot: DagRunSnapshot }
   | {
       readonly kind: "retried"
       readonly run_id: string
@@ -84,12 +92,14 @@ export type DagToolDetails =
       readonly kind: "sent"
       readonly run_id: string
       readonly node_id: string
-      readonly task_id: string
+      readonly task_id?: string
       readonly delivery: DagToolSendDelivery
+      readonly guidance_id?: string
       readonly effect_id?: string
       readonly queue_position?: number
     }
   | { readonly kind: "amended"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
+  | { readonly kind: "guided"; readonly run_id: string; readonly guidance: Guidance }
   | { readonly kind: "error"; readonly error: DagToolError }
 
 export type DagToolResult = AgentToolResult<DagToolDetails>
@@ -105,6 +115,8 @@ export type DagToolDeps = {
   readonly wait?: (runId: DagRunId, parentSessionId: string) => Promise<DagRunResult>
   /** Injection point for the scheduler's run cancellation. */
   readonly cancel?: (runId: DagRunId, reason?: string) => void | Promise<void>
+  readonly cancelNode?: (runId: DagRunId, nodeId: string) => Promise<void>
+  readonly guide?: (runId: DagRunId, command: PausedDagGuideCommand) => Promise<Guidance>
   /** Injection point for the runtime's retry entry point (fresh scheduler, run re-entered). */
   readonly retry?: (
     runId: DagRunId,

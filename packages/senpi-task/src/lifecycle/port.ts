@@ -94,6 +94,8 @@ export type RespawnFailureCode =
   // was opened nowhere and waits for the next reconcile.
   | "store_index_unavailable"
   | "host_incompatible"
+  // The child's run is stopped: nothing launches until its Resume (which respawns it paused).
+  | "run_paused"
   | "respawn_failed"
 
 export type RespawnResult =

@@ -2,6 +2,8 @@ import type { AgentSession } from "@code-yeongyu/senpi"
 import { reportedEffectiveModel, type CatalogModelIdentity, type EffectiveModel } from "../pinned-model-equivalence"
 
 import type { TaskInterruptCause } from "../../state/record-types"
+import type { NativeRunPause } from "../../pause/native-child-pause"
+import { createInProcessRunPause, type EngineTurnWatch, type RunHoldSession } from "./native-run-pause"
 import type { TaskStartFailureKind, TaskStartFailureReason } from "../../state/start-failure"
 
 /** How the engine settled a steer/follow-up: delivered to the running turn, or queued behind it. */
@@ -28,7 +30,7 @@ export type ChildExtensionRunner = {
  * live AgentSession; fakes implement only these members. `model` is what the session actually
  * started on, read by the runner's post-start pin check (#9722); fakes may omit it.
  */
-export type ChildSession = {
+export type ChildSession = RunHoldSession & {
   readonly sessionId: string
   readonly model?: CatalogModelIdentity
   readonly effectiveServiceTier?: string
@@ -103,6 +105,7 @@ export type ChildCompletionPolicy = "final-text" | "turn"
 export type ChildHandle = {
   readonly task_id: string
   readonly sessionId: string
+  readonly runPause?: NativeRunPause
   /** The model the child session is ACTUALLY on, read live - the post-start record's source (#9722). */
   effectiveModel(): EffectiveModel | undefined
   steer(text: string): Promise<void>
@@ -287,9 +290,36 @@ function createTrackedChildHandle(
     )
   }
 
+  // The engine starts a resumed turn itself: observe it from its agent_start to its agent_end.
+  const watchEngineTurn = (): EngineTurnWatch => {
+    const settled = Promise.withResolvers<RunnerOutcome>()
+    let started = false
+    const unsubscribe = session.subscribe((event) => {
+      if (event.type === "agent_start" && !started) {
+        started = true
+        aborted = false
+        turnActive = true
+        observation.text = undefined
+        observation.stopReason = undefined
+        observation.errorMessage = undefined
+        observation.provider = undefined
+        observation.model = undefined
+        observation.baseline = session.getLastAssistantText()
+        running = settled.promise
+      } else if (event.type === "agent_end" && started) {
+        unsubscribe()
+        turnActive = false
+        settled.resolve(aborted ? { status: "cancelled" } : turnOutcome(session, observation, completion))
+      }
+    })
+    return { outcome: settled.promise, cancel: unsubscribe }
+  }
+  const runPause = createInProcessRunPause(session, watchEngineTurn)
+
   const handle: ChildHandle = {
     task_id: taskId,
     sessionId: session.sessionId,
+    ...(runPause === undefined ? {} : { runPause }),
     effectiveModel: () => reportedEffectiveModel(session.model, session.effectiveServiceTier),
     steer: (text) => session.steer(text).then(ignoreQueuedInputDisposition),
     followUp: async (text) => {
@@ -319,9 +349,16 @@ function createTrackedChildHandle(
 }
 
 export function createChildHandle(input: CreateChildHandleInput): ChildHandle {
+  const staged = createStagedChildHandle(input)
+  staged.begin()
+  return staged.handle
+}
+
+// A created child whose first prompt has not been sent: the launch decides, after creation, whether
+// to begin that turn or hold the prompt for the run's Resume.
+export function createStagedChildHandle(input: CreateChildHandleInput): { readonly handle: ChildHandle; begin(): void } {
   const tracked = createTrackedChildHandle(input.taskId, input.session, input.completion)
-  tracked.beginTurn(input.promptText)
-  return tracked.handle
+  return { handle: tracked.handle, begin: () => tracked.beginTurn(input.promptText) }
 }
 
 // A restored child is rebuilt from its persisted transcript: the original prompt is NEVER

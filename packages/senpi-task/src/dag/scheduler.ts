@@ -1,4 +1,5 @@
 import type { TaskManager } from "../manager/types"
+import type { ResumeCredential } from "../pause/admission-barrier"
 import type { DagExecutionModeSources } from "./execution-mode"
 import { createDagJournal, subscribeDagJournal, type DagJournalListener } from "./journal"
 import { skipDuplicateTerminalTransition, type DagMaterializeSkills, type DagRunRecordV1 } from "./manager"
@@ -20,6 +21,7 @@ export type { DagRetryOptions, DagRunReentry } from "./node-retry"
 export type { DagNodeSendResult } from "./node-send"
 
 export type DagSchedulerOptions = {
+  readonly resumeCredential?: ResumeCredential
   readonly store: DagFileStore
   readonly taskManager: TaskManager
   readonly initialRecord: DagRunRecordV1
@@ -123,6 +125,7 @@ export function createDagScheduler(options: DagSchedulerOptions): DagScheduler {
     definitionNodes: new Map(options.initialRecord.definition.nodes.map((node) => [node.id, node])),
     ...(options.executionMode === undefined ? {} : { executionMode: options.executionMode }),
     ...(options.ancestry === undefined ? {} : { ancestry: options.ancestry }),
+    ...(options.resumeCredential === undefined ? {} : { resumeCredential: options.resumeCredential }),
     ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
     now,
     pendingErrors,

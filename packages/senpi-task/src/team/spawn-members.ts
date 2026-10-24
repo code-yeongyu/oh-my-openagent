@@ -103,6 +103,7 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
     ? undefined
     : assembleMemberExtensions(launch.entryPath, await resolveInheritedExtensionList(launch.inheritedExtensions))
   const result = await input.manager.start(buildMemberStartSpec(input, member, extensions))
+  if (result.kind === "held") return { taskId: result.task_id, status: "pending" }
   if (result.kind !== "started") {
     throw new SenpiTeamRuntimeError(
       `member '${member.name}' failed to start: ${describeStartResult(result)}`,
@@ -192,6 +193,8 @@ function describePlanError(error: PlanResolutionError): string {
 
 function describeStartResult(result: Exclude<StartResult, { kind: "started" }>): string {
   switch (result.kind) {
+    case "held":
+      return `held by user Stop at pause sequence ${result.pauseSeq}`
     case "depth_denied":
       return result.reason
     case "plan_unresolved":

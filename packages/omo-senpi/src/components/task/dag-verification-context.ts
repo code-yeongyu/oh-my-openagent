@@ -39,8 +39,10 @@ function verificationScopes(message: Record<string, unknown>): readonly DagVerif
       return Array.isArray(details) && details.some((detail: unknown) => isRecord(detail) && isRecord(detail["dag"])) ? ["node"] : []
     case "omo-senpi.dag-run":
       return isRecord(details) && ["completed", "failed", "cancelled"].includes(String(details["status"])) ? ["run"] : []
-    case "omo-senpi:wake":
-      return Array.isArray(details) ? details.flatMap((detail: unknown) => isRecord(detail) ? verificationScopes(detail) : []) : []
+    case "omo-senpi:wake": {
+      const items = Array.isArray(details) ? details : isRecord(details) && Array.isArray(details["items"]) ? details["items"] : []
+      return items.flatMap((detail: unknown) => isRecord(detail) ? verificationScopes(detail) : [])
+    }
     default:
       return []
   }

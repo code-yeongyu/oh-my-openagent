@@ -40,15 +40,24 @@ const EXPECTED_JOURNALED_EVENT_TYPES = [
   "dag.definition.amended",
   "dag.diagnostic.added",
   "dag.stream.overflow",
+  "dag.guidance.added",
+  "dag.guidance.edited",
+  "dag.guidance.removed",
+  "dag.guidance.dispatching",
+  "dag.guidance.delivered",
+  "dag.node.cancel_requested",
+  "dag.node.retry-staged",
+  "dag.node.pause-recovered",
+  "dag.node.pause-lost",
 ] as const
 
 describe("dag domain types", () => {
-  test("#given the journaled payload union #when its type tags are enumerated #then it has exactly 17 members and excludes live activity", () => {
+  test("#given the journaled payload union #when its type tags are enumerated #then it includes durable paused controls and excludes live activity", () => {
     // given / when
     const tags = [...DAG_RUN_EVENT_TYPES]
 
     // then
-    expect(tags).toHaveLength(17)
+    expect(tags).toHaveLength(26)
     expect([...tags].sort()).toEqual([...EXPECTED_JOURNALED_EVENT_TYPES].sort())
     expect(tags).not.toContain("dag.node.activity")
     expectTypeOf<DagRunEventPayload["type"]>().toEqualTypeOf<(typeof DAG_RUN_EVENT_TYPES)[number]>()
@@ -175,6 +184,7 @@ describe("dag domain types", () => {
       "blocked",
       "scheduled",
       "running",
+      "paused",
       "completed",
       "failed",
       "cancelled",
@@ -191,6 +201,7 @@ describe("dag domain types", () => {
       "task_cancelled",
       "resume_task_missing",
       "resume_task_orphaned",
+      "lost_while_paused",
       "journal_corrupt",
     ])
     expect(DAG_NODE_TRANSITION_REASONS).toEqual([
