@@ -63,8 +63,9 @@ async function releaseAttachment(request: RpcRequest, command: RpcObject): Promi
 
 /**
  * Runs one command on an authenticated connection under the v1.1 attachment fence. Only a
- * session-scoped mutation is fenced, as the host gates only commands that name a session: a wake
- * with no routing id carries no `sessionId` and is sent as it always was.
+ * session-scoped mutation is fenced, as the host gates only commands that name a session: a host
+ * command always names one (`live-surface.ts` resolves a missing routing id first), and a terminal's
+ * session-less wake is sent as it always was.
  */
 export async function fencedCommand(
   request: RpcRequest,

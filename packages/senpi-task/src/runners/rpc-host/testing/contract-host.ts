@@ -42,7 +42,26 @@ export type ContractHost = {
   readonly frames: { readonly connection: number; readonly frame: Frame }[]
   readonly mutations: Frame[]
   readonly permissionPreset: () => string
+  /**
+   * Starts the host's drain, as a real host does when it is superseded: every connection that arrives
+   * afterwards is disconnected before any frame is read, and an already admitted connection sees
+   * attach_session / reclaim_session refused `session_busy_lifecycle` + `host_draining`.
+   */
+  readonly drain: () => void
 }
+
+/**
+ * The real host's attachment-gate exemptions (senpi `session-attachment-gate.ts` ATTACH_GATE_EXEMPT):
+ * a connection that holds no attachment may still send these session commands.
+ */
+export const ATTACH_GATE_EXEMPT: ReadonlySet<string> = new Set([
+  "get_protocol_info", "list_sessions", "subscribe_sessions", "unsubscribe_sessions", "get_subscription_limits", "warm",
+  "detach_connection", "open_session", "attach_session", "reclaim_session", "get_effect_status", "get_state", "get_messages",
+  "get_entries", "get_tree", "get_fork_messages", "get_last_assistant_text", "get_media", "get_commands", "get_loaded_surfaces",
+  "get_available_models", "get_available_thinking_levels", "get_fast_mode", "get_session_stats", "get_pending_inputs",
+  "get_steering_messages", "get_follow_up_messages", "get_auth_providers", "get_provider_accounts", "resolve_path",
+  "memory_report", "eval_cells.list", "eval_cells.peek", "check_reload_veto",
+])
 
 /** Enforces the public v1.1 wire contract, including connection-local attachment ownership. */
 export async function withContractHost(options: ContractHostOptions, exercise: (host: ContractHost) => Promise<void>): Promise<void> {
@@ -70,7 +89,10 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
   const session = () => ({ sessionId: "rpc-1", durableSessionId: durableId, sessionPath, cwd: root, name: "target" })
   // Host-wide, unlike attachments: a session that left the host is unknown to every later connection.
   let gone = options.attachRefusal === "unknown_session"
+  let draining = false
   const server = createServer((client) => transport.authenticate(client, () => {
+    // A draining host disconnects a newly arriving client; only an admitted connection sees the attach refusal.
+    if (draining) { client.destroy(); return }
     const connection = nextConnection++
     sockets.add(client)
     client.once("close", () => sockets.delete(client))
@@ -123,11 +145,11 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
         }
         if (!authenticated) { refuseAndClose(frame, "auth_required"); continue }
         if (frame.type === "attach_session") {
-          if (options.attachRefusal === "host_draining") respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
+          if (draining || options.attachRefusal === "host_draining") respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
           else if (options.attachRefusal === "session_not_attached") respond(frame, undefined, "session_not_attached", { reason: "no_connection" })
-          else if (gone) respond(frame, undefined, "unknown_session")
+          else if (gone) respond(frame, undefined, "unknown_session", {})
           else if (frame.sessionId !== "rpc-1" || frame.durableSessionId !== durableId) {
-            respond(frame, undefined, "session_identity_mismatch")
+            respond(frame, undefined, "session_identity_mismatch", {})
           } else { attached = true; respond(frame, { sessionId: "rpc-1", attached: true }) }
           continue
         }
@@ -140,16 +162,13 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
           continue
         }
         if (frame.type === "reclaim_session") {
-          if (options.attachRefusal === "host_draining") respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
+          if (draining || options.attachRefusal === "host_draining") respond(frame, undefined, "session_busy_lifecycle", { reason: "host_draining" })
           else if (options.attachRefusal === "session_not_attached") respond(frame, undefined, "session_not_attached", { reason: "no_connection" })
-          else if (frame.durableSessionId !== durableId) respond(frame, undefined, "session_identity_mismatch")
+          else if (frame.durableSessionId !== durableId) respond(frame, undefined, "session_identity_mismatch", {})
           else { attached = true; respond(frame, { reclaimed: true, sessionId: "rpc-1" }) }
           continue
         }
         if (frame.type === "list_sessions") { respond(frame, { sessions: [session()] }); continue }
-        if (frame.type === "get_messages") { respond(frame, { messages: [] }); continue }
-        if (frame.type === "get_state") { respond(frame, { isStreaming: false }); continue }
-        if (frame.type === "get_available_models") { respond(frame, { models: [{ provider: "p", id: "m" }] }); continue }
         if (frame.type === "warm") { respond(frame, { warmed: true }); continue }
         if (frame.type === "open_session") {
           attached = true
@@ -157,14 +176,21 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
           respond(frame, { sessionId: "rpc-1", state: session() })
           continue
         }
-        // Only session-scoped commands are gated, as the host's attachment gate reads `sessionId`.
-        if (!options.legacy && !attached && frame.sessionId !== undefined) {
+        // A multi-session host routes every other command by `sessionId` (senpi `session-router-routing.ts`):
+        // one that names no session is refused before it reaches any session, an older host included.
+        if (frame.sessionId === undefined || frame.sessionId === "") { respond(frame, undefined, "missing_session_id"); continue }
+        // Only session-scoped commands are gated, as the host's attachment gate reads `sessionId`; its exempt reads pass.
+        if (!options.legacy && !attached && !ATTACH_GATE_EXEMPT.has(String(frame.type))) {
           respond(frame, undefined, "session_not_attached", {
             reason: "this connection is not attached to that session",
             action: "attach first with attach_session { sessionId, durableSessionId } or open_session { sessionPath }",
           })
           continue
         }
+        if (frame.type === "get_messages") { respond(frame, { messages: [] }); continue }
+        if (frame.type === "get_state") { respond(frame, { isStreaming: false }); continue }
+        if (frame.type === "get_available_models") { respond(frame, { models: [{ provider: "p", id: "m" }] }); continue }
+        if (frame.type === "get_available_thinking_levels") { respond(frame, { levels: ["off", "high"] }); continue }
         if (frame.type === "release_session" && options.releaseFailsThenGone && !gone) {
           gone = true
           respond(frame, undefined, "release_failed", { detail: "the hand-over entry could not be written" })
@@ -188,7 +214,7 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
     const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
     server.listen(transport.listenAddress)
     await listening
-    await exercise({ socket, root, recordPath, frames, mutations, permissionPreset: () => preset })
+    await exercise({ socket, root, recordPath, frames, mutations, permissionPreset: () => preset, drain: () => { draining = true } })
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const client of sockets) client.destroy()
