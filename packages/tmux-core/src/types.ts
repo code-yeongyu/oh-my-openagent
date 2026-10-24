@@ -18,6 +18,7 @@ export type TmuxConfig = {
   readonly main_pane_min_width: number
   readonly agent_pane_min_width: number
   readonly isolation: TmuxIsolation
+  readonly server_url_override?: string
 }
 
 export interface SpawnPaneResult {
