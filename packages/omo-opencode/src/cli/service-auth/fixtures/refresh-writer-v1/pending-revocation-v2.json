@@ -1,0 +1,90 @@
+{
+  "request": {
+    "version": 2,
+    "revocationId": "revocation_fixture_a",
+    "owner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 7,
+      "ownerHandle": "synthetic-owner-handle-a"
+    }
+  },
+  "secondRequest": {
+    "version": 2,
+    "revocationId": "revocation_fixture_b",
+    "owner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 7,
+      "ownerHandle": "synthetic-owner-handle-a"
+    }
+  },
+  "alreadyOwned": {
+    "exit": 0,
+    "body": {
+      "revocation": {
+        "revocationId": "revocation_fixture_a",
+        "state": "pending",
+        "reason": "already_owned",
+        "owner": {
+          "accountId": "account_fixture_a",
+          "deviceId": "device_fixture_a",
+          "familyId": "family_fixture_a",
+          "generation": 8,
+          "ownerHandle": "synthetic-owner-handle-a"
+        }
+      }
+    }
+  },
+  "resumeRequest": {
+    "version": 2,
+    "revocationId": "revocation_fixture_a",
+    "owner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 8,
+      "ownerHandle": "synthetic-owner-handle-a"
+    }
+  },
+  "confirmed": {
+    "exit": 0,
+    "body": {
+      "revocation": {
+        "revocationId": "revocation_fixture_a",
+        "state": "confirmed",
+        "owner": {
+          "accountId": "account_fixture_a",
+          "deviceId": "device_fixture_a",
+          "familyId": "family_fixture_a",
+          "generation": 8,
+          "ownerHandle": "synthetic-owner-handle-a"
+        }
+      }
+    }
+  },
+  "conflict": {
+    "exit": 2,
+    "body": { "error": "revocation_id_conflict" }
+  },
+  "ownerUnavailable": {
+    "exit": 1,
+    "body": { "error": "owner_unavailable" }
+  },
+  "ownerChanged": {
+    "exit": 3,
+    "body": {
+      "ownerChanged": {
+        "current": {
+          "accountId": "account_fixture_b",
+          "deviceId": "device_fixture_b",
+          "familyId": "family_fixture_b",
+          "generation": 1,
+          "ownerHandle": "synthetic-owner-handle-b"
+        }
+      }
+    }
+  }
+}

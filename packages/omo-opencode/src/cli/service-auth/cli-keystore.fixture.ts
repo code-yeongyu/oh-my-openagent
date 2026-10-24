@@ -3,17 +3,22 @@ import { join } from "node:path"
 
 const fakeStoreUrl = process.env.OMO_TEST_KEYSTORE_URL
 if (!fakeStoreUrl?.startsWith("http://127.0.0.1:")) throw new Error("local fake keystore required")
-const get = async () => {
-  const response = await fetch(fakeStoreUrl, { proxy: "" })
+const get = async (key: { readonly service: string } = { service: "omo-cli" }) => {
+  const response = await fetch(fakeStoreUrl, { proxy: "", headers: { "x-omo-test-secret-service": key.service } })
   const value: unknown = await response.json()
   if (value !== null && typeof value !== "string") throw new Error("invalid fake keystore value")
+  // Older fixture servers hold a single legacy item. They have no protocol-2 namespaces.
+  if (value !== null && key.service !== "omo-cli") {
+    const parsed: unknown = JSON.parse(value)
+    if (typeof parsed !== "object" || parsed === null || !("version" in parsed) || parsed.version !== 2) return null
+  }
   return value
 }
-const set = async ({ value }: { readonly value: string }) => {
-  await fetch(fakeStoreUrl, { method: "PUT", body: value, proxy: "" })
+const set = async ({ service, value }: { readonly service: string; readonly value: string }) => {
+  await fetch(fakeStoreUrl, { method: "PUT", body: value, proxy: "", headers: { "x-omo-test-secret-service": service } })
 }
-const remove = async () => {
-  await fetch(fakeStoreUrl, { method: "DELETE", proxy: "" })
+const remove = async (key: { readonly service: string }) => {
+  await fetch(fakeStoreUrl, { method: "DELETE", proxy: "", headers: { "x-omo-test-secret-service": key.service } })
   return true
 }
 Object.defineProperty(Bun, "secrets", { value: { get, set, delete: remove } })

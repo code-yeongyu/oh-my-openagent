@@ -1,3 +1,5 @@
 export { type CredentialStore, createCredentialStore, quietNotice } from "./keystore"
 export { type Credentials, SignInError, serviceOrigin } from "./protocol"
 export { createSession, type Session } from "./session"
+export { createProtocol2Session } from "./session-v2"
+export { sameStableOwner } from "./credential-owner"

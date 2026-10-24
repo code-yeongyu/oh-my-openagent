@@ -28,6 +28,17 @@ export const FIDELITY_GATE_CODES = Object.freeze([
 ])
 const RANK = { blocker: 0, major: 1, minor: 2 }
 
+/** The gate and delivery barrier share registry policy; caller severities cannot demote it. */
+export function blocksDelivery(defect) {
+	if (!Object.hasOwn(DEFECT_CODES, defect?.code)) return true
+	const entry = DEFECT_CODES[defect.code]
+	return entry.integrity || entry.severity !== "minor"
+}
+
+export function deliveryBlockReason(defect) {
+	return Object.hasOwn(DEFECT_CODES, defect?.code) ? `fidelity_unresolved: ${defect.code}` : `unknown defect code ${defect?.code}`
+}
+
 function withIntegrity(defect) {
 	const { code, severity, selector, line, message, hint } = defect
 	return { code, severity, integrity: DEFECT_CODES[code].integrity, selector, line, message, hint }

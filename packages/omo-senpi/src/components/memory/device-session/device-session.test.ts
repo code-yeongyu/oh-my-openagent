@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, onTestFinished, spyOn, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto"
 import { mkdtemp, rm } from "node:fs/promises"
@@ -46,6 +46,22 @@ function memoryStore(initial: Credentials | null): CredentialStore & { clear(): 
   }
 }
 
+function sealedAuthority(store: CredentialStore): void {
+  const get = spyOn(Bun.secrets, "get").mockImplementation(async ({ service }) => {
+    if (service !== "omo-cli-v2") return null
+    const current = await store.read()
+    return current === null ? null : JSON.stringify({ version: 2, active: {
+      ...current, writerFloor: 2, owner: {
+        accountId: "acct_42", deviceId: current.device.id, familyId: `family-${current.device.id}`,
+        generation: 1, ownerHandle: `owner-${current.device.id}`,
+      },
+    } })
+  })
+  const set = spyOn(Bun.secrets, "set").mockImplementation(async () => { throw new Error("Unexpected native write") })
+  const remove = spyOn(Bun.secrets, "delete").mockImplementation(async () => { throw new Error("Unexpected native delete") })
+  onTestFinished(() => { get.mockRestore(); set.mockRestore(); remove.mockRestore() })
+}
+
 const meReply = (accountId: string): typeof fetch =>
   Object.assign(async (input: Parameters<typeof fetch>[0]) => {
     if (!String(input).endsWith("/v1/me")) return new Response("{}", { status: 404 })
@@ -54,7 +70,9 @@ const meReply = (accountId: string): typeof fetch =>
 
 describe("the CLI device account source", () => {
   test("a signed-out device answers null", async () => {
-    expect(await createCliAccountSource({ api: "http://127.0.0.1:9", store: memoryStore(null), fetch: meReply("acct") })()).toBeNull()
+    const store = memoryStore(null)
+    sealedAuthority(store)
+    expect(await createCliAccountSource({ api: "http://127.0.0.1:9", store, fetch: meReply("acct") })()).toBeNull()
   })
 
   test("a host whose OS credential store cannot be used reads as signed out, not as a failure", async () => {
@@ -65,12 +83,14 @@ describe("the CLI device account source", () => {
       write: async () => undefined,
       clear: async () => undefined,
     }
+    sealedAuthority(locked)
     expect(await createCliAccountSource({ api: "http://127.0.0.1:9", store: locked, fetch: meReply("acct") })()).toBeNull()
   })
 
   test("a signed-in device names its account and builds its keyring from the keys it registered at sign-in", async () => {
     const stored = credentials()
     const store = memoryStore(stored)
+    sealedAuthority(store)
     const account = await createCliAccountSource({ api: "http://127.0.0.1:9", store, fetch: meReply("acct_42") })()
     if (account === null) throw new Error("signed in, yet no account")
     expect(account.accountId).toBe("acct_42")
@@ -81,6 +101,9 @@ describe("the CLI device account source", () => {
     expect(keyring.publicKeys().signing).toBe(registered)
     expect(keyring.principal().id).not.toBe(stored.device.id)
     expect(await account.signedOut()).toBe(false)
+    await store.write({ ...stored, device: { id: "another-device", name: "another" } })
+    expect(await account.signedOut()).toBe(true)
+    await expect(account.accessToken()).rejects.toBeInstanceOf(SignInError)
     await store.clear()
     expect(await account.signedOut()).toBe(true)
   })

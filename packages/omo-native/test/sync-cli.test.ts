@@ -8,7 +8,7 @@ import { SignInError } from "../../omo-opencode/src/cli/service-auth/protocol"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
 import type { SyncContext } from "../sync-context"
 
-const initialExitCode = process.exitCode
+const initialExitCode = process.exitCode ?? 0
 afterEach(() => {
   process.exitCode = initialExitCode
 })

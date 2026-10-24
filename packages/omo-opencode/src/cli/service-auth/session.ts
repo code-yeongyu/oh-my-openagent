@@ -60,7 +60,7 @@ export function createSession(options: {
         await store.write(current)
         throw error
       }
-      throw new SignInError("The refresh outcome is unknown. Saved credentials and keys were retained. Sign in again with omo login.", true)
+      throw new SessionEnded("The refresh outcome is unknown. Saved credentials and keys were retained. Sign in again with omo login.", false, "refresh_recovery_expired")
     }
   }
   async function snapshot(): Promise<Credentials | null> {

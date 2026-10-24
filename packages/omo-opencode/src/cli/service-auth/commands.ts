@@ -3,7 +3,11 @@ import { isCancel, select, confirm } from "@clack/prompts"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
-import { createCredentialStore } from "./keystore"
+import { createCredentialStore, createSealedStore } from "./keystore"
+import { credentialAuthoritySchema } from "./credential-authority"
+import { revocationsSchema } from "./protocol-v2"
+import { createProtocol2Session } from "./session-v2"
+import { createWriterProtocol } from "./writer-protocol"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
 import { createSession, type Session } from "./session"
@@ -61,20 +65,28 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   try {
     const api = serviceOrigin(options.api ?? process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
     const store = createCredentialStore(api)
-    const session = createSession({ api, store, signal: controller.signal })
+    const legacySession = createSession({ api, store, signal: controller.signal })
+    const authorityStore = createSealedStore(api, "omo-cli-v2", credentialAuthoritySchema)
+    const revocations = createSealedStore(api, "omo-cli-revocations-v2", revocationsSchema)
+    const hasAuthority = await legacySession.transaction(async () =>
+      await authorityStore.read() !== null || (await revocations.read())?.records.some(record => record.state !== "settled") === true)
+    const protocol2 = () => createProtocol2Session({ api, legacy: store, store: authorityStore, revocations, signal: controller.signal })
+    let session: Pick<Session, "request" | "signal" | "ready" | "save" | "removeForLimit" | "logout" | "accessToken" | "accessSnapshot"> =
+      hasAuthority ? protocol2() : legacySession
     if (action === "logout") {
       const revoked = await session.logout()
-      console.log("Signed out of OmO. Stored credentials and device keys were removed.")
+      console.log("Signed out of OmO.")
       if (!revoked) console.error("Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.")
       return
     }
     if (action === "whoami") {
-      await session.accessToken()
-      const saved = await store.read()
-      console.log(saved ? `Signed in to ${api} as ${terminalText(saved.device.name)}.` : "Not signed in.")
+      const saved = await session.accessSnapshot()
+      if (saved === null) throw new SignInError("Not signed in. Run omo login.")
+      console.log(`Signed in to ${api} as ${terminalText(saved.device.name)}.`)
       return
     }
     await ensureServiceAvailable(session, api)
+    if (!hasAuthority && await createWriterProtocol(api, controller.signal).adoption.available()) session = protocol2()
     const name = deviceName()
     const platform = devicePlatform()
     if (!options.device && options.browser !== false) {

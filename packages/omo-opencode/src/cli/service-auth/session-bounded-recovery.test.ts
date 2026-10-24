@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import type { Credentials } from "./protocol"
 import { createSession } from "./session"
-import { clock, fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
+import { clock, fakeApi, grant, memorySecrets, privateKeys, temporaryHome } from "./test-support"
 
 const expired: Credentials = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
 
@@ -23,9 +23,11 @@ test.each(["missing", "invalid", "unprovable"] as const)("an uncertain %s journa
   expect(sends).toBe(0)
 })
 
-test("invalid_request never erases an earlier unanswered attempt", async () => {
+// The invalid_request response itself is covered by session-uncertain-recovery.test.ts.
+test("legacy exhaustion preserves the unanswered journal without sending", async () => {
   const time = clock()
-  const api = fakeApi(() => refusal("invalid_request"))
+  let sends = 0
+  const api = fakeApi(() => { sends++; return Response.json(grant) })
   const store = memorySecrets().store(api)
   const original = { ...expired, refreshState: "uncertain" as const, refreshAttempt: {
     idempotencyKey: "j".repeat(43), attempts: 1, nextAttemptAt: "2000-01-01T00:00:00Z",
@@ -34,5 +36,6 @@ test("invalid_request never erases an earlier unanswered attempt", async () => {
   const session = createSession({ api, store, home: await temporaryHome(), now: time.now })
 
   await expect(session.accessToken()).rejects.toThrow()
+  expect(sends).toBe(0)
   expect(await store.read()).toMatchObject({ refreshState: "uncertain", refreshAttempt: { idempotencyKey: original.refreshAttempt.idempotencyKey } })
 })

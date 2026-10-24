@@ -50,7 +50,7 @@ The request and its destination usually answer the format question already. Deri
 | A prior report of the same kind in this workspace, not pointed at | that report's format, offered as the Q1 default | `template-vibe` | full |
 | A complete existing deliverable for this question (section 2) | its existing format | `edit-existing` | the original's tier |
 
-QA tiers: **light** runs the static gates and one render check of the answer, and records the fidelity gate as `not_run` until Markdown deliverable support ships for it. **Full** runs the static gates, the fidelity gate, the layout gates, visual QA of every page, and the proofread gate (section 7).
+QA tiers: **light** runs the static gates and one render check of the answer, and records the fidelity gate as `not_run --reason "<why>"` (the reason is required) until Markdown deliverable support ships for it. **Full** runs the static gates, the fidelity gate, the layout gates, visual QA of every page, and the proofread gate (section 7).
 
 ## 4. The empty-info interview
 
@@ -105,7 +105,7 @@ Write `$SESSION_DIR/design-spec.md` the moment the deliverable fields are known,
    The extractor copies the CSS custom properties (light and dark), font stacks by role, the most-used colors, px breakpoints, the section skeleton, the heading numbering, the citation marker style, the lineage mode, and the figure containers, under the fixed sections `Extracted from`, `Tokens`, `Typography`, `Layout`, `Structure`, `Figures`, `Citations`, `Open questions`. A field it cannot determine reads `TODO: ask`. A PDF reference is unsupported: ask for its HTML or Markdown source.
 2. Fill every `TODO: ask` from the interview answers, then from the clean analyst register below. Never guess a value.
 3. Apply the binding figure standard and the defaults:
-   - Every figure sits in a fixed-size container with a caption; the image scales inside it with contain-fit, its aspect ratio preserved, never stretched, cropped, or spilling out. Every chart carries a title, axis labels, units, and value labels as real text, with deterministic ticks (round values computed from the data range, never left to a renderer's auto-scaling).
+   - Every figure sits in a fixed-size container with a caption; the image scales inside it with contain-fit, its aspect ratio preserved, never stretched, cropped, or spilling out. Every chart carries a title, axis labels, units, and value labels as real text, with deterministic ticks (round values computed from the data range, never left to a renderer's auto-scaling). A chart is plotted only from a `fact export --csv` file saved under `$SESSION_DIR/assets/`, its figure carries `data-chart-source` pointing at that file, and its axis tick labels sit inside one `<g class="ticks" data-tick-step=".." data-tick-min=".." data-tick-max="..">` group, so the fidelity gate can check every value label against the ledger and every tick against the declared grid.
    - One accent color over neutral background, text, and rule tones. Every color in prose, charts, and diagrams is a spec token.
    - For web deliverables, HTML/CSS bars and inline SVG are preferred over image charts, and the page has responsive breakpoints so it reads on a phone, a tablet, and a desktop.
    - Gothic (sans) type only, as a real embedded webfont for the report language; Korean text uses `word-break: keep-all; overflow-wrap: anywhere`.
@@ -123,7 +123,11 @@ Nothing reaches the requester until the gates for its QA tier pass, in this orde
    node "$SKILL_DIR/scripts/report-tools.mjs" check "$SESSION_DIR/report.html" --design-spec "$SESSION_DIR/design-spec.md" > "$SESSION_DIR/defects.json"
    ```
    It checks keep-all, palette tokens, emoji, em dashes in prose (en dashes outside numeric ranges are advisory), heading length and generic headings, unsourced numbers (section 6), figure containers and captions, chart SVG text, a report with no visual at all, images without alt text, Korean serif fonts, sections without citations, the closing section, the sources section, broken local assets, and any `--require-section <regex>` the brief requires. Every code, severity, and fix is in [report-gates.md](report-gates.md).
-2. **Fidelity gate.** The fidelity verifier checks every number, quote, and claim binding against the fact ledger and the source snapshots; its codes are the Fidelity Gate table in [report-gates.md](report-gates.md). It runs before layout and visual QA because a content failure would otherwise force an expensive re-render. Until the fidelity verifier ships in this edition, record `outcome gate fidelity not_run`.
+2. **Fidelity gate.** The fidelity verifier checks every number, quote, and claim binding against the fact ledger and the source snapshots; its codes are the Fidelity Gate table in [report-gates.md](report-gates.md). It runs before layout and visual QA because a content failure would otherwise force an expensive re-render.
+   ```bash
+   node "$SKILL_DIR/scripts/report-tools.mjs" fact verify "$SESSION_DIR/report.html" --session-dir "$SESSION_DIR"   # writes fidelity-defects.json
+   ```
+   Exit `1` on any blocker or major defect: record `outcome gate fidelity fail`; minors alone exit `0` and are listed. The grammar, the fill step, and the derivations are in section 11; this stage verifies HTML only.
 3. **Layout gates.** Print the probe, evaluate it in the rendered page through the browser skill's owned headless engine, save the returned object as `$SESSION_DIR/boxes.json`, and re-run `check` with `--layout "$SESSION_DIR/boxes.json"`. It adds overflow past the container, clipped text, scroll containers, distorted images, and overlapping siblings.
    ```bash
    node "$SKILL_DIR/scripts/report-tools.mjs" layout-probe --json   # .source is one async expression
@@ -131,19 +135,25 @@ Nothing reaches the requester until the gates for its QA tier pass, in this orde
 4. **Visual QA.** Render the artifact to images (PDF pages to PNG, the HTML in the browser skill's engine at desktop and phone widths) and look at the pixels for what a machine cannot see: composition, hierarchy, page breaks, figure legibility.
 5. **Proofread.** A dedicated writing lane proofreads the final text only (grammar, spelling, punctuation, terminology, native register); it never composes or rewrites content.
 
-The light tier runs gate 1 and one render (recorded as `visual`) and records `fidelity`, `layout`, and `proofread` as `not_run`; `fidelity` stays `not_run` in the light tier until Markdown deliverable support ships for the fidelity verifier. The full tier runs all five.
+**Every reader-facing edition is verified.** The main report, the inline edition (section 9), LaTeX per-section sources, and slide sources are filled by `fact fill` from one placeholder source and each is verified by `fact verify` into its own record; PDF and DOCX are renders of a verified source. A delivered row is recorded with `outcome set <format> delivered --path <file> --verified-by <record>`, where the record's `artifact_sha256` equals the sha256 of the delivered source; a PDF or DOCX adds `--rendered-from <source>` and is matched against that source. In a session with a fact ledger, `outcome verify` refuses a delivered row without a matching record (`edition_unverified`, blocker, integrity). Markdown and LaTeX verification arrive with the Markdown stage; until then `fact verify --format md|tex` exits `2`, and such an edition is recorded `blocked_capability` with that reason rather than delivered unverified.
+
+The light tier runs gate 1 and one render (recorded as `visual`) and records `fidelity`, `layout`, and `proofread` as `not_run` (`fidelity not_run` needs `--reason "<why>"`); `fidelity` stays `not_run` in the light tier until Markdown deliverable support ships for the fidelity verifier. The full tier runs all five.
 
 ## 8. Bounded repair loop
 
 After every gate run that produced defects, ask the tracker what to do next:
 
 ```bash
-node "$SKILL_DIR/scripts/report-tools.mjs" repair decide --state "$SESSION_DIR/repair-state.json" --defects "$SESSION_DIR/defects.json" --artifact-bytes <report bytes> --renders <rendered page count> --session-dir "$SESSION_DIR"
+node "$SKILL_DIR/scripts/report-tools.mjs" repair decide --state "$SESSION_DIR/repair-state.json" --defects "$SESSION_DIR/defects.json" --defects "$SESSION_DIR/fidelity-defects.json" --artifact-bytes <report bytes> --renders <rendered page count> --session-dir "$SESSION_DIR"
 ```
+
+`--defects` repeats: every file (a `check` result, a `fact verify` record, or a bare defect array) joins one defect list, so one decision covers both gates.
 
 - `action: repair`: fix the listed defects, re-render, re-run the gate, and ask again.
 - `action: deliver`: stop repairing and deliver. `reason` is `clean` or the stop condition that fired; the residual defects are written into the manifest and listed in the closing briefing.
 - `action: block` (exit `1`): do not deliver. Either a content-integrity defect remains (`missing_closing_section`, `missing_citation_section`, `broken_asset_reference`, `missing_required_section`, `missing_promised_deliverable`, or a fidelity integrity code: `unresolved_placeholder`, `value_mismatch`, `unit_mismatch`, `quote_not_verbatim`, `claim_status_invalid`, `incompatible_operands`, `pointer_label_mismatch`, `quote_anchor_unresolved`, `unit_duplicated`, `polish_diff_fail`, `fidelity_interview_incomplete`, `derived_not_allowed`, `source_outside_floor`, `snapshot_hash_mismatch`, `chart_value_untraceable`, `quote_unbound`, `edition_unverified`), or a stop fired without proof of a usable artifact (`--artifact-bytes` and `--renders`). Tell the requester what blocks delivery and record the affected rows as `failed` with the reason.
+
+**The fidelity barrier is separate from the budget.** A `deliver` decision does not release fidelity defects: `outcome verify` and `outcome finish` use the fidelity gate's `blocksDelivery` predicate over `DEFECT_CODES` (integrity, blocker, or major), never a CLI code list or the row's claimed severity. Unknown codes refuse with `unknown defect code <code>`; known blockers produce `fidelity_unresolved`. Fix the defect and re-verify the edition before delivery.
 
 Defaults: 3 repair attempts, a plateau of 2 consecutive attempts that do not improve the (blocker, major, minor) counts compared in that order, and 15 minutes of wall clock from the first decision. A defect set that repeats an earlier attempt exactly stops the loop as an oscillation. When several conditions hold at once the reported reason follows `clean`, `blocking`, `oscillation`, `plateau`, `max_attempts`, `wall_clock`.
 
@@ -153,7 +163,7 @@ Defaults: 3 repair attempts, a plateau of 2 consecutive attempts that do not imp
 
 ```bash
 node "$SKILL_DIR/scripts/report-tools.mjs" outcome init --promised pdf,docx --lane template-vibe --session-dir "$SESSION_DIR"
-node "$SKILL_DIR/scripts/report-tools.mjs" outcome set pdf delivered --path "$SESSION_DIR/report.pdf" --pages 12 --session-dir "$SESSION_DIR"
+node "$SKILL_DIR/scripts/report-tools.mjs" outcome set pdf delivered --path "$SESSION_DIR/report.pdf" --rendered-from "$SESSION_DIR/report.html" --verified-by "$SESSION_DIR/fidelity-defects.json" --pages 12 --session-dir "$SESSION_DIR"
 node "$SKILL_DIR/scripts/report-tools.mjs" outcome set docx blocked_capability --reason "no document converter in this session" --session-dir "$SESSION_DIR"
 node "$SKILL_DIR/scripts/report-tools.mjs" outcome render "$SESSION_DIR/renders/page-01.png" --page 1 --session-dir "$SESSION_DIR"
 node "$SKILL_DIR/scripts/report-tools.mjs" outcome verify --session-dir "$SESSION_DIR"
@@ -162,8 +172,9 @@ node "$SKILL_DIR/scripts/report-tools.mjs" outcome briefing --session-dir "$SESS
 ```
 
 - `init` runs when the brief is written (section 4): one `pending` row per promised format (`pdf`, `docx`, `html`, `md`, `latex`, `slides`, `post`).
-- `set` resolves a row: `delivered` (absolute path; bytes are read from disk; pages when paginated), `blocked_capability` (this session cannot produce it), `skipped` (the requester or the lane dropped it), or `failed`. Every status except `delivered` needs `--reason`.
-- `verify` runs before delivery and exits `1` while a row is `pending`, a status lacks its reason, or a delivered file is missing or empty.
+- `set` resolves a row: `delivered` (absolute path; bytes are read from disk; pages when paginated), `blocked_capability` (this session cannot produce it), `skipped` (the requester or the lane dropped it), or `failed`. Every status except `delivered` needs `--reason`; `outcome set <format> delivered` records intent permissively, while the required `outcome verify` and `outcome finish` enforce the delivery barrier.
+- `verify` runs before delivery and exits `1` while a row is `pending`, a status lacks its reason, a delivered file is missing or empty, a registry blocker remains (`fidelity_unresolved`), or a delivered edition has no matching verify record (`edition_unverified`, section 7). Delivered HTML/PDF/DOCX without any ledger or record also refuse with `fidelity gate not run`; explicitly record `outcome gate fidelity not_run --reason "<text>"` to exempt an unverified edition. This choice is logged in `gateHistory` with its timestamp and reason; it never releases an existing ledger requirement, record, or defect, and a subsequent fidelity gate status replaces the exemption.
+- `finish` refuses (exit `1`, nothing stamped) while the fidelity barrier holds.
 - `finish` stamps the finish time, the elapsed minutes from the session directory's start stamp, and the source and domain counts from `sources-ledger.md`.
 - `briefing` prints the closing block from the manifest and the ledger: sources and distinct domains, elapsed minutes, every deliverable with its status, the gate results, the residual defects, and the repair summary. That text is the closing briefing, pasted as printed, never filled in from memory.
 
@@ -185,14 +196,58 @@ Invoke every command as `node "$SKILL_DIR/scripts/report-tools.mjs" <command>`. 
 | --- | --- | --- |
 | `check <report.html>` | `--design-spec <spec>` (required), `--layout <boxes.json>`, `--require-section <regex>` (repeatable), `--max-defects N` | any blocker defect |
 | `layout-probe` | `--cap N` (default 400), `--root <selector>` (default `main, article`), `--json` | never |
-| `repair decide` | `--state <file>` and `--defects <json>` (required), `--artifact-bytes N`, `--renders N`, `--session-dir <dir>`, `--max-attempts N`, `--plateau-limit N`, `--wall-clock-ms N`, `--now <ISO>` | the decision is `block` |
+| `repair decide` | `--state <file>` and `--defects <json>` (required; repeatable, the files are concatenated), `--artifact-bytes N`, `--renders N`, `--session-dir <dir>`, `--max-attempts N`, `--plateau-limit N`, `--wall-clock-ms N`, `--now <ISO>` | the decision is `block` |
 | `outcome init` | `--promised <list>` (required), `--lane <lane>`, `--session-dir <dir>`, `--now <ISO>` | never |
-| `outcome set <format> <status>` | `--path <file>`, `--pages N`, `--reason <text>`, `--session-dir <dir>`, `--now <ISO>` | never |
-| `outcome gate <gate> <status>` | `--session-dir <dir>` | never |
+| `outcome set <format> <status>` | `--path <file>`, `--pages N`, `--reason <text>`, `--verified-by <fidelity record>`, `--rendered-from <source>`, `--session-dir <dir>`, `--now <ISO>` | never |
+| `outcome gate <gate> <status>` | `--session-dir <dir>`, `--now <ISO>`, `--reason <text>` (required for `fidelity not_run`; logged in `gateHistory`) | never (a missing reason exits `2`) |
 | `outcome render <png>` | `--page N` (required), `--session-dir <dir>` | never |
 | `outcome state` | `--deliverable <path>` (required), `--session-dir <dir>` | never |
-| `outcome verify` | `--session-dir <dir>` | a promise is unresolved or a delivered file is missing or empty |
-| `outcome finish` | `--ledger <file>`, `--session-dir <dir>`, `--now <ISO>` | never |
+| `outcome verify` | `--session-dir <dir>` | a promise is unresolved, a delivered file is missing or empty, `fidelity_unresolved`, or `edition_unverified` |
+| `outcome finish` | `--ledger <file>`, `--session-dir <dir>`, `--now <ISO>` | the fidelity barrier holds (section 8) |
 | `outcome briefing` | `--json`, `--ledger <file>`, `--session-dir <dir>`, `--now <ISO>` | never |
 | `format-extract <reference>` | `--out <design-spec.md>` (required), `--from-url` | never (an unsupported reference exits `2`) |
 | `--help` | `--json` | never |
+| `source snapshot` | `--id S<n>` (required), one of `--url <u>`, `--html <file>`, `--text <file>` (with optional `--extractor NAME@VERSION`), `--command '<argv json>' --cwd <dir>`; `--kind page\|command\|document`, `--provenance primary\|secondary`, `--revision <r>`, `--session-dir <dir>` | the id already holds different content (`snapshot_exists`) |
+| `fact add` | `--source S<n>` with `--find <text>` (`--unit-expected <unit>`), or `--table <id> --row <label> --col <label>`, or `--page N --line N`; `--label`, `--entity`, `--valid-at`, `--population`, `--accounting-basis`, `--observation O<n>`, `--json`, `--session-dir <dir>`. Or `--assumed <value> --unit <unit> --rationale <text> --label <label>` | `fact_not_located`, `fact_ambiguous`, `unit_mismatch` (no row written) |
+| `fact quote` | `--source S<n> --match <text>` (required), `--label`, `--json`, `--session-dir <dir>` | `fact_not_located`, `fact_ambiguous` |
+| `fact retract <id>` | `--reason <text>` (required), `--replacement <id>`, `--session-dir <dir>` | never (an illegal transition exits `2`) |
+| `fact export` | `--csv`, `--out <file>`, `--session-dir <dir>` | never |
+| `fact fill <src>` | `--out <file>` or `--view`, `--format html\|md\|tex`, `--inline`, `--replace-failed`, `--session-dir <dir>` | a fill error (nothing is written) |
+| `fact verify <report>` | `--format html`, `--sources <dir>`, `--claims <claims.json>`, `--fill-map <file>`, `--brief <brief.md>`, `--out <record>`, `--session-dir <dir>` | any blocker or major defect |
+| `fact derive` | `--op <op>` (required) with the operation's operands (section 11), `--unit`, `--to`, `--rationale`, `--disjoint`, `--label`, `--json`, `--session-dir <dir>` | `incompatible_operands` (no row written) |
+| `claims index <claim-graph.md>` | `--out <claims.json>` (required) | never (a malformed claim table exits `2`) |
+
+## 11. Fidelity gate
+
+Every number, quotation, and chart value in a reader-facing edition comes from the fact ledger (`$SESSION_DIR/fact-ledger.json`, schema and operations in [fact-ledger.md](fact-ledger.md)), which is built only from source snapshots (`$SESSION_DIR/sources/S<n>/`). Nobody types a value into a report. The commands, in the order a run uses them:
+
+```bash
+node "$SKILL_DIR/scripts/report-tools.mjs" source snapshot --id S4 --url https://example.org/bridge --session-dir "$SESSION_DIR"
+node "$SKILL_DIR/scripts/report-tools.mjs" fact add --source S4 --find "Span length" --label span_len --session-dir "$SESSION_DIR"
+node "$SKILL_DIR/scripts/report-tools.mjs" fact quote --source S4 --match "no earlier than 2027" --label completion --session-dir "$SESSION_DIR"
+node "$SKILL_DIR/scripts/report-tools.mjs" fact derive --op convert F1 --to mm --label span_mm --session-dir "$SESSION_DIR"
+node "$SKILL_DIR/scripts/report-tools.mjs" claims index "$SESSION_DIR/claim-graph.md" --out "$SESSION_DIR/claims.json"
+node "$SKILL_DIR/scripts/report-tools.mjs" fact fill "$SESSION_DIR/report.src.html" --out "$SESSION_DIR/report.html" --session-dir "$SESSION_DIR"
+node "$SKILL_DIR/scripts/report-tools.mjs" fact verify "$SESSION_DIR/report.html" --session-dir "$SESSION_DIR"
+```
+
+- **Snapshot.** A source directory is immutable: the same id with identical text is a no-op, different text fails with `snapshot_exists`, because ledger rows pin the old hash; use a new id. `--url` fetches with plain fetch (30 s timeout, no browser) and records extractor `tool:source-snapshot@1`. `--html` and `--text` import a capture the browser lane saved and record extractor `model` (lower trust), or the named extractor with `--text --extractor NAME@VERSION`. `--command` runs an argv without a shell, snapshots its stdout, and writes `command.json` with the argv, working directory, exit status, and output hashes.
+- **Register.** `fact add` locates one quantity deterministically (`--find`: the first numeral within 80 characters after a unique anchor, in the same sentence; `--table`/`--row`/`--col` by header labels; `--page`/`--line`) and prints the row with 60 characters of source context on each side (`--json` for the full row). `fact quote` stores the whole containing sentence. The row records the source's kind, URL, host, and whether the brief's source floor points at it. A failed locate writes nothing.
+- **Write by reference.** Placeholders: `{{F12:span_len}}` (value and unit), `{{F12:span_len:value}}`, `{{F12:span_len:unit}}`, `{{F12:span_len:q}}` (with the source qualifier), `{{Q7:completion}}`, `{{Q7:completion:lead=8}}`, `{{Q7:completion:from="no earlier":to="2027"}}`. The label must equal the row's label.
+- **Fill.** `fact fill` is all or nothing: on `pointer_label_mismatch`, `unresolved_placeholder`, `quote_anchor_unresolved`, or `unit_duplicated` it exits `1` and writes nothing. On success it writes the output and `<out>.fill-map.json`. `--view` prints the rendered text without writing; `--inline` builds the inline edition (local stylesheets and scripts inlined, image paths made absolute) from the same source; `--format md` and `--format tex` fill Markdown and LaTeX sources; `--replace-failed` replaces a sentence that failed twice with an attributed block quote of its source.
+- **Verify.** `fact verify` writes its record (default `fidelity-defects.json`; `--out` for another edition) with the verified file's `artifact_sha256`, reads `claims.json` and the locked `## Fidelity` block of `brief.md`, and exits `1` on any blocker or major defect; minors alone exit `0`. This stage verifies HTML only; `--format md` and `--format tex` exit `2` until Markdown support lands.
+- **Export.** `fact export --csv --out "$SESSION_DIR/assets/<chart>.csv"` writes `fact_id,label,plot_value,unit` for every active value row, the only data a chart may plot, and prints `N of M sources snapshotted, by extractor: ...` for the closing briefing.
+
+Derivations are computed in exact rationals from the operands' stored values and rendered at the operands' fewest significant figures; a refused operation exits `1` with `incompatible_operands` and writes no row.
+
+| Operation | Operands | Checks |
+| --- | --- | --- |
+| `sum` | two or more ids, `--unit` | one unit; summing `%` needs `--disjoint` and `--rationale` |
+| `diff` | two ids (minuend, subtrahend) | one unit; a difference of `%` is in `pp` |
+| `growth` | `--from <id> --to <id>` | one declared entity, two different `valid_at` periods, a positive start; result in `%` |
+| `ratio` | `--num <id> --den <id>`, `--unit` | a non-zero denominator |
+| `share` | `--part <id> --whole <id>` | one unit; result in `%` |
+| `convert` | one id, `--to <unit>` | a known conversion between the units |
+| `expr` | a formula over ids, `+ - * /`, `0`, `1`, `100`, `--unit`, `--rationale` | none (recorded `unchecked`) |
+
+Exit codes: `0` ok; `1` a semantic failure (`fact_not_located`, `fact_ambiguous`, a fill error, `incompatible_operands`, `snapshot_exists`, or a verify record with a blocker or major defect); `2` usage, an unreadable input, or an invalid ledger write.

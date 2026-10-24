@@ -3,7 +3,7 @@
 // supplies one DeviceAccountSource; everything after it is the same code for the TUI, the CLI and
 // the desktop. Private keys stay in the credential store and reach only the keyring built from them.
 
-import { type Credentials, createCredentialStore, type CredentialStore, createSession, quietNotice, serviceOrigin, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
+import { createCredentialStore, type CredentialStore, createProtocol2Session, quietNotice, sameStableOwner, serviceOrigin, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
 
 import type { DeviceKeyMaterial, DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 
@@ -54,28 +54,39 @@ export function createCliAccountSource(options: {
   }
   const doFetch = options.fetch ?? fetch
   return async () => {
-    let store: CredentialStore
-    let credentials: Credentials | null
+    let session: ReturnType<typeof createProtocol2Session>
     try {
       // A host runs under a TUI: the CLI's keyring-fallback notice must not write over it, and the fallback is
       // the same libsecret path the CLI uses (#10658 review).
-      store = options.store ?? createCredentialStore(api, undefined, undefined, undefined, quietNotice)
-      credentials = await store.read()
+      const store = options.store ?? createCredentialStore(api, undefined, undefined, undefined, quietNotice)
+      session = createProtocol2Session({ api, legacy: store, notice: quietNotice })
+      if (await session.stored() === null) return null
     } catch (error) {
       // A host with no usable OS credential store (plain Node, a locked or absent keyring) cannot be
       // signed in; that is the signed-out state, not a sync failure on every session bind.
       if (error instanceof SignInError) return null
       throw error
     }
+    const credentials = await session.accessSnapshot()
     if (credentials === null) return null
-    const session = createSession({ api, store })
-    const accessToken = () => session.accessToken()
+    const accessToken = async () => {
+      const current = await session.accessSnapshot()
+      if (current === null || !sameStableOwner(current.owner, credentials.owner)) {
+        throw new SignInError("The signed-in device changed. Reconnect memory sync.")
+      }
+      return current.accessToken
+    }
+    const accountId = await accountIdOf(api, credentials.accessToken, doFetch)
+    if (accountId !== credentials.owner.accountId) throw new SignInError("The service returned another account for this device.")
     return {
       api,
-      accountId: await accountIdOf(api, await accessToken(), doFetch),
+      accountId,
       keyring: (build) => build({ signingPrivatePkcs8: base64url(credentials.signingPrivateKey), sealingPrivatePkcs8: base64url(credentials.sealingPrivateKey) }),
       accessToken,
-      signedOut: async () => (await store.read()) === null,
+      signedOut: async () => {
+        const current = await session.stored()
+        return current === null || current.owner === undefined || !sameStableOwner(current.owner, credentials.owner)
+      },
     }
   }
 }

@@ -62,6 +62,6 @@ test("login against a reachable service checks health first, then signs in as be
     return new Response(null, { status: 404 })
   })
   const result = await omo(["login", "--device"], api)
-  expect(requests.slice(0, 2)).toEqual(["GET /v1/health", "POST /v1/device/code"])
+  expect(requests.slice(0, 3)).toEqual(["GET /v1/health", "GET /.well-known/omo-service", "POST /v1/device/code"])
   expect(result.stdout).toContain(minted.userCode)
 })

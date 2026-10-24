@@ -4,7 +4,7 @@ import { ApiRefusal, type ChooseDevice, deviceCodeSchema, grantSchema, jsonReque
 import type { Session } from "./session"
 
 export type DisplayCode = { readonly verificationUri: string; readonly userCode: string; readonly matchingCode: string }
-export async function loginDevice(session: Session, options: {
+export async function loginDevice(session: Pick<Session, "ready" | "request" | "signal" | "save" | "removeForLimit">, options: {
   readonly name: string
   readonly platform: Platform
   readonly show: (code: DisplayCode) => void

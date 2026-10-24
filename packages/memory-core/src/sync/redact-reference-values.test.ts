@@ -27,12 +27,14 @@ describe("secret scanner: assignments that only reference a credential", () => {
     })
   }
 
+  const jwtHeader = Buffer.from(JSON.stringify({ alg: "HS256" })).toString("base64url")
+
   const credentials = [
     "password: hunter2Abrx9",
     "token=nullable-9fQ2xK7",
     "secret: exampleValue123",
     "api_key: $ecretValue9!x",
-    "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature",
+    `Authorization: Bearer ${jwtHeader}.payload.signature`,
     "client_secret=abcDEF123456",
     "a p i _ k e y : hunter2Abrx9",
     "sk-proj-AbCdEf123456",

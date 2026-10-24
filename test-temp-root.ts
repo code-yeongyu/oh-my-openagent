@@ -2,6 +2,7 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
+import { removeTreeSync } from "./test-support/remove-tree"
 import reportOnlyPrefixesByOwner from "./test-temp-leak-report-only.json"
 import { isOsCreatedTempEntry, reportOnlyOwner as ownerIn } from "./test-temp-leak-match"
 
@@ -48,11 +49,22 @@ function isAbandoned(root: string): boolean {
 // A run that is killed (SIGKILL, a CI timeout, a crash) never reaches its afterAll, so its root stays
 // behind. Each root records its owner's pid; a later run removes the roots whose owner is gone. A live
 // pid, including a reused one, keeps its root, so a concurrent suite's root is never touched.
-function removeAbandonedRunRoots(osTempDir: string): void {
+export function removeAbandonedRunRoots(
+  osTempDir: string,
+  removeRoot: (root: string) => void = (root) => removeTreeSync(root, { maxRetries: 3 }),
+): void {
   for (const entry of readdirSync(osTempDir)) {
     if (!entry.startsWith(RUN_ROOT_PREFIX)) continue
     const root = join(osTempDir, entry)
-    if (isAbandoned(root)) rmSync(root, { recursive: true, force: true, maxRetries: 3 })
+    if (!isAbandoned(root)) continue
+    try {
+      removeRoot(root)
+    } catch (error) {
+      // Another run's leftover may still be held after the retries; a later sweep can remove it.
+      const code = error instanceof Error && "code" in error ? error.code : undefined
+      if (typeof code === "string" && ["EBUSY", "EPERM", "ENOTEMPTY", "EACCES"].includes(code)) continue
+      throw error
+    }
   }
 }
 

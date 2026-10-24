@@ -186,6 +186,14 @@ export function validateOutcomeManifest(manifest) {
 	if (isObject(manifest.gates)) {
 		for (const gate of GATE_NAMES) check(errors, GATE_STATUSES.includes(manifest.gates[gate]), `gates.${gate} must be one of ${GATE_STATUSES.join(", ")}`)
 	} else errors.push("gates must be an object")
+	if (manifest.gateHistory !== undefined) {
+		if (!Array.isArray(manifest.gateHistory)) errors.push("gateHistory must be an array")
+		else for (const entry of manifest.gateHistory) {
+			check(errors, isObject(entry) && GATE_NAMES.includes(entry.gate) && GATE_STATUSES.includes(entry.status)
+				&& typeof entry.at === "string" && ISO_DATE.test(entry.at)
+				&& (entry.reason === undefined || typeof entry.reason === "string"), "gateHistory entries must have a known gate, status, timestamp, and optional reason")
+		}
+	}
 	if (Array.isArray(manifest.residualDefects)) manifest.residualDefects.forEach((defect, index) => validateDefect(defect, `residualDefects[${index}]`, errors))
 	else errors.push("residualDefects must be an array")
 	check(errors, manifest.repair === null || isObject(manifest.repair), "repair must be null or an object")

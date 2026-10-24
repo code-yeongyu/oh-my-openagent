@@ -74,7 +74,8 @@ export async function refreshOwnedCredential(options: {
   }
   await write({ ...current, refreshState: "uncertain", refreshAttempt: { ...attempt, state: "successor_received_uncommitted" } })
   const { refreshAttempt: _attempt, refreshState: _state, ...committed } = successor
-  // A failed replacement leaves the original sent_unknown record. No successor token is published.
+  // A failed replacement retains successor_received_uncommitted with the original attempt identity.
+  // No successor token is published.
   await write(committed)
   return committed
 }

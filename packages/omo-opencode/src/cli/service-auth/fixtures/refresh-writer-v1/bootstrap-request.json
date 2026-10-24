@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "refreshToken": "synthetic-original-refresh-token",
+  "legacyState": "uncertain",
+  "intent": {
+    "version": 1,
+    "purpose": "refresh_writer_enrollment",
+    "serviceOrigin": "https://service.example.test",
+    "deviceId": "device_fixture_a",
+    "refreshTokenHash": "0f4847f954b8664c36630d72ef9a2c6025ddd7137260d899dea4222cd56342b8",
+    "challengeNonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "challengeExpiresAt": "2030-01-02T03:04:05.000Z",
+    "enrollmentId": "enrollment_fixture_a",
+    "idempotencyKey": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    "requestedFloor": 2
+  },
+  "signature": "gdRIu-sRs28Xbu67bsFDkv1boAYk4U8U4mRzaF8NV8-7_zrsRjdQfoJMpgjBbKY7flihCIHN1uz06M56x44RAA"
+}

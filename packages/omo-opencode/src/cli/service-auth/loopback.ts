@@ -78,7 +78,7 @@ async function authorize(options: {
   }
 }
 
-export async function loginLoopback(session: Session, options: {
+export async function loginLoopback(session: Pick<Session, "ready" | "request" | "signal" | "save" | "removeForLimit">, options: {
   readonly accounts: string
   readonly name: string
   readonly platform: Platform

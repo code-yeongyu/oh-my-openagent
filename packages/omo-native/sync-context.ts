@@ -5,7 +5,7 @@ import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
 import { type CredentialStore, createCredentialStore } from "../omo-opencode/src/cli/service-auth/keystore"
 import { serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
-import { createSession } from "../omo-opencode/src/cli/service-auth/session"
+import { createProtocol2Session } from "../omo-opencode/src/cli/service-auth/session-v2"
 
 export interface SyncContext {
   readonly account: string
@@ -30,16 +30,23 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 export async function signedInSyncContext(options: SyncContextOptions): Promise<SyncContext> {
   const api = serviceOrigin(options.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
   const store = options.store ?? createCredentialStore(api)
-  const credentials = await store.read()
+  const session = createProtocol2Session({ api, legacy: store })
+  const credentials = await session.accessSnapshot()
   if (credentials === null) throw new SignInError("Not signed in. Run omo login first.")
-  const session = createSession({ api, store })
-  const token = () => session.accessToken()
+  const token = async () => {
+    const current = await session.accessSnapshot()
+    if (current === null || current.owner.ownerHandle !== credentials.owner.ownerHandle) {
+      throw new SignInError("The signed-in device changed. Start the sync command again.")
+    }
+    return current.accessToken
+  }
   const doFetch = options.fetch ?? fetch
   const me = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${await token()}` } })
   if (!me.ok) throw new SignInError(`The account could not be read (${me.status}). Try again, or run omo login.`)
   const body: unknown = await me.json()
   const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
   if (typeof account !== "string" || account === "") throw new SignInError("The service named no account for this sign-in.")
+  if (account !== credentials.owner.accountId) throw new SignInError("The service returned another account for this device.")
   const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
   return {
     account,

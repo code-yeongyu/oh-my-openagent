@@ -1,0 +1,139 @@
+{
+  "challengeRequest": { "version": 1, "purpose": "refresh_writer_enrollment" },
+  "challengeResponse": {
+    "version": 1,
+    "purpose": "refresh_writer_enrollment",
+    "serviceOrigin": "https://service.example.test",
+    "challengeNonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "challengeExpiresAt": "2030-01-02T03:04:05.000Z"
+  },
+  "bootstrapReady": {
+    "version": 1,
+    "outcome": "ready",
+    "owner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 7,
+      "ownerHandle": "synthetic-owner-handle-a"
+    },
+    "writerFloor": 1,
+    "enrollmentAuthorization": "synthetic-enrollment-authorization",
+    "enrollmentAuthorizationExpiresAt": "2030-01-02T03:05:05.000Z"
+  },
+  "enrollmentRequest": {
+    "version": 1,
+    "enrollmentId": "enrollment_fixture_a",
+    "idempotencyKey": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    "expectedFamilyId": "family_fixture_a",
+    "expectedGeneration": 7,
+    "refreshToken": "synthetic-original-refresh-token",
+    "enrollmentAuthorization": "synthetic-enrollment-authorization"
+  },
+  "enrollmentClaimed": {
+    "version": 1,
+    "outcome": "claimed",
+    "credential": {
+      "owner": {
+        "accountId": "account_fixture_a",
+        "deviceId": "device_fixture_a",
+        "familyId": "family_fixture_a",
+        "generation": 8,
+        "ownerHandle": "synthetic-owner-handle-a"
+      },
+      "writerFloor": 2,
+      "refreshToken": "synthetic-successor-refresh-token",
+      "accessToken": "synthetic-access-token",
+      "accessTokenExpiresAt": "2030-01-02T04:04:00.000Z"
+    }
+  },
+  "enrollmentStatus": {
+    "version": 1,
+    "outcome": "claimed",
+    "owner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 8,
+      "ownerHandle": "synthetic-owner-handle-a"
+    },
+    "writerFloor": 2
+  },
+  "adoptionRequest": {
+    "version": 1,
+    "adoptionId": "adoption_fixture_b",
+    "action": "replace_account",
+    "freshAuthorizationProof": "synthetic-fresh-authorization-proof",
+    "credential": {
+      "owner": {
+        "accountId": "account_fixture_b",
+        "deviceId": "device_fixture_b",
+        "familyId": "family_fixture_b",
+        "generation": 1,
+        "ownerHandle": "synthetic-owner-handle-b"
+      },
+      "writerFloor": 2,
+      "refreshToken": "synthetic-fresh-refresh-token"
+    },
+    "expectedActiveOwner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 8,
+      "ownerHandle": "synthetic-owner-handle-a"
+    }
+  },
+  "adoptionApproval": {
+    "version": 1,
+    "outcome": "approved",
+    "adoptionId": "adoption_fixture_b",
+    "action": "replace_account",
+    "owner": {
+      "accountId": "account_fixture_b",
+      "deviceId": "device_fixture_b",
+      "familyId": "family_fixture_b",
+      "generation": 1,
+      "ownerHandle": "synthetic-owner-handle-b"
+    },
+    "writerFloor": 2,
+    "expectedActiveOwner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 8,
+      "ownerHandle": "synthetic-owner-handle-a"
+    }
+  },
+  "adoptionStatusUnknown": {
+    "version": 1,
+    "outcome": "unknown"
+  },
+  "adoptionStatusApproved": {
+    "version": 1,
+    "outcome": "approved",
+    "adoptionId": "adoption_fixture_b",
+    "action": "replace_account",
+    "owner": {
+      "accountId": "account_fixture_b",
+      "deviceId": "device_fixture_b",
+      "familyId": "family_fixture_b",
+      "generation": 1,
+      "ownerHandle": "synthetic-owner-handle-b"
+    },
+    "writerFloor": 2,
+    "expectedActiveOwner": {
+      "accountId": "account_fixture_a",
+      "deviceId": "device_fixture_a",
+      "familyId": "family_fixture_a",
+      "generation": 8,
+      "ownerHandle": "synthetic-owner-handle-a"
+    }
+  },
+  "capabilities": {
+    "refreshWriterProtocols": [1, 2],
+    "refreshWriterBootstrap": "device-signature-v1",
+    "refreshWriterEnrollment": "generation-bound-v1",
+    "credentialAdoption": "fresh-authorization-v1",
+    "pendingRevocation": "generation-bound-v1"
+  }
+}

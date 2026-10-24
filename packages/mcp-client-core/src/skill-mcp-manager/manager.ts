@@ -109,20 +109,40 @@ export class SkillMcpManager {
 
   async listTools(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Tool[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listTools()
-    return result.tools
+    return this.collectPages(async (cursor) => {
+      const result = await client.listTools(cursor === undefined ? undefined : { cursor })
+      return { items: result.tools, nextCursor: result.nextCursor }
+    })
   }
 
   async listResources(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Resource[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listResources()
-    return result.resources
+    return this.collectPages(async (cursor) => {
+      const result = await client.listResources(cursor === undefined ? undefined : { cursor })
+      return { items: result.resources, nextCursor: result.nextCursor }
+    })
   }
 
   async listPrompts(info: SkillMcpClientInfo, context: SkillMcpServerContext, options?: SkillMcpClientOptions): Promise<Prompt[]> {
     const client = await this.getOrCreateClientWithRetry(info, context.config, options)
-    const result = await client.listPrompts()
-    return result.prompts
+    return this.collectPages(async (cursor) => {
+      const result = await client.listPrompts(cursor === undefined ? undefined : { cursor })
+      return { items: result.prompts, nextCursor: result.nextCursor }
+    })
+  }
+
+  private async collectPages<T>(
+    request: (cursor?: string) => Promise<{ items: T[]; nextCursor?: string }>,
+  ): Promise<T[]> {
+    const items: T[] = []
+    let cursor: string | undefined
+    for (let page = 0; page < 100; page++) {
+      const result = await request(cursor)
+      items.push(...result.items)
+      if (result.nextCursor === undefined) return items
+      cursor = result.nextCursor
+    }
+    throw new Error("MCP list pagination exceeded 100 pages.")
   }
 
   async callTool(
