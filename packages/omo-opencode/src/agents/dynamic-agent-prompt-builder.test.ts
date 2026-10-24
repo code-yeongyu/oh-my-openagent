@@ -6,6 +6,7 @@ import {
   buildNonClaudePlannerSection,
   buildParallelDelegationSection,
   buildUltraworkSection,
+  PLAN_CONSULT_TRIGGERS,
   type AvailableAgent,
   type AvailableCategory,
   type AvailableSkill,
@@ -103,5 +104,37 @@ describe("buildNonClaudePlannerSection", () => {
     expect(geminiResult).toBe(gptResult)
     expect(geminiResult).not.toBe(claudeResult)
     expect(claudeResult).toBe("")
+  })
+
+  it("gates Plan consultation on unresolved decisions, never procedural step count (#6074)", () => {
+    // given the machine-readable trigger contract behind the non-Claude planner section
+
+    // when the trigger vocabulary is inspected
+    const triggers = [...PLAN_CONSULT_TRIGGERS].sort()
+
+    // then it contains exactly the decision-based sentinels from the #6074 boundary
+    expect(triggers).toEqual([
+      "architecture-or-migration",
+      "compatibility-impact",
+      "explicit-plan-request",
+      "multi-owner-ordering",
+      "unresolved-ambiguity",
+    ])
+
+    // and no trigger encodes a procedural step count
+    expect(PLAN_CONSULT_TRIGGERS.some((trigger) => /step/i.test(trigger))).toBe(false)
+  })
+
+  it("propagates every decision trigger into the assembled non-Claude section", () => {
+    // given a GPT-5.6 model id routed through the shared GPT sisyphus family
+    const section = buildNonClaudePlannerSection("openai/gpt-5.6-sol")
+
+    // then each machine-consumed trigger sentinel reaches the assembled prompt
+    for (const trigger of PLAN_CONSULT_TRIGGERS) {
+      expect(section).toContain(`[plan-trigger:${trigger}]`)
+    }
+
+    // and the plan tool invocation seam stays wired
+    expect(section).toContain('subagent_type="plan"')
   })
 })
