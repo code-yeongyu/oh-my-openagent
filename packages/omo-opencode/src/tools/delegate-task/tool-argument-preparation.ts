@@ -1,5 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
+import { isValidSessionID } from "./task-id"
 import { log } from "../../shared/logger"
 
 export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx: ToolContextWithMetadata): Promise<DelegateTaskArgs> {
@@ -81,7 +82,22 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     ? loadSkills.filter((value): value is string => typeof value === "string")
     : []
 
-  const taskID = typeof args.task_id === "string" ? args.task_id : undefined
+  // A hallucinated task_id (e.g. a description slug) must NOT silently route
+  // the call into the continuation branch: that path feeds the value to the
+  // session API, which throws `Expected a string starting with "ses"` and
+  // burns turns on retries. Drop anything that is not a real session id so the
+  // call degrades to a normal new delegation. See issue #4119 for the same
+  // "don't hard-fail on a bad optional arg" contract.
+  const rawTaskID = typeof args.task_id === "string" ? args.task_id : undefined
+  let taskID = rawTaskID
+  if (rawTaskID !== undefined && rawTaskID !== "" && !isValidSessionID(rawTaskID)) {
+    log("[task] ignoring task_id that is not a session id; treating as a new delegation", {
+      task_id: rawTaskID,
+      category: args.category,
+      subagent_type: originalSubagentType,
+    })
+    taskID = undefined
+  }
   const command = typeof args.command === "string" ? args.command : undefined
 
 
