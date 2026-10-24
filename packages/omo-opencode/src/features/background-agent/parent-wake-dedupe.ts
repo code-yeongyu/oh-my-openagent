@@ -17,6 +17,8 @@ export type PendingParentWake = {
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
+  noAssistantOutputRetryStartedAt?: number
+  noAssistantOutputDeadlineNotice?: boolean
   gateHoldExpiresAt?: number
 }
 
@@ -47,6 +49,12 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
       : {}),
     ...(wake.noAssistantOutputRetryCount !== undefined
       ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
+      : {}),
+    ...(wake.noAssistantOutputRetryStartedAt !== undefined
+      ? { noAssistantOutputRetryStartedAt: wake.noAssistantOutputRetryStartedAt }
+      : {}),
+    ...(wake.noAssistantOutputDeadlineNotice !== undefined
+      ? { noAssistantOutputDeadlineNotice: wake.noAssistantOutputDeadlineNotice }
       : {}),
     ...(wake.gateHoldExpiresAt !== undefined ? { gateHoldExpiresAt: wake.gateHoldExpiresAt } : {}),
   }

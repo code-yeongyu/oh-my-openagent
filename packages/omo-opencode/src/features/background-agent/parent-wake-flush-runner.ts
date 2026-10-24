@@ -47,6 +47,21 @@ export class ParentWakeFlushRunner {
     if (await this.dropAdmittedWakeConsumedByParent(sessionID, latestWake)) {
       return
     }
+    if (latestWake.noAssistantOutputDeadlineNotice === true) {
+      // Deadline exhausted: deposit the notification into the parent session
+      // as a noReply user message so the owner sees the result in chat history
+      // even though no assistant turn ever started, then consume the wake.
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry: false,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+        retainPendingWake: false,
+      })
+      log("[background-agent] Deposited deadline-exhausted parent wake notice into parent session:", {
+        sessionID,
+      })
+      return
+    }
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
     if (sessionActive && !forceDispatchAfterActiveDefer) {

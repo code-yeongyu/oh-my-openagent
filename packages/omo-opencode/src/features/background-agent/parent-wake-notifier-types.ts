@@ -47,4 +47,12 @@ export type ParentWakeNotifierOptions = {
    */
   readonly userMessageInProgressWindowMs: number
   readonly parentSessionActivityInProgressWindowMs?: number
+  /**
+   * Bounded deadline for retrying a parent wake whose dispatch produced no
+   * assistant output. Once exhausted, the wake is deposited into the parent
+   * session as a visible noReply notice instead of being retried forever.
+   */
+  readonly noAssistantOutputRetryDeadlineMs?: number
+  /** Base delay for no-output retry backoff (doubles per retry, capped at 10 s). */
+  readonly noAssistantOutputRetryBaseDelayMs?: number
 }
