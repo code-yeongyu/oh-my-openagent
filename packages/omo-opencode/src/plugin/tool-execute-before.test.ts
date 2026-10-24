@@ -321,6 +321,47 @@ describe("createToolExecuteBeforeHandler", () => {
       //#then
       expect(output.args.subagent_type).toBe("oracle")
     })
+
+    test("#given @explore mention with both category and subagent_type #when hook runs #then only subagent_type=explore is passed", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = {
+        args: {
+          category: "explore",
+          subagent_type: "explore",
+          prompt: "hello",
+          description: "Explore hello",
+        } as Record<string, unknown>,
+      }
+
+      //#when
+      await handler(input, output)
+
+      //#then — OpenCode task() is XOR; do not leave category on a named-agent mention
+      expect(output.args.category).toBeUndefined()
+      expect("category" in output.args).toBe(false)
+      expect(output.args.subagent_type).toBe("explore")
+    })
+
+    test("#given category=explore without subagent_type #when hook runs #then it maps to subagent_type only", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = {
+        args: { category: "explore", prompt: "hello" } as Record<string, unknown>,
+      }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.category).toBeUndefined()
+      expect("category" in output.args).toBe(false)
+      expect(output.args.subagent_type).toBe("explore")
+    })
   })
 })
 
