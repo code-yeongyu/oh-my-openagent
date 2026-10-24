@@ -1,10 +1,9 @@
 import { existsSync, realpathSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute } from "node:path";
 import type { Readable, Writable } from "node:stream";
-import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
+import { handleLspMcpRequest, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 import { createStandaloneMcpRequestContext, runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context";
-import { jsonRpcId, type ParentWatchdogConfig, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
-import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
+import { type ParentWatchdogConfig, runJsonRpcStdioServer } from "@oh-my-opencode/mcp-stdio-core";
 
 import { type CallToolOptions, callToolViaDaemon, type DaemonToolContext } from "./daemon-client.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
@@ -28,12 +27,6 @@ export interface ProxyOptions {
 }
 
 const DEFAULT_STARTUP_TIMEOUT_MS = 10_000;
-
-interface ToolCall {
-	id: JsonRpcId;
-	name: string;
-	args: Record<string, unknown>;
-}
 
 export async function runMcpStdioProxy(options: ProxyOptions = {}): Promise<void> {
 	const input = options.input ?? process.stdin;
@@ -115,23 +108,9 @@ function isPrematureCloseError(error: unknown): boolean {
 }
 
 async function handleProxyRequest(parsed: unknown, callOptions: CallToolOptions): Promise<JsonRpcResponse | undefined> {
-	const toolCall = asToolCall(parsed);
-	if (!toolCall) return handleLspMcpRequest(parsed);
-
-	const result = await callToolViaDaemon(toolCall.name, toolCall.args, callOptions);
-	return successResponse(toolCall.id, {
-		content: result.content,
-		isError: result.isError ?? false,
-		details: result.details,
+	return handleLspMcpRequest(parsed, {
+		executeTool: (name, args) => callToolViaDaemon(name, args, callOptions),
 	});
-}
-
-function asToolCall(parsed: unknown): ToolCall | null {
-	if (!isPlainRecord(parsed) || parsed["method"] !== "tools/call") return null;
-	const params = parsed["params"];
-	if (!isPlainRecord(params) || typeof params["name"] !== "string") return null;
-	const args = params["arguments"];
-	return { id: jsonRpcId(parsed["id"]), name: params["name"], args: isPlainRecord(args) ? args : {} };
 }
 
 function inferOpenCodeProjectCwd(projectConfigEnv: string | undefined): string | undefined {

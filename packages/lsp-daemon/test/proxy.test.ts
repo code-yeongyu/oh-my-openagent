@@ -48,6 +48,64 @@ function parseResponses(chunks: string[]): Array<Record<string, unknown>> {
 const noSpawn = (): Promise<void> => Promise.resolve();
 
 describe("mcp stdio proxy", () => {
+	it("returns modern envelopes through the real daemon tool path without initialize", async () => {
+		const paths = tempPaths();
+		servers.push(await startDaemonServer(paths, { onIdleShutdown: () => {} }));
+		const out: string[] = [];
+		const _meta = {
+			"io.modelcontextprotocol/protocolVersion": "2026-07-28",
+			"io.modelcontextprotocol/clientCapabilities": {},
+			"io.modelcontextprotocol/clientInfo": { name: "modern-proxy-fixture", version: "1.0.0" },
+		};
+		await runMcpStdioProxy({
+			input: inputStream([
+				{ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta } },
+				{ jsonrpc: "2.0", id: 2, method: "tools/call", params: { _meta, name: "status", arguments: {} } },
+				{ jsonrpc: "2.0", id: 3, method: "tools/list", params: { _meta } },
+			]),
+			output: collectingWritable(out),
+			paths,
+			ensure: noSpawn,
+		});
+		const responses = parseResponses(out);
+		expect(responses).toHaveLength(3);
+		for (const response of responses) {
+			expect(response["result"]).toMatchObject({
+				resultType: "complete",
+				_meta: { "io.modelcontextprotocol/serverInfo": { name: "lsp", version: "0.1.0" } },
+			});
+		}
+		expect(responses[1]?.["result"]).toMatchObject({ isError: false });
+		expect(responses[2]?.["result"]).toMatchObject({ ttlMs: 0, cacheScope: "public" });
+	});
+
+	it("rejects unsupported tool-call versions before starting or contacting the daemon", async () => {
+		const out: string[] = [];
+		const ensure = vi.fn(noSpawn);
+		await runMcpStdioProxy({
+			input: inputStream([
+				{
+					jsonrpc: "2.0",
+					id: 1,
+					method: "tools/call",
+					params: {
+						name: "status",
+						arguments: {},
+						_meta: {
+							"io.modelcontextprotocol/protocolVersion": "2099-01-01",
+							"io.modelcontextprotocol/clientCapabilities": {},
+						},
+					},
+				},
+			]),
+			output: collectingWritable(out),
+			paths: tempPaths(),
+			ensure,
+		});
+		expect(parseResponses(out)[0]?.["error"]).toMatchObject({ code: -32022, data: { requested: "2099-01-01" } });
+		expect(ensure).not.toHaveBeenCalled();
+	});
+
 	it("#given initialize and tools/call #when proxied #then initialize is local and the tool goes to the daemon", async () => {
 		const paths = tempPaths();
 		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
@@ -88,7 +146,10 @@ describe("mcp stdio proxy", () => {
 		writeFileSync(opencodeConfig, JSON.stringify({ lsp: { typescript: { disabled: true } } }));
 		writeFileSync(omoConfig, JSON.stringify({ lsp: { typescript: { priority: 99 } } }));
 		writeFileSync(omoClientConfig, JSON.stringify({ lsp: { deno: { disabled: true } } }));
-		writeFileSync(userConfig, JSON.stringify({ lsp: { "user-context-proof": { command: ["user-ls"], extensions: [".user"] } } }));
+		writeFileSync(
+			userConfig,
+			JSON.stringify({ lsp: { "user-context-proof": { command: ["user-ls"], extensions: [".user"] } } }),
+		);
 		const previousProject = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
 		const previousUser = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
 		const previousDecisions = process.env["LSP_TOOLS_MCP_INSTALL_DECISIONS"];

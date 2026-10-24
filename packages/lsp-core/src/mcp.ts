@@ -20,9 +20,15 @@ export type { JsonRpcError, JsonRpcId, JsonRpcResponse, JsonRpcResult, McpToolDe
 const SERVER_NAME = "lsp";
 const SERVER_VERSION = "0.1.0";
 const PROTOCOL_VERSIONS: readonly string[] = ["2025-06-18", "2025-03-26", "2024-11-05"];
+const MODERN_PROTOCOL_VERSION = "2026-07-28";
+const SUPPORTED_VERSIONS = [MODERN_PROTOCOL_VERSION, ...PROTOCOL_VERSIONS];
+const VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion";
+const CAPABILITIES_META_KEY = "io.modelcontextprotocol/clientCapabilities";
+const CLIENT_INFO_META_KEY = "io.modelcontextprotocol/clientInfo";
 
 export interface HandleLspMcpRequestOptions {
 	readonly signal?: AbortSignal;
+	readonly executeTool?: typeof executeLspTool;
 }
 
 export interface LspMcpStdioServerOptions {
@@ -38,9 +44,50 @@ export async function handleLspMcpRequest(
 	if (!isPlainRecord(input)) {
 		return errorResponse(null, -32600, "Invalid Request");
 	}
+	if (typeof input["method"] === "string" && !Object.hasOwn(input, "id")) return undefined;
 
 	const id = jsonRpcId(input["id"]);
 	const method = input["method"];
+	const params = input["params"];
+	const meta = isPlainRecord(params) && isPlainRecord(params["_meta"]) ? params["_meta"] : undefined;
+	const hasProtocolMeta =
+		meta !== undefined &&
+		[VERSION_META_KEY, CAPABILITIES_META_KEY, CLIENT_INFO_META_KEY].some((key) => Object.hasOwn(meta, key));
+	const version = meta?.[VERSION_META_KEY];
+	if (hasProtocolMeta || method === "server/discover") {
+		if (typeof version !== "string" || !isPlainRecord(meta?.[CAPABILITIES_META_KEY])) {
+			return errorResponse(id, -32602, "Protocol version and client capabilities are required in params._meta");
+		}
+		if (version !== MODERN_PROTOCOL_VERSION) {
+			return errorResponse(id, -32022, "Unsupported protocol version", {
+				supported: SUPPORTED_VERSIONS,
+				requested: version,
+			});
+		}
+	}
+	const modern = version === MODERN_PROTOCOL_VERSION;
+	const respond = (result: JsonRpcResult): JsonRpcResponse =>
+		successResponse(
+			id,
+			modern
+				? {
+						...result,
+						resultType: "complete",
+						_meta: { "io.modelcontextprotocol/serverInfo": { name: SERVER_NAME, version: SERVER_VERSION } },
+					}
+				: result,
+		);
+	if (method === "server/discover") {
+		return respond({
+			supportedVersions: SUPPORTED_VERSIONS,
+			capabilities: { tools: {} },
+			ttlMs: 0,
+			cacheScope: "public",
+		});
+	}
+	if (modern && (method === "initialize" || method === "ping" || method === "notifications/initialized")) {
+		return errorResponse(id, -32601, `Method not found: ${String(method)}`);
+	}
 	if (method === "notifications/initialized") return undefined;
 	if (method === "ping") return successResponse(id, {});
 	if (method === "initialize") {
@@ -53,11 +100,13 @@ export async function handleLspMcpRequest(
 	}
 
 	if (method === "tools/list") {
-		return successResponse(id, { tools: LSP_MCP_TOOLS.map(describeTool) });
+		const tools = LSP_MCP_TOOLS.map(describeTool);
+		return respond(modern ? { tools, ttlMs: 0, cacheScope: "public" } : { tools });
 	}
 
 	if (method === "tools/call") {
-		return handleToolCall(id, input["params"], options.signal);
+		const response = await handleToolCall(id, params, options);
+		return response.result === undefined ? response : respond(response.result);
 	}
 
 	return errorResponse(id, -32601, `Method not found: ${String(method)}`);
@@ -82,13 +131,21 @@ export async function runMcpStdioServer(
 	});
 }
 
-async function handleToolCall(id: JsonRpcId, params: unknown, signal?: AbortSignal): Promise<JsonRpcResponse> {
+async function handleToolCall(
+	id: JsonRpcId,
+	params: unknown,
+	options: HandleLspMcpRequestOptions,
+): Promise<JsonRpcResponse> {
 	if (!isPlainRecord(params) || typeof params["name"] !== "string") {
 		return errorResponse(id, -32602, "tools/call requires params.name");
 	}
 
 	try {
-		const result = await executeLspTool(params["name"], coerceToolArguments(params["arguments"]), signal);
+		const result = await (options.executeTool ?? executeLspTool)(
+			params["name"],
+			coerceToolArguments(params["arguments"]),
+			options.signal,
+		);
 		return successResponse(id, {
 			content: result.content,
 			isError: result.isError ?? false,
@@ -116,7 +173,5 @@ function describeTool(tool: (typeof LSP_MCP_TOOLS)[number]): McpToolDescriptor {
 
 function requestedProtocolVersion(params: unknown): string {
 	const requested = isPlainRecord(params) ? params["protocolVersion"] : undefined;
-	return typeof requested === "string" && PROTOCOL_VERSIONS.includes(requested)
-		? requested
-		: "2025-06-18";
+	return typeof requested === "string" && PROTOCOL_VERSIONS.includes(requested) ? requested : "2025-06-18";
 }
