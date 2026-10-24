@@ -81,6 +81,9 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
     const initialized = sessionNotificationInit.initialize()
     currentPlatform = initialized.platform
     defaultSoundPath = initialized.defaultSoundPath || mergedConfig.soundPath
+    if (!mergedConfig.soundPath && defaultSoundPath) {
+      mergedConfig.soundPath = defaultSoundPath
+    }
     return currentPlatform
   }
 
