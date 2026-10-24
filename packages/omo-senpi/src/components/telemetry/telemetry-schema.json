@@ -2390,6 +2390,16 @@
         "required": false,
         "posthog_name": "provider_count"
       },
+      "omo.session.role": {
+        "type": "string",
+        "values": [
+          "root",
+          "child",
+          "unknown"
+        ],
+        "required": false,
+        "posthog_name": "session_role"
+      },
       "omo.signed_in_provider_count": {
         "type": "number",
         "min": 0,
@@ -2457,6 +2467,13 @@
         "max": 1000000000,
         "required": false,
         "posthog_name": "custom_model_turns"
+      },
+      "omo.dropped_events": {
+        "type": "number",
+        "min": 0,
+        "max": 1000000000,
+        "required": false,
+        "posthog_name": "dropped_events"
       },
       "omo.ended_by": {
         "type": "string",
@@ -2944,13 +2961,18 @@
       "omo.session.role": {
         "type": "string",
         "values": [
-          "main",
+          "root",
           "child",
-          "dag_child",
-          "member"
+          "unknown"
         ],
         "required": false,
         "posthog_name": "session_role"
+      },
+      "omo.summary_epoch": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{16}$",
+        "required": false,
+        "posthog_name": "summary_epoch"
       },
       "omo.summary_seq": {
         "type": "number",
@@ -3831,5 +3853,5 @@
       }
     }
   },
-  "sha256": "0b87901ae02532d49dd34f190f4b922c014ec1c52975b3f9a91fc9d5535496a7"
+  "sha256": "f23fc64dfbb7be812f2682d0bc360bc12899c734694d4c1e9e96c069f30cfde2"
 }

@@ -29,15 +29,15 @@ export function createLazyLiveThreadSurface(pi: SenpiExtensionAPI | undefined, o
     return {
       getMessages: async (sessionId) => { const port = await target(); return await port.getMessages(sessionId) },
       getState: async (sessionId) => { const port = await target(); return await port.getState(sessionId) },
-      prompt: async (sessionId, message, options) => { const port = await target(); return await port.prompt(sessionId, message, options) },
-      interrupt: async (sessionId, turnId) => { const port = await target(); return await port.interrupt(sessionId, turnId) },
-      setSessionName: async (sessionId, name) => { const port = await target(); return await port.setSessionName(sessionId, name) },
-      setModel: async (sessionId, provider, modelId) => { const port = await target(); return await port.setModel(sessionId, provider, modelId) },
+      prompt: async (sessionId, message, options, durableId) => { const port = await target(); return await port.prompt(sessionId, message, options, durableId) },
+      interrupt: async (sessionId, turnId, durableId) => { const port = await target(); return await port.interrupt(sessionId, turnId, durableId) },
+      setSessionName: async (sessionId, name, durableId) => { const port = await target(); return await port.setSessionName(sessionId, name, durableId) },
+      setModel: async (sessionId, provider, modelId, durableId) => { const port = await target(); return await port.setModel(sessionId, provider, modelId, durableId) },
       getAvailableModels: async (sessionId) => { const port = await target(); return await port.getAvailableModels(sessionId) },
-      setThinkingLevel: async (sessionId, level, scope) => { const port = await target(); return await port.setThinkingLevel(sessionId, level, scope) },
+      setThinkingLevel: async (sessionId, level, scope, durableId) => { const port = await target(); return await port.setThinkingLevel(sessionId, level, scope, durableId) },
       getAvailableThinkingLevels: async (sessionId) => { const port = await target(); return await port.getAvailableThinkingLevels(sessionId) },
-      wake: async (sessionId, deliveryIds) => { const port = await target(); if (port.wake === undefined) throw new Error("unsupported:wake"); return await port.wake(sessionId, deliveryIds) },
-      releaseSession: async (sessionId, request) => { const port = await target(); if (port.releaseSession === undefined) throw new Error("unsupported:release_session"); return await port.releaseSession(sessionId, request) },
+      wake: async (sessionId, deliveryIds, durableId) => { const port = await target(); if (port.wake === undefined) throw new Error("unsupported:wake"); return await port.wake(sessionId, deliveryIds, durableId) },
+      releaseSession: async (sessionId, request, durableId) => { const port = await target(); if (port.releaseSession === undefined) throw new Error("unsupported:release_session"); return await port.releaseSession(sessionId, request, durableId) },
     }
   }
   return {

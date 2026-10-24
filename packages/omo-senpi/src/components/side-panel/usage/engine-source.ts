@@ -58,8 +58,10 @@ export function createEngineUsageSource(deps: {
 
 /**
  * The serving account's record. Only when no stored login names a serving account (an env or ambient
- * login) does the provider's most recent record stand in; a named account with no record yet draws
- * nothing, so a rotation never shows the account the session just left.
+ * login) does the provider's most recent record stand in. A named account with no record yet falls
+ * back only to the engine's `env` record (a stored login while the engine serves through an
+ * environment token), never to another named account, so a rotation never shows the account the
+ * session just left.
  */
 function servingRecord(
   records: readonly SenpiAccountLimits[],
@@ -67,7 +69,12 @@ function servingRecord(
   credential: PanelUsageCredential | undefined,
 ): SenpiAccountLimits | undefined {
   const own = records.filter((record) => providers.includes(record.provider))
-  if (credential !== undefined) return own.find((record) => record.account === (credential.account ?? "default"))
+  if (credential !== undefined) {
+    return (
+      own.find((record) => record.account === (credential.account ?? "default")) ??
+      own.find((record) => record.account === "env")
+    )
+  }
   return (
     own.reduce<SenpiAccountLimits | undefined>(
       (latest, record) => (latest === undefined || record.reportedAt > latest.reportedAt ? record : latest),

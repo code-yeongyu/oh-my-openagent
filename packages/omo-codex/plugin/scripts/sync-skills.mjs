@@ -171,8 +171,13 @@ private logs, or PII; summarize with lengths, hashes, and short non-sensitive
 prefixes when identity is needed.
 `;
 
-const ulwResearchOriginalDeliveryGates = "Reading the source markup is not visual QA; inspect the pixels.\n4. **Proofread gate: `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo.";
-const ulwResearchCodexDeliveryGate = "Reading the source markup is not visual QA; inspect the pixels.";
+// Codex has no `task(category="writing")` worker, so its ulw-research edition drops the proofread gate
+// and keeps every tool-based delivery gate (static, fidelity, layout, visual QA). The item is matched by
+// its text right after the Visual QA sentence, not by its list numeral, so adding or removing an earlier
+// delivery gate does not unhook the overlay.
+const ulwResearchProofreadGate = "**Proofread gate: `task(category=\"writing\", ...)`.** Hand the final text to a dedicated `writing` worker whose only job is language: grammar, spelling, punctuation, terminology consistency, and whether the prose reads NATIVELY in the report's own language. It proofreads only and never composes. It returns a defect list; fix every item and re-run the gate on the delta. Deliver only on a clean pass. This gate runs BEFORE the first delivery, not after the user finds the typo.";
+const ulwResearchProofreadGateSource = ulwResearchProofreadGate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const ulwResearchProofreadGatePattern = new RegExp(`(inspect the pixels\\.)\\n\\d+\\. ${ulwResearchProofreadGateSource}`);
 
 export const ulwExecuteOriginalCompletion = [
 	"When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:",
@@ -216,7 +221,7 @@ const ulwExecuteCodexHardRule = [
 
 export function applyCodexSkillOverlays(skillName, content) {
 	if (skillName === "ulw-research") {
-		return content.replace(ulwResearchOriginalDeliveryGates, ulwResearchCodexDeliveryGate);
+		return content.replace(ulwResearchProofreadGatePattern, "$1");
 	}
 	if (skillName === "ulw-execute") {
 		return content

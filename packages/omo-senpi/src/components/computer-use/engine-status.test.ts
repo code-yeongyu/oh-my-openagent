@@ -2,10 +2,58 @@
 
 import { describe, expect, test } from "bun:test"
 
-import { DesktopServiceError } from "@oh-my-opencode/senpi-desktop-service"
+import { DesktopEngineAbiMismatchError, DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-engine"
+import { DesktopEngineUnavailableError, DesktopServiceError } from "@oh-my-opencode/senpi-desktop-service"
+import { fakeEngineFactory } from "../../../../senpi-desktop-service/test/harness"
 import { TrackedDesktopService } from "./engine-status"
 
 describe("tracked desktop service error coverage", () => {
+  for (const failure of [
+    new DesktopEngineAbiMismatchError("/fixture", { abi: "wrong", protocolVersion: "wrong" }),
+    new DesktopEngineUnavailableError({
+      code: "native-unavailable", host: "darwin-arm64", attemptedPaths: ["/fixture"],
+      message: "missing engine", cause: "fixture",
+    }),
+    new DesktopEngineUnavailableError({
+      code: "quarantined", host: "darwin-arm64", attemptedPaths: ["/fixture"],
+      message: "quarantined engine", cause: "fixture",
+    }),
+  ]) {
+    test(`#given activation succeeded #when ${failure.name} is reported #then later replies keep the hard diagnostic`, async () => {
+      const engine = fakeEngineFactory()
+      const service = new TrackedDesktopService({ createChild: engine.factory })
+      const diagnostic = failure instanceof DesktopEngineAbiMismatchError ? failure.code : failure.diagnostic.code
+      try {
+        await service.open({})
+        expect(service.engineState).toBe("ready")
+        service.reportError(failure)
+        expect(service.engineState).toBe(diagnostic)
+        await service.capabilities()
+        await service.stopPathStatus()
+        expect(service.engineState).toBe(diagnostic)
+        // Explicit successful activation, rather than an unrelated reply, verifies recovery.
+        await service.open({})
+        expect(service.engineState).toBe("ready")
+      } finally {
+        await service.close()
+      }
+    })
+  }
+
+  test("#given a launch-context failure #when a later operation succeeds #then status recovers to ready", async () => {
+    const engine = fakeEngineFactory()
+    const service = new TrackedDesktopService({ createChild: engine.factory })
+    try {
+      await service.open({})
+      service.reportError(new DesktopLaunchContextError("unresolved", "fixture"))
+      expect(service.engineState).toBe("launch-context-unavailable")
+      await service.capabilities()
+      expect(service.engineState).toBe("ready")
+    } finally {
+      await service.close()
+    }
+  })
+
   test("#given stop-path setup fails #when ensureStopPath rejects #then the telemetry error seam observes it", async () => {
     const errors: Error[] = []
     const service = new TrackedDesktopService({

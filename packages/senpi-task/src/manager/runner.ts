@@ -36,6 +36,7 @@ export type InProcessRunnerLike = {
 
 export type RpcRunnerLike = {
   start(spec: RpcRunnerSpec): Promise<RpcChildHandle>
+  settleTeardowns?(): Promise<void>
 }
 
 export function createInProcessManagedRunner(
@@ -63,6 +64,7 @@ export function createInProcessManagedRunner(
 
 export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
   return {
+    settleTeardowns: () => runner.settleTeardowns?.() ?? Promise.resolve(),
     async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
       const rpcSpec: RpcRunnerSpec = {
         task_id: spec.taskId,
