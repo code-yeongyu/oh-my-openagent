@@ -46,9 +46,19 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
   let currentPlatform: Platform | null = null
   let defaultSoundPath = mergedConfig.soundPath
 
+  function ensureNotificationPlatform(): Platform {
+    if (currentPlatform) return currentPlatform
+
+    const initialized = sessionNotificationInit.initialize()
+    currentPlatform = initialized.platform
+    defaultSoundPath = mergedConfig.soundPath || initialized.defaultSoundPath
+    return currentPlatform
+  }
+
   const scheduler = createIdleNotificationScheduler({
     ctx,
     config: mergedConfig,
+    getSoundPath: () => defaultSoundPath,
     hasIncompleteTodos: hasPendingSessionWork,
     send: async (hookCtx, sessionID) => {
       const platform = ensureNotificationPlatform()
@@ -74,15 +84,6 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
   const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
   const PERMISSION_EVENTS = new Set(["permission.ask", "permission.asked", "permission.updated", "permission.requested"])
   const PERMISSION_HINT_PATTERN = /\b(permission|approve|approval|allow|deny|consent)\b/i
-
-  const ensureNotificationPlatform = (): Platform => {
-    if (currentPlatform) return currentPlatform
-
-    const initialized = sessionNotificationInit.initialize()
-    currentPlatform = initialized.platform
-    defaultSoundPath = initialized.defaultSoundPath || mergedConfig.soundPath
-    return currentPlatform
-  }
 
   const shouldNotifyForSession = (sessionID: string): boolean => {
     if (subagentSessions.has(sessionID)) return false
