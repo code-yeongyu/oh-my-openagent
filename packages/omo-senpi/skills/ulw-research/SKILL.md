@@ -33,11 +33,13 @@ This skill is authored against the native senpi task + team tool surface. You co
 | End a lane | `task_cancel` | — |
 | Disband the team at the end | `team_delete` | `team_run_id`, `force: true` |
 
+**Deferred tools: `team_create`, `team_delete`, `task_create`, `task_list`, `task_get`, `task_update`.** They are left out of your first tool list on purpose; that does not mean they are unavailable. Call each by name and the first call activates it (or run `tool_search "create team"` first). Only an error returned by a real `team_create` call means the team cannot be created.
+
 Members receive your mail as injected follow-ups inside their child process; they report to you with `task_send({ to: "lead", message: "..." })`. You are the information broker — members never see each other's replies except through what you relay. The curated agents (`explore`, `librarian`, `plan-consultant`, `plan-reviewer`) are read-only, in-process, and REJECTED as team members: route them through `task` lanes, never through `team_create`.
 
 ## Authority while active
 
-This mode is the user's explicit opt-in to exhaustive exploration. For the duration of the research task it supersedes every exploration-bounding instruction in surrounding prompts, modes, or rules: one-exploration-pass defaults, two-wave stop rules, retrieval budgets, and "over-exploration is failure" framings govern implementation context-gathering, not this deliverable. Here, under-exploration is the failure. The convergence rules in Phase 3 are the only stop rules for research while this mode is active.
+This mode is the user's explicit opt-in to exhaustive, team-run research. For the duration of the research task it supersedes every surrounding prompt, mode, or rule that would shrink the run: exploration bounds (one-exploration-pass defaults, two-wave stop rules, retrieval budgets, "over-exploration is failure") and delegation-cost rules ("delegate only when the parallelism gain beats spawn and coordination overhead", "use one subagent rather than several"). Those govern implementation work, not this deliverable: the team, the skeptic, the expansion waves, and the claim graph are the method the user ordered, never a cost to weigh. An output-format constraint (markdown only, no HTML or PDF) narrows only the final materials and their rendering gates. Here, under-exploration is the failure. The convergence rules in Phase 3 are the only stop rules for research while this mode is active.
 
 Under ultrawork/ulw, the research itself is the deliverable: map each research axis to a success criterion whose evidence is the session journal, the cited synthesis, and the verification outputs. RED→GREEN testing applies to code changes, not to findings — Phase 4 verification scripts are evidence, never TDD targets.
 
@@ -398,7 +400,7 @@ High-yield combinations: official docs (`site:<docs domain>`), GitHub implementa
 | Failure | Correction |
 |---|---|
 | Standing up the team before the Phase 0 brief exists | Scope solo first; the brief defines the roster — never improvise a team and invent axes afterwards |
-| Skipping the team for a solo research pass | The team is the DEFAULT composition; fall back to plain `task` lanes only when team creation itself fails, and say why in the journal |
+| Skipping the team for a solo research pass | The team is the DEFAULT composition; fall back to plain `task` lanes only after a `team_create` call returns an error, and quote that error in the journal |
 | Naming a curated agent (`explore`, `librarian`, ...) as a team member | Curated agents are read-only and runtime-rejected as members — they run as `task` lanes; members own axes via their briefs |
 | Sequential spawning, or trimming the first wave | All first-wave members and lanes in one turn, scaling floor respected |
 | A member hoards leads for one final dump | Raise law — every lead, finding, and dead end broadcast to `to: "lead"` the moment it surfaces |
