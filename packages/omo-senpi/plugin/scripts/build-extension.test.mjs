@@ -1,7 +1,7 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, parse } from "node:path"
+import { dirname, join, parse, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
@@ -134,6 +134,36 @@ describe("checkExtensionCurrent", () => {
 
     // then
     expect(result).toMatchObject({ ok: true })
+  })
+
+  test("#given every built output #when each one is removed in turn #then freshness reports that output as missing", async () => {
+    // given
+    const outputs = await mutableOutputs()
+    const shared = await sharedOutputs()
+    const builtOutputPaths = Object.entries(outputs)
+      .filter(([key, value]) => key.endsWith("OutputPath") && typeof value === "string")
+      .map(([, value]) => value)
+    expect(builtOutputPaths.length).toBeGreaterThan(0)
+
+    // when / then: a built output the freshness check never reads would pass as current here (#8263)
+    for (const outputPath of builtOutputPaths) {
+      await rm(outputPath)
+      expect(await checkExtensionCurrent(outputs), outputPath)
+        .toMatchObject({ ok: false, reason: "missing-output", output: outputPath })
+      await cp(join(shared.root, relative(outputs.root, outputPath)), outputPath)
+    }
+  })
+
+  test("#given a stale gateway rules artifact #when checked #then freshness reports that output", async () => {
+    // given
+    const outputs = await mutableOutputs()
+    await appendFile(outputs.gatewayRulesExtensionOutputPath, "\nchanged\n")
+
+    // when
+    const result = await checkExtensionCurrent(outputs)
+
+    // then
+    expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.gatewayRulesExtensionOutputPath })
   })
 
   test("#given a missing supervisor artifact #when checked #then freshness reports that output", async () => {
