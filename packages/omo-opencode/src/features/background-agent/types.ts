@@ -97,6 +97,8 @@ export interface BackgroundTask {
   /** ID of the currently active attempt */
   currentAttemptID?: string
 
+  cancellationRequested?: boolean
+
   /** Last message count for stability detection */
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
