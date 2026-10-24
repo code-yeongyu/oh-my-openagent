@@ -82,6 +82,7 @@ test("#given 10000 parked-but-hot files and one live file #when enqueue and laun
   const claimed = await queue.claim(selected, "settle")
   const reads = entryReads().length
   console.log(`facts backlog: parked=10000 entryReads=${reads} bound=5 claimed=${claimed.length}`)
+  expect(reads).toBeGreaterThan(0)
   expect(reads).toBeLessThanOrEqual(5)
   expect(claimed.map((entry) => entry.range.end_message_id).sort()).toEqual(["m1", "m2"])
   expect(await readdir(join(layout.queueDir, "parked"))).toHaveLength(10_000)
