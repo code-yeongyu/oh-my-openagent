@@ -16,12 +16,9 @@ function fixture() {
   const exec: GitExec = {
     async run(argv) {
       commands.push([...argv])
-      const revision = argv.map((arg) => /^(HEAD|[0-9a-f]{40})(?::|$)/.exec(arg)?.[1])
+      const revision = argv.map((arg) => /^(HEAD|[0-9a-f]{40}|[0-9a-f]{64})(?::|$)/.exec(arg)?.[1])
         .find((value) => value !== undefined)
       if (revision === undefined) throw new Error(`Unexpected git argv: ${JSON.stringify(argv)}`)
-      expect(argv).toEqual(argv[0] === "ls-tree"
-        ? ["ls-tree", "-r", "--name-only", "-z", revision, "--", AGREEMENTS_PATH]
-        : ["show", `${revision}:${AGREEMENTS_PATH}`])
       if (fail) return { code: 128, stdout: "", stderr: "unavailable object" }
       const content = contents.get(revision)
       return {
@@ -36,6 +33,21 @@ function fixture() {
 }
 
 describe("readAgreementsAt immutable revision cache", () => {
+  it("#given a SHA-256 revision #when read twice #then caches the ledger with exact git argv", async () => {
+    // given
+    const f = fixture()
+    const revision = "a".repeat(64)
+    f.contents.set(revision, "sha256 ledger\n")
+    // when
+    const values = [await readAgreementsAt(f.open(), revision), await readAgreementsAt(f.open(), revision)]
+    // then
+    expect(values).toEqual(["sha256 ledger\n", "sha256 ledger\n"])
+    expect(f.commands).toEqual([
+      ["ls-tree", "-r", "--name-only", "-z", revision, "--", AGREEMENTS_PATH],
+      ["show", `${revision}:${AGREEMENTS_PATH}`],
+    ])
+  })
+
   it("#given one SHA read by two repo instances #when read again #then no git command is spawned", async () => {
     // given
     const f = fixture()
@@ -46,7 +58,10 @@ describe("readAgreementsAt immutable revision cache", () => {
     // then
     expect(again).toBe("first ledger\n")
     expect(f.commands.length).toBe(before)
-    expect(f.commands[0]?.slice(-2)).toEqual(["--", AGREEMENTS_PATH])
+    expect(f.commands).toEqual([
+      ["ls-tree", "-r", "--name-only", "-z", FIRST, "--", AGREEMENTS_PATH],
+      ["show", `${FIRST}:${AGREEMENTS_PATH}`],
+    ])
   })
 
   it("#given cached content #when another SHA is read #then reads the new committed ledger", async () => {

@@ -30,8 +30,10 @@ export function readHeadFromFiles(repoDir: string): string | undefined {
     if (common === null || common === "" || (common !== undefined && !/^[^\r\n]+\r?\n?$/.test(common))) return undefined
     const commonDir = common === undefined ? gitDir : resolve(gitDir, common.trim())
     const config = readText(join(commonDir, "config"))
-    // Includes and alternative ref backends are git's job, including future ref storage formats.
-    if (typeof config !== "string" || /^\s*(?:\[include(?:if)?\b|refstorage\s*=)/im.test(config)) return undefined
+    // Includes, worktree config, and alternative ref backends are git's job.
+    if (typeof config !== "string" || /^\s*(?:\[include(?:if)?\b|(?:refstorage|worktreeconfig)\s*(?:=|$))/im.test(config)) return undefined
+    if ([gitDir, commonDir].some((dir) => lstatSync(join(dir, "config.worktree"), { throwIfNoEntry: false }) !== undefined)) return undefined
+    // Detect reftable storage even when selected through system/global rather than local config.
     if (lstatSync(join(commonDir, "reftable"), { throwIfNoEntry: false }) !== undefined) return undefined
     if (!lstatSync(join(commonDir, "objects"), { throwIfNoEntry: false })?.isDirectory()) return undefined
 

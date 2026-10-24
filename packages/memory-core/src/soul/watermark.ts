@@ -10,7 +10,7 @@
 // emit and both advance.
 
 import { randomUUID } from "node:crypto"
-import { mkdir, readFileSync, rename, writeFile } from "../fs/resilient"
+import { mkdir, readFileSync, rename, rm, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { GitCommandError, type GitMemoryRepo } from "../git"
@@ -131,7 +131,18 @@ async function writeWatermark(noticesDir: string, head: string): Promise<void> {
   const target = join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME)
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
   const watermark: SoulHeadWatermark = { version: 1, lastNotifiedHead: head }
-  await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
-  await rename(temporary, target)
-  await syncJournalDirectory(noticesDir)
+  try {
+    await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
+    await rename(temporary, target)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw error
+  }
+  try {
+    await syncJournalDirectory(noticesDir)
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error)) throw error
+    // Rename already consumed this notice. A durability failure must not discard its announcement.
+    console.warn("[memory] Published soul watermark directory sync failed:", error.code)
+  }
 }

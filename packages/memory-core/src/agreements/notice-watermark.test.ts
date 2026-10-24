@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { afterEach, describe, expect, it, setDefaultTimeout, spyOn } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -9,6 +9,9 @@ import { removeTree } from "../../../../test-support/remove-tree"
 import { consumeAgreementsNoticeDelta } from "./notice-watermark"
 import { AGREEMENTS_PATH } from "./types"
 import { observeWatermarkPublication, withWatermarkReadFault } from "../concurrency/watermark-publication.test-support"
+import { createLockRecord, noticeLockPath, withLock } from "../locks"
+import * as locks from "../locks"
+import * as ledger from "./ledger-file"
 
 const AUTHOR = { agentId: "agent-one", authorName: "Facts Extractor" }
 const line = (n: number, status: string) =>
@@ -36,6 +39,32 @@ async function fixture() {
 }
 
 describe("needs-human notice watermark (exactly-once contract)", () => {
+  it("#given duplicate flagged ids already announced #when the notice lock is held #then the warm path avoids reacquisition", async () => {
+    // given
+    const { repo, options, commitLedger } = await fixture()
+    await commitLedger(line(3, "needs-human"))
+    await consumeAgreementsNoticeDelta(repo, options)
+    const record = await createLockRecord("duplicate notice test")
+    // when
+    await withLock(noticeLockPath(options.locksDir), record, async () => {
+      const acquisition = spyOn(locks, "createLockRecord")
+      // The parser currently dedupes; exercise the watermark's own set contract independently.
+      const itemsOf = ledger.agreementItemsOf
+      const duplicated = spyOn(ledger, "agreementItemsOf").mockImplementation((content) =>
+        itemsOf(content).flatMap((item) => [item, item]),
+      )
+      try {
+        const result = await consumeAgreementsNoticeDelta(repo, { ...options, waitTimeoutMs: 0 })
+        // then
+        expect(result).toEqual([])
+        expect(acquisition).not.toHaveBeenCalled()
+      } finally {
+        acquisition.mockRestore()
+        duplicated.mockRestore()
+      }
+    })
+  })
+
   it.each([undefined, "{", '{"version":2}'])(
     "#given no flagged items and watermark %j #when consumed #then the locked path establishes valid empty state",
     async (initial) => {

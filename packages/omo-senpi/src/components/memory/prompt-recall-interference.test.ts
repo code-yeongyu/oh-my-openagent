@@ -42,6 +42,7 @@ test("#given a warmed projection and cold recall #when recall is ready on the ne
   const build = Promise.withResolvers<void>()
   // Register the next-turn work before triggering the prompt. This is a scheduler boundary,
   // not a delay: the assertion depends on order, never on elapsed milliseconds.
+  // The order assertion requires the warmed projection path to yield only to microtasks.
   setImmediate(() => {
     try {
       selectRecallCandidates(documents, ["deployment rollback"], { maxItems: 3, surfaced: new Set() })

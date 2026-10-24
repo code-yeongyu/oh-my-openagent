@@ -41,6 +41,22 @@ async function fixture() {
 }
 
 describe("GitMemoryRepo.head filesystem fast path", () => {
+  it.each(["extension", "file"] as const)(
+    "#given worktree config via %s #when read #then delegates to git",
+    async (source) => {
+      // given
+      const f = await fixture()
+      if (source === "extension") await f.git("config", "extensions.worktreeConfig", "true")
+      else await writeFile(join(f.dir, ".git/config.worktree"), "[core]\n\tbare = false\n")
+      // when
+      const head = await f.open().head()
+      // then
+      expect(head).toBe(f.second)
+      expect(f.spawns()).toBe(1)
+    },
+    GIT_INTEGRATION_TEST_TIMEOUT,
+  )
+
   it("#given detached HEAD #when read twice #then returns its SHA without spawning git", async () => {
     // given
     const f = await fixture()

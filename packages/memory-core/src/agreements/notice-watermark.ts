@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-import { mkdir, readFileSync, rename, writeFile } from "../fs/resilient"
+import { mkdir, readFileSync, rename, rm, writeFile } from "../fs/resilient"
 import type { GitMemoryRepo } from "../git"
 import { syncJournalDirectory } from "../journal/fsync"
 import { LockContentionError, createLockRecord, noticeLockPath, withLock } from "../locks"
@@ -42,7 +42,8 @@ export async function consumeAgreementsNoticeDelta(
     }
     // No mutation or notice is needed. A differing set, including an acknowledgement,
     // must still be read again under the lock before consuming or replacing the watermark.
-    if (announced !== undefined && flagged.length === announced.size && flagged.every((item) => announced.has(item.id))) return []
+    const flaggedIds = new Set(flagged.map((item) => item.id))
+    if (announced !== undefined && flaggedIds.size === announced.size && [...flaggedIds].every((id) => announced.has(id))) return []
   }
   const record = await createLockRecord("agreements notice watermark")
   try {
@@ -64,7 +65,7 @@ async function consumeUnderLock(repo: GitMemoryRepo, noticesDir: string): Promis
   const flagged = agreementItemsOf(await readAgreementsAt(repo, head)).filter((item) => item.status === "needs-human")
   const announced = readWatermark(noticesDir)
   const fresh = flagged.filter((item) => !announced?.has(item.id))
-  const next = flagged.map((item) => item.id).sort()
+  const next = [...new Set(flagged.map((item) => item.id))].sort()
   if (fresh.length > 0 || next.length !== announced?.size) await writeWatermark(noticesDir, next)
   return fresh
 }
@@ -93,7 +94,18 @@ async function writeWatermark(noticesDir: string, announced: readonly string[]):
   const target = join(noticesDir, AGREEMENTS_NOTICE_WATERMARK_FILENAME)
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
   const watermark: FlaggedWatermark = { version: 1, announced }
-  await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
-  await rename(temporary, target)
-  await syncJournalDirectory(noticesDir)
+  try {
+    await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
+    await rename(temporary, target)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw error
+  }
+  try {
+    await syncJournalDirectory(noticesDir)
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error)) throw error
+    // Rename already consumed this notice. A durability failure must not discard its announcement.
+    console.warn("[memory] Published agreements watermark directory sync failed:", error.code)
+  }
 }
