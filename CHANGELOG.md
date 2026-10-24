@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**The desktop-engine MCP server also serves MCP 2026-07-28 clients.** Discovery and per-request protocol metadata work without initialization; modern results identify the server and complete result type, and tool lists include cache hints. Unsupported request versions are rejected before daemon access, notifications receive no reply, and legacy initialization keeps its existing supported-version negotiation. ([#11239](https://github.com/code-yeongyu/oh-my-openagent/pull/11239), part of [#11205](https://github.com/code-yeongyu/oh-my-openagent/issues/11205))
+
 **The stale-reflection-lock test leaves no background writer behind when removing its temporary root.** Its teardown closes the memory wiring and awaits facts reconciliation and maintenance before removal, so a late lock publication cannot recreate the directory and make the temp-leak guard blame another test. ([#11225](https://github.com/code-yeongyu/oh-my-openagent/pull/11225))
 
 **ulw-research ships a Markdown block model for checking Markdown and post deliverables.** It splits a Markdown report into headings, paragraphs, list items, table rows, code blocks and quotes with exact text offsets, and sorts sections with the same classifier as the HTML checks; an unclosed code fence is reported instead of passing silently, and no check uses it yet. The HTML checks now also treat a section headed exactly "Closing" as the closing section. ([#11153](https://github.com/code-yeongyu/oh-my-openagent/pull/11153), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))
