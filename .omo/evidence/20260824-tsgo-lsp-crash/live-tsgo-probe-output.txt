@@ -1,0 +1,512 @@
+{
+  "name": "A-paramless-initialized (4.19.4 wire shape)",
+  "outcome": "process-exit",
+  "exitCode": 2,
+  "signal": null,
+  "events": [
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Resolved client capabilities: {}"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "capabilities": {
+          "positionEncoding": "utf-16",
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": true
+          },
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "\"",
+              "'",
+              "`",
+              "/",
+              "@",
+              "<",
+              "#",
+              " ",
+              "*"
+            ],
+            "resolveProvider": true,
+            "completionItem": {
+              "labelDetailsSupport": true
+            }
+          },
+          "hoverProvider": true,
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ",",
+              "<"
+            ],
+            "retriggerCharacters": [
+              ")"
+            ]
+          },
+          "definitionProvider": true,
+          "typeDefinitionProvider": true,
+          "implementationProvider": true,
+          "referencesProvider": true,
+          "documentHighlightProvider": true,
+          "documentSymbolProvider": true,
+          "codeActionProvider": {
+            "codeActionKinds": [
+              "quickfix",
+              "source.organizeImports",
+              "source.removeUnusedImports",
+              "source.sortImports",
+              "source.fixAll"
+            ]
+          },
+          "codeLensProvider": {
+            "resolveProvider": true
+          },
+          "workspaceSymbolProvider": true,
+          "documentFormattingProvider": true,
+          "documentRangeFormattingProvider": true,
+          "documentOnTypeFormattingProvider": {
+            "firstTriggerCharacter": "{",
+            "moreTriggerCharacter": [
+              "}",
+              ";",
+              "\n"
+            ]
+          },
+          "renameProvider": {
+            "prepareProvider": true
+          },
+          "foldingRangeProvider": true,
+          "selectionRangeProvider": true,
+          "callHierarchyProvider": true,
+          "linkedEditingRangeProvider": true,
+          "semanticTokensProvider": {
+            "legend": {
+              "tokenTypes": [],
+              "tokenModifiers": []
+            },
+            "range": true,
+            "full": true
+          },
+          "inlayHintProvider": true,
+          "diagnosticProvider": {
+            "identifier": "typescript",
+            "interFileDependencies": true,
+            "workspaceDiagnostics": false
+          },
+          "workspace": {
+            "fileOperations": {
+              "willRename": {
+                "filters": [
+                  {
+                    "scheme": "file",
+                    "pattern": {
+                      "glob": "**/*.{ts,tsx,js,jsx,cts,cjs,mts,mjs,json}"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "experimental": {
+            "customSourceDefinitionProvider": true,
+            "customMultiDocumentHighlightProvider": true
+          },
+          "_vs_onAutoInsertProvider": {
+            "_vs_triggerCharacters": [
+              ">"
+            ]
+          },
+          "_vs_referencesProvider": true
+        },
+        "serverInfo": {
+          "name": "typescript-go",
+          "version": "7.0.2"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 1,
+        "message": "error handling method 'initialized': InvalidParams: params must be an object or array"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 1,
+        "message": "error handling notification: InvalidParams: params must be an object or array"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 1,
+        "message": "error handling method 'workspace/didChangeConfiguration': ServerNotInitialized"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 1,
+        "message": "error handling notification: ServerNotInitialized"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 1,
+        "message": "error handling method 'textDocument/didOpen': ServerNotInitialized"
+      }
+    },
+    {
+      "stderr": "panic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x1 addr=0x3c8 pc=0xb7d046]\n\ngoroutine 39 [running]:\ninternal/sync.(*Mutex).Lock(...)\n\tinternal/sync/mutex.go:63\nsync.(*Mutex).Lock(...)\n\tsync/mutex.go:46\ngithub.com/microsoft/typescript-go/internal/project.(*Session).getSnapshot(0x0, {0x1172818, 0x2cb858d35710}, {{0x2cb858a64090, 0x1, 0x1}, {0x0, 0x0, 0x0}, {0x0, ...}, ...}, ...)\n\tgithub.com/microsoft/typescript-go/internal/project/session.go:909 +0x66\ngithub.com/microsoft/typescript-go/internal/project.(*Session).getSnapshotAndDefaultProject(0x0, {0x1172818, 0x2cb858d35710}, {0x2cb858a5ab40, 0x2c}, 0x0)\n\tgithub.com/microsoft/typescript-go/internal/project/session.go:976 +0x13d\ngithub.com/microsoft/typescript-go/internal/project.(*Session).GetLanguageService(0x116e220?, {0x1172818?, 0x2cb858d35710?}, {0x2cb858a5ab40?, 0x0?})\n\tgithub.com/microsoft/typescript-go/internal/project/session.go:989 +0x25\ngithub.com/microsoft/typescript-go/internal/lsp.init.func1.registerLanguageServiceDocumentRequestHandler[...].14({0x1172818, 0x2cb858d35710}, 0x2cb858d8e1b0)\n\tgithub.com/microsoft/typescript-go/internal/lsp/server.go:865 +0x85\ngithub.com/microsoft/typescript-go/internal/lsp.(*Server).handleRequestOrNotification(0x2cb858c89c08, {0x1172850?, 0x2cb858ae4140?}, 0x2cb858d8e1b0)\n\tgithub.com/microsoft/typescript-go/internal/lsp/server.go:703"
+    },
+    {
+      "stderr": " +0xec\ngithub.com/microsoft/typescript-go/internal/lsp.(*Server).dispatchLoop(0x2cb858c89c08, {0x1172850?, 0x2cb858bf0500?})\n\tgithub.com/microsoft/typescript-go/internal/lsp/server.go:577 +0x445\ngithub.com/microsoft/typescript-go/internal/lsp.(*Server).Run.func1()\n\tgithub.com/microsoft/typescript-go/internal/lsp/server.go:426 +0x1f\ngolang.org/x/sync/errgroup.(*Group).Go.func1()\n\tgolang.org/x/sync@v0.21.0/errgroup/errgroup.go:93 +0x50\ncreated by golang.org/x/sync/errgroup.(*Group).Go in goroutine 1\n\tgolang.org/x/sync@v0.21.0/errgroup/errgroup.go:78 +0x95\n"
+    }
+  ]
+}
+{
+  "name": "B-initialized-with-empty-object (fixed wire shape)",
+  "outcome": "diagnostics-ok",
+  "result": {
+    "kind": "full",
+    "items": []
+  },
+  "events": [
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Resolved client capabilities: {}"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {
+        "capabilities": {
+          "positionEncoding": "utf-16",
+          "textDocumentSync": {
+            "openClose": true,
+            "change": 2,
+            "save": true
+          },
+          "completionProvider": {
+            "triggerCharacters": [
+              ".",
+              "\"",
+              "'",
+              "`",
+              "/",
+              "@",
+              "<",
+              "#",
+              " ",
+              "*"
+            ],
+            "resolveProvider": true,
+            "completionItem": {
+              "labelDetailsSupport": true
+            }
+          },
+          "hoverProvider": true,
+          "signatureHelpProvider": {
+            "triggerCharacters": [
+              "(",
+              ",",
+              "<"
+            ],
+            "retriggerCharacters": [
+              ")"
+            ]
+          },
+          "definitionProvider": true,
+          "typeDefinitionProvider": true,
+          "implementationProvider": true,
+          "referencesProvider": true,
+          "documentHighlightProvider": true,
+          "documentSymbolProvider": true,
+          "codeActionProvider": {
+            "codeActionKinds": [
+              "quickfix",
+              "source.organizeImports",
+              "source.removeUnusedImports",
+              "source.sortImports",
+              "source.fixAll"
+            ]
+          },
+          "codeLensProvider": {
+            "resolveProvider": true
+          },
+          "workspaceSymbolProvider": true,
+          "documentFormattingProvider": true,
+          "documentRangeFormattingProvider": true,
+          "documentOnTypeFormattingProvider": {
+            "firstTriggerCharacter": "{",
+            "moreTriggerCharacter": [
+              "}",
+              ";",
+              "\n"
+            ]
+          },
+          "renameProvider": {
+            "prepareProvider": true
+          },
+          "foldingRangeProvider": true,
+          "selectionRangeProvider": true,
+          "callHierarchyProvider": true,
+          "linkedEditingRangeProvider": true,
+          "semanticTokensProvider": {
+            "legend": {
+              "tokenTypes": [],
+              "tokenModifiers": []
+            },
+            "range": true,
+            "full": true
+          },
+          "inlayHintProvider": true,
+          "diagnosticProvider": {
+            "identifier": "typescript",
+            "interFileDependencies": true,
+            "workspaceDiagnostics": false
+          },
+          "workspace": {
+            "fileOperations": {
+              "willRename": {
+                "filters": [
+                  {
+                    "scheme": "file",
+                    "pattern": {
+                      "glob": "**/*.{ts,tsx,js,jsx,cts,cjs,mts,mjs,json}"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "experimental": {
+            "customSourceDefinitionProvider": true,
+            "customMultiDocumentHighlightProvider": true
+          },
+          "_vs_onAutoInsertProvider": {
+            "_vs_triggerCharacters": [
+              ">"
+            ]
+          },
+          "_vs_referencesProvider": true
+        },
+        "serverInfo": {
+          "name": "typescript-go",
+          "version": "7.0.2"
+        }
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "file watching: disabled (client lacks dynamic watch registration and builtin watcher backend is not fast-recursive)"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": "ts1",
+      "method": "client/registerCapability",
+      "params": {
+        "registrations": [
+          {
+            "id": "typescript-config-watch-id",
+            "method": "workspace/didChangeConfiguration",
+            "registerOptions": {
+              "section": [
+                "js/ts",
+                "typescript",
+                "javascript",
+                "editor"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "handled method 'initialized' in 941.676µs"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "handled method 'workspace/didChangeConfiguration' in 28.374µs"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Processed 1 file changes in 14.419µs"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Adopted snapshot 1 (parent 0) as current session snapshot (replacing 0)"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "======== Cloning snapshot 0 ========\n[17:46:40.064] Reason: DidOpenFile - file:///tmp/opencode/tsgo-live/proj/clean.ts\n[17:46:40.064] DidChangeCustomConfigFileName\n[17:46:40.064] DidChangeFiles\n\t[17:46:40.064] Checking for changes affecting config files\n\t\t[17:46:40.064] Summarizing file changes\n\t\t[17:46:40.064] Checking if any changed files are config files\n\t[17:46:40.064] computeConfigFileName:: File: /tmp/opencode/tsgo-live/proj/clean.ts:: Result: /tmp/opencode/tsgo-live/proj/tsconfig.json\n\t[17:46:40.064] Searching for default configured project for /tmp/opencode/tsgo-live/proj/clean.ts\n\t\t[17:46:40.065] Acquiring config for open file\n\t\t\t[17:46:40.066] Loading config file: /tmp/opencode/tsgo-live/proj/tsconfig.json\n\t\t\t[17:46:40.067] Finished loading config file\n\t\t[17:46:40.067] Creating ConfiguredProject: /tmp/opencode/tsgo-live/proj/tsconfig.json, currentDirectory: /tmp/opencode/tsgo-live/proj\n\t\t[17:46:40.067] Acquiring config for project\n\t\t[17:46:40.067] CompilerHost\n\t\t[17:46:40.153] Program update for /tmp/opencode/tsgo-live/proj/tsconfig.json completed in 86.09099ms\n\t\t[17:46:40.153] Project contains file directly\n\t[17:46:40.153] Found default configured project for /tmp/opencode/tsgo-live/proj/clean.ts: /tmp/opencode/tsgo-live/proj/tsconfig.json (in 88.281163ms)\n[17:46:40.153] DidRequestFile\n\t[17:46:40.153] Acquiring config for project\n[17:46:40.153] Removed 1 cached file(s) in 87.611µs\n[17:46:40.153] UpdateAutoImports\n\t[17:46:40.153] Building autoimport registry\n\t\t[17:46:40.154] Added project: /tmp/opencode/tsgo-live/proj/tsconfig.json\n\t\t[17:46:40.155] Added directory: /tmp/opencode/tsgo-live/proj\n\t\t[17:46:40.155] Added directory: /tmp/opencode/tsgo-live\n\t\t[17:46:40.155] Added directory: /tmp/opencode\n\t\t[17:46:40.156] Added directory: /tmp\n\t\t[17:46:40.156] Added directory: /\n\t\t[17:46:40.156] Added node_modules bucket: /tmp/opencode/tsgo-live\n\t\t[17:46:40.156] Updated buckets and directories in 3.101423ms\n\t\t[17:46:40.156] Built autoimport registry in 3.119472ms\n[17:46:40.156] Finished cloning snapshot 0 into snapshot 1 in 91.792273ms\n"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "\nProject '/tmp/opencode/tsgo-live/proj/tsconfig.json'\n\tFiles (64)\n-----------------------------------------------"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "\n======== Cache Statistics ========"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Open file count:        1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Cached disk files:     64"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Realpath aliases:       0"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Project count:          1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Config count:           1"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": ""
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "textDocument/publishDiagnostics",
+      "params": {
+        "uri": "file:///tmp/opencode/tsgo-live/proj/tsconfig.json",
+        "diagnostics": []
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "handled method 'textDocument/didOpen' in 95.026819ms"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "Adopted snapshot 2 (parent 1) as current session snapshot (replacing 1)"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "======== Cloning snapshot 1 ========\n[17:46:40.159] Reason: RequestedLanguageService (pending file changes) -  Documents: [file:///tmp/opencode/tsgo-live/proj/clean.ts]\n[17:46:40.159] DidChangeCustomConfigFileName\n[17:46:40.159] DidRequestFile\n\t[17:46:40.159] Acquiring config for project\n[17:46:40.159] UpdateAutoImports\n\t[17:46:40.159] Building autoimport registry\n\t\t[17:46:40.160] Updated buckets and directories in 49.023µs\n\t\t[17:46:40.160] Built autoimport registry in 57.479µs\n[17:46:40.160] Finished cloning snapshot 1 into snapshot 2 in 106.135µs\n"
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": ""
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "result": {
+        "kind": "full",
+        "items": []
+      }
+    },
+    {
+      "jsonrpc": "2.0",
+      "method": "window/logMessage",
+      "params": {
+        "type": 3,
+        "message": "handled method 'textDocument/diagnostic' (2) in 5.635974ms"
+      }
+    }
+  ]
+}
+SUMMARY {"A_bug_reproduced":true,"B_fix_verified":true}
