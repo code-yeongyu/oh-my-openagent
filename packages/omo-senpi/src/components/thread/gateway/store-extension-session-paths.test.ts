@@ -28,6 +28,12 @@ const openOp: SessionCallableOp = {
   await: { statusOp: "threadOpenStatus", expireOp: "expireThreadOpen", timeoutMs: 2_000 },
   wake: "requests.marker",
 }
+
+const openAwait = () => {
+  if (openOp.await === undefined) throw new Error("openOp declares no await")
+  return openOp.await
+}
+
 const statusOp: SessionCallableOp = {
   op: "workItemStatus",
   toolName: "work_item_status",
@@ -120,7 +126,7 @@ test.each(["tor_short", "../../escape", "tor_" + "G".repeat(32)])("#given an awa
 test("#given the connector completes before the wait is armed #when the tool awaits #then it returns the final status at once, without waiting for the timeout", async () => {
   const h = (harness = createGatewayHarness())
   const store = h.store()
-  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openOp.await!, timeoutMs: 120_000 } }] }))
+  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openAwait(), timeoutMs: 120_000 } }] }))
   const id = "tor_" + "1".repeat(32)
   await store.extensionCall("gw", "completeThreadOpen", { await_request_id: id })
   const result = await store.extensionSessionAwait("gw", "openThread", { target_session_durable_id: "child", await: true, await_request_id: id }, { callerDurableId: "caller" })
@@ -134,7 +140,7 @@ test("#given a waiter that read pending and armed its watch #when a SEPARATE sto
   const waiterArmed = new Promise<void>((resolve) => { armed = resolve })
   // The hook fires only after the first status read answered pending, so the completion below lands after it.
   const store = h.store({ _test: { onAwaitArmed: (id) => { armedIds.push(id); armed() } } })
-  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openOp.await!, timeoutMs: 120_000 } }] }))
+  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openAwait(), timeoutMs: 120_000 } }] }))
   const id = "tor_" + "2".repeat(32)
   const wake = join(dirname(gatewayDatabasePath(h.agentDir)), "thread-open", id)
   mkdirSync(dirname(wake), { recursive: true })
@@ -150,7 +156,7 @@ test("#given a waiter that read pending and armed its watch #when a SEPARATE sto
 test("#given a running connector (wake dir present) but no wake ever arrives #when timeoutMs passes #then expireOp runs and the final status is returned", async () => {
   const h = (harness = createGatewayHarness())
   const store = h.store()
-  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openOp.await!, timeoutMs: 50 } }] }))
+  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openAwait(), timeoutMs: 50 } }] }))
   mkdirSync(join(dirname(gatewayDatabasePath(h.agentDir)), "thread-open"), { recursive: true })
   const id = "tor_" + "3".repeat(32)
   const result = await store.extensionSessionAwait("gw", "openThread", { target_session_durable_id: "child", await: true, await_request_id: id }, { callerDurableId: "caller" })
@@ -160,7 +166,7 @@ test("#given a running connector (wake dir present) but no wake ever arrives #wh
 test("#given no connector has started (no wake dir) #when the tool awaits with a long timeout #then it expires at once instead of waiting it out", async () => {
   const h = (harness = createGatewayHarness())
   const store = h.store()
-  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openOp.await!, timeoutMs: 120_000 } }] }))
+  await store.registerStoreExtension(registration({ sessionCallable: [{ ...openOp, await: { ...openAwait(), timeoutMs: 120_000 } }] }))
   const id = "tor_" + "4".repeat(32)
   const result = await store.extensionSessionAwait("gw", "openThread", { target_session_durable_id: "child", await: true, await_request_id: id }, { callerDurableId: "caller" })
   expect(result).toMatchObject({ kind: "ok", value: { status: "refused" } })

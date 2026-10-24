@@ -1,0 +1,9 @@
+{
+	"source_id": "S5",
+	"url": null,
+	"observed_at": "2026-10-01T00:00:00Z",
+	"sha256": "e6d47cc01ac7d20e7ba7acd6d1ad113573c1991f02c5af5f0f64a0572e0607f1",
+	"extractor": "tool:source-snapshot@1",
+	"revision": null,
+	"kind": "command"
+}
