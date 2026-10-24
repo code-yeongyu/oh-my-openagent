@@ -144,6 +144,16 @@ export function recallBm25IndexFor(
   return index
 }
 
+/** What the memory report reads for these documents: their cached term arrays and the process dictionary. */
+export function recallTermFigures(documents: Iterable<RecallDocument>): { readonly termArrayBytes: number; readonly vocabularyTerms: number } {
+  let termArrayBytes = 0
+  for (const document of documents) {
+    const terms = currentTerms(document)
+    if (terms !== undefined) termArrayBytes += terms.ids.byteLength + terms.counts.byteLength
+  }
+  return { termArrayBytes, vocabularyTerms: vocabulary.length }
+}
+
 export function termCount(terms: DocumentTerms, id: number): number {
   let low = 0
   let high = terms.ids.length - 1

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**senpi's on-demand memory report now shows OmO's task children and memory recall.** With `SENPI_MEMORY_REPORT=1`, a report gains an `omoTask` section (resident task children, cached task records and their bytes, open event logs) and an `omoRecall` section (loaded memory corpora, their text bytes, the recall index's term arrays and dictionary size), so a large session's memory can be traced to these layers. Nothing is measured unless a report is taken. ([#11178](https://github.com/code-yeongyu/oh-my-openagent/pull/11178), part of [#9442](https://github.com/code-yeongyu/oh-my-openagent/issues/9442))
+
 ## [5.1.45] - 2026-10-24
 
 **Reading the end of a long session takes 42 ms and 68 MB instead of 40 s and 1.8 GB.** `session_read`, `session_search` and `session_info` page through OpenCode's message API instead of loading the whole session: on a 23,000-message session, `session_read` with `limit: 2, from_end: true` dropped from 39.6 s and 1,848 MB peak memory to 42 ms and 68 MB, and a search that runs out its 60-second timeout now stops reading when it returns, where it used to read another 228 MB in the background ([#10738](https://github.com/code-yeongyu/oh-my-openagent/issues/10738), [#10741](https://github.com/code-yeongyu/oh-my-openagent/pull/10741)).

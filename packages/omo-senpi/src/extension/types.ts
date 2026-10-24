@@ -18,6 +18,9 @@ export interface BeforeAgentStartHandlerOptions {
   previewSafe?: boolean
 }
 
+/** Figures for one section of senpi's on-demand memory report. */
+export type MemoryReporter = () => Readonly<Record<string, number>>
+
 export interface SenpiExtensionAPI {
   readonly sessionKind?: "interactive" | "worker"
   /**
@@ -47,6 +50,11 @@ export interface SenpiExtensionAPI {
     on(name: string, handler: (payload: unknown) => void): () => void
   }
   registerTool(tool: Record<string, unknown>): void
+  /**
+   * Adds figures to senpi's on-demand memory report (`SENPI_MEMORY_REPORT=1`), read only when a report
+   * is taken. Optional: hosts older than the release that added the report do not have it.
+   */
+  registerMemoryReporter?(name: string, reporter: MemoryReporter): void
   registerCommand(name: string, options: Record<string, unknown>): void
   registerFlag(
     name: string,

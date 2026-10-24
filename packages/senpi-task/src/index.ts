@@ -79,8 +79,10 @@ export type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
   StateDirConfig,
+  ResidentTaskRecordStore,
   TaskRecordDiagnostic,
   TaskRecordStore,
+  TaskRecordStoreResidentFigures,
 } from "./store"
 export {
   buildLiveStatsTokens,
