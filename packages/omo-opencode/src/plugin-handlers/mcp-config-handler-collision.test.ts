@@ -139,3 +139,62 @@ describe("applyMcpConfig collision handling", () => {
     )
   })
 })
+
+describe("applyMcpConfig plugin MCP deduplication", () => {
+  test("skips namespaced plugin MCP whose bare server name collides with a native MCP", async () => {
+    //#given
+    // Issue #2989: a Claude Code Figma plugin contributes "figma:figma" while the user
+    // already has a native "figma" MCP. OpenCode keys OAuth state by MCP name, so the
+    // namespaced duplicate can never satisfy the stored "figma" tokens and re-prompts
+    // for auth on every start.
+    const userMcp = {
+      figma: { type: "remote", url: "https://mcp.figma.com/mcp", enabled: true },
+    }
+
+    loadMcpConfigsSpy.mockResolvedValue({ servers: {}, loadedServers: [] })
+
+    const config: Record<string, unknown> = { mcp: userMcp }
+    const pluginConfig = createPluginConfig()
+    const pluginComponents = {
+      ...EMPTY_PLUGIN_COMPONENTS,
+      mcpServers: {
+        "figma:figma": { type: "remote", url: "https://mcp.figma.com/mcp", enabled: true },
+      },
+    }
+
+    //#when
+    const { applyMcpConfig } = await importFreshMcpConfigHandlerModule()
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents })
+
+    //#then
+    const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
+    expect(mergedMcp).not.toHaveProperty("figma:figma")
+    expect(mergedMcp.figma.url).toBe("https://mcp.figma.com/mcp")
+    expect(logSpy).toHaveBeenCalledWith(
+      'warning: skipping plugin MCP server "figma:figma"; native MCP server "figma" already exists'
+    )
+  })
+
+  test("keeps namespaced plugin MCP when no native server shares its bare name", async () => {
+    //#given
+    loadMcpConfigsSpy.mockResolvedValue({ servers: {}, loadedServers: [] })
+
+    const config: Record<string, unknown> = {}
+    const pluginConfig = createPluginConfig()
+    const pluginComponents = {
+      ...EMPTY_PLUGIN_COMPONENTS,
+      mcpServers: {
+        "demo-plugin:onlyInPlugin": { type: "remote", url: "https://plugin.example.com", enabled: true },
+      },
+    }
+
+    //#when
+    const { applyMcpConfig } = await importFreshMcpConfigHandlerModule()
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents })
+
+    //#then
+    const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
+    expect(mergedMcp).toHaveProperty("demo-plugin:onlyInPlugin")
+    expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining("skipping plugin MCP server"))
+  })
+})
