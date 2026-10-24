@@ -1,10 +1,10 @@
-# src/cli/doctor/ — Health Diagnostics (26 Check Files)
+# src/cli/doctor/ — Health Diagnostics (27 Check Files)
 
 **Generated:** 2026-08-10 / 38d268995
 
 ## OVERVIEW
 
-`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions()` registers **8** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four of the eight are category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
+`bunx oh-my-opencode doctor` — parallel diagnostic checks. `getAllCheckDefinitions()` registers **9** checks; a second function `getCodexCheckDefinitions()` registers **3** Codex-only checks. Four of the nine are category aggregators (System, Config, Tools, Models); the rest register standalone. Catches broken installs, config typos, missing dependencies, provider misconfigurations before they become runtime errors.
 
 ## COMMAND FLAGS
 
@@ -17,11 +17,12 @@ bunx oh-my-opencode doctor --json       # Machine-readable output
 
 ## CHECK CATEGORIES
 
-Registered by `getAllCheckDefinitions()` (8):
+Registered by `getAllCheckDefinitions()` (9):
 
 | Check | File | Validates |
 |----------|------|-----------|
 | **SYSTEM** | `checks/system.ts` | OpenCode binary found + version >= `MIN_OPENCODE_VERSION` (`1.4.0`), plugin registered in opencode.json, loaded plugin version matches installed |
+| **INSTALL_SHADOWING** | `checks/install-shadowing.ts` | Multiple OmO family binaries on PATH (`oh-my-opencode`, `oh-my-openagent`, `omo-agent-toolkit`; not bare `omo`) report the same `--version` |
 | **CONFIG** | `checks/config.ts` | JSONC validity, Zod schema passes, no unknown keys, model override syntax correct |
 | **TUI_PLUGIN** | `checks/tui-plugin-config.ts` | TUI sidebar plugin entry resolvable |
 | `deprecated-reasoning-keys` | `checks/deprecated-reasoning-keys.ts` | Scans `~/.omo/omo.json[c]` for deprecated `variant` / `reasoningEffort` / `thinking` / `textVerbosity` / `fallback_models` keys, reporting file + dotted path and a `config migrate` hint. Skips the `[opencode]` block and passthrough containers (`provider_options`). Registered with a literal id, NOT in `CHECK_IDS`. |
@@ -36,7 +37,7 @@ Registered by `getCodexCheckDefinitions()` (3): **CODEX** (critical, `checks/cod
 
 `checks/latest-version.ts` is not a check either: `runner.ts` runs `gatherEditionDistTags(target)` in parallel with the checks (npm dist-tags for `oh-my-openagent` / `lazycodex-ai`, 5s fetch timeout, `null` when unreachable) and `resolveLatestVersion()` picks the tag matching the installed channel. The result lands in `DoctorResult.latestVersion`, which the default formatter prints on the OK summary line together with the edition label and the per-edition update command (`framework/constants.ts` `EDITION_LABELS` / `UPDATE_COMMANDS`; `null` renders as `could not check`).
 
-## SUPPORTING CHECK FILES (26 total)
+## SUPPORTING CHECK FILES (27 total)
 
 ```
 checks/
@@ -45,6 +46,7 @@ checks/
 ├── system-binary.ts                       # OpenCode binary discovery (PATH + desktop app)
 ├── system-plugin.ts                       # opencode.json plugin entry detection
 ├── system-loaded-version.ts               # Cache vs npm latest
+├── install-shadowing.ts                   # Multiple OmO family installs on PATH
 ├── config.ts                              # Main Config aggregator
 ├── tools.ts                               # Main Tools aggregator
 ├── dependencies.ts                        # AST-Grep CLI/NAPI + comment-checker presence
@@ -74,7 +76,7 @@ checks/
 ```
 doctor command
   → runner.ts: parallel check execution with 30s per-check timeout
-  → checks/index.ts: getAllCheckDefinitions() (8) + getCodexCheckDefinitions() (3)
+  → checks/index.ts: getAllCheckDefinitions() (9) + getCodexCheckDefinitions() (3)
   → checks/latest-version.ts: gatherEditionDistTags(target) runs alongside the checks
   → each check returns CheckResult: { name, status, message, details?, issues, duration? }
   → formatter.ts: render to stdout (text/status/json)
