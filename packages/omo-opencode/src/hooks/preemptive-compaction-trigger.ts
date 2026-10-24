@@ -6,12 +6,17 @@ import {
 import { log } from "../shared/logger"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
+import { resolveEmptySummaryFromSession } from "./preemptive-compaction-empty-summary"
 import type {
   CachedCompactionState,
   PreemptiveCompactionContext,
 } from "./preemptive-compaction-types"
 
-const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 60_000
+// A summarize of a large context runs long: in a 1M-window session, four consecutive
+// attempts at ~650K tokens completed 64-67s in — just past the previous 60s budget — so
+// every one was abandoned mid-flight, which produced empty summaries and repeated
+// re-fires. The degradation monitor already budgets 120s for the same call.
+const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 const PREEMPTIVE_COMPACTION_COOLDOWN_MS = 60_000
 
@@ -109,6 +114,37 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       PREEMPTIVE_COMPACTION_TIMEOUT_MS,
       `Compaction summarize timed out after ${PREEMPTIVE_COMPACTION_TIMEOUT_MS}ms`,
     )
+
+    // A summarize whose provider stream died mid-flight still resolves, leaving an
+    // empty summary message that replaces the conversation with nothing. Never latch
+    // the session as compacted in that case: report it and allow a retry after cooldown.
+    const emptySummary = await resolveEmptySummaryFromSession({
+      client: ctx.client,
+      sessionID,
+      directory: ctx.directory,
+    })
+
+    if (emptySummary) {
+      log("[preemptive-compaction] Compaction produced an empty summary; not marking session compacted", {
+        sessionID,
+        providerID: targetProviderID,
+        modelID: targetModelID,
+      })
+      ctx.client.tui.showToast({
+        body: {
+          title: "Preemptive compaction produced no summary",
+          message: `Compaction ran on ${targetProviderID}/${targetModelID} but returned an empty summary. The session was not compacted and will retry.`,
+          variant: "warning",
+          duration: 10000,
+        },
+      }).catch((toastError: unknown) => {
+        log("[preemptive-compaction] Failed to show toast", {
+          sessionID,
+          toastError: String(toastError),
+        })
+      })
+      return
+    }
 
     compactedSessions.add(sessionID)
   } catch (error) {
