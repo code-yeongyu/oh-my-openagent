@@ -30,6 +30,7 @@ Build, staging, sync, and install pipeline for the `@code-yeongyu/omo-senpi` Pi 
 ## ANTI-PATTERNS
 
 - Never edit generated outputs directly; change source or these scripts and rebuild. Never bypass a stale/missing-artifact or `--check` failure.
+- Feature PRs never commit generated bundles (#9903, `script/generated-bundles.json`; the `Generated bundles gate` refuses them): build locally to test, and `bundle-regen.yml` regenerates and commits them on dev after the merge.
 - Never widen `SENPI_LOADER_ALIASES` without the matching senpi loader and `bundle-purity.test.ts` change (peer-external rule in `../../AGENTS.md`).
 - No non-atomic settings writes and no direct artifact mutation in install paths.
 - Never let forbidden tokens (`multi_agent`, `spawn_agent`, codex references) into synced skills or the embedded directive; the checks exist to fail the build.

@@ -19,7 +19,11 @@ function readTrackedBundle(): string {
   return result.stdout.toString()
 }
 
-describe("committed Codex installer bundle", () => {
+// Committed bundles are regenerated on dev by bundle-regen.yml after each merge (#9903); a PR or
+// merge-queue checkout carries the base's bundle with the PR's sources, so this contract holds on dev.
+const onPullRequest = ["pull_request", "merge_group"].includes(process.env.GITHUB_EVENT_NAME ?? "")
+
+describe.skipIf(onPullRequest)("committed Codex installer bundle", () => {
   test("#given the tracked bundle #when its build marker is read #then it is present and self-consistent", () => {
     // given
     const artifact = parseCodexInstallerArtifact(readTrackedBundle())

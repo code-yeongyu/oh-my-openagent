@@ -1,0 +1,104 @@
+name: Bundle regen
+
+# Feature PRs never commit generated bundles (#9903). After every push to dev this job rebuilds them
+# on the same toolchain as ci.yml's freshness check and commits only the paths listed in
+# script/generated-bundles.json, as the dedicated bundle-regen GitHub App (the only extra bypass
+# actor on the dev "Require passing CI" ruleset). The release-state job still regenerates on its own.
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundle-regen
+  cancel-in-progress: false
+
+jobs:
+  regen:
+    name: Regenerate committed bundles
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - id: app_token
+        name: Mint bundle-regen app token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.OMO_BUNDLE_BOT_APP_ID }}
+          private-key: ${{ secrets.OMO_BUNDLE_BOT_PRIVATE_KEY }}
+          repositories: oh-my-openagent
+
+      - uses: actions/checkout@v7
+        with:
+          ref: dev
+          token: ${{ steps.app_token.outputs.token }}
+          persist-credentials: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+
+      - id: identity
+        name: Resolve the app's bot identity
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          APP_SLUG: ${{ steps.app_token.outputs.app-slug }}
+        run: |
+          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          echo "name=${APP_SLUG}[bot]" >> "$GITHUB_OUTPUT"
+          echo "email=${user_id}+${APP_SLUG}[bot]@users.noreply.github.com" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate, verify scope, commit and push
+        shell: bash
+        env:
+          BOT_NAME: ${{ steps.identity.outputs.name }}
+          BOT_EMAIL: ${{ steps.identity.outputs.email }}
+        run: |
+          set -euo pipefail
+          git config user.name "$BOT_NAME"
+          git config user.email "$BOT_EMAIL"
+          # A merge can land between fetch and push; every attempt rebuilds on the newest dev.
+          for attempt in 1 2 3; do
+            git fetch --no-tags origin dev
+            git reset --hard origin/dev
+            bun install --frozen-lockfile --ignore-scripts
+            node packages/omo-senpi/plugin/scripts/build-extension.mjs
+            node packages/omo-senpi/plugin/scripts/build-install.mjs
+            bun run build:codex-install
+            bun script/stage-generated-bundles.ts
+            if git diff --cached --quiet; then
+              echo "Bundles already current on $(git rev-parse --short HEAD)."
+              exit 0
+            fi
+            bun script/assert-generated-only.ts
+            git commit -q -m "chore(bundles): regenerate after $(git rev-parse --short HEAD)"
+            if git push origin HEAD:dev; then
+              exit 0
+            fi
+            echo "dev moved; regenerating again (attempt ${attempt})"
+          done
+          echo "::error::could not push regenerated bundles after 3 attempts"
+          exit 1
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Bundle regen
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Rebuilds the generated bundles listed in script/generated-bundles.json on dev after each push (#9903).
+            - Commits only listed paths, as the bundle-regen app; no-op when the bytes already match.
+          JOB_SUMMARY_NEXT: If this fails, read the staging/assert step output first; never widen the generated list to make a push pass.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

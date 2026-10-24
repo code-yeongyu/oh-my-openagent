@@ -18,7 +18,11 @@ function harnessIds(source: string): string | undefined {
   return /OMO_CONFIG_HARNESS_IDS = (\[[^\]]*\])/.exec(source)?.[1]
 }
 
-describe("the committed Codex installer bundle tracks its transitive inputs", () => {
+// Committed bundles are regenerated on dev by bundle-regen.yml after each merge (#9903); a PR or
+// merge-queue checkout carries the base's bundle with the PR's sources, so this contract holds on dev.
+const onPullRequest = ["pull_request", "merge_group"].includes(process.env.GITHUB_EVENT_NAME ?? "")
+
+describe.skipIf(onPullRequest)("the committed Codex installer bundle tracks its transitive inputs", () => {
   // The bundle INLINES workspace dependencies, but the freshness digest walks only
   // packages/omo-codex/src/install. omo#8620 renamed the harness ids in omo-config-core, the
   // inlined copy went stale, and the existing guard still reported the bundle current - so the

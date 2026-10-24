@@ -33,6 +33,7 @@ The single Pi package `@code-yeongyu/omo-senpi`: one generated extension entry, 
 ## ANTI-PATTERNS
 
 - NEVER hand-edit anything under `extensions/`, `skills/`, `skills-conditional/`, or the staged `runtime/` dirs; regenerate via `plugin/scripts/` (`build-extension.mjs`, `sync-skills.mjs`, `stage-x-search-skill.mjs`, the other stage scripts). Generated hook text repeats this: "Do not edit by hand - regenerated on startup". Do not add credential-gated skills to `pi.skills`.
+- Feature PRs never commit generated bundles (#9903, `script/generated-bundles.json`; the `Generated bundles gate` refuses them): build locally to test, and `bundle-regen.yml` regenerates and commits them on dev after the merge.
 - Treat bundles as opaque: minified one-liners up to ~870KB with minifier-local symbol names; LSP diagnostics on them are noise. Source of truth is `../src/` plus the build scripts.
 - Do not widen the Pi manifest surface without keeping `../src/package-shape.test.ts` and `../src/plugin-manifest.test.ts` green.
 
