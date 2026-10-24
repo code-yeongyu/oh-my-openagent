@@ -87,14 +87,14 @@ async function trimDescriptions(
   const trimmed: TrimmedDescription[] = []
   for (const path of await listReflectionChangedPaths(exec, worktree.dir, recordedBase, tipSha)) {
     if (!isMemoryContentPath(path)) continue
-    const blob = await exec.run(["show", `${tipSha}:${path}`], { cwd: worktree.dir, timeoutMs: 30_000 })
+    const blob = await exec.run(["cat-file", "blob", `${tipSha}:${path}`], { cwd: worktree.dir, timeoutMs: 30_000 })
     if (blob.code !== 0) continue // Deleted paths have no description to repair.
     const content = blob.stdout
     const violation = describeFrontmatterViolation(content)
     if (violation === null) continue
     // Grammar is validated before description length, so equality excludes every other violation.
     if (!violation.startsWith(`'description' exceeds ${MAX_DESCRIPTION_LENGTH} characters (`)) continue
-    const base = await exec.run(["show", `${recordedBase}:${path}`], { cwd: worktree.dir, timeoutMs: 30_000 })
+    const base = await exec.run(["cat-file", "blob", `${recordedBase}:${path}`], { cwd: worktree.dir, timeoutMs: 30_000 })
     if (base.code === 0 && frontmatterBlock(base.stdout) === frontmatterBlock(content)) continue
     const parsed = parseMemoryFile(content)
     const original = parsed.frontmatter.description

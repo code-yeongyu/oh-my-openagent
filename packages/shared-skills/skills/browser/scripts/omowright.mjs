@@ -3,16 +3,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { guardOmowright } from "./browser-engine-guard.mjs"
 
-export {
-  BROWSER_CONFIRMATION_POLICY,
-  BROWSER_ENGINE_ENV,
-  BROWSER_STATE_EVENT,
-  BrowserActionDeclinedError,
-  BrowserEngineRefusal,
-  BrowserNotConnectedError,
-  BrowserUserStoppedError,
-  guardOmowright,
-} from "./browser-engine-guard.mjs"
+export { BROWSER_ENGINE_ENV, BuiltinBrowserUnavailableError, guardOmowright } from "./browser-engine-guard.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const skillRoot = dirname(scriptDir)
