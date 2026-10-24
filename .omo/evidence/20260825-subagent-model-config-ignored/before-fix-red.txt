@@ -1,0 +1,48 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-agent-overrides.test.ts:
+134 |     // when
+135 |     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+136 | 
+137 |     // then
+138 |     expect(result.error).toBeUndefined()
+139 |     expect(result.categoryModel).toEqual({
+                                       ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "modelID": "duo-chat-sonnet-4-6",
+-   "providerID": "gitlab",
+- }
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-3228/packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-agent-overrides.test.ts:139:34)
+(fail) resolveSubagentExecution agent overrides > resolves override stored under a config alias bound via prompt_append file stem (#3228) [20.03ms]
+169 |     // when
+170 |     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+171 | 
+172 |     // then
+173 |     expect(result.error).toBeUndefined()
+174 |     expect(result.categoryModel).toEqual({
+                                       ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "modelID": "duo-chat-haiku-4-5",
+-   "providerID": "gitlab",
+- }
++ undefined
+
+- Expected  - 4
++ Received  + 1
+
+      at <anonymous> (/home/viprix/projects/oom-wt-3228/packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-agent-overrides.test.ts:174:34)
+(fail) resolveSubagentExecution agent overrides > resolves override stored under a config alias bound via displayName (#3228) [6.58ms]
+
+ 3 pass
+ 2 fail
+ 10 expect() calls
+Ran 5 tests across 1 file. [764.00ms]
