@@ -5,6 +5,7 @@ import type { OmoSidePanelSettings } from "@oh-my-opencode/omo-config-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
+import { getOmoNativeStateDir } from "../telemetry/product-identity"
 import {
   FILE_VISIBLE_ROWS,
   GIT_REFRESH_FLOOR_MS,
@@ -28,6 +29,10 @@ import { findGitRoot, readGitBranch } from "./git/repo"
 import { createPanelHostSurface } from "./host-surface"
 import type { PanelAction } from "./links"
 import { openPanelViewer } from "./popups/open"
+import {
+  claimRegularModeNotice,
+  REGULAR_MODE_NOTICE_MESSAGE,
+} from "./regular-mode-notice"
 import { buildAgentCardRows } from "./sections/agents"
 import { buildMemoryDetailRows } from "./sections/memory"
 import type { PanelGitStatus } from "./sections/files"
@@ -76,6 +81,8 @@ export interface SidePanelRuntimeOptions {
   readonly usage?: {
     readonly readCredentials?: () => UsageCredentialSource
   }
+  /** Where the regular-mode notice claim marker lives; injected so tests never touch a real install. */
+  readonly regularNoticeStateDir?: string
 }
 
 const globalTimers: PanelTimers = {
@@ -361,6 +368,12 @@ export function createSidePanelController(
         })
       },
       ...(options.defer === undefined ? {} : { defer: options.defer }),
+      onRegularModeFallback: () => {
+        // Claim before notifying: parallel sessions of one install cannot both show it, and a
+        // later revisit (a mode switch back to regular) finds the marker and stays silent.
+        if (!claimRegularModeNotice(options.regularNoticeStateDir ?? defaultRegularNoticeStateDir())) return
+        hostUi?.notify(REGULAR_MODE_NOTICE_MESSAGE, "info")
+      },
     })
     // git runs three processes per refresh, so a files section that is off never finds a root.
     gitRoot = settings.sections.files ? locateGit(cwd) : undefined
@@ -508,4 +521,9 @@ function createChildOutputReader(): (cwd: string, taskId: string) => Promise<rea
     const rendered = runtime.renderTranscript(result.entries, { mode: "full", tailLines: 0 })
     return childOutputRows(rendered.text, rendered.truncated)
   }
+}
+
+/** The install state dir every omo-native marker lives in; one resolver, so the path has one source. */
+function defaultRegularNoticeStateDir(): string {
+  return getOmoNativeStateDir(process.env)
 }

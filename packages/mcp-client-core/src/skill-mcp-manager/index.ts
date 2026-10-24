@@ -1,2 +1,5 @@
 export * from "./types"
 export { SkillMcpManager } from "./manager"
+export type { GrantStore, EnvGrant, EnvGrantLabel, EnvGrantSnapshot } from "./env-grant-store"
+export { createFileGrantStore } from "./env-grant-store"
+export { resolveGrantsStorePath } from "./env-grants-store"

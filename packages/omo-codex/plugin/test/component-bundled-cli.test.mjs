@@ -17,6 +17,7 @@ import test from "node:test";
 
 import { readAggregateHookManifests, readJson, root } from "./aggregate-plugin-fixture.mjs";
 import { componentHookContractCases } from "./component-hook-contract-cases.mjs";
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs";
 
 const HOOK_EVENTS_BY_COMPONENT = {
 	"comment-checker": "post-tool-use",
@@ -348,7 +349,9 @@ async function stopTestDaemons(daemonRoot) {
 		const pid = Number(readFileSync(pidPath, "utf8").trim());
 		if (!Number.isInteger(pid) || pid <= 0) continue;
 		if (process.platform === "win32") {
-			const result = spawnSync("taskkill", ["/pid", String(pid), "/f", "/t"], {
+			const args = windowsTreeKillArgs(pid);
+			if (args.length === 0) continue;
+			const result = spawnSync("taskkill", args, {
 				encoding: "utf8",
 				windowsHide: true,
 			});

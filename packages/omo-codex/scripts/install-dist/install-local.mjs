@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:589465f5060a80fea8a2bbe83bbcfd842b5c052b84c01c9c1ec4d97118fa4a04:960b1c9132bfc8b0def0b8b62ba61e3a8873e4391079648c783d6cba18534957
+// omo-codex-install:8b9824e295d69487dd817315c33a87802b0085bb02e8769565dbc1d3982d5d4c:6169d75a919602e20e768a24432bad9b07ae3234fba2968eb5673b2c430eef54
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -9982,20 +9982,98 @@ var init_index_node = __esm(() => {
   };
 });
 
+// packages/telemetry-core/src/telemetry-delivery-error.ts
+var PERMANENT_STATUSES, TelemetryDeliveryError;
+var init_telemetry_delivery_error = __esm(() => {
+  PERMANENT_STATUSES = new Set([400, 413]);
+  TelemetryDeliveryError = class TelemetryDeliveryError extends Error {
+    permanent;
+    status;
+    constructor(status, cause) {
+      super(status === undefined ? "telemetry event was not delivered (no response)" : `telemetry event was rejected with HTTP ${status}`, { cause });
+      this.name = "TelemetryDeliveryError";
+      this.status = status;
+      this.permanent = status !== undefined && PERMANENT_STATUSES.has(status);
+    }
+  };
+});
+
+// packages/telemetry-core/src/posthog-immediate-send.ts
+function createImmediateSender(apiKey, options, PostHogClient) {
+  const baseFetch = options.fetch ?? ((url, init) => fetch(url, init));
+  let current;
+  const trackedFetch = async (url, init) => {
+    const attempt = current;
+    try {
+      const response = await baseFetch(url, init);
+      if (attempt !== undefined)
+        attempt.status = response.status;
+      return response;
+    } catch (error) {
+      if (attempt !== undefined)
+        attempt.error = error;
+      throw error;
+    }
+  };
+  const client = new PostHogClient(apiKey, { ...options, fetch: trackedFetch, fetchRetryCount: 0 });
+  let queue = Promise.resolve();
+  const sendOne = async (message) => {
+    const attempt = {};
+    current = attempt;
+    try {
+      await client.captureImmediate(message);
+    } finally {
+      current = undefined;
+    }
+    const { status } = attempt;
+    if (status === undefined || status < 200 || status >= 300)
+      throw new TelemetryDeliveryError(status, attempt.error);
+  };
+  return {
+    send(message) {
+      const result = queue.then(() => sendOne(message));
+      queue = result.catch(() => {
+        return;
+      });
+      return result;
+    },
+    async shutdown() {
+      await client.shutdown();
+    }
+  };
+}
+var init_posthog_immediate_send = __esm(() => {
+  init_telemetry_delivery_error();
+});
+
 // packages/telemetry-core/src/posthog-transport.ts
 class PostHogTelemetryTransport {
   #client;
+  #apiKey;
+  #options;
+  #immediate;
   constructor(apiKey, options) {
     this.#client = new PostHog(apiKey, options);
+    this.#apiKey = apiKey;
+    this.#options = options;
   }
   capture(message) {
     this.#client.capture(message);
+  }
+  captureImmediate(message) {
+    this.#immediate ??= Promise.resolve().then(() => (init_posthog_immediate_send(), {})).then(({}) => createImmediateSender(this.#apiKey, this.#options, PostHog)).catch((error) => {
+      this.#immediate = undefined;
+      throw error;
+    });
+    return this.#immediate.then((sender) => sender.send(message));
   }
   async flush() {
     await this.#client.flush();
   }
   async shutdown() {
-    await this.#client.shutdown();
+    await Promise.all([this.#client.shutdown(), this.#immediate?.then((sender) => sender.shutdown(), () => {
+      return;
+    })]);
   }
 }
 function createDefaultPostHogTransport(apiKey, options) {
@@ -10045,7 +10123,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.44",
+    version: "5.1.45",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19538,6 +19616,7 @@ var OmoMemoryReflectionSchema = object({
   merge: _enum(["auto", "integration"]).default("auto"),
   category: string2().min(1).default("quick"),
   timeout_minutes: number2().int().positive().default(15),
+  max_concurrent_runs: number2().int().positive().default(1),
   sandbox: _enum(["auto", "required", "off"]).default("auto")
 }).strict();
 var OmoMemorySyncSchema = object({
@@ -19609,6 +19688,7 @@ var OmoMemoryReflectionLayerSchema = object({
   merge: _enum(["auto", "integration"]).optional(),
   category: string2().min(1).optional(),
   timeout_minutes: number2().int().positive().optional(),
+  max_concurrent_runs: number2().int().positive().optional(),
   sandbox: _enum(["auto", "required", "off"]).optional()
 }).strict();
 var OmoMemorySyncLayerSchema = object({
@@ -19673,7 +19753,7 @@ var OmoMemoryProjectionLayerSchema = object({
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
-  reflection: OmoMemoryReflectionLayerSchema.optional(),
+  reflection: OmoMemoryReflectionLayerSchema.omit({ max_concurrent_runs: true }).optional(),
   nudge: OmoMemoryNudgeLayerSchema.optional(),
   facts: OmoMemoryFactsLayerSchema.optional(),
   dream: OmoMemoryDreamLayerSchema.optional(),
@@ -19698,6 +19778,7 @@ var OmoMemorySettingsSchema = object({
     merge: "auto",
     category: "quick",
     timeout_minutes: 15,
+    max_concurrent_runs: 1,
     sandbox: "auto"
   }),
   nudge: OmoMemoryNudgeSchema.default({ enabled: true, every_user_turns: 10 }),
@@ -20018,7 +20099,8 @@ var OmoTeamsConfigLayerSchema = record(string2(), OmoTeamSpecLayerSchema);
 
 // packages/omo-config-core/src/schema/telemetry.ts
 var OmoTelemetrySettingsShape = {
-  enabled: boolean2()
+  enabled: boolean2(),
+  rawTurnSampleRate: number2().min(0).max(1)
 };
 var OmoTelemetrySettingsLayerSchema = object(OmoTelemetrySettingsShape).partial().strict();
 var OmoTelemetrySettingsSchema = OmoTelemetrySettingsLayerSchema.extend({

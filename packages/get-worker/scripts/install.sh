@@ -49,6 +49,15 @@ sha256_of() {
   fi
 }
 
+is_musl_libc() { # the system libc, not whether a musl loader happens to be installed (#10562)
+  # musl's ldd exits 1 after printing its version, which pipefail would turn into a miss.
+  case "$(ldd --version 2>&1 || true)" in *[Mm][Uu][Ss][Ll]*) return 0 ;; esac
+  # Debian/Ubuntu's optional `musl` package ships /lib/ld-musl-*.so.1 next to glibc,
+  # so the loader file only counts when the system libc is not glibc.
+  if getconf GNU_LIBC_VERSION >/dev/null 2>&1; then return 1; fi
+  [ -f /etc/alpine-release ] || ls /lib/ld-musl-*.so.1 >/dev/null 2>&1
+}
+
 detect_asset() {
   local os arch libc="" cpu=""
   case "$(uname -s)" in
@@ -65,11 +74,7 @@ detect_asset() {
   if [ "$os" = darwin ] && [ "$arch" = x64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = 1 ]; then
     arch=arm64 # a Rosetta shell on Apple silicon gets the native build
   fi
-  if [ "$os" = linux ]; then
-    if [ -f /etc/alpine-release ] || ls /lib/ld-musl-*.so.1 >/dev/null 2>&1 || (ldd --version 2>&1 | grep -qi musl); then
-      libc="-musl"
-    fi
-  fi
+  if [ "$os" = linux ] && is_musl_libc; then libc="-musl"; fi
   if [ "$arch" = x64 ]; then
     if [ "$os" = linux ] && ! grep -qwi avx2 /proc/cpuinfo 2>/dev/null; then cpu="-baseline"; fi
     if [ "$os" = darwin ] && [ "$(sysctl -n hw.optional.avx2_0 2>/dev/null || echo 0)" != 1 ]; then cpu="-baseline"; fi

@@ -86,7 +86,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
       cwd: session.cwd,
       created_at: new Date(0).toISOString(),
       updated_at: new Date(0).toISOString(),
-      endpoint: { kind: "tui" as const, socket: `fake:${session.id}`, routing_id: null },
+      endpoint: { kind: "tui" as const, socket: `fake:${session.id}`, routing_id: null, durable_session_id: session.id },
       liveness: session.online ? ("routable" as const) : ("dead" as const),
     }))]
   }

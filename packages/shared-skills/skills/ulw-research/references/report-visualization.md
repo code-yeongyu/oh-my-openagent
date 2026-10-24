@@ -44,6 +44,8 @@ uv run --with numpy --with polars --with matplotlib python plot_<name>.py
 - Keep chart text as real text: set `matplotlib.rcParams["svg.fonttype"] = "none"` before saving an SVG. The default converts text to paths, and the static gate then sees a chart with no title, ticks, or labels.
 - Use the design spec's font family and palette tokens (`rcParams["font.family"]`, explicit colors from the spec). One accent color for the series that carries the finding; neutral tones for the rest.
 - Title, axis labels with units, value labels on bars or end points, ticks at round values computed from the data range.
+- Plot only from the fact ledger: export the rows with `node "$SKILL_DIR/scripts/report-tools.mjs" fact export --csv --out "$SESSION_DIR/assets/<chart>.csv" --session-dir "$SESSION_DIR"`, draw from that CSV, and give the chart figure `data-chart-source="assets/<chart>.csv"`.
+- Emit the axis tick labels inside one `<g class="ticks" data-tick-step=".." data-tick-min=".." data-tick-max="..">` group, so the fidelity gate can check every tick against the declared grid and every value label against the ledger.
 - One message per chart. A chart that needs a paragraph to explain is two charts.
 - For a web deliverable, HTML/CSS bars or an inline SVG built from the same table are preferred over an image.
 
