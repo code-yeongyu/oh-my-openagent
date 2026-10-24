@@ -404,6 +404,63 @@ describe("createMessagesTransformHandler", () => {
     })
   })
 
+  it("#given every Anthropic Claude release at or after its prefill-disabled family floor #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const scenarios: Array<{ name: string; modelID: string }> = [
+      { name: "opus 4.6", modelID: "claude-opus-4-6" },
+      { name: "opus 4.7", modelID: "claude-opus-4-7" },
+      { name: "opus 4.8", modelID: "claude-opus-4-8" },
+      { name: "opus 5", modelID: "claude-opus-5" },
+      { name: "opus 5 fast variant", modelID: "claude-opus-5-fast" },
+      { name: "sonnet 4.6", modelID: "claude-sonnet-4-6" },
+      { name: "sonnet 4.7", modelID: "claude-sonnet-4-7" },
+      { name: "sonnet 5", modelID: "claude-sonnet-5" },
+      { name: "mythos", modelID: "claude-mythos" },
+    ]
+
+    for (const scenario of scenarios) {
+      const messages: TestMessage[] = [
+        {
+          info: {
+            id: `msg_user_${scenario.modelID}`,
+            role: "user",
+            sessionID: `ses_${scenario.modelID}`,
+            agent: "sisyphus",
+            model: { providerID: "anthropic", modelID: scenario.modelID },
+            system: "system-prompt",
+            tools: { bash: true },
+          },
+          parts: [{ type: "text", text: "finish the debugging report" }],
+        },
+        {
+          info: {
+            id: `msg_assistant_${scenario.modelID}`,
+            role: "assistant",
+            sessionID: `ses_${scenario.modelID}`,
+          },
+          parts: [{ type: "text", text: "done" }],
+        },
+      ]
+
+      //#when
+      await runHandler(makeHooks({}), messages)
+
+      //#then
+      expect(messages, scenario.name).toHaveLength(3)
+      expect(messages.at(-1)?.info, scenario.name).toMatchObject({
+        role: "user",
+        sessionID: `ses_${scenario.modelID}`,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: scenario.modelID },
+      })
+      expect(messages.at(-1)?.parts[0], scenario.name).toMatchObject({
+        type: "text",
+        text: "[internal] Continue from the previous assistant state.",
+        synthetic: true,
+      })
+    }
+  })
+
   it("#given rejecting model metadata is only on the assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
     //#given
     const messages: TestMessage[] = [
@@ -718,6 +775,13 @@ describe("createMessagesTransformHandler", () => {
         userInfo: {
           role: "user",
           model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+        },
+      },
+      {
+        name: "anthropic haiku allowed",
+        userInfo: {
+          role: "user",
+          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
         },
       },
       {
