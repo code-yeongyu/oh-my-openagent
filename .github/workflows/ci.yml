@@ -22,6 +22,41 @@ permissions:
   contents: read
 
 jobs:
+  # A stable, unconditional context that dev's required checks can enforce even
+  # when the rest of CI takes a docs/web/release fast path.
+  lint-ratchet:
+    name: Lint ratchet
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Lint ratchet
+        run: bun run lint:ratchet
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Lint ratchet
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Runs the lint-debt ratchet on every CI event, independently of fast-path classification.
+            - Requires each tracked source file's counts to match the committed baseline.
+          JOB_SUMMARY_NEXT: Fix new findings; when removing existing debt, lower the baseline in the same change.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   ci-mode:
     runs-on: ubuntu-26.04
     outputs:
@@ -613,8 +648,7 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run lint
 
-      # Every file's count of no-explicit-any / ban-ts-comment / no-non-null-assertion must match
-      # script/lint-ratchet.baseline.json: a rise or a drop fails until the baseline is updated.
+      # Keep this check until dev requires the standalone Lint ratchet status.
       - name: Lint ratchet
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run lint:ratchet
@@ -1181,7 +1215,7 @@ jobs:
   auto-commit-schema:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -1232,7 +1266,7 @@ jobs:
   draft-release:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/dev' &&
