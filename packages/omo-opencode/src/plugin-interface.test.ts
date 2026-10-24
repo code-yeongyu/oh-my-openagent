@@ -1,11 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { OhMyOpenCodeConfig } from "./config"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 import { createPluginInterface } from "./plugin-interface"
+import * as dataPathModule from "./shared/data-path"
+import { writeProviderModelsCache } from "./shared/connected-providers-cache"
 import { createKeywordDetectorHook } from "./hooks/keyword-detector"
 import { getUltraworkMessage } from "./hooks/keyword-detector/ultrawork"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
@@ -368,6 +371,73 @@ describe("createPluginInterface - backward compatibility", () => {
 })
 
 describe("createPluginInterface - chat.params variant injection", () => {
+  let tempCacheRoot = ""
+  let getCacheDirSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    tempCacheRoot = mkdtempSync(join(tmpdir(), "plugin-interface-variant-cache-"))
+    getCacheDirSpy = spyOn(dataPathModule, "getOmoOpenCodeCacheDir").mockReturnValue(tempCacheRoot)
+    writeProviderModelsCache({
+      connected: ["variant-test"],
+      models: { "variant-test": [{ id: "live-reasoner", variants: { low: {} } }] },
+    })
+  })
+
+  afterEach(() => {
+    writeProviderModelsCache({ connected: [], models: {} })
+    getCacheDirSpy?.mockRestore()
+    rmSync(tempCacheRoot, { recursive: true, force: true })
+  })
+
+  test.each([
+    ["agent variant", { agents: { oracle: { variant: "high" } } }],
+    ["agent reasoning", { agents: { oracle: { reasoning: "high" } } }],
+    ["category variant", {
+      agents: { oracle: { category: "analysis" } },
+      categories: { analysis: { variant: "high" } },
+    }],
+    ["category reasoning", {
+      agents: { oracle: { category: "analysis" } },
+      categories: { analysis: { reasoning: "high" } },
+    }],
+  ] satisfies Array<[string, OhMyOpenCodeConfig]>)(
+    "uses live model capabilities for %s when the cached variants are stale",
+    async (_source, pluginConfig) => {
+      // given
+      const pluginInterface = createPluginInterface({
+        ctx: { client: {} } as never,
+        pluginConfig,
+        firstMessageVariantGate: {
+          shouldOverride: () => false,
+          markApplied: () => {},
+          markSessionCreated: () => {},
+          clear: () => {},
+        },
+        managers: {} as never,
+        hooks: {} as never,
+        tools: {},
+      })
+      const input = {
+        sessionID: "ses-variant-live",
+        agent: { name: "oracle" },
+        model: {
+          providerID: "variant-test",
+          id: "live-reasoner",
+          capabilities: { reasoning: true },
+          variants: { low: {}, high: {} },
+        },
+        provider: { info: { id: "variant-test" } },
+        message: {} as { variant?: string },
+      }
+
+      // when
+      await pluginInterface["chat.params"]?.(input as never, { options: {} } as never)
+
+      // then
+      expect(input.message.variant).toBe("high")
+    },
+  )
+
   test("injects variant from agent config into chat.params message", async () => {
     // given
     const pluginInterface = createPluginInterface({
@@ -403,13 +473,43 @@ describe("createPluginInterface - chat.params variant injection", () => {
     expect(input.message.variant).toBe("max")
   })
 
-  test("does not overwrite existing variant in chat.params message", async () => {
+  test("uses cached variants when chat.params only supplies model IDs", async () => {
+    // given
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: { agents: { oracle: { variant: "low" } } },
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const input = {
+      sessionID: "ses-variant-cache",
+      agent: "oracle",
+      model: { providerID: "variant-test", modelID: "live-reasoner" },
+      provider: { id: "variant-test" },
+      message: {} as { variant?: string },
+    }
+
+    // when
+    await pluginInterface["chat.params"]?.(input as never, { options: {} } as never)
+
+    // then
+    expect(input.message.variant).toBe("low")
+  })
+
+  test("does not overwrite an existing live-supported variant with agent config", async () => {
     // given
     const pluginInterface = createPluginInterface({
       ctx: { client: {} } as never,
       pluginConfig: {
         agents: {
-          sisyphus: { variant: "max" },
+          sisyphus: { variant: "low" },
         },
       } as never,
       firstMessageVariantGate: {
@@ -425,8 +525,13 @@ describe("createPluginInterface - chat.params variant injection", () => {
     const input = {
       sessionID: "ses-variant-keep",
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
-      provider: { id: "anthropic" },
+      model: {
+        providerID: "variant-test",
+        modelID: "live-reasoner",
+        capabilities: { reasoning: true },
+        variants: { low: {}, high: {} },
+      },
+      provider: { id: "variant-test" },
       message: { variant: "high" } as { variant?: string },
     }
     const output = { options: {} }
