@@ -1,4 +1,7 @@
-import { relative } from "node:path"
+import { dirname, isAbsolute, join, relative } from "node:path"
+import { setSkillSourceProvenance } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/config-source-discovery"
+import { knownUserSkillRoots } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
+import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
 import { omoConfigDiagnosticLines, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 import type * as z from "zod"
@@ -206,6 +209,25 @@ export function validatePluginConfig(
     protectUserFields(mergeViews(views), userConfig),
   ))
   warnLegacyUlwExecuteKey(chain.views)
+  if (config.skills) {
+    const owner = chain.views.findLast((view) => Object.hasOwn(view.config, "skills"))
+    const userRoots = [...knownUserSkillRoots()]
+    for (const view of chain.views.filter((candidate) => candidate.scope === "user")) {
+      const settings = OhMyOpenCodeConfigSchema.safeParse({ skills: view.config.skills })
+      const skills = settings.success ? settings.data.skills : undefined
+      if (!skills || Array.isArray(skills)) continue
+      for (const source of skills.sources ?? []) {
+        const path = typeof source === "string" ? source : source.path
+        if (/^https?:\/\//.test(path)) continue
+        userRoots.push(path.startsWith("~/") ? join(homeDir ?? "", path.slice(2)) : isAbsolute(path) ? path : join(dirname(view.path), path))
+      }
+    }
+    setSkillSourceProvenance(config.skills, {
+      kind: owner?.scope === "user" ? "user" : "project-auto",
+      selectedRoot: owner ? dirname(owner.path) : directory,
+      projectRoot: detectWorktreePath(directory) ?? directory, userRoots,
+    })
+  }
 
   return {
     valid: messages.length === 0,

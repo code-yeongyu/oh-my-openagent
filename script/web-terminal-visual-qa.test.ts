@@ -201,6 +201,80 @@ describe("web terminal visual QA helper", () => {
     expect(evaluate.mock.calls[1]?.[1]).toBe("\u001f")
   })
 
+  test("#given a WaitFor token #when the marker renders after a delay #then later input is typed only after it appears", async () => {
+    // given
+    const module = await import("./qa/xterm-live-terminal.mjs") as {
+      driveInput?: (
+        page: unknown,
+        inputs: readonly string[],
+        keyDelayMs: number,
+        options?: { readonly waitForTimeoutMs?: number },
+      ) => Promise<void>
+    }
+    const startedAt = Date.now()
+    const events: string[] = []
+    let screen = "booting...\n"
+    setTimeout(() => { screen = "booting...\n❯ \n" }, 250)
+    const page = unsafeTestValue({
+      evaluate: async () => screen,
+      keyboard: {
+        press: async (key: string) => { events.push(`press:${key}`) },
+        type: async (text: string) => { events.push(`type:${text}@${screen.includes("❯") ? "ready" : "early"}`) },
+      },
+    })
+
+    // when
+    expect(module.driveInput).toBeInstanceOf(Function)
+    if (!module.driveInput) return
+    await module.driveInput(page, ["{WaitFor:❯}", "/mcp", "{Enter}"], 0, { waitForTimeoutMs: 5000 })
+
+    // then
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(200)
+    expect(events).toEqual(["type:/mcp@ready", "press:Enter"])
+  })
+
+  test("#given a WaitFor token #when the marker never renders #then the capture fails naming the text and timeout", async () => {
+    // given
+    const module = await import("./qa/xterm-live-terminal.mjs") as {
+      driveInput?: (
+        page: unknown,
+        inputs: readonly string[],
+        keyDelayMs: number,
+        options?: { readonly waitForTimeoutMs?: number },
+      ) => Promise<void>
+    }
+    const type = mock(async () => undefined)
+    const page = unsafeTestValue({
+      evaluate: async () => "still loading\n",
+      keyboard: { type },
+    })
+
+    // when
+    expect(module.driveInput).toBeInstanceOf(Function)
+    if (!module.driveInput) return
+    const run = module.driveInput(page, ["{WaitFor:MCP servers}", "next"], 0, { waitForTimeoutMs: 150 })
+
+    // then
+    await expect(run).rejects.toThrow("{WaitFor:MCP servers} timed out after 150 ms")
+    expect(type).not.toHaveBeenCalled()
+  })
+
+  test("#given an empty WaitFor token #when driving input #then it is rejected instead of passing instantly", async () => {
+    // given
+    const module = await import("./qa/xterm-live-terminal.mjs") as {
+      driveInput?: (page: unknown, inputs: readonly string[], keyDelayMs: number) => Promise<void>
+    }
+    const page = unsafeTestValue({ evaluate: async () => "anything\n" })
+
+    // when
+    expect(module.driveInput).toBeInstanceOf(Function)
+    if (!module.driveInput) return
+    const run = module.driveInput(page, ["{WaitFor:}"], 0)
+
+    // then
+    await expect(run).rejects.toThrow("{WaitFor:} needs the text to wait for")
+  })
+
   test("#given conflicting sources #when both --from-file and --command are given #then it errors", async () => {
     // when
     const dir = makeTempDir()

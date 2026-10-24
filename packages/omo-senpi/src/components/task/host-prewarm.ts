@@ -121,7 +121,7 @@ async function warmHost(engine: HostPrewarmEngine): Promise<void> {
   // Only a session whose children will run on its host warms one up; in-process children never open there.
   if (gate.current() !== "process") return
   const socket = engine.host.shardSocket()
-  const warm = engine.host.warmHost ?? ((target: string, cwd: string) => warmTaskHost({ socket: target, cwd }))
+  const warm = engine.host.warmHost ?? ((target: string, cwd: string) => warmTaskHost({ socket: target, cwd, agentDir: engine.host.agentDir }))
   await warm(socket, engine.runtime.cwd()).catch((error: unknown) => {
     log("omo-senpi task host warm failed", { socket, error: error instanceof Error ? error.message : String(error) })
   })

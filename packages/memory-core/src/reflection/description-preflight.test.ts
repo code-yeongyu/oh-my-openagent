@@ -71,10 +71,8 @@ describe("reflection description preflight", () => {
       const input = `---\ndescription: ${JSON.stringify(original)}\n---\n${body}`
       const { parent, worktree, child, tip } = await fixture(input, existing)
       expect(oversized.length).toBe(1118)
-      expect(await validateCompletion(worktree, worktree.baseSha)).toMatchObject({
-        status: "failed",
-        detail: `Reflection commit contains invalid frontmatter in ${path}: 'description' exceeds 1024 characters (${original.length})`,
-      })
+      // validateCompletion would repair the branch by dropping the note (#10528), so the pre-check reads the file.
+      expect(describeFrontmatterViolation(input)).toBe(`'description' exceeds 1024 characters (${original.length})`)
       installHooks(worktree.dir, {
         checker: { execPath: process.execPath, script: join(import.meta.dir, "../memfs/memory-hook-cli.ts") },
       })
@@ -113,9 +111,10 @@ describe("reflection description preflight", () => {
 
     expect(await child.head()).toBe(tip)
     expect(await readFile(join(worktree.dir, path), "utf8")).toBe(content)
+    // The gate keeps the run's other entries and drops this one (#10528); here it was the only entry.
     expect(await validateCompletion(worktree, worktree.baseSha)).toMatchObject({
-      status: "failed",
-      detail: `Reflection commit contains invalid frontmatter in ${path}: duplicate frontmatter key 'kind'`,
+      status: "no_changes",
+      dropped: [{ path, reason: "invalid frontmatter: duplicate frontmatter key 'kind'" }],
     })
   })
 
@@ -148,7 +147,7 @@ describe("reflection description preflight", () => {
     expect(description.isWellFormed()).toBe(true)
   })
 
-  it("#given a refusing commit hook #when preflight runs #then it restores only its edits and leaves the original gate failure", async () => {
+  it("#given a refusing commit hook #when preflight runs #then it restores only its edits and the gate drops the note", async () => {
     const input = renderMemoryFile({ description: oversized }, body)
     const { worktree, child, tip } = await fixture(input)
     installHooks(worktree.dir)
@@ -160,8 +159,8 @@ describe("reflection description preflight", () => {
     expect(await child.status()).toBe("")
     expect(await readFile(join(worktree.dir, path), "utf8")).toBe(input)
     expect(await validateCompletion(worktree, worktree.baseSha)).toMatchObject({
-      status: "failed",
-      detail: `Reflection commit contains invalid frontmatter in ${path}: 'description' exceeds 1024 characters (1118)`,
+      status: "no_changes",
+      dropped: [{ path, reason: "invalid frontmatter: 'description' exceeds 1024 characters (1118)" }],
     })
   })
 

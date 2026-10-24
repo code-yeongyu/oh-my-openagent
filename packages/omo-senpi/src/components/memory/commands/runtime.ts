@@ -17,6 +17,8 @@ import { registerSearchCommand } from "./search"
 import { registerSleeptimeCommand } from "./sleeptime"
 import type { MemoryCommandContext, MemoryCommandDeps, MemoryCommandHandler } from "./types"
 
+export { planFactsMutation, FactsPlanParentDirtyError } from "@oh-my-opencode/memory-core"
+
 type CommandRegistrar = (pi: MemoryCommandPort, deps: MemoryCommandDeps) => void
 
 const REGISTRARS: Readonly<Record<LazyMemoryCommandName, CommandRegistrar>> = {
