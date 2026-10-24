@@ -18,7 +18,13 @@ export function applyCategoryParams(
         : {}),
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
-    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
+    // CategoryConfigSchema documents max_tokens and keeps maxTokens as its deprecated alias.
+    // Same documented-first precedence as reasoning / reasoningEffort above.
+    ...(config.max_tokens !== undefined
+      ? { maxTokens: config.max_tokens }
+      : config.maxTokens !== undefined
+        ? { maxTokens: config.maxTokens }
+        : {}),
     ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
     ...(config.tools !== undefined ? { tools: config.tools } : {}),
   }
