@@ -1,0 +1,46 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/todo-continuation-enforcer/session-state.test.ts:
+113 | 
+114 |     // when
+115 |     const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, churnedTodos)
+116 | 
+117 |     // then: status churn is the #5120 loop fuel and must not reset stagnation
+118 |     expect(progressUpdate.hasProgressed).toBe(false)
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5120/packages/omo-opencode/src/hooks/todo-continuation-enforcer/session-state.test.ts:118:42)
+(fail) createSessionStateStore > given todo statuses churn without completion-count changes, does not treat it as progress (#5120) [0.41ms]
+142 |       )
+143 |       updates.push(sessionStateStore.trackContinuationProgress(sessionID, 2, todos))
+144 |     }
+145 | 
+146 |     // then: no churn cycle ever reads as progress; the third one stops re-arming
+147 |     expect(updates.map((update) => update.hasProgressed)).toEqual([false, false, false])
+                                                                ^
+error: expect(received).toEqual(expected)
+
+  [
+-   false,
+-   false,
+-   false,
++   true,
++   true,
++   true,
+  ]
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/home/viprix/projects/oom-wt-5120/packages/omo-opencode/src/hooks/todo-continuation-enforcer/session-state.test.ts:147:59)
+(fail) createSessionStateStore > given todo statuses keep churning across post-injection turns, stagnation reaches the stop threshold (#5120) [0.62ms]
+
+ 10 pass
+ 2 fail
+ 28 expect() calls
+Ran 12 tests across 1 file. [493.00ms]
+TEST_EXIT:1
