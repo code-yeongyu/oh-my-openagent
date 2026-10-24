@@ -1,0 +1,26 @@
+[2026-09-01T16:21:35.792Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/pr6669-srv-mqtbTm"}
+[2026-09-01T16:21:35.807Z] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-09-01T16:21:35.811Z] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown 
+[2026-09-01T16:21:35.822Z] [live-server-route] registered {"directory":"/tmp/pr6669-srv-mqtbTm","hasServerUrl":true,"registrationCount":1}
+[2026-09-01T16:21:35.825Z] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"/tmp/pr6669-srv-mqtbTm","serverUrl":"http://127.0.0.1:35199/"}
+[2026-09-01T16:21:35.878Z] [tool-registry] Built tool registry {"totalTools":13,"teamModeEnabled":false,"teamToolCount":0}
+[2026-09-01T16:21:36.244Z] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.18","nativeVersion":"1.1.37"}
+[2026-09-01T16:21:36.265Z] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-09-01T16:21:36.266Z] [connected-providers-cache] Cache file not found {"cacheFile":"/tmp/pr6669-srv-mqtbTm/cache/oh-my-opencode/connected-providers.json"}
+[2026-09-01T16:21:36.266Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-09-01T16:21:36.266Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-09-01T16:21:36.270Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-09-01T16:21:36.270Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-09-01T16:21:36.271Z] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Hephaestus - Deep Agent","Prometheus - Plan Builder","Atlas - Plan Executor","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-09-01T16:21:36.248Z] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers 
+[2026-09-01T16:21:36.310Z] [config-handler] config handler applied {"agentCount":13,"commandCount":16}
+[2026-09-01T16:21:36.344Z] [codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap {"matchedRoot":"/tmp","projectRoot":"/tmp/pr6669-srv-mqtbTm","reason":"tmp-root"}
+[2026-09-01T16:21:38.276Z] [connected-providers-cache] Provider-models cache file not found {"cacheFile":"/tmp/pr6669-srv-mqtbTm/cache/oh-my-opencode/provider-models.json"}
+[2026-09-01T16:21:41.759Z] [connected-providers-cache] Fetched connected providers {"count":2,"providers":["openai","opencode"]}
+[2026-09-01T16:21:41.759Z] [connected-providers-cache] Cache written {"count":2,"updatedAt":"2026-09-01T16:21:41.759Z"}
+[2026-09-01T16:21:41.760Z] [connected-providers-cache] Extracted models from provider list {"providerCount":2,"totalModels":56}
+[2026-09-01T16:21:41.761Z] [connected-providers-cache] Provider-models cache written {"providerCount":2,"updatedAt":"2026-09-01T16:21:41.760Z"}
+[2026-09-01T16:21:41.761Z] [auto-update-checker] Connected providers cache created on first run 
+[2026-09-01T16:21:42.149Z] [model-capabilities-cache] Cache written {"modelCount":3381,"generatedAt":"2026-09-01T16:21:42.144Z"}
+[2026-09-01T16:21:42.149Z] [auto-update-checker] Local development mode 
+[2026-09-01T16:21:47.396Z] [auto-update-checker] Local dev toast shown: v5.0.0-beta.31 
