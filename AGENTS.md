@@ -354,6 +354,7 @@ Digest-verified centrality (refs unmeasured unless noted):
 - Never test with Arrange-Act-Assert comments — use given/when/then.
 - **Prompt/prose contract tests are forbidden.** Never assert authored agent prompt, `SKILL.md`, rule, `AGENTS.md`, or markdown-instruction wording, headings, section order, fragments, snapshots, negative past wording, or authored text length. Test only machine-consumed fields/sentinels/tool names, byte or shipped-copy equality between real artifacts, or observable runtime behavior such as parsing, routing, dispatch, state, security, and dynamic input propagation. Pure prose has no automated-test seam; review and QA-by-read are the correct verification.
 - Never dump business logic into `index.ts` — barrel exports only.
+- **Never commit operational identifiers or private-infrastructure endpoints tied to a single contributor's deployment.** The list is in `script/identity-scrub-patterns.json`; the test in `script/identity-scrub.test.ts` fails `bun test` if any committed file matches. The rule docs in this file, `CONTRIBUTING.md`, and the patterns JSON are intentionally exempt. Use generic placeholders (`https://example.test`, `~/.creds/<provider>/api-key`) in any examples. The literal word `CloudBSD` as the upstream project name on GitHub is not in the rule. There is no override for this rule.
 - Prometheus may ONLY edit `.md` files (enforced by `prometheus-md-only` hook); FORBIDDEN paths: `packages/*/src/`, `package.json`, config files.
 
 ## COMMANDS
