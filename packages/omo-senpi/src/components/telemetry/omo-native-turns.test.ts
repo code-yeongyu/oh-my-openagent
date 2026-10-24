@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import type { TurnEndEvent } from "@code-yeongyu/senpi"
 import type {
   EventTelemetryClient,
@@ -8,12 +8,14 @@ import type {
 import {
   KNOWN_MODELS,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
-  type KnownProvider,
 } from "./product-identity"
-import { createOmoNativeTurnHandler, maskModel } from "./omo-native-turns"
-import { createSessionSummaryRecorder } from "./omo-native-session-summary"
+import { createOmoNativeTurnHandler } from "./omo-native-turns"
+import { createTempStateDirs, createTestRecorder } from "./session-summary.test-support"
 
 type CapturedEvent = { readonly name: string; readonly properties: EventTelemetryProperties }
+
+const stateDirs = createTempStateDirs()
+afterEach(() => stateDirs.cleanup())
 
 function createRecorder(): {
   readonly captured: CapturedEvent[]
@@ -35,28 +37,64 @@ function createRecorder(): {
       diagnostics: (input) => diagnostics.push(input),
       isConsented: () => true,
       sessionId: "hashed-session",
-      summary: createSessionSummaryRecorder({
-        captureEvent: () => undefined,
-        sampleRate: 1,
-        store: { read: () => undefined, write: () => undefined, remove: () => undefined, claimOrphans: () => [] },
-      }),
+      sessionRole: "root",
+      summary: createTestRecorder({ dir: stateDirs.make(), sampleRate: 1 }).summary,
     }),
   }
 }
 
-test("#given a known model routed through an unknown provider #when the summary records it #then the model stays named and only the provider is custom", () => {
-  const rows: EventTelemetryProperties[] = []
-  const summary = createSessionSummaryRecorder({
-    captureEvent: (_name, properties) => rows.push(properties),
-    sampleRate: 0,
-    store: { read: () => undefined, write: () => undefined, remove: () => undefined, claimOrphans: () => [] },
-  })
-  const handle = createOmoNativeTurnHandler({ client: { captureEvent: () => undefined }, isConsented: () => true, sessionId: "s", summary })
+test("#given a known model routed through an unknown provider #when the summary records it #then the model stays named and only the provider is custom", async () => {
+  const recorder = createTestRecorder({ dir: stateDirs.make(), sampleRate: 0 })
+  const handle = createOmoNativeTurnHandler({ client: { captureEvent: () => undefined }, isConsented: () => true, sessionId: "s", sessionRole: "root", summary: recorder.summary })
 
   handle(turnEvent({ provider: "my-private-gateway", model: "gpt-5.6-sol" }))
-  summary.finish("s", "quit")
+  await recorder.summary.finish("s", "quit")
 
-  expect(rows[0]).toMatchObject({ m1_provider: "custom", m1_model: "gpt-5.6-sol", custom_model_turns: 0 })
+  expect(recorder.published[0]?.properties).toMatchObject({ m1_provider: "custom", m1_model: "gpt-5.6-sol", custom_model_turns: 0 })
+})
+
+// Cost contract (plan todo 8): cost_1e4 = round(cost * 1e4) is the only rounding step, cost_usd is derived
+// from it, and the summary adds integers, so raw rows and the summary agree exactly in any order.
+describe("integer cost accounting", () => {
+  async function costsOf(costs: readonly number[]): Promise<{ turns: unknown[][]; summary: EventTelemetryProperties | undefined; summaryTotal: number }> {
+    const captured: CapturedEvent[] = []
+    const recorder = createTestRecorder({ dir: stateDirs.make(), sampleRate: 1 })
+    const handle = createOmoNativeTurnHandler({
+      client: { captureEvent: (name, properties) => captured.push({ name, properties }) },
+      isConsented: () => true,
+      sessionId: "s",
+      sessionRole: "root",
+      summary: recorder.summary,
+    })
+    costs.forEach((total, index) => handle(turnEvent({ turnIndex: index, usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { total } } })))
+    await recorder.summary.finish("s", "quit")
+    return {
+      turns: captured.map(({ properties }) => [properties.cost_1e4, properties.cost_usd]),
+      summary: recorder.published.at(-1)?.properties,
+      summaryTotal: recorder.published.reduce((sum, { properties }) => sum + Number(properties.cost_1e4), 0),
+    }
+  }
+
+  test.each([
+    [[0.00006, 0.00006], [[1, 0.0001], [1, 0.0001]], 2, 0.0002],
+    [[0.1, 0.2], [[1000, 0.1], [2000, 0.2]], 3000, 0.3],
+    [[0.00005], [[1, 0.0001]], 1, 0.0001],
+    [[0.00015], [[2, 0.0002]], 2, 0.0002],
+    [[0.000049], [[0, 0]], 0, 0],
+  ])("#given turn costs %p #when summed #then turns report %p and the summary %p / %p", async (costs, turns, summary1e4, summaryUsd) => {
+    const result = await costsOf(costs)
+    expect(result.turns).toEqual(turns)
+    expect(result.summary).toMatchObject({ cost_1e4: summary1e4, cost_usd: summaryUsd })
+  })
+
+  test("#given 1,000 turns #when they arrive in two different orders #then the summary rows add up to the same integer as the raw turns", async () => {
+    const costs = Array.from({ length: 1_000 }, (_, index) => ((index * 7_919) % 1_000) / 100_003)
+    const forward = await costsOf(costs)
+    const backward = await costsOf([...costs].reverse())
+    const sumOfTurns = forward.turns.reduce((sum, [cost1e4]) => sum + Number(cost1e4), 0)
+    expect(forward.summaryTotal).toBe(sumOfTurns)
+    expect(backward.summaryTotal).toBe(sumOfTurns)
+  })
 })
 
 // Sampling is decided per session, long before a turn is sent. Consent must be read again at send time:
@@ -65,15 +103,12 @@ test("#given a sampled session whose consent is withdrawn between sampling and s
   // given
   const sent: string[] = []
   let consent = true
-  const summary = createSessionSummaryRecorder({
-    captureEvent: () => undefined,
-    sampleRate: 1,
-    store: { read: () => undefined, write: () => undefined, remove: () => undefined, claimOrphans: () => [] },
-  })
+  const { summary } = createTestRecorder({ dir: stateDirs.make(), sampleRate: 1 })
   const handle = createOmoNativeTurnHandler({
     client: { captureEvent: (name) => sent.push(name) },
     isConsented: () => consent,
     sessionId: "sampled",
+    sessionRole: "root",
     summary: {
       ...summary,
       isRawTurnSampled: (sessionHash) => {
@@ -121,20 +156,23 @@ function turnEvent(input: {
   return { type: "turn_end", turnIndex: input.turnIndex ?? 7, message, toolResults: [] } as unknown as TurnEndEvent
 }
 
-function firstKnownModel(provider: KnownProvider): string {
-  const model = KNOWN_MODELS[provider][0]
-  expect(model).toBeDefined()
-  return model ?? ""
-}
+const OPENAI_MODEL = KNOWN_MODELS.openai[0] ?? "gpt-5.6-sol"
 
 describe("OmO Native turn telemetry", () => {
-  test("#given provider and model identities #when masked #then each field is decided independently", () => {
-    const knownModel = firstKnownModel("openai")
+  // Privacy contract (docs/reference/senpi-telemetry.md masking table): the raw turn row masks provider
+  // and model independently, exactly like session_summary, so a public model behind a private gateway
+  // stays named while the gateway name never leaves the machine.
+  test.each([
+    ["openai", OPENAI_MODEL, "openai", OPENAI_MODEL],
+    ["openai", "user-defined-model", "openai", "custom"],
+    ["my-proxy", "claude-opus-5-5", "custom", "claude-opus-5-5"],
+    ["my-proxy", "user-defined-model", "custom", "custom"],
+  ])("#given provider %s and model %s #when turn_completed is emitted #then it reports %s / %s", (provider, model, maskedProvider, maskedModel) => {
+    const recorder = createRecorder()
 
-    expect(maskModel("openai", knownModel)).toEqual({ provider: "openai", model_id: knownModel })
-    expect(maskModel("openai", "user-defined-model")).toEqual({ provider: "openai", model_id: "custom" })
-    expect(maskModel("sionic-openrouter", knownModel)).toEqual({ provider: "custom", model_id: "custom" })
-    expect(maskModel("sionic-openrouter", "user-defined-model")).toEqual({ provider: "custom", model_id: "custom" })
+    recorder.handle(turnEvent({ provider, model }))
+
+    expect(recorder.captured[0]?.properties).toMatchObject({ provider: maskedProvider, model_id: maskedModel })
   })
 
   test("#given an assistant turn #when it ends #then exactly one allowlisted turn_completed payload is emitted", () => {
@@ -155,9 +193,11 @@ describe("OmO Native turn telemetry", () => {
         cache_write_tokens: 4,
         reasoning_tokens: 5,
         total_tokens: 40,
+        cost_1e4: 1235,
         cost_usd: 0.1235,
         turn_index: 7,
         sample_rate: 1,
+        session_role: "root",
       },
     })
     expect(Object.keys(recorder.captured[0]?.properties ?? {}).sort()).toEqual(

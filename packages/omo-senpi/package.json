@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "5.1.44",
+  "version": "5.1.45",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
@@ -11,6 +11,7 @@
     "#omo-memory-doctor-runtime": "./src/components/memory/commands/doctor-runtime.ts",
     "#omo-thread-client-runtime": "./src/components/thread/live-surface.ts",
     "#omo-memory-memfs-runtime": "./src/components/memory/commands/memfs-runtime.ts",
+    "#omo-telemetry-recovery-runtime": "./src/components/telemetry/session-summary-recovery.ts",
     "#omo-feedback-runtime": "./src/components/feedback/runtime.ts",
     "#omo-claim-receipt-runtime": "./src/components/claim-receipt/runtime.ts",
     "#omo-memory-palace-runtime": "./src/components/memory/palace/runtime.ts",
@@ -51,7 +52,7 @@
   },
   "dependencies": {
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
-    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.21-3",
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.23-1",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -73,7 +74,7 @@
     "typebox": "1.3.34"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.10.21-3"
+    "@code-yeongyu/senpi": "2026.10.23-1"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -81,8 +82,8 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.10.21-3",
-    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.21-3",
+    "@code-yeongyu/senpi": "2026.10.23-1",
+    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.23-1",
     "@types/node": "26.6.2",
     "bun-types": "1.4.3",
     "terser": "5.51.2"

@@ -99,6 +99,13 @@ export function createLazyPostHogTransportFactory(input: LazyPostHogOptions = {}
         queued.push(message)
         void load()
       },
+      // An ack-gated event (session_summary) resolves only on the real transport's 2xx answer; with no
+      // transport (the sidecar did not load) it rejects, so its pending file stays for a later retry.
+      async captureImmediate(message) {
+        const target = await load()
+        if (target?.captureImmediate === undefined) throw new Error("PostHog telemetry sidecar is not loaded")
+        await target.captureImmediate(message)
+      },
       async flush() {
         reportDropped()
         if (transport === undefined && loading === undefined && queued.length === 0) return

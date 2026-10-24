@@ -157,6 +157,7 @@ function buildProcessRunner(build: RunnerBuildContext): ManagedRunner {
   const runner = buildProcessChildRunner(build)
   const resolveInheritedExtensions = build.resolveInheritedExtensions ?? createInheritedExtensionsResolver(build)
   return createRpcManagedRunner({
+    settleTeardowns: () => runner.settleTeardowns(),
     async start(spec) {
       const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels)
       if (filtered.extensions !== undefined) return runner.start(filtered)
@@ -176,10 +177,11 @@ function withoutExcludedRpcFallbacks(spec: RpcRunnerSpec, excludeModels: readonl
  */
 export function buildRespawnRunner(
   build: RunnerBuildContext,
-): { start(spec: RpcRunnerSpec): Promise<RpcChildHandle> } {
+): { start(spec: RpcRunnerSpec): Promise<RpcChildHandle>; settleTeardowns(): Promise<void> } {
   const runner = buildProcessChildRunner(build)
   const resolveInheritedExtensions = build.resolveInheritedExtensions ?? createInheritedExtensionsResolver(build)
   return {
+    settleTeardowns: () => runner.settleTeardowns(),
     start: async (spec) => {
       const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels)
       return runner.start(filtered.extensions === undefined ? { ...filtered, extensions: await resolveInheritedExtensions() } : filtered)

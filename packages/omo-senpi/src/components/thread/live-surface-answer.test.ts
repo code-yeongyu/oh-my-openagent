@@ -3,6 +3,7 @@ import { once } from "node:events"
 import { mkdtempSync, rmSync } from "node:fs"
 import { createServer, type Socket } from "node:net"
 import { join } from "node:path"
+import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 
 import type { GatewayEndpointKind, GatewayEndpointRef } from "./gateway/adapter"
 import { createGatewayRelay } from "./gateway/relay"
@@ -30,7 +31,11 @@ afterEach(async () => {
 async function answeringEndpoint(socketPath: string, kind: GatewayEndpointKind, pending: Set<string>) {
   const frames: Frame[] = []
   const sockets = new Set<Socket>()
-  const server = createServer((socket) => {
+  // An rpc_host listens on the transport its logical path names (a hashed pipe behind a raw secret on win32);
+  // a terminal keeps its own secret on the logical path.
+  const transport = kind === "rpc_host" ? fakeHostTransport(socketPath) : undefined
+  const admit = (socket: Socket, accept: () => void) => (transport === undefined ? accept() : transport.authenticate(socket, accept))
+  const server = createServer((socket) => admit(socket, () => {
     sockets.add(socket)
     socket.once("close", () => sockets.delete(socket))
     let authenticated = kind === "rpc_host"
@@ -47,8 +52,9 @@ async function answeringEndpoint(socketPath: string, kind: GatewayEndpointKind, 
       if (newline < 0) return
       const frame = JSON.parse(buffer.subarray(0, newline).toString("utf8")) as Frame
       buffer = buffer.subarray(newline + 1)
+      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
       frames.push(frame)
-      const reply = (body: Frame) => socket.end(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, ...body })}\n`)
+      const reply = (body: Frame) => socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, ...body })}\n`)
       if (frame.type !== "extension_ui_response") return reply({ success: true, data: {} })
       const request = typeof frame.uiRequestId === "string" ? frame.uiRequestId : frame.id
       const shaped = typeof frame.answers === "object" && frame.answers !== null && !Array.isArray(frame.answers)
@@ -57,9 +63,9 @@ async function answeringEndpoint(socketPath: string, kind: GatewayEndpointKind, 
       pending.delete(request)
       return reply({ success: true })
     })
-  })
+  }))
   const listening = once(server, "listening")
-  server.listen(socketPath)
+  server.listen(transport?.listenAddress ?? socketPath)
   await listening
   cleanups.push(async () => {
     for (const socket of sockets) socket.destroy()
@@ -83,7 +89,7 @@ async function questionRelayedFrom(kind: GatewayEndpointKind, pending: readonly 
     registry: async () => [],
     readSecret: () => SECRET,
   })
-  const ref: GatewayEndpointRef = { kind, socket, routing_id: kind === "rpc_host" ? "rpc-1" : null }
+  const ref: GatewayEndpointRef = { kind, socket, routing_id: kind === "rpc_host" ? "rpc-1" : null, durable_session_id: "B" }
   const store = h.store()
   const relay = createGatewayRelay({ store, engine: h.engineFor(store), endpoints: surface.gateway, locate: async () => ref, now: () => h.clock.now })
   const bound = await relay.bind({ principal: "session:A", binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session_durable_id: "B" } })
