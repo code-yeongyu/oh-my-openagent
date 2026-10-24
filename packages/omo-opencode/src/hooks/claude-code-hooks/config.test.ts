@@ -1,7 +1,7 @@
 const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 const { clearClaudeHooksConfigCache, loadClaudeHooksConfig } = await import("./config")
 
@@ -334,6 +334,129 @@ describe("setPluginHooksConfigs", () => {
     )
     expect(stopCommands).not.toContain("echo plugin-stop-a")
   })
+})
+
+describe("loadClaudeHooksConfig project trust gating", () => {
+  const { clearClaudeHooksConfigCache: clearTrustCache, loadClaudeHooksConfig: loadTrustConfig } = require("./config")
+  let originalWorkingDirectory = ""
+  let originalClaudeConfigDir: string | undefined
+  let originalTrustEnv: string | undefined
+  let tempHome = ""
+  let projectDirectory = ""
+  let claudeConfigDirectory = ""
+
+  beforeEach(() => {
+    //#given
+    originalWorkingDirectory = process.cwd()
+    originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+    originalTrustEnv = process.env.OMO_CLAUDE_SETTINGS_TRUST
+    tempHome = mkdtempSync(join(tmpdir(), "omo-claude-hooks-trust-"))
+    projectDirectory = join(tempHome, "project")
+    claudeConfigDirectory = join(tempHome, "claude-config")
+    mkdirSync(join(projectDirectory, ".claude"), { recursive: true })
+    mkdirSync(claudeConfigDirectory, { recursive: true })
+    writeFileSync(
+      join(projectDirectory, ".claude", "settings.json"),
+      JSON.stringify({
+        hooks: {
+          Stop: [{ matcher: "*", hooks: [{ command: "project-stop-command" }] }],
+        },
+      }),
+    )
+    process.chdir(projectDirectory)
+    process.env.CLAUDE_CONFIG_DIR = claudeConfigDirectory
+    delete process.env.OMO_CLAUDE_SETTINGS_TRUST
+    clearTrustCache()
+  })
+
+  afterEach(() => {
+    clearTrustCache()
+    if (originalClaudeConfigDir === undefined) {
+      delete process.env.CLAUDE_CONFIG_DIR
+    } else {
+      process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+    }
+    if (originalTrustEnv === undefined) {
+      delete process.env.OMO_CLAUDE_SETTINGS_TRUST
+    } else {
+      process.env.OMO_CLAUDE_SETTINGS_TRUST = originalTrustEnv
+    }
+    process.chdir(originalWorkingDirectory)
+    rmSync(tempHome, { recursive: true, force: true })
+  })
+
+  test("#given an untrusted project #when hooks config loads #then project-level hooks are not loaded", async () => {
+    //#given
+    writeClaudeGlobalConfig({})
+
+    //#when
+    const result = await loadTrustConfig()
+
+    //#then
+    expect(getStopCommands(result)).not.toContain("project-stop-command")
+  })
+
+  test("#given a project trusted by Claude Code #when hooks config loads #then project-level hooks are loaded", async () => {
+    //#given
+    writeClaudeGlobalConfig({
+      projects: { [resolve(projectDirectory)]: { hasTrustDialogAccepted: true } },
+    })
+
+    //#when
+    const result = await loadTrustConfig()
+
+    //#then
+    expect(getStopCommands(result)).toContain("project-stop-command")
+  })
+
+  test("#given an explicitly denied project with env opt-in #when hooks config loads #then project-level hooks stay excluded", async () => {
+    //#given
+    process.env.OMO_CLAUDE_SETTINGS_TRUST = "1"
+    writeClaudeGlobalConfig({
+      projects: { [resolve(projectDirectory)]: { hasTrustDialogAccepted: false } },
+    })
+
+    //#when
+    const result = await loadTrustConfig()
+
+    //#then
+    expect(getStopCommands(result)).not.toContain("project-stop-command")
+  })
+
+  test("#given an unknown project with env opt-in #when hooks config loads #then project-level hooks are loaded", async () => {
+    //#given
+    process.env.OMO_CLAUDE_SETTINGS_TRUST = "1"
+
+    //#when
+    const result = await loadTrustConfig()
+
+    //#then
+    expect(getStopCommands(result)).toContain("project-stop-command")
+  })
+
+  test("#given an untrusted project with user-level settings #when hooks config loads #then user-level hooks still load", async () => {
+    //#given
+    writeClaudeGlobalConfig({})
+    writeFileSync(
+      join(claudeConfigDirectory, "settings.json"),
+      JSON.stringify({
+        hooks: {
+          Stop: [{ matcher: "*", hooks: [{ command: "user-stop-command" }] }],
+        },
+      }),
+    )
+
+    //#when
+    const result = await loadTrustConfig()
+
+    //#then
+    expect(getStopCommands(result)).toContain("user-stop-command")
+    expect(getStopCommands(result)).not.toContain("project-stop-command")
+  })
+
+  function writeClaudeGlobalConfig(config: unknown): void {
+    writeFileSync(join(claudeConfigDirectory, ".claude.json"), JSON.stringify(config))
+  }
 })
 
 export {}
