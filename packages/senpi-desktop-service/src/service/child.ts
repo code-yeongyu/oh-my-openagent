@@ -5,6 +5,8 @@ import {
 	type AcquiredDesktopEngine,
 	acquireDesktopEngine,
 	type DesktopEngineLocateDiagnostic,
+	DesktopLaunchRefusal,
+	type DesktopLaunchContextError,
 	getDesktopEngineHost,
 	launchDesktopEngine,
 	locateDesktopEngine,
@@ -77,7 +79,7 @@ function locateEnginePath(): string {
 export interface EngineChildEvents {
 	readonly onLine: (line: string) => void;
 	/** Called once, after stdout has drained, with why the child is gone. */
-	readonly onExit: (reason: string) => void;
+	readonly onExit: (reason: string, refusal: DesktopLaunchContextError | undefined) => void;
 }
 
 /** One engine process: NDJSON framing on stdout, a stderr tail for diagnostics, and a single kill. */
@@ -88,6 +90,7 @@ export class EngineChild {
 	#stderrTail = "";
 	#failure = "";
 	#alive = true;
+	readonly #refusal = new DesktopLaunchRefusal();
 
 	constructor(process: ChildProcessWithoutNullStreams, events: EngineChildEvents) {
 		this.#process = process;
@@ -95,16 +98,21 @@ export class EngineChild {
 		process.stderr.setEncoding("utf8");
 		// Drained so a chatty engine never blocks on a full stderr pipe.
 		process.stderr.on("data", (chunk: string) => {
+			this.#refusal.push(chunk);
 			this.#stderrTail = (this.#stderrTail + chunk).slice(-STDERR_TAIL_CHARS);
 		});
 		process.stdin.on("error", (error) => this.#recordFailure(`stdin: ${error.message}`));
-		process.on("error", (error) => this.#recordFailure(`spawn: ${error.message}`));
+		process.on("error", (error) => {
+			this.#refusal.disable();
+			this.#recordFailure(`spawn: ${error.message}`);
+		});
 		createInterface({ input: process.stdout }).on("line", events.onLine);
 		this.exited = new Promise((resolve) => {
 			// `close` fires after stdout ends, so every reply the engine wrote is dispatched first.
 			process.on("close", (code, signal) => {
 				this.#alive = false;
-				events.onExit(this.#exitReason(code, signal));
+				const reason = this.#exitReason(code, signal);
+				events.onExit(reason, this.#refusal.finish(code, signal, reason));
 				resolve();
 			});
 		});
@@ -112,6 +120,10 @@ export class EngineChild {
 
 	get alive(): boolean {
 		return this.#alive;
+	}
+
+	finishStartup(): void {
+		this.#refusal.disable();
 	}
 
 	write(message: object): void {
@@ -125,6 +137,7 @@ export class EngineChild {
 	}
 
 	kill(): void {
+		this.#refusal.disable();
 		if (!this.#alive) return;
 		this.#alive = false;
 		this.#process.kill();

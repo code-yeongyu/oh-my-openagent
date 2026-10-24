@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import { createInterface } from "node:readline"
 import type { OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import { DesktopLaunchRefusal, type DesktopLaunchRefusalReason } from "@oh-my-opencode/senpi-desktop-engine"
 import {
   ENGINE_ABI,
   PROTOCOL_VERSION,
@@ -20,6 +21,7 @@ export type EngineProbe = {
 
 export type EngineProbeResult =
   | { readonly ok: true; readonly value: EngineProbe }
+  | { readonly ok: false; readonly code: "launch-context-unavailable"; readonly reason: DesktopLaunchRefusalReason; readonly message: string; readonly diagnostic: string }
   | {
       readonly ok: false
       readonly code: "abi-mismatch" | "handshake-failed" | "timeout"
@@ -100,6 +102,7 @@ export function probeComputerUseEngine(
   return new Promise((resolveProbe) => {
     const replies = new Map<number, unknown>()
     let stderrTail = ""
+    const refusal = new DesktopLaunchRefusal()
     // The point a stalled probe reached, so a timeout says where the engine stopped answering (#9720).
     const phase = (): string => {
       if (replies.has(1) && !replies.has(2)) return "engine.hello answered, awaiting capabilities"
@@ -113,6 +116,7 @@ export function probeComputerUseEngine(
       child.stdin.end()
     }
     const timer = setTimeout(() => {
+      refusal.disable()
       const result: EngineProbeResult = settled ?? {
         ok: false, code: "timeout", message: `desktop engine probe timed out after ${timeoutMs} ms at ${enginePath} (phase: ${phase()})`,
       }
@@ -140,12 +144,14 @@ export function probeComputerUseEngine(
 
     child.stderr.setEncoding("utf8")
     child.stderr.on("data", (chunk: string) => {
+      refusal.push(chunk)
       stderrTail = (stderrTail + chunk).slice(-STDERR_TAIL_CHARS)
     })
     child.stdin.on("error", (error) => {
       settle({ ok: false, code: "handshake-failed", message: `desktop engine stdin failed at ${enginePath}: ${error.message}` })
     })
     child.on("error", (error) => {
+      refusal.disable()
       settle({ ok: false, code: "handshake-failed", message: `desktop engine spawn failed at ${enginePath}: ${error.message}` })
     })
     const lines = createInterface({ input: child.stdout }).on("line", (line) => {
@@ -154,11 +160,13 @@ export function probeComputerUseEngine(
         value = JSON.parse(line)
       } catch (error) {
         if (!(error instanceof SyntaxError)) throw error
+        refusal.disable()
         settle({ ok: false, code: "handshake-failed", message: `desktop engine emitted non-JSON output at ${enginePath}` })
         return
       }
       const parsed = RpcResponseSchema.safeParse(value)
       if (!parsed.success) return
+      if (parsed.data.id === 1 || parsed.data.error !== undefined) refusal.disable()
       if (parsed.data.error !== undefined) {
         settle({
           ok: false,
@@ -172,6 +180,11 @@ export function probeComputerUseEngine(
     })
     child.on("close", (code, signal) => {
       clearTimeout(timer)
+      const launchError = refusal.finish(code, signal, stderrTail)
+      if (launchError !== undefined) {
+        resolveProbe({ ok: false, code: launchError.code, reason: launchError.reason, message: launchError.message, diagnostic: launchError.diagnostic })
+        return
+      }
       resolveProbe(settled ?? {
         ok: false,
         code: "handshake-failed",

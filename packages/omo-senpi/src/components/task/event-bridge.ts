@@ -1,7 +1,8 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
-import { readSessionContext, readSessionRole } from "@oh-my-opencode/senpi-task"
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
+import { ownHostedTaskId } from "./own-task-identity"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
 import type { LiveTaskContext } from "./runtime-context"
@@ -156,10 +157,10 @@ export function wireEventBridge(
               engine.settings.process_runner !== "child-process" && engine.settings.resume_children !== false)
           ))
         : []
-      const ownTaskId = readSessionContext(pi)?.["task_id"]
-      const summary = await engine.lifecycle.suspendOnSessionShutdown({
-        parentSessionId: sessionId, reason, ...(ownTaskId === undefined || ownTaskId.length === 0 ? {} : { ownTaskId }),
-      })
+      const ownTaskId = ownHostedTaskId(pi, engine.stateDir)
+      const summary = await engine.lifecycle.suspendOnSessionShutdown(
+        ownTaskId === undefined ? { parentSessionId: sessionId, reason } : { parentSessionId: sessionId, reason, ownTaskId },
+      )
       const notify = (notice: string, level: "info" | "warning"): void => {
         if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
         else liveContext.ui?.notify(notice, level)

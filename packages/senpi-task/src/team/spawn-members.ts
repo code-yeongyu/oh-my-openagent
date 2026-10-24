@@ -185,7 +185,7 @@ function describePlanError(error: PlanResolutionError): string {
   const categorySuffix = categories.length === 0
     ? ""
     : error.code === "model_unavailable"
-      ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+      ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
       : ` Available categories: ${categories.join(", ")}.`
   return error.message + agentSuffix + categorySuffix
 }

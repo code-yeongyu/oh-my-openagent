@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createTaskRecordStore } from "../store"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
-import { terminateRpcChild } from "../runners/rpc/terminate"
+import { stopFakeChild } from "../runners/rpc/__fixtures__/stop-fake-child"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import { createRpcManagedRunner } from "./runner"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
@@ -36,7 +36,7 @@ function createManager() {
 }
 
 afterEach(async () => {
-  await Promise.all(children.splice(0).map((child) => terminateRpcChild(child, { sigkillDelayMs: 100 })))
+  await Promise.all(children.splice(0).map(stopFakeChild))
   cleanupProjects()
 })
 

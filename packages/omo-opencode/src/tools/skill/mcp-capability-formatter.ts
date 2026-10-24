@@ -6,11 +6,13 @@ import type {
   SkillMcpServerContext,
 } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
+import { skillMcpClientInfo } from "./skill-mcp-authority"
 
 export async function formatMcpCapabilities(
   skill: LoadedSkill,
   manager: SkillMcpManager,
-  sessionID: string
+  sessionID: string,
+  directory?: string,
 ): Promise<string | null> {
   if (!skill.mcpConfig || Object.keys(skill.mcpConfig).length === 0) {
     return null
@@ -19,12 +21,7 @@ export async function formatMcpCapabilities(
   const sections: string[] = ["", "## Available MCP Servers", ""]
 
   for (const [serverName, config] of Object.entries(skill.mcpConfig)) {
-    const info: SkillMcpClientInfo = {
-      serverName,
-      skillName: skill.name,
-      sessionID,
-      scope: skill.scope,
-    }
+    const info: SkillMcpClientInfo = skillMcpClientInfo(skill, serverName, sessionID, directory)
     const context: SkillMcpServerContext = {
       config,
       skillName: skill.name,
@@ -46,6 +43,8 @@ export async function formatMcpCapabilities(
       if (tools.length === 0 && resources.length === 0 && prompts.length === 0) {
         sections.push("*No capabilities discovered*")
       }
+      const notice = manager.getEnvironmentNotice?.(info)
+      if (notice) sections.push(notice)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       sections.push(`*Failed to connect: ${errorMessage.split("\n")[0]}*`)

@@ -45,6 +45,14 @@
       "types": "./src/runners/rpc/spawn.ts",
       "import": "./src/runners/rpc/spawn.ts"
     },
+    "./agent-home": {
+      "types": "./src/agent-home.ts",
+      "import": "./src/agent-home.ts"
+    },
+    "./rpc-socket-client": {
+      "types": "./src/runners/rpc-host/socket-client.ts",
+      "import": "./src/runners/rpc-host/socket-client.ts"
+    },
     "./rpc-model-admission": {
       "types": "./src/runners/rpc/model-admission.ts",
       "import": "./src/runners/rpc/model-admission.ts"
@@ -64,16 +72,18 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/skills-loader-core": "workspace:*",
     "@oh-my-opencode/delegate-core": "workspace:*",
     "@oh-my-opencode/isolation-core": "workspace:*",
+    "@oh-my-opencode/model-core": "workspace:*",
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "typebox": "1.3.34"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.10.21-3",
-    "@earendil-works/pi-tui": "2026.10.21-3",
+    "@code-yeongyu/senpi": "2026.10.23-1",
+    "@earendil-works/pi-tui": "2026.10.23-1",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
@@ -88,8 +98,8 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.10.21-3",
-    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.21-3",
+    "@code-yeongyu/senpi": "2026.10.23-1",
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.23-1",
     "typebox": "1.3.34"
   },
   "sideEffects": false

@@ -31,5 +31,7 @@ export function telemetryLocalSinkEnv(sinkUrl) {
   if (!["127.0.0.1", "localhost", "[::1]"].includes(hostname)) {
     throw new Error(`telemetry QA sink must be loopback, got ${hostname}`)
   }
-  return { ...Object.fromEntries(TELEMETRY_OPT_OUT_NAMES.map((name) => [name, ""])), POSTHOG_HOST: sinkUrl }
+  // A QA sandbox is an automated run (temp HOME, often CI), which the runtime keeps telemetry off for
+  // (#10934); the documented override lets this deliberate, loopback-only run report.
+  return { ...Object.fromEntries(TELEMETRY_OPT_OUT_NAMES.map((name) => [name, ""])), OMO_TELEMETRY_ALLOW_AUTOMATION: "1", POSTHOG_HOST: sinkUrl }
 }

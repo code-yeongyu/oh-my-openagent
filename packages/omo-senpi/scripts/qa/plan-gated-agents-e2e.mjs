@@ -14,6 +14,10 @@
 //   gate after the ulw-execute read and denies the second spawn.
 //   scenarios: denial | read-unlock | sequence | retired-id | description | team-retired |
 //              dag-retired | retired-config   (the retired-name scenarios only take --expect gated)
+//              resume   (#10378: a typed ulw-plan request + plan write in one process, then a
+//              SECOND process continues that session and spawns plan-reviewer. --expect replayed is
+//              the contract on an engine that records `inputSource` on user entries; --expect
+//              unsourced is the baseline on an older engine, where replay must stay denied)
 // Exit code: 0 on PASS, 1 on FAIL (the JSON verdict is printed either way).
 // Isolation: SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME point at a throwaway sandbox; the real
 // ~/.senpi/agent is digest-compared before/after and MUST stay identical. When launched from inside
@@ -220,7 +224,25 @@ function retiredConfigScript() {
 const UNLOCK_PROMPT = "please run the ulw-plan review scripted scenario"
 const PLAIN_PROMPT = "run the scripted scenario"
 
+function resumeSeedScript() {
+  return {
+    parentSteps: [PLAN_WRITE_STEP, { type: "text", text: "resume seed complete" }],
+    childSteps: [{ type: "text", text: "unused child" }],
+  }
+}
+
+function resumeSpawnScript() {
+  return {
+    parentSteps: [
+      { type: "tool_call", name: "task", arguments: { subagent_type: "plan-reviewer", prompt: "review the plan", run_in_background: false } },
+      { type: "text", text: "resume scenario complete" },
+    ],
+    childSteps: [{ type: "text", text: "plan-reviewer review complete" }],
+  }
+}
+
 const SCENARIOS = {
+  resume: { script: () => resumeSeedScript(), prompt: UNLOCK_PROMPT, config: OMO_CONFIG, resume: { script: () => resumeSpawnScript(), prompt: PLAIN_PROMPT } },
   denial: { script: () => denialScript(), prompt: PLAIN_PROMPT, config: OMO_CONFIG },
   "read-unlock": { script: (skillsDir) => readUnlockScript(skillsDir), prompt: PLAIN_PROMPT, config: OMO_CONFIG },
   sequence: { script: (skillsDir) => sequenceScript(skillsDir), prompt: UNLOCK_PROMPT, config: OMO_CONFIG },
@@ -331,10 +353,10 @@ function senpiEnv(sandbox, sessionDir) {
   }
 }
 
-function runSenpi(senpiBin, scenario, sandbox, sessionDir) {
+function runSenpi(senpiBin, scenario, sandbox, sessionDir, { continueSession = false } = {}) {
   const run = spawnSync(
     senpiBin,
-    ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, scenario.prompt],
+    ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, ...(continueSession ? ["-c"] : []), scenario.prompt],
     { cwd: sandbox.cwd, env: senpiEnv(sandbox, sessionDir), encoding: "utf8", timeout: SENPI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
   )
   return { status: run.status, pid: run.pid, stdout: run.stdout ?? "", stderr: run.stderr ?? "" }
@@ -401,8 +423,14 @@ async function main() {
   const { sandbox, sessionDir, stateDir } = seedScenario(args.bundle, script, scenario.config)
   const pids = []
   try {
-    const run = runSenpi(senpiBin, scenario, sandbox, sessionDir)
-    if (typeof run.pid === "number") pids.push(run.pid)
+    const seedRun = runSenpi(senpiBin, scenario, sandbox, sessionDir)
+    if (typeof seedRun.pid === "number") pids.push(seedRun.pid)
+    let run = seedRun
+    if (scenario.resume !== undefined) {
+      writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify(scenario.resume.script(skillsDir), null, 2)}\n`)
+      run = runSenpi(senpiBin, scenario.resume, sandbox, sessionDir, { continueSession: true })
+      if (typeof run.pid === "number") pids.push(run.pid)
+    }
 
     const stdout = run.stdout
     const stderr = run.stderr
@@ -418,7 +446,22 @@ async function main() {
     let startupNotices = []
 
     const checks = {}
-    if (args.scenario === "denial" && args.expect === "gated") {
+    if (args.scenario === "resume") {
+      const sessionFiles = existsSync(sessionDir) ? readdirSync(sessionDir, { recursive: true }).filter((name) => String(name).endsWith(".jsonl")) : []
+      checks.seed_exit_zero = seedRun.status === 0
+      checks.seed_wrote_plan = existsSync(join(sandbox.cwd, ".omo", "plans", "qa-plan.md"))
+      checks.one_session_continued = sessionFiles.length === 1
+      const resumedDenied = run.stdout.includes("available only after the user explicitly requests")
+      if (args.expect === "replayed") {
+        checks.resumed_spawn_allowed = run.stdout.includes("plan-reviewer review complete") && !resumedDenied
+        checks.exactly_one_child = reviewerRecords.length === 1
+      } else if (args.expect === "unsourced") {
+        checks.resumed_spawn_denied = resumedDenied
+        checks.no_child_spawned = records.length === 0
+      } else {
+        throw new Error(`scenario resume takes --expect replayed|unsourced, not ${args.expect}`)
+      }
+    } else if (args.scenario === "denial" && args.expect === "gated") {
       checks.denial_present = missingRequestDenial
       checks.no_child_spawned = records.length === 0
     } else if (args.scenario === "denial" && args.expect === "ungated") {

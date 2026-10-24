@@ -5,7 +5,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
 import { CliError, parseArgs, readJsonFile, writeJsonAtomic } from "./cli-support.mjs"
-import { REPAIR_DEFAULTS } from "./contracts.mjs"
+import { GATE_NAMES, GATE_STATUSES, REPAIR_DEFAULTS } from "./contracts.mjs"
 import { parseLineageMode, parsePalette, renderDesignSpec } from "./design-spec.mjs"
 import { extractFromHtml, extractFromPath, fetchHtml } from "./format-extract.mjs"
 import { checkLayout } from "./gates-layout.mjs"
@@ -149,7 +149,7 @@ export function runOutcome(argv) {
 		}
 		case "gate": {
 			const [gate, status] = args.positionals
-			if (!gate || !status) throw new CliError("usage: outcome gate <static|layout|visual|proofread> <pass|fail|not_run>")
+			if (!gate || !status) throw new CliError(`usage: outcome gate <${GATE_NAMES.join("|")}> <${GATE_STATUSES.join("|")}>`)
 			outcome.writeManifest(file, outcome.setGate(outcome.readManifest(file), gate, status))
 			return { json: { command: "outcome gate", gate, status }, exitCode: 0 }
 		}

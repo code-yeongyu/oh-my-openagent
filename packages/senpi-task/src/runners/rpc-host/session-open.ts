@@ -36,10 +36,12 @@ export interface HostSessionOpenerInput {
 
 export interface HostSessionOpener {
   openChild(spec: RpcRunnerSpec, socket: string, sessionPath: string): Promise<RpcChildHandle>
+  settleTeardowns(): Promise<void>
 }
 
 /** Open a daemon session, wire its recoverable handle, and deliver only a fresh child's first turn. */
 export function createHostSessionOpener(input: HostSessionOpenerInput): HostSessionOpener {
+  const pendingTeardowns = new Set<Promise<void>>()
   let fallbackProfileUnsupportedNoticed = false
   const noticeFallbackProfileUnsupported = (opened: OpenedHostSession): void => {
     if (opened.retryFallbackDropped !== true || fallbackProfileUnsupportedNoticed) return
@@ -71,11 +73,12 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
     } catch (error) {
       if (error instanceof InputUncertainError) error = error.cause
       const exitOutcome = handle.exitOutcome()
-      try {
-        await discardUnstartedRpcHandle(handle)
-      } catch (cleanupError) {
-        log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
-      }
+      void discardUnstartedRpcHandle(handle, {
+        pending: pendingTeardowns,
+        onFailure: (cleanupError) => {
+          log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
+        },
+      })
       throw new RunnerError({
         kind: "child-prompt-failed",
         message: error instanceof Error ? error.message : String(error),
@@ -89,6 +92,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
   }
 
   return {
+    settleTeardowns: async () => { await Promise.all(pendingTeardowns) },
     openChild: async (spec, socket, sessionPath) => {
       const client = input.createClient(socket)
       if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })

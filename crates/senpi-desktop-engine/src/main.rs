@@ -138,7 +138,10 @@ fn run_xpc(_: &str) -> ExitCode {
 
 #[cfg(target_os = "macos")]
 fn check_launch() -> Result<(), String> {
-    senpi_desktop_backend_macos::check_launch()
+    senpi_desktop_backend_macos::check_launch().map_err(|refusal| {
+        eprintln!("{}", refusal.record());
+        refusal.to_string()
+    })
 }
 
 #[cfg(not(target_os = "macos"))]

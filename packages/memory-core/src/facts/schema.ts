@@ -66,6 +66,7 @@ export interface FactsConsumedWatermark {
 
 export interface FactsQueueLayout {
   readonly queueDir: string
+  readonly parkedDir: string
   readonly cursorDir: string
   readonly consumedPath: string
   readonly failuresPath: string
@@ -75,6 +76,14 @@ export interface FactsQueueLayout {
 
 function hash(value: string, length: number): string {
   return createHash("sha256").update(value).digest("hex").slice(0, length)
+}
+
+export function queueConversationHash(conversationId: string): string {
+  return hash(conversationId, 12)
+}
+
+export function queueEntrySuffix(conversationId: string, endMessageId: string): string {
+  return `-${queueConversationHash(conversationId)}-${hash(endMessageId, 8)}.json`
 }
 
 /**
@@ -90,12 +99,13 @@ export function factsQueuePaths(identityPaths: MemoryIdentityPaths): FactsQueueL
   const cursorDir = join(queueDir, "cursor")
   return {
     queueDir,
+    parkedDir: join(queueDir, "parked"),
     cursorDir,
     consumedPath: join(queueDir, "consumed.json"),
     failuresPath: join(queueDir, "failures.json"),
-    cursorPath: (conversationId) => join(cursorDir, `${hash(conversationId, 12)}.json`),
+    cursorPath: (conversationId) => join(cursorDir, `${queueConversationHash(conversationId)}.json`),
     entryPath: (conversationId, endMessageId, at) =>
-      join(queueDir, `${queueTimestamp(at)}-${hash(conversationId, 12)}-${hash(endMessageId, 8)}.json`),
+      join(queueDir, `${queueTimestamp(at)}${queueEntrySuffix(conversationId, endMessageId)}`),
   }
 }
 

@@ -56,6 +56,10 @@ export async function recordDailyActive(input: RecordDailyActiveInput): Promise<
     distinctId: getTelemetryDistinctId(input.product.machineIdPrefix, osProvider),
     reason: input.reason,
   })
-  await client.flush()
-  await client.shutdown()
+  try {
+    await client.flush()
+  } finally {
+    // A failed flush (a 5xx or a refused connection) must not leave the client and its timers running.
+    await client.shutdown()
+  }
 }

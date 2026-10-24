@@ -627,7 +627,7 @@ Team mode is enabled for this session. The rules below **override Phase 4-6** ab
 When invoking the Plan agent in Phase 4.1, append this additional requirement to the prompt:
 
 \`\`\`
-7. (REQUIRED when team mode is active) Output a Team Staffing Recommendation section with these fields — missing fields fail Phase 5.0:
+7. (REQUIRED when team mode is active) Output a Team Staffing Recommendation section with these fields (missing fields fail Phase 5.0):
    - total_atomic_steps: integer
    - file_independent_steps: integer (parallelizable, no cross-file blocker)
    - cross_file_dependent_steps: integer (has blockers)
@@ -637,8 +637,8 @@ When invoking the Plan agent in Phase 4.1, append this additional requirement to
 \`\`\`
 
 **Classification rules** the plan agent must apply to each step:
-- \`quick\`: mechanical edits — LSP rename, extract variable, inline, simple move, signature change without call-site logic.
-- \`unspecified-low\`: logic-preserving refactors that need reasoning — extract function, restructure conditional, pattern transformation, cross-file API change.
+- \`quick\` - mechanical edits: LSP rename, extract variable, inline, simple move, signature change without call-site logic.
+- \`unspecified-low\` - logic-preserving refactors that need reasoning: extract function, restructure conditional, pattern transformation, cross-file API change.
 - Recommend \`team\` path when \`file_independent_steps >= 3\`; recommend \`legacy\` otherwise.
 
 ## Phase 5 override: Dispatch path selection
@@ -647,7 +647,7 @@ Read the Team Staffing Recommendation from Phase 4. If any required field is mis
 
 Then choose the path:
 
-- **Team path (5.1-T)**: when the plan recommends \`team\` AND \`file_independent_steps >= 3\`. Members execute in parallel, Lead orchestrates, a \`deep\` verifier lives outside the team.
+- **Team path (5.1-T)**: when the plan recommends \`team\` AND \`file_independent_steps >= 3\`. Members execute in parallel, Lead orchestrates, a \`deep-high\` verifier lives outside the team.
 - **Legacy path (5.1-L)**: otherwise. Use the original 5.1 / 5.2 / 5.3 flow from above.
 
 Record the chosen path in the TodoWrite list.
@@ -670,7 +670,7 @@ Record the chosen path in the TodoWrite list.
     {
       "kind": "category",
       "category": "quick",
-      "prompt": "You handle mechanical refactoring steps (LSP rename, extract variable, inline, simple move, signature change). Use LSP tools for correctness. Apply the task description's per-step instructions verbatim — no scope expansion. After edits, run lsp_diagnostics on touched files. Report via team_send_message(teamRunId=<id>, to=\"lead\", summary=<files touched>, body=<lsp status + diff summary>) + team_task_update(status=completed). Never run tests — the external verifier handles that. Never git add, never --continue."
+      "prompt": "You handle mechanical refactoring steps (LSP rename, extract variable, inline, simple move, signature change). Use LSP tools for correctness. Apply the task description's per-step instructions verbatim: no scope expansion. After edits, run lsp_diagnostics on touched files. Report via team_send_message(teamRunId=<id>, to=\"lead\", summary=<files touched>, body=<lsp status + diff summary>) + team_task_update(status=completed). Never run tests: the external verifier handles that. Never git add, never --continue."
     },
     { "kind": "category", "category": "quick", "prompt": "Same contract as peer quick worker." },
     {
@@ -685,8 +685,8 @@ Record the chosen path in the TodoWrite list.
 
 Rationale for this composition:
 - **4 workers = team mode's parallel cap.** 5+ just queues.
-- **No verifier team member.** Verification needs \`deep-high\` reasoning (or \`unspecified-high\` fallback). In-team category routing downcasts to the category worker, which is weaker than required — the verifier runs OUTSIDE the team as a \`task(category="deep-high")\`.
-- **quick × 2** for mechanical edits, **unspecified-low × 2** for reasoning edits — mirrors the plan's split.
+- **No verifier team member.** Verification needs \`deep-high\` reasoning (or \`unspecified-high\` fallback). In-team category routing downcasts to the category worker, which is weaker than required: the verifier runs OUTSIDE the team as a \`task(category="deep-high")\`.
+- **quick × 2** for mechanical edits, **unspecified-low × 2** for reasoning edits: mirrors the plan's split.
 
 **Team lifecycle** (one team, reused until Phase 6 cleanup):
 
@@ -714,7 +714,7 @@ Rationale for this composition:
 While any team task is \`pending | claimed | in_progress\`:
 
 - Wait for \`<system-reminder>\` or member messages. Avoid tight polling; a single \`team_status\` check is acceptable if no notification arrives within roughly 10 seconds of expected completion.
-- On a worker completion report, immediately dispatch an **external verifier** — verification runs OUTSIDE the team because team-member category routing downcasts to the category worker:
+- On a worker completion report, immediately dispatch an **external verifier** (verification runs OUTSIDE the team because team-member category routing downcasts to the category worker):
   \`\`\`
   task(
     category="deep-high",
@@ -735,7 +735,7 @@ Proceed to Phase 6 only when every team task is \`completed\` AND every paired v
 
 ## Phase 6 override: Team cleanup before summary
 
-If Phase 5 used the team path, dismantle \`refactor-squad\` BEFORE producing the 6.6 summary. Every exit path — success, escalation, abort — must cleanup; orphan teams poison the next session's precondition check.
+If Phase 5 used the team path, dismantle \`refactor-squad\` BEFORE producing the 6.6 summary. Every exit path (success, escalation, abort) must clean up; orphan teams poison the next session's precondition check.
 
 1. \`team_shutdown_request\` for each member, then \`team_approve_shutdown\` if members do not self-approve within a reasonable window.
 2. \`team_delete(teamRunId=<id>)\`.
@@ -747,9 +747,9 @@ Append to the 6.6 summary a "Dispatch path" line and, when team path was used, t
 
 ## MUST NOT (team mode)
 
-- Lead never edits files directly — orchestrate only.
-- Do not inline the Intent Card or verify-spec into task descriptions — rely on the broadcasts.
+- Lead never edits files directly: orchestrate only.
+- Do not inline the Intent Card or verify-spec into task descriptions: rely on the broadcasts.
 - Do not recreate the team mid-session.
-- Do not run tests from Lead — the external verifier owns that lane.
-- Do not put \`oracle\` / \`librarian\` / \`deep\` into the team spec — curated read-only agents are team-ineligible, and \`deep\` under category routing downcasts to the category worker. Use them via \`task()\` outside the team when needed.
+- Do not run tests from Lead: the external verifier owns that lane.
+- Do not put \`oracle\` / \`librarian\` / a deep lane into the team spec: oracle/librarian are team-ineligible, and a deep lane under category routing downcasts to the category worker. Use them via \`task()\` outside the team when needed.
 `

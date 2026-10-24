@@ -5,8 +5,7 @@
 import * as nodeFs from "node:fs"
 import { basename, dirname, join } from "node:path"
 
-import { DELIVERABLE_FORMATS, DELIVERABLE_STATUSES, GATE_NAMES, GATE_STATUSES, LANES } from "./contracts.mjs"
-import { MANIFEST_CODES, SCHEMA_VERSION, validateOutcomeManifest } from "./contracts.mjs"
+import { DELIVERABLE_FORMATS, DELIVERABLE_STATUSES, GATE_NAMES, GATE_STATUSES, LANES, MANIFEST_CODES, normalizeManifest, SCHEMA_VERSION, validateOutcomeManifest } from "./contracts.mjs"
 
 export const MANIFEST_FILENAME = "outcome.json"
 const MISSING = MANIFEST_CODES[0]
@@ -226,7 +225,7 @@ function assertValid(manifest, where) {
 export function readManifest(file) {
 	let manifest
 	try {
-		manifest = JSON.parse(nodeFs.readFileSync(file, "utf8"))
+		manifest = normalizeManifest(JSON.parse(nodeFs.readFileSync(file, "utf8")))
 	} catch (error) {
 		if (error instanceof SyntaxError) throw new OutcomeError("invalid_manifest", `${file}: not valid JSON (${error.message})`)
 		throw error

@@ -230,6 +230,7 @@ describe("RpcHostRunner start failures", () => {
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("child-prompt-failed")
     expect(RunnerError.is(failure) ? failure.failure.rejected_while : undefined).toBe("alive")
     expect(RunnerError.is(failure) ? failure.failure.message : "").toContain("prompt rejected by the host")
+    await runner.settleTeardowns()
     expect(channel.calls).toEqual(["open", "prompt", "abort", "close", "detach"])
   })
 

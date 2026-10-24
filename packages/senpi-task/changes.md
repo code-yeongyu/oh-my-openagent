@@ -1,3 +1,11 @@
+## 2026-10-23 - Report refused starts before teardown (#10402)
+
+First-prompt refusals settle the launch without waiting for child termination and
+disposal. Both RPC runners retain detached cleanup until it finishes, and the
+manager includes that cleanup in its existing shutdown deadline. Failed process
+resumes still await cleanup before permitting a retry against the same session.
+The `started` result with `starting: true` keeps its existing contract.
+
 ## 2026-10-19 - Retry infrastructure-failed DAG nodes before cascading skips (#10605)
 
 The shared DAG scheduler retries an infrastructure-failed node at most twice, with
@@ -21,6 +29,36 @@ exhaustion, misleading task error text, cancellation, typed host refusal, and
 budget/backoff restoration across scheduler re-entry. Manual retry after
 exhaustion still accepts a prompt override, journals the amendment before the
 retry, and rejects already-completed work before applying an amendment.
+
+## 2026-10-18 - A quit-suspended child records why it is still running (senpi#3493)
+
+Quitting the owning session parks every live child - resident RPC handles park `rpc_detached`,
+pending children park `persisted_only` - but the record keeps `status: running` by design (a
+later session can still revive it). Nothing recorded WHY it was parked, so a status check after a
+restart that never resumed that session showed a running task nothing would move, and no surface
+could explain it.
+
+`lifecycle/shutdown.ts` now stamps `suspension_reason: "session_quit"` when - and only when - the
+shutdown reason is `quit`: once per parked handle and once per parked pending record. Other
+reasons keep today's behavior: a `reload` parks the same way and the new generation revives
+through reconcile (a marker would misdescribe a suspension that resolves itself), and the
+dispose opt-out ends the run outright.
+
+`state/types.ts` adds the reason to `SuspensionReason`; `state/recovery-presentation.ts` maps it
+to "session quit", so `task_output` renders the existing "resuming (session quit)" phrase instead
+of the bare raw token. `lifecycle/host-session-record.ts` `markRevivalDeferred` now supersedes a
+stale `session_quit` marker with the deferral's own reason: the resume feeding that deferral IS
+the revival the marker was waiting for, so keeping it would promise a resume that already
+happened (the same reasoning as omo#9498).
+
+Keep the stamping on the quit path only, and keep the supersession narrow to `session_quit`: a
+more specific recorded reason (a parked host, a draining generation) still wins, and
+`clearSuspensionReason`/TTL behavior is untouched.
+
+`host-session-teardown.test.ts` pins the quit marker on both park paths and the absence of a
+marker on a `reload` shutdown; `snapshot-suspension.test.ts` pins the phrase;
+`reconcile-revival.test.ts` pins the supersession; `parked-recovery.test.ts` still pins the
+auto-resume after a parent restart - now with the marker present, the resume is unchanged.
 
 ## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
 

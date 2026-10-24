@@ -224,9 +224,9 @@ function rewriteMcpArg(arg: unknown): unknown {
   return rewrite?.[1] ?? arg
 }
 
-const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude"])
+const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude", "test"])
 
-function shouldCopyPluginPath(path: string, root: string): boolean {
+export function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
   if (relative.length === 0) return true
   const parts = relative.split(sep)

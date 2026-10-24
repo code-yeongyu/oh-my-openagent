@@ -13,6 +13,7 @@ import { createEventHandler } from "./plugin/event"
 import { createToolDefinitionHandler } from "./plugin/tool-definition"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
+import { showSkillSecurityNotice } from "./plugin/skill-security-notice"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
@@ -63,6 +64,8 @@ export function createPluginInterface(args: {
     "command.execute.before": createCommandExecuteBeforeHandler({
       directory: ctx.directory,
       hooks,
+      mcpManager: managers.skillMcpManager,
+      notify: (message) => showSkillSecurityNotice(ctx, message),
     }),
 
     "chat.message": createChatMessageHandler({

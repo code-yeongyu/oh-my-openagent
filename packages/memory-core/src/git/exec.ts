@@ -3,6 +3,7 @@ import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
 import { holdGitActivityShared } from "./git-activity-lock"
+import { recordGitTimeout } from "./timeout-diagnostics"
 
 export interface GitExecOptions {
   cwd: string
@@ -131,6 +132,7 @@ function spawnGitCommand(
     let killTimer: ReturnType<typeof setTimeout> | undefined
     const timer = setTimeout(() => {
       timedOut = true
+      recordGitTimeout(environment, child.pid, argv, options.cwd, options.timeoutMs)
       child.kill("SIGTERM")
       killTimer = setTimeout(() => child.kill("SIGKILL"), options.killGraceMs ?? GIT_KILL_GRACE_MS)
     }, options.timeoutMs)
@@ -144,7 +146,17 @@ function spawnGitCommand(
 
     child.stdout!.on("data", (chunk: Buffer) => stdout.push(chunk))
     child.stderr!.on("data", (chunk: Buffer) => stderr.push(chunk))
-    if (hasStdin) child.stdin!.end(options.stdin)
+    // An unlistened stdin 'error' would crash the process (#11129). EPIPE means git exited before
+    // reading all of its stdin (a bad path, a held index.lock), which git's own exit code already
+    // reports. Any other stdin error is recorded and reported in the result's stderr.
+    let stdinError: NodeJS.ErrnoException | undefined
+    const stdin = hasStdin ? child.stdin : null
+    if (stdin) {
+      stdin.on("error", (error: NodeJS.ErrnoException) => {
+        if (error.code !== "EPIPE") stdinError = error
+      })
+      stdin.end(options.stdin)
+    }
     child.on("error", (error: NodeJS.ErrnoException) => {
       if (settled) return
       settled = true
@@ -188,7 +200,7 @@ function spawnGitCommand(
       resolve({
         code: code ?? 1,
         stdout: stdoutBytes.toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8") + describeStdinError(stdinError),
         stdoutBytes,
       })
     }
@@ -242,4 +254,8 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
       }
     },
   }
+}
+
+function describeStdinError(error: NodeJS.ErrnoException | undefined): string {
+  return error === undefined ? "" : `\nomo: git stdin was not fully delivered (${error.code ?? error.message})\n`
 }

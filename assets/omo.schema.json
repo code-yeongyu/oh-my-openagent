@@ -5,6 +5,45 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "git_owners": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -41,13 +80,13 @@
       },
       "additionalProperties": false
     },
-    "gateway": {
+    "dori": {
       "type": "object",
       "propertyNames": {
         "type": "string"
       },
       "additionalProperties": {},
-      "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+      "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
     },
     "$schema": {
       "type": "string"
@@ -899,7 +938,7 @@
           ]
         },
         "include_co_authored_by": {
-          "default": false,
+          "default": true,
           "type": "boolean"
         },
         "git_env_prefix": {
@@ -1973,6 +2012,24 @@
           },
           "additionalProperties": false
         },
+        "project_scope": {
+          "default": {
+            "nudge": true,
+            "recall": true
+          },
+          "type": "object",
+          "properties": {
+            "nudge": {
+              "default": true,
+              "type": "boolean"
+            },
+            "recall": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "projection": {
           "default": {
             "max_entries_per_directory": 40,
@@ -2302,6 +2359,11 @@
         "enabled": {
           "default": true,
           "type": "boolean"
+        },
+        "rawTurnSampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       },
       "additionalProperties": false
@@ -2495,6 +2557,45 @@
     "[native]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -2528,13 +2629,13 @@
           },
           "additionalProperties": false
         },
-        "gateway": {
+        "dori": {
           "type": "object",
           "propertyNames": {
             "type": "string"
           },
           "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+          "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -4282,6 +4383,18 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "projection": {
               "type": "object",
               "properties": {
@@ -4602,6 +4715,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -4772,6 +4890,45 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -4805,13 +4962,13 @@
           },
           "additionalProperties": false
         },
-        "gateway": {
+        "dori": {
           "type": "object",
           "propertyNames": {
             "type": "string"
           },
           "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+          "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -6559,6 +6716,18 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "projection": {
               "type": "object",
               "properties": {
@@ -6879,6 +7048,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -7049,6 +7223,45 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -7082,13 +7295,13 @@
           },
           "additionalProperties": false
         },
-        "gateway": {
+        "dori": {
           "type": "object",
           "propertyNames": {
             "type": "string"
           },
           "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+          "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -8836,6 +9049,18 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "projection": {
               "type": "object",
               "properties": {
@@ -9156,6 +9381,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -9332,6 +9562,45 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "workspaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "git_owners": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "formatOnMutation": {
             "type": "object",
             "properties": {
@@ -9364,6 +9633,14 @@
               }
             },
             "additionalProperties": false
+          },
+          "dori": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {},
+            "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
           },
           "categories": {
             "type": "object",
@@ -11111,6 +11388,18 @@
                 },
                 "additionalProperties": false
               },
+              "project_scope": {
+                "type": "object",
+                "properties": {
+                  "nudge": {
+                    "type": "boolean"
+                  },
+                  "recall": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "projection": {
                 "type": "object",
                 "properties": {
@@ -11431,6 +11720,11 @@
             "properties": {
               "enabled": {
                 "type": "boolean"
+              },
+              "rawTurnSampleRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
               }
             },
             "additionalProperties": false
@@ -11601,6 +11895,45 @@
           "[native]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -11634,13 +11967,13 @@
                 },
                 "additionalProperties": false
               },
-              "gateway": {
+              "dori": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
                 "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+                "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -13388,6 +13721,18 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "projection": {
                     "type": "object",
                     "properties": {
@@ -13708,6 +14053,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -13878,6 +14228,45 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -13911,13 +14300,13 @@
                 },
                 "additionalProperties": false
               },
-              "gateway": {
+              "dori": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
                 "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+                "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -15665,6 +16054,18 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "projection": {
                     "type": "object",
                     "properties": {
@@ -15985,6 +16386,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -16155,6 +16561,45 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -16188,13 +16633,13 @@
                 },
                 "additionalProperties": false
               },
-              "gateway": {
+              "dori": {
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
                 "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
+                "description": "Chat-surface dori settings, owned and validated by a separately installed dori package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -17942,6 +18387,18 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "projection": {
                     "type": "object",
                     "properties": {
@@ -18262,6 +18719,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -28052,7 +28514,7 @@
         "git_master": {
           "default": {
             "commit_footer": false,
-            "include_co_authored_by": false,
+            "include_co_authored_by": true,
             "git_env_prefix": "GIT_MASTER=1"
           },
           "type": "object",
@@ -28065,7 +28527,7 @@
               ]
             },
             "include_co_authored_by": {
-              "default": false,
+              "default": true,
               "type": "boolean"
             },
             "git_env_prefix": {

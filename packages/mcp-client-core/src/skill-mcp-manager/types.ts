@@ -2,6 +2,7 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import type { ClaudeCodeMcpServer } from "@oh-my-opencode/claude-code-compat-core/claude-code-mcp-loader/types"
 import type { McpOAuthProvider } from "../mcp-oauth/provider"
+import type { EnvironmentGrantPolicy } from "./environment-grant-policy"
 
 export type SkillMcpConfig = Record<string, ClaudeCodeMcpServer>
 
@@ -19,6 +20,19 @@ export interface McpClient {
 }
 
 export interface SkillMcpClientInfo {
+  sourcePath?: string
+  sourceKind?: "frontmatter" | "sidecar"
+  provenance?: {
+    readonly kind: "project-auto" | "user" | "host" | "builtin"
+    readonly selectedRoot: string
+    readonly projectRoot?: string
+  }
+  hostUserTrusted?: boolean
+  revalidateDeclaration?: () => Promise<{
+    config: ClaudeCodeMcpServer
+    sourcePath: string
+    sourceKind: "frontmatter" | "sidecar"
+  } | undefined>
   serverName: string
   skillName: string
   sessionID: string
@@ -74,6 +88,7 @@ export type OAuthProviderFactory = (options: {
 }) => OAuthProviderLike
 
 export interface SkillMcpManagerState {
+  environmentPolicy?: EnvironmentGrantPolicy
   clients: Map<string, ManagedClient>
   pendingConnections: Map<string, Promise<McpClient>>
   disconnectedSessions: Map<string, number>
@@ -89,6 +104,8 @@ export interface SkillMcpManagerState {
 }
 
 export interface SkillMcpClientConnectionParams {
+  environment?: Record<string, string>
+  policySignal?: AbortSignal
   state: SkillMcpManagerState
   clientKey: string
   info: SkillMcpClientInfo

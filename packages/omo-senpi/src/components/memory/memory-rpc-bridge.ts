@@ -4,6 +4,8 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { MEMORY_FACTS_APPLY_RPC_METHOD, type MemoryFactsApplier } from "./facts-apply-rpc"
 import { MEMORY_REFLECTIONS_RPC_METHOD, readMemoryReflections } from "./memory-rpc-reflections"
+import type { MemoryRpcSync } from "./memory-rpc-sync"
+import type { SyncStatusReader } from "./sync-status-surface"
 export { MEMORY_REFLECTIONS_RPC_METHOD } from "./memory-rpc-reflections"
 import {
   buildMemorySnapshot,
@@ -77,6 +79,8 @@ export interface MemoryRpcSnapshot {
     readonly totalSteps: number
     readonly reflectedSteps: number
   }
+  /** Additive (#10637): this device's memory sync state; omitted while the device does not sync this memory. */
+  readonly sync?: MemoryRpcSync
 }
 
 export interface MemoryRpcUnavailable {
@@ -91,6 +95,8 @@ export interface MemoryRpcBridgeDeps {
   readonly createGitRepo?: (repoPath: string) => MemoryRpcGitRepo
   /** `omo.memory.facts.apply`: the facts extractor's apply for the bound session; absent registers nothing. */
   readonly applyFacts?: MemoryFactsApplier
+  /** The repository's sync status for the snapshot's `sync` field; absent omits the field. */
+  readonly syncStatus?: SyncStatusReader
 }
 
 export interface MemoryRpcBridge {
@@ -141,6 +147,7 @@ export function createMemoryRpcBridge(
       activeRun: deps.activeRun,
       tokenEstimates,
       treeStats,
+      ...(deps.syncStatus === undefined ? {} : { syncStatus: deps.syncStatus }),
     })
   }
 

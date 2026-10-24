@@ -588,6 +588,33 @@ path still maps to its main checkout. Git records the real path of the main chec
 main checkout opened through a symlinked path resolves differently from its worktrees; use an
 explicit `agent` name in that case.
 
+#### Memory from projects the session touches
+
+After a successful `read`, `edit` or `write` under a child project with existing memory, the tool
+result lists up to 30 of that project's note paths and descriptions, not their bodies. The nudge
+appears once per project and is re-armed after accepted compaction. A non-git workspace can link
+projects in through directory symlinks; links committed inside a git repository do not extend its
+scope. Links to an ancestor, home or a directory containing the memory root never widen scope.
+Linked worktrees use the session's bound `auto_identity` mode and absolute memory root.
+
+Kibitzer considers up to three recently touched projects. It ranks each project's committed notes
+apart from the session's own corpus and reserves up to half the available seats, rounded up, for
+projects in touch order. Unused seats go to the other side. Each repository uses the same persisted
+search-term cache as the session's own memory; an unreadable or unwritable cache is logged and recall
+continues. Project note keys are `@project/<identity>/<path>` so ledgers cannot confuse two projects'
+notes with the same name; delivered hints name the readable file path.
+
+| Option                 | Default | Description |
+| ---------------------- | ------- | ----------- |
+| `project_scope.nudge`   | `true`  | List a touched project's note paths and descriptions |
+| `project_scope.recall`  | `true`  | Include touched projects in Kibitzer recall and its memory tool |
+
+These switches belong to the root `memory` block and its harness/profile layers, not `agents`
+overrides. Turning both off revokes grants on the next file touch. Project access is read-only:
+enumeration, writes, the repository root itself, git metadata and the reserved `system/` tree stay
+denied. The exclusions are case-insensitive on every platform; symlinks cannot escape a granted
+repository, and grants are revoked when the session shuts down.
+
 #### Memory file list in the prompt
 
 Every turn the compiled memory block ends with `<external_projection>`, one line per directory
@@ -965,10 +992,10 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 Configure git commit behavior:
 
 ```json
-{ "git_master": { "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
+{ "git_master": { "include_co_authored_by": true, "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
 ```
 
-`commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Commits keep your own git author and committer, and omo never adds a `Co-authored-by` trailer; `include_co_authored_by` is a deprecated no-op kept so existing configs still validate.
+`include_co_authored_by` (default `true`) adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` to every commit git-master writes, exactly once: it is passed with `git -c trailer.ifexists=addIfDifferent commit --trailer`, so amending or rewording a commit that already has it does not add a second copy, and after a squash git-master rewrites the joined message once. It needs git 2.32 or newer. Set it to `false` to keep the trailer out of your history. `commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Either way, commits keep your own git author and committer.
 
 This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-native-harness).
 

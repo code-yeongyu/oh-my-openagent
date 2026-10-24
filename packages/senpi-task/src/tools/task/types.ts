@@ -45,6 +45,7 @@ export type LoadedSkill = {
 // v1 load_skills contract: resolve named skills to SKILL.md content and expose a ready-to-prepend
 // block plus which names resolved vs went missing (missing names never fail the spawn).
 export type SkillResolution = {
+  readonly rejected?: readonly { readonly name: string; readonly reason: string }[]
   readonly prepend: string
   readonly resolved: readonly string[]
   readonly missing: readonly string[]
@@ -54,6 +55,7 @@ export type SkillResolution = {
 export type SkillLoader = (names: readonly string[], cwd: string) => SkillResolution
 
 export type TaskSkillSummary = {
+  readonly rejected?: readonly { readonly name: string; readonly reason: string }[]
   readonly requested: readonly string[]
   readonly resolved: readonly string[]
   readonly missing: readonly string[]

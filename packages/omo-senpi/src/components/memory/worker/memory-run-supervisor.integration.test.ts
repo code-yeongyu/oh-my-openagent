@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { rmEfaultTolerant } from "../teardown.test-support"
+import { windowsTreeKillArgs } from "../../../../../memory-core/src/concurrency/windows-process-tree.mjs"
 import {
   advanceTestClock,
   createTestClock,
@@ -94,7 +95,7 @@ function launchSupervisor(runDir: string): ChildProcess {
       OMO_MEMORY_SUPERVISOR_CLOCK_PATH: clockPath,
     } : process.env,
   })
-  // Track every supervisor so afterEach can tree-kill it: on win32 taskkill /T /F takes the
+  // Track every supervisor so afterEach can tree-kill it: on win32 the checked PID list takes the
   // supervisor, bootstrap, and model child together, which is what releases the run directory.
   if (child.pid !== undefined) processGroups.add(child.pid)
   return child
@@ -152,7 +153,8 @@ function groupIsAlive(pid: number): boolean {
 // for the run directory to be removable.
 function killTree(pid: number): void {
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" })
+    const args = windowsTreeKillArgs(pid)
+    if (args.length > 0) spawnSync("taskkill", args, { stdio: "ignore", windowsHide: true })
     return
   }
   signalGroup(pid, "SIGKILL")

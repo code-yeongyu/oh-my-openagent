@@ -14,9 +14,9 @@ import {
   type SearchResult,
 } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { parseCommandArgs } from "./args"
 import { respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 const SNIPPET_BEFORE = 60
 const SNIPPET_AFTER = 120
@@ -56,10 +56,9 @@ function resolveSessionsDir(deps: MemoryCommandDeps, ctx: MemoryCommandContext):
   return ctx.agentDir === undefined ? undefined : join(ctx.agentDir, "sessions")
 }
 
-export function registerSearchCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerSearchCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("search", {
-    description: "Search past session transcripts and show scored, numbered results.",
-    argumentHint: "<query> [--include-hidden]",
+    ...LAZY_MEMORY_COMMANDS.search,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const parsed = parseCommandArgs(args, { booleans: ["include-hidden"] })
       const query = parsed.positionals.join(" ").trim()
@@ -82,7 +81,7 @@ export function registerSearchCommand(pi: SenpiExtensionAPI, deps: MemoryCommand
 
       const { terms, phrases } = parseQuery(query)
       const needles = [...phrases, ...terms]
-      const lines = [`# Search: "${query}" — ${results.length} result${results.length === 1 ? "" : "s"}`, ""]
+      const lines = [`# Search: "${query}" - ${results.length} result${results.length === 1 ? "" : "s"}`, ""]
       results.forEach((result, index) => {
         lines.push(
           `${index + 1}. session ${result.conversationId} · ${result.createdAt} · ${result.document.messageType ?? "unknown"}`,

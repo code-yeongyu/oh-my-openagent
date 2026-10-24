@@ -164,6 +164,11 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
   return { create, resolveKernelTools, inspect, push, close, cancel, yieldResults, waitForEvent,
     setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string) => void) => { checkPolicy = policy },
     ownsTask: (taskId: string) => store.list().some(pool => pool.workers.some(worker => worker.task_id === taskId) || pool.items.some(item => item.binding?.task_id === taskId)),
+    // One store read for every task a pool owns, for callers that classify many records at once (#10782).
+    ownedTaskIds: (): ReadonlySet<string> => new Set(store.list().flatMap(pool => [
+      ...pool.workers.flatMap(worker => worker.task_id === undefined ? [] : [worker.task_id]),
+      ...pool.items.flatMap(item => item.binding?.task_id === undefined ? [] : [item.binding.task_id]),
+    ])),
     subscribe: (listener: (event: WorkpoolEvent) => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
     attach: (caller: WorkpoolCaller) => {
       assertParent(caller)

@@ -64,7 +64,7 @@ describe("buildUsageRows", () => {
   test("#given a failure on top of known numbers #when built #then the bars stay and the error is quiet", () => {
     // given
     const usage: PanelUsageSnapshot = {
-      claude: { updatedAt: NOW - 60_000, windows: [{ label: "5h", percent: 38 }], error: "rate limited", retryAt: NOW + 300_000 },
+      claude: { updatedAt: NOW - 60_000, windows: [{ label: "5h", percent: 38 }], error: "rate limited" },
     }
 
     // when
@@ -72,7 +72,7 @@ describe("buildUsageRows", () => {
 
     // then
     const error = rows.find((row) => row.text.startsWith("rate limited"))
-    expect(error?.text).toBe("rate limited · retry 5m")
+    expect(error?.text).toBe("rate limited")
     expect(error?.color).toBe("dim")
     expect(rows.some((row) => row.text.includes("38%"))).toBe(true)
   })

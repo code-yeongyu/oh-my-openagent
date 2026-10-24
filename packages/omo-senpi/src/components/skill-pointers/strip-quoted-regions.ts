@@ -1,10 +1,16 @@
-const INJECTED_BLOCK = /<(omo-[a-z0-9-]+-pointer|ultrawork-mode|omo-ultrawork-reminder)>[\s\S]*?<\/\1>/gi
+const INJECTED_BLOCK = /<(omo-[a-z0-9-]+-(?:pointer|mode)|ultrawork-mode|omo-ultrawork-reminder)>[\s\S]*?<\/\1>/gi
 const INLINE_CODE = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g
 // A message relayed from another session opens with a sender header: a bracketed tag such as `[REPORT]` or
 // `[a -> b]`, or `Name (id), recipient:` / `Name (id) to recipient:`. Everything in it is someone else's text, so none of it is a request.
-const RELAY_HEADER = /^\s*(?:\[(?:[A-Z][A-Z0-9_-]{2,}|[\w.-]+ -> [\w.-]+)\]|[A-Z][\w.-]{0,30} \([^()\s]{1,40}\)(?:, | to )[\w.-]{1,40}:)/
+// The arrow form is a leading header naming one sender (optionally relayed "via" others) and any recipient list
+// ("[lead via coordinator -> lane, PR#1]", "[lane -> coordinator + ledger-lane]"): a stricter `name -> name` shape let
+// such relays arm sessions (#10822). A bracketed prose arrow ("[step 1 -> step 2]") names no sender and is not a header.
+const RELAY_HEADER = /^\s*(?:\[(?:[A-Z][A-Z0-9_-]{2,}|[\w.:@#-]+(?: via [\w.:@#-]+)* -> [\w.:@#-]+[^\]\n]{0,160})\]|[A-Z][\w.-]{0,30} \([^()\s]{1,40}\)(?:, | to )[\w.-]{1,40}:)/
 const BLOCK_QUOTE_LINE = /^ {0,3}>[^\n]*/gm
 const DOUBLE_QUOTED = /"[^"\n]*"|\u201C[^\u201D\n]*\u201D/g
+// A single-quoted span opens after a non-word character and closes before one, so the apostrophes in
+// "don't" or "it's" never pair up; a quoted test or file name ('omo-senpi ultrawork ...') is a mention.
+const SINGLE_QUOTED = /(?<![\w'])'[^'\n]{1,200}'(?![\w])|\u2018[^\u2019\n]{1,200}\u2019/g
 const URL_SPAN = /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`]+/gi
 // A skill named only to forbid it ("Do not load mass-ulw or ulw-research") is not a request: the
 // negated verb's objects are masked up to the next sentence or clause break. A comma does not end
@@ -44,7 +50,7 @@ export function stripQuotedSpans(text: string): string {
     visible = visible.slice(0, opening.index) + mask(visible.slice(opening.index, end)) + visible.slice(end)
     fenceStart.lastIndex = end
   }
-  return visible.replace(INLINE_CODE, mask).replace(BLOCK_QUOTE_LINE, mask).replace(DOUBLE_QUOTED, mask).replace(URL_SPAN, mask)
+  return visible.replace(INLINE_CODE, mask).replace(BLOCK_QUOTE_LINE, mask).replace(DOUBLE_QUOTED, mask).replace(SINGLE_QUOTED, mask).replace(URL_SPAN, mask)
 }
 
 export function maskNegatedInvocations(text: string): string {

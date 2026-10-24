@@ -28,6 +28,7 @@ import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
+import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostView, type ThreadHostViewRequest, type ThreadToolSurfaceOptions } from "./tools/ports"
@@ -172,14 +173,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
 
   // Fuzzy candidates follow the exact ladder's scope: the caller's workspace unless all_scope.
   const fuzzyCandidates = (entries: ThreadAddressEntry[], allScope: boolean | undefined) => allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
-  const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value) => {
+  const create: AnyTool = { ...metadata("thread_create"), parameters: threadToolParamSchemas.thread_create, promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES], execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) => execute("thread_create", id, args, ectx, async (current, value, _operationId, callerId) => {
     const entries = resolveEntries(options, current)
     if (value.name !== undefined) { const conflict = checkNameConflict(entries, value.name); if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult }
     const skills = value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
     if (skills?.kind === "invalid") return failure("invalid_arguments", `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`, "Pass skill names as listed by the skill index.", { invalid: skills.names })
     const loaded = skills?.kind === "ok" ? skills.names : undefined
     const session = await options.host.openSession({ cwd: value.cwd, forkFrom: value.fork_from, name: value.name, ...(loaded === undefined ? {} : { initialSkills: loaded }) })
-    return { kind: "ok", thread: { ...summary(session), ...(loaded === undefined ? {} : { requested_skills: loaded }) }, deduplicated: false }
+    return recordThreadCreator(options, current, callerId, { kind: "ok", thread: { ...summary(session), ...(loaded === undefined ? {} : { requested_skills: loaded }) }, deduplicated: false })
   }) }
   const list: AnyTool = {
     ...metadata("thread_list"),
@@ -188,7 +189,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   }
   const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => readThread(options, current, value, callerId)) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
-  const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
+  const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id, resolved.entry.thread_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
   const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { if (value.match === "fuzzy" && value.all_scope !== true && options.callerWorkspaceRoot().trim() === "") return failure("caller_context_missing", "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.", "Set all_scope to search every workspace, or hand off from a session that knows its workspace."); const entries = value.match === "fuzzy" ? fuzzyCandidates(resolveEntries(options, current), value.all_scope) : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope)); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
@@ -204,7 +205,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
       const existing = visible.find((entry) => entry.thread_id !== resolved.entry.thread_id && normalizeThreadName(entry.name) === normalizeThreadName(name))
       if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
-      await sessionPort(options, session).setSessionName(routingId(session), name)
+      await sessionPort(options, session).setSessionName(routingId(session), name, resolved.entry.thread_id)
       return { kind: "ok", thread_id: resolved.entry.thread_id, name }
     }),
   }
@@ -225,7 +226,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       if (matches.length === 0) matches = available.filter((model) => model.id.toLowerCase().includes(pattern) || model.name?.toLowerCase().includes(pattern))
       if (matches.length === 0) return failure("model_not_found", `No available model matches "${value.model}".`, "Choose a provider/id from the available list and retry.", { available: catalog.slice(0, 20).map((model) => `${model.provider}/${model.id}`) })
       if (matches.length > 1) return failure("model_ambiguous", `Several available models match "${value.model}".`, "Pass an exact provider/id or narrow the pattern with provider.", { candidates: matches.slice(0, 10).map((model) => `${model.provider}/${model.id}`) })
-      const selected = await sessionPort(options, session).setModel(routingId(session), matches[0].provider, matches[0].id)
+      const selected = await sessionPort(options, session).setModel(routingId(session), matches[0].provider, matches[0].id, resolved.entry.thread_id)
       return { kind: "ok", thread_id: resolved.entry.thread_id, model: { provider: selected.provider, id: selected.id } }
     }),
   }
@@ -238,7 +239,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const session = targetSession(current, resolved.entry.thread_id)
       if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
       try {
-        await sessionPort(options, session).setThinkingLevel(routingId(session), value.level, value.scope === "turn" ? "turn" : undefined)
+        await sessionPort(options, session).setThinkingLevel(routingId(session), value.level, value.scope === "turn" ? "turn" : undefined, resolved.entry.thread_id)
       } catch (error) {
         if (!(error instanceof Error) || !error.message.startsWith("thinking_level_unsupported:")) throw error
         const supported = await sessionPort(options, session).getAvailableThinkingLevels(routingId(session))
@@ -311,10 +312,14 @@ async function deliverThroughGateway(
   return { kind: "ok", thread, resolved_by: resolvedBy, delivery: sent.delivery, message_seq: sent.message_seq, deduplicated: sent.deduplicated, ...facts }
 }
 
-/** Registers the seventeen tools; `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys. */
-export function registerThreadTools(pi: { registerTool(tool: Record<string, unknown>): void }, options: ThreadToolSurfaceOptions): { readonly dispose: () => void } {
+/**
+ * Registers the seventeen tools, and with `pi.on` the store extensions' session tools at each `session_start`
+ * (`tools/extension-tools.ts`); `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys.
+ */
+export function registerThreadTools(pi: ExtensionToolHost, options: ThreadToolSurfaceOptions, log: (line: string) => void = () => undefined): { readonly dispose: () => void } {
   const built = buildThreadTools(options)
   for (const tool of built.tools) pi.registerTool({ ...tool })
+  if (pi.on !== undefined) registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
   return { dispose: built.dispose }
 }
 

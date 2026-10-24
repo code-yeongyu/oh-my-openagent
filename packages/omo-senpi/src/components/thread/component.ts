@@ -3,9 +3,13 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { loadSenpiOmoConfig } from "../config-resolution"
+import { applyDoriToolkitGate } from "../ulw-loop/sdk/dori-gate"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
+import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
+import { resolveProvenance } from "./gateway/provenance-resolver"
 import { registerInitialSkills } from "./initial-skills"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -41,6 +45,17 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
   readonly agentDir?: () => string
   readonly store?: GatewayStore
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
+  /** The raw `dori` config section; absent: read from the user's omo config at registration. */
+  readonly doriSection?: () => unknown
+}
+
+function readDoriSection(options: ThreadComponentOptions, ctx: ComponentContext): unknown {
+  try {
+    return (options.doriSection ?? (() => loadSenpiOmoConfig().config.dori))()
+  } catch (error) {
+    ctx.logger.warn(`thread gateway: the dori config section was not read, so the dori toolkit stays off: ${error instanceof Error ? error.message : String(error)}`)
+    return undefined
+  }
 }
 
 /**
@@ -190,11 +205,15 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const host = options.host ?? createLazyLiveThreadSurface(pi)
       const stateDirectory = options.stateDirectory ?? defaultThreadStateDirectory(pi)
       const agentDir = options.agentDir ?? (() => resolveAgentHome({ env: process.env }))
+      // Before any kernel starts: a kernel reads the switch once, when it imports the toolkit SDK.
+      const doriToolkit = applyDoriToolkitGate(readDoriSection(options, ctx), process.env)
       const runtimeInstance = hostInstanceOf(pi)
       // The pre-gateway `thread_send` mailbox of this workspace: its undelivered items are imported
       // into the store once, when this session starts and the mailbox still exists on disk.
       const legacyMailbox = join(stateDirectory, "mailbox")
-      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      const callerWorkspaceRoot = options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd())
+      const onProvenanceWarning = (message: string) => ctx.logger.warn(`thread gateway: ${message}`)
+      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()
@@ -217,18 +236,22 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         host,
         stateDirectory,
         store,
+        env: options.env,
+        loadProvenanceWorkspaces,
+        onProvenanceWarning,
         diskSessions: options.diskSessions,
         sessionsDirectory: options.sessionsDirectory ?? (() => join(agentDir(), "sessions")),
         ensureHost: options.ensureHost,
         callerSessionId: options.callerSessionId ?? (() => UNKNOWN_CALLER),
-        callerWorkspaceRoot: options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd()),
+        callerWorkspaceRoot,
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerName: () => pi.getSessionName?.(),
         callerCause: () => run.cause,
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-      })
+        ...(doriToolkit ? { doriToolkit: true } : {}),
+      }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.

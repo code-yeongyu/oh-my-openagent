@@ -3,6 +3,7 @@ import type { GatewayEndpointPort, GatewayEndpointRef } from "../gateway/adapter
 import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type GatewayResolve } from "../gateway/engine"
 import { createGatewayRelay, type GatewayRelay } from "../gateway/relay"
 import type { GatewayStore } from "../gateway/store"
+import { resolveProvenance } from "../gateway/provenance-resolver"
 import { addressBook, sendAddressBook } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 import { sendView } from "./send-view"
@@ -49,7 +50,7 @@ export function createGatewayServices(options: ThreadToolSurfaceOptions, view: (
   const now = options.now ?? store.now
   const endpoints = options.host.gateway ?? UNREACHABLE
   const entries = async () => toGatewayAddressEntries(addressBook(options, await view()))
-  const engine = createGatewayEngine({ store, endpoints, resolve, now })
+  const engine = createGatewayEngine({ store, endpoints, resolve, now, senderProvenance: () => resolveProvenance({ cwd: options.callerWorkspaceRoot(), env: options.env, ...(options.loadProvenanceWorkspaces === undefined ? {} : { loadWorkspaces: options.loadProvenanceWorkspaces }), ...(options.onProvenanceWarning === undefined ? {} : { onWarning: options.onProvenanceWarning }) }) })
   const locate = async (durableId: string): Promise<GatewayEndpointRef | null> => {
     const entry = (await entries()).find((candidate) => candidate.thread_id === durableId)
     return entry === undefined || entry.liveness !== "routable" ? null : entry.endpoint

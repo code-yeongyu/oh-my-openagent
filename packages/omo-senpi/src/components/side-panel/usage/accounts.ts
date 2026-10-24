@@ -47,7 +47,7 @@ export function resolveUsageCredential(
  * `anthropic-subscription`, `openai-codex` became `chatgpt-subscription` - and installs that
  * predate the rename still hold the old spelling, so the current name is read first and the
  * retired one remains a fallback. Reading only the retired name is not a visible error: there is
- * simply no credential, so nothing polls and the block ages in place.
+ * simply no credential, so no serving account is picked and the usage block stays empty.
  *
  * Health is looked up under EVERY listed name, because auth.json and the credential pool were
  * renamed on different schedules and a slot filed under the old key still describes this account.

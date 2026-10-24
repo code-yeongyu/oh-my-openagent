@@ -12,7 +12,8 @@ import { resolveMemorySettings } from "./identity-runtime"
 import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createSessionBinder, readSessionSurface, releaseSession, type SessionState } from "./session-binding"
 import { finalizeIdentityRun } from "./transient-identity"
-import { createCliAccountSource, type DeviceAccountSource } from "./device-session/account-source"
+import type { DeviceAccountSource } from "./device-session/account-source"
+import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
 import { sweepTransientMemoryRuns, type TransientSweep } from "./transient-sweep"
@@ -66,10 +67,13 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         return
       }
 
+      // The runner reports sync status transitions to the wiring, which exists only after the runner.
+      const syncStatusChanged: { current?: (repo: string) => void } = {}
       const syncRunner = options.syncRunner ?? createSyncRunner({
         logger: ctx.logger,
+        onStatusChange: (repo) => syncStatusChanged.current?.(repo),
         resolveSession: createDeviceSessionResolver({
-          source: options.deviceAccount ?? createCliAccountSource({ env }),
+          source: options.deviceAccount ?? lazyCliAccountSource({ env }),
           pinDir: syncPinDir(resolveMemoryRoot(env, cwd)),
           loadRuntime: () => import("#omo-memory-sync-runtime"),
         }),
@@ -92,6 +96,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         now,
         logger: ctx.logger,
         deviceName: (principal) => syncRunner.deviceName(principal),
+        syncStatus: (repo) => syncRunner.status(repo),
         ...(options.createRuntime === undefined ? {} : { createRuntime: options.createRuntime }),
         ...(options.refreshStatus === undefined ? {} : { refreshStatus: options.refreshStatus }),
         // Reuse the boot snapshot: registration must not add a loadConfig() call, because the
@@ -110,6 +115,11 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         isEnabled: (config) => isEnabled(config, ctx, env),
         resolveConfig: resolveMemoryConfig,
       })
+      syncStatusChanged.current = (repo) => {
+        void wiring.onSyncStatusChanged(repo).catch((error: unknown) => {
+          ctx.logger.warn("memory sync status refresh failed", { error: describeError(error) })
+        })
+      }
       wiring.registerStatic(pi, ctx)
       // A session that reaches a turn without session_start in this runner generation (a host
       // restart or reload that resumed an open conversation) is bound here from its own recorded

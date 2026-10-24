@@ -1,4 +1,4 @@
-import { DesktopEngineAbiMismatchError } from "@oh-my-opencode/senpi-desktop-engine"
+import { DesktopEngineAbiMismatchError, DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-engine"
 import type { EngineMethod, PermissionDeniedData, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
 import {
   type CallOptions,
@@ -12,7 +12,7 @@ import {
 
 import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
 
-export type EngineDiagnostic = "native-unavailable" | "quarantined" | "abi-mismatch"
+export type EngineDiagnostic = "native-unavailable" | "quarantined" | "abi-mismatch" | "launch-context-unavailable"
 
 /** What `/computer status` reports as `engine:`; the engine is located and started on first use only. */
 export type EngineState = "not started" | "ready" | EngineDiagnostic
@@ -35,6 +35,7 @@ export class ComputerEngineUnavailableError extends Error {
 function diagnosticOf(error: Error): EngineDiagnostic | undefined {
   if (error instanceof DesktopEngineUnavailableError) return error.diagnostic.code
   if (error instanceof DesktopEngineAbiMismatchError) return "abi-mismatch"
+  if (error instanceof DesktopLaunchContextError) return error.code
   return undefined
 }
 
@@ -65,6 +66,7 @@ export class TrackedDesktopService extends DesktopService {
     } catch (error) {
       if (!(error instanceof Error)) throw error
       this.#report(error)
+      if (error instanceof DesktopLaunchContextError) throw error
       const diagnostic = diagnosticOf(error)
       if (diagnostic === undefined) throw error
       this.#engineState = diagnostic
@@ -94,7 +96,9 @@ export class TrackedDesktopService extends DesktopService {
 
   async #observe<T>(operation: Promise<T>): Promise<T> {
     try {
-      return await operation
+      const result = await operation
+      this.#engineState = "ready"
+      return result
     } catch (error) {
       if (!(error instanceof Error)) throw error
       this.#report(error)
@@ -103,6 +107,8 @@ export class TrackedDesktopService extends DesktopService {
   }
 
   #report(error: Error): void {
+    const diagnostic = diagnosticOf(error)
+    if (diagnostic !== undefined) this.#engineState = diagnostic
     if (error instanceof DesktopEngineRpcError && error.data !== null && "code" in error.data) {
       if (error.data.code === "PermissionDenied" && error.data.permission != null) {
         this.#onPermissionRequired?.(error.data.permission)

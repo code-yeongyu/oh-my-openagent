@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import type { DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-engine";
 import type { EngineMethod, ErrorCode, JsonRpcErrorData } from "@oh-my-opencode/senpi-desktop-protocol";
 import { EngineChild } from "./child";
 import { isRecord, parseErrorData } from "./parse";
@@ -71,7 +72,7 @@ export class RpcClient {
 		this.#hooks = hooks;
 		this.#child = new EngineChild(process, {
 			onLine: (line) => this.#onLine(line),
-			onExit: (reason) => this.#onExit(reason),
+			onExit: (reason, refusal) => this.#onExit(reason, refusal),
 		});
 	}
 
@@ -139,6 +140,7 @@ export class RpcClient {
 		if (pending === undefined || pending.cancelled !== undefined) return;
 		pending.release();
 		pending.cancelled = reason;
+		this.#child.finishStartup();
 		const grace = setTimeout(() => {
 			this.#settle(id);
 			pending.reject(new DesktopServiceError(reason.code, `${reason.message}; ${RESTART_MESSAGE}`, true));
@@ -169,6 +171,8 @@ export class RpcClient {
 		// A reply for an id no longer pending was already settled by the grace kill: nothing awaits it.
 		const pending = typeof message.id === "number" ? this.#settle(message.id) : undefined;
 		if (pending === undefined) return;
+		// A hello reply, including malformed/ABI-mismatched replies, is not a gate refusal.
+		if (pending.method === "engine.hello") this.#child.finishStartup();
 		if (pending.cancelled !== undefined) {
 			// A cancelled hold whose held input could not be released must say so: a key may still be down.
 			const failure = releaseFailure(pending.method, message.error);
@@ -189,10 +193,14 @@ export class RpcClient {
 		pending.reject(new DesktopServiceError("Internal", `desktop engine sent a malformed reply to ${pending.method}`));
 	}
 
-	#onExit(reason: string): void {
+	#onExit(reason: string, refusal: DesktopLaunchContextError | undefined): void {
+		const failure = this.#exitReason === undefined ? refusal : undefined;
 		this.#exitReason ??= reason;
-		const closed = new DesktopServiceError("Closed", this.#exitReason);
-		for (const id of [...this.#pending.keys()]) this.#settle(id)?.reject(closed);
+		const closed = failure ?? new DesktopServiceError("Closed", this.#exitReason);
+		for (const id of [...this.#pending.keys()]) {
+			const pending = this.#settle(id);
+			pending?.reject(pending.cancelled ?? closed);
+		}
 		this.#hooks.onExit();
 	}
 }

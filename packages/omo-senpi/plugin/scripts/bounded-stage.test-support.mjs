@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process"
 import { join } from "node:path"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 // One external stage of a packaging test, run without blocking the test process (#10911): it either
 // settles with its output or, past `capMs`, has its whole process tree killed and awaited, and fails
@@ -16,7 +17,8 @@ export function runBoundedStage(stage, command, args, options, capMs) {
     const cap = setTimeout(() => {
       stalled = true
       if (process.platform === "win32" && child.pid !== undefined) {
-        spawnSync("taskkill", ["/T", "/F", "/PID", String(child.pid)], { windowsHide: true })
+        const args = windowsTreeKillArgs(child.pid)
+        if (args.length > 0) spawnSync("taskkill", args, { windowsHide: true })
       } else {
         child.kill("SIGKILL")
       }

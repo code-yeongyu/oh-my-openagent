@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { readFile } from "node:fs/promises"
+import { readFile, readdir } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
   MAX_FACTS_PAYLOAD_BYTES,
+  FactsFailureStore,
   factsQueuePaths,
   serializeFactsPayload,
   type FactsConsumedWatermark,
@@ -111,7 +112,7 @@ describe("facts payload byte cap", () => {
     expect(Object.keys(consumed.consumed).sort()).toEqual(["session-1", "session-2", "session-3"])
   }, 60_000)
 
-  test("#given a conversation whose older entry is unconsumed #when the cap forbids both #then neither ships and the watermark stays put", async () => {
+  test("#given a conversation whose older entry exceeds the cap #when it parks #then it waits unconsumed in the dead-letter store while the newer entry ships on its own (#10918)", async () => {
     // given
     const { root, identity, queue } = await fixture()
     const older = message("m2", "y".repeat(MAX_FACTS_PAYLOAD_BYTES))
@@ -126,10 +127,11 @@ describe("facts payload byte cap", () => {
     // then
     expect(result.status).toBe("committed")
     const ledgers = await runLedgers(identity)
-    expect(ledgers).toHaveLength(1)
-    expect(ledgers[0]?.queued.map((key) => key.conversationId)).toEqual(["session-1"])
-    const consumed = JSON.parse(await readFile(factsQueuePaths(identity.paths).consumedPath, "utf8")) as FactsConsumedWatermark
-    expect(consumed.consumed["session-2"]).toBeUndefined()
-    expect((await queue.listPending()).map((entry) => entry.conversationId)).toContain("session-2")
+    expect(ledgers.map((ledger) => ledger.queued.map((key) => `${key.conversationId}/${key.end_message_id}`))).toEqual([["session-1/m1"], ["session-2/m3"]])
+    const failures = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
+    expect(failures.entries).toMatchObject([{ conversationId: "session-2", end_message_id: "m2", state: "parked", lastReason: "payload_entry_oversize" }])
+    // Parked bytes leave the hot queue for the parked/ dead-letter store (#11002); they are kept for /facts retry, not consumed.
+    expect(await queue.listPending()).toEqual([])
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 60_000)
 })

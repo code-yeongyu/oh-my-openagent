@@ -93,10 +93,40 @@ export type TelemetryTransportOptions = {
 /** The SDK's public network seam: every batch it sends, timer, size or shutdown flush, goes through it. */
 export type TelemetryFetch = NonNullable<PostHogOptions["fetch"]>
 
+export type TurnSpanStatus = "ok" | "error"
+export type TurnSpanAttributes = Readonly<Record<string, string | number | boolean>>
+
+export type TurnSpanStart = {
+  readonly attributes: TurnSpanAttributes
+  /** The delegating turn's W3C traceparent carried across the task bridge; invalid values are ignored. */
+  readonly parentTraceparent?: string
+}
+
+/** One live `omo.turn` span: lowercase hex ids, its own `traceparent`, and a scope that makes it active. */
+export type TurnSpanHandle = {
+  readonly traceId: string
+  readonly spanId: string
+  readonly traceparent: string
+  readonly run: <T>(fn: () => T) => T
+  readonly setAttributes: (attributes: TurnSpanAttributes) => void
+  readonly end: (status: TurnSpanStatus) => void
+}
+
+/** Present only on a transport with a span sink (the collector); undefined from `startTurn` while telemetry is off. */
+export type TurnTracing = {
+  readonly startTurn: (start: TurnSpanStart) => TurnSpanHandle | undefined
+}
+
 export type TelemetryTransport = {
   readonly capture: (message: TelemetryCaptureMessage) => void
+  /**
+   * Sends one event now; resolves only on a 2xx answer and rejects otherwise (the default PostHog transport
+   * rejects with `TelemetryDeliveryError`, whose `permanent` flag says a retry can never succeed).
+   */
+  readonly captureImmediate?: (message: TelemetryCaptureMessage) => Promise<void>
   readonly flush?: () => Promise<void>
   readonly shutdown: () => Promise<void>
+  readonly traces?: TurnTracing
 }
 
 export type TelemetryTransportFactory = (

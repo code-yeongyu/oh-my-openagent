@@ -16,15 +16,21 @@ import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
 import * as ownership from "./store-ownership"
 import { StoreExtensions } from "./store-extension-ops"
+import * as sessions from "./store-extension-session-ops"
+import { listSessionOps } from "./extension-registrations"
 import { ExtensionTransactionEndedError } from "./extension-transaction"
 import type { GatewayResolution, GatewayResolve } from "./engine"
 import type { StoreExtensionRegistration } from "./store-extensions"
-import type { GatewayStoreConfig, GatewayStoreEvent } from "./types"
+import type { GatewayStoreConfig, GatewayStoreEvent, Provenance } from "./types"
 
 type WorkerRequest = { readonly type: "request"; readonly id: number; readonly op: string; readonly args: unknown }
 type WorkerControl = { readonly type: "resume"; readonly hook: string }
 type ResolutionReply = { readonly type: "resolution"; readonly id: number } & (
   | { readonly ok: true; readonly value: GatewayResolution }
+  | { readonly ok: false; readonly error: string }
+)
+type ProvenanceReply = { readonly type: "provenance_resolved"; readonly id: number } & (
+  | { readonly ok: true; readonly value: Provenance }
   | { readonly ok: false; readonly error: string }
 )
 
@@ -48,6 +54,12 @@ const resolveTarget: GatewayResolve = (address, request) => new Promise((resolve
   resolutions.set(id, { resolve, reject })
   port.postMessage({ type: "resolve", id, address, request })
 })
+const provenanceRequests = new Map<number, { readonly resolve: (value: Provenance) => void; readonly reject: (error: Error) => void }>()
+const senderProvenance = (): Promise<Provenance> => new Promise((resolve, reject) => {
+  const id = nextResolution++
+  provenanceRequests.set(id, { resolve, reject })
+  port.postMessage({ type: "provenance", id })
+})
 
 function lateTransactionError(error: unknown): void {
   if (error instanceof ExtensionTransactionEndedError) {
@@ -63,7 +75,14 @@ function lateTransactionError(error: unknown): void {
 process.on("uncaughtException", lateTransactionError)
 process.on("unhandledRejection", lateTransactionError)
 
-port.on("message", (message: WorkerRequest | WorkerControl | ResolutionReply) => {
+port.on("message", (message: WorkerRequest | WorkerControl | ResolutionReply | ProvenanceReply) => {
+  if (message.type === "provenance_resolved") {
+    const pending = provenanceRequests.get(message.id)
+    provenanceRequests.delete(message.id)
+    if (message.ok) pending?.resolve(message.value)
+    else pending?.reject(new Error(message.error))
+    return
+  }
   if (message.type === "resolution") {
     const pending = resolutions.get(message.id)
     resolutions.delete(message.id)
@@ -127,21 +146,27 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
   const ctx = requireContext()
   switch (op) {
     case "extension_register": {
-      const request = args as { readonly extension: StoreExtensionRegistration; readonly now: number }
+      const request = args as { readonly extension: StoreExtensionRegistration; readonly now: number; readonly restored_at?: number }
       lastExtensionActivity = request.extension.name
-      const result = await extensions?.register(request.extension, request.now)
+      const result = await extensions?.register(request.extension, request.now, request.restored_at)
       return { result, retained: extensions?.holds(request.extension) === true }
     }
-    case "extension_call": {
+    case "extension_call":
+    case "extension_session_call": {
       const request = args as { readonly name: string; readonly op: string; readonly args: unknown; readonly now: number }
       lastExtensionActivity = request.name
       try {
-        return await extensions?.call(request.name, request.op, request.args, request.now)
+        if (extensions === undefined) return undefined
+        return op === "extension_call" ? await extensions.call(request.name, request.op, request.args, request.now) : await sessions.sessionCall(ctx, extensions, args as sessions.SessionCallRequest)
       } finally {
         for (const pending of resolutions.values()) pending.reject(new ExtensionTransactionEndedError(request.name))
         resolutions.clear()
+        for (const pending of provenanceRequests.values()) pending.reject(new ExtensionTransactionEndedError(request.name))
+        provenanceRequests.clear()
       }
     }
+    case "session_callable_ops": return listSessionOps(ctx)
+    case "record_thread_creation": return await sessions.recordThreadCreation(ctx, args as Parameters<typeof sessions.recordThreadCreation>[1])
     case "enqueue": return await ops.enqueue(ctx, args as Parameters<typeof ops.enqueue>[1])
     case "reconcile": return await ops.reconcile(ctx, args as Parameters<typeof ops.reconcile>[1])
     case "claim": return await ops.claim(ctx, args as Parameters<typeof ops.claim>[1])
@@ -225,7 +250,7 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   }
   try {
     await ops.migrate(context)
-    extensions = new StoreExtensions(context, resolveTarget)
+    extensions = new StoreExtensions(context, resolveTarget, senderProvenance)
     const legacy = await ops.migrateLegacyMailboxes(context, request.now)
     context.stats.writes = 0
     context.stats.transactions = 0

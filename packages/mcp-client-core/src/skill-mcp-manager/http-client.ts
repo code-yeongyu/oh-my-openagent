@@ -5,6 +5,7 @@ import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { redactSensitiveData } from "./error-redaction"
 import { buildHttpRequestInit } from "./oauth-handler"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
+import { connectWithPolicySignal, McpEnvironmentPolicyChangedError } from "./policy-connection"
 
 type HttpClientFactory = (
   clientInfo: { name: string; version: string },
@@ -126,13 +127,14 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   )
 
   try {
-    await client.connect(transport)
+    await connectWithPolicySignal(client, transport, params.policySignal)
   } catch (error) {
     await closeHttpResourceIgnoringFailure(() => transport.close(), {
       resource: "transport",
       serverName: info.serverName,
       phase: "connect-failure",
     })
+    if (error instanceof McpEnvironmentPolicyChangedError) throw error
 
     const errorMessage = redactCleanupErrorMessage(error instanceof Error ? error.message : String(error))
     throw new Error(

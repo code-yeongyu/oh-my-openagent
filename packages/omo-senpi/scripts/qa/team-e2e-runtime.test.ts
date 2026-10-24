@@ -341,6 +341,9 @@ describe("team e2e process cleanup", () => {
       platform: "win32",
       isProcessAlive: () => true,
       spawnSync: (command: string, args: readonly string[]) => {
+        if (command === "powershell.exe") {
+          return { status: 0, stdout: "4242 1 200 bun.exe\n4243 4242 210 node.exe\n4244 4243 100 unrelated.exe\n4245 4243 220 child.exe\n", stderr: "" }
+        }
         calls.push({ command, args })
         return { status: 0, stdout: "SUCCESS", stderr: "" }
       },
@@ -349,7 +352,7 @@ describe("team e2e process cleanup", () => {
     // then
     expect(calls).toEqual([{
       command: "taskkill.exe",
-      args: ["/PID", "4242", "/T", "/F"],
+      args: ["/F", "/PID", "4242", "/PID", "4243", "/PID", "4245"],
     }])
     expect(result).toEqual({ kind: "terminated", pid: 4242, platform: "win32" })
   })

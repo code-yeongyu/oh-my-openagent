@@ -1,124 +1,86 @@
-import type { Dirent } from "node:fs"
 import * as fs from "node:fs/promises"
-import { join } from "path"
-import { resolveSymlinkAsync, isMarkdownFile } from "@oh-my-opencode/utils"
+import { join } from "node:path"
+import type { DiscoveredProjectDirectory } from "../../shared/project-discovery-dirs"
 import type { LoadedSkill, SkillScope } from "./types"
 import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
-
-async function readDirectoryEntries(skillsDir: string): Promise<Dirent[]> {
-  try {
-    return await fs.readdir(skillsDir, { withFileTypes: true })
-  } catch (error) {
-    if (error instanceof Error) {
-      return []
-    }
-    return []
-  }
-}
-
-async function canAccessFile(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath)
-    return true
-  } catch (error) {
-    if (error instanceof Error) {
-      return false
-    }
-    return false
-  }
-}
+import {
+  checkSkillPath, reportSkillLoadError, skillProvenance,
+  type SkillProvenance, type SkillDiagnosticSink,
+} from "./skill-provenance"
 
 export async function loadSkillsFromDir(options: {
-  skillsDir: string
+  skillsDir: string | DiscoveredProjectDirectory
   scope: SkillScope
   namePrefix?: string
   depth?: number
   maxDepth?: number
+  skipMalformedFrontmatter?: boolean
+  provenance?: SkillProvenance
+  onDiagnostic?: SkillDiagnosticSink
+  ancestry?: ReadonlySet<string>
 }): Promise<LoadedSkill[]> {
+  const directory = typeof options.skillsDir === "string" ? undefined : options.skillsDir
+  const discovered = typeof options.skillsDir === "string" ? options.skillsDir : options.skillsDir.discovered
+  const provenance = skillProvenance(discovered, options.scope, options.provenance ?? (
+    directory ? { kind: "project-auto", selectedRoot: directory.discovered, projectRoot: directory.projectRoot } : undefined
+  ))
   const namePrefix = options.namePrefix ?? ""
   const depth = options.depth ?? 0
   const maxDepth = options.maxDepth ?? 2
-
-  const entries = await readDirectoryEntries(options.skillsDir)
   const skillMap = new Map<string, LoadedSkill>()
-
-  const directories = entries.filter(
-    (entry) => !entry.name.startsWith(".") && (entry.isDirectory() || entry.isSymbolicLink())
-  )
-  const files = entries.filter(
-    (entry) =>
-      !entry.name.startsWith(".") &&
-      !entry.isDirectory() &&
-      !entry.isSymbolicLink() &&
-      isMarkdownFile(entry)
-  )
-
-  for (const entry of directories) {
-    const entryPath = join(options.skillsDir, entry.name)
-    const resolvedPath = await resolveSymlinkAsync(entryPath)
-    const dirName = entry.name
-
-    const skillMdPath = join(resolvedPath, "SKILL.md")
-    if (await canAccessFile(skillMdPath)) {
-      const skill = await loadSkillFromPath({
-        skillPath: skillMdPath,
-        resolvedPath,
-        defaultName: dirName,
-        scope: options.scope,
-        namePrefix,
-      })
-      if (skill && !skillMap.has(skill.name)) {
-        skillMap.set(skill.name, skill)
-      }
-      continue
-    }
-
-    const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
-    if (await canAccessFile(namedSkillMdPath)) {
-      const skill = await loadSkillFromPath({
-        skillPath: namedSkillMdPath,
-        resolvedPath,
-        defaultName: dirName,
-        scope: options.scope,
-        namePrefix,
-      })
-      if (skill && !skillMap.has(skill.name)) {
-        skillMap.set(skill.name, skill)
-      }
-      continue
-    }
-
-    if (depth < maxDepth) {
-      const newPrefix = namePrefix ? `${namePrefix}/${dirName}` : dirName
-      const nestedSkills = await loadSkillsFromDir({
-        skillsDir: resolvedPath,
-        scope: options.scope,
-        namePrefix: newPrefix,
-        depth: depth + 1,
-        maxDepth,
-      })
-      for (const nestedSkill of nestedSkills) {
-        if (!skillMap.has(nestedSkill.name)) {
-          skillMap.set(nestedSkill.name, nestedSkill)
+  try {
+    const canonical = checkSkillPath(discovered, provenance, true)
+    if (options.ancestry?.has(canonical)) return []
+    const ancestry = new Set([...(options.ancestry ?? []), canonical])
+    const entries = await fs.readdir(discovered, { withFileTypes: true })
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue
+      const path = join(discovered, entry.name)
+      try {
+        const entryProvenance = skillProvenance(path, options.scope, provenance)
+        const resolved = checkSkillPath(path, entryProvenance, true)
+        const stat = await fs.stat(resolved)
+        if (stat.isDirectory()) {
+          if (ancestry.has(resolved)) continue
+          const candidates = [join(path, "SKILL.md"), join(path, `${entry.name}.md`)]
+          let found = false
+          for (const skillPath of candidates) {
+            try { await fs.lstat(skillPath) } catch (error) {
+              if (error instanceof Error && "code" in error && error.code === "ENOENT") continue
+              reportSkillLoadError(error, skillPath, options.onDiagnostic)
+              found = true
+              break
+            }
+            found = true
+            const skill = await loadSkillFromPath({
+              skillPath, resolvedPath: resolved, defaultName: entry.name, scope: options.scope,
+              namePrefix, provenance: entryProvenance, onDiagnostic: options.onDiagnostic,
+              skipMalformedFrontmatter: options.skipMalformedFrontmatter,
+            })
+            if (skill && !skillMap.has(skill.name)) skillMap.set(skill.name, skill)
+            break
+          }
+          if (!found && depth < maxDepth) {
+            const nested = await loadSkillsFromDir({
+              ...options, skillsDir: path, provenance: entryProvenance, ancestry,
+              namePrefix: namePrefix ? `${namePrefix}/${entry.name}` : entry.name, depth: depth + 1,
+            })
+            for (const skill of nested) if (!skillMap.has(skill.name)) skillMap.set(skill.name, skill)
+          }
+        } else if (stat.isFile() && path.toLowerCase().endsWith(".md")) {
+          const skill = await loadSkillFromPath({
+            skillPath: path, resolvedPath: canonical, defaultName: inferSkillNameFromFileName(path),
+            scope: options.scope, namePrefix, provenance: entryProvenance, onDiagnostic: options.onDiagnostic,
+            skipMalformedFrontmatter: options.skipMalformedFrontmatter,
+          })
+          if (skill && !skillMap.has(skill.name)) skillMap.set(skill.name, skill)
         }
+      } catch (error) {
+        reportSkillLoadError(error, path, options.onDiagnostic)
       }
     }
+  } catch (error) {
+    reportSkillLoadError(error, discovered, options.onDiagnostic)
   }
-
-  for (const entry of files) {
-    const entryPath = join(options.skillsDir, entry.name)
-    const baseName = inferSkillNameFromFileName(entryPath)
-    const skill = await loadSkillFromPath({
-      skillPath: entryPath,
-      resolvedPath: options.skillsDir,
-      defaultName: baseName,
-      scope: options.scope,
-      namePrefix,
-    })
-    if (skill && !skillMap.has(skill.name)) {
-      skillMap.set(skill.name, skill)
-    }
-  }
-
-  return Array.from(skillMap.values())
+  return [...skillMap.values()]
 }

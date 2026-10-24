@@ -14,6 +14,9 @@ import { FactsExtractorRunner } from "./facts-runner"
 import { enqueue, fixture, runnerOptions } from "./facts-runner.test-support"
 import type { FactsRunLedger } from "./facts-runner-types"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
+import { MemoryFakeExtensionAPI } from "./memory.test-support"
+import { fakeCommandContext, fakeDeps, invoke } from "./commands/commands.test-support"
+import { registerFactsCommand } from "./commands/facts"
 
 const NOW = new Date("2026-08-16T12:00:00.000Z")
 
@@ -59,7 +62,8 @@ describe("facts launch gating on failure state", () => {
     // then
     expect(result.status).toBe("empty")
     expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
-    expect(await queue.listPending()).toHaveLength(1)
+    expect(await queue.listPending()).toHaveLength(0)
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 30_000)
 
   test("#given one parked conversation beside a healthy one #when a launch runs #then only the healthy conversation's entry is carried", async () => {
@@ -84,7 +88,36 @@ describe("facts launch gating on failure state", () => {
       { conversationId: "session-2", end_message_id: "m2", end_snapshot_line: 1 },
     ])
     const pending = await queue.listPending()
-    expect(pending.map((entry) => entry.conversationId)).toEqual(["session-1"])
+    expect(pending).toEqual([])
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
+  }, 30_000)
+
+  test("#given a parked entry #when /facts retry restores it #then the real runner launches and consumes the restored file", async () => {
+    const { root, identity, queue } = await fixture()
+    const before = await queue.listPending()
+    await park(identity, "session-1", "m1", 1)
+    const layout = factsQueuePaths(identity.paths)
+    const [name] = await readdir(layout.parkedDir)
+    if (name === undefined) throw new Error("expected a parked file")
+    const original = await readFile(join(layout.parkedDir, name), "utf8")
+    expect(await queue.listPending()).toEqual([])
+    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", { now: () => NOW }))
+    const launches: string[] = []
+    const deps = fakeDeps({ identity: identity.id, identityPaths: identity.paths }, {
+      factsSink: { reconcile: async () => {
+        expect(await readFile(join(layout.queueDir, name), "utf8")).toBe(original)
+        expect((await queue.listPending()).map((entry) => entry.range)).toEqual(before.map((entry) => entry.range))
+        launches.push((await runner.launchPending()).status)
+      } },
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    registerFactsCommand(pi, deps)
+    const output = await invoke(pi, "facts", "retry --conversation session-1", fakeCommandContext())
+    expect(output).toContain("cleared 1 record")
+    expect(launches).toEqual(["committed"])
+    expect(await queue.listPending()).toEqual([])
+    expect(await readdir(layout.parkedDir)).toEqual([])
+    expect((await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()).entries).toEqual([])
   }, 30_000)
 
   test("#given a backoff endpoint #when the clock is before nextEligibleAt #then the launch is empty, and at the instant itself it launches", async () => {

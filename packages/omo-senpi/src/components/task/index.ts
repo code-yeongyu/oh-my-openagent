@@ -52,7 +52,7 @@ import { registerWorkpoolTool } from "./workpool-tool"
 const TASK_ENABLED_FLAG = "omo-task"
 
 export { wireEventBridge } from "./event-bridge"
-export { createInProcessJudgeRunner, findModelReference } from "./judge-runner"
+export { createInProcessJudgeRunner, findModelReference, isModelUnavailableStart } from "./judge-runner"
 export type { InProcessRunnerLike } from "./judge-runner"
 
 export interface TaskComponentOptions {
@@ -158,8 +158,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           ...(engine.settings.state_dir !== undefined ? { task: { state_dir: engine.settings.state_dir } } : {}),
         },
         settings: engine.settings,
+        logger: ctx.logger,
       })
-      engine.onStoreMutation(() => {
+      engine.onStoreMutation((change) => {
+        statusUi.observeRecord(change)
         statusUi.scheduleSync()
         dagRuntime.sync()
         void resumptionChannels.emitIfChanged().catch((error: unknown) => {

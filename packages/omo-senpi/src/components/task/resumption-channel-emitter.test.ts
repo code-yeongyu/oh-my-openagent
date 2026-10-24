@@ -121,6 +121,7 @@ describe("createResumptionChannelEmitter", () => {
         name: "wake_source_state",
         data: {
           source: "senpi-task",
+          kind: "children",
           activeCount: 1,
           items: [{
             id: "st_00000001",
@@ -136,7 +137,7 @@ describe("createResumptionChannelEmitter", () => {
       },
       {
         name: "wake_source_state",
-        data: { source: "senpi-task", activeCount: 0, items: [], channels: [] },
+        data: { source: "senpi-task", kind: "children", activeCount: 0, items: [], channels: [] },
       },
     ])
   })
@@ -160,6 +161,7 @@ describe("createResumptionChannelEmitter", () => {
       name: "wake_source_state",
       data: {
         source: "senpi-task",
+        kind: "children",
         activeCount: 1,
         items: [{
           id: member.task_id,
@@ -216,6 +218,7 @@ describe("createResumptionChannelEmitter", () => {
       name: "wake_source_state",
       data: {
         source: "senpi-task",
+        kind: "children",
         activeCount: 1,
         items: [{
           id: member.task_id,

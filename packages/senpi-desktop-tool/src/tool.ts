@@ -5,7 +5,7 @@ import {
 	type ComputerScreenshot,
 	isReadOnlyComputerCall,
 } from "@oh-my-opencode/senpi-desktop-protocol";
-import { DesktopEngineRpcError, type ExecuteTool, runComputerCode } from "@oh-my-opencode/senpi-desktop-service";
+import { DesktopEngineRpcError, DesktopLaunchContextError, type ExecuteTool, runComputerCode } from "@oh-my-opencode/senpi-desktop-service";
 import type { ComputerHandle } from "./activation";
 import { Check } from "typebox/value";
 import { actionBranches, argumentsError } from "./action-schema";
@@ -17,7 +17,7 @@ import {
 } from "./params";
 import { type ComputerHostContext, runSnapshot } from "./session";
 import { computerToolDefinition } from "./tool-definition";
-import { computerFailure } from "./cua-errors";
+import { computerFailure, launchContextFailure } from "./cua-errors";
 
 /** One `desktop.control.acquire` confirmation request, carried to the host component (#9651 B5b). */
 export interface ControlConfirmRequest {
@@ -169,8 +169,10 @@ export function createComputerTool(deps: ComputerToolDeps) {
 					return permissionResult(run(context, { code: params.code, readOnly: params.read_only === true, timeoutSeconds }, signal), handle);
 				}
 				case "capabilities":
-					await handle.activate(context);
-					return valueResult(await handle.service.capabilities(), "capabilities unavailable");
+					return permissionResult((async () => {
+						await handle.activate(context);
+						return valueResult(await handle.service.capabilities(), "capabilities unavailable");
+					})(), handle);
 				case "close":
 					await handle.close();
 					return valueResult(undefined, "Closed the desktop session.");
@@ -185,6 +187,14 @@ async function permissionResult(result: Promise<ComputerToolResult>, handle: Com
 	try {
 		return await result;
 	} catch (error) {
+		if (error instanceof DesktopLaunchContextError) {
+			const failure = launchContextFailure(error);
+			return {
+				content: [{ type: "text", text: error.message }],
+				details: { value: failure, isError: true },
+				isError: true,
+			};
+		}
 		if (!(error instanceof DesktopEngineRpcError) || error.data === null || !("code" in error.data) ||
 			(error.data.code !== "PermissionDenied" && error.data.code !== "ControlRequired" &&
 				error.data.code !== "InputBusy" && error.data.code !== "Suspended")) throw error;

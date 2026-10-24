@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { isolateTelemetryEnv } from "../../../test-support/telemetry-env.test-helpers"
 import type { TelemetryCaptureMessage, TelemetryTransportFactory } from "@oh-my-opencode/telemetry-core"
 import { createPluginModule, type PluginModuleDeps } from "./testing/create-plugin-module"
 import * as posthogModule from "./shared/posthog"
@@ -49,6 +50,7 @@ const mockCreateHooks = mock(() => ({
 }))
 const mockCreatePluginInterface = mock(() => ({}))
 const mockLog = mock(() => {})
+let restoreTelemetryEnv: () => void
 
 function enableTelemetryEnv(): void {
   process.env.OMO_DISABLE_POSTHOG = "0"
@@ -113,6 +115,7 @@ function createTestPluginModule(overrides: Partial<PluginModuleDeps> = {}): Retu
 
 describe("oh-my-openagent telemetry isolation", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     clearTelemetryEnv()
     posthogModule.__resetActivityStateProviderForTesting()
     posthogModule.__resetOsProviderForTesting()
@@ -136,6 +139,7 @@ describe("oh-my-openagent telemetry isolation", () => {
     posthogModule.__resetActivityStateProviderForTesting()
     posthogModule.__resetOsProviderForTesting()
     posthogModule.__resetTransportFactoryForTesting()
+    restoreTelemetryEnv()
   })
 
   it("does not crash plugin load when telemetry throws", async () => {

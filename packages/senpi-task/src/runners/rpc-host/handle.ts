@@ -186,6 +186,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     stopUnreached: stop.stopUnreached,
     recoveryEnded: (adopted) => {
       stop.recoveryEnded(adopted)
+      if (adopted) teardown.republishStatus()
       if (adopted) void inputEffects.reconcile().catch(error => log("senpi-task input reconciliation failed", { taskId, error: String(error) }))
     },
     continueInput: (command) => inputEffects.send(command, identified => client.send(toHostInput(identified))),
@@ -232,6 +233,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const beginTurn = (): void => {
     continuationState = continuationState === "pending_delivery" ? "awaiting_start" : "none"
     if (outcome !== undefined) return
+    teardown.publishRunning()
     if (reachedIdle || turnOutcome !== undefined) {
       reachedIdle = false
       turnOutcome = undefined
@@ -248,6 +250,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
 
   const teardown = createHandleTeardown({
     taskId,
+    openedAttached: openDisposition === "attached",
     closeGraceMs,
     port: () => client,
     exited: () => outcome !== undefined,
@@ -323,6 +326,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     detach: teardown.detach,
     close: teardown.close,
     terminate: teardown.terminate,
+    publishTaskStatus: teardown.publishTaskStatus,
     startInitialPrompt: (text) => delivery.runPrompt(text),
   }
 }

@@ -104,6 +104,56 @@ describe("facts record tool", () => {
     }
   })
 
+  test("#given a project fact whose optional person is an empty placeholder #when recorded #then it is kept without the person (#10918)", async () => {
+    // given: GPT-family models fill the optional person field on project facts.
+    const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))
+    try {
+      const path = join(root, "extraction.jsonl")
+      await Bun.write(path, "")
+      const tool = createFactsRecordTool({ exchanges: [], extractionPath: path })
+
+      // when
+      const result = await tool.execute("placeholder", { scope: "project", person: { name: "", aliases: [] }, text: "The office uses rhwp for HWP files.", date: "2026-10-22" })
+
+      // then
+      expect(result.isError).toBeUndefined()
+      expect(await readFile(path, "utf8")).toBe('{"scope":"project","text":"The office uses rhwp for HWP files.","date":"2026-10-22","receipt":{"source":"inferred"}}\n')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a model that repeats a rejected call verbatim #when it keeps calling #then the run ends after the repeat and keeps the facts already recorded (#10918)", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))
+    try {
+      const path = join(root, "extraction.jsonl")
+      await Bun.write(path, "")
+      const tool = createFactsRecordTool({ exchanges: [], extractionPath: path })
+      await tool.execute("kept", { scope: "project", text: "The project uses Bun.", date: "2026-10-22" })
+      const rejected = { scope: "project" as const, person: { name: "Mina", aliases: [] }, text: "Mina reviews releases.", date: "2026-10-22" }
+
+      // when: a model that never changes its arguments, stopped by the runner only at terminate.
+      const results = []
+      for (let call = 0; call < 50; call += 1) {
+        const result = await tool.execute(`retry-${call}`, rejected)
+        results.push(result)
+        if (result.terminate === true) break
+      }
+
+      // then
+      expect(results).toHaveLength(2)
+      expect(results[0]?.isError).toBe(true)
+      expect(results[0]?.terminate).toBeUndefined()
+      expect(results[1]?.isError).toBe(true)
+      expect(results[1]?.terminate).toBe(true)
+      expect((await tool.execute("late", { scope: "project", text: "late", date: "2026-10-22" })).terminate).toBe(true)
+      expect(await readFile(path, "utf8")).toBe('{"scope":"project","text":"The project uses Bun.","date":"2026-10-22","receipt":{"source":"inferred"}}\n')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given an inactive facts run #when a late call arrives #then it returns an error without appending", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "facts-record-tool-"))

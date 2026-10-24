@@ -141,7 +141,30 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,490,000 is the measured need plus a 4,393-byte margin. #10902 (Fixes #10860) moves the memory slash commands and the
 // memory-sync device account into lazy sidecars: measured on this batch's head, omo.js 1,485,607 -> 1,439,434 B (-46,173),
 // so that PR sets this ceiling back to 1,450,000. The commands sidecar alone (-33,263) would leave it ~2.3 KB over.
-const BUDGET_BYTES = 1_490_000
+// Reset to 1,450,000 by #10860: eleven memory slash commands (/memory, /remember, /init, /recompile,
+// /memory-repository, /sleeptime, /reflect, /dream, /search, /facts, /agreements) keep synchronous registration
+// but load their handlers from the lazy #omo-memory-commands-runtime sidecar on first use, and memory sync's
+// device account (service-auth store and refresh) loads from #omo-device-account-runtime on the first sync
+// resolve. On the batch #2 head (e320d31ab1) build-extension.mjs (bun 1.4.3) measures 1,485,607 -> 1,439,434
+// bytes (-46,173): -33,386 from the commands sidecar, -12,787 from the device account sidecar.
+// Batch #3 (bundle train) adds more cars on top of #10860: measured omo.js on its regen head = 1,456,692 B, so the
+// ceiling is that measurement rounded up to the next 5,000 bytes (never below what is measured).
+// Batch #4 (bundle train, 9 cars: #10948 #10355 #10358 #10951 #10727 #10730 #10985 #10987 #10715) on top of batch #3:
+// dev (dfbeeec9bc) measures 1,457,603 B; the batch #4 regen head measures 1,461,838 B (+4,235) after the canonical
+// regen (two clean linux containers, node 24 + bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to
+// the next 5,000 bytes (never below what is measured).
+// To be reduced for #9915 (LSP slice, #10659): formatter.ts no longer imports the lsp-core root barrel, which
+// pulled lsp-core's whole in-process engine into omo.js although Senpi runs LSP only through the packaged daemon.
+// Measured in the canonical linux/amd64 container (bun 1.4.3) on three successive dev bases: -82,427, -82,471 and
+// -82,481 bytes. Batch #6 measures its regen head and sets the ceiling to that measurement rounded up to the next 5,000 bytes (the lead's standing rule).
+// Batch #6 (bundle train, 8 cars incl. #10659's LSP slice) on dev d127625784: dev measures 1,464,171 B; the batch #6
+// regen head measures 1,400,487 B (-63,684) after the canonical regen (two clean linux containers, node 24 + bun 1.4.3,
+// byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
+// Batch #8 (bundle train, 12 cars: #11111 #11114 #11118 #11115 #11121 #11122 #10533 #10716 #11007 #11086 #10712 #11084)
+// on dev 1a62c298d2: dev measures 1,404,729 B; the batch #8 regen head measures 1,406,000 B (+1,271) after the canonical
+// regen (two clean linux containers, node 24 + bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the
+// next 5,000 bytes (never below what is measured).
+const BUDGET_BYTES = 1_410_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {

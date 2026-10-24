@@ -4,6 +4,9 @@ import { McpOAuthProvider } from "../mcp-oauth/provider"
 import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
 import { handlePostRequestAuthError, handleStepUpIfNeeded } from "./oauth-handler"
+import { EnvironmentGrantPolicy } from "./environment-grant-policy"
+import { createFileGrantStore, type GrantStore } from "./env-grant-store"
+import { policyHash } from "./project-env-policy"
 import type {
   McpClient,
   OAuthProviderFactory,
@@ -14,34 +17,28 @@ import type {
 
 export interface SkillMcpClientOptions {
   cdpUrl?: string
+  env?: Readonly<Record<string, string>>
 }
 
 export function buildSkillMcpClientKey(info: SkillMcpClientInfo, options?: SkillMcpClientOptions): string {
   const baseKey = `${info.sessionID}:${info.skillName}:${info.serverName}`
+  const authorityKey = info.provenance ? `${baseKey}::provenance=${policyHash(info.provenance)}` : baseKey
   if (!options?.cdpUrl) {
-    return baseKey
+    return authorityKey
   }
 
-  return `${baseKey}::cdp=${options.cdpUrl}`
-}
-
-function withInjectedCdpEndpoint(
-  config: ClaudeCodeMcpServer,
-  options?: SkillMcpClientOptions
-): ClaudeCodeMcpServer {
-  if (!options?.cdpUrl) {
-    return config
-  }
-
-  const configWithCdpEndpoint = structuredClone(config)
-  configWithCdpEndpoint.args = [...(configWithCdpEndpoint.args ?? []), "--cdp-endpoint", options.cdpUrl]
-  return configWithCdpEndpoint
+  return `${authorityKey}::cdp=${options.cdpUrl}`
 }
 
 export class SkillMcpManager {
   private readonly state: SkillMcpManagerState
 
-  constructor(options: { createOAuthProvider?: OAuthProviderFactory } = {}) {
+  constructor(options: {
+    createOAuthProvider?: OAuthProviderFactory
+    grantStore?: GrantStore
+    configDir?: string
+    onEnvironmentNotice?: (message: string, info: SkillMcpClientInfo) => void
+  } = {}) {
     this.state = {
       clients: new Map(),
       pendingConnections: new Map(),
@@ -56,6 +53,30 @@ export class SkillMcpManager {
       disposed: false,
       createOAuthProvider: options.createOAuthProvider ?? ((providerOptions) => new McpOAuthProvider(providerOptions)),
     }
+    this.state.environmentPolicy = new EnvironmentGrantPolicy(options.grantStore ?? createFileGrantStore(options.configDir), options.onEnvironmentNotice, (identity) => this.closeIdentityClients(identity))
+  }
+
+  async invalidateIdentity(identity: string): Promise<void> {
+    this.state.environmentPolicy?.invalidateIdentity(identity)
+    await this.closeIdentityClients(identity)
+  }
+
+  private async closeIdentityClients(identity: string): Promise<void> {
+    for (const key of this.state.pendingConnections.keys()) {
+      if (key.includes(`::identity=${identity}::`)) this.state.pendingConnections.delete(key)
+    }
+    for (const key of this.state.clients.keys()) {
+      if (key.includes(`::identity=${identity}::`)) await forceReconnect(this.state, key)
+    }
+  }
+
+  async grantEnvironment(id: string, names?: readonly string[]): Promise<string> {
+    if (!this.state.environmentPolicy) throw new Error("MCP environment grant policy is unavailable.")
+    return this.state.environmentPolicy.grant(id, names)
+  }
+
+  getEnvironmentNotice(info: SkillMcpClientInfo): string | undefined {
+    return this.state.environmentPolicy?.notice(info)
   }
 
   private getClientKey(info: SkillMcpClientInfo, options?: SkillMcpClientOptions): string {
@@ -68,12 +89,13 @@ export class SkillMcpManager {
     options?: SkillMcpClientOptions
   ): Promise<McpClient> {
     const clientKey = this.getClientKey(info, options)
-    const resolvedConfig = withInjectedCdpEndpoint(config, options)
     return await getOrCreateClient({
       state: this.state,
       clientKey,
       info,
-      config: resolvedConfig,
+      config,
+      sessionEnv: options?.env,
+      cdpUrl: options?.cdpUrl,
     })
   }
 
@@ -197,12 +219,13 @@ export class SkillMcpManager {
     options?: SkillMcpClientOptions
   ): Promise<McpClient> {
     const clientKey = this.getClientKey(info, options)
-    const resolvedConfig = withInjectedCdpEndpoint(config, options)
     return await getOrCreateClientWithRetryImpl({
       state: this.state,
       clientKey,
       info,
-      config: resolvedConfig,
+      config,
+      sessionEnv: options?.env,
+      cdpUrl: options?.cdpUrl,
     })
   }
 
@@ -211,6 +234,7 @@ export class SkillMcpManager {
   }
 
   isConnected(info: SkillMcpClientInfo): boolean {
-    return this.state.clients.has(this.getClientKey(info))
+    const base = this.getClientKey(info)
+    return [...this.state.clients.keys()].some((key) => key === base || key.startsWith(`${base}::identity=`))
   }
 }

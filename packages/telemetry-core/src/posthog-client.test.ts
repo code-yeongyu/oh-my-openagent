@@ -8,6 +8,7 @@ import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
   UNCONFIGURED_POSTHOG_API_KEY,
+  createDefaultPostHogTransport,
   createTelemetryClient,
   getTelemetryActivityStateFilePath,
   getTelemetryDistinctId,
@@ -197,6 +198,41 @@ describe("posthog telemetry client", () => {
     }
   })
 
+  test("#given a transport whose flush rejects #when daily active records #then the transport is still shut down", async () => {
+    // given
+    const stateDir = mkdtempSync(join(tmpdir(), "telemetry-core-flush-fails-"))
+    let shutdowns = 0
+    const transportFactory: TelemetryTransportFactory = () => ({
+      capture: () => undefined,
+      flush: async () => {
+        throw new Error("collector answered 500")
+      },
+      shutdown: async () => {
+        shutdowns += 1
+      },
+    })
+
+    try {
+      // when
+      const recorded = recordDailyActive({
+        env: { POSTHOG_API_KEY: "test-key" },
+        now: new Date("2026-05-25T01:02:03.000Z"),
+        osProvider: OS_PROVIDER,
+        product: PRODUCT,
+        reason: "session_start",
+        source: "plugin",
+        stateDir,
+        transportFactory,
+      })
+
+      // then
+      await expect(recorded).rejects.toThrow("collector answered 500")
+      expect(shutdowns).toBe(1)
+    } finally {
+      rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
+
   test("#given no API key after trimming #when client is created #then transport is not constructed", () => {
     // given
     let transportCreated = false
@@ -277,6 +313,46 @@ describe("posthog telemetry client", () => {
       expect(existsSync(stateFilePath)).toBe(false)
     } finally {
       rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
+
+  // Acknowledgment contract: an ack-gated event (session_summary) may be retired only once it is on the
+  // wire. posthog-node's capture() enqueues after an async prepare step that flush() does not wait for, so
+  // the transport exposes captureImmediate, whose promise resolves after the HTTP request was answered.
+  test("#given the real PostHog transport #when an event is captured immediately #then the request carrying its uuid and time was sent before the promise resolved", async () => {
+    // given
+    const bodies: string[] = []
+    const options = {
+      // A loopback host: the injected fetch answers, and the test guard (#10394) refuses any other host.
+      host: "http://127.0.0.1:9",
+      disableGeoip: true,
+      enableExceptionAutocapture: false,
+      enableLocalEvaluation: false,
+      strictLocalEvaluation: true,
+      disableRemoteConfig: true,
+      disableCompression: true,
+      flushAt: 20,
+      flushInterval: 10_000,
+      fetch: async (_url: string, init: { readonly body?: unknown }) => {
+        bodies.push(String(init.body))
+        return new Response("{}", { status: 200 })
+      },
+    }
+    const transport = createDefaultPostHogTransport("test-key", options)
+    const uuid = "0b6c5d3e-2f1a-4c8b-9d7e-6a5b4c3d2e1f"
+    const createdAt = new Date("2026-05-25T01:02:03.000Z")
+
+    try {
+      // when
+      expect(transport.captureImmediate).toBeFunction()
+      await transport.captureImmediate?.({ distinctId: "machine-hash", event: "session_summary", properties: { turns: 1 }, uuid, timestamp: createdAt })
+
+      // then
+      const wire = bodies.join("\n")
+      expect(wire).toContain(uuid)
+      expect(wire).toContain(createdAt.toISOString())
+    } finally {
+      await transport.shutdown()
     }
   })
 })

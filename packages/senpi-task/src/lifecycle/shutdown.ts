@@ -1,11 +1,12 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import { nowIso, type LifecycleContext } from "./context"
+import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { markSuspensionReason } from "./host-session-record"
 import type { ResidentHandle } from "./port"
 import { stopOwnedChildren, stoppedOwnerTask } from "./stopped-owner"
-import { withinTeardownBudget } from "./teardown-budget"
+import { withinTeardownBudget, type TeardownStep } from "./teardown-budget"
 import type { SuspendFailure, SuspendInput, SuspendSummary } from "./types"
 
 /**
@@ -49,6 +50,11 @@ export async function suspendOnSessionShutdown(
     }
     try {
       await suspendHandle(context, handle, input.reason)
+      // senpi#3493: a quit-parked record must say WHY it is still "running" - the owning session
+      // exited, so nothing revives the child until that session resumes and task_output can present
+      // it as "resuming (session quit)" instead of a bare running record. Other shutdown reasons
+      // keep today's behavior (a reload revives through the new generation; the opt-out disposes).
+      if (input.reason === "quit") markSuspensionReason(context, handle.task_id, "session_quit")
       if (handle.kind === "in-process") suspendedInProcess += 1
       else suspendedRpc += 1
     } catch (error) {
@@ -64,6 +70,7 @@ export async function suspendOnSessionShutdown(
       context.dequeuePending(record.task_id)
       context.store.transition(record.task_id, { type: "persist_only", timestamp: nowIso(context) })
       context.store.appendEvent(record.task_id, { type: "suspended", payload: { reason: input.reason } })
+      if (input.reason === "quit") markSuspensionReason(context, record.task_id, "session_quit")
       suspendedPending += 1
     } catch (error) {
       failures.push({ task_id: record.task_id, error: String(error) })
@@ -94,6 +101,14 @@ export async function suspendHandle(context: LifecycleContext, handle: ResidentH
   const target = { taskId: handle.task_id, pid: handle.pid }
   if (handle.kind !== "host-session") {
     await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
+  }
+  // A finished child's session stays loaded on the daemon after the detach: its terminal status goes
+  // out first, over the attachment, so a successor host drops the park instead of reopening it (omo#10778).
+  const status = context.store.load(handle.task_id)?.status
+  const publish = handle.publishTaskStatus?.bind(handle)
+  if (status !== undefined && TERMINAL_STATUSES.has(status) && publish !== undefined) {
+    await bestEffort(handle.task_id, "publish_task_status", () =>
+      withinTeardownBudget(context.teardownStepDeadline, target, "publish_task_status", () => publish(status)))
   }
   if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()))
   try {
@@ -145,7 +160,7 @@ function isOwnedChild(
   return record !== null && record.parent_session_id === parentSessionId && record.host_pid === context.hostPid
 }
 
-async function bestEffort(taskId: string, step: "abort" | "terminate", run: () => Promise<void>): Promise<void> {
+async function bestEffort(taskId: string, step: TeardownStep, run: () => Promise<void>): Promise<void> {
   try {
     await run()
   } catch (error) {

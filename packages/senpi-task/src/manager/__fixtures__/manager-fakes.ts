@@ -7,6 +7,7 @@ import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo
 import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import type { SuspensionReason } from "../../state"
 import type { ManagedChildEvent, ManagedChildListener } from "../child-handle"
+import type { StartResult, TaskManager } from "../types"
 import { createTaskRecordStore } from "../../store"
 import type { TaskRecordStore } from "../../store"
 import type { ManagedChildHandle } from "../child-handle"
@@ -201,9 +202,34 @@ export function makeManager(options: {
  * `start` reports a launch slower than its report window as still starting, so a test that uses the
  * child's session or emits records to it right after `start` must wait here first.
  */
-export async function launchSettled(manager: { whenLaunched?(taskId: string): Promise<void> }, taskId: string): Promise<void> {
+const LAUNCH_SETTLEMENT_BOUND_MS = 2_000
+
+type LaunchObserver = { whenLaunched?(taskId: string): Promise<void>; get?: TaskManager["get"] }
+
+export function launchSettled(manager: LaunchObserver, taskId: string): Promise<void>
+export function launchSettled(manager: LaunchObserver, result: StartResult): Promise<string>
+export async function launchSettled(manager: LaunchObserver, input: string | StartResult): Promise<void | string> {
+  if (typeof input !== "string" && (input.kind !== "started" || input.starting !== true)) return input.kind
   if (manager.whenLaunched === undefined) throw new Error("the manager exposes no whenLaunched")
-  await manager.whenLaunched(taskId)
+  const taskId = typeof input === "string" ? input : input.task_id
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      manager.whenLaunched(taskId),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(
+          `launch settlement bound breached for ${taskId} (${LAUNCH_SETTLEMENT_BOUND_MS} ms)`,
+        )), LAUNCH_SETTLEMENT_BOUND_MS)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+  if (typeof input !== "string") {
+    const record = manager.get?.(taskId)
+    if (record === undefined) throw new Error(`settled launch has no record: ${taskId}`)
+    return record.status
+  }
 }
 
 export function baseSpec(overrides: Partial<ManagerStartSpec> = {}): ManagerStartSpec {

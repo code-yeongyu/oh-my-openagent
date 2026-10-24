@@ -3,10 +3,10 @@
 // allow: SIZE_OK - marketplace sync tests exercise one release payload fixture tree; this release adds narrow assertions and future additions should split by payload section.
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
-import { syncLazycodexMarketplace } from "./sync-lazycodex-marketplace"
+import { dirname, join, sep } from "node:path"
+import { shouldCopyPluginPath, syncLazycodexMarketplace } from "./sync-lazycodex-marketplace"
 
 const astGrepSkillSegments = ["ast", "grep"] as const
 const astGrepSkillName = astGrepSkillSegments.join("-")
@@ -171,6 +171,27 @@ async function expectPathMissing(path: string): Promise<void> {
 }
 
 describe("sync-lazycodex-marketplace", () => {
+  test("#given real plugin tree #when selecting marketplace files #then excludes tests and preserves runtime files", async () => {
+    // given: the marketplace package contract excludes repository-only tests.
+    const pluginRoot = join(import.meta.dir, "../packages/omo-codex/plugin")
+    const files = (await readdir(pluginRoot, { recursive: true, withFileTypes: true }))
+      .filter((entry) => entry.isFile())
+      .map((entry) => join(entry.parentPath, entry.name).slice(pluginRoot.length + sep.length))
+      .filter((path) => !path.split(sep).some((part) => [".git", "node_modules", ".ulw", ".claude"].includes(part)))
+      .filter((path) => !path.includes(sep) || ![".mcp.json", ".gitignore"].includes(path.split(sep).at(-1) ?? ""))
+    const testFiles = files.filter((path) => path.split(sep).includes("test"))
+    const runtimeFiles = files.filter((path) => !path.split(sep).includes("test"))
+    expect(testFiles).toContain(join("test", "component-bundled-cli.test.mjs"))
+    expect(runtimeFiles.length).toBeGreaterThan(0)
+
+    // when
+    const selected = files.filter((path) => shouldCopyPluginPath(join(pluginRoot, path), pluginRoot))
+
+    // then
+    expect(selected.filter((path) => path.split(sep).includes("test"))).toEqual([])
+    expect(selected.sort()).toEqual(runtimeFiles.sort())
+  })
+
   test("#given marketplace sync #when copying plugin bundle #then emits self-contained mcp paths", async () => {
     // given
     const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-source-"))

@@ -67,7 +67,7 @@ export function createNativeSkillSources(repoRoot) {
       // shared pool and are overlaid at sync time instead of being duplicated into the native source.
       name: "ulw-research",
       source: join(nativeSkillsRoot, "ulw-research"),
-      sharedAssets: ["scripts", "references/report-gates.md", "references/deliverable-phase.md", "references/report-visualization.md"],
+      sharedAssets: ["scripts", "references/report-gates.md", "references/deliverable-phase.md", "references/report-visualization.md", "references/fact-ledger-grammar.md"],
     },
     {
       name: "visualize",

@@ -292,8 +292,8 @@ describe("createSkillContext", () => {
       const skill = result.mergedSkills.find((s) => s.name === "runtime-host-skill")
       expect(skill).toBeDefined()
       expect(Boolean(skill?.mcpConfig && "testmcp" in skill.mcpConfig)).toBe(true)
-      // and the on-disk reader was bypassed entirely
-      expect(readOpencodeConfigSkillsSpy).not.toHaveBeenCalled()
+      // Disk is consulted for global authority, but its missing paths do not replace runtime paths.
+      expect(readOpencodeConfigSkillsSpy).toHaveBeenCalledTimes(1)
     } finally {
       readOpencodeConfigSkillsSpy.mockRestore()
       discoverUserClaudeSkillsSpy.mockRestore()

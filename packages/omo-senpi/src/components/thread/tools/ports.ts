@@ -2,6 +2,7 @@ import type { AddressBookHost, DiskSession } from "../address-book"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
 import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
+import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
 
@@ -63,17 +64,17 @@ export type ThreadHost = {
   readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[] }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
-  readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }) => Promise<{ readonly turnId?: string }>
-  readonly interrupt: (sessionId: string, turnId?: string) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
-  readonly setSessionName: (sessionId: string, name: string) => Promise<void>
-  readonly setModel: (sessionId: string, provider: string, modelId: string) => Promise<{ provider: string; id: string; name?: string }>
+  readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }, durable_session_id?: string) => Promise<{ readonly turnId?: string }>
+  readonly interrupt: (sessionId: string, turnId?: string, durable_session_id?: string) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
+  readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
+  readonly setModel: (sessionId: string, provider: string, modelId: string, durable_session_id?: string) => Promise<{ provider: string; id: string; name?: string }>
   readonly getAvailableModels: (sessionId: string) => Promise<readonly { provider: string; id: string; name?: string }[]>
-  readonly setThinkingLevel: (sessionId: string, level: string, scope?: "session" | "turn") => Promise<void>
+  readonly setThinkingLevel: (sessionId: string, level: string, scope?: "session" | "turn", durable_session_id?: string) => Promise<void>
   readonly getAvailableThinkingLevels: (sessionId: string) => Promise<readonly string[]>
   /** Runs the session's registered inbox drain once (`wake`); every endpoint kind answers it. */
-  readonly wake?: (sessionId: string, deliveryIds: readonly string[]) => Promise<GatewayWakeReply>
+  readonly wake?: (sessionId: string, deliveryIds: readonly string[], durable_session_id?: string) => Promise<GatewayWakeReply>
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
-  readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest) => Promise<ReleaseSessionReply>
+  readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest, durable_session_id?: string) => Promise<ReleaseSessionReply>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -85,6 +86,11 @@ export type ThreadHost = {
 }
 
 export type ThreadToolSurfaceOptions = {
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** Reads the sender's `provenance.workspaces` table; absent, only the sender's environment and git classify it. */
+  readonly loadProvenanceWorkspaces?: ProvenanceRuntime["loadWorkspaces"]
+  /** Receives a degraded-classification diagnostic; the send goes on either way. */
+  readonly onProvenanceWarning?: ProvenanceRuntime["onWarning"]
   readonly host: ThreadHost
   readonly callerSessionId: () => string
   readonly callerWorkspaceRoot: () => string
@@ -120,6 +126,8 @@ export type ThreadToolSurfaceOptions = {
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
+  /** True only while the `dori` section is on: layer-2 toolkit calls run through their replay receipts, and the dori host's layer-2 tools exist only then. */
+  readonly doriToolkit?: boolean
   readonly now?: () => number
 }
 

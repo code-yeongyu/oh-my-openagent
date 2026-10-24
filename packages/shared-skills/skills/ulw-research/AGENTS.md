@@ -13,12 +13,13 @@ ulw-research/
 │   ├── deliverable-phase.md         # lanes, state, destination defaults, interview, memory episodes, design spec, gates, repair, manifest, command reference
 │   ├── report-gates.md              # one row per defect code: severity, integrity, what it detects, how to fix
 │   ├── report-visualization.md      # which visual fits which finding, render commands (charts, Mermaid, PlotNeuralNet), quality bar, visual QA checklist
+│   ├── fact-ledger-grammar.md       # the one definition of a valid fact ledger; its per-kind table is rendered from KIND_RULES
 │   └── latex-report.md
 └── scripts/
     ├── report-tools.mjs             # CLI entry + dispatcher (COMMANDS, run, main)
     ├── report-tools-commands.mjs    # one function per subcommand
     ├── cli-support.mjs / entry-guard.mjs   # flags, CliError, exit codes, atomic JSON, symlink-safe entry check
-    ├── contracts.mjs                # frozen vocabulary: DEFECT_CODES (severity lives only here), enums, manifest + repair-state validators
+    ├── contracts.mjs                # frozen vocabulary: DEFECT_CODES (severity lives only here), FIDELITY_CODES, enums, manifest + repair-state validators
     ├── outcome.mjs                  # outcome.json manifest, deliverable state, verify, closing briefing
     ├── repair-tracker.mjs           # bounded repair decisions (attempts, plateau, oscillation, wall clock, integrity codes)
     ├── html-lite.mjs / entities.mjs # HTML tokenizer, selector paths, prose text
@@ -26,13 +27,18 @@ ulw-research/
     ├── gates-static.mjs + gates-text.mjs / gates-figures.mjs / gates-structure.mjs   # static gates G1-G17
     ├── layout-probe.mjs / gates-layout.mjs # in-page probe source + layout gates L1-L5 over its output
     ├── format-extract.mjs / format-extract-css.mjs   # design-spec draft from a pointed-at HTML or Markdown document
+    ├── fact-ledger.mjs              # fact ledger IO and writers (addRow, retractRow, supersedeRow, --view table)
+    ├── fact-ledger-schema.mjs       # ledger vocabulary, validateLedger, the status machine (transitionError) shared with the writers
+    ├── fact-ledger-kinds.mjs        # KIND_RULES: every per-kind column rule; drives the validator, renders the grammar table (--render-grammar)
+    ├── claims-index.mjs             # claim-graph.md index: the claim table plus the verified-claims digest
+    ├── fidelity-state.mjs           # per-sentence failure counts for the fidelity repair loop
     ├── *.test.ts                    # co-located bun tests, one per module (unshipped)
     └── tests/fixtures/              # good/bad reports, boxes.json, reference docs (unshipped)
 ```
 
 ## SURFACE
 
-`node "$SKILL_DIR/scripts/report-tools.mjs" <command>`: `check`, `layout-probe`, `repair decide`, `outcome init`, `outcome set`, `outcome gate`, `outcome render`, `outcome state`, `outcome verify`, `outcome finish`, `outcome briefing`, `format-extract`, `--help --json`. Exit codes: `0` pass, `1` semantic failure (blockers, a failed verify, a blocked repair), `2` usage or IO. JSON on stdout, one summary line on stderr. Flags per command: `references/deliverable-phase.md` section 10.
+`node "$SKILL_DIR/scripts/report-tools.mjs" <command>`: `check`, `layout-probe`, `repair decide`, `outcome init`, `outcome set`, `outcome gate`, `outcome render`, `outcome state`, `outcome verify`, `outcome finish`, `outcome briefing`, `format-extract`, `--help --json`. Gates recorded by `outcome gate`, in order: `static`, `fidelity`, `layout`, `visual`, `proofread` (`fidelity` is recorded `not_run` until the fidelity verifier ships). Exit codes: `0` pass, `1` semantic failure (blockers, a failed verify, a blocked repair), `2` usage or IO. JSON on stdout, one summary line on stderr. Flags per command: `references/deliverable-phase.md` section 10.
 
 ## CONVENTIONS
 
@@ -41,7 +47,7 @@ ulw-research/
 - The CLI never launches a browser. The layout probe is printed as one async expression; the orchestrator evaluates it through the browser skill's owned headless engine and passes the result back with `check --layout`.
 - Time is always injected (`--now`, `startedAt`); no module reads the clock inside a decision.
 - Tests are co-located given/when/then bun tests; CLI tests spawn `node` with bun removed from `PATH`. Fixtures live only under `scripts/tests/fixtures/`, are depersonalized, and never ship.
-- The senpi source dir (`packages/omo-senpi/skills/ulw-research/`) intentionally has no `scripts/`, `references/report-gates.md`, `references/deliverable-phase.md`, or `references/report-visualization.md`: the senpi sync overlays them from here byte-for-byte (`sharedAssets` in `packages/omo-senpi/plugin/scripts/native-skill-sources.mjs`), and both editions' sync suites assert the shipped copies equal these sources.
+- The senpi source dir (`packages/omo-senpi/skills/ulw-research/`) intentionally has no `scripts/`, `references/report-gates.md`, `references/deliverable-phase.md`, `references/report-visualization.md`, or `references/fact-ledger-grammar.md`: the senpi sync overlays them from here byte-for-byte (`sharedAssets` in `packages/omo-senpi/plugin/scripts/native-skill-sources.mjs`), and both editions' sync suites assert the shipped copies equal these sources.
 - References and scripts carry no Hangul (Korean match strings are `\u` escapes) and never three consecutive newlines (the senpi sync normalizes those and would break byte equality).
 
 ## ANTI-PATTERNS

@@ -1,4 +1,5 @@
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 /**
  * A model profile is a named, ordered model chain a human picks by lane
@@ -86,9 +87,9 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     displayName: "Daily · Normal",
     description: "Gets any task done without fuss.",
     models: [
-      { providers: [...CLAUDE_PROVIDERS], model: "claude-opus-5-5", variant: "medium" },
-      { providers: [...KIMI_PROVIDERS], model: "kimi-k3", variant: "max" },
-      { providers: [...GLM_PROVIDERS], model: "glm-5.3", variant: "max" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeOpus, variant: "medium" },
+      { providers: [...KIMI_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.kimi, variant: "max" },
+      { providers: [...GLM_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
     ],
   },
   "daily-heavy": {
@@ -96,7 +97,7 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     tier: "heavy",
     displayName: "Daily · Heavy",
     description: "Gets any task done, after thinking it over from more sides.",
-    models: [{ providers: [...CLAUDE_PROVIDERS], model: "claude-fable-5-1", variant: "xhigh" }],
+    models: [{ providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "xhigh" }],
   },
   "geeky-normal": {
     family: "geeky",
@@ -105,9 +106,9 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     description: "Obsessive focus on one hard task.",
     caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
     models: [
-      { providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "medium" },
-      { providers: [...GPT_6_1_PROVIDERS], model: "gpt-6.1-sol-fast", variant: "medium" },
-      { providers: [...GPT_6_1_PROVIDERS], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "medium" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
       { providers: [...GPT_PROVIDERS], model: "gpt-5.6-sol", variant: "medium" },
     ],
   },
@@ -117,6 +118,6 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     displayName: "Obsessive · Heavy",
     description: "Obsessive focus on one hard task, checked from every side.",
     caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
-    models: [{ providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "high" }],
+    models: [{ providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" }],
   },
 })
