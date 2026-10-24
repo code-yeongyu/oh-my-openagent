@@ -204,8 +204,7 @@ gh release view "v${NEW_VERSION}" --json tagName,url --jq '{tag: .tagName, url: 
 
 **Release notes are written BEFORE the release, not after.**
 
-The release body is extracted from the `CHANGELOG.md` section for this version. Author the user-facing
-notes under `## [Unreleased]` and land them before dispatching `/publish`; release-state preparation
+The release body is extracted from the `CHANGELOG.md` section for this version. Add the user-facing notes as `changes/unreleased/<pr-number>.md` fragments (one per PR, named for the PR) and land them before dispatching `/publish`; release-state preparation
 stamps that heading into `## [<version>] - <UTC date>` and commits it with the release state, so the
 published commit already carries its own notes.
 
@@ -219,13 +218,13 @@ bun run script/print-release-notes.ts "${NEW_VERSION}" /tmp/contributors.md
 <agent-instruction>
 After running the preview, present the output to the user and say:
 
-> **This is the exact body the release will publish:** the notes you authored under `[Unreleased]`,
+> **This is the exact body the release will publish:** the assembled fragments,
 > then contributor thank-yous for non-team contributors, then the install footer.
 >
 > Both steps are fail-closed: an absent, empty, or duplicated section aborts the release instead of
 > publishing blank notes, and re-stamping a version that already has a section is refused.
 >
-> If the `[Unreleased]` section is empty, STOP and write the notes first — the release cannot proceed.
+> If `changes/unreleased/` holds no fragments, STOP and write them first — the release cannot proceed.
 
 **APPROVAL GATE (single, binary):** The user's initial publish request with a named bump type IS the only approval this workflow requires. Do NOT wait for a separate acknowledgement here. Present the preview, then IMMEDIATELY proceed to Step 6. The only exception: if the user explicitly said "let me review the changelog before you continue" (or equivalent), stop and wait. Otherwise continue without ending the turn.
 </agent-instruction>

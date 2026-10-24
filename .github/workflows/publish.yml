@@ -492,9 +492,13 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' packages/omo-senpi/package.json > tmp.json && mv tmp.json packages/omo-senpi/package.json
           node packages/omo-senpi/plugin/scripts/sync-version.mjs
           node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
-          # Stamp the authored ## [Unreleased] notes into this release's section so the released
-          # commit carries the notes the GitHub release body is later extracted from.
+          # Assemble the changes/unreleased fragments into this release's CHANGELOG section and
+          # delete them (same release commit), so the released commit carries the notes the GitHub
+          # release body is later extracted from.
           bun run script/stamp-release-changelog.ts "$VERSION"
+          # The stamp step assembled changes/unreleased/*.md into the released CHANGELOG section, wrote their
+          # log blocks into changes.md and packages/*/changes.md, and deleted the fragments; stage all of it.
+          git add changes changes.md packages/*/changes.md
           npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false
           bun install --lockfile-only
 
@@ -1103,7 +1107,7 @@ jobs:
             - Extracts this version's CHANGELOG section from the prepared release source.
             - Fails closed when the section is absent, empty, or duplicated.
             - Runs before the platform builds so a source without notes cannot burn a tag.
-          JOB_SUMMARY_NEXT: Author the notes under [Unreleased] and prepare a fresh release state.
+          JOB_SUMMARY_NEXT: Add changes/unreleased fragments and prepare a fresh release state.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-platform:

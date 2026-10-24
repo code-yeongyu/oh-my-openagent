@@ -417,6 +417,10 @@ Adding `run-full-ci` or `ci:full-matrix` launches `ci-full-matrix-label.yml`, wh
 | `package-labels.yml` | issues opened/edited + pull_request_target | Auto-applies package labels (`opencode` / `lazycodex` / `lazycodex-generated`) |
 | `stats.yml` | weekly cron (Sun) / dispatch | Runs `script/stats.ts` (npm + GitHub-release download counts) |
 
+## CHANGELOG FRAGMENTS
+
+Never edit `CHANGELOG.md`, the root `changes.md` or any `packages/<name>/changes.md` in a normal PR. A PR that changes a shipped path (`script/changelog-shipping-policy.mjs`) adds exactly one file, `changes/unreleased/<pr-number>.md`: the text that used to go under `## [Unreleased]` (paragraphs or `### Section` bullets), then a `<!-- changes-log: <path> -->` block (heading `## YYYY-MM-DD - <title>`) for each entry that used to be prepended to a `changes.md`. Format: `docs/reference/changelog-fragments.md`. The `changelog-gate` workflow refuses any changelog or log edit on a normal PR and any edit to an existing fragment; the `no-changelog` label waives the fragment only for a PR with no shipped paths. Only the release-state PR (branch `release/*`, opened by the release workflow as `sisyphus-dev-ai`) edits those files: `script/stamp-release-changelog.ts` writes the release section and the log blocks and deletes the fragments, and the PR may carry only the release artifacts listed in `script/changelog-gate.config.ts` (#9961, #10841). Convert an old branch with `bun script/changelog-fragments-cli.ts from-diff --base origin/dev --pr <n>`; a batch PR folds its cars' fragments into its own with `bun script/changelog-fragments-cli.ts fold-batch --base origin/dev --pr <batch>`.
+
 ## PR MERGE POLICY
 
 - **PRs into `dev` MUST use merge commits.**
