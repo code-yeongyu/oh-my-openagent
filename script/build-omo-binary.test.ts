@@ -16,6 +16,7 @@ import {
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { removeTreeSync } from "../test-support/remove-tree"
 import {
   assertBinarySizeBudget,
   assertEngineGraphBundled,
@@ -831,7 +832,7 @@ describe("engine build identity compile defines", () => {
     expect(built.status).toBe(0)
     const ran = spawnSync(outfile, [], { encoding: "utf8" })
     expect(JSON.parse(ran.stdout)).toEqual({ epoch: 1788486552, sha7: "7fd18df", scheme: "epoch" })
-    rmSync(root, { recursive: true, force: true })
+    removeTreeSync(root)
   }, 60_000)
 
   test("#given no define args #when bun compiles a probe #then the binary reports scheme nodef", () => {
@@ -855,6 +856,6 @@ describe("engine build identity compile defines", () => {
     expect(built.status).toBe(0)
     const ran = spawnSync(outfile, [], { encoding: "utf8" })
     expect(JSON.parse(ran.stdout)).toEqual({ epoch: 0, sha7: "", scheme: "nodef" })
-    rmSync(root, { recursive: true, force: true })
+    removeTreeSync(root)
   }, 60_000)
 })
