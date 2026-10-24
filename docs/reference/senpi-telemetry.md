@@ -343,12 +343,12 @@ Related: the re-query signal is `start_reason = 'revive_after_completed'` only. 
 
 Omitting an unavailable number is invisible inside a `sum()`, where missing silently reads as zero. Four status enums make coverage explicit:
 
-- `cost_status`: sum `cost_usd` only where `cost_status = 'reported'`. A reported zero is a real zero; an absent cost is not.
+- `cost_status`: sum `cost_usd` where `cost_status in ('reported', 'partial')`. `reported` is exact. `partial` means some turns reported usage and some did not, so that row's `cost_usd` covers only the reporting turns and any sum that includes it is a lower bound. A reported zero is a real zero; an absent cost (`unavailable`, `invalid`) is not. A query that needs exact cost, such as an A/B cost comparison, keeps `reported` rows only and says so.
 - `token_status`: sum token fields only where `token_status = 'complete'`. `partial` means some turns reported usage and some did not.
 - `duration_status`: average or percentile durations only where `duration_status = 'monotonic'`. `wall_clock` values come from record timestamps and can include suspended age or clock skew.
 - `stats_status`: exclude `stats_status = 'unavailable'` rows (tasks that never ran, or were reconciled as lost) from efficiency metrics.
 
-Every cost or time dashboard must publish its coverage column alongside the aggregate, for example `countIf(cost_status = 'reported') / count()`. An aggregate without its coverage is misleading by construction.
+Every cost or time dashboard must publish its coverage column alongside the aggregate, for example `countIf(cost_status = 'reported') / count()` (exact) beside `countIf(cost_status = 'partial') / count()` (lower bound). An aggregate without its coverage is misleading by construction.
 
 #### Known undercounts
 
