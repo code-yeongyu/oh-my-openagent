@@ -139,7 +139,7 @@ async function runRgFilesInternal(
     const args = buildFindArgs(options)
     const paths = options.paths?.length ? options.paths : ["."]
     cwd = paths[0] || "."
-    command = [cli.path, ...args]
+    command = ["find", ...args]
   }
 
   try {
