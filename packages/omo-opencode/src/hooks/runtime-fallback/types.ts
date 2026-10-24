@@ -61,7 +61,8 @@ export type AutoRetryDispatchOutcome =
     }
   | {
       readonly accepted: false
-      readonly status: "blocked" | "invalid-model" | "failed"
+      /** `superseded`: another dispatch or a newer fallback generation owns the session, so this call acquired nothing. */
+      readonly status: "blocked" | "superseded" | "invalid-model" | "failed"
       readonly reason: string
     }
 
@@ -96,4 +97,11 @@ export interface HookDeps {
    * loop (every cycle started over at attempt:1). See issue #4006.
    */
   internallyAbortedSessions: Set<string>
+  /**
+   * session.error events skipped because a retry dispatch was in flight when they arrived, keyed by session.
+   * Their recovery claims stay open until that dispatch settles (see hook.ts).
+   */
+  deferredSessionErrors?: Map<string, object[]>
+  /** Called by the retry dispatcher once a dispatch it started has finished, accepted or not. */
+  onRetryDispatchSettled?: (sessionID: string, accepted: boolean) => void
 }
