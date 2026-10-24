@@ -2,7 +2,7 @@
  * Person routing for facts extraction (IC-7, IC-14, IC-15).
  *
  * Routes person-scoped records to people/<slug>/observations.md ledgers,
- * minting a card skeleton when the person is new and confidently named.
+ * minting an identity card when the person is new and confidently named.
  * Alias matching is case-insensitive, longest-alias-wins, with a
  * lexicographic slug tie-break that is logged. Reinforcement equality is
  * NFKC textual, never semantic. The primary human's aliases route to
@@ -55,7 +55,7 @@ export interface FactsRoutingPlan {
 }
 
 type MutableObservationBucket = {
-  readonly target: FactsPersonTarget
+  target: FactsPersonTarget
   records: FactsExtractionRecord[]
 }
 
@@ -105,6 +105,25 @@ export async function planFactsRouting(
       },
       records: [],
     }
+    const at = index.findIndex((entry) => entry.slug === slug)
+    const entry = index[at]
+    if (entry === undefined) throw new Error(`Person target lacks index entry: ${slug}`)
+    const names = [...entry.names]
+    for (const name of [record.person.name, ...record.person.aliases]) {
+      if (!names.some((known) => foldAlias(known) === foldAlias(name))) names.push(name)
+    }
+    if (names.length > entry.names.length) {
+      index[at] = { ...entry, names }
+      // Keep the canonical identity; a newly encountered name is another alias, not a rename.
+      const existing = bucket.target.isNew ? undefined
+        : parseMemoryFile(await readFile(join(repoDir, personCardPath(slug)), "utf8"))
+      if (existing?.frontmatter.read_only !== "true") {
+        bucket.target = {
+          ...bucket.target,
+          person: { name: entry.displayName, aliases: names.slice(1) },
+        }
+      }
+    }
     bucket.records.push(record)
     observations.set(slug, bucket)
   }
@@ -115,7 +134,7 @@ export function factsRoutingPaths(plan: FactsRoutingPlan): readonly string[] {
   const paths = [...plan.notes.keys()]
   for (const [slug, bucket] of plan.observations) {
     paths.push(`people/${slug}/observations.md`)
-    if (bucket.target.isNew) paths.push(`people/${slug}/card.md`)
+    if (bucket.target.person !== undefined) paths.push(personCardPath(slug))
   }
   return paths.sort()
 }
@@ -127,7 +146,9 @@ export async function renderPersonTargets(
 ): Promise<ReadonlyMap<string, string>> {
   const content = new Map<string, string>()
   for (const [slug, bucket] of plan.observations) {
-    if (bucket.target.isNew) content.set(`people/${slug}/card.md`, renderCardSkeleton(bucket.target))
+    if (bucket.target.person !== undefined) {
+      content.set(personCardPath(slug), await renderPersonCard(repoDir, bucket.target, limits))
+    }
     content.set(
       `people/${slug}/observations.md`,
       await renderExplicitObservations(repoDir, slug, bucket.target.displayName, bucket.records, limits),
@@ -142,13 +163,25 @@ export function normalizeObservationText(text: string): string {
   return uncommented.replace(/[\p{P}]+$/u, "").trim()
 }
 
-function renderCardSkeleton(target: FactsPersonTarget): string {
-  if (target.person === undefined) throw new Error(`New person target lacks identity: ${target.slug}`)
-  return renderMemoryFile({
-    description: `Person - ${target.person.name}`,
-    kind: "person",
-    aliases: [...target.person.aliases],
-  }, "")
+function personCardPath(slug: string): string {
+  return slug === "human" ? "system/human.md" : `people/${slug}/card.md`
+}
+
+async function renderPersonCard(repoDir: string, target: FactsPersonTarget, limits: PeopleLimits): Promise<string> {
+  if (target.person === undefined) throw new Error(`Person target lacks identity: ${target.slug}`)
+  if (target.isNew) {
+    const body = `${serializePeopleCard({
+      entries: [{ prefix: "IDENTITY", content: target.person.name }],
+    }, limits)}\n`
+    return renderMemoryFile({
+      description: `Person - ${target.person.name}`,
+      kind: "person",
+      aliases: [...target.person.aliases],
+    }, body)
+  }
+  const parsed = parseMemoryFile(await readFile(join(repoDir, personCardPath(target.slug)), "utf8"))
+  const frontmatter = { ...parsed.frontmatter, aliases: [...target.person.aliases] }
+  return renderMemoryFile(stampReceipt(parsed, frontmatter, parsed.body, undefined), parsed.body)
 }
 
 async function renderExplicitObservations(
