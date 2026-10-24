@@ -11,6 +11,7 @@ import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
+import { reflectionLockReport } from "./doctor-reflection-lock.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
@@ -184,13 +185,14 @@ export async function runLauncher(args = process.argv.slice(2)) {
       process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
       return
     }
-    const [categoryCoverage, computerUse, configDiagnostics, dori] = args[1] === "--reap"
-      ? [[], [], [], []]
+    const [categoryCoverage, computerUse, configDiagnostics, dori, reflectionLock] = args[1] === "--reap"
+      ? [[], [], [], [], []]
       : await Promise.all([
           doctorCoverageLines({ agentDir: canonicalAgentDir() }),
           doctorComputerUseLines(),
           doctorConfigLines(),
           import("./dori.js").then((hook) => hook.doriDoctorLines()),
+          reflectionLockReport(),
         ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
@@ -198,6 +200,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
       computerUse,
       configDiagnostics,
       dori,
+      reflectionLock,
     })
     return
   }

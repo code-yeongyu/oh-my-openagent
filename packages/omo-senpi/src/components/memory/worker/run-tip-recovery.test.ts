@@ -5,7 +5,8 @@ import { join } from "node:path"
 
 import { readMemoryReceipts } from "@oh-my-opencode/memory-core"
 
-import { writeRunJsonAtomic } from "./run-artifacts"
+import { readRunJson, writeRunJsonAtomic } from "./run-artifacts"
+import type { ReservationRunLedger } from "./reservation-run-ledger"
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import {
   cleanupReconciliationFixtures,
@@ -51,6 +52,17 @@ async function events(item: Item): Promise<string[]> {
 }
 
 describe("tip recovery after a dead supervisor", () => {
+  test("an exit after the original budget but before the admitted deadline is recovered", async () => {
+    const item = await deadSupervisorRun({ ...CLEAN_EXIT, finishedAt: "2026-08-10T00:15:00.000Z" })
+    const ledger = await readRunJson<ReservationRunLedger>(join(item.runDir, "ledger.json"))
+    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
+      ...ledger, queued: false, hardDeadlineAt: HARD_DEADLINE_AT + 600_000,
+      deadlineAt: HARD_DEADLINE_AT + 600_100,
+    })
+    expect(await reconcile(item)).toEqual([{ runId: "run-orphan", outcome: "merged" }])
+    expect(await events(item)).toEqual(["recovered", "merged"])
+  }, 30_000)
+
   test("#given this attempt's child recorded a clean exit before the deadline #when reconciled #then the tip is recovered and merged once", async () => {
     // given
     const item = await deadSupervisorRun(CLEAN_EXIT)

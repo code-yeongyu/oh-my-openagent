@@ -56,8 +56,8 @@ export function fixtureEnv(fixture: Fixture, env: Record<string, string> = {}): 
   return { ...inherited, ...env }
 }
 
-export function createFixture(): Fixture {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-bin-shim-")))
+export function createFixture(label = ""): Fixture {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), `omo-bin-shim-${label}-`)))
   roots.push(root)
   const bunInstall = join(root, "buninstall")
   const packageRoot = join(bunInstall, "install", "global", "node_modules", "omo-ai")
@@ -92,7 +92,7 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   const markerFile = join(root, "fake-bun.marker")
   const bunBinary = join(bunInstall, "bin", "bun")
   mkdirSync(join(bunInstall, "bin"), { recursive: true })
-  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile}'\nexit 42\n`, { mode: 0o755 })
+  writeFileSync(bunBinary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.4.2; exit 0; fi\nprintf fake-bun-ran > '${markerFile.replaceAll("'", "'\\''")}'\nexit 42\n`, { mode: 0o755 })
   symlinkSync(stockLinkTarget(), join(bunInstall, "bin", "omo"))
   mkdirSync(join(root, "home"), { recursive: true })
   return {

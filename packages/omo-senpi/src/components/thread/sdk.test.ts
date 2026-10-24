@@ -156,7 +156,7 @@ describe("thread SDK: bindings and the connector surface", () => {
     expect(await sdk.report({ session: "host lane", binding_id: bindingId, kind: "milestone", text: "step 1" })).toMatchObject({ kind: "ok", armed: false })
     expect(wakes).toEqual([])
     expect(await sdk.report({ session: "host lane", binding_id: bindingId, kind: "completion", text: "done" })).toMatchObject({ kind: "ok", armed: true })
-    expect(wakes).toEqual([{ endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1" }, ids: [] }])
+    expect(wakes).toEqual([{ endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" }, ids: [] }])
   })
 
   test("#given an answer release that gave up at the store's lock-wait bound #when the SDK is disposed #then the background release retry makes no further attempt", async () => {
@@ -253,10 +253,10 @@ describe("thread SDK: takeover", () => {
   test("#given a host session #when located and released #then the release carries reason takeover and the flags on the serving endpoint", async () => {
     const { sdk, releases } = fixture()
     const located = await sdk.locate({ thread: "host lane" })
-    expect(located).toMatchObject({ kind: "ok", thread: { thread_id: "dur-host", surface: "desktop", alive: true, endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1" } } })
+    expect(located).toMatchObject({ kind: "ok", thread: { thread_id: "dur-host", surface: "desktop", alive: true, endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" } } })
     if (located.kind !== "ok") throw new Error("located")
     expect(await sdk.release(located.thread, { interrupt: true })).toMatchObject({ success: true, data: { session_path: "/sessions/dur-host.jsonl" } })
-    expect(releases).toEqual([{ endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1" }, request: { reason: "takeover", interrupt: true } }])
+    expect(releases).toEqual([{ endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" }, request: { reason: "takeover", interrupt: true } }])
   })
 
   test("#given an endpoint that fails in transport #when released #then the failure is data, never a throw", async () => {

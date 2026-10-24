@@ -95,6 +95,10 @@ Opinionated defaults, adjustable if you insist. Your settings live in `~/.omo/om
 - [Computer use](docs/guide/computer-use.md) (experimental)
 - [Ultrawork Manifesto](docs/manifesto.md)
 
+## Reporting a bug
+
+The fastest way to report a bug is `/bug` inside a session (available in the omo app). It lists what it includes and lets you see the exact report before you send it, then sends it to the OmO team: the recent engine log, your environment and config with secrets blanked, the session transcript, and identity lines - your device name and, when telemetry is on, an install id and a session hash, plus your account details (email, name, account, user and device ids, plan, device name) when you report from the desktop app, so we can reply. Everything but the identity lines goes through the upload redactor. GitHub issues stay open for anyone who cannot use the in-app report.
+
 ## Reviews
 
 > "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community." - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)

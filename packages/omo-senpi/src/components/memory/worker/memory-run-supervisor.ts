@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process"
-import { closeSync, openSync, writeSync } from "@oh-my-opencode/memory-core/fs"
+import { closeSync, openSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -8,13 +8,8 @@ import { maybeKillAt } from "@oh-my-opencode/memory-core"
 import { runMemoryHook } from "@oh-my-opencode/memory-core/memory-hook"
 
 import {
-  CHILD_EXIT_FILENAME,
-  readRunJson,
   unlinkRunArtifact,
   updateRunLedger,
-  writeRunJsonAtomic,
-  type RunChildExit,
-  type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
 import {
@@ -24,102 +19,35 @@ import {
   readSupervisorClockNow,
   recordSupervisorGracefulDeadline,
   scheduleSupervisorDeadline,
-  signalSupervisorProcessGroup,
   terminateSupervisorChildGracefully,
   terminateSupervisorChildHard,
   type SupervisorChildExit,
 } from "./supervisor-process-identity"
 import { publishRunOutcome } from "./run-outcome-publication"
+import { runChildBootstrap } from "./supervisor-child-bootstrap"
+import { admitSupervisor } from "./supervisor-admission"
 
-async function readRelease(): Promise<boolean> {
-  for await (const chunk of process.stdin) {
-    if (Buffer.byteLength(chunk) > 0) return true
-  }
-  return false
-}
-
-function writeBootstrapStatus(status: SupervisorChildExit): void {
-  try {
-    writeSync(3, `${JSON.stringify(status)}\n`)
-  } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || !["EPIPE", "EBADF"].includes(String(error.code))) throw error
-  }
-}
-
-async function runChildBootstrap(runDir: string): Promise<void> {
-  if (!(await readRelease())) return
-  const manifest = await readRunJson<RunLaunchManifest>(join(runDir, "launch.json"))
-  const platform = getSupervisorRuntimePlatform()
-  const child = spawn(manifest.command, [...manifest.args], {
-    cwd: manifest.cwd,
-    env: manifest.env,
-    detached: false,
-    stdio: ["ignore", "inherit", "inherit"],
-    // The bootstrap itself runs without a console on win32, so a console-subsystem child would
-    // allocate a fresh visible one for the whole run unless it is created hidden.
-    windowsHide: true,
-  })
-  writeBootstrapStatus({ code: child.pid ?? null, signal: "MODEL_PID" })
-  const cascadeGraceful = () => {
-    if (platform === "win32" || process.platform === "win32") child.kill()
-  }
-  process.on("SIGTERM", cascadeGraceful)
-  process.on("SIGINT", cascadeGraceful)
-  let deadlineFired = false
-  const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
-    deadlineFired = true
-    if (platform === "win32") terminateSupervisorChildGracefully(platform, child)
-    else signalSupervisorProcessGroup(process.pid, "SIGTERM")
-  })
-  const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
-    deadlineFired = true
-    terminateSupervisorChildHard(platform, process.pid)
-  })
-  const status = await new Promise<SupervisorChildExit>((resolve) => {
-    let settled = false
-    child.once("error", () => {
-      if (settled) return
-      settled = true
-      resolve({ code: null, signal: null })
-    })
-    child.once("close", (code, signal) => {
-      if (settled) return
-      settled = true
-      resolve({ code, signal })
-    })
-  }).finally(() => {
-    cancelTerm()
-    cancelKill()
-  })
-  // Durable before it is reported: a supervisor that dies after this point loses the pipe message,
-  // and recovery may only trust a tip whose child is recorded as having finished cleanly in time.
-  await writeRunJsonAtomic(join(runDir, CHILD_EXIT_FILENAME), {
-    version: 1,
-    runId: manifest.runId,
-    attempt: manifest.attempt,
-    code: status.code,
-    signal: status.signal,
-    finishedAt: new Date().toISOString(),
-    timedOut: deadlineFired || reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt),
-  } satisfies RunChildExit)
-  writeBootstrapStatus(status)
-}
-
-/** A clock the bootstrap cannot read counts as past the deadline, so recovery stays closed. */
-function reachedDeadline(now: number, hardDeadlineAt: number): boolean {
-  return !Number.isFinite(now) || now >= hardDeadlineAt
-}
 
 async function runSupervisor(runDir: string): Promise<void> {
   const launchPath = join(runDir, "launch.json")
   const ledgerPath = join(runDir, "ledger.json")
-  const manifest = await readRunJson<RunLaunchManifest>(launchPath)
+  const { manifest, lease } = await admitSupervisor(runDir)
   const platform = getSupervisorRuntimePlatform()
-  await updateRunLedger(ledgerPath, {
-    launching: false,
-    pid: process.pid,
-    processStart: await getSupervisorProcessStart(process.pid),
-  })
+  let childPid: number | undefined
+  const containChild = () => {
+    try {
+      terminateSupervisorChildHard(platform, childPid, true)
+    } catch (error) {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+      return
+    }
+    // An exit handler cannot await the child's close. Keep its ownership record until death is
+    // proven rather than freeing capacity merely because a kill signal was sent.
+    if (childPid === undefined) lease.releaseSync()
+  }
+  process.once("exit", containChild)
+  process.once("SIGTERM", () => process.exit(143))
+  process.once("SIGINT", () => process.exit(130))
 
   const stdoutFd = openSync(manifest.stdoutPath, "w")
   const stderrFd = openSync(manifest.stderrPath, "w")
@@ -129,7 +57,7 @@ async function runSupervisor(runDir: string): Promise<void> {
     stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
     windowsHide: true,
   })
-  let childPid = bootstrap.pid
+  childPid = bootstrap.pid
   let modelPid: number | undefined
   let bootstrapStatus = ""
   const control = bootstrap.stdio[3]
@@ -148,31 +76,13 @@ async function runSupervisor(runDir: string): Promise<void> {
     })
   }
 
-  const containChild = (synchronous = false) => {
-    try {
-      terminateSupervisorChildHard(platform, childPid, synchronous)
-    } catch (error) {
-      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
-    }
-  }
-  // The exit handler is the last chance to contain the child, and nothing it queues will ever run,
-  // so this one containment is synchronous; the signal handlers below still run on a live loop.
-  process.once("exit", () => containChild(true))
-  process.once("SIGTERM", () => {
-    containChild()
-    childPid = undefined
-    process.exit(143)
-  })
-  process.once("SIGINT", () => {
-    containChild()
-    childPid = undefined
-    process.exit(130)
-  })
-
   if (bootstrap.pid === undefined) throw new Error("child bootstrap did not receive a pid")
+  const childProcessStart = await getSupervisorProcessStart(bootstrap.pid)
+  // The pipe gate keeps the child idle until its lease ownership and ledger are durable.
+  await lease.retainFor(bootstrap.pid, childProcessStart)
   await updateRunLedger(ledgerPath, {
     childPid: bootstrap.pid,
-    childProcessStart: await getSupervisorProcessStart(bootstrap.pid),
+    childProcessStart,
   })
   bootstrap.stdin?.end("1\n")
 
@@ -225,6 +135,7 @@ async function runSupervisor(runDir: string): Promise<void> {
     childExit: childExit ?? wrapperExit,
     timedOut: timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt),
   }
+  await lease.release()
   await publishRunOutcome(runDir, manifest, outcome)
   await unlinkRunArtifact(launchPath)
   process.exit(0)
@@ -242,5 +153,5 @@ try {
   }
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`)
-  process.exitCode = 1
+  process.exit(1)
 }
