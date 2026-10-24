@@ -12,6 +12,7 @@ import { refreshModelCapabilitiesOnStartup } from "./hook/model-capabilities-sta
 import { showModelCacheWarningIfNeeded } from "./hook/model-cache-warning"
 import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
 import { ignoreToastError } from "./hook/ignore-toast-error"
+import { getStartupCheckProcessState } from "./startup-check-process-state"
 
 interface AutoUpdateCheckerDeps {
   getBundledVersion?: typeof getBundledVersion
@@ -89,7 +90,17 @@ export function createAutoUpdateCheckerHook(
       if (hasChecked || hasScheduled) return
       if (getParentID(event.properties)) return
 
+      const processState = getStartupCheckProcessState()
+      if (processState.completed || processState.running) {
+        deps.log(
+          "[auto-update-checker] startup check already completed in this process; skipping per-instance rerun",
+        )
+        hasChecked = true
+        return
+      }
+
       hasScheduled = true
+      processState.running = true
 
       scheduleDeferredStartupCheck(() => {
         hasChecked = true
@@ -125,6 +136,15 @@ export function createAutoUpdateCheckerHook(
             deps.log("[auto-update-checker] Background update check failed:", err)
           })
         })()
+          .catch((error) => {
+            // A failed startup check must neither crash the process nor fan
+            // out retries on the next plugin instance.
+            deps.log("[auto-update-checker] startup check failed:", error)
+          })
+          .finally(() => {
+            processState.running = false
+            processState.completed = true
+          })
       })
     },
   }

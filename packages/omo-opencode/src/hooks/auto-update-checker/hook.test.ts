@@ -3,6 +3,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { afterAll, describe, expect, mock, test } from "bun:test"
 import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import { resetStartupCheckProcessStateForTests } from "./startup-check-process-state"
 
 type CreateAutoUpdateCheckerHook = typeof import("./hook").createAutoUpdateCheckerHook
 type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
@@ -109,10 +110,13 @@ const createHook = async (
   }
 }
 
+// The startup-check gate lives on globalThis so it survives per-instance
+// rebuilds; tests must reset it like any other deferred state.
 const resetDeferredState = (): void => {
   latestVersionCallCount = 0
   scheduleDeferredStartupCheckCallCount = 0
   scheduledCheck = null
+  resetStartupCheckProcessStateForTests()
 }
 
 const runScheduledCheck = async (): Promise<void> => {
@@ -353,5 +357,70 @@ describe("auto-update-checker hook", () => {
       "3.9.9",
       expect.any(String),
     )
+  })
+
+  // The startup check runs once per process, not once per plugin instance:
+  // the host builds one plugin instance per directory, and every fresh
+  // instance used to re-run the whole deferred startup check.
+  test("second plugin instance in the same process never re-runs the startup check", async () => {
+    // given: instance A already completed its startup check
+    resetDeferredState()
+    const first = await createHook()
+    triggerSessionCreated(first.hook)
+    await runScheduledCheck()
+    expect(first.mocks.showVersionToast).toHaveBeenCalledTimes(1)
+
+    // when: instance B (a rebuilt/new folder instance) sees session.created
+    const second = await createHook()
+    triggerSessionCreated(second.hook)
+    await runScheduledCheck()
+
+    // then: B is gated by the process-level flag — nothing scheduled, nothing run
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
+    expect(second.mocks.showConfigErrorsIfAny).not.toHaveBeenCalled()
+    expect(second.mocks.updateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
+    expect(second.mocks.refreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
+    expect(second.mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(second.mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  test("instance skips while another instance's deferred check is still running", async () => {
+    // given: instance A scheduled its check (running gate held) but it has not fired yet
+    resetDeferredState()
+    const first = await createHook()
+    triggerSessionCreated(first.hook)
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
+
+    // when: instance B triggers before A's deferred check executes
+    const second = await createHook()
+    triggerSessionCreated(second.hook)
+
+    // then: B does not schedule a duplicate check
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
+
+    // and: A's check still completes normally
+    await runScheduledCheck()
+    expect(first.mocks.showVersionToast).toHaveBeenCalledTimes(1)
+  })
+
+  test("a failed startup check still marks the process gate so failures do not fan out", async () => {
+    // given: the startup check body throws
+    resetDeferredState()
+    const failing = await createHook({}, {
+      showConfigErrorsIfAny: mock(async () => {
+        throw new Error("boom")
+      }),
+    })
+    triggerSessionCreated(failing.hook)
+    await runScheduledCheck()
+
+    // when: another instance triggers afterwards
+    const second = await createHook()
+    triggerSessionCreated(second.hook)
+    await runScheduledCheck()
+
+    // then: the gate is closed even after the failure — no retry storm
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
+    expect(second.mocks.showVersionToast).not.toHaveBeenCalled()
   })
 })
