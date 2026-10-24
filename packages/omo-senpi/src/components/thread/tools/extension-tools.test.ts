@@ -217,7 +217,8 @@ test("#given the caller creates a child with thread_create #when it opens a thre
   const { store, host, tools } = await surface(sessions)
   const threadTools = createThreadTools({ host, store, stateDirectory: tempDir("extension-tools-create-"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => process.cwd() })
   sessions.push(child)
-  const create = threadTools.find((tool) => tool.name === "thread_create")!
+  const create = threadTools.find((tool) => tool.name === "thread_create")
+  if (create === undefined) throw new Error("thread_create tool missing")
   expect(resultOf(await create.execute("call-c", { name: "new-child" }, undefined, undefined, ectxFor("dur-caller") as never))).toMatchObject({ kind: "ok" })
   const own = resultOf(await tools[0].execute("call-1", { target_session_durable_id: "dur-child" }, undefined, undefined, ectxFor("dur-caller") as never))
   expect(own.value?.received).toMatchObject({ caller_created_target: true })

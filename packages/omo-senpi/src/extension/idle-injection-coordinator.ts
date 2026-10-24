@@ -38,9 +38,40 @@ export type IdleInjectionDelivery = (
 // that still fires has nothing left to deliver.
 export type FlushScheduler = (flush: () => void) => (() => void) | void
 
+type ReceiptErrors = { readonly threw: boolean; readonly first: unknown; readonly rest: readonly unknown[] }
+
+const NO_RECEIPT_ERRORS: ReceiptErrors = { threw: false, first: undefined, rest: [] }
+
+// Runs one receipt per producer, each in its own try, and returns every error: one producer's throwing receipt
+// must never cost a later producer its receipt, or that producer's completion is never recorded or redelivered.
+// `threw` is set in the catch block, never from the caught value, so a thrown undefined, null, 0 or '' still counts.
+function runReceipts(injections: readonly IdleInjection[], receipt: (injection: IdleInjection) => void): ReceiptErrors {
+  let threw = false
+  let first: unknown
+  const rest: unknown[] = []
+  for (const injection of injections) {
+    try {
+      receipt(injection)
+    } catch (error) {
+      if (threw) rest.push(error)
+      else first = error
+      threw = true
+    }
+  }
+  return { threw, first, rest }
+}
+
 export interface IdleInjectionCoordinatorOptions {
   readonly scheduleFlush?: FlushScheduler
+  /** Called with each new count of child results queued or still in delivery (#10782). */
+  readonly onChildWorkChange?: (count: number) => void
+  /** Receives every producer receipt error that is not rethrown to the caller. */
+  readonly onReceiptError?: (error: unknown) => void
 }
+
+// Sources that carry a child's result to its parent: until they are delivered, the parent still owes
+// that work, so the engine must not read it as done. Continuations and nudges are the parent's own.
+const CHILD_WORK_SOURCES: ReadonlySet<IdleInjectionSource> = new Set(["task-completion", "workpool-aggregate", "team-message", "dag-run"])
 
 /**
  * Handed to `onDeliveryFailed` for every injection still queued when the coordinator retires, and
@@ -92,10 +123,24 @@ export class IdleInjectionCoordinator {
   #soonScheduled = false
   #retired = false
   #cancelScheduledFlush: (() => void) | undefined
+  readonly #onChildWorkChange: ((count: number) => void) | undefined
+  readonly #onReceiptError: ((error: unknown) => void) | undefined
+  #childrenInDelivery = 0
+  #reportedChildWork = 0
 
   constructor(deliver: IdleInjectionDelivery, options: IdleInjectionCoordinatorOptions = {}) {
     this.#deliver = deliver
     this.#scheduleFlush = options.scheduleFlush ?? ((flush) => queueMicrotask(flush))
+    this.#onChildWorkChange = options.onChildWorkChange
+    this.#onReceiptError = options.onReceiptError
+  }
+
+  #reportChildWork(): void {
+    let count = this.#childrenInDelivery
+    for (const injection of this.#pending.values()) if (CHILD_WORK_SOURCES.has(injection.source)) count++
+    if (count === this.#reportedChildWork) return
+    this.#reportedChildWork = count
+    this.#onChildWorkChange?.(count)
   }
 
   /**
@@ -107,6 +152,7 @@ export class IdleInjectionCoordinator {
   enqueue(injection: IdleInjection): boolean {
     if (this.#retired) return false
     this.#pending.set(injection.key, injection)
+    this.#reportChildWork()
     return true
   }
 
@@ -135,12 +181,19 @@ export class IdleInjectionCoordinator {
     })
   }
 
+  /** The child work count last reported (queued plus in delivery). */
+  childWorkCount(): number {
+    return this.#reportedChildWork
+  }
+
   pendingCount(): number {
     return this.#pending.size
   }
 
   remove(key: string): boolean {
-    return this.#pending.delete(key)
+    const removed = this.#pending.delete(key)
+    this.#reportChildWork()
+    return removed
   }
 
   /**
@@ -162,7 +215,26 @@ export class IdleInjectionCoordinator {
     cancelScheduledFlush?.()
     const dropped = [...this.#pending.values()]
     this.#pending.clear()
-    for (const injection of dropped) injection.onDeliveryFailed?.(new IdleInjectionRetiredError())
+    this.#reportChildWork()
+    const errors = runReceipts(dropped, (injection) => injection.onDeliveryFailed?.(new IdleInjectionRetiredError()))
+    this.#reportReceiptErrors(errors.rest)
+    if (errors.threw) throw errors.first
+  }
+
+  // Each report is isolated: a reporter that throws must not drop the errors after it, replace a delivery error the
+  // caller needs, or become an unhandled rejection on the async path. Its own failure goes to the console.
+  #reportReceiptErrors(errors: readonly unknown[]): void {
+    for (const error of errors) {
+      try {
+        this.#onReceiptError?.(error)
+      } catch (reporterError) {
+        console.error("[omo-senpi] onReceiptError threw while reporting a receipt error", { receiptError: error, reporterError })
+      }
+    }
+  }
+
+  #reportAllReceiptErrors(errors: ReceiptErrors): void {
+    if (errors.threw) this.#reportReceiptErrors([errors.first, ...errors.rest])
   }
 
   // Flush the whole queue as one idle-edge steer. Returns how many queued items were collapsed (0 = no-op).
@@ -177,7 +249,26 @@ export class IdleInjectionCoordinator {
       (left, right) => SOURCE_RANK[left.source] - SOURCE_RANK[right.source],
     )
     const collapsed = ordered.length
+    const children = ordered.filter((injection) => CHILD_WORK_SOURCES.has(injection.source)).length
+    const settleChildren = () => {
+      this.#childrenInDelivery -= children
+      this.#reportChildWork()
+    }
+    // Every producer gets its receipt even when an earlier one throws, and the count settles after all of them.
+    // It happens once per flush: a thenable that calls back and then throws, or calls both callbacks, must not
+    // hand out a second set of receipts or settle the count twice.
+    let settled = false
+    const receiptsThenSettle = (receipt: (injection: IdleInjection) => void): ReceiptErrors => {
+      if (settled) return NO_RECEIPT_ERRORS
+      settled = true
+      try {
+        return runReceipts(ordered, receipt)
+      } finally {
+        settleChildren()
+      }
+    }
     this.#pending.clear()
+    this.#childrenInDelivery += children
     let delivery: unknown
     try {
       const contents = ordered.map((injection) => injection.content)
@@ -201,20 +292,29 @@ export class IdleInjectionCoordinator {
         { deliverAs },
       )
     } catch (error) {
-      for (const injection of ordered) injection.onDeliveryFailed?.(error)
+      // Receipts first: the count is a report, and nothing about reporting may cost a producer its receipt.
+      // The delivery error is the one the caller needs, so a receipt that throws does not replace it.
+      this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onDeliveryFailed?.(error)))
       throw error
     }
     if (!isPromiseLike(delivery)) {
-      for (const injection of ordered) injection.onFlushed?.()
+      const errors = receiptsThenSettle((injection) => injection.onFlushed?.())
+      this.#reportReceiptErrors(errors.rest)
+      if (errors.threw) throw errors.first
     } else {
-      void delivery.then(
-        () => {
-          for (const injection of ordered) injection.onFlushed?.()
-        },
-        (error: unknown) => {
-          for (const injection of ordered) injection.onDeliveryFailed?.(error)
-        },
-      )
+      // Nothing awaits this chain, so every receipt error here goes to onReceiptError instead of becoming an
+      // unhandled rejection.
+      try {
+        void delivery.then(
+          () => this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onFlushed?.())),
+          (error: unknown) => this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onDeliveryFailed?.(error))),
+        )
+      } catch (error) {
+        // A thenable whose then() throws never settles: treat it as a failed delivery so receipts and the count
+        // still settle.
+        this.#reportAllReceiptErrors(receiptsThenSettle((injection) => injection.onDeliveryFailed?.(error)))
+        throw error
+      }
     }
     return collapsed
   }

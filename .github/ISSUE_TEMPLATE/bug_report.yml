@@ -6,6 +6,11 @@ body:
   - type: markdown
     attributes:
       value: |
+        **Fastest way to report a bug: run `/bug` inside a session** (available in the omo app). It lists what it includes and lets you see the exact report before you send it, then sends the redacted engine log, environment, config with secrets blanked and session transcript, plus identity lines - device name and, when telemetry is on, an install id and a session hash, and your account details (email, name, account, user and device ids, plan, device name) from the desktop app - so we can reply. Use this form if you cannot use the in-app report, for example on the OpenCode plugin.
+
+  - type: markdown
+    attributes:
+      value: |
         **Please write your issue in English.** See our [Language Policy](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/CONTRIBUTING.md#language-policy) for details.
 
   - type: checkboxes

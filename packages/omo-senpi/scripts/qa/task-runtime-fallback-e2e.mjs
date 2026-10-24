@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url"
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
 import { parseJsonEvents } from "./task-e2e-analysis.mjs"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-runtime-fallback-mock-provider.ts")
@@ -298,6 +299,10 @@ function sandboxProcesses(sandbox, table = processTable()) {
 }
 
 function descendants(pid, table) {
+  if (process.platform === "win32") {
+    const args = windowsTreeKillArgs(pid)
+    return args.filter((_arg, index) => args[index - 1] === "/PID").map(Number).filter((child) => child !== pid)
+  }
   const direct = table.filter((row) => row.ppid === pid).map((row) => row.pid)
   return direct.flatMap((child) => [child, ...descendants(child, table)])
 }

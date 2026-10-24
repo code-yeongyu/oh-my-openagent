@@ -86,6 +86,7 @@ describe("createDagWakeSource", () => {
       name: DAG_WAKE_SOURCE_STATE_EVENT,
       data: {
         source: DAG_WAKE_SOURCE,
+        kind: "children",
         activeCount: 1,
         channels: [{
           id: first.runId,
@@ -118,6 +119,7 @@ describe("createDagWakeSource", () => {
       name: DAG_WAKE_SOURCE_STATE_EVENT,
       data: {
         source: DAG_WAKE_SOURCE,
+        kind: "children",
         activeCount: 2,
         channels: [
           {
@@ -156,6 +158,7 @@ describe("createDagWakeSource", () => {
         name: DAG_WAKE_SOURCE_STATE_EVENT,
         data: {
           source: DAG_WAKE_SOURCE,
+          kind: "children",
           activeCount: 1,
           channels: [{
             id: second.runId,
@@ -166,7 +169,7 @@ describe("createDagWakeSource", () => {
       },
       {
         name: DAG_WAKE_SOURCE_STATE_EVENT,
-        data: { source: DAG_WAKE_SOURCE, activeCount: 0, channels: [] },
+        data: { source: DAG_WAKE_SOURCE, kind: "children", activeCount: 0, channels: [] },
       },
     ])
   })
@@ -184,7 +187,7 @@ describe("createDagWakeSource", () => {
     // then
     expect(harness.emitted).toEqual([{
       name: DAG_WAKE_SOURCE_STATE_EVENT,
-      data: { source: DAG_WAKE_SOURCE, activeCount: 0, channels: [] },
+      data: { source: DAG_WAKE_SOURCE, kind: "children", activeCount: 0, channels: [] },
     }])
   })
 
@@ -231,7 +234,7 @@ describe("createDagWakeSource", () => {
     // then
     expect(emitted).toEqual([{
       name: DAG_WAKE_SOURCE_STATE_EVENT,
-      data: { source: DAG_WAKE_SOURCE, activeCount: 0, channels: [] },
+      data: { source: DAG_WAKE_SOURCE, kind: "children", activeCount: 0, channels: [] },
     }])
   })
 
@@ -250,6 +253,7 @@ describe("createDagWakeSource", () => {
       name: DAG_WAKE_SOURCE_STATE_EVENT,
       data: {
         source: DAG_WAKE_SOURCE,
+        kind: "children",
         activeCount: 1,
         channels: [{
           id: survivor.runId,

@@ -8,7 +8,7 @@ interface WorkerInput {
 
 interface WorkerOutputSuccess {
   ok: true
-  skills: LoadedSkill[]
+  skills: Omit<LoadedSkill, "lazyContent">[]
 }
 
 interface WorkerOutputError {
@@ -58,5 +58,8 @@ export function discoverAllSkillsBlocking(dirs: string[], scopes: SkillScope[]):
     throw error
   }
 
-  return output.skills
+  return output.skills.map((skill) => {
+    const content = skill.definition.template
+    return content === undefined ? skill : { ...skill, lazyContent: { loaded: true, content, load: async () => content } }
+  })
 }

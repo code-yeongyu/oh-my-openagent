@@ -253,6 +253,12 @@ export interface PanelHostSurfaceDeps {
   readonly onAction?: (action: PanelAction) => void
   /** Injected so tests can drive the deferred attach synchronously. */
   readonly defer?: (callback: () => void) => void
+  /**
+   * Fired at most once per surface when the renderer exposes no layout seam - the default
+   * regular mode - so the runtime can show its install-once notice. A fullscreen renderer
+   * whose root is merely not built yet never reaches this.
+   */
+  readonly onRegularModeFallback?: () => void
 }
 
 export interface PanelSurfaceLogger {
