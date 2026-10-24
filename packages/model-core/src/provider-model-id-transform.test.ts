@@ -16,6 +16,13 @@ describe("provider model id transform", () => {
     expect(transformed256k).toBe("k3-256k")
   })
 
+  test("transforms commandcode models for GOAT and greater plans", () => {
+    expect(transformModelForProvider("commandcode", "commandcode/claude-3-7-sonnet")).toBe("claude-3-7-sonnet")
+    expect(transformModelForProvider("commandcode", "commandcode/claude-sonnet-3-5")).toBe("claude-sonnet-3.5")
+    expect(transformModelForProvider("commandcode-goat-plan", "gpt-4o")).toBe("gpt-4o")
+    expect(transformModelForProvider("command-code", "deepseek-chat")).toBe("deepseek-chat")
+  })
+
   test("passes through unrelated models unchanged", () => {
     // given
     const provider = "kimi-for-coding"

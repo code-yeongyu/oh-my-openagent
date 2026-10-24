@@ -7,6 +7,8 @@ function inferSubProvider(model: string): string | undefined {
 	if (model.startsWith("kimi-")) return "moonshotai"
 	if (model.startsWith("k3")) return "moonshotai"
 	if (model.startsWith("glm-")) return "zai"
+	if (model.startsWith("deepseek-")) return "deepseek"
+	if (model.startsWith("qwen-")) return "alibaba"
 	return undefined
 }
 
@@ -29,6 +31,13 @@ function transformModelForProviderUsingAnthropicBehavior(
 	provider: string,
 	model: string,
 ): string {
+	if (provider === "commandcode" || provider === "command-code" || provider === "commandcode-goat-plan") {
+		const cleanModel = model.replace(/^(commandcode|command-code)\//, "")
+		if (cleanModel.startsWith("claude-")) {
+			return claudeVersionDot(cleanModel)
+		}
+		return cleanModel
+	}
 	if (provider === "vercel") {
 		const slashIndex = model.indexOf("/")
 		if (slashIndex !== -1) {
