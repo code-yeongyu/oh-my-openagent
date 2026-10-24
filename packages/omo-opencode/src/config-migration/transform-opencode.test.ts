@@ -195,6 +195,47 @@ describe("OpenCode config migration transform", () => {
       sisyphus_agent: { model: "provider/sisyphus" },
     })
     expect(result.document.legacy_migrations).toBeUndefined()
+    expect(result.diagnostics).toEqual([
+      "not imported: agents",
+      "not imported: categories",
+      "not imported: disabled_agents",
+      "not imported: disabled_hooks",
+      "not imported: experimental",
+      "not imported: lsp",
+    ])
+    expect(result.diagnostics.join("\n")).not.toContain("anthropic/claude-opus-4-4")
+    expect(result.diagnostics.join("\n")).not.toContain("anthropic-auto-compact")
+    expect(result.diagnostics.join("\n")).not.toContain("typescript-language-server")
+  })
+
+  test("#given a legacy config holding only imported keys #when transforming #then diagnostics stay empty", () => {
+    // given
+    const root: DiscoveredLegacyConfigSource = {
+      baseRoot: "/home/alice/.config/opencode",
+      configPath: "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      kind: "user-config",
+      path: "/home/alice/.config/opencode/oh-my-openagent.jsonc",
+      precedence: 0,
+    }
+
+    // when
+    const result = transformOpenCodeSources({
+      discovered: [root],
+      scope: { kind: "user" },
+      sources: [loaded(root, {
+        disabled_providers: ["github-copilot"],
+        model_fallback: true,
+        omo_agent: { model: "provider/sisyphus" },
+      })],
+    })
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.document["[opencode]"]).toEqual({
+      disabled_providers: ["github-copilot"],
+      model_fallback: true,
+      sisyphus_agent: { model: "provider/sisyphus" },
+    })
   })
 
   test("#given a legacy OpenCode source with agents, categories, and model/provider fields #when transformed #then agents and categories are omitted while model/provider fields remain", () => {
