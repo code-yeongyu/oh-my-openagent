@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Memory path-state recovery and commit hooks now keep literal Git lookups working when global glob or case-insensitive pathspec modes are enabled ([#11130](https://github.com/code-yeongyu/oh-my-openagent/issues/11130), [#11167](https://github.com/code-yeongyu/oh-my-openagent/pull/11167)).
+
 **Usage summaries from older versions no longer stay on disk after an upgrade.** Versions 5.1.34 to 5.1.44 kept session summaries in a `rollups` folder that nothing reads or sends any more. The first start after upgrading now deletes it, whether telemetry is on or off, and never follows a link out of that folder. With telemetry turned off in `omo.json`, a summary file that was cut short by a crash is deleted too. ([#10234](https://github.com/code-yeongyu/oh-my-openagent/issues/10234)) ([#11147](https://github.com/code-yeongyu/oh-my-openagent/pull/11147)) (batch [#11168](https://github.com/code-yeongyu/oh-my-openagent/pull/11168))
 
 **Computer-use cancellation retains engine crash diagnostics.** Cancelled and timed-out calls keep their error code and carry the engine exit diagnostic as their cause. Capability-query permission failures remain structured tool results, hard engine diagnostics survive unrelated successful replies, and legacy launch refusals now share the structured record's exit-code and UTF-8 size rules. ([#11150](https://github.com/code-yeongyu/oh-my-openagent/pull/11150)) Follow-up to [#11086](https://github.com/code-yeongyu/oh-my-openagent/pull/11086), part of [#11073](https://github.com/code-yeongyu/oh-my-openagent/issues/11073). (batch [#11168](https://github.com/code-yeongyu/oh-my-openagent/pull/11168))

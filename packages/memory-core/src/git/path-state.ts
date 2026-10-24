@@ -210,7 +210,8 @@ export class GitPathStateStore {
     const result = await this.exec.run(argv, {
       cwd: this.dir,
       timeoutMs: GIT_TIMEOUT_MS,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      // Literal lookup must not conflict with inherited global pathspec modes.
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_GLOB_PATHSPECS: "0", GIT_ICASE_PATHSPECS: "0" },
       ...(stdin === undefined ? {} : { stdin }),
     })
     if (result.code !== 0) throw commandError(argv, result)

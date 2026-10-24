@@ -15,7 +15,14 @@ export interface StagedEntry {
 const ZERO = /^0+$/
 
 export function git(cwd: string, args: readonly string[]): string | undefined {
-  const result = spawnSync("git", ["--literal-pathspecs", ...args], { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, windowsHide: true })
+  const result = spawnSync("git", ["--literal-pathspecs", ...args], {
+    cwd,
+    // Git rejects literal pathspecs combined with inherited glob or case-folding modes.
+    env: { ...process.env, GIT_GLOB_PATHSPECS: "0", GIT_ICASE_PATHSPECS: "0" },
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    windowsHide: true,
+  })
   return result.status === 0 ? result.stdout : undefined
 }
 
