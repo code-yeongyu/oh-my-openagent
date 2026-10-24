@@ -1,0 +1,87 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/test-isolation.regression.test.ts:
+58 |         }
+59 |       }
+60 |     }
+61 | 
+62 |     // then
+63 |     expect(offenders).toEqual([])
+                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "file": "message-builder.test.ts",
++     "specifier": "./storage/empty-text",
++   },
++   {
++     "file": "message-builder.test.ts",
++     "specifier": "./storage/empty-text.ts",
++   },
++   {
++     "file": "message-builder.test.ts",
++     "specifier": "./storage/text-part-injector",
++   },
++   {
++     "file": "message-builder.test.ts",
++     "specifier": "./storage/text-part-injector.ts",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 18
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6142/packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/test-isolation.regression.test.ts:63:23)
+(fail) anthropic-context-window-limit-recovery test isolation regression (#6142) > #given every test file in this hook dir #when scanned #then no file module-mocks the empty-content-recovery-sdk dependency specifiers [12.89ms]
+
+packages/omo-opencode/src/hooks/comment-checker/test-isolation.regression.test.ts:
+50 |         offenders.push(path.relative(DIR, filePath))
+51 |       }
+52 |     }
+53 | 
+54 |     // then
+55 |     expect(offenders).toEqual([])
+                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "hook.apply-patch.test.ts",
++   "hook.lazy-init.test.ts",
++   "test-isolation.regression.test.ts",
++ ]
+
+- Expected  - 1
++ Received  + 5
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6142/packages/omo-opencode/src/hooks/comment-checker/test-isolation.regression.test.ts:55:23)
+(fail) comment-checker test isolation regression (#6142) > #given every test file in comment-checker #when scanned #then no file registers module mocks [3.38ms]
+73 |         }
+74 |       }
+75 |     }
+76 | 
+77 |     // then
+78 |     expect(offenders).toEqual([])
+                           ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "file": "hook.before-after.test.ts",
++     "line": "L3: const hookModulePath = "./hook?before-after"",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 6
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6142/packages/omo-opencode/src/hooks/comment-checker/test-isolation.regression.test.ts:78:23)
+(fail) comment-checker test isolation regression (#6142) > #given every test file in comment-checker #when scanned #then no file imports through query-suffixed specifiers [4.25ms]
+
+ 0 pass
+ 3 fail
+ 6 expect() calls
+Ran 3 tests across 2 files. [545.00ms]

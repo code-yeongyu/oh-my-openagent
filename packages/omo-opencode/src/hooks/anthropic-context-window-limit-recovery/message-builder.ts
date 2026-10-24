@@ -82,13 +82,26 @@ async function findEmptyMessageIdsFromSDK(
   }
 }
 
+export interface SanitizeEmptyMessagesDeps {
+  isSqliteBackend: typeof isSqliteBackend
+  findMessagesWithEmptyTextPartsFromSDK: typeof findMessagesWithEmptyTextPartsFromSDK
+  replaceEmptyTextPartsAsync: typeof replaceEmptyTextPartsAsync
+  injectTextPartAsync: typeof injectTextPartAsync
+}
+
 export async function sanitizeEmptyMessagesBeforeSummarize(
   sessionID: string,
   client?: OpencodeClient,
+  deps?: Partial<SanitizeEmptyMessagesDeps>,
 ): Promise<number> {
-  if (client && isSqliteBackend()) {
+  const sqliteBackend = deps?.isSqliteBackend ?? isSqliteBackend
+  const findEmptyTextPartIds = deps?.findMessagesWithEmptyTextPartsFromSDK ?? findMessagesWithEmptyTextPartsFromSDK
+  const replaceEmpty = deps?.replaceEmptyTextPartsAsync ?? replaceEmptyTextPartsAsync
+  const injectPart = deps?.injectTextPartAsync ?? injectTextPartAsync
+
+  if (client && sqliteBackend()) {
     const emptyMessageIds = await findEmptyMessageIdsFromSDK(client, sessionID)
-    const emptyTextPartIds = await findMessagesWithEmptyTextPartsFromSDK(client, sessionID)
+    const emptyTextPartIds = await findEmptyTextPartIds(client, sessionID)
     const allIds = [...new Set([...emptyMessageIds, ...emptyTextPartIds])]
     if (allIds.length === 0) {
       return 0
@@ -96,11 +109,11 @@ export async function sanitizeEmptyMessagesBeforeSummarize(
 
     let fixedCount = 0
     for (const messageID of allIds) {
-      const replaced = await replaceEmptyTextPartsAsync(client, sessionID, messageID, PLACEHOLDER_TEXT)
+      const replaced = await replaceEmpty(client, sessionID, messageID, PLACEHOLDER_TEXT)
       if (replaced) {
         fixedCount++
       } else {
-        const injected = await injectTextPartAsync(client, sessionID, messageID, PLACEHOLDER_TEXT)
+        const injected = await injectPart(client, sessionID, messageID, PLACEHOLDER_TEXT)
         if (injected) {
           fixedCount++
         }
