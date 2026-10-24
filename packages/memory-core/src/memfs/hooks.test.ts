@@ -6,6 +6,7 @@ import type { ClaimReceipt } from "../provenance"
 import { stampReceipt } from "../tools/claim-frontmatter"
 import { renderMemoryFile } from "./frontmatter"
 import { installHooks, resolveHooksDir } from "./hooks"
+import { stagedEntries, treeBlob } from "./memory-hook-git"
 import { COMMIT_MSG_HOOK_SCRIPT } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
 import { commit, createRepo, removeTempDirs, run, tempDir, writeFiles } from "./hooks.test-support"
@@ -29,6 +30,32 @@ async function seedServerFile(dir: string, relativePath: string, content: string
 afterEach(removeTempDirs)
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+
+describe("memory hook Git pathspec environment", () => {
+  for (const variable of ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const) {
+    it(`#given inherited ${variable} #when reading staged memory #then literal Git commands still succeed`, async () => {
+      const dir = await createRepo()
+      await seedServerFile(dir, "reference/z.md", VALID)
+      const expectedBlob = treeBlob(dir, "HEAD", "reference/z.md")
+      expect(expectedBlob).toBeDefined()
+      await writeFiles(dir, { "reference/z.md": `${VALID}updated\n` })
+      expect((await run(["git", "add", "-A"], dir)).code).toBe(0)
+      const expectedEntries = stagedEntries(dir)
+      expect(expectedEntries.map((entry) => entry.path)).toEqual(["reference/z.md"])
+      const saved = process.env[variable]
+      try {
+        process.env[variable] = "1"
+        expect(stagedEntries(dir)).toEqual(expectedEntries)
+        expect(treeBlob(dir, "HEAD", "reference/z.md")).toBe(expectedBlob)
+        expect((await run(["git", "commit", "-m", "memory write"], dir)).code).toBe(0)
+        expect(process.env[variable]).toBe("1")
+      } finally {
+        if (saved === undefined) delete process.env[variable]
+        else process.env[variable] = saved
+      }
+    })
+  }
+})
 
 describe("installHooks", () => {
   it("#given a repository #when hooks are installed twice #then both hooks stay executable and identical", async () => {

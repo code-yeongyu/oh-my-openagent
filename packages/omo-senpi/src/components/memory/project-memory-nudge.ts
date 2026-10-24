@@ -43,7 +43,7 @@ export interface ProjectMemoryNudgeOptions {
 interface SessionScope {
   readonly key: string
   readonly resolver: ProjectIdentityResolver
-  readonly nudged: Set<string>
+  readonly nudged: Map<string, symbol>
   readonly touched: ProjectIdentity[]
   readonly touchedPaths: Map<string, string>
   corpora?: { readonly key: string; readonly list: readonly ProjectRecallCorpus[] }
@@ -87,7 +87,7 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
         ...(options.env === undefined ? {} : { env: options.env }),
         ...(options.fs === undefined ? {} : { fs: options.fs }),
       }),
-      nudged: new Set(),
+      nudged: new Map(),
       touched: [],
       touchedPaths: new Map(),
     }
@@ -154,10 +154,14 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
     if (within !== undefined) scope.touchedPaths.set(project.identity.id, within)
 
     if (!switches.nudge || scope.nudged.has(project.identity.id)) return undefined
+    // Reserve before I/O; the token distinguishes this read from one started after compaction.
+    const reservation = Symbol()
+    scope.nudged.set(project.identity.id, reservation)
     let notes: readonly RecallDocument[]
     try {
       notes = await notesOf(project)
     } catch (error) {
+      if (scope.nudged.get(project.identity.id) === reservation) scope.nudged.delete(project.identity.id)
       // Advice only: a project repo that cannot be read leaves the tool result untouched and is retried on the next touch.
       options.logger?.warn("omo-senpi project memory nudge skipped", {
         project: project.projectDir,
@@ -165,7 +169,7 @@ export function createProjectMemoryScope(options: ProjectMemoryNudgeOptions): Pr
       })
       return undefined
     }
-    scope.nudged.add(project.identity.id)
+    if (!live() || scope.nudged.get(project.identity.id) !== reservation) return undefined
     if (notes.length === 0) return undefined
     const content = isRecord(payload) && Array.isArray(payload.content) ? payload.content : []
     return { content: [...content, { type: "text", text: formatProjectMemoryNudge(project, notes), audience: "model" }] }

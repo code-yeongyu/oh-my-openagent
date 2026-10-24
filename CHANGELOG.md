@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Memory path-state recovery and commit hooks now keep literal Git lookups working when global glob or case-insensitive pathspec modes are enabled ([#11130](https://github.com/code-yeongyu/oh-my-openagent/issues/11130), [#11167](https://github.com/code-yeongyu/oh-my-openagent/pull/11167)). (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
+**A user Stop pauses the workflow run it started instead of cancelling it.** DAG nodes, workpool workers and task children hold where they are; a message to the paused run or Resume continues it from where it stopped. ([#10808](https://github.com/code-yeongyu/oh-my-openagent/pull/10808), fixes [#6752](https://github.com/code-yeongyu/oh-my-openagent/issues/6752)) (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
+**Concurrent file touches show each project memory nudge once.** Project memory reads reserve the nudge before asynchronous loading, retry failed reads, and discard stale results after compaction or session changes. ([#11165](https://github.com/code-yeongyu/oh-my-openagent/pull/11165), addresses item 1 of [#10927](https://github.com/code-yeongyu/oh-my-openagent/issues/10927)) (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
+**A finished workflow run now shows as a finished run.** When a workflow (DAG) run started from a session completes, including one that completes after recovery, the engine records the session's completion as a finished run instead of a plain reply ([#11155](https://github.com/code-yeongyu/oh-my-openagent/pull/11155)). (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
+**A finished ulw-execute plan now shows as a finished run.** When this session's own ulw-execute work is marked completed, the engine records the session's completion as a finished run instead of a plain reply. Work finished by an earlier run, abandoned work, and another session's work are not counted ([#11174](https://github.com/code-yeongyu/oh-my-openagent/pull/11174)). (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
+**A completed ulw-loop plan now shows as a finished run.** When this session's ulw-loop plan reaches its aggregate completion, the engine records the session's completion as a finished run instead of a plain reply. A plan that was already complete when the session started is not counted ([#11175](https://github.com/code-yeongyu/oh-my-openagent/pull/11175)). (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
+**CI exposes the lint ratchet as its own required-free status check.** Pull requests, pushes and merge groups run `Lint ratchet` independently of the heavy-validation typecheck path. ([#11128](https://github.com/code-yeongyu/oh-my-openagent/pull/11128), thanks @Dante-dan) (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
+**The 10k parked-backlog memory test now fails if it observed no entry reads.** ([#11164](https://github.com/code-yeongyu/oh-my-openagent/pull/11164), part of [#11091](https://github.com/code-yeongyu/oh-my-openagent/issues/11091), thanks @Dante-dan) (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
+
 **The repository now has a security policy.** `SECURITY.md` explains how to report a vulnerability privately through GitHub's Security tab, what to include, and when to expect triage and an acknowledgement; `CONTRIBUTING.md` links to it. Adapted from the policy proposed by @marklapointe in [#10752](https://github.com/code-yeongyu/oh-my-openagent/pull/10752). ([#11221](https://github.com/code-yeongyu/oh-my-openagent/pull/11221))
 
 **ulw-research can check that a report's sentences keep the meaning of their sources.** It pairs each report sentence with the quote, claim or original text it rests on, and records drift only when two independent readers name the same kind of change; a single reader's flag is kept as a minor warning. A pair no reader judged, or a pair that needs the strong reader and only got the cheap one, is reported as unverified instead of passing as clean. Nothing in the CLI runs it yet. ([#11151](https://github.com/code-yeongyu/oh-my-openagent/pull/11151), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))

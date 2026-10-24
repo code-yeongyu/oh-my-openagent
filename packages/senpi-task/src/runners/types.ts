@@ -4,6 +4,7 @@ import type { ChildExtensionListener } from "./child-extension-events"
 import type { EffectiveModel } from "./pinned-model-equivalence"
 import type { TaskRecord } from "../state"
 import type { HostTurnReconciliation } from "./rpc-host/reconcile-turn"
+import type { NativeRunPause } from "../pause/native-child-pause"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -62,6 +63,7 @@ export type ChildEventListener = (event: AgentSessionEvent) => void
 export type ChildHandle = {
   reconcileInputs?(): Promise<void>
   readonly task_id: string
+  readonly runPause?: NativeRunPause
   readonly sessionId: string | undefined
   readonly pid: number | undefined
   /** The model the child actually opened on, when its open path observed one (host get_state; #9722). */

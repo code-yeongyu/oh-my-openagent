@@ -5,10 +5,12 @@ export function transformContextText(message: Record<string, unknown>, transform
   const content = message["content"]
   if (typeof content !== "string") return message
   const details = message["details"]
-  if (message["customType"] !== "omo-senpi:wake" || !Array.isArray(details)) return { ...message, content: transform(content, message) }
+  const segments = Array.isArray(details) ? details
+    : isRecord(details) && Array.isArray(details["items"]) ? details["items"] : undefined
+  if (message["customType"] !== "omo-senpi:wake" || segments === undefined) return { ...message, content: transform(content, message) }
   let cursor = 0
   let selected = ""
-  const updated = details.map((detail: unknown) => {
+  const updated = segments.map((detail: unknown) => {
     if (!isRecord(detail) || !Array.isArray(detail["contentRange"])) return detail
     const [start, end] = detail["contentRange"]
     if (!Number.isInteger(start) || !Number.isInteger(end) || start < cursor || end < start || end > content.length) return detail
@@ -19,7 +21,7 @@ export function transformContextText(message: Record<string, unknown>, transform
     return { ...detail, contentRange: [selectedStart, selected.length] }
   })
   selected += transform(content.slice(cursor))
-  return { ...message, content: selected, details: updated }
+  return { ...message, content: selected, details: isRecord(details) ? { ...details, items: updated } : updated }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

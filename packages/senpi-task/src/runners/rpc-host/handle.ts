@@ -28,6 +28,9 @@ import { extractTerminalAssistantMessage } from "./terminal-message"
 import { createInputEffects } from "../input-effects"
 import { toHostInput } from "./input-command"
 import { createInputDelivery } from "../input-delivery"
+import { createRpcRunPause } from "../rpc/native-run-pause"
+import { createTurnClaim } from "../rpc/turn-claim"
+import { createTaskParentControl, TaskParentControlError } from "../task-parent-control"
 
 /**
  * The steerable child handle over ONE daemon session: identical turn semantics to
@@ -59,6 +62,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   let parked = false
   let detached = false
   let tornDown = false
+  const claims = createTurnClaim()
 
   const settleTurn = (settled: RunnerOutcome): void => {
     if (turnOutcome !== undefined) return
@@ -94,7 +98,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
     if (event.type === "agent_start" && (continuationState === "awaiting_start" || turnOutcome !== undefined) && outcome === undefined) {
       beginTurn()
-      listeners.emitSelfResumed()
+      if (!claims.consume()) listeners.emitSelfResumed()
     }
     if (event.type === "message_end") {
       const terminal = extractTerminalAssistantMessage(event.message)
@@ -316,6 +320,15 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       return sessionIsIdle(state)
     },
     waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+    runPause: createRpcRunPause({
+      taskId, claimNextTurn: claims.claim,
+      currentOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+      control: () => {
+        const wire = client.taskParentWire?.()
+        if (wire === undefined) throw new TaskParentControlError("unsupported")
+        return createTaskParentControl(wire)
+      },
+    }),
     lastAssistantText: () => finalText,
     terminalAssistantMessage: () => terminalAssistantMessage,
     wasAbortedByUser: () => abortedByUser,

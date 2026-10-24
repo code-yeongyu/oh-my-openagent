@@ -111,6 +111,7 @@ describe("lead poller lifecycle", () => {
       {
         message: {
           customType: "senpi-task:team-message",
+          details: { runRef: { kind: "team", id: "run-owned" } },
           content: '<peer_message from="worker" to="lead" messageId="m1">ready</peer_message>',
           display: false,
         },

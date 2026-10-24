@@ -36,7 +36,10 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     try {
       results = await Promise.allSettled(awaitingAdmission.map(async (nodeId) => ({
         nodeId,
-        result: await context.taskManager.startOwned(startSpec(context, nodeId), owner(context, nodeId)),
+        result: await context.taskManager.startOwned({
+          ...startSpec(context, nodeId),
+          ...(context.resumeCredential === undefined ? {} : { resumeCredential: context.resumeCredential }),
+        }, owner(context, nodeId)),
       })))
     } finally {
       context.admissionInProgress = false
@@ -126,6 +129,12 @@ function attachOrFail(
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
 ): void {
+  if (result.kind === "held") {
+    context.journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq: result.pauseSeq })
+    context.suspended = true
+    context.resolveCancellationRequested()
+    return
+  }
   if (result.kind === "owner_conflict") {
     attachStarted(context, nodeId, {
       kind: "started",
@@ -149,7 +158,7 @@ function attachOrFail(
   attachStarted(context, nodeId, result)
 }
 
-function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" }>): {
+function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" | "held" }>): {
   readonly code: DagNodeErrorCode
   readonly message: string
 } {

@@ -4,6 +4,7 @@ import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
 import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { deliverItems } from "./deliver-items"
 import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
 import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
@@ -126,8 +127,7 @@ export function composeOmoSenpiExtension(
     // 200ms timer behind after a `quit` shutdown.
     const publishChildWork = publishWakeQueueChildWork(pi, logger)
     const idleCoordinator = new IdleInjectionCoordinator(
-      (message, options) =>
-        pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
+      (message, options) => deliverItems((native, delivery) => pi.sendMessage(native, delivery), { ...options, message }),
       {
         scheduleFlush: (flush) => {
           const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)

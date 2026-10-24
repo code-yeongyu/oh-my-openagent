@@ -36,6 +36,8 @@ export type ReconcileDeferredReason =
   // The child ran in a copy-on-write clone that is already settled and reclaimed; respawning it
   // would resume against a directory that no longer exists, so it is refused at every boundary.
   | "isolated_not_revivable"
+  // The child's run is stopped: it waits for the run's Resume, which no retry budget may end.
+  | "run_paused"
 
 export type ReconcileOutcome = {
   readonly task_id: string

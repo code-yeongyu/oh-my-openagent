@@ -1,6 +1,7 @@
 import type { IsolationDetails } from "../isolation/details"
 import type { EffectiveModelRecord, ParentModelFallback, ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { ListTaskRecordsResult, PersistedTaskEvent } from "../store"
+import type { RunRef } from "../pause/ports"
 
 export type TransitionReason = "compacting" | "session_switching" | "session_shutdown"
 
@@ -18,6 +19,7 @@ export type RoutingDecision =
   | { readonly kind: "buffer"; readonly reason: TransitionReason }
 
 export type CompletionDetails = {
+  readonly runRef?: RunRef
   readonly task_id: string
   readonly name: string
   readonly status: TaskStatus

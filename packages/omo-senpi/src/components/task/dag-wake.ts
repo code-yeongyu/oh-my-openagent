@@ -128,6 +128,7 @@ function buildRunInjection(
   return {
     key: `dag-run:${run.runId}`,
     source: "dag-run",
+    runRef: { kind: "dag", id: run.runId },
     customType: DAG_WAKE_MESSAGE_TYPE,
     // Buffering and the coordinator retain this object; select for the receiver when it is flushed.
     contextScoped: true,
@@ -153,8 +154,10 @@ function buildPausedInjection(run: DagWakeRun, reason: string | undefined): Idle
   return {
     key: `dag-run:${run.runId}`,
     source: "dag-run",
+    runRef: { kind: "dag", id: run.runId },
     customType: DAG_WAKE_MESSAGE_TYPE,
-    content: `DAG "${run.name}" paused${cause}: it will resume when the session restarts.`,
+    content: reason === "user_stop" ? `DAG "${run.name}" paused by your Stop. Resume the run to continue.`
+      : `DAG "${run.name}" paused${cause}: it will resume when the session restarts.`,
     display: false,
     details: {
       runId: run.runId,

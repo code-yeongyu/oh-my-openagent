@@ -8,6 +8,7 @@ import type { ChildExtensionListener } from "../runners/child-extension-events"
 import { HOST_TURN_RESUMED_EVENT } from "./host-turn-resumed"
 import type { EffectiveModel } from "../runners/pinned-model-equivalence"
 import type { ReconciledTurnNotice } from "../runners/rpc-host/reconcile-turn"
+import type { NativeRunPause } from "../pause/native-child-pause"
 
 export type { RunnerOutcome } from "../runners/in-process/child-handle"
 
@@ -34,6 +35,8 @@ export type ManagedChildListener = (event: ManagedChildEvent) => void
 export type ManagedChildHandle = {
   reconcileInputs?(): Promise<void>
   readonly task_id: string
+  // The child engine's run hold controls; absent when that engine has none (senpi#3811).
+  readonly runPause?: NativeRunPause
   // Which runner owns this child. `pid` cannot answer that: a daemon session has no pid either.
   // Absent only on handles built before the field shipped (they are in-process by construction).
   readonly kind?: "in-process" | "rpc" | "host-session"
@@ -95,6 +98,7 @@ export function adaptInProcessHandle(handle: InProcessChildHandle): ManagedChild
     kind: "in-process",
     sessionId: handle.sessionId,
     pid: undefined,
+    ...(handle.runPause === undefined ? {} : { runPause: handle.runPause }),
     effectiveModel: () => handle.effectiveModel(),
     steer: (text) => handle.steer(text),
     followUp: (text) => handle.followUp(text),
@@ -116,6 +120,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     task_id: handle.task_id,
     kind: "kind" in handle && handle.kind === "host-session" ? "host-session" : "rpc",
     ...(handle.reconcileInputs === undefined ? {} : { reconcileInputs: handle.reconcileInputs }),
+    ...(handle.runPause === undefined ? {} : { runPause: handle.runPause }),
     ...(hostSession === undefined ? {} : { hostSession }),
     get sessionId() {
       return handle.sessionId

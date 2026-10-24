@@ -97,6 +97,7 @@ export type PendingSteeringEntry = {
 }
 
 export type TaskRecordInput = {
+  readonly task_id?: string
   readonly name?: string
   readonly task_summary?: string
   readonly description?: string
@@ -135,6 +136,12 @@ export type TaskRecordInput = {
   readonly background_mode?: BackgroundMode
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
+}
+
+export type RecordedRunPause = {
+  readonly parent_session_id: string
+  readonly parent_pause_seq: number
+  readonly run_ref: { readonly kind: "dag" | "task" | "workpool" | "team"; readonly id: string }
 }
 
 export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
@@ -200,6 +207,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly awaiting_input?: TaskAwaitingInput
   // One parked episode's absolute deadline; retry writes and parent restarts must not extend it.
   readonly recovery_deadline_at?: number
+  // The run that paused this child (senpi#3811): a restarted host re-holds it under exactly this owner.
+  readonly run_pause?: RecordedRunPause
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly fallback_handoff_epoch?: number

@@ -167,7 +167,16 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // Batch #10 (bundle train, 4 cars: #11150 #10528 #11161 #11147) on dev bf748ed461: dev measures 1,407,569 B; the
 // batch #10 regen head measures 1,419,994 B (+12,425) after the canonical regen (two clean linux containers, node 24 +
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
-const BUDGET_BYTES = 1_420_000
+// Batch #11 (bundle train: #11169 #10808 #11128 #11164 #11165 #11167 + #10782 item 5: #11155 #11174 #11175) on dev
+// de27f2ebfa: dev measures 1,419,994 B; the batch #11 head measures 1,423,331 B (+3,337 B) in the canonical container
+// build (bun 1.4.3, per-module bytes from bun build --metafile). Growth by module (pre-minify): #10808 Stop/pause
+// delivery about +2,410 (idle-injection-items +2,045, deliver-items +327, idle-injection-receipts +255,
+// idle-injection-coordinator -385, context-text-transform +153, compose +17); #10782 item 5 run-completed signals
+// about +2,340 (ulw-loop/index +794, ulw-execute-continuation/run-completion +743, ulw-loop/run-completion +432,
+// ulw-execute-continuation/index +371); small: project-memory-nudge +204, provenance-resolver +64, path-state +47,
+// omo-native-delegation +13. No dead code, duplicated dependency or new third-party module: all new runtime
+// behaviour (lead GO). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
+const BUDGET_BYTES = 1_425_000
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
