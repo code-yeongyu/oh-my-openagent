@@ -199,3 +199,51 @@ describe("createSkillTool", () => {
     expect(skillTool.description).toContain("<name>/seeded-command</name>")
   })
 })
+
+
+describe("createSkillTool permission ask", () => {
+  it("loads the skill when the tool context has no ask (OpenCode v2 projection)", async () => {
+    // given
+    const { ask: _ask, ...contextWithoutAsk } = mockContext
+    const skillTool = await createSkillTool({})
+
+    // when
+    const result = await skillTool.execute({ name: "lazy-skill" }, contextWithoutAsk as ToolContext)
+
+    // then
+    expect(result).toContain("## Skill: lazy-skill")
+  })
+
+  it("asks for the skill permission when the host provides ask", async () => {
+    // given
+    const ask = mock(async () => {})
+    const skillTool = await createSkillTool({})
+
+    // when
+    await skillTool.execute({ name: "lazy-skill" }, { ...mockContext, ask })
+
+    // then
+    expect(ask.mock.calls.length).toBe(1)
+    expect(ask.mock.calls[0]).toEqual([
+      {
+        permission: "skill",
+        patterns: ["lazy-skill"],
+        always: ["lazy-skill"],
+        metadata: { skill: "lazy-skill" },
+      },
+    ])
+  })
+
+  it("propagates a rejected ask instead of loading the skill", async () => {
+    // given
+    const ask = mock(async () => {
+      throw new Error("permission denied")
+    })
+    const skillTool = await createSkillTool({})
+
+    // when / then
+    await expect(skillTool.execute({ name: "lazy-skill" }, { ...mockContext, ask })).rejects.toThrow(
+      "permission denied",
+    )
+  })
+})
