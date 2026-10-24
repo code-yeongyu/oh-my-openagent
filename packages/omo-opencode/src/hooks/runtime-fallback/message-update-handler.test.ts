@@ -7,7 +7,6 @@ import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { clearAllCompactions, recordCompactionStart } from "../../shared/compaction-in-flight"
-import { createFallbackState } from "./fallback-state"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
