@@ -3,6 +3,7 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
+import { markExhaustedProviderOnQuotaError } from "./quota-provider-marker"
 import {
   areRuntimeModelsEquivalent,
   createFallbackState,
@@ -247,6 +248,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       errorName: extractErrorName(error),
       errorType: classifyErrorType(error),
     })
+
+    markExhaustedProviderOnQuotaError(error, resolveEventModel(props))
 
     if (!isRetryableError(error, config.retry_on_errors)) {
       log(`[${HOOK_NAME}] Error not retryable, skipping fallback`, {
