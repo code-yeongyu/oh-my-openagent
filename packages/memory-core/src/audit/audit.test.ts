@@ -47,9 +47,17 @@ test("#given same bodies with different headers #when audited #then later path n
 })
 
 test("#given outside-home note #when audited #then orphan is named", async () => {
-  const { dir } = await repoWith([{ relativePath: "scratch/x.md", content: "Stray" }])
+  const { dir } = await repoWith([{ relativePath: "scratch/x.md", content: memory("Stray", "body") }])
   const report = await auditMemoryRepo(dir)
   expect(report.issues).toEqual([{ code: "path_orphan", path: "scratch/x.md", detail: "outside memory homes" }])
+})
+
+test("#given a frontmatter-less root note #when audited #then the orphan says a bare move would be refused (#10511)", async () => {
+  const { dir } = await repoWith([{ relativePath: "notes-dump.md", content: "# Title\n\nno frontmatter\n" }])
+  const orphans = (await auditMemoryRepo(dir)).issues.filter((issue) => issue.code === "path_orphan")
+  expect(orphans).toHaveLength(1)
+  expect(orphans[0]?.path).toBe("notes-dump.md")
+  expect(orphans[0]?.detail).toContain("no frontmatter")
 })
 
 test("#given missing description #when audited #then frontmatter violation is reported", async () => {

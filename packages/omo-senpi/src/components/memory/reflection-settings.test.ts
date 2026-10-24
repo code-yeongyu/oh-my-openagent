@@ -13,6 +13,7 @@ describe("effective reflection settings", () => {
         merge: "auto",
         category: "quick",
         timeout_minutes: 15,
+        max_concurrent_runs: 1,
         sandbox: "required",
       },
       agents: {
@@ -39,6 +40,7 @@ describe("effective reflection settings", () => {
       merge: "integration",
       category: "deep",
       timeout_minutes: 30,
+      max_concurrent_runs: 1,
       sandbox: "off",
     })
   })

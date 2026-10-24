@@ -47,6 +47,10 @@ export interface ManualReflectionRequest {
 export interface ReflectionRequestReceipt {
   readonly disposition: "reserved" | "pending"
   readonly runId: string
+  /** A dead run that held the reflection lock was settled, so this request runs next (#10377). */
+  readonly recoveredRunId?: string
+  /** The lock is held by a run whose liveness cannot be proven; shown with the next step (#10377). */
+  readonly stuck?: string
 }
 
 export interface ReflectionRequestSink {

@@ -74,7 +74,8 @@ async function launchCandidate(
   attempt: number,
   fallbacks: readonly ReflectionModelCandidate[],
 ): Promise<MemoryChildResult> {
-  const payloadText = typeof input.payload === "string" ? input.payload : serializeFactsPayload(input.payload)
+  const payload = typeof input.payload === "string" ? input.payload : { ...input.payload, agreementEventVersion: 1 as const }
+  const payloadText = typeof payload === "string" ? payload : serializeFactsPayload(payload)
   const payloadPath = join(input.runDir, "facts-payload.json")
   const extractionPath = join(input.runDir, "extraction.jsonl")
   const agreementsPath = join(input.runDir, FACTS_AGREEMENTS_FILENAME)
@@ -98,8 +99,9 @@ async function launchCandidate(
     ...(input.recordLimits === undefined ? {} : input.recordLimits),
   })
   const known = typeof input.payload === "string" ? undefined : input.payload.agreements
-  const agreementTool = known === undefined ? undefined : createFactsAgreementTool({
+  const agreementTool = known === undefined || typeof payload === "string" ? undefined : createFactsAgreementTool({
     extractionPath: agreementsPath, state, knownIds: new Set(known.map((item) => item.id)),
+    payload,
     ...(guard === undefined ? {} : { onFailure: guard.fail }),
   })
   const createSession = guard?.createSession ?? input.options.createSession

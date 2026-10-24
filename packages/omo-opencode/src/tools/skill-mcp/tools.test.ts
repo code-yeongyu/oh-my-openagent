@@ -210,7 +210,7 @@ describe("skill_mcp tool", () => {
           playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
         }),
       ]
-      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue([{ type: "text", text: "ok" }] as never)
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue({ content: [{ type: "text", text: "ok" }] })
       const tool = createSkillMcpTool({
         manager,
         getLoadedSkills: () => loadedSkills,
@@ -242,7 +242,7 @@ describe("skill_mcp tool", () => {
           playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
         }),
       ]
-      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue([{ type: "text", text: "ok" }] as never)
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue({ content: [{ type: "text", text: "ok" }] })
       const tool = createSkillMcpTool({
         manager,
         getLoadedSkills: () => loadedSkills,
@@ -264,6 +264,41 @@ describe("skill_mcp tool", () => {
         { url: "https://example.com" },
         undefined,
       )
+    })
+  })
+
+  describe("MCP result semantics", () => {
+    it("rejects a tool error even when grep would hide its content", async () => {
+      loadedSkills = [createMockSkillWithMcp("fixture", { fixture: { command: "fixture" } })]
+      spyOn(manager, "callTool").mockResolvedValue({
+        content: [{ type: "text", text: "Not connected: synthetic tool failure" }],
+        isError: true,
+        structuredContent: { code: "fixture-failure" },
+      })
+      const tool = createSkillMcpTool({ manager, getLoadedSkills: () => loadedSkills })
+      await expect(tool.execute({
+        mcp_name: "fixture", tool_name: "fail", grep: "cannot-match",
+      }, mockContext)).rejects.toThrow("fixture-failure")
+    })
+
+    for (const structuredContent of [{ count: 2 }, [1, "two"], 0, false, null, "value"]) {
+      it(`keeps structured JSON ${JSON.stringify(structuredContent)}`, async () => {
+        loadedSkills = [createMockSkillWithMcp("fixture", { fixture: { command: "fixture" } })]
+        spyOn(manager, "callTool").mockResolvedValue({ content: [], structuredContent })
+        const tool = createSkillMcpTool({ manager, getLoadedSkills: () => loadedSkills })
+        const result = await tool.execute({ mcp_name: "fixture", tool_name: "structured" }, mockContext)
+        if (typeof result !== "string") throw new Error("Expected formatted MCP output")
+        expect(JSON.parse(result)).toEqual({ content: [], structuredContent })
+      })
+    }
+
+    it("preserves plain content output", async () => {
+      loadedSkills = [createMockSkillWithMcp("fixture", { fixture: { command: "fixture" } })]
+      const content = [{ type: "text", text: "unchanged" }]
+      spyOn(manager, "callTool").mockResolvedValue({ content })
+      const tool = createSkillMcpTool({ manager, getLoadedSkills: () => loadedSkills })
+      expect(await tool.execute({ mcp_name: "fixture", tool_name: "plain" }, mockContext))
+        .toBe(JSON.stringify(content, null, 2))
     })
   })
 
