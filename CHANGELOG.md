@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Warm memory prompts avoid repeated git processes for HEAD and agreements.** Committed agreement reads are cached by repository and full revision, and cache misses inspect only the ledger path. Standard file-backed HEADs resolve from stat-validated Git files, including packed refs and linked worktrees, with git fallback for unusual layouts. ([#11216](https://github.com/code-yeongyu/oh-my-openagent/pull/11216), part of [#10707](https://github.com/code-yeongyu/oh-my-openagent/issues/10707))
+
 **The repository now has a security policy.** `SECURITY.md` explains how to report a vulnerability privately through GitHub's Security tab, what to include, and when to expect triage and an acknowledgement; `CONTRIBUTING.md` links to it. Adapted from the policy proposed by @marklapointe in [#10752](https://github.com/code-yeongyu/oh-my-openagent/pull/10752). ([#11221](https://github.com/code-yeongyu/oh-my-openagent/pull/11221))
 
 **ulw-research can check that a report's sentences keep the meaning of their sources.** It pairs each report sentence with the quote, claim or original text it rests on, and records drift only when two independent readers name the same kind of change; a single reader's flag is kept as a minor warning. A pair no reader judged, or a pair that needs the strong reader and only got the cheap one, is reported as unverified instead of passing as clean. Nothing in the CLI runs it yet. ([#11151](https://github.com/code-yeongyu/oh-my-openagent/pull/11151), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))

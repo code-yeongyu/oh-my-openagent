@@ -2,12 +2,14 @@
 
 import type { GitExecResult } from "./exec"
 import { commandError } from "./repo-arguments"
+import { readHeadFromFiles } from "./repo-head"
 import { parseLogOutput, parseLogOutputWithPaths } from "./repo-log"
 import { parseCatFileBatch, parseLsTreeBlobs, parseLsTreeSized } from "./repo-tree"
 import type { GitLogOptions, GitTreeBlobEntry, GitTreeSizedEntry, MemoryCommit } from "./repo-types"
 import { STABLE_LOG_OUTPUT } from "./stable-log-output"
 
 export interface GitRevisionRunner {
+  readonly dir?: string
   /** Runs git and throws the command error on a non-zero exit. */
   run(argv: readonly string[], timeoutMs?: number): Promise<GitExecResult>
   /** Runs git and returns the result whatever the exit code. */
@@ -18,6 +20,8 @@ export class GitRevisionReads {
   constructor(private readonly git: GitRevisionRunner) {}
 
   async head(): Promise<string | null> {
+    const cached = this.git.dir === undefined ? undefined : readHeadFromFiles(this.git.dir)
+    if (cached !== undefined) return cached
     const result = await this.git.result(["rev-parse", "--verify", "HEAD"])
     if (result.code !== 0) return null
     return result.stdout.trim() || null
