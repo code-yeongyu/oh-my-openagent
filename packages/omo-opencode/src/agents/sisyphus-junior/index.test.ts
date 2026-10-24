@@ -229,6 +229,35 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
     })
 
+    test("#given Claude model with variant override #when agent is created #then scales thinking budget by variant", () => {
+      // given
+      const lowOverride = { model: "anthropic/claude-sonnet-5", variant: "low" }
+      const maxOverride = { model: "anthropic/claude-sonnet-5", variant: "max" }
+
+      // when
+      const lowResult = createSisyphusJuniorAgentWithOverrides(lowOverride)
+      const maxResult = createSisyphusJuniorAgentWithOverrides(maxOverride)
+
+      // then
+      expect(lowResult.thinking).toEqual({ type: "enabled", budgetTokens: 8192 })
+      expect(maxResult.thinking).toEqual({ type: "enabled", budgetTokens: 60000 })
+    })
+
+    test("#given Claude model with explicit thinking override #when agent is created #then keeps user budgetTokens", () => {
+      // given
+      const override = {
+        model: "anthropic/claude-sonnet-5",
+        variant: "max",
+        thinking: { type: "enabled", budgetTokens: 12345 },
+      }
+
+      // when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      // then
+      expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 12345 })
+    })
+
     test("#given GLM reasoning model #when agent is created #then skips injected thinking", () => {
       // given
       const override = { model: "z-ai/glm-5" }
