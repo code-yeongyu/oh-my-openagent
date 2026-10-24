@@ -147,6 +147,8 @@ describe("submitReport", () => {
   })
 
   test.each([
+    [401, "sign-in-required"],
+    [403, "sign-in-required"],
     [413, "too-large"],
     [429, "rate-limited"],
     [503, "unavailable"],

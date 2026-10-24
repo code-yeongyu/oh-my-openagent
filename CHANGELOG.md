@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Terminal bug reports match the private intake contract.** `/bug` sends the required request fields and uses your `omo login` account when available; signed-out reports remain supported. Service rejections show an error code and a safe request ID, and sign-in refusals point to `omo login` instead of blaming the connection. ([#11213](https://github.com/code-yeongyu/oh-my-openagent/pull/11213), fixes [#11194](https://github.com/code-yeongyu/oh-my-openagent/issues/11194))
+
 **`omo update` on Windows survives a package file that another process holds.** When `bun add -g` fails with `EPERM` (`NtSetInformationFile`) because a file of the install is in use, `omo update` retries twice with a short backoff. If the file stays held, it names the file and the omo processes holding it, tells you to quit them and run `omo update` again, and keeps whatever version is installed, reinstalling the previous one only if the failed run left an unreadable install. ([#10090](https://github.com/code-yeongyu/oh-my-openagent/issues/10090), [#11125](https://github.com/code-yeongyu/oh-my-openagent/pull/11125))
 
 **A held abandoned test directory no longer fails a new run during preload.** Cleanup retries through the shared tree remover, skips roots still held with EBUSY, EPERM, ENOTEMPTY or EACCES, and continues with the other abandoned roots. Unrelated filesystem errors still fail the run, and Bun's panic-only retry keeps its existing test-failure checks. ([#11190](https://github.com/code-yeongyu/oh-my-openagent/pull/11190), refs [#11135](https://github.com/code-yeongyu/oh-my-openagent/issues/11135) and [#8990](https://github.com/code-yeongyu/oh-my-openagent/issues/8990))

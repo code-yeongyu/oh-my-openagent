@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto"
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { FeedbackDraft, FeedbackKind, UploadRedactor } from "./draft"
 
-export const FEEDBACK_REDACTOR_VERSION = "1"
+export const FEEDBACK_REDACTOR_VERSION = "1.0.0"
 
 export interface ReportClient {
   readonly app: string
@@ -22,7 +23,8 @@ export type SubmitResult =
   | { readonly kind: "sent"; readonly reportId: string }
   | { readonly kind: "saved"; readonly path: string }
   | { readonly kind: "already-sent" }
-  | { readonly kind: "refused"; readonly reason: "secret-detected" | "too-large" | "rate-limited" | "unavailable" }
+  | { readonly kind: "refused"; readonly reason: "secret-detected" | "too-large" | "rate-limited" | "sign-in-required" | "unavailable" }
+  | { readonly kind: "refused"; readonly reason: "service-rejected"; readonly code: string; readonly requestId?: string }
 
 export interface SubmitOptions {
   readonly draft: FeedbackDraft
@@ -85,10 +87,17 @@ const rememberDeleteToken = (stateDir: string, entry: SentEntry): void => {
   privateWrite(path, JSON.stringify([...entries.filter((value) => value.id !== entry.id), entry], null, 2))
 }
 
-const refusalFor = (status: number, code: unknown): SubmitResult => {
+const refusalFor = (status: number, code: unknown, requestId: unknown, redact: UploadRedactor): SubmitResult => {
+  if (status === 401 || status === 403) return { kind: "refused", reason: "sign-in-required" }
   if (code === "secret_detected") return { kind: "refused", reason: "secret-detected" }
   if (status === 413) return { kind: "refused", reason: "too-large" }
   if (status === 429) return { kind: "refused", reason: "rate-limited" }
+  if (status === 400 || status === 426) return {
+    kind: "refused",
+    reason: "service-rejected",
+    code: code === "invalid_request" || code === "client_update_required" ? code : "unknown",
+    ...(typeof requestId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(requestId) && redact(requestId).count === 0 ? { requestId } : {}),
+  }
   return { kind: "refused", reason: "unavailable" }
 }
 
@@ -125,6 +134,8 @@ export async function submitReport(options: SubmitOptions): Promise<SubmitResult
 
   const keptKey = options.idempotencyKey !== undefined && FEEDBACK_IDEMPOTENCY_KEY.test(options.idempotencyKey) ? options.idempotencyKey : undefined
   const headers = new Headers({ "content-type": "application/json", "idempotency-key": keptKey ?? `feedback-${options.draft.draftId}` })
+  headers.set("content-length", String(Buffer.byteLength(json)))
+  headers.set("x-omo-content-sha256", createHash("sha256").update(json).digest("hex"))
   if (options.accessToken !== null) headers.set("authorization", `Bearer ${options.accessToken}`)
   let response: Response
   try {
@@ -138,9 +149,10 @@ export async function submitReport(options: SubmitOptions): Promise<SubmitResult
   }
   const answer: unknown = await response.json().catch(() => null)
   if (!response.ok) {
-    const code: unknown = Reflect.get(Object(Reflect.get(Object(answer), "error")), "code")
+    const error = Object(Reflect.get(Object(answer), "error"))
+    const code: unknown = Reflect.get(error, "code")
     if (keptKey !== undefined && response.status === 409 && code === "conflict") return { kind: "already-sent" }
-    return refusalFor(response.status, code)
+    return refusalFor(response.status, code, Reflect.get(error, "requestId"), options.redact)
   }
   const reportId: unknown = Reflect.get(Object(answer), "id")
   if (typeof reportId !== "string") return { kind: "refused", reason: "unavailable" }
