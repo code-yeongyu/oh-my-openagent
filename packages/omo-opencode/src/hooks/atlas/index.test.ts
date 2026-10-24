@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, mock, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -45,6 +45,7 @@ describe("atlas hook", () => {
     }))
     const client = createOpencodeClient({ baseUrl: "http://localhost" })
     Reflect.set(client.session, "get", sessionGetMock)
+    Reflect.set(client.session, "status", mock(async () => ({ data: {} })))
     Reflect.set(client.session, "messages", mock(async () => ({ data: [] })))
     Reflect.set(client.session, "prompt", promptMock)
     Reflect.set(client.session, "promptAsync", promptMock)
@@ -2260,6 +2261,7 @@ session_id: ses_untrusted_999
       const hook = createTestAtlasHook(mockInput)
 
       const originalDateNow = Date.now
+      const fetchSpy = spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected network access in Atlas backoff test"))
       let now = 0
       Date.now = () => now
 
@@ -2278,8 +2280,10 @@ session_id: ses_untrusted_999
 
         //#then - 11th attempt should run after backoff expiration
         expect(promptMock).toHaveBeenCalledTimes(11)
+        expect(fetchSpy).not.toHaveBeenCalled()
       } finally {
         Date.now = originalDateNow
+        fetchSpy.mockRestore()
       }
     })
 
