@@ -44,7 +44,7 @@ IMPORTANT_COOKIES = {
 
 class CookieRecord(TypedDict):
     name: str
-    value: str
+    value: str | bytes
     domain: str
     path: str
     expires: int
@@ -139,7 +139,7 @@ def write_cookie_file(path: Path, cookies: list[CookieRecord]) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             os.fchmod(f.fileno(), 0o600)
-            json.dump(cookies, f, indent=2)
+            json.dump(cookies, f, indent=2, default=lambda o: o.decode("latin-1") if isinstance(o, bytes) else str(o))
             f.write("\n")
         os.replace(tmp_path, path)
     finally:
@@ -235,7 +235,7 @@ def inject_cookies(cookies: list[CookieRecord], cdp_port: int) -> None:
     payload: list[CdpCookie] = [
         {
             "name": c["name"],
-            "value": c["value"],
+            "value": c["value"].decode("latin-1") if isinstance(c["value"], bytes) else str(c["value"]),
             "domain": c["domain"],
             "path": c.get("path") or "/",
             "secure": bool(c.get("secure")),
