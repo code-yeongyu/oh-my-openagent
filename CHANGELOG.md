@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Nested in-process tasks retain their original session tree.** A child's own tasks now record the tree root and increasing depth, so nested delegation obeys `max_depth` instead of restarting at depth 1. The root session's own view now also covers its nested in-process descendants: the footer, `/tasks`, the default `task_output` list, and `task_send` and cancel. Process-mode descendants already appeared there. ([#11226](https://github.com/code-yeongyu/oh-my-openagent/pull/11226))
+
 **Re-extracting a conversation no longer counts the same agreement correction again.** Corrections are bound to validated user turns and recorded atomically with their replay receipts. Distinct turns on the same date still count separately; acknowledgement, drop and eviction retain replay history. Pending records from older versions use a documented agreement/date migration. ([#11214](https://github.com/code-yeongyu/oh-my-openagent/pull/11214), fixes [#11191](https://github.com/code-yeongyu/oh-my-openagent/issues/11191))
 
 **The LSP MCP server negotiates supported protocol versions.** It preserves supported client versions and answers unsupported or missing versions with `2025-06-18`, rather than claiming an arbitrary protocol revision. ([#11208](https://github.com/code-yeongyu/oh-my-openagent/pull/11208))
