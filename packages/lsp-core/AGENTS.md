@@ -17,7 +17,9 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 | `src/lsp/json-rpc-connection.ts` | Raw JSON-RPC 2.0 framing over stdio |
 | `src/lsp/config-loader.ts` | Load `.codex/lsp-client.json` (project + user), merge with builtins |
 | `src/lsp/server-definitions.ts` | `BUILTIN_SERVERS` (51 languages), `LSP_INSTALL_HINTS`, `AUTO_INSTALLABLE_SERVERS` |
-| `src/lsp/server-resolution.ts` | `findServerForExtension()`: map extension to installed server; substitutes the resolved absolute binary path into `command[0]` |
+| `src/lsp/server-resolution.ts` | `findServerForExtension()`: map extension to installed server; substitutes the resolved absolute binary path into `command[0]`; skips a built-in server whose project marker is absent (`BUILTIN_SERVER_PROJECT_MARKERS`: `deno` needs `deno.json`/`deno.jsonc` up to the repo root) |
+| `src/lsp/server-probe.ts` | `probeLspServer()`: throwaway workspace with a fixture, bounded `initialize` + `documentSymbol` (must return a symbol), classified `startup_failed` / `timeout` / `request_failed` |
+| `src/lsp/component-check.ts` | `checkLspComponents()`: per language the cwd uses plus required ones, resolution through `findServerForExtension()`, routing sanity, probe; statuses `ok` / `unverified` / `missing` / `unconfigured` / `wrong_routing` / failures, with remediation text. Never installs |
 | `src/lsp/server-installation.ts` | `resolveServerBinary()`: marker-gated repo-local lookup then PATH, with Windows extension handling; `isServerInstalled()` retained for existing consumers |
 | `src/lsp/directory-diagnostics.ts` | `aggregateDiagnosticsForDirectory()`: walk directory, cap files + diagnostics; `AbortSignal` cancels acquisition and per-file scans |
 | `src/lsp/formatters.ts` | Format locations, symbols, diagnostics, rename results, workspace edits |

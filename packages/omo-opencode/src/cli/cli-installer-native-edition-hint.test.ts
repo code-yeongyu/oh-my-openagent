@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import * as configManager from "./config-manager"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as componentCheck from "./install-component-check"
 import * as nativeDevInstaller from "./install-native-dev"
 import { runCliInstaller } from "./cli-installer"
 import { NATIVE_EDITION_GUIDE_URL, NATIVE_EDITION_INSTALL_COMMAND } from "./native-edition-hint"
@@ -52,6 +53,7 @@ describe("runCliInstaller OmO Native hint", () => {
     console.log = mockConsoleLog
     mockConsoleLog.mockClear()
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(componentCheck, "reportComponentHealth").mockResolvedValue(undefined)
   })
 
   afterEach(() => {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 import * as p from "@clack/prompts"
 import * as configManager from "./config-manager"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as componentCheck from "./install-component-check"
 import * as nativeDevInstaller from "./install-native-dev"
 import * as tuiInstallPrompts from "./tui-install-prompts"
 import { NATIVE_EDITION_GUIDE_URL, NATIVE_EDITION_INSTALL_COMMAND } from "./native-edition-hint"
@@ -65,6 +66,7 @@ describe("runTuiInstaller OmO Native hint", () => {
     spyOn(p, "confirm").mockResolvedValue(false)
     spyOn(p, "outro").mockImplementation(() => undefined)
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(componentCheck, "reportComponentHealth").mockResolvedValue(undefined)
   })
 
   afterEach(() => {

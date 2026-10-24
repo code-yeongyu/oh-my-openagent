@@ -201,6 +201,7 @@ describe("runner", () => {
         getAllCheckDefinitions: () => checks,
         gatherSystemInfo: async () => expectedResult.systemInfo,
         gatherToolsSummary: async () => expectedResult.tools,
+        gatherComponents: async () => undefined,
         gatherEditionDistTags,
         resolveLatestVersion,
       }))

@@ -27,6 +27,8 @@ export const LSP_INSTALL_HINTS: Record<string, string> = {
 	"bash-ls": "npm install -g bash-language-server",
 	jdtls: "See https://github.com/eclipse-jdtls/eclipse.jdt.ls",
 	"yaml-ls": "npm install -g yaml-language-server",
+	json: "npm install -g vscode-langservers-extracted",
+	marksman: "See https://github.com/artempyanykh/marksman#how-to-install",
 	"lua-ls": "See https://github.com/LuaLS/lua-language-server",
 	php: "npm install -g intelephense",
 	dart: "Included with Dart SDK",
@@ -68,6 +70,7 @@ export const LSP_LOCAL_INSTALL_HINTS: Record<string, string> = {
 	bash: "bun add -d bash-language-server",
 	"bash-ls": "bun add -d bash-language-server",
 	"yaml-ls": "bun add -d yaml-language-server",
+	json: "bun add -d vscode-langservers-extracted",
 	php: "bun add -d intelephense",
 	prisma: "bun add -d prisma",
 	dockerfile: "bun add -d dockerfile-language-server-nodejs",
@@ -88,6 +91,10 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 	eslint: {
 		command: ["vscode-eslint-language-server", "--stdio"],
 		extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue"],
+	},
+	json: {
+		command: ["vscode-json-language-server", "--stdio"],
+		extensions: [".json", ".jsonc"],
 	},
 	oxlint: {
 		command: ["oxlint", "--lsp"],
@@ -149,6 +156,7 @@ export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 	},
 	jdtls: { command: ["jdtls"], extensions: [".java"] },
 	"yaml-ls": { command: ["yaml-language-server", "--stdio"], extensions: [".yaml", ".yml"] },
+	marksman: { command: ["marksman", "server"], extensions: [".md", ".markdown"] },
 	"lua-ls": { command: ["lua-language-server"], extensions: [".lua"] },
 	php: { command: ["intelephense", "--stdio"], extensions: [".php"] },
 	dart: { command: ["dart", "language-server", "--lsp"], extensions: [".dart"] },
@@ -191,6 +199,7 @@ export const AUTO_INSTALLABLE_SERVERS: Record<string, string[]> = {
 	"bash-ls": ["npm", "install", "-g", "bash-language-server"],
 	bash: ["npm", "install", "-g", "bash-language-server"],
 	"yaml-ls": ["npm", "install", "-g", "yaml-language-server"],
+	json: ["npm", "install", "-g", "vscode-langservers-extracted"],
 	php: ["npm", "install", "-g", "intelephense"],
 	prisma: ["npm", "install", "-g", "prisma"],
 	dockerfile: ["npm", "install", "-g", "dockerfile-language-server-nodejs"],

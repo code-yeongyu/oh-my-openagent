@@ -74,14 +74,12 @@ export function formatVerbose(result: DoctorResult): string {
 
   lines.push(`${color.bold("Tools")}`)
   lines.push(`${color.dim("\u2500".repeat(40))}`)
-  if (tools.lspServers.length === 0) {
-    lines.push(`  ${formatStatusSymbol("warn")} LSP         none detected`)
-  } else {
-    const count = tools.lspServers.length
-    lines.push(`  ${formatStatusSymbol("pass")} LSP         ${count} server${count === 1 ? "" : "s"}`)
-    for (const server of tools.lspServers) {
-      lines.push(`${" ".repeat(20)}${server.id} (${server.extensions.join(", ")})`)
-    }
+  lines.push(`  ${formatStatusSymbol(tools.lspServers.length > 0 ? "pass" : "warn")} LSP bridge  ${tools.lspServers.length > 0 ? "available" : "unavailable"}`)
+  for (const language of result.components?.lsp?.languages ?? []) {
+    const status = language.status === "ok" ? "pass" : language.required ? "fail" : language.status === "unconfigured" || language.status === "unverified" ? "skip" : "warn"
+    const required = language.required ? " (required)" : ""
+    lines.push(`  ${formatStatusSymbol(status)} LSP ${language.language}${required}: ${language.status}${language.serverId === null ? "" : ` via ${language.serverId}`}`)
+    if (language.status !== "ok") lines.push(`${" ".repeat(6)}${color.dim(language.detail)}`)
   }
   lines.push(`  ${formatStatusSymbol(tools.astGrepCli ? "pass" : "fail")} ast-grep CLI ${tools.astGrepCli ? "installed" : "not found"}`)
   lines.push(`  ${formatStatusSymbol(tools.commentChecker ? "pass" : "fail")} comment-checker ${tools.commentChecker ? "installed" : "not found"}`)
