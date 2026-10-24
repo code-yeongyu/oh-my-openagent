@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**A completed ulw-loop plan now shows as a finished run.** When this session's ulw-loop plan reaches its aggregate completion, the engine records the session's completion as a finished run instead of a plain reply. A plan that was already complete when the session started is not counted ([#11175](https://github.com/code-yeongyu/oh-my-openagent/pull/11175)).
+
 **Windows dori sidecar paths pass the extension's path checks.** The omo-senpi tests accept the Windows form of the sidecar path, so the Windows suite no longer fails on a correct path. ([#11111](https://github.com/code-yeongyu/oh-my-openagent/pull/11111), fixes [#11110](https://github.com/code-yeongyu/oh-my-openagent/issues/11110))
 
 **Child-task, workflow and workpool wake sources report kind `children`.** ([#11114](https://github.com/code-yeongyu/oh-my-openagent/pull/11114), part of [#10782](https://github.com/code-yeongyu/oh-my-openagent/issues/10782))
