@@ -607,6 +607,7 @@
     "packages/omo-native/tsconfig.json",
     "packages/omo-opencode/bunfig.toml",
     "packages/omo-opencode/package.json",
+    "packages/omo-opencode/src/cli/service-auth/credential-owner.ts",
     "packages/omo-opencode/src/cli/service-auth/index.ts",
     "packages/omo-opencode/src/cli/service-auth/keystore.ts",
     "packages/omo-opencode/src/cli/service-auth/protocol.ts",

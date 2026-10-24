@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- An uncertain legacy account refresh now fails closed instead of replaying an unprovable attempt. Protocol-2 recovery retains one original key and absolute deadline, checks a suspend-inclusive clock and boot identity before every send, and publishes only a durably committed successor. Account token and device metadata come from the same locked snapshot. ([#10898](https://github.com/code-yeongyu/oh-my-openagent/pull/10898))
+
 **ulw-research can check that a report's sentences keep the meaning of their sources.** It pairs each report sentence with the quote, claim or original text it rests on, and records drift only when two independent readers name the same kind of change; a single reader's flag is kept as a minor warning. A pair no reader judged, or a pair that needs the strong reader and only got the cheap one, is reported as unverified instead of passing as clean. Nothing in the CLI runs it yet. ([#11151](https://github.com/code-yeongyu/oh-my-openagent/pull/11151), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))
 
 **Skill MCP catalogs include every page.** Tools, resources, and prompts follow opaque pagination cursors in order, with a clear error if a server exceeds 100 pages. ([#11204](https://github.com/code-yeongyu/oh-my-openagent/pull/11204))

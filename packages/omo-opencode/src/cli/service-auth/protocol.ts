@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { credentialOwnerSchema } from "./credential-owner"
 import { terminalText } from "./terminal-text"
 
 export class SignInError extends Error {
@@ -7,9 +8,13 @@ export class SignInError extends Error {
 }
 
 export class RequestFailure extends SignInError {
-  constructor(readonly notSent: boolean) {
+  constructor(readonly notSent: boolean, readonly responseStatus?: number) {
     super("Unable to complete the service request. Check the connection and retry.", true)
   }
+}
+
+export class InvalidApiResponse extends SignInError {
+  constructor(readonly status: number) { super("The service returned an invalid error response.") }
 }
 
 export const platformSchema = z.enum(["macos", "linux", "windows"])
@@ -22,10 +27,15 @@ export const tokenSchema = z.object({
 export const grantSchema = tokenSchema.extend({
   device: z.object({ id: nonempty, name: nonempty }),
   offlineGrant: nonempty.optional(),
+  owner: credentialOwnerSchema.optional(),
+  writerFloor: z.union([z.literal(1), z.literal(2)]).optional(),
+  freshAuthorizationProof: nonempty.optional(),
 })
 export const credentialSchema = grantSchema.extend({
   signingPrivateKey: nonempty, sealingPrivateKey: nonempty,
   refreshState: z.literal("uncertain").optional(),
+  // Preserve even a malformed journal so the owning transaction fails closed without re-keying.
+  refreshAttempt: z.unknown().optional(),
 })
 export type Credentials = z.infer<typeof credentialSchema>
 export const deviceCodeSchema = z.object({
@@ -63,6 +73,7 @@ export class ApiRefusal extends SignInError {
       "unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked", "entitlement_required",
       "authorization_pending", "slow_down", "access_denied", "expired_token", "rate_limited",
       "internal", "unavailable", "forbidden", "invalid_request", "not_found",
+      "client_upgrade_required", "writer_floor_mismatch", "service_upgrade_required", "refresh_recovery_expired",
     ].includes(code) ? code : "unknown"
     this.#detail = detail
     this.#retryAfter = retryAfter
@@ -114,10 +125,10 @@ export async function requestApi(api: string, path: string, init: RequestInit, s
     ].includes(code))
   }
   if (response.status === 204) return null
-  try { body = await response.json() } catch { throw new RequestFailure(false) }
+  try { body = await response.json() } catch { throw new RequestFailure(false, response.status) }
   if (response.ok) return body
   const envelope = envelopeSchema.safeParse(body)
-  if (!envelope.success) throw new SignInError("The service returned an invalid error response.")
+  if (!envelope.success) throw new InvalidApiResponse(response.status)
   const error = envelope.data.error
   const detail = limitSchema.safeParse(error.detail)
   throw new ApiRefusal(error.code, response.status,
