@@ -203,7 +203,7 @@ describe("BackgroundManager parent wake active turn events", () => {
     expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
   })
 
-  test("#when parent reasoning delta is newer than stale idle state #then background completion records an admit-only wake", async () => {
+  test("#when parent reasoning delta is newer than stale idle state #then reply-required wake is deferred without forceNoReply", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "idle" },
@@ -233,12 +233,11 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(0)
     expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
   })
 
-  test("#when parent idle event follows fresh reasoning delta #then background completion still records an admit-only wake", async () => {
+  test("#when parent idle event follows fresh reasoning delta #then reply-required wake is deferred without forceNoReply", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {
       "parent-1": { type: "idle" },
@@ -269,8 +268,80 @@ describe("BackgroundManager parent wake active turn events", () => {
     await flushPendingParentWakeForTest(manager, "parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(1)
-    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(0)
     expect(getPendingParentWakes(manager).get("parent-1")?.shouldReply).toBe(true)
+  })
+
+  test("#regression: shouldReply wake with recent parent activity defers without forceNoReply #then infinite timer loop is broken", async () => {
+    // given
+    const sessionStatuses: Record<string, { type: string }> = {
+      "parent-1": { type: "idle" },
+    }
+    const { manager, promptAsyncCalls } = createManager(sessionStatuses)
+    managerUnderTest = manager
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: {
+        sessionID: "parent-1",
+        field: "reasoning",
+        delta: "parent is still generating content",
+      },
+    })
+    const task = createTask({
+      id: "task-a",
+      parentSessionId: "parent-1",
+      description: "task A",
+      status: "completed",
+      completedAt: new Date("2026-05-20T14:19:14.625Z"),
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    // when
+    await notifyParentSessionForTest(manager, task)
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(0)
+    const pendingWake = getPendingParentWakes(manager).get("parent-1")
+    expect(pendingWake?.shouldReply).toBe(true)
+  })
+
+  test("#regression: shouldReply wake past the defer ceiling force-dispatches #then indefinite deferral loop is broken", async () => {
+    // given
+    const sessionStatuses: Record<string, { type: string }> = {
+      "parent-1": { type: "idle" },
+    }
+    const { manager, promptAsyncCalls } = createManager(sessionStatuses)
+    managerUnderTest = manager
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: {
+        sessionID: "parent-1",
+        field: "reasoning",
+        delta: "sustained streaming output",
+      },
+    })
+    const task = createTask({
+      id: "task-a",
+      parentSessionId: "parent-1",
+      description: "task A",
+      status: "completed",
+      completedAt: new Date("2026-05-20T14:19:14.625Z"),
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    // when
+    await notifyParentSessionForTest(manager, task)
+    const wake = getPendingParentWakes(manager).get("parent-1")
+    if (wake) {
+      wake.queuedAt = Date.now() - 61_000
+    }
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBeUndefined()
   })
 })
