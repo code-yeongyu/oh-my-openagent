@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Completed Momus review verdicts are now persisted as numbered Markdown artifacts next to the plan file.** Each `.omo/plans/{plan}.reviews/NNN-okay.md` or `NNN-reject.md` artifact captures the verdict, timestamp, model, plan sha256, review duration, reviewer session id, and the full verdict output, so a finished review survives the end of the session. Momus itself stays read-only; persistence happens entirely on the orchestrator side after the review result returns. ([#11237](https://github.com/code-yeongyu/oh-my-openagent/pull/11237), fixes [#3002](https://github.com/code-yeongyu/oh-my-openagent/issues/3002))
+
 **The stale-reflection-lock test leaves no background writer behind when removing its temporary root.** Its teardown closes the memory wiring and awaits facts reconciliation and maintenance before removal, so a late lock publication cannot recreate the directory and make the temp-leak guard blame another test. ([#11225](https://github.com/code-yeongyu/oh-my-openagent/pull/11225))
 
 **ulw-research ships a Markdown block model for checking Markdown and post deliverables.** It splits a Markdown report into headings, paragraphs, list items, table rows, code blocks and quotes with exact text offsets, and sorts sections with the same classifier as the HTML checks; an unclosed code fence is reported instead of passing silently, and no check uses it yet. The HTML checks now also treat a section headed exactly "Closing" as the closing section. ([#11153](https://github.com/code-yeongyu/oh-my-openagent/pull/11153), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))

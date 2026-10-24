@@ -1,5 +1,12 @@
 export { getBoulderFilePath, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "./path"
 export { findPrometheusPlans, getPlanName, getPlanProgress } from "./plan-progress"
+export {
+  formatMomusReviewArtifact,
+  getPlanReviewsDir,
+  hashPlanContent,
+  writeMomusReviewArtifact,
+} from "./review-artifacts"
+export type { MomusReviewArtifactInput, MomusReviewVerdict } from "./review-artifacts"
 export { normalizeSessionId } from "./shared"
 export {
   getActiveWorks,
