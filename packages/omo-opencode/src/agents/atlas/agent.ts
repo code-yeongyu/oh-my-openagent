@@ -1,9 +1,12 @@
+import { buildNativeAgentPrompt, getNativePromptSource } from "../native-model-prompt"
+export const getAtlasPromptSource = getNativePromptSource
+export type AtlasPromptSource = ReturnType<typeof getNativePromptSource>
 /**
  * Atlas - Master Orchestrator Agent
  *
  * Orchestrates work via task() to complete ALL tasks in a todo list until fully done.
  *
- * Prompt routing (`getAtlasPromptSource`, evaluated by prompts-core variant order):
+ * Prompt routing (`getAtlasRoleSource`, evaluated by prompts-core variant order):
  * 1. Claude Opus 4.7       → opus-4-7.md   (literal-following + explicit fan-out push)
  * 2. GPT family            → gpt.md        (shared GPT-family calibration)
  * 3. Gemini family         → gemini.md
@@ -37,7 +40,7 @@ import {
 
 const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k3" | "kimi-k2-7" | "opus-4-7" | "glm"
+type AtlasRoleSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k3" | "kimi-k2-7" | "opus-4-7" | "glm"
 
 class AtlasPromptVariantError extends Error {
   readonly name = "AtlasPromptVariantError"
@@ -47,13 +50,13 @@ class AtlasPromptVariantError extends Error {
   }
 }
 
-export function getAtlasPromptSource(model?: string): AtlasPromptSource {
+function getAtlasRoleSource(model?: string): AtlasRoleSource {
   const variant = resolveVariant({
     agentName: "atlas",
     modelID: model,
     variants: atlasPromptVariants,
   })
-  if (isAtlasPromptSource(variant)) return variant
+  if (isAtlasRoleSource(variant)) return variant
   throw new AtlasPromptVariantError(variant)
 }
 
@@ -64,7 +67,7 @@ export interface OrchestratorContext {
   userCategories?: Record<string, CategoryConfig>
 }
 
-function isAtlasPromptSource(variant: string): variant is AtlasPromptSource {
+function isAtlasRoleSource(variant: string): variant is AtlasRoleSource {
   return Object.prototype.hasOwnProperty.call(atlasPromptVariants, variant)
 }
 
@@ -85,7 +88,7 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
   const decisionMatrix = buildDecisionMatrix(agents, userCategories)
   const skillsSection = buildSkillsSection(skills)
   const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, skills)
-  const source = getAtlasPromptSource(model)
+  const source = getAtlasRoleSource(model)
   const runtimeInjections = [
     { placeholder: "{CATEGORY_SECTION}", resolver: () => categorySection },
     { placeholder: "{AGENT_SECTION}", resolver: () => agentSection },
@@ -115,7 +118,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
-    prompt: buildDynamicOrchestratorPrompt(ctx),
+    prompt: buildNativeAgentPrompt(ctx.model, buildDynamicOrchestratorPrompt(ctx)),
     color: "#10B981",
   }
 

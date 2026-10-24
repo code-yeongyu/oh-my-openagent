@@ -17,6 +17,9 @@ import { showSkillSecurityNotice } from "./plugin/skill-security-notice"
 
 import type { CreatedHooks } from "./create-hooks"
 import type { Managers } from "./create-managers"
+import { reconcileNativeModelPrompts } from "./agents/native-model-prompt"
+import type { NativePromptContext } from "./agents/native-prompt-frame"
+import { createSessionToolPermissionLookup } from "./plugin/session-tool-permissions"
 
 export function createPluginInterface(args: {
   ctx: PluginContext
@@ -33,6 +36,17 @@ export function createPluginInterface(args: {
 }): PluginInterface {
   const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
     args
+  const toolSnippets = Object.fromEntries(
+    Object.entries(tools).map(([name, definition]) => [name, definition.description]),
+  )
+  const sessionToolPermissions = createSessionToolPermissionLookup(ctx)
+  const handleEvent = createEventHandler({
+    ctx,
+    pluginConfig,
+    firstMessageVariantGate,
+    managers,
+    hooks,
+  })
 
   return {
     tool: tools,
@@ -83,20 +97,49 @@ export function createPluginInterface(args: {
       pluginConfig.default_mode,
       getUltraworkMessage,
       hooks.keywordDetector,
+      () => toolSnippets,
+      sessionToolPermissions.lookup,
     ),
 
-    config: managers.configHandler,
+    config: async (config) => {
+      await managers.configHandler(config)
+      for (const agent of Object.values(config.agent ?? {})) {
+        if (!agent || typeof agent.prompt !== "string") continue
+        const rules: NonNullable<NativePromptContext["toolPermissions"]> = []
+        for (const [pattern, enabled] of Object.entries(config.tools ?? {})) {
+          rules.push({ pattern, permission: enabled ? "allow" : "deny" })
+        }
+        for (const permissions of [config.permission, agent.permission]) {
+          for (const [pattern, permission] of Object.entries(permissions ?? {})) {
+            if (permission === "allow" || permission === "ask" || permission === "deny") {
+              rules.push({ pattern, permission })
+            } else if (typeof permission === "object" && permission !== null) {
+              for (const [scope, action] of Object.entries(permission)) {
+                if (action === "allow" || action === "ask" || action === "deny") {
+                  rules.push({ pattern, permission: action, scope })
+                }
+              }
+            }
+          }
+        }
+        for (const pattern of pluginConfig.disabled_tools ?? []) rules.push({ pattern, permission: "deny" })
+        const system = [agent.prompt]
+        reconcileNativeModelPrompts(system, undefined, toolSnippets, rules)
+        agent.prompt = system[0]
+      }
+    },
 
-    event: createEventHandler({
-      ctx,
-      pluginConfig,
-      firstMessageVariantGate,
-      managers,
-      hooks,
-    }),
+    event: async (input) => {
+      sessionToolPermissions.observe(input)
+      await handleEvent(input)
+    },
 
     "tool.definition": createToolDefinitionHandler({
       hooks,
+      onDefinition: (name, description) => {
+        // OpenCode defines this error handler but never exposes it as a model tool.
+        if (name !== "invalid") toolSnippets[name] = description
+      },
     }),
 
     "tool.execute.before": createToolExecuteBeforeHandler({

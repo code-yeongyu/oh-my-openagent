@@ -1,3 +1,7 @@
+## 2026-10-24 - Share Native model prompt builders with OpenCode (#9856, fixes #9851)
+
+OpenCode imports the public generation facade from the senpi version OmO Native pins, applies one documented host-tool transform, and appends explicit agent roles instead of maintaining duplicate model bodies; runtime model switches preserve task mode and Hephaestus model eligibility, with catalog-wide byte parity and mutation checks covering both construction and reconciliation. Session tool permissions are read once per session and then follow its update and delete events instead of a 3 s lookup on every request; the Native toast keeps dev's interactive gating and show records.
+
 ## 2026-10-23 - Inside OmO Desktop the browser skill is the terminal's, plus the app's built-in browser (sisyphuslabs/omo-desktop-app#4227)
 
 Under `OMO_BROWSER_ENGINE` (the desktop sets it for every session) `loadOmowright()` used to return a guarded library: on the default engine (`builtin`) it refused `connectBrowserSkill()` and every owned creator (`connectPipe`, `connectCloakProfile`, `connect`), refused every export outside an allowlist, and wrapped the user's-browser session with state events, Stop and an ask-before-irreversible question (#9486). An agent on default settings had no browser unless it knew to call `connectBuiltinBrowser()`, the app showed nothing, and agents went looking for a way around it. Product direction (2026-10-23): inside the app the agent's browser path is the same as in the terminal, and the app's built-in browser is offered in addition.
