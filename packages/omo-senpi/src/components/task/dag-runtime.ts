@@ -168,7 +168,30 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     }
   }
 
+  // omo#10782 item 5: a workflow run that completes tells the engine, so the session's next `done` reads
+  // completion kind "run". The engine ignores it outside an open epoch. A host fault here must never reach the
+  // scheduler's event fan-out.
+  // The mark is taken on the scheduler subscription, ahead of the shared delivery de-duplication: a recovered run's
+  // checkpoint delivers its events on the durable path first, so `deliveredSeq` already holds the completion when
+  // the scheduler's copy arrives. Scheduler subscribers only see events appended after they subscribe, so an old
+  // completion is never replayed into a mark (the durable path replays the whole log and must not mark).
+  const markedCompletionSeq = new Map<DagRunId, number>()
+  const markRunCompleted = (runId: DagRunId): void => {
+    try {
+      deps.pi.lifecycle?.markRunCompleted({ runId })
+    } catch (error) {
+      deps.logger.warn("omo-senpi dag could not tell the engine a run completed", {
+        runId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   const publishSchedulerEvent = (event: DagRunEvent): void => {
+    if (event.type === "dag.run.completed" && (markedCompletionSeq.get(event.runId) ?? 0) < event.seq) {
+      markedCompletionSeq.set(event.runId, event.seq)
+      markRunCompleted(event.runId)
+    }
     if ((deliveredSeq.get(event.runId) ?? 0) >= event.seq) return
     deliveredSeq.set(event.runId, event.seq)
     deliverDurableEvent(durableEventListener, event)

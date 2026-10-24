@@ -95,6 +95,14 @@ export interface SenpiExtensionAPI {
     text: string,
     options?: { readonly extraLiterals?: readonly string[] },
   ): { readonly text: string; readonly counts: Readonly<Record<string, number>> }
+  /**
+   * The engine's session lifecycle (senpi#3864). `markRunCompleted` tells it a workflow run finished inside the
+   * current epoch, so the epoch's `done` reads `completion.kind = "run"`. Feature-detected: hosts before senpi
+   * 2026.10.23-1 expose nothing.
+   */
+  readonly lifecycle?: {
+    markRunCompleted(run: { readonly runId: string }): void
+  }
   /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
   exec?(
     command: string,
