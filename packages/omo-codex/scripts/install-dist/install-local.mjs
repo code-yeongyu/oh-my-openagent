@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:8b9824e295d69487dd817315c33a87802b0085bb02e8769565dbc1d3982d5d4c:6169d75a919602e20e768a24432bad9b07ae3234fba2968eb5673b2c430eef54
+// omo-codex-install:7e9c6c89063c313abf78c51a4b3c309166515c045fda7173d4b0bc8491c3de8c:00466217f18aacc567475a7fe61d576ccc3d39bc019a1bcf2a211ae5cbdd9ba2
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10612,8 +10612,7 @@ function windowsNodeDiscoveryLines() {
     '  for /f "tokens=* delims= " %%N in ("!OMO_NODE_BINARY!") do set "OMO_NODE_BINARY=%%N"',
     `  if "!OMO_NODE_BINARY:~0,1!"=="'" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"`,
     `  if "!OMO_NODE_BINARY:~-1!"=="'" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~0,-1!"`,
-    '  if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"',
-    '  if "!OMO_NODE_BINARY:~-1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~0,-1!"',
+    '  set "OMO_NODE_BINARY=!OMO_NODE_BINARY:"=!"',
     '  if defined OMO_NODE_BINARY if not exist "!OMO_NODE_BINARY!" set "OMO_NODE_BINARY="',
     ")",
     'if not defined OMO_NODE_BINARY where node >nul 2>nul && set "OMO_NODE_BINARY=node"'
