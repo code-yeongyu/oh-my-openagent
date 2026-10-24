@@ -184,7 +184,8 @@ test("#given process A registered gw from one location and process B later from 
   expect(await a.registerStoreExtension(registration())).toMatchObject({ kind: "ok" })
   h.clock.now += 60_000
   expect(await h.store().registerStoreExtension(registration({ moduleUrl: `file://${relocated}` }))).toMatchObject({ kind: "ok" })
-  const crashed = workerA!
+  if (workerA === undefined) throw new Error("worker A never started")
+  const crashed = workerA
   const exited = new Promise<void>((resolve) => crashed.once("exit", () => resolve()))
   await crashed.terminate()
   await exited

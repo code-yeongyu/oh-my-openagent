@@ -131,6 +131,7 @@ async function reconcileRun(
   }
   if (ledger.launching === true && context.now() <= ledger.hardDeadlineAt) return undefined
   const supervisor = await classifyRunProcess(ledger.pid, ledger.processStart, context)
+  if (ledger.queued === true && (supervisor === "alive" || supervisor === "unknown")) return undefined
   if (supervisor === "alive" || supervisor === "unknown") {
     const wait = context.waitForOutcome ?? ((path, deadlineAt) => waitForRunSentinel(path, deadlineAt, context.now))
     await wait(outcomePath, ledger.deadlineAt)
@@ -140,6 +141,7 @@ async function reconcileRun(
     }
     if (refreshed.launching === true && context.now() <= refreshed.hardDeadlineAt) return undefined
     const freshSupervisor = await classifyRunProcess(refreshed.pid, refreshed.processStart, context)
+    if (refreshed.queued === true && (freshSupervisor === "alive" || freshSupervisor === "unknown")) return undefined
     if (freshSupervisor === "unknown" || freshSupervisor === "absent") {
       return await abandonReservationRun(context, runDir, refreshed)
     }

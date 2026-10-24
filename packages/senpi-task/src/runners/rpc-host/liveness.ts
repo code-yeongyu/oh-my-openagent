@@ -38,8 +38,8 @@ export async function daemonReachable(socket: string): Promise<boolean> {
  * `list_sessions` and drops `include_workers`, so every task child would read as gone - and a live
  * child that reads as gone is claimed by the next omo session that reconciles the store (#8932).
  */
-export async function liveSessionPaths(socket: string): Promise<readonly string[]> {
-  const reply = await askDaemon(socket, { id: LIST_REQUEST_ID, type: "list_sessions", include_workers: true })
+export async function liveSessionPaths(socket: string, agentDir?: string): Promise<readonly string[]> {
+  const reply = await askDaemon(socket, { id: LIST_REQUEST_ID, type: "list_sessions", include_workers: true }, agentDir)
   if (reply === undefined) {
     log("senpi-task daemon session list failed", { socket })
     throw new Error(`list_sessions failed on ${socket}`)
@@ -50,8 +50,8 @@ export async function liveSessionPaths(socket: string): Promise<readonly string[
 }
 
 // A refusal answers undefined, exactly like no answer: both mean "holds nothing we can see".
-async function askDaemon(socket: string, request: HostReply): Promise<HostReply | undefined> {
-  const reply = await askHost(socket, request, LIST_TIMEOUT_MS)
+async function askDaemon(socket: string, request: HostReply, agentDir: string | undefined): Promise<HostReply | undefined> {
+  const reply = await askHost(socket, request, LIST_TIMEOUT_MS, agentDir === undefined ? {} : { agentDir })
   if (reply?.success !== true) return undefined
   return isRecord(reply.data) ? reply.data : {}
 }

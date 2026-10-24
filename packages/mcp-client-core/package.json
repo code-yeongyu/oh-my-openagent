@@ -35,9 +35,11 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/claude-code-compat-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
+    "proper-lockfile": "4.1.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/proper-lockfile": "4.1.4",
     "bun-types": "1.4.3"
   }
 }

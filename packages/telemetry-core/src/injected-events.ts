@@ -14,6 +14,11 @@ import type {
 
 export type EventPropertyAllowlist = Readonly<Record<string, readonly string[]>>
 export type EventTelemetryProperties = Readonly<Record<string, unknown>>
+/**
+ * `uuid` makes a re-sent event idempotent: PostHog keeps one row per uuid. `timestamp` is the event's own
+ * time; a re-send passes the original one so the event lands on the same day it first did.
+ */
+export type EventTelemetryCaptureOptions = { readonly uuid?: string; readonly timestamp?: Date }
 export type EventTelemetrySetTimeout = (callback: () => void, delay: number) => unknown
 
 export type CreateEventTelemetryClientInput = {
@@ -31,7 +36,7 @@ export type CreateEventTelemetryClientInput = {
 
 export type EventTelemetryClient = {
   readonly enabled: boolean
-  readonly captureEvent: (name: string, properties: EventTelemetryProperties) => void
+  readonly captureEvent: (name: string, properties: EventTelemetryProperties, options?: EventTelemetryCaptureOptions) => void
   readonly flush: () => Promise<void>
   readonly shutdown: () => Promise<void>
 }
@@ -54,6 +59,7 @@ const ALLOWED_DOLLAR_KEYS = new Set([
   "$session_id",
 ])
 const FORBIDDEN_SUFFIX = /_(?:text|path|prompt)$/
+const EVENT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const NO_OP_EVENT_CLIENT: EventTelemetryClient = {
   enabled: false,
@@ -110,7 +116,7 @@ export function createEventTelemetryClient(
 
   return {
     enabled: true,
-    captureEvent(name, properties) {
+    captureEvent(name, properties, options) {
       const allowlist = allowlists.get(name)
       if (name.length === 0 || allowlist === undefined) {
         report("telemetry_event_rejected", new Error("event name is empty or not allowlisted"))
@@ -134,14 +140,20 @@ export function createEventTelemetryClient(
         projected[key] = typeof value === "string" ? value.slice(0, 64) : value
       }
 
-      // event_id is minted last so neither the product nor the caller can supply it; PostHog dedupes
-      // on `uuid`, so mirroring it there makes a direct and a relayed delivery of one event collapse.
-      const eventId = createEventId()
+      const uuid = options?.uuid
+      if (uuid !== undefined && !EVENT_UUID.test(uuid)) {
+        report("telemetry_event_property_rejected", new Error("invalid event uuid"))
+      }
+      // event_id is minted last so no event property can supply it; PostHog dedupes on `uuid`, so
+      // mirroring it there makes a direct and a relayed delivery of one event collapse. A re-send passes
+      // the uuid it first carried, so its event_id stays that same id.
+      const eventId = uuid !== undefined && EVENT_UUID.test(uuid) ? uuid : createEventId()
       const payload: TelemetryCaptureMessage = {
         distinctId: input.distinctId,
         event: name,
         uuid: eventId,
         properties: { ...projected, ...sharedProperties, event_id: eventId },
+        ...(isValidDate(options?.timestamp) ? { timestamp: options.timestamp } : {}),
       }
       try {
         transport.capture(payload)
@@ -212,4 +224,8 @@ function isEventPropertyValue(value: unknown): value is string | number | boolea
     typeof value === "boolean" ||
     (typeof value === "number" && Number.isFinite(value))
   )
+}
+
+function isValidDate(value: Date | undefined): value is Date {
+  return value instanceof Date && Number.isFinite(value.getTime())
 }
