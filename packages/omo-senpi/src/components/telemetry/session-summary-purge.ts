@@ -4,7 +4,37 @@ import { join } from "node:path"
 // The opted-out side of session_summary, kept in the entry bundle with node:fs only: turning telemetry off
 // must delete what earlier runs queued without loading any telemetry code (the recorder lives in a sidecar).
 
-type QueuedScope = { readonly cwd?: string }
+/** Env keys that pick which config a process reads (a profile, a config dir, a home): per-process choices. */
+export const CONFIG_SELECTION_ENV_KEYS = ["OMO_PROFILE", "OCX_PROFILE", "OPENCODE_CONFIG_DIR", "HOME", "USERPROFILE"] as const
+
+/**
+ * The config selection a record's writer consented under. Stored with the record's scope so that a reader judges
+ * the record by the writer's own config (its profile included), never by the reader's (#11198).
+ */
+export type ConfigSelection = Readonly<Partial<Record<(typeof CONFIG_SELECTION_ENV_KEYS)[number], string>>>
+
+export function configSelectionOf(env: Readonly<Record<string, string | undefined>>): ConfigSelection {
+  const selection: Partial<Record<(typeof CONFIG_SELECTION_ENV_KEYS)[number], string>> = {}
+  for (const key of CONFIG_SELECTION_ENV_KEYS) {
+    const value = env[key]
+    if (typeof value === "string" && value.length > 0) selection[key] = value
+  }
+  return selection
+}
+
+export function parseConfigSelection(value: unknown): ConfigSelection | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
+  const selection: Partial<Record<(typeof CONFIG_SELECTION_ENV_KEYS)[number], string>> = {}
+  for (const key of CONFIG_SELECTION_ENV_KEYS) {
+    const entry: unknown = Reflect.get(value, key)
+    if (entry === undefined) continue
+    if (typeof entry !== "string" || entry.length === 0) return undefined
+    selection[key] = entry
+  }
+  return selection
+}
+
+type QueuedScope = { readonly cwd?: string; readonly config?: ConfigSelection }
 
 /** `<state>/session-summary`: windows at the top, events awaiting delivery under `pending/`. */
 export function summaryDir(stateDir: string): string {
@@ -31,7 +61,8 @@ export function purgeUnconsentedQueue(
   // One persisted-setting read per cwd per pass: a queue of many records from one project loads its config once.
   const verdicts = new Map<string, boolean>()
   const consented = (scope: QueuedScope): boolean => {
-    const key = scope.cwd ?? ""
+    const config = scope.config === undefined ? "" : JSON.stringify(CONFIG_SELECTION_ENV_KEYS.map((name) => scope.config?.[name] ?? null))
+    const key = `${scope.cwd ?? ""}\u0000${config}`
     const known = verdicts.get(key)
     if (known !== undefined) return known
     const verdict = isScopeConsented(scope)
@@ -59,7 +90,8 @@ function sendable(value: unknown, isScopeConsented: (scope: QueuedScope) => bool
   // A record that names no cwd fails closed, as at send time (isRecordSendable): consent read without a cwd would
   // be this process's default, not the writer's.
   if (typeof cwd !== "string" || cwd.length === 0) return false
-  return isScopeConsented({ cwd })
+  const config = parseConfigSelection(Reflect.get(scope, "config"))
+  return isScopeConsented(config === undefined ? { cwd } : { cwd, config })
 }
 
 function names(dir: string): string[] {

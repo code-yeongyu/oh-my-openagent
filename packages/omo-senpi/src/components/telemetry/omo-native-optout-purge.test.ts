@@ -207,4 +207,23 @@ describe("omo-native session_summary opt-out purge", () => {
       })
     })
   }
+
+  // #11198: consent given through a profile is consent too (lead ruling 2026-10-20 covers it): the purge judges a
+  // record by the config its writer selected, so a profile-consented queue survives another session's env opt-out.
+  test("#given a live session consented through OMO_PROFILE=work while the base omo.json is off #when a process opted out only by DO_NOT_TRACK starts #then that session's window is kept", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      writeInventory(agentDir)
+      const stateDir = join(agentDir, "omo-senpi", "omo-native")
+      const workProfileOn = { isConfigEnabled: (_cwd: string | undefined, env: Record<string, string | undefined>) => env.OMO_PROFILE === "work" }
+      const writer = await registerProcess({ agentDir, recorder: createTransportRecorder(), env: { OMO_PROFILE: "work" }, cwd: "/repo", options: workProfileOn })
+      await writer.dispatch("session_start", { type: "session_start", reason: "startup" }, inProject("work", "/repo"))
+      await writer.dispatch("turn_end", turnEnd(), inProject("work", "/repo"))
+      const queued = contentFiles(stateDir)
+      expect(queued.length).toBeGreaterThan(0)
+
+      await registerProcess({ agentDir, recorder: createTransportRecorder(), env: { DO_NOT_TRACK: "1" }, cwd: "/repo", options: workProfileOn })
+
+      expect(contentFiles(stateDir)).toEqual(queued)
+    })
+  })
 })

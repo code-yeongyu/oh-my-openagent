@@ -23,6 +23,7 @@ import type { OmoSenpiComponent } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import { userInfo } from "node:os"
+import { CONFIG_SELECTION_ENV_KEYS, type ConfigSelection } from "./session-summary-purge"
 import { getSenpiTelemetryStateDir, recordSenpiDailyActive } from "./index"
 import { createCategoryConfigCapture } from "./omo-native-category-config"
 import { captureProcessCrashes } from "./omo-native-crash"
@@ -329,25 +330,27 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
   })
 }
 
-/** Env keys that pick which config a process reads: per-process choices, like the env opt-outs. */
-const CONFIG_SELECTION_ENV_KEYS = ["OMO_PROFILE", "OCX_PROFILE", "OPENCODE_CONFIG_DIR", "HOME", "USERPROFILE"] as const
 
 /**
  * The persisted half of consent: the telemetry setting in the config files, for a scope's cwd. Environment
  * opt-outs are left out on purpose: they belong to one process, while this decides for every process that
  * shares the queue (see `purgeUnconsentedQueue`). For the same reason the config is read with a neutral env:
  * no profile selection and the account's own home, so a config only this process selects (`OMO_PROFILE`,
- * `OCX_PROFILE`, `OPENCODE_CONFIG_DIR`, an overridden `HOME`) cannot judge other sessions' records.
+ * `OCX_PROFILE`, `OPENCODE_CONFIG_DIR`, an overridden `HOME`) cannot judge other sessions' records. A record's
+ * own `selection` (the config its writer consented under, #11198) is applied on top, so it is judged by its writer's
+ * config, profile included.
  */
 export function isOmoNativeTelemetryConfigEnabled(
   options: Pick<OmoNativeSessionOptions, "diagnostics" | "isConfigEnabled">,
   eventCtx: unknown,
   env: TelemetryEnv,
   accountHomeDir: string = userInfo().homedir,
+  selection?: ConfigSelection,
 ): boolean {
   const shared: Record<string, string | undefined> = { ...env }
   for (const key of CONFIG_SELECTION_ENV_KEYS) delete shared[key]
   shared.HOME = accountHomeDir
+  if (selection !== undefined) Object.assign(shared, selection)
   return configEnabled(options, eventCtx, shared)
 }
 

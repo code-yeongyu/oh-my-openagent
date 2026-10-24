@@ -47,6 +47,7 @@ import { isTelemetryHostWarmup, resolveTelemetrySessionRole } from "./session-ro
 import type { LoadSummaryRecovery } from "./session-summary-lazy-recovery"
 import { removeLegacyRollupsOnce } from "./session-summary-legacy-rollups"
 import { startOptOutPurge } from "./session-summary-optout-start"
+import { configSelectionOf } from "./session-summary-purge"
 import type { ConsentScope } from "./session-summary-storage"
 import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
@@ -146,11 +147,11 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       // variable (DO_NOT_TRACK, OMO_DISABLE_TELEMETRY, CI, ...) is this process's own and must not delete what
       // consented sessions queued.
       const isQueueScopeConsented = (scope: ConsentScope): boolean =>
-        isOmoNativeTelemetryConfigEnabled(consentOptions, scope.cwd === undefined ? {} : { cwd: scope.cwd }, env, options.accountHomeDir)
+        isOmoNativeTelemetryConfigEnabled(consentOptions, scope.cwd === undefined ? {} : { cwd: scope.cwd }, env, options.accountHomeDir, scope.config)
       const purgeQueue = () => startOptOutPurge({
         stateDir,
         isScopeConsented: isQueueScopeConsented,
-        persistedOptOut: !isQueueScopeConsented(consentCwd === undefined ? {} : { cwd: consentCwd }),
+        persistedOptOut: !isQueueScopeConsented(consentCwd === undefined ? { config: configSelectionOf(env) } : { cwd: consentCwd, config: configSelectionOf(env) }),
         load: options.loadRecovery ?? (() => import("#omo-telemetry-recovery-runtime")),
         ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
         ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
@@ -223,7 +224,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
           state,
           consent: {
             isConsented: () => currentConsent(true),
-            consentScope: () => (consentCwd === undefined ? {} : { cwd: consentCwd }),
+            consentScope: () => (consentCwd === undefined ? {} : { cwd: consentCwd, config: configSelectionOf(env) }),
             isScopeConsented,
             scheduleConsentCheck: options.scheduleConsentCheck ?? scheduleUnrefInterval,
           },
