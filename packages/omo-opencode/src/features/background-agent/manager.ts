@@ -29,6 +29,10 @@ import {
   hasMoreFallbacks,
   shouldRetryError,
 } from "../../shared/model-error-classifier"
+import {
+  awaitLateRuntimeFallbackRecoveryDecision,
+  awaitRuntimeFallbackRecoveryDecision,
+} from "../../shared/runtime-fallback-recovery"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -1962,6 +1966,7 @@ The fallback retry session is now created and can be inspected directly.
 
       const errorInfo = { name: errorName, message: errorMessage }
       void this.handleSessionErrorEvent({
+        event,
         errorInfo,
         errorMessage,
         errorName,
@@ -2146,6 +2151,7 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private async handleSessionErrorEvent(args: {
+    event: Event
     task: BackgroundTask
     errorInfo: { name?: string; message?: string; statusCode?: number }
     errorName: string | undefined
@@ -2173,6 +2179,45 @@ The fallback retry session is now created and can be inspected directly.
       return
     }
 
+    // runtime-fallback retries inside this session, so a replacement session or a terminal error here
+    // would leave its generation running unobserved. It decides first; only a declined recovery falls through.
+    const runtimeFallbackDecision = awaitRuntimeFallbackRecoveryDecision(args.event)
+    if (runtimeFallbackDecision) {
+      const sessionID = task.sessionId
+      const attemptID = task.currentAttemptID
+      const decision = await runtimeFallbackDecision
+      const isSameAttempt = () =>
+        task.status === "running" && task.sessionId === sessionID && task.currentAttemptID === attemptID
+      if (!isSameAttempt()) return
+      if (decision === "timed-out") {
+        // A timeout is not a refusal. Keep listening: a late `declined` still ends the task with this error.
+        void awaitLateRuntimeFallbackRecoveryDecision(args.event)?.then(async (lateDecision) => {
+          if (lateDecision !== "declined" || !isSameAttempt()) return
+          await this.recoverDeclinedSessionError(task, errorInfo, errorName, errorMessage)
+        })
+      }
+      if (decision !== "declined") {
+        task.consecutiveErroredIdlePolls = 0
+        log("[background-agent] session.error recovery not declined by runtime-fallback; keeping task running:", {
+          taskId: task.id,
+          decision,
+          sessionID: task.sessionId,
+          errorName,
+          errorMessage: errorMessage?.slice(0, 200),
+        })
+        return
+      }
+    }
+
+    await this.recoverDeclinedSessionError(task, errorInfo, errorName, errorMessage)
+  }
+
+  private async recoverDeclinedSessionError(
+    task: BackgroundTask,
+    errorInfo: { name?: string; message?: string; statusCode?: number },
+    errorName: string | undefined,
+    errorMessage: string | undefined,
+  ): Promise<void> {
     if (await this.tryFallbackRetry(task, errorInfo, "session.error")) {
       return
     }
