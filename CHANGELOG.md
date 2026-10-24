@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Skill MCP OAuth validates authorization-server issuers and preserves existing logins.** Authorization responses are checked against validated issuer metadata before code redemption. Stored tokens and client registrations carry the full issuer, legacy records gain it at their next discovery, and a changed issuer triggers fresh registration and login instead of reusing another server's credentials. Dynamic registration declares native application type for loopback and custom-scheme redirects, and web application type for remote web redirects. ([#11236](https://github.com/code-yeongyu/oh-my-openagent/pull/11236))
+
 **The stale-reflection-lock test leaves no background writer behind when removing its temporary root.** Its teardown closes the memory wiring and awaits facts reconciliation and maintenance before removal, so a late lock publication cannot recreate the directory and make the temp-leak guard blame another test. ([#11225](https://github.com/code-yeongyu/oh-my-openagent/pull/11225))
 
 **ulw-research ships a Markdown block model for checking Markdown and post deliverables.** It splits a Markdown report into headings, paragraphs, list items, table rows, code blocks and quotes with exact text offsets, and sorts sections with the same classifier as the HTML checks; an unclosed code fence is reported instead of passing silently, and no check uses it yet. The HTML checks now also treat a section headed exactly "Closing" as the closing section. ([#11153](https://github.com/code-yeongyu/oh-my-openagent/pull/11153), part of [#11009](https://github.com/code-yeongyu/oh-my-openagent/issues/11009))
