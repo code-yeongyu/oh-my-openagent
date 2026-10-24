@@ -48,6 +48,20 @@ export async function resolveSubagentSpawnContext(
   return { rootSessionID, parentDepth, childDepth: parentDepth + 1 }
 }
 
+// senpi-task parity for the child tool surface: the in-process runner keeps the
+// task family for every non-DAG owner (includeTaskTools: owner.kind !== "dag") and
+// enforces depth at spawn time (decideDepthPolicy admits childDepth <= maxDepth).
+// A host child may therefore delegate while its own children would still be admitted,
+// i.e. while spawnDepth < maxDepth; team (DAG) members never receive the task family.
+export function shouldIncludeTaskTools(input: {
+  readonly teamRunId?: string
+  readonly spawnDepth?: number
+  readonly maxDepth: number
+}): boolean {
+  if (input.teamRunId !== undefined) return false
+  return (input.spawnDepth ?? 1) < input.maxDepth
+}
+
 export function createSubagentDepthLimitError(input: { childDepth: number; maxDepth: number; parentSessionID: string; rootSessionID: string }): Error {
   return new Error(`Subagent spawn blocked: child depth ${input.childDepth} exceeds background_task.maxDepth=${input.maxDepth}. Parent session: ${input.parentSessionID}. Root session: ${input.rootSessionID}. Continue in an existing subagent session instead of spawning another.`)
 }

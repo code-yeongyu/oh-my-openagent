@@ -242,8 +242,8 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
-  describe("tool safety (task blocked, call_omo_agent allowed)", () => {
-    test("task remains blocked, call_omo_agent is allowed via tools format", () => {
+  describe("tool safety (task gated per spawn, call_omo_agent allowed)", () => {
+    test("task follows the override, call_omo_agent is allowed via tools format", () => {
       // given
       const override = {
         tools: {
@@ -260,19 +260,21 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const tools = result.tools as Record<string, boolean> | undefined
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
-        expect(tools.task).toBe(false)
+        // task is no longer force-denied here: the background manager gates the
+        // task family per spawn (depth/member-aware); an explicit override wins.
+        expect(tools.task).toBe(true)
         // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
         expect(tools.call_omo_agent).toBe(true)
         expect(tools.read).toBe(true)
       }
       if (permission) {
-        expect(permission.task).toBe("deny")
+        expect(permission.task).not.toBe("deny")
         // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
         expect(permission.call_omo_agent).toBe("allow")
       }
     })
 
-    test("task remains blocked when using permission format override", () => {
+    test("task follows the permission format override", () => {
       // given
       const override = {
         permission: {
@@ -285,15 +287,16 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
 
-      // then - task blocked, but call_omo_agent allowed for explore/librarian spawning
+      // then - task follows the override (per-spawn gate lives in the background
+      // manager), call_omo_agent allowed for explore/librarian spawning
       const tools = result.tools as Record<string, boolean> | undefined
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
-        expect(tools.task).toBe(false)
+        expect(tools.task).not.toBe(false)
         expect(tools.call_omo_agent).toBe(true)
       }
       if (permission) {
-        expect(permission.task).toBe("deny")
+        expect(permission.task).toBe("allow")
         expect(permission.call_omo_agent).toBe("allow")
       }
     })
@@ -326,8 +329,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const permission = result.permission as Record<string, string>
       expect(permission["mcp__context7__resolve-library-id"]).toBe("allow")
       expect(permission.grep).toBe("deny")
-      // task must remain denied (hardcoded BLOCKED_TOOLS)
-      expect(permission.task).toBe("deny")
+      // task is no longer hard-denied by BLOCKED_TOOLS: the background manager
+      // gates the task family per spawn (depth/member-aware)
+      expect(permission.task).toBeUndefined()
     })
   })
 
