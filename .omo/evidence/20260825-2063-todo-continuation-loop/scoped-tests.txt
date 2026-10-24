@@ -1,0 +1,7 @@
+$ bun test packages/omo-opencode/src/hooks/todo-continuation-enforcer/ packages/omo-opencode/src/hooks/runtime-fallback/ packages/omo-opencode/src/hooks/shared/
+bun test v1.3.14 (0d9b296a)
+
+ 499 pass
+ 0 fail
+ 948 expect() calls
+Ran 499 tests across 58 files. [6.17s]
