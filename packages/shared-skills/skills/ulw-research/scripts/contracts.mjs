@@ -6,6 +6,16 @@
 
 export const SCHEMA_VERSION = 1
 
+/** The severity vocabulary in rank order; every DEFECT_CODES entry uses one of these. */
+export const SEVERITIES = Object.freeze(["blocker", "major", "minor"])
+
+/** Defect counts per severity, then total. */
+export function countDefects(defects) {
+	const counts = Object.fromEntries(SEVERITIES.map((severity) => [severity, 0]))
+	for (const defect of defects) counts[defect.severity] += 1
+	return { ...counts, total: defects.length }
+}
+
 function deepFreeze(value) {
 	if (value === null || typeof value !== "object") return value
 	for (const key of Object.keys(value)) deepFreeze(value[key])
@@ -66,6 +76,7 @@ export const DEFECT_CODES = deepFreeze({
 	qualifier_dropped: { severity: "major", integrity: false, hint: "The source bounds this value (up to, at least, about); restore the qualifier or use :q." },
 	unbound_sentence: { severity: "major", integrity: false, hint: "Bind the sentence to a fact, a quote, a citation, or a claim-graph node with data-claim." },
 	meaning_drift_confirmed: { severity: "major", integrity: false, hint: "Two independent readers found the same drift; rewrite from the quote or dispute with a reason." },
+	meaning_unverified: { severity: "major", integrity: false, hint: "No meaning reader judged this pair, or no strong reader judged a force_strong pair; run the missing reader on pairs.json and rerun fact meaning-check." },
 	polish_edit_rejected: { severity: "major", integrity: false, hint: "The edit changed a number, a hedge, a qualifier, a link, or a claim id, or contained <, > or &; re-propose the language fix only, narrowed to the words around any entity or tag." },
 	polish_hedging_decreased: { severity: "major", integrity: false, hint: "The polish pass removed qualifiers; restore them." },
 	polish_text_churn: { severity: "major", integrity: false, hint: "More than half the text changed during polish; the pass composed instead of proofreading." },
@@ -91,7 +102,7 @@ export const FIDELITY_CODES = Object.freeze([
 	"fidelity_interview_incomplete", "derived_not_allowed", "source_outside_floor", "snapshot_hash_mismatch",
 	"chart_value_untraceable", "quote_unbound", "edition_unverified", "untraceable_number", "unsupported_verification", "claim_kind_mismatch",
 	"conflicting_readings", "hedge_dropped", "direction_flipped", "causality_added", "qualifier_dropped", "unbound_sentence",
-	"meaning_drift_confirmed", "polish_edit_rejected", "polish_hedging_decreased", "polish_text_churn", "snapshot_mismatch",
+	"meaning_drift_confirmed", "meaning_unverified", "polish_edit_rejected", "polish_hedging_decreased", "polish_text_churn", "snapshot_mismatch",
 	"join_integrity_fail", "quote_stale_version", "quote_fuzzy_match", "name_outside_quote", "verification_claim_unmarked", "scope_widened_warn",
 	"particle_unverified", "fallback_without_entity", "meaning_drift_warn", "polish_edit_unlocated", "polish_link_changed",
 	"polish_name_changed",

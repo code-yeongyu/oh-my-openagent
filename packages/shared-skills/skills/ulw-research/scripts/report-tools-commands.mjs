@@ -176,14 +176,14 @@ export async function runOutcome(argv) {
 		case "verify": {
 			const manifest = outcome.readManifest(file)
 			const base = outcome.verifyManifest(manifest)
-			const { fidelityProblems } = await import("./fact-commands-verify.mjs")
+			const { fidelityProblems } = await import("./fidelity-records.mjs")
 			const problems = [...base.problems, ...fidelityProblems(sessionDirFrom(args.flags), manifest)]
 			const result = { ok: problems.length === 0, problems }
 			return { json: { command: "outcome verify", ...result }, summary: `verify: ${result.ok ? "OK" : `${result.problems.length} problem(s)`}`, exitCode: result.ok ? 0 : 1 }
 		}
 		case "finish": {
 			const manifest = outcome.readManifest(file)
-			const refused = (await import("./fact-commands-verify.mjs")).fidelityProblems(sessionDirFrom(args.flags), manifest)
+			const refused = (await import("./fidelity-records.mjs")).fidelityProblems(sessionDirFrom(args.flags), manifest)
 			if (refused.length > 0) return { json: { command: "outcome finish", refused: true, problems: refused }, summary: `finish: refused (${refused.map((p) => p.code).join(", ")})`, exitCode: 1 }
 			const ledgerPath = args.flags.ledger ?? join(sessionDirFrom(args.flags), "sources-ledger.md")
 			const now = nowFrom(args.flags)

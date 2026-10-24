@@ -15,7 +15,9 @@ import { normalizeUnit } from "./units.mjs"
 
 const SKIP = new Set(["code", "pre", "kbd", "samp", "script", "style", "svg", "template", "noscript"])
 const CONTAINERS = new Set(["figure", "table", "nav", "header", "footer"])
-const EXEMPT_KINDS = new Set(["opinion", "recommendation"])
+/** data-kind values whose sentences need no binding (opinion and recommendation blocks). */
+export const EXEMPT_KINDS = Object.freeze(["opinion", "recommendation"])
+export const isExemptKind = (kind) => EXEMPT_KINDS.includes(kind)
 const DECIMAL = /^-?\d+(?:\.\d+)?$/
 /** Gaps and Contradictions headings (English, and the Korean gap/limit/contradiction/conflict words). */
 const GAPS_HEADING = /\b(?:gaps?|contradictions?|unresolved)\b|\uACF5\uBC31|\uD55C\uACC4|\uBAA8\uC21C|\uC0C1\uCDA9/i
@@ -113,7 +115,7 @@ export function bindingChecks(ctx, claims, ledger) {
 	const out = []
 	for (const block of proseSentences(ctx)) {
 		const findings = Boolean(block.scope.section) && block.kind === null
-		const exempt = selfOrUp(ctx, block.owner, (cur) => EXEMPT_KINDS.has(cur.attrs["data-kind"]) || cur.attrs["data-claim"] !== undefined)
+		const exempt = selfOrUp(ctx, block.owner, (cur) => isExemptKind(cur.attrs["data-kind"]) || cur.attrs["data-claim"] !== undefined)
 		for (const sentence of block.sentences) {
 			const bound = sentence.facts.length > 0 || ctx.util.citationMarker.test(sentence.text) || sentence.text.includes("{{")
 			if (findings && !exempt && !bound) out.push(ctx.defect("unbound_sentence", block.owner, `no fact, citation, or data-claim binds: "${sentence.text.slice(0, 80)}"`))

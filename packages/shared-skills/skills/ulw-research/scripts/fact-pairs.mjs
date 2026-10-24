@@ -8,35 +8,31 @@
 // hedge-position heuristic fired, or when the source hedges and the sentence's last six tokens do
 // not. No model, no IO: the readers run as separate lanes. Plain Node ESM; no Hangul here.
 
-import { proseSentences } from "./fidelity-binding.mjs"
-import { lexiconChecks } from "./fidelity-lexicon.mjs"
+import { isExemptKind, proseSentences } from "./fidelity-binding.mjs"
+import { isKoreanTerm, lexicalPattern, lexiconChecks } from "./fidelity-lexicon.mjs"
 import { sentenceKey } from "./fidelity-state.mjs"
 import { buildContext } from "./gates-static.mjs"
 import { parseHtml, proseText } from "./html-lite.mjs"
 import { HEDGES } from "./lexicon.mjs"
 import { normalizeText } from "./text-normalize.mjs"
 
-const KOREAN = /[\uAC00-\uD7A3]/u
-const EXEMPT_KINDS = new Set(["opinion", "recommendation"])
+/** Every pair kind the producers below emit; consumers count and schema pairs by this list. */
+export const PAIR_KINDS = Object.freeze(["quote", "claim", "translation"])
 const TAIL = 6
 
-const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-const lang = (text) => (KOREAN.test(text) ? "ko" : "en")
+const lang = (text) => (isKoreanTerm(text) ? "ko" : "en")
 /** Sentence text with its fact spans cut out, so a Korean value does not make an English sentence Korean. */
 const outsideFacts = (sentence) => sentence.facts.reduceRight((text, fact) => text.slice(0, fact.start - sentence.start) + text.slice(fact.end - sentence.start), sentence.text)
 
-/** Latin hedges match whole words; Korean hedges match as substrings, one syllable as a token. */
-const HEDGE_RES = HEDGES.map((term) => {
-	if (!KOREAN.test(term)) return new RegExp(`(?<![\\p{L}\\p{N}])${escape(term).replace(/ /g, "\\s+")}(?![\\p{L}\\p{N}])`, "giu")
-	return [...term].length >= 2 ? new RegExp(escape(term), "gu") : new RegExp(`(?<=^|[\\s\\p{P}])${escape(term)}`, "gu")
-})
+/** Latin hedges match whole words ("exact"); Korean hedges match as substrings, one syllable as a token prefix ("stem"). */
+const HEDGE_RES = HEDGES.map((term) => lexicalPattern(term, isKoreanTerm(term) ? "stem" : "exact"))
 
 /** Hedge terms that are also month names; capitalized and followed by a date number, they are months. */
 const MONTH_WORDS = new Set(["may"])
 
 /** A capitalized Latin match after the first word is a name or a month ("in May"), not a hedge. */
 const isHedgeAt = (text, match) => {
-	if (!/^\p{Lu}/u.test(match[0]) || KOREAN.test(match[0])) return true
+	if (!/^\p{Lu}/u.test(match[0]) || isKoreanTerm(match[0])) return true
 	if (match.index !== 0) return false
 	// At the start of a text a capital is only sentence case, so the word still hedges - unless it is a
 	// month name followed by a date number ("May 2024 sales rose.").
@@ -85,7 +81,7 @@ function claimIdsFor(ctx, block, sentence) {
 }
 
 function exempt(ctx, node) {
-	return EXEMPT_KINDS.has(node.attrs["data-kind"]) || Boolean(ctx.util.closest(node, (cur) => EXEMPT_KINDS.has(cur.attrs?.["data-kind"])))
+	return isExemptKind(node.attrs["data-kind"]) || Boolean(ctx.util.closest(node, (cur) => isExemptKind(cur.attrs?.["data-kind"])))
 }
 
 /** Lexicon routing for every fact span of one quote group in one sentence. */

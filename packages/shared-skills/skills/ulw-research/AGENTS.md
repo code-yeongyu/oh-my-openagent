@@ -41,7 +41,8 @@ ulw-research/
     ├── claims-index.mjs             # claim-graph.md index: the claim table plus the verified-claims digest
     ├── fidelity-state.mjs           # per-sentence failure counts for the fidelity repair loop
     ├── fact-commands.mjs            # `fact add|quote|retract|export|fill|derive` (lazy-loaded by report-tools)
-    ├── fact-commands-verify.mjs     # `fact verify` and the fidelity delivery barrier (fidelity_unresolved, edition_unverified)
+    ├── fact-commands-verify.mjs     # `fact verify` and the Markdown projection it checks
+    ├── fidelity-records.mjs         # FIDELITY_RECORDS table + the delivery barrier of outcome verify/finish (fidelity_unresolved, edition_unverified)
     ├── source-commands.mjs          # `source snapshot`, `claims index`, snapshot readers
     ├── *.test.ts                    # co-located bun tests, one per module (unshipped)
     └── tests/fixtures/              # good/bad reports, boxes.json, reference docs (unshipped)

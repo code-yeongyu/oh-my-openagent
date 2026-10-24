@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { indexClaims } from "./claims-index.mjs"
-import { extractPairs, hasHedge } from "./fact-pairs.mjs"
+import { extractPairs, hasHedge, PAIR_KINDS } from "./fact-pairs.mjs"
 import { fill } from "./fact-fill.mjs"
 
 type Row = Record<string, unknown> & { fact_id: string }
@@ -54,6 +54,11 @@ describe("extractPairs: a filled report", () => {
 			["P5", "translation"],
 			["P6", "claim"],
 		])
+	})
+
+	test("#given the fixture that produces every pair kind #when extracted #then the kinds are exactly PAIR_KINDS", () => {
+		expect([...new Set(pairs().map((pair) => pair.kind))].sort()).toEqual([...PAIR_KINDS].sort())
+		expect(Object.isFrozen(PAIR_KINDS)).toBe(true)
 	})
 
 	test("#given two facts sharing one source quote #when extracted #then one quote pair names both", () => {
