@@ -102,6 +102,7 @@ export function loroWasmSourcePath() {
 const threadClientEntryPath = join(packageRoot, "src", "components", "thread", "live-surface.ts")
 const telemetryRecoveryEntryPath = join(packageRoot, "src", "components", "telemetry", "session-summary-recovery.ts")
 const feedbackEntryPath = join(packageRoot, "src", "components", "feedback", "runtime.ts")
+const desktopToolkitEntryPath = join(packageRoot, "src", "components", "desktop-toolkit", "runtime.ts")
 const claimReceiptEntryPath = join(packageRoot, "src", "components", "claim-receipt", "runtime.ts")
 const memoryDoctorOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-doctor.js")
 const memoryMemfsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-memfs.js")
@@ -115,6 +116,7 @@ const memorySyncOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginR
 const threadClientOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-thread-client.js")
 const telemetryRecoveryOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-telemetry-recovery.js")
 const feedbackOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-feedback.js")
+const desktopToolkitOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-desktop-toolkit.js")
 const claimReceiptOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-claim-receipt.js")
 // The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
 // same contract as the staged personas, so omo.js carries none of the ~29 KB of prelude text (#9113).
@@ -124,6 +126,7 @@ const rollbackRuntimeEntryPath = join(packageRoot, "src", "extension", "rollback
 const rollbackRuntimeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "rollback-migrate.js")
 const builtinModuleNames = builtinModules.filter((moduleName) => !moduleName.startsWith("_")).sort()
 const externalSpecifiers = [
+  "#omo-desktop-toolkit-runtime",
   "#omo-task-runtime",
   "#omo-computer-use-runtime",
   "#omo-memory-doctor-runtime",
@@ -185,6 +188,7 @@ export const extensionBuildPaths = {
   threadClientOutputPath,
   telemetryRecoveryOutputPath,
   feedbackOutputPath,
+  desktopToolkitOutputPath,
   claimReceiptOutputPath,
   gatewayStoreWorkerOutputPath,
 }
@@ -217,6 +221,7 @@ export function resolveOutputs(options) {
     threadClientOutput: sibling(options.threadClientOutputPath, threadClientOutputPath, "omo-thread-client.js"),
     telemetryRecoveryOutput: sibling(options.telemetryRecoveryOutputPath, telemetryRecoveryOutputPath, "omo-telemetry-recovery.js"),
     feedbackOutput: sibling(options.feedbackOutputPath, feedbackOutputPath, "omo-feedback.js"),
+    desktopToolkitOutput: sibling(options.desktopToolkitOutputPath, desktopToolkitOutputPath, "omo-desktop-toolkit.js"),
     claimReceiptOutput: sibling(options.claimReceiptOutputPath, claimReceiptOutputPath, "omo-claim-receipt.js"),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
@@ -256,6 +261,7 @@ export async function buildExtension(options = {}) {
     threadClientOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
+    desktopToolkitOutput,
     claimReceiptOutput,
     gatewayStoreWorkerOutput,
   } = resolveOutputs(options)
@@ -280,6 +286,7 @@ export async function buildExtension(options = {}) {
   const threadClientInputs = await buildEntry(threadClientEntryPath, threadClientOutput, buildDefines)
   const telemetryRecoveryInputs = await buildEntry(telemetryRecoveryEntryPath, telemetryRecoveryOutput, buildDefines)
   const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
+  const desktopToolkitInputs = await buildEntry(desktopToolkitEntryPath, desktopToolkitOutput, buildDefines)
   const claimReceiptInputs = await buildEntry(claimReceiptEntryPath, claimReceiptOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
@@ -313,6 +320,7 @@ export async function buildExtension(options = {}) {
     threadClientInputs,
     telemetryRecoveryInputs,
     feedbackInputs,
+    desktopToolkitInputs,
     claimReceiptInputs,
     gatewayStoreWorkerInputs,
     threadSdkInputs,
