@@ -52,7 +52,8 @@ for (const code of ["device_revoked", "unknown_refusal"]) {
           refreshState: "uncertain",
         },
       ])
-      expect(await runAccountVerb(dependencies, ["token"])).toBe(ACCOUNT_EXIT.uncertain)
+      expect(await runAccountVerb(dependencies, ["token"])).toBe(ACCOUNT_EXIT.ended)
+      expect(JSON.parse(output.at(-1) ?? "{}")).toEqual({ ended: { code: "refresh_recovery_expired" } })
     }
     expect(refreshes).toBe(1)
   })

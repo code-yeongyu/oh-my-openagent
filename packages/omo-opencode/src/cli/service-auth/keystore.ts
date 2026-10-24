@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto"
+import type { z } from "zod"
 import { credentialSchema, type Credentials, serviceOrigin, SignInError } from "./protocol"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
 
@@ -8,15 +9,17 @@ export type SecretApi = {
   readonly set: (key: SecretKey & { readonly value: string }) => Promise<void>
   readonly delete: (key: SecretKey) => Promise<boolean>
 }
-export type CredentialStore = {
-  readonly read: () => Promise<Credentials | null>
-  readonly write: (value: Credentials) => Promise<void>
+export type SealedStore<T> = {
+  readonly read: () => Promise<T | null>
+  readonly write: (value: T) => Promise<void>
   readonly clear: () => Promise<void>
 }
+export type CredentialStore = SealedStore<Credentials>
 
 export class CredentialStoreError extends SignInError {}
 export class KeychainLockedError extends CredentialStoreError {}
 export class SecretServiceUnavailableError extends CredentialStoreError {}
+export class InvalidCredentialState extends SignInError {}
 
 // The OS store refused because it is locked and may not ask the person (macOS errSecInteractionNotAllowed,
 // a locked libsecret keyring). Callers must surface this as its own outcome, never as a prompt.
@@ -45,6 +48,18 @@ export function createCredentialStore(
   lockProbe: SecretServiceLockProbe = probeSecretServiceLock,
   notice: (message: string) => void = stderrNoticeOncePerProcess,
 ): CredentialStore {
+  return createSealedStore(api, "omo-cli", credentialSchema, secrets, platform, lockProbe, notice)
+}
+
+export function createSealedStore<T>(
+  api: string,
+  namespace: "omo-cli" | "omo-cli-v2" | "omo-cli-revocations-v2",
+  schema: z.ZodType<T>,
+  secrets: SecretApi | null = typeof Bun === "undefined" ? null : Bun.secrets,
+  platform: NodeJS.Platform = process.platform,
+  lockProbe: SecretServiceLockProbe = probeSecretServiceLock,
+  notice: (message: string) => void = stderrNoticeOncePerProcess,
+): SealedStore<T> {
   if (!secrets) throw new SignInError("OmO sign-in needs Bun 1.4 or newer with OS credential storage. No file fallback is available.")
   const platformName =
     platform === "darwin"
@@ -55,7 +70,7 @@ export function createCredentialStore(
           ? "Windows Credential Manager"
           : null
   if (platformName === null) throw new SignInError("This platform has no supported OS credential store.")
-  const key = { service: "omo-cli", name: credentialId(api) }
+  const key = { service: namespace, name: credentialId(api) }
   const unavailable = (error: unknown) =>
     isLocked(error)
       ? new KeychainLockedError(`${platformName} is locked. Unlock it, then try again. Credentials are never saved to a file.`)
@@ -95,16 +110,16 @@ export function createCredentialStore(
       }
       if (value === null) return null
       try {
-        return credentialSchema.parse(JSON.parse(value))
+        return schema.parse(JSON.parse(value))
       } catch {
-        throw new SignInError("Stored sign-in data is invalid. Run omo logout, then omo login.")
+        throw new InvalidCredentialState("Stored sign-in data is invalid. Run omo logout, then omo login.")
       }
     },
     async write(value) {
       // One OS-store replacement commits the rotating token and its access token together.
       await assertUsable()
       try {
-        await secrets.set({ ...key, value: JSON.stringify(credentialSchema.parse(value)) })
+        await secrets.set({ ...key, value: JSON.stringify(schema.parse(value)) })
       } catch (error) {
         throw unavailable(error)
       }

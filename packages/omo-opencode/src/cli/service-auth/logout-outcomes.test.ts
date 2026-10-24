@@ -74,7 +74,7 @@ test("native logout journals before refresh and persists rotated credentials bef
   expect(result.code).toBe(0)
   expect(result.stdout.length).toBeGreaterThan(0)
   expect(result.stderr).toBe("")
-  expect(h.atRefresh).toEqual([{ ...expired, refreshState: "uncertain" }])
+  expect(h.atRefresh).toMatchObject([{ ...expired, refreshState: "uncertain" }])
   expect(h.atRevoke[0]).toMatchObject({ accessToken: "rotated-access", refreshToken: "rotated-refresh" })
   expect(h.atRevoke[0]).not.toHaveProperty("refreshState")
   expect(h.calls).toEqual(["POST /v1/session/refresh", "DELETE /v1/devices/device-1"])
@@ -131,7 +131,7 @@ for (const outcome of ["500", "500-terminal", "lost-response", "timeout", "netwo
     const result = await h.launch("logout", fault).result
     expect(result.code).toBe(0)
     expect(result.stdout.length).toBeGreaterThan(0)
-    expect(h.writes[0]).toEqual({ ...expired, refreshState: "uncertain" })
+    expect(h.writes[0]).toMatchObject({ ...expired, refreshState: "uncertain" })
     expect(h.readStored()).toBeNull()
     expect(h.calls).toEqual(outcome === "network" || outcome === "tls" ? [] : ["POST /v1/session/refresh"])
     expect(tlsRequests).toBe(0)
@@ -155,7 +155,7 @@ test("crashed logout refresh is cleared by a fresh logout without replay, then w
     h.entered,
     first.result.then(() => { throw new Error("logout exited before its refresh was observed") }),
   ])
-  expect(journal).toEqual({ ...expired, refreshState: "uncertain" })
+  expect(journal).toMatchObject({ ...expired, refreshState: "uncertain" })
   // Only this owned PID is killed; the held response cannot complete beforehand.
   process.kill(first.child.pid, "SIGKILL")
   await first.result

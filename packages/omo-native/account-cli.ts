@@ -78,24 +78,23 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
 }
 
 async function token(dependencies: AccountCommandDependencies): Promise<number> {
-  if ((await dependencies.store.read()) === null) return reply(dependencies, { signedIn: false }, ACCOUNT_EXIT.signedOut)
   const session = createSession({ api: dependencies.api, store: dependencies.store, ...(dependencies.home === undefined ? {} : { home: dependencies.home }) })
   try {
-    const accessToken = await session.accessToken()
-    const current = await dependencies.store.read()
+    const current = await session.accessSnapshot()
     if (current === null) return reply(dependencies, { signedIn: false }, ACCOUNT_EXIT.signedOut)
-    return reply(dependencies, { accessToken, accessTokenExpiresAt: current.accessTokenExpiresAt, device: deviceOf(current) })
+    return reply(dependencies, {
+      accessToken: current.accessToken, accessTokenExpiresAt: current.accessTokenExpiresAt,
+      device: deviceOf(current), ...(current.owner === undefined ? {} : { owner: current.owner }),
+    })
   } catch (error) {
     // Storage failures keep their own outcome; another native read can repeat the same timeout.
     if (error instanceof CredentialStoreError) throw error
+    if (error instanceof SessionEnded) return reply(dependencies, { ended: { code: error.code } }, ACCOUNT_EXIT.ended)
     const after = await dependencies.store.read()
     dependencies.error(error instanceof Error ? error.message : "omo account token: the refresh failed")
     // The refusal code tells the desktop why the sign-in ended (desktop#3522); the message never leaves stderr.
     // Any other error with the item gone means another process signed out (forget/logout) meanwhile.
-    if (after === null)
-      return error instanceof SessionEnded
-        ? reply(dependencies, { ended: { code: error.code } }, ACCOUNT_EXIT.ended)
-        : reply(dependencies, { signedIn: false }, ACCOUNT_EXIT.signedOut)
+    if (after === null) return reply(dependencies, { signedIn: false }, ACCOUNT_EXIT.signedOut)
     if (after.refreshState === "uncertain") return ACCOUNT_EXIT.uncertain
     return ACCOUNT_EXIT.failed
   }
