@@ -3,10 +3,12 @@
 // and an item the person acknowledged (status back to active) leaves the watermark so a later
 // re-flag is announced again. Read, decision, and replacement run under the identity's notice lock.
 
+import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-import { mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { mkdir, readFileSync, rename, writeFile } from "../fs/resilient"
 import type { GitMemoryRepo } from "../git"
+import { syncJournalDirectory } from "../journal/fsync"
 import { LockContentionError, createLockRecord, noticeLockPath, withLock } from "../locks"
 import { agreementItemsOf, readAgreementsAt } from "./ledger-file"
 import type { AgreementItem } from "./types"
@@ -28,6 +30,20 @@ export async function consumeAgreementsNoticeDelta(
   repo: GitMemoryRepo,
   options: ConsumeAgreementsNoticeOptions,
 ): Promise<readonly AgreementItem[]> {
+  const head = await repo.head()
+  if (head !== null) {
+    const flagged = agreementItemsOf(await readAgreementsAt(repo, head)).filter((item) => item.status === "needs-human")
+    let announced: ReadonlySet<string> | undefined
+    try {
+      announced = readWatermark(options.noticesDir)
+    } catch {
+      // Retry an anomalous optimistic read under the lock, preserving locked-path errors.
+      announced = undefined
+    }
+    // No mutation or notice is needed. A differing set, including an acknowledgement,
+    // must still be read again under the lock before consuming or replacing the watermark.
+    if (announced !== undefined && flagged.length === announced.size && flagged.every((item) => announced.has(item.id))) return []
+  }
   const record = await createLockRecord("agreements notice watermark")
   try {
     return await withLock(
@@ -46,23 +62,23 @@ async function consumeUnderLock(repo: GitMemoryRepo, noticesDir: string): Promis
   const head = await repo.head()
   if (head === null) return []
   const flagged = agreementItemsOf(await readAgreementsAt(repo, head)).filter((item) => item.status === "needs-human")
-  const announced = await readWatermark(noticesDir)
-  const fresh = flagged.filter((item) => !announced.has(item.id))
+  const announced = readWatermark(noticesDir)
+  const fresh = flagged.filter((item) => !announced?.has(item.id))
   const next = flagged.map((item) => item.id).sort()
-  if (fresh.length > 0 || next.length !== announced.size) await writeWatermark(noticesDir, next)
+  if (fresh.length > 0 || next.length !== announced?.size) await writeWatermark(noticesDir, next)
   return fresh
 }
 
-async function readWatermark(noticesDir: string): Promise<ReadonlySet<string>> {
+function readWatermark(noticesDir: string): ReadonlySet<string> | undefined {
   let parsed: unknown
   try {
-    parsed = JSON.parse(await readFile(join(noticesDir, AGREEMENTS_NOTICE_WATERMARK_FILENAME), "utf8"))
+    parsed = JSON.parse(readFileSync(join(noticesDir, AGREEMENTS_NOTICE_WATERMARK_FILENAME), "utf8"))
   } catch (error) {
-    if (error instanceof SyntaxError) return new Set()
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return new Set()
+    if (error instanceof SyntaxError) return undefined
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
     throw error
   }
-  if (!isWatermark(parsed)) return new Set()
+  if (!isWatermark(parsed)) return undefined
   return new Set(parsed.announced)
 }
 
@@ -75,8 +91,9 @@ function isWatermark(value: unknown): value is FlaggedWatermark {
 async function writeWatermark(noticesDir: string, announced: readonly string[]): Promise<void> {
   await mkdir(noticesDir, { recursive: true, mode: 0o700 })
   const target = join(noticesDir, AGREEMENTS_NOTICE_WATERMARK_FILENAME)
-  const temporary = `${target}.tmp-${process.pid}`
+  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
   const watermark: FlaggedWatermark = { version: 1, announced }
-  await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600 })
+  await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
   await rename(temporary, target)
+  await syncJournalDirectory(noticesDir)
 }

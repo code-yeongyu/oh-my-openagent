@@ -9,10 +9,12 @@
 // `notice` lock so concurrent sessions bound to the same identity cannot both
 // emit and both advance.
 
-import { mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { randomUUID } from "node:crypto"
+import { mkdir, readFileSync, rename, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { GitCommandError, type GitMemoryRepo } from "../git"
+import { syncJournalDirectory } from "../journal/fsync"
 import { LockContentionError, createLockRecord, noticeLockPath, withLock } from "../locks"
 import { SOUL_PATHS } from "./paths"
 
@@ -50,6 +52,10 @@ export async function consumeSoulNoticeDelta(
   repo: GitMemoryRepo,
   options: ConsumeSoulNoticeOptions,
 ): Promise<SoulNotice | undefined> {
+  // The immutable HEAD has already been consumed. Read the small atomic watermark without
+  // yielding to a detached recall build; any change still gets rechecked under the notice lock.
+  const head = await repo.head()
+  if (head !== null && readWatermark(options.noticesDir)?.lastNotifiedHead === head) return undefined
   const record = await createLockRecord("soul notice watermark")
   try {
     return await withLock(
@@ -70,7 +76,7 @@ async function consumeUnderLock(
 ): Promise<SoulNotice | undefined> {
   const head = await repo.head()
   if (head === null) return undefined
-  const watermark = await readWatermark(noticesDir)
+  const watermark = readWatermark(noticesDir)
   if (watermark === undefined) {
     await writeWatermark(noticesDir, head)
     return undefined
@@ -101,10 +107,10 @@ async function consumeUnderLock(
   return { sha: newest.sha, subject: newest.subject }
 }
 
-async function readWatermark(noticesDir: string): Promise<SoulHeadWatermark | undefined> {
+function readWatermark(noticesDir: string): SoulHeadWatermark | undefined {
   let parsed: unknown
   try {
-    parsed = JSON.parse(await readFile(join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME), "utf8"))
+    parsed = JSON.parse(readFileSync(join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME), "utf8"))
   } catch {
     return undefined
   }
@@ -123,8 +129,9 @@ function isWatermark(value: unknown): value is SoulHeadWatermark {
 async function writeWatermark(noticesDir: string, head: string): Promise<void> {
   await mkdir(noticesDir, { recursive: true, mode: 0o700 })
   const target = join(noticesDir, SOUL_NOTICE_WATERMARK_FILENAME)
-  const temporary = `${target}.tmp-${process.pid}`
+  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
   const watermark: SoulHeadWatermark = { version: 1, lastNotifiedHead: head }
-  await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600 })
+  await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
   await rename(temporary, target)
+  await syncJournalDirectory(noticesDir)
 }
