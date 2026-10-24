@@ -51,7 +51,8 @@ function createLaunchHarness(sessions: Record<string, SessionRecord>) {
   return { manager, promptCalls }
 }
 
-function launchToolsOf(call: Record<string, unknown>): Record<string, boolean> {
+function launchToolsOf(call: Record<string, unknown> | undefined): Record<string, boolean> {
+  if (call === undefined) throw new Error("Expected a recorded child launch prompt")
   const body = call.body as { tools: Record<string, boolean> }
   return body.tools
 }
@@ -95,7 +96,7 @@ describe("BackgroundManager child task-tool surface", () => {
 
     // then the agent-level task deny is overridden by the depth-aware grant
     expect(promptCalls).toHaveLength(1)
-    expect(launchToolsOf(promptCalls[0]!).task).toBe(true)
+    expect(launchToolsOf(promptCalls[0]).task).toBe(true)
   })
 
   test("launch grants task to an ordinary explore child within maxDepth", async () => {
@@ -114,7 +115,7 @@ describe("BackgroundManager child task-tool surface", () => {
     await manager.shutdown()
 
     // then
-    expect(launchToolsOf(promptCalls[0]!).task).toBe(true)
+    expect(launchToolsOf(promptCalls[0]).task).toBe(true)
   })
 
   test("launch keeps task denied for a team member (DAG exclusion)", async () => {
@@ -134,7 +135,7 @@ describe("BackgroundManager child task-tool surface", () => {
     await manager.shutdown()
 
     // then
-    expect(launchToolsOf(promptCalls[0]!).task).toBe(false)
+    expect(launchToolsOf(promptCalls[0]).task).toBe(false)
   })
 
   test("launch keeps task denied at the depth floor while still admitting the child", async () => {
@@ -158,7 +159,7 @@ describe("BackgroundManager child task-tool surface", () => {
 
     // then the child spawns (depth 3 <= maxDepth 3) but cannot delegate further
     expect(promptCalls).toHaveLength(1)
-    expect(launchToolsOf(promptCalls[0]!).task).toBe(false)
+    expect(launchToolsOf(promptCalls[0]).task).toBe(false)
   })
 
   test("an explicit user permission deny of task wins over the depth grant", async () => {
@@ -178,6 +179,6 @@ describe("BackgroundManager child task-tool surface", () => {
     await manager.shutdown()
 
     // then
-    expect(launchToolsOf(promptCalls[0]!).task).toBe(false)
+    expect(launchToolsOf(promptCalls[0]).task).toBe(false)
   })
 })
