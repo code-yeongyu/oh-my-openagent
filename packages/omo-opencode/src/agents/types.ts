@@ -18,6 +18,7 @@ import {
   isKimiK27Model,
   isKimiK28Model,
   isKimiK3Model,
+  isKimiK31Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
@@ -39,6 +40,7 @@ export {
   isKimiK27Model,
   isKimiK28Model,
   isKimiK3Model,
+  isKimiK31Model,
   isMiniMaxModel,
 };
 

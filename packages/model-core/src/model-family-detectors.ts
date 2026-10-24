@@ -113,8 +113,22 @@ export function isKimiK2CodeModel(model: string): boolean {
   return isKimiK27Model(model) || isKimiK28Model(model)
 }
 
+/**
+ * Kimi K3.1: `k3.1-pro` / `k3.1-pro-highspeed` on Kimi Code, `kimi-k3.1-pro` / `kimi-k3.1-pro-highspeed`
+ * on the Kimi API and gateways, `kimi-k3-1-pro` on Venice, and the dotless `k3p1`.
+ * https://www.kimi.com/code/docs/en/kimi-code/models.html and
+ * https://platform.kimi.com/docs/guide/kimi-k3-1-pro-quickstart (checked 2026-10-24).
+ * K3.1 stays inside the K3 family (isKimiK3Model is true for it); prompt routing checks K3.1 first.
+ */
+const KIMI_K31_RE = /(?:^|[/._-])(?:kimi-)?k3(?:[._-]|p)1(?:$|[/._:-])/
+
+export function isKimiK31Model(model: string): boolean {
+  return KIMI_K31_RE.test(extractModelName(model).toLowerCase().replace(/\s+/g, "-"))
+}
+
 export function isKimiK3Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase()
+  if (isKimiK31Model(model)) return true
   if (/kimi-k3/.test(modelName)) return true
   if (/k3[-.]?p?\d*$/.test(modelName)) return true
   return false

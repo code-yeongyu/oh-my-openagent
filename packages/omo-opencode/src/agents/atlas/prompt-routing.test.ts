@@ -22,7 +22,12 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
 
   test("Kimi K3 routes to its own variant, ahead of K2.7 and generic kimi", () => {
     expect(getAtlasPromptSource("opencode-go/kimi-k3")).toBe("kimi-k3")
-    expect(getAtlasPromptSource("kimi-for-coding/k3p1")).toBe("kimi-k3")
+  })
+
+  test("Kimi K3.1 routes to its own variant, ahead of K3", () => {
+    expect(getAtlasPromptSource("kimi-for-coding/k3p1")).toBe("kimi-k3-1")
+    expect(getAtlasPromptSource("kimi-coding/k3.1-pro")).toBe("kimi-k3-1")
+    expect(getAtlasPromptSource("moonshotai/kimi-k3.1-pro-highspeed")).toBe("kimi-k3-1")
   })
 
   test("Kimi K2.7 routes to its own variant, ahead of generic kimi", () => {
