@@ -6,6 +6,8 @@ const PACKAGE_PATH = join(import.meta.dir, "..", "..", "package.json")
 const ENTRY_POINT = join(import.meta.dir, "index.ts")
 // omo#8247: the Senpi adapter reuses the release-download primitives through this second public subpath.
 const BINARY_DOWNLOADER_ENTRY_POINT = join(import.meta.dir, "..", "shared", "binary-downloader.ts")
+// omo#10630: the Senpi memory sync resolver reads the CLI sign-in through this third public subpath.
+const SERVICE_AUTH_ENTRY_POINT = join(import.meta.dir, "..", "cli", "service-auth", "index.ts")
 const PACKAGES_PATH = join(import.meta.dir, "..", "..", "..", "..", "packages")
 const CONFIG_CORE_ENTRY_POINT = join(PACKAGES_PATH, "omo-config-core", "src", "index.ts")
 const NEGATIVE_FIXTURE_ENTRY_POINT = join(import.meta.dir, "..", "..", "test", "fixtures", "config-migration", "opencode-side-effect-import.ts")
@@ -100,12 +102,19 @@ describe("config-migration public subpath", () => {
         import: "./src/shared/binary-downloader.ts",
         types: "./src/shared/binary-downloader.ts",
       },
+      "./service-auth": {
+        import: "./src/cli/service-auth/index.ts",
+        types: "./src/cli/service-auth/index.ts",
+      },
     })
   })
 
-  test("#given the binary-downloader entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", () => {
+  test.each([
+    ["binary-downloader", BINARY_DOWNLOADER_ENTRY_POINT],
+    ["service-auth", SERVICE_AUTH_ENTRY_POINT],
+  ])("#given the %s entry point #when its local module graph is audited #then it imports neither OpenCode SDK modules nor plugin runtime code", (_name, entryPoint) => {
     // given
-    const modules = moduleGraph(BINARY_DOWNLOADER_ENTRY_POINT)
+    const modules = moduleGraph(entryPoint)
     const offenders: string[] = []
 
     // when

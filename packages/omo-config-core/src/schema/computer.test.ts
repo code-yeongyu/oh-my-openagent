@@ -4,6 +4,15 @@ import { OmoConfigSchema } from "./config"
 import { COMPUTER_HARNESS_SUPPORT, OmoComputerSettingsSchema } from "./computer"
 
 describe("computer settings schema", () => {
+  test("#given the cursor off switch #when config is parsed #then false survives validation", () => {
+    // given: the public config spelling requested by the owner.
+    const config = { computer: { showCursor: false } }
+    // when
+    const parsed = OmoConfigSchema.parse(config)
+    // then
+    expect(parsed.computer).toEqual({ showCursor: false })
+  })
+
   test("#given every computer key #when parsed #then the block round-trips unchanged", () => {
     // given
     const block = {

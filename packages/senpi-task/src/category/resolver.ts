@@ -1,14 +1,6 @@
-import {
-  resolveModelForDelegateTask,
-  type DelegateFallbackEntry,
-} from "@oh-my-opencode/delegate-core"
-import {
-  canonicalCategoryName,
-  type OmoCategoryConfig,
-  type OmoConfig,
-  type OmoFallbackModelObject,
-  type OmoFallbackModels,
-} from "@oh-my-opencode/omo-config-core"
+import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
+import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+import { canonicalCategoryName, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import {
   CATEGORY_DESCRIPTIONS,
@@ -16,11 +8,15 @@ import {
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
   isCategoryChainRungResolvable,
-  isCategoryChainViable,
   isCategoryGateSatisfied,
 } from "./builtins"
-import { availableChainCandidates, buildRuntimeModelChain, chainRungCandidates, type ModelChainCandidate } from "../model-chain"
+import { availableCategoryNames, gatedAvailableCategories } from "./available-names"
+import { missingChainProviders, unlistedProviderModel } from "./chain-diagnostics"
+import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
+import { withoutExcludedModels } from "../model-exclusion"
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
+import { parseAvailableModels, parseModel, parseRegistryModel } from "./registry-models"
+import { categoryModelCandidates, flattenFallbackModels } from "./user-candidates"
 import type {
   CategoryModelSelection,
   CategoryResolutionResult,
@@ -30,15 +26,9 @@ import type {
   SenpiModelRegistryPort,
 } from "./types"
 
-type ParsedModel = {
-  readonly provider: string
-  readonly modelId: string
-}
-
-type ParsedRegistryModel<TModel extends SenpiModelPort> = ParsedModel & {
-  readonly model: TModel
-  readonly displayName?: string
-}
+export { resolveAvailableCategoryNames } from "./available-names"
+export { builtinCategoryChainCandidates, missingChainProviders, unlistedProviderModel } from "./chain-diagnostics"
+export { parseAvailableModels } from "./registry-models"
 
 type ModelSelectionInput = {
   readonly selectedModel: string
@@ -47,211 +37,11 @@ type ModelSelectionInput = {
   readonly matchedFallback?: boolean
 }
 
-type AvailableModelsParseResult = {
-  readonly models: readonly string[]
-  readonly validContainer: boolean
-}
-
-const SECRET_LIKE_MODEL_FIELD_NAMES: ReadonlySet<string> = new Set([
-  "accesstoken", "apikey", "auth", "authorization",
-  "bearertoken", "clientsecret", "password", "privatekey",
-  "privatetoken", "secret", "secretkey", "token",
-] as const)
-
-function formatModel(model: ParsedModel): string {
-  return `${model.provider}/${model.modelId}`
-}
-
-function normalizeModelFieldName(key: string): string {
-  return key.replaceAll(/[^a-zA-Z0-9]/g, "").toLowerCase()
-}
-
-function hasSecretLikeModelField(model: object): boolean {
-  return Object.getOwnPropertyNames(model).some((key) =>
-    SECRET_LIKE_MODEL_FIELD_NAMES.has(normalizeModelFieldName(key))
-  )
-}
-
-function ownStringDataProperty(model: object, key: "provider" | "id" | "name"): string | undefined {
-  const descriptor = Object.getOwnPropertyDescriptor(model, key)
-  return descriptor && "value" in descriptor && typeof descriptor.value === "string" ? descriptor.value : undefined
-}
-
-function isSenpiModelPort<TModel extends SenpiModelPort>(model: unknown): model is TModel {
-  if (typeof model !== "object" || model === null || hasSecretLikeModelField(model)) return false
-  return ownStringDataProperty(model, "provider") !== undefined && ownStringDataProperty(model, "id") !== undefined
-}
-
-function parseRegistryModel<TModel extends SenpiModelPort>(
-  model: unknown,
-  expected?: ParsedModel,
-): ParsedRegistryModel<TModel> | undefined {
-  if (!isSenpiModelPort<TModel>(model)) {
-    return undefined
-  }
-  const provider = ownStringDataProperty(model, "provider")
-  const modelId = ownStringDataProperty(model, "id")
-  const displayName = ownStringDataProperty(model, "name")
-  if (!provider || !modelId || (expected !== undefined && (provider !== expected.provider || modelId !== expected.modelId))) {
-    return undefined
-  }
-  return { model, provider, modelId, ...(displayName !== undefined && displayName.trim().length > 0 && displayName.length <= 120 && !/[\u0000-\u001f\u007f-\u009f]/u.test(displayName) ? { displayName } : {}) }
-}
-
-function parseModel(model: string): ParsedModel | undefined {
-  const separatorIndex = model.indexOf("/")
-  if (separatorIndex <= 0 || separatorIndex === model.length - 1) {
-    return undefined
-  }
-  return {
-    provider: model.slice(0, separatorIndex),
-    modelId: model.slice(separatorIndex + 1),
-  }
-}
-
-function fallbackObjectToString(fallback: OmoFallbackModelObject): string {
-  return fallback.variant ? `${fallback.model} ${fallback.variant}` : fallback.model
-}
-
-function flattenFallbackModels(fallbackModels: OmoFallbackModels | undefined): readonly string[] | undefined {
-  if (fallbackModels === undefined) {
-    return undefined
-  }
-  if (typeof fallbackModels === "string") {
-    return [fallbackModels]
-  }
-  return fallbackModels.map((fallback) => typeof fallback === "string" ? fallback : fallbackObjectToString(fallback))
-}
-
-function categoryModelCandidates(config: OmoCategoryConfig): readonly ModelChainCandidate[] {
-  // Canonical models[] wins over the legacy model + fallback_models branch: entry zero is the
-  // primary model and the rest become the ordered runtime fallback chain.
-  if (config.models !== undefined && config.models.length > 0) {
-    return config.models.map((entry): ModelChainCandidate => {
-      if (typeof entry === "string") return { model: entry }
-      return {
-        model: entry.model,
-        ...(entry.variant !== undefined ? { variant: entry.variant } : {}),
-        ...(entry.reasoning !== undefined ? { reasoningEffort: entry.reasoning } : {}),
-      }
-    })
-  }
-
-  const categoryReasoning = config.reasoning ?? config.reasoningEffort
-  const primary = config.model === undefined
-    ? []
-    : [{
-        model: config.model,
-        ...(config.variant !== undefined ? { variant: config.variant } : {}),
-        ...(categoryReasoning !== undefined
-          ? { reasoningEffort: categoryReasoning }
-          : {}),
-      }]
-  const fallbackModels = config.fallback_models
-  if (fallbackModels === undefined) return primary
-
-  const entries = typeof fallbackModels === "string" ? [fallbackModels] : fallbackModels
-  const fallbacks = entries.map((entry): ModelChainCandidate => {
-    if (typeof entry === "string") {
-      return {
-        model: entry,
-        ...(config.variant !== undefined ? { variant: config.variant } : {}),
-        ...(config.reasoningEffort !== undefined
-          ? { reasoningEffort: config.reasoningEffort }
-          : {}),
-      }
-    }
-    return {
-      model: entry.model,
-      ...(entry.variant ?? config.variant) !== undefined
-        ? { variant: entry.variant ?? config.variant }
-        : {},
-      ...(entry.reasoning ?? config.reasoning ?? entry.reasoningEffort ?? config.reasoningEffort) !== undefined
-        ? { reasoningEffort: entry.reasoning ?? config.reasoning ?? entry.reasoningEffort ?? config.reasoningEffort }
-        : {},
-    }
-  })
-  return [...primary, ...fallbacks]
-}
-
-function availableCategoryNames(config: OmoConfig, availableModels?: ReadonlySet<string>): readonly string[] {
-  const names = Array.from(new Set([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(config.categories ?? {})])).sort()
-  if (availableModels === undefined) return names
-  const userCategories = config.categories ?? {}
-  return names.filter((name) => {
-    const hasExplicitUserConfig = getOwnRecordValue(userCategories, name) !== undefined
-    return isCategoryGateSatisfied(name, hasExplicitUserConfig, availableModels)
-      && isCategoryChainViable(name, hasExplicitUserConfig, availableModels)
-  })
-}
-
-// Gated listing for the disabled/not_found early returns. The registry is only consulted best
-// effort here: a throwing or malformed registry degrades to the ungated list (today's behavior),
-// since those results never resolve a model anyway.
-function gatedAvailableCategories<TModel extends SenpiModelPort>(
-  config: OmoConfig,
-  senpiModelRegistry: SenpiModelRegistryPort<TModel>,
-): readonly string[] {
-  try {
-    const parsed = parseAvailableModels(senpiModelRegistry.getAvailable())
-    if (!parsed.validContainer) return availableCategoryNames(config)
-    return availableCategoryNames(config, new Set(parsed.models))
-  } catch {
-    return availableCategoryNames(config)
-  }
-}
-
-export function resolveAvailableCategoryNames<TModel extends SenpiModelPort>(
-  config: OmoConfig,
-  senpiModelRegistry: SenpiModelRegistryPort<TModel>,
-): readonly string[] {
-  return gatedAvailableCategories(config, senpiModelRegistry)
-}
-
-// Chain providers with no model in the live registry, in chain order, deduplicated.
-export function missingChainProviders(
-  chain: readonly DelegateFallbackEntry[],
-  availableModels: readonly string[],
-): readonly string[] {
-  const connected = new Set(availableModels.map((model) => model.slice(0, model.indexOf("/"))))
-  const missing: string[] = []
-  for (const rung of chain) {
-    for (const provider of rung.providers) {
-      if (!connected.has(provider) && !missing.includes(provider)) missing.push(provider)
-    }
-  }
-  return missing
-}
-
-// The first rung model, in chain order, that only an unlisted provider (a gateway or custom proxy)
-// serves. Builtin resolution never selects it; it is the exact pin a user may opt into (#9146).
-export function unlistedProviderModel(
-  chain: readonly DelegateFallbackEntry[],
-  availableModels: readonly string[],
-): string | undefined {
-  const available = new Set(availableModels)
-  for (const rung of chain) {
-    const match = resolveModelForDelegateTask(
-      { fallbackChain: [rung], allowUnlistedProviders: true, availableModels: available },
-      { connectedProviders: null, hasProviderModelsCache: true, hasConnectedProvidersCache: true },
-    )
-    if (match !== undefined && "model" in match) return match.model
-  }
-  return undefined
-}
-
 function getOwnRecordValue<TValue>(
   record: Readonly<Record<string, TValue>>,
   key: string,
 ): TValue | undefined {
   return Object.hasOwn(record, key) ? record[key] : undefined
-}
-
-export function parseAvailableModels(models: unknown): AvailableModelsParseResult {
-  if (!Array.isArray(models)) {
-    return { models: [], validContainer: false }
-  }
-  return { models: models.map((model) => parseRegistryModel(model)).filter((model) => model !== undefined).map(formatModel).sort(), validContainer: true }
 }
 
 function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
@@ -281,26 +71,13 @@ function modelSelection(input: ModelSelectionInput): CategoryModelSelection {
   }
 }
 
-/**
- * The builtin fallback chain of a category, resolved against the models the registry reports as
- * available, in chain order. `resolveCategory` leaves a user-forced model's chain untouched; a
- * background child that must not die with its one refused pin appends these rungs itself.
- */
-export function builtinCategoryChainCandidates<TModel extends SenpiModelPort>(
-  requestedCategoryName: string,
-  senpiModelRegistry: SenpiModelRegistryPort<TModel>,
-): readonly ModelChainCandidate[] {
-  const chain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, canonicalCategoryName(requestedCategoryName))
-  if (chain === undefined) return []
-  return availableChainCandidates(chain, new Set(parseAvailableModels(senpiModelRegistry.getAvailable()).models))
-}
-
 export function resolveCategory<TModel extends SenpiModelPort>(
   requestedCategoryName: string,
   omoConfig: OmoConfig,
-  senpiModelRegistry: SenpiModelRegistryPort<TModel>,
+  registry: SenpiModelRegistryPort<TModel>,
   options: ResolveCategoryOptions = {},
 ): CategoryResolutionResult<TModel> {
+  const senpiModelRegistry = withoutExcludedModels(registry, omoConfig.exclude_models)
   // A retired builtin name resolves to its replacement so third-party skills and AGENTS.md text
   // spawning the old category keep working; a user category of that name still wins over the alias.
   const userCategories = omoConfig.categories

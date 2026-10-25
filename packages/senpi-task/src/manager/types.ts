@@ -2,40 +2,35 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
-import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
 import type { IsolationRuntime, IsolationStartedDetails } from "../isolation"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { KernelToolGrant } from "../kernel-tools/resolve"
 import type {
+  EffectiveModelRecord,
   ResolvedModelRecord,
   TaskRecord,
-  TaskRunStats,
   TaskStartFailureKind,
   TaskStartFailureReason,
   TaskStatus,
 } from "../state"
-import type {
-  CancelOptions,
-  CancelOutcome,
-  DestructionPort,
-  InterruptOutcome,
-  SendInput,
-  SendOutcome,
-} from "../steering"
+import type { DestructionPort, SendOutcome } from "../steering"
 import type { TaskRecordStore } from "../store"
-import type { ManagedChildHandle, ManagedChildListener } from "./child-handle"
+import type { ManagedChildHandle } from "./child-handle"
 import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 import type { TaskConcurrency } from "./concurrency"
 import type { InheritedExtensions } from "../runners/rpc/parent-extensions"
-import type { WorkpoolEngine } from "../workpool/engine"
 import type { ChildExtensionEvent } from "../runners/child-extension-events"
 import type { ExitConfirmationSchedule } from "./provisional-exit"
+import type { ChildCreationPort, ChildPausePort, ResumedChildTurn, RunPauseOwner } from "../pause/ports"
+import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
+import type { HeldStart, StartAdmission } from "./start-admission"
 
 export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
 // The unified spec both runner adapters accept. A superset: the rpc adapter uses the subset it
 // needs (task_id, cwd, state_dir, prompt); the in-process adapter also consumes model/tools/agent.
 export type ManagedStartSpec = {
+  readonly admission?: StartAdmission
   readonly taskId: string
   readonly cwd: string
   readonly stateDir: string
@@ -66,16 +61,32 @@ export type ManagedStartSpec = {
   readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
+  // The delegating turn's W3C traceparent, for a process child's own turn spans. Launch-time only:
+  // never persisted on the spawn spec, so a respawned or resumed child starts its own trace.
+  readonly traceparent?: string
+}
+
+// A created child whose first prompt is not sent yet; `begin` sends it and returns that turn.
+export type StagedManagedChild = {
+  readonly child: ManagedChildHandle
+  readonly firstPrompt: string
+  begin(): ResumedChildTurn
 }
 
 export type ManagedRunner = {
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle>
+  // Runners that can create a child without its first prompt, so a Stop that lands during creation
+  // holds that prompt instead of letting the first turn start.
+  startStaged?(spec: ManagedStartSpec): Promise<StagedManagedChild>
+  settleTeardowns?(): Promise<void>
   // Rebuild a persisted child from its session transcript without replaying its prompt. Optional
   // until the mode adapters grow their resume paths (todo 10); start-only fakes keep compiling.
   resume?(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle>
 }
 
 export type ManagerStartSpec = {
+  readonly admission?: StartAdmission
+  readonly resumeCredential?: ResumeCredential
   readonly isolated?: boolean
   readonly apply?: boolean
   readonly merge?: "patch" | "branch"
@@ -88,6 +99,8 @@ export type ManagerStartSpec = {
   readonly subagent_type?: string
   readonly execution_mode?: ExecutionMode
   readonly model?: string
+  // `provider/model` the parent session runs at spawn; appended as a category child's last rung (#10750).
+  readonly parent_model?: string
   readonly name?: string
   readonly description?: string
   readonly team_run_id?: string
@@ -143,6 +156,7 @@ export type PlanResolution =
 export type ChildPlanner = (spec: ManagerStartSpec) => PlanResolution
 
 export type StartResult =
+  | HeldStart
   | {
       readonly kind: "started"
       readonly task_id: string
@@ -153,8 +167,11 @@ export type StartResult =
       readonly resolved_model?: ResolvedModelRecord
       // The model the child ACTUALLY started on, read from the child itself (never the plan) -
       // absent for a queued start that has not launched yet (#9722).
-      readonly effective_model?: ResolvedModelRecord
+      readonly effective_model?: EffectiveModelRecord
       readonly queue_position?: number
+      // The task host has not admitted the child yet; its start outcome arrives on the record (#10042).
+      // run_epoch and resolved_model are then the plan's: a start-time fallback may still move both.
+      readonly starting?: true
       readonly name_warning?: string
       // Where an isolated child is working. The merge outcome is NOT here: it does not exist yet.
       readonly isolation?: IsolationStartedDetails
@@ -212,6 +229,7 @@ export type ResidencyDenied =
 export type ContinueDelivery = "steer" | "followUp" | "revive"
 
 export type ContinueResult =
+  | Extract<SendOutcome, { kind: "uncertain" }>
   | {
       readonly kind: "continued"
       readonly task_id: string
@@ -256,6 +274,11 @@ export type TrustedRespawnLaunch = {
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
 export type TaskManagerOptions = {
+  readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
+  readonly childCreationPort?: ChildCreationPort
+  readonly admissionBarrier?: AdmissionBarrier
+  readonly onHeldAdmission?: (result: HeldStart, spec: ManagerStartSpec) => void
+  readonly childPausePort?: ChildPausePort
   readonly onChildExtensionEvent?: (event: ChildExtensionEvent, owner: TaskRecord) => void
   readonly concurrency?: TaskConcurrency
   // Injected by row 17. Absent, `isolated` children are refused rather than silently run against the
@@ -284,6 +307,8 @@ export type TaskManagerOptions = {
   // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
   // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
   readonly hostPid?: number
+  // Whether a recorded owner host still runs; defaults to the lifecycle's signal-0 probe.
+  readonly isProcessAlive?: (pid: number) => boolean
   // The parent engine's RUNTIME-ONLY kernel-tool capability map (item 6). Shared with the runner so
   // a same-host parked child revives onto the same live parent closures; absent = no kernel tools.
   readonly kernelToolBindings?: KernelToolBindingRegistry
@@ -293,52 +318,9 @@ export type TaskManagerOptions = {
   // capability check). Absent -> `auto` reads as in-process, which is what a wiring without a
   // daemon (tests, a pinned engine without the host surface) must do.
   readonly executionModeGate?: ExecutionModeGate
+  // The parent session's current turn traceparent (raw session id in), read once per launch. Absent or
+  // undefined -> the child carries no inherited trace context.
+  readonly traceparentFor?: (parentSessionId: string) => string | undefined
 }
 
-export type TaskManager = {
-  readonly workpools?: WorkpoolEngine
-  // Optional for structural adapters; the concrete manager exposes its live lease allocator.
-  readonly concurrency?: TaskConcurrency
-  findTaskByChildSession?(sessionId: string): TaskRecord | undefined
-  start(spec: ManagerStartSpec): Promise<StartResult>
-  startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
-  findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined
-  continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
-  sendToTask(input: SendInput): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
-  cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
-  get(taskId: string): TaskRecord | undefined
-  hasPendingSends?(taskId: string): boolean
-  hasInFlightSends?(taskId: string): boolean
-  tryClaimEviction?(taskId: string): boolean
-  releaseEviction?(taskId: string): void
-  isEvicting?(taskId: string): boolean
-  tryBeginSend?(taskId: string): boolean
-  endSend?(taskId: string): void
-  list(scope: ListScope): readonly ListedTask[]
-  waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>
-  // Live read of the manager-owned run-stats accumulator. Snapshot and live TUI surfaces need
-  // in-flight turns/tool-calls/tok-s; the record only carries run_stats once terminal.
-  // Optional so downstream structural fakes keep compiling; the concrete manager always implements it.
-  runStatsSnapshot?(taskId: string): TaskRunStats | undefined
-  // W1-V F3: prune a live handle (and its per-epoch release/background bookkeeping) so the lifecycle
-  // destruction port and eviction path never leave a stale handle behind or grow #live unbounded.
-  forget(taskId: string, options: ForgetOptions): void
-  // Live-handle read seam for the wiring's ResidencyRegistry (W1-V F7: registry and #live share one
-  // forget path). Returns the ManagedChildHandle for a task this process still owns, if any.
-  getResidentHandle(taskId: string): ManagedChildHandle | undefined
-  // Subscribe at the runner-agnostic handle seam now or when a queued task is promoted.
-  subscribeChild(taskId: string, listener: ManagedChildListener): () => void
-  residentTaskIds(): readonly string[]
-  // #8396: session-scoped residency wake. Resolves the next time the parent session's residency
-  // picture changes - a resident child reaches a terminal status, is forgotten (evicted, suspended,
-  // destroyed), or has its last pending send drained - so a caller denied for residency can park
-  // and re-probe instead of judging the SESSION by its own bookkeeping. Repeatable: each call arms
-  // the NEXT change, so arm it BEFORE the probe whose denial you intend to wait out.
-  residencyChanged(parentSessionId: string): Promise<void>
-  // Promote a foreground task when the tool stops waiting inline. The completion bridge reads this
-  // state live at terminal transition, so promotion makes the eventual completion notify normally.
-  promoteToBackground(taskId: string): boolean
-  // Whether a task is currently background, either from its spawn spec or a later promotion.
-  wasBackground(taskId: string): boolean
-}
+export type { TaskManager } from "./manager-contract"

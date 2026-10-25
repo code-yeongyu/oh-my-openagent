@@ -25,7 +25,7 @@ const SAMPLE_TEMPLATE = [
 const FOOTER_FIXTURE = "FOOTER_PROPAGATION_SENTINEL_9d41"
 
 /**
- * Source parser for the rendered skill: every `git commit -m` line inside
+ * Source parser for the rendered skill: every `git [-c ...] commit -m` line inside
  * bash code blocks, in render order. Observes what the injected commit
  * example actually ships instead of diffing two production outputs.
  */
@@ -36,7 +36,7 @@ function bashCommitExampleLines(rendered: string): string[] {
 	return bashBlocks.flatMap((block) =>
 		block
 			.split("\n")
-			.filter((line) => line.includes("git commit -m")),
+			.filter((line) => / commit -m /.test(line)),
 	)
 }
 
@@ -195,8 +195,8 @@ describe("#given git_env_prefix with commit footer", () => {
 		})
 	})
 
-	describe("#when the deprecated co-author flag is enabled alongside the footer", () => {
-		it("#then the injected commit example carries the fixture but never a co-author trailer", () => {
+	describe("#when the co-author flag is enabled alongside the footer", () => {
+		it("#then one prefixed commit example carries the fixture and the sisyphus-dev-ai trailer with git's dedup option", () => {
 			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
 				commit_footer: FOOTER_FIXTURE,
 				include_co_authored_by: true,
@@ -206,22 +206,32 @@ describe("#given git_env_prefix with commit footer", () => {
 			const examples = bashCommitExampleLines(result)
 			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
 
-			// the fixture still reaches a prefixed commit example
-			expect(injected.some((line) => line.startsWith("GIT_MASTER=1 git commit"))).toBe(true)
-			// no GitHub-resolvable identity is ever emitted
-			expect(result).not.toMatch(/Co-authored-by:/i)
+			expect(injected).toEqual([
+				`GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" -m "${FOOTER_FIXTURE}" --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`,
+			])
+			expect(result.split('--trailer "').length - 1).toBe(1)
 			expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
 		})
 	})
 
 	describe("#when no config is provided", () => {
-		it("#then no attribution section is injected at all", () => {
+		it("#then only the co-author trailer is injected, under the default prefix, and no footer", () => {
 			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE))
 
-			expect(result).not.toContain("Commit Footer")
+			expect(result).toContain(
+				`GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`,
+			)
 			expect(result).not.toContain("Ultraworked with")
-			expect(result).not.toMatch(/Co-authored-by:/i)
 			expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
+		})
+	})
+
+	describe("#when include_co_authored_by is false and the footer is off", () => {
+		it("#then no attribution section is injected at all", () => {
+			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, { include_co_authored_by: false }))
+
+			expect(result).not.toContain("5.5 Commit Attribution")
+			expect(result).not.toMatch(/Co-authored-by:/i)
 		})
 	})
 })

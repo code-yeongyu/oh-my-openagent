@@ -24,12 +24,13 @@ import {
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { createLateSendOutcomeDeliverer } from "./late-send-outcome"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
 import { registerDagCommands } from "./dag-commands"
 import { createDagReloadSource } from "./dag-reload-source"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
-import { createDagTool } from "./dag-tool"
+import { registerDagTool } from "./register-workflow-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { registerEvalHandleHost } from "./eval-handle-host"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
@@ -51,7 +52,7 @@ import { registerWorkpoolTool } from "./workpool-tool"
 const TASK_ENABLED_FLAG = "omo-task"
 
 export { wireEventBridge } from "./event-bridge"
-export { createInProcessJudgeRunner, findModelReference } from "./judge-runner"
+export { createInProcessJudgeRunner, findModelReference, isModelUnavailableStart } from "./judge-runner"
 export type { InProcessRunnerLike } from "./judge-runner"
 
 export interface TaskComponentOptions {
@@ -157,8 +158,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
           ...(engine.settings.state_dir !== undefined ? { task: { state_dir: engine.settings.state_dir } } : {}),
         },
         settings: engine.settings,
+        logger: ctx.logger,
       })
-      engine.onStoreMutation(() => {
+      engine.onStoreMutation((change) => {
+        statusUi.observeRecord(change)
         statusUi.scheduleSync()
         dagRuntime.sync()
         void resumptionChannels.emitIfChanged().catch((error: unknown) => {
@@ -237,6 +240,7 @@ function registerTaskTools(
     ...createTaskSendTool({
       manager,
       resolveCallerSessionId,
+      deliverLateOutcome: createLateSendOutcomeDeliverer(pi, () => engine.runtime.sessionId()),
       teamRouting: { service: teamService, from: TEAM_LEAD_SENTINEL, ...(resolveDefaultTeamRunId !== undefined ? { resolveDefaultTeamRunId } : {}) },
     }),
   })
@@ -249,25 +253,6 @@ function registerTaskTools(
   registerEvalHandleHost(pi, engine)
 }
 
-function registerDagTool(pi: SenpiExtensionAPI, engine: TaskEngine, runtime: DagRuntime): void {
-  const sessionId = (): string => engine.runtime.sessionId() ?? ""
-  const rootSessionId = (): string => {
-    const id = sessionId()
-    return engine.resolveAncestry(id)?.rootSessionId ?? id
-  }
-  pi.registerTool({
-    ...createDagTool({
-      manager: runtime.manager,
-      parentSessionId: sessionId,
-      rootSessionId,
-      wait: runtime.wait,
-      cancel: runtime.cancel,
-      retry: runtime.retry,
-      send: runtime.send,
-      amend: runtime.amend,
-    }),
-  })
-}
 
 export function wireDagLifecycle(
   pi: SenpiExtensionAPI,
@@ -297,7 +282,7 @@ function createTeamToolContext(
     omoConfig: engine.omoConfig,
     cwd: engine.runtime.cwd(),
     agentNames: new Set(Object.keys(engine.agents)),
-    ...(engine.ancestry === undefined ? {} : { ancestry: engine.ancestry }),
+    resolveAncestry: engine.resolveAncestry,
   }
   const baseService = createTeamService(serviceDeps)
   const stateDir = {

@@ -1,6 +1,10 @@
 // allow: SIZE_OK - recovery keeps lease claiming, node reconciliation, and resumed frontier admission in one crash-safety boundary.
 import * as fs from "node:fs"
 import { join } from "node:path"
+import type { ResumeCredential } from "../pause/admission-barrier"
+import type { DagScheduler } from "./scheduler"
+import { installRecoveredDag } from "./recovery-install"
+import type { PausedChildRecoveryPort } from "./paused-child-recovery"
 
 import { defaultSignaller } from "../lifecycle/context"
 import type { ManagerStartSpec, TaskManager } from "../manager/types"
@@ -34,7 +38,7 @@ const LIVE_RUN_STATUSES = new Set(["pending", "running"])
 // attempt. Retries/amendments also consume this budget; recovery never advances it past three.
 const MAX_RECOVERY_READMISSIONS = 3
 
-type RecoverableRecord = DagRunRecordV1 & {
+export type RecoverableRecord = DagRunRecordV1 & {
   readonly leaseHolderPid?: number
   readonly previousLeaseHolderPid?: number
 }
@@ -53,6 +57,7 @@ export type DagRecoveryOutcome = {
 }
 
 export type DagRecoveryOptions = {
+  readonly pausedChildren?: PausedChildRecoveryPort
   readonly store: DagFileStore
   readonly taskManager: TaskManager
   readonly hostPid?: number
@@ -74,11 +79,21 @@ export type DagRecoveryOptions = {
 }
 
 export type DagRecovery = {
+  readonly installResumedRun: (runId: DagRunId, parentSessionId: string, pauseSeq: number, credential?: ResumeCredential) => Promise<InstalledDagRun | DagRecoveryOutcome>
   readonly pauseRunsForShutdown: (parentSessionId: string) => readonly DagRunId[]
   readonly resumePausedRuns: (parentSessionId: string, forkSourceSessionId?: string) => Promise<readonly DagRecoveryOutcome[]>
 }
 
-type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager">> & {
+export type InstalledDagRun = {
+  readonly kind: "installed"
+  readonly runId: DagRunId
+  readonly scheduler: DagScheduler
+  readonly settled: Promise<DagRecoveryOutcome>
+}
+
+export type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager">> & {
+  readonly pausedChildren?: PausedChildRecoveryPort
+  readonly resumeCredential?: ResumeCredential
   readonly hostPid: number
   readonly isProcessAlive: (pid: number) => boolean
   readonly isRunHeldInProcess?: (runId: DagRunId) => boolean
@@ -90,7 +105,7 @@ type RecoveryContext = Required<Pick<DagRecoveryOptions, "store" | "taskManager"
   readonly ancestry?: { readonly depth: number }
 }
 
-type RecoveryPendingTerminalResult = {
+export type RecoveryPendingTerminalResult = {
   readonly record: TaskRecord
 }
 
@@ -108,6 +123,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     ...(options.isRunHeldInProcess === undefined ? {} : { isRunHeldInProcess: options.isRunHeldInProcess }),
     now: options.now ?? Date.now,
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
+    ...(options.pausedChildren === undefined ? {} : { pausedChildren: options.pausedChildren }),
     ...(options.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: options.nodeSpawnPolicy }),
     ...(options.stopAdmission === undefined ? {} : { stopAdmission: options.stopAdmission }),
     ...(options.reattach === undefined ? {} : { reattach: options.reattach }),
@@ -115,6 +131,13 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
   }
 
   return {
+    installResumedRun: async (runId, parentSessionId, pauseSeq, credential) => {
+      const record = context.store.readCheckpoint<RecoverableRecord>(runId)
+      if (record?.pause?.pauseSeq !== pauseSeq) return { kind: "skipped", runId, reason: "not_paused" }
+      const claim = claimPausedRun(context, runId, parentSessionId)
+      if (claim.kind === "skipped") return { ...claim, runId }
+      return installResumedRun({ ...context, ...(credential === undefined ? {} : { resumeCredential: credential }) }, claim.record)
+    },
     pauseRunsForShutdown: (parentSessionId) => pauseRunsForShutdown(context, parentSessionId),
     resumePausedRuns: (parentSessionId, forkSourceSessionId) => resumePausedRuns(context, parentSessionId, forkSourceSessionId),
   }
@@ -123,6 +146,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
 function pauseRunsForShutdown(context: RecoveryContext, parentSessionId: string): readonly DagRunId[] {
   const paused: DagRunId[] = []
   for (const observed of listRunRecords(context.store)) {
+    if (observed.pause?.reason === "user_stop") continue
     if (observed.parentSessionId !== parentSessionId || !LIVE_RUN_STATUSES.has(observed.status)) continue
     context.stopAdmission?.(observed.runId)
     const journal = recoveryJournal(context, observed)
@@ -147,6 +171,7 @@ async function resumePausedRuns(
   const outcomes: DagRecoveryOutcome[] = []
   const forkSource = normalizeSessionId(forkSourceSessionId)
   for (const observed of listRunRecords(context.store)) {
+    if (observed.pause?.reason === "user_stop") continue
     const foreign = observed.parentSessionId !== parentSessionId
     if (foreign && (forkSource === undefined || normalizeSessionId(observed.parentSessionId) !== forkSource)) continue
     const claim = foreign
@@ -220,30 +245,15 @@ function holderStillLive(context: RecoveryContext, runId: DagRunId, holderPid: n
 }
 
 async function resumeClaimedRun(context: RecoveryContext, claimed: RecoverableRecord): Promise<DagRecoveryOutcome> {
-  const pendingErrors = new Map<DagNodeId, DagNodeError>()
-  const pendingTerminalResults = new Map<DagNodeId, RecoveryPendingTerminalResult>()
-  const journal = recoveryJournal(context, claimed, pendingErrors, pendingTerminalResults)
-  const reusedOutputs = new Map<DagNodeId, string>()
-  const reattachedTasks = new Map<DagNodeId, string>()
-  try {
-    await reconcileNodes(context, journal, reusedOutputs, pendingErrors, pendingTerminalResults, reattachedTasks)
-    const generation = journal.snapshot().generation + 1
-    journal.append(dagRunResumedEvent({ generation }))
-    const scheduler = createDagScheduler({
-      store: context.store,
-      taskManager: context.taskManager,
-      initialRecord: journal.snapshot(),
-      ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
-      ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),
-      ...(reattachedTasks.size === 0 ? {} : { preAttachedTasks: reattachedTasks }),
-      ...(context.ancestry === undefined ? {} : { ancestry: context.ancestry }),
-      now: context.now,
-    })
-    const record = await scheduler.run()
-    return { runId: claimed.runId, kind: "resumed", record, reusedOutputs }
-  } finally {
-    releaseLease(context, claimed.runId)
-  }
+  return (await installResumedRun(context, claimed)).settled
+}
+
+async function installResumedRun(context: RecoveryContext, claimed: RecoverableRecord): Promise<InstalledDagRun> {
+  return installRecoveredDag(context, claimed, {
+    journal: (record, errors, results) => recoveryJournal(context, record, errors, results),
+    reconcile: (journal, outputs, errors, results, tasks) => reconcileNodes(context, journal, outputs, errors, results, tasks),
+    release: () => releaseLease(context, claimed.runId),
+  })
 }
 
 async function reconcileNodes(
@@ -273,7 +283,7 @@ async function reconcileNodes(
       continue
     }
     if (observed.state === "failed" || observed.state === "cancelled" || observed.state === "skipped") continue
-    if (observed.state !== "scheduled" && observed.state !== "running") continue
+    if (observed.state !== "scheduled" && observed.state !== "running" && observed.state !== "paused") continue
 
     const owned = context.taskManager.findOwnedTask(ownerKey(journal.snapshot(), observed.id))
     // Retrying retains taskId until the next admission batch attaches its replacement. The
@@ -283,7 +293,8 @@ async function reconcileNodes(
 
     if (task === undefined && observed.state === "scheduled" && observed.taskId === undefined) {
       const result = await context.taskManager.startOwned(
-        startSpec(journal.snapshot(), observed.id, context.ancestry?.depth ?? 0),
+        { ...startSpec(journal.snapshot(), observed.id, context.ancestry?.depth ?? 0),
+          ...(context.resumeCredential === undefined ? {} : { resumeCredential: context.resumeCredential }) },
         taskOwner(journal.snapshot(), observed.id),
       )
       if (result.kind === "residency_denied") {
@@ -328,7 +339,7 @@ async function reconcileNodes(
     // instead of being awaited here: blocking inside reconcile froze the whole run in `paused` for
     // as long as the slowest child ran, withholding `dag.run.resumed`, the reuse events of every
     // node ordered after it, and every operator lever that refuses on an active run.
-    if (task.status === "pending" || task.status === "running") {
+    if (task.status === "pending" || task.status === "running" || task.status === "paused") {
       const orphaned = startedHere.has(task.task_id) ? undefined : orphanedTaskReason(context, task)
       if (orphaned !== undefined) {
         failNode(journal, observed.id, "resume_task_orphaned", orphaned, context.now, pendingErrors)
@@ -392,6 +403,10 @@ function attachStartedOrFail(
   now: () => number,
   pendingErrors: Map<DagNodeId, DagNodeError>,
 ): TaskRecord | undefined {
+  if (result.kind === "held") {
+    journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq: result.pauseSeq })
+    return undefined
+  }
   if (result.kind === "started") {
     attachTask(journal, nodeId, result.task_id)
     return undefined
@@ -409,7 +424,7 @@ function foldTaskOutcome(
   pendingErrors: Map<DagNodeId, DagNodeError>,
   pendingTerminalResults: Map<DagNodeId, RecoveryPendingTerminalResult>,
 ): void {
-  if (task.status === "pending" || task.status === "running") {
+  if (task.status === "pending" || task.status === "running" || task.status === "paused") {
     throw new Error(`TaskManager.waitFor returned nonterminal task ${task.task_id}`)
   }
   if (task.status === "completed") {
@@ -566,7 +581,7 @@ function persistedNode(record: DagRunRecordV1, nodeId: DagNodeId): DagPersistedN
   return node
 }
 
-function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" }>): {
+function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" | "held" }>): {
   readonly code: DagNodeErrorCode
   readonly message: string
 } {
@@ -578,7 +593,7 @@ function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "starte
   }
 }
 
-function taskFailure(status: Exclude<TaskStatus, "completed" | "pending" | "running">, message?: string): {
+function taskFailure(status: Exclude<TaskStatus, "completed" | "pending" | "running" | "paused">, message?: string): {
   readonly code: DagNodeErrorCode
   readonly message: string
 } {

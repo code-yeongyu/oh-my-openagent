@@ -15,7 +15,7 @@ we run on is a deliberate choice, not an accident of neglect.
 | Fact | Value |
 |---|---|
 | Upstream project | `https://github.com/fivetaku/insane-search` |
-| Vendoring commit | `a4e4ed797` (2026-06-21) `feat(ultimate-browsing): vendor insane-search engine (junk-excluded)` |
+| Import commit | `a4e4ed797` (2026-06-21) `feat(ultimate-browsing): vendor insane-search engine (junk-excluded)` |
 | De-personalization | `4743199a5` (2026-06-21) |
 | Pinned upstream baseline | upstream state as of 2026-06-21, **pre-0.7.0** (0.7.0 is dated 2026-06-22) |
 | Re-vendors since | none — every later change here is ours |

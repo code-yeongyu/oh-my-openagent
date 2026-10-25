@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { spawn } from "node:child_process"
-import { chmodSync, realpathSync } from "node:fs"
+import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -15,6 +15,7 @@ import {
   mirrorLogPath,
 } from "./mirror"
 import { removeTree } from "../../../../test-support/remove-tree"
+import { createMirrorRepo, initBareMirror } from "./mirror.test-support"
 
 const tempDirs: string[] = []
 
@@ -53,22 +54,12 @@ async function tempDir(prefix: string): Promise<string> {
 /** A repo with the post-commit snippet installed, run inline so pushes are deterministic. */
 async function createRepo(): Promise<{ dir: string; repo: GitMemoryRepo; mirror: MirrorSync }> {
   const dir = await tempDir("memory-mirror-repo-")
-  const repo = new GitMemoryRepo({ dir, agentId: "agent-mirror" })
-  await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "seed\n" }] })
-  await installPostCommit(dir)
-  return { dir, repo, mirror: new MirrorSync({ repo }) }
-}
-
-async function installPostCommit(dir: string): Promise<void> {
-  const path = join(dir, ".git", "hooks", "post-commit")
-  await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, getPostCommitHookScript(), "utf8")
-  chmodSync(path, 0o755)
+  return createMirrorRepo(dir)
 }
 
 async function createBareMirror(): Promise<string> {
   const dir = await tempDir("memory-mirror-bare-")
-  await run(["git", "init", "--bare", "--quiet", "--initial-branch=main"], dir)
+  await initBareMirror(dir)
   return dir
 }
 

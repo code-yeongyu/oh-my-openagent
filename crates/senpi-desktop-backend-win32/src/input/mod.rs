@@ -36,6 +36,8 @@ mod foreground;
 #[cfg(target_os = "windows")]
 mod global;
 #[cfg(target_os = "windows")]
+mod holds;
+#[cfg(target_os = "windows")]
 mod menu_guard;
 #[cfg(target_os = "windows")]
 mod native;

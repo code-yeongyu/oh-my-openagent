@@ -6,6 +6,18 @@ interface ComputerDeliveryOptions {
 	delivery?: ComputerDelivery;
 }
 
+/** A bounded hold; input is always released before the call settles. */
+interface ComputerHoldOptions extends ComputerDeliveryOptions {
+	/** Finite seconds in 0..=100; cancellation or a safety stop may end it early. */
+	readonly duration: number;
+}
+
+interface ComputerHoldMouseOptions extends ComputerHoldOptions {
+	readonly button?: "left" | "right" | "middle";
+	readonly keys?: readonly string[];
+	readonly frameId?: string;
+}
+
 /** Options for pointer clicks. */
 interface ComputerClickOptions extends ComputerDeliveryOptions {
 	button?: "left" | "right" | "middle";
@@ -143,6 +155,8 @@ interface ComputerCapabilities {
 	ax: boolean;
 	/** Whether input can target a background window. */
 	backgroundWindowInput: boolean;
+	/** Whether the display-only virtual cursor is live now. */
+	cursorOverlay: boolean;
 	deliveryModes: string[];
 	capturePermission: string;
 	inputPermission: string;
@@ -200,6 +214,10 @@ interface ComputerInputTarget {
 	type(text: string, options?: ComputerDeliveryOptions): Promise<void>;
 	/** Key chord such as `"cmd+shift+p"` or `["cmd", "shift", "p"]`. */
 	press(chord: string | string[], options?: ComputerDeliveryOptions): Promise<void>;
+	/** Non-empty keys; press in order and release in reverse on every exit. */
+	holdKeys(keys: readonly string[], options: ComputerHoldOptions): Promise<void>;
+	/** Uses the latest full frame. No pressed state escapes this call. */
+	holdMouse(x: number, y: number, options: ComputerHoldMouseOptions): Promise<void>;
 }
 
 /** A display target; `active` resolves focus again on each capture, `all` composites every display. */

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { readFileSync } from "node:fs"
 import { promisify } from "node:util"
 import { setTimeout } from "node:timers/promises"
 import { hostStopBudgetMs, postDrainStopReserveMs } from "../../packages/omo-native/bin/lib/daemon-stop-budget.js"
@@ -16,10 +17,26 @@ export function smokeStopCommand(env, endpointCount) {
   }
 }
 
-function isAlive(pid) {
+function readProcStat(pid) {
+  return readFileSync(`/proc/${pid}/stat`, "utf8")
+}
+
+// A zombie has already exited. It stays listed only until its parent reaps it, and a
+// container whose PID 1 is not an init (node under `docker run` without --init) never does.
+function isZombie(pid, readStat) {
+  let stat
+  try {
+    stat = readStat(pid)
+  } catch {
+    return false
+  }
+  // The command name in field 2 may contain spaces and parentheses; the state follows the last ")".
+  return stat.slice(stat.lastIndexOf(")") + 1).trimStart().startsWith("Z")
+}
+
+function isAlive(pid, readStat) {
   try {
     process.kill(pid, 0)
-    return true
   } catch (error) {
     if (error.code === "ESRCH") return false
     // EPERM proves existence, not ownership. This probe never signals an exit;
@@ -27,11 +44,13 @@ function isAlive(pid) {
     if (error.code === "EPERM") return true
     throw error
   }
+  return !isZombie(pid, readStat)
 }
 
 export async function waitForSmokeSupervisors(supervisors, options, observer = {}) {
   const now = observer.now ?? (() => performance.now())
-  const alive = observer.isAlive ?? isAlive
+  const readStat = observer.readProcStat ?? readProcStat
+  const alive = observer.isAlive ?? ((pid) => isAlive(pid, readStat))
   const pause = observer.pause ?? ((ms) => setTimeout(ms, undefined, { signal: options.signal }))
   const started = options.drainedAt ?? now()
   const reserveMs = postDrainStopReserveMs()

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createTaskRecordStore } from "../store"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
-import { terminateRpcChild } from "../runners/rpc/terminate"
+import { stopFakeChild } from "../runners/rpc/__fixtures__/stop-fake-child"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import { createRpcManagedRunner } from "./runner"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
@@ -36,7 +36,7 @@ function createManager() {
 }
 
 afterEach(async () => {
-  await Promise.all(children.splice(0).map((child) => terminateRpcChild(child, { sigkillDelayMs: 100 })))
+  await Promise.all(children.splice(0).map(stopFakeChild))
   cleanupProjects()
 })
 
@@ -58,13 +58,15 @@ describe("RPC terminal outcomes", () => {
       execution_mode: "process",
       model: "fixture/model",
     })
+    if (result.kind !== "start_failed" && result.kind !== "started") throw new Error(`unexpected ${result.kind}`)
+    // A start slower than the report window returns `starting`; the failure then lands on the record (#10042).
+    const record = await manager.waitFor(result.task_id)
     process.off("unhandledRejection", onRejection)
 
     // then
-    expect(result.kind).toBe("start_failed")
-    if (result.kind !== "start_failed") throw new Error("expected start_failed")
-    expect(store.load(result.task_id)?.status).toBe("error")
-    expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
+    expect(record.status).toBe("error")
+    expect(record.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
+    if (result.kind === "start_failed") expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
     expect(rejections).toEqual([])
   })
 
@@ -82,10 +84,12 @@ describe("RPC terminal outcomes", () => {
       run_in_background: true,
     })
     if (started.kind !== "started") throw new Error("expected started")
+    // A start slower than the report window returns before the child is resident, so read the child
+    // only after its run is terminal (#10042).
+    const terminal = await manager.waitFor(started.task_id)
     const handle = manager.getResidentHandle(started.task_id)
     if (handle === undefined) throw new Error("expected resident handle")
     const outcome = await handle.waitForOutcome()
-    const terminal = await manager.waitFor(started.task_id)
 
     // then
     expect(outcome).toMatchObject({

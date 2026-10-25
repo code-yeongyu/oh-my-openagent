@@ -24,6 +24,8 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
+
 const here = dirname(fileURLToPath(import.meta.url))
 const omoRoot = resolve(here, "..", "..", "..", "..", "..")
 // The legacy checkouts have no portable default location; the legacy suite is SKIPPED until both are set.
@@ -84,7 +86,7 @@ function legacyMissing() {
   ].filter(([, value]) => value === undefined)
   if (unset.length > 0) return unset.map(([name, , what]) => `${name} (unset: the path of ${what})`)
   const needed = [
-    [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-app-server", "lib", "env.mjs"), "senpi source checkout"],
+    [join(senpiRoot, "packages", "coding-agent", "scripts", "qa-shared", "lib", "env.mjs"), "senpi source checkout"],
     [join(senpiRoot, "node_modules"), "senpi checkout not installed: bun install"],
     ...["ai", "agent", "tui"].map((pkg) => [join(senpiRoot, "packages", pkg, "dist", "index.js"), "senpi checkout not built: bun run build"]),
     [desktopRoot, "desktop checkout"],
@@ -106,7 +108,7 @@ function runOne(name, file, extraArgs = [], reportDir = outDir) {
   const args = [process.execPath, join(here, file), ...extraArgs]
   const outFile = reportDir === undefined ? undefined : join(reportDir, `${name}.txt`)
   if (outFile !== undefined) args.push("--out", outFile, "--evidence-dir", join(reportDir, name))
-  const child = Bun.spawnSync(args, { stdout: "inherit", stderr: "inherit" })
+  const child = Bun.spawnSync(args, { env: withTelemetryOptOut(process.env), stdout: "inherit", stderr: "inherit" })
   let text = ""
   if (outFile !== undefined) {
     try {

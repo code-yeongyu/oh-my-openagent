@@ -51,11 +51,11 @@
 	};
 
 	const windowFields = ["id", "app", "title", "pid", "bounds", "focused"];
-	const windowValueMethods = ["screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "raise", "ax"];
+	const windowValueMethods = ["screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "raise", "ax"];
 	const elementFields = ["ref", "role", "nativeRole", "title", "description", "enabled", "focused", "childCount"];
 	const elementValueMethods = ["value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "focus"];
-	const desktopValueMethods = ["displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press"];
-	const displayValueMethods = ["screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press"];
+	const desktopValueMethods = ["displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse"];
+	const displayValueMethods = ["screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse"];
 
 	const copyFields = (target, fields, snapshot) => {
 		for (const field of fields) {

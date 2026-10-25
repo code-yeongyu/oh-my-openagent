@@ -86,6 +86,45 @@ describe("packaged eval smoke shutdown", () => {
     expect(clock.elapsed()).toBe(postDrainStopReserveMs())
   })
 
+  // Container contract: under a PID 1 that never reaps (node in a bare `docker run`), an exited
+  // supervisor stays a zombie that still answers kill(pid, 0); it has exited and is not a leak.
+  describe("a supervisor that answers kill(pid, 0)", () => {
+    function probed(stat) {
+      const kill = spyOn(process, "kill").mockImplementation(() => true)
+      onTestFinished(() => kill.mockRestore())
+      const clock = observer()
+      const readProcStat = (pid) => {
+        expect(pid).toBe(4242)
+        if (stat instanceof Error) throw stat
+        return stat
+      }
+      return { clock, run: () => waitForSmokeSupervisors([{ pid: 4242 }], {}, { now: clock.now, pause: clock.pause, readProcStat }) }
+    }
+
+    test("counts as exited when /proc reports it as a zombie", async () => {
+      const { clock, run } = probed("4242 (omo) Zs 1 4242 4242 0 -1 4227332 0 0 0 0\n")
+      await run()
+      expect(clock.waits).toEqual([])
+    })
+
+    test("reads the state after the last parenthesis of a command name that contains one", async () => {
+      const { clock, run } = probed("4242 (omo (x) R) Z 1 4242 4242 0 -1\n")
+      await run()
+      expect(clock.waits).toEqual([])
+    })
+
+    test.each([
+      ["is still running", "4242 (omo) S 1 4242 4242 0 -1 4227328 0 0 0 0\n"],
+      ["has no /proc entry to read", Object.assign(new Error("no such file"), { code: "ENOENT" })],
+    ])("is reported as a leak when it %s", async (_case, stat) => {
+      const { clock, run } = probed(stat)
+      const failure = await run().catch((error) => error)
+      expect(failure).toBeInstanceOf(Error)
+      expect(failure.message).toContain(`pid 4242 survived ${postDrainStopReserveMs()} ms after drain`)
+      expect(clock.elapsed()).toBe(postDrainStopReserveMs())
+    })
+  })
+
   test.each([{}, { SENPI_RPC_CHILD_STALLED_STOP_MAX_MS: "120000" }])(
     "the command and outer deadline cover the same engine budget for each endpoint",
     (env) => {

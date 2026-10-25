@@ -20,7 +20,7 @@ use crate::worker::{Audited, Worker};
 impl Worker {
     /// The latest frame of `target` plus, for a window, its current geometry
     /// (a resize since capture fails `InvalidCoordinateFrame`).
-    fn frame_for(
+    pub(crate) fn frame_for(
         &mut self,
         target: &Target,
         frame_id: Option<&str>,
@@ -165,12 +165,15 @@ impl Worker {
             )
         };
         let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let mode = delivery(params.opts.as_ref())?;
             let check_stop = || {
                 let is_cancelled = cancelled();
                 if supervisor.is_suspended() {
                     Err(DesktopError::new(ErrorCode::Suspended, "input was suspended while typing"))
+                } else if let Some(stopped) = crate::mutate::interruption(&supervisor, &policy) {
+                    Err(stopped)
                 } else if is_cancelled {
                     Err(DesktopError::new(ErrorCode::Cancelled, "the request was cancelled while typing"))
                 } else {

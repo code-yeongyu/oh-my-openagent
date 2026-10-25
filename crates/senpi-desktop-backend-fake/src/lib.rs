@@ -9,6 +9,8 @@ mod clock;
 mod desktop_impl;
 mod fake;
 mod faults;
+mod frames_impl;
+mod holds_impl;
 mod menus_impl;
 mod method;
 mod scenario;

@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("category routing policy", () => {
-  test("visual-engineering prioritizes Fable 5.1 max, Opus max, then Kimi K3 max", () => {
+  test("visual-engineering prioritizes Argon low, Fable 5.1 max, Opus max, then Kimi K3 max", () => {
     // given
     const visual = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -12,6 +12,11 @@ describe("category routing policy", () => {
 
     // then
     expect(leadingChain).toEqual([
+      {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -103,7 +108,7 @@ describe("category routing policy", () => {
     ])
   })
 
-  test("unspecified-low follows the approved 8-rung chain headed by claude-sonnet-5-5 medium", () => {
+  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -127,6 +132,11 @@ describe("category routing policy", () => {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
         variant: "xhigh",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+        variant: "high",
       },
       {
         providers: ["openai", "chatgpt-subscription"],
@@ -208,6 +218,11 @@ describe("category routing policy", () => {
       }
     ])
     expect(writingChain).toEqual([
+      {
+        providers: ["google", "google-vertex", "opencode"],
+        model: "gemini-4-argon",
+        variant: "low",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",

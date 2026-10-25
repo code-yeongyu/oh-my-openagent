@@ -22,6 +22,8 @@ const DEFAULT_ARTIFACT_DIR: &str = "senpi-desktop";
 
 /// Owned by the session thread: AX handles are `Rc`, so it never leaves it.
 pub(crate) struct Worker {
+    pub(crate) hold_signal: Option<Arc<senpi_desktop_safety::HoldSignal>>,
+    emergency: Option<Arc<dyn senpi_desktop_core::backend::EmergencyRelease>>,
     factory: Box<dyn BackendFactory>,
     pub(crate) backend: CoreResult<Box<dyn Backend>>,
     /// `Some` once `session.open` ran; backend requests need it.
@@ -50,8 +52,13 @@ impl Worker {
         capabilities: Arc<Mutex<DesktopCapabilities>>,
         safety: SessionSafety,
     ) -> Self {
-        let backend = factory.create(&DesktopSessionOptions::default());
+        let backend = factory.create(&DesktopSessionOptions {
+            show_cursor: false,
+            ..DesktopSessionOptions::default()
+        });
         let mut worker = Self {
+            hold_signal: None,
+            emergency: None,
             factory,
             backend,
             options: None,
@@ -69,10 +76,31 @@ impl Worker {
         worker
     }
 
-    /// Re-creates the backend for the requested display; every earlier ref
-    /// and frame belongs to the previous backend and is dropped.
+    /// Applies cursor-only display changes in place; every other change
+    /// re-creates the backend and invalidates earlier refs and frames.
     pub(crate) fn open(&mut self, options: DesktopSessionOptions) -> DesktopCapabilities {
+        let cursor_only = self.options.as_ref().is_some_and(|current| {
+            if current.show_cursor == options.show_cursor {
+                return false;
+            }
+            let mut normalized = options.clone();
+            normalized.show_cursor = current.show_cursor;
+            normalized == *current
+        });
+        if cursor_only {
+            if let Ok(backend) = self.backend.as_mut() {
+                backend.set_show_cursor(options.show_cursor);
+            }
+            self.options = Some(options);
+            return self.refresh_capabilities();
+        }
         self.backend = self.factory.create(&options);
+        self.emergency = self.backend.as_ref().ok().and_then(|backend| backend.emergency_release());
+        if let Some(release) = &self.emergency {
+            if let Err(error) = self.safety.supervisor.register_emergency_release(release) {
+                self.backend = Err(error);
+            }
+        }
         self.registry = AxRegistry::default();
         self.frames = FrameCache::default();
         self.options = Some(options);
@@ -124,6 +152,8 @@ impl Worker {
             Op::Scroll(params) => served(self.scroll(&params, cancelled)),
             Op::TypeText(params) => served(self.type_text(&params, cancelled)),
             Op::KeyChord(params) => served(self.key_chord(&params, cancelled)),
+            Op::HoldKeys(params) => served(self.hold_keys(&params, cancelled)),
+            Op::HoldMouse(params) => served(self.hold_mouse(&params, cancelled)),
             Op::RaiseWindow(params) => served(self.raise_window(&params.window_id, cancelled)),
             Op::AxSnapshot(params) => self.ax_snapshot(&params),
             Op::AxQuery(params) => self.ax_query(&params),

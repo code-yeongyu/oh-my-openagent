@@ -37,6 +37,8 @@ export {
   TASK_STATUSES,
   TOKEN_COVERAGE_STATUSES,
   createTaskRecord,
+  currentRunStartEpoch,
+  LEGACY_RUN_START_EPOCH,
   markRecordLostForReconciliation,
   messageability,
   transitionTaskRecord,
@@ -55,6 +57,7 @@ export type {
   Messageability,
   PendingSteeringEntry,
   ResidencyState,
+  EffectiveModelRecord,
   ResolvedModelRecord,
   ResolvedModelSource,
   SpawnSpecV1,
@@ -63,6 +66,7 @@ export type {
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
+  LiveRunStats,
   TaskSpawnSpec,
   TaskStatus,
   TaskTransition,
@@ -75,8 +79,10 @@ export type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
   StateDirConfig,
+  ResidentTaskRecordStore,
   TaskRecordDiagnostic,
   TaskRecordStore,
+  TaskRecordStoreResidentFigures,
 } from "./store"
 export {
   buildLiveStatsTokens,
@@ -90,6 +96,7 @@ export {
   toolCountSuffix,
 } from "./status-line"
 export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
+export { activeParentModelFallback } from "./manager/parent-model-rung"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,
@@ -142,6 +149,9 @@ export {
   resolveAvailableCategoryNames,
   resolveCategory,
 } from "./category"
+export { withoutExcludedFallbacks, withoutExcludedSelectors } from "./manager/exclude-fallbacks"
+export { withoutExcludedModels } from "./model-exclusion"
+export { resolveTaskAgents } from "./agents/task-agents"
 export type {
   BuiltinCategoryDefinition,
   CategoryModelSelection,
@@ -205,6 +215,7 @@ export {
   readSessionAncestry,
   readSessionContext,
   readSessionRole,
+  readSessionTraceparent,
   HOST_WARMUP_CONTEXT,
   HOST_WARMUP_TASK_ID,
   isHostWarmupSession,
@@ -278,6 +289,7 @@ export type {
 } from "./runners"
 export {
   HOST_TURN_RESUMED_EVENT,
+  TASK_AWAITING_INPUT_EVENT,
   NameRegistry,
   TaskConcurrency,
   adaptInProcessHandle,
@@ -444,6 +456,7 @@ export type {
   DestructionCause,
   DestructionPort,
   InterruptOutcome,
+  RedispatchOutcome,
   SendDelivery,
   SendInput,
   SendOutcome,
@@ -528,6 +541,8 @@ export type {
   TaskCancelDeps,
   TaskCancelInput,
   TaskSendDeps,
+  LateSendDelivery,
+  LateSendOutcome,
   TaskSendInput,
   TaskSendTeamRouting,
   WaitBounds,
@@ -535,6 +550,7 @@ export type {
 export {
   TRANSCRIPT_MAX_CHARS,
   TaskOutputParams,
+  awaitingInputDetails,
   buildTaskSnapshot,
   childSessionDir,
   createTaskOutputTool,
@@ -659,4 +675,4 @@ export type {
 
 export * from "./tools/team"
 export { createEvalHandleHost, type EvalHandleHostDeps } from "./eval-handles"
-export { isPriorityAliasOf } from "./runners/pinned-model-equivalence"
+export { isPriorityAliasOf, type PriorityPairingRegistry } from "./runners/pinned-model-equivalence"

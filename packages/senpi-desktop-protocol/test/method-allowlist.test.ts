@@ -24,6 +24,8 @@ const CHAIN_METHOD_SNAPSHOT = [
 	"focus",
 	"focusedElement",
 	"focusedWindow",
+	"holdKeys",
+	"holdMouse",
 	"menu.items",
 	"menu.select",
 	"move",

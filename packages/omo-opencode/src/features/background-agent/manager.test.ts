@@ -2935,6 +2935,35 @@ describe("BackgroundManager.resume concurrency key", () => {
     manager.shutdown()
   })
 
+  test("returns pending without waiting for a saturated concurrency group", async () => {
+    manager.shutdown()
+    manager = createBackgroundManagerWithOptions({ config: { defaultConcurrency: 1 } })
+    stubNotifyParentSession(manager)
+    const concurrency = getConcurrencyManager(manager)
+    await concurrency.acquire("explore")
+    const task: BackgroundTask = {
+      id: "queued-resume", sessionId: "queued-session", status: "completed",
+      agent: "explore", description: "continuation", prompt: "original",
+      parentSessionId: "parent", parentMessageId: "message", completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    const result = await manager.resume({ sessionId: "queued-session", prompt: "latest", parentSessionId: "parent", parentMessageId: "message" })
+    expect(result?.status).toBe("pending")
+    expect(task.queuedAt).toBeInstanceOf(Date)
+  })
+
+  test("preserves the latest continuation for retry", async () => {
+    const task: BackgroundTask = {
+      id: "latest-resume", sessionId: "latest-session", status: "completed",
+      agent: "explore", description: "continuation", prompt: "original",
+      parentSessionId: "parent", parentMessageId: "message", completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    await manager.resume({ sessionId: "latest-session", prompt: "latest", parentSessionId: "parent", parentMessageId: "message" })
+    expect(task.prompt).toBe("latest")
+    expect(task.originalPrompt).toBe("original")
+  })
+
   test("should re-acquire using external task concurrency key", async () => {
     // given
     const task = await manager.trackTask({
@@ -3515,8 +3544,10 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // then
       expect(task.attempts).toHaveLength(1)
       expect(task.currentAttemptID).toBe(task.attempts?.[0]?.attemptId)
+      const currentAttemptID = task.currentAttemptID
+      if (currentAttemptID === undefined) throw new Error("Expected a current launch attempt")
       expect(task.attempts?.[0]).toEqual({
-        attemptId: task.currentAttemptID,
+        attemptId: currentAttemptID,
         attemptNumber: 1,
         providerId: "openai",
         modelId: "gpt-5.6-luna-fast",

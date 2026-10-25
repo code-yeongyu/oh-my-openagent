@@ -13,6 +13,9 @@ export interface RunLaunchManifest {
   readonly cwd: string
   readonly env: Readonly<Record<string, string>>
   readonly hardDeadlineAt: number
+  readonly queuedAt?: number
+  readonly memoryRoot?: string
+  readonly maxConcurrentRuns?: number
   readonly terminationGraceMs: number
   readonly maxOutputBytes: number
   readonly stdoutPath: string

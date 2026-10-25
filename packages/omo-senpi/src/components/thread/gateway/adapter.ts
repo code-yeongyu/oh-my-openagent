@@ -17,13 +17,18 @@ export type GatewayEndpointRef = {
   readonly kind: GatewayEndpointKind
   readonly socket: string
   readonly routing_id: string | null
+  readonly durable_session_id: string
 }
 
 export type ExternalAdmissionKind = "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "already_admitted"
 
 export type GatewayAdmissionKind = ExternalAdmissionKind | "not_steerable" | "expired"
 
-export type GatewayWakeReply = SessionControlDrainResult
+/**
+ * `unroutable`: the endpoint names its session only by durable id and its host lists no live session under
+ * it, so no wake was sent; the delivery stays queued for the session's next start.
+ */
+export type GatewayWakeReply = SessionControlDrainResult & { readonly unroutable?: "no_live_session" }
 
 export type ReleaseDropped = { readonly deliveries: readonly string[]; readonly user_messages: readonly string[] }
 

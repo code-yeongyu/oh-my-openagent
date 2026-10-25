@@ -112,7 +112,7 @@ impl Backend for Win32Backend {
         self.capture.windows()
     }
 
-    fn capture(&mut self, target: &Target, _caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         self.capture.capture(target)
     }
 
@@ -152,6 +152,18 @@ impl Backend for Win32Backend {
 
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.input()?.key_chord(target, keys, mode)
+    }
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.input()?.hold_keys(target, keys, mode, control)
+    }
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.input()?.hold_mouse(target, hold, mode, control)
     }
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {

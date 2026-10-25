@@ -97,6 +97,7 @@ describe("relay_direction_question_authority_and_completion", () => {
     const deliveryId = ok(first).delivery_id
     expect({ first: ok(first).delivery.kind, replayId: ok(second).delivery_id, deduplicated: ok(second).deduplicated }).toEqual({ first: "started", replayId: deliveryId, deduplicated: true })
     expect({ enqueued: b.runtime.enqueueCount(deliveryId), entries: b.runtime.transcriptEntries(deliveryId), rows: (await b.store.list({ target_durable_id: "B" })).length }).toEqual({ enqueued: 1, entries: 1, rows: 1 })
+    expect((b.runtime.textOf(deliveryId) ?? "").split("\n")[0]).toStartWith("From unclassified / ")
     const header = (b.runtime.textOf(deliveryId) ?? "").split("\n")[0]
     expect(header).toContain("source=external")
     expect(header).toContain(`binding=${x}@1`)
@@ -482,7 +483,7 @@ describe("answer_when_the_session_cannot_be_located", () => {
       },
       locate: async () => {
         if (hostGone) throw new Error("host_unavailable:/gone/rpc.sock")
-        return { kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" }
+        return { kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }
       },
       now: () => h.clock.now,
     })
@@ -552,7 +553,7 @@ describe("answer_release_retry_past_the_lock_wait_bound", () => {
           return { delivered: true }
         },
       },
-      locate: async () => ({ kind: "tui", socket: "fake:B", routing_id: null }),
+      locate: async () => ({ kind: "tui", socket: "fake:B", routing_id: null, durable_session_id: "B" }),
       now: () => h.clock.now,
     })
     const x = await bindAs(relay, binding("B"))

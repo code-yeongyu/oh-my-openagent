@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { versionLines, type OmoBuildInfo } from "../packages/omo-native/build-info"
@@ -28,14 +28,13 @@ function spawnCountingFixture(root: string): Fixture {
 	const install = (versionOutput: string): void => {
 		writeFileSync(`${binary}.version`, versionOutput)
 		writeFileSync(`${binary}.spawns`, "")
-		// Removed and rewritten so each install lands on a new inode, which is the property under
-		// test. installBinary itself publishes via renameSync; this fixture only reproduces the
-		// resulting identity change, not the atomicity.
+		// Published the way installBinary does: the temporary file is created while the old binary
+		// still exists, so the rename always lands a new inode. Removing first and rewriting can get
+		// the freed inode straight back (ext4 does every time), which made the stale-marker test
+		// depend on mtime granularity (#10609).
 		const temporary = `${binary}.tmp`
 		writeFileSync(temporary, `#!/bin/sh\nprintf x >> "$0.spawns"\ncat "$0.version"\n`, { mode: 0o755 })
-		rmSync(binary, { force: true })
-		writeFileSync(binary, readFileSync(temporary), { mode: 0o755 })
-		rmSync(temporary, { force: true })
+		renameSync(temporary, binary)
 	}
 	install(expectedVersion)
 	return { binary, spawns: () => readFileSync(`${binary}.spawns`, "utf8").length, install }
@@ -93,7 +92,9 @@ describe("omob provenance marker", () => {
 				expect(readProvenanceMarker(fixture.binary)).toBe(expectedVersion)
 				// Reinstalling is exactly the failed-install shape this guards: the path survives,
 				// the file behind it does not, so the old marker must stop being believed.
+				const replacedInode = statSync(fixture.binary).ino
 				fixture.install(expectedVersion)
+				expect(statSync(fixture.binary).ino).not.toBe(replacedInode)
 				expect(readProvenanceMarker(fixture.binary)).toBeUndefined()
 				expect(isCurrentOmobBuild(fixture.binary, info, hostTarget)).toBe(true)
 				expect(fixture.spawns()).toBe(1)

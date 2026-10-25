@@ -4,7 +4,7 @@ use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::protocol_params::{
     AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
     CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
-    ObserveParams, RaiseWindowParams, ScrollParams, TypeTextParams,
+    HoldKeysParams, HoldMouseParams, ObserveParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
 use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_core::types::{
@@ -27,6 +27,8 @@ pub enum Op {
     Scroll(ScrollParams),
     TypeText(TypeTextParams),
     KeyChord(KeyChordParams),
+    HoldKeys(HoldKeysParams),
+    HoldMouse(HoldMouseParams),
     RaiseWindow(RaiseWindowParams),
     AxSnapshot(AxSnapshotParams),
     AxQuery(AxQueryParams),

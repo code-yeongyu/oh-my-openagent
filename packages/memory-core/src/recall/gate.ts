@@ -46,6 +46,8 @@ const TMP_PREFIX_PATTERN = /\.tmp-/
 export interface RecallNudge {
   readonly path: string
   readonly hint: string
+  /** Readable location of a project-scoped note; the ledger key remains `path`. */
+  readonly source?: string
 }
 
 export interface PendingNudgesFile {
@@ -158,7 +160,7 @@ export class PendingNudges {
       version: PENDING_NUDGES_VERSION,
       sessionId,
       writtenAt: new Date().toISOString(),
-      nudges: nudges.map((nudge) => ({ path: nudge.path, hint: nudge.hint })),
+      nudges: nudges.map(({ path, hint, source }) => ({ path, hint, ...(source === undefined ? {} : { source }) })),
     }
     const temporary = `${target}.tmp-${process.pid}`
     await writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
@@ -189,7 +191,7 @@ export class PendingNudges {
     await removeQuietly(target)
     const writtenAt = Date.parse(payload.writtenAt)
     if (!Number.isFinite(writtenAt) || Date.now() - writtenAt > PENDING_TTL_MS) return []
-    return payload.nudges.map((nudge) => ({ path: nudge.path, hint: nudge.hint }))
+    return payload.nudges.map((nudge) => ({ ...nudge }))
   }
 
   /**
@@ -245,11 +247,12 @@ export class PendingNudges {
 function parseNudge(value: unknown): RecallNudge | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined
   const record = value as Record<string, unknown>
-  const { path, hint } = record
+  const { path, hint, source } = record
   if (typeof path !== "string" || path.length === 0) return undefined
   if (typeof hint !== "string" || hint.length === 0) return undefined
   if (!isValidHint(hint) || containsSecretLikeMaterial(hint)) return undefined
-  return { path, hint }
+  if (source !== undefined && (typeof source !== "string" || source.length === 0)) return undefined
+  return { path, hint, ...(source === undefined ? {} : { source }) }
 }
 
 function parsePendingFile(raw: string): PendingNudgesFile | undefined {

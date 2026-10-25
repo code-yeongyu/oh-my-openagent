@@ -115,6 +115,7 @@ impl Harness {
         let params = CaptureParams {
             target: target.to_owned(),
             caps: None,
+            exclude_window_titles: None,
         };
         match self.process(Op::Capture(params)) {
             Ok(Response::Capture(capture)) => capture.frame_id,

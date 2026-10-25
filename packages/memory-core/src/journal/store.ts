@@ -115,15 +115,16 @@ export class TranscriptJournal {
     this.lock = options.lock ?? withLocalJournalLock
   }
 
-  async reconcile(messages: readonly TranscriptProjection[]): Promise<AppendResult> {
+  async reconcile(messages: readonly TranscriptProjection[], signal?: AbortSignal): Promise<AppendResult> {
     const capturedAt = this.now().toISOString()
-    return this.append(messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)))
+    return this.append(messages.flatMap((message) => projectTranscriptEntries(message, capturedAt)), signal)
   }
 
   /** A journal is created by its first entry: appending nothing to a journal that does not exist writes nothing (#9737). */
-  async append(entries: readonly TranscriptEntry[]): Promise<AppendResult> {
+  async append(entries: readonly TranscriptEntry[], signal?: AbortSignal): Promise<AppendResult> {
+    signal?.throwIfAborted()
     if (entries.length === 0 && !(await this.exists())) return { appended: 0, skipped: 0 }
-    return this.locked(() => this.appendUnlocked(entries))
+    return this.locked(() => this.appendUnlocked(entries), signal)
   }
 
   async readEntries(): Promise<TranscriptEntry[]> {

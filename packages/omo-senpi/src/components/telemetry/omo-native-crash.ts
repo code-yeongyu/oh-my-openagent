@@ -1,11 +1,10 @@
 import type {
   EventTelemetryProperties,
-  TelemetryDiagnosticInput,
   TelemetryOsProvider,
 } from "@oh-my-opencode/telemetry-core"
 
 import { CRASH_DETECTIONS, CRASH_SIGNALS, PROCESS_KINDS, UPTIME_BUCKETS } from "./crash-schema"
-import { claimUnreportedCrashRecords, type ClaimedCrashRecord } from "./process-crash-records"
+import type { ClaimedCrashRecord } from "./process-crash-records"
 
 export type CaptureProcessCrashesInput = {
   readonly captureEvent: (name: "process_crashed", properties: EventTelemetryProperties) => void
@@ -13,31 +12,11 @@ export type CaptureProcessCrashesInput = {
   readonly stateDir: string
   readonly now?: Date
   readonly osProvider: TelemetryOsProvider
-  readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
 }
 
-/**
- * Report every crash an earlier OmO process left on disk, once. Called only after the telemetry
- * gates passed, so an opted-out user neither sends nor claims anything. Returns how many were sent.
- */
-export function captureProcessCrashes(input: CaptureProcessCrashesInput): number {
-  try {
-    const claimed = claimUnreportedCrashRecords({
-      agentDir: input.agentDir,
-      stateDir: input.stateDir,
-      now: input.now ?? new Date(),
-    })
-    for (const crash of claimed) input.captureEvent("process_crashed", processCrashedProperties(crash, input.osProvider))
-    return claimed.length
-  } catch (error) {
-    input.diagnostics?.({
-      event: "telemetry_capture_failed",
-      source: "omo-native-crash",
-      error,
-      errorKind: error instanceof Error ? "error" : "non_error",
-    })
-    return 0
-  }
+/** Legacy automatic crash reporting is retired; usage telemetry is not crash consent. */
+export function captureProcessCrashes(_input: CaptureProcessCrashesInput): number {
+  return 0
 }
 
 export function processCrashedProperties(

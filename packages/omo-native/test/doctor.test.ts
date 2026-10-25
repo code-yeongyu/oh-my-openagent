@@ -60,10 +60,24 @@ function withoutHostProcesses(fixture: Fixture, env: NodeJS.ProcessEnv): NodeJS.
   return { ...env, PATH: `${fakeBin}${delimiter}${env.PATH ?? ""}` }
 }
 
+// An agent dir exported by the calling shell (an omo or senpi session) outranks the fixture's,
+// so the child sees only the agent-dir variables a test sets (#10265).
+function withoutInheritedAgentDir(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const isolated: NodeJS.ProcessEnv = { ...env }
+  delete isolated.OMO_CODING_AGENT_DIR
+  delete isolated.SENPI_CODING_AGENT_DIR
+  delete isolated.PI_CODING_AGENT_DIR
+  return isolated
+}
+
 function run(fixture: Fixture, env: NodeJS.ProcessEnv = {}) {
   return spawnSync(process.execPath, [fixture.launcher, "doctor"], {
     encoding: "utf8",
-    env: withoutHostProcesses(fixture, { ...process.env, SENPI_CODING_AGENT_DIR: fixture.agentDir, ...env }),
+    env: withoutHostProcesses(fixture, {
+      ...withoutInheritedAgentDir(process.env),
+      SENPI_CODING_AGENT_DIR: fixture.agentDir,
+      ...env,
+    }),
   })
 }
 
@@ -161,11 +175,7 @@ describe("omo doctor", () => {
 })
 
 function envWithoutAgentDir(home: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env, HOME: home, USERPROFILE: home }
-  delete env.OMO_CODING_AGENT_DIR
-  delete env.SENPI_CODING_AGENT_DIR
-  delete env.PI_CODING_AGENT_DIR
-  return env
+  return { ...withoutInheritedAgentDir(process.env), HOME: home, USERPROFILE: home }
 }
 
 describe("omo doctor", () => {

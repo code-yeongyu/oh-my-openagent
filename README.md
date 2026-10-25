@@ -1,3 +1,5 @@
+[English](README.md) | [简体中文](README.zh-cn.md) | [日本語](README.ja.md) | [Русский](README.ru.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-br.md) | [Italiano](README.it.md)
+
 > [!NOTE]
 > **OmO 5.0: OmO ❤️ Pi**
 > Install it with `curl -fsSL https://get.omo.dev/install.sh | bash`. Memory system, CodeMode, Anthropic subscriptions, all covered.
@@ -9,11 +11,6 @@
 > | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** sponsors OmO. An OpenAI-compatible gateway that puts many model providers behind one API. Thank you for backing open source. |
 > | :-----| :----- |
 
-
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO is maintained by Jobdori, the AI assistant shown above. Meet your own Jobdori, Dori. <br />Join the waitlist [here](https://sisyphuslabs.ai).**
 
 > [!TIP]
 > Be with us!
@@ -40,7 +37,6 @@
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md) | [Русский](README.ru.md)
 
 </div>
 
@@ -63,7 +59,7 @@ Open your project, run `omo`, describe the job. That's the whole setup.
 
 In a session, `/thinking <level>` sets how hard the model thinks (`/thinking` alone opens a picker), `Shift+Tab` cycles through the levels, and `/efforts <level>` sets the reasoning effort directly on models with effort grades. To pick up earlier work, `/resume` (or `/sessions`) opens your past sessions; from the shell, `omo -c` continues the last one and `omo -r` opens the picker. `/help` lists everything else.
 
-Coming from the OpenCode edition or LazyCodex? Run `omo setup` once. It carries your provider keys, custom providers, MCP servers, skills and model picks across. `omo doctor` then shows which task categories your providers can run and what the old install left behind. The full walkthrough is [Migrating from OpenCode](docs/guide/migrating-from-opencode.md).
+Coming from the OpenCode edition or LazyCodex? Run `omo setup` once. It carries your provider keys, custom providers, MCP servers, skills and model picks across. `omo doctor` then shows which task categories your providers can run and what the old install left behind, and `omo doctor --models` shows which model each category and agent runs and in what order (keep one out everywhere with [`exclude_models`](docs/reference/omo-json.md#exclude_models-native-harness)). The full walkthrough is [Migrating from OpenCode](docs/guide/migrating-from-opencode.md).
 
 To update, run the install line again (a package-manager install updates with `omo update`). `rm ~/.local/bin/omo` removes the binary install; `bun remove -g omo-ai` (or `npm uninstall -g omo-ai`) removes the package install.
 
@@ -93,6 +89,10 @@ Opinionated defaults, adjustable if you insist. Your settings live in `~/.omo/om
 - [Features](docs/reference/features.md)
 - [Computer use](docs/guide/computer-use.md) (experimental)
 - [Ultrawork Manifesto](docs/manifesto.md)
+
+## Reporting a bug
+
+The fastest way to report a bug is `/bug` inside a session (available in the omo app). It lists what it includes and lets you see the exact report before you send it, then sends it to the OmO team: the recent engine log, your environment and config with secrets blanked, the session transcript, and identity lines - your device name and, when telemetry is on, an install id and a session hash, plus your account details (email, name, account, user and device ids, plan, device name) when you report from the desktop app, so we can reply. Everything but the identity lines goes through the upload redactor. GitHub issues stay open for anyone who cannot use the in-app report.
 
 ## Reviews
 

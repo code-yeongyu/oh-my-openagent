@@ -60,6 +60,7 @@ fn ax_window(app: &str, pid: i32, title: &str) -> Option<DesktopWindow> {
             width: bounds.width as u32,
             height: bounds.height as u32,
             focused: false,
+            is_on_screen: None,
             elevated: None,
         });
     }
@@ -171,6 +172,7 @@ pub(super) fn close_focused_window(pid: i32) {
         width: 0,
         height: 0,
         focused: false,
+        is_on_screen: None,
         elevated: None,
     };
     let _ = crate::ax::close_window(&window);

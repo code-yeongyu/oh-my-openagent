@@ -93,7 +93,7 @@ def _make_computer():
     _install(
         _Window,
         {
-            **{name: name for name in ("screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "ax")},
+            **{name: name for name in ("screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "ax")},
             "raise_": "raise",
         },
     )
@@ -109,7 +109,7 @@ def _make_computer():
 
     _install(
         _Display,
-        {name: name for name in ("screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press")},
+        {name: name for name in ("screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse")},
     )
 
     class _Menu:
@@ -209,7 +209,7 @@ def _make_computer():
 
     _install(
         _Computer,
-        {name: name for name in ("displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press")},
+        {name: name for name in ("displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse")},
     )
     return _Computer()
 

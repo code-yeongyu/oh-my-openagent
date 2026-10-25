@@ -16,7 +16,9 @@ use senpi_desktop_core::types::{
 
 use crate::ax::{is_trusted, MacAx};
 use crate::capture::{MacCapture, Screencapture};
-use crate::input::{CanaryMode, CanaryResult, MacInput, CANARY_STOP_REASON};
+use crate::input::{CanaryMode, CanaryResult, MacInput};
+
+mod capabilities;
 
 #[path = "permissions.rs"]
 pub(crate) mod permissions;
@@ -25,15 +27,42 @@ pub struct MacosBackend {
     capture: MacCapture,
     input: MacInput,
     ax: MacAx,
+    overlay: crate::overlay::Overlay,
 }
 
 impl MacosBackend {
     pub fn new(display: DisplaySelector) -> CoreResult<Self> {
+        let overlay = crate::overlay::Overlay::default();
         Ok(Self {
-            capture: MacCapture::new(display, Screencapture::system()),
-            input: MacInput::new(CanaryMode::Session)?,
-            ax: MacAx::new(),
+            capture: MacCapture::new(display, Screencapture::system()).with_overlay(overlay.clone()),
+            input: MacInput::new(CanaryMode::Session)?.with_overlay(overlay.clone()),
+            ax: MacAx::with_overlay(overlay.clone()),
+            overlay,
         })
+    }
+
+    /// Display-only setting; it does not change delivery mode or control admission.
+    pub fn set_show_cursor(&mut self, enabled: bool) {
+        self.overlay.configure(enabled);
+    }
+
+    pub fn overlay_available(&self) -> bool {
+        self.overlay.available()
+    }
+
+    fn show_typing_target(&self, target: &Target) {
+        if !self.overlay.available() {
+            return;
+        }
+        if let Ok(windows) = self.capture.windows() {
+            let window = windows.iter().find(|window| match target {
+                Target::Desktop | Target::Display(_) => window.focused,
+                Target::Window(id) => window.id == *id,
+            });
+            if let Some(window) = window {
+                self.ax.show_typing_target(window);
+            }
+        }
     }
 
     /// Applies the `computer.macosCanary` setting (`session` default).
@@ -52,36 +81,6 @@ impl MacosBackend {
         self.input.rerun_canary();
     }
 
-    /// Runtime truth from the TCC preflights and the SkyLight probe; never
-    /// prompts and never pops the canary dialog.
-    pub fn capabilities(&self) -> DesktopCapabilities {
-        let capture_permission = self.capture.permission_granted();
-        let trusted = is_trusted();
-        let display_count = if capture_permission {
-            self.capture
-                .displays()
-                .map_or(0, |displays| u32::try_from(displays.len()).unwrap_or(u32::MAX))
-        } else {
-            0
-        };
-        let canary_failed = self.input.canary_failed();
-        DesktopCapabilities {
-            backend: "quartz".to_string(),
-            display_server: Some("Quartz WindowServer".to_string()),
-            capture: capture_permission && display_count > 0,
-            input: trusted,
-            ax: trusted,
-            background_window_input: trusted && crate::skylight::is_available() && !canary_failed,
-            delivery_modes: vec!["background".to_string(), "foreground".to_string()],
-            capture_permission: permission_label(capture_permission),
-            input_permission: permission_label(trusted),
-            ax_permission: permission_label(trusted),
-            display_count,
-            focus_guard: true,
-            stop_reason: canary_failed.then(|| CANARY_STOP_REASON.to_string()),
-            ..DesktopCapabilities::unavailable()
-        }
-    }
 
     pub fn displays(&self) -> CoreResult<Vec<DesktopDisplay>> {
         self.capture.displays()
@@ -105,12 +104,20 @@ impl MacosBackend {
 }
 
 impl Backend for MacosBackend {
+    fn emergency_release(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EmergencyRelease>> {
+        Some(self.input.emergency_release())
+    }
+
     fn permission_denied(&mut self, permission: TccPermission) -> DesktopError {
         permissions::permission_denied(permission)
     }
 
     fn capabilities(&mut self) -> DesktopCapabilities {
         MacosBackend::capabilities(self)
+    }
+
+    fn set_show_cursor(&mut self, enabled: bool) {
+        MacosBackend::set_show_cursor(self, enabled);
     }
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
@@ -121,8 +128,13 @@ impl Backend for MacosBackend {
         self.capture.windows()
     }
 
-    fn capture(&mut self, target: &Target, _caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
-        self.capture.capture(target)
+    fn capture(
+        &mut self,
+        target: &Target,
+        _caps: &CaptureCaps,
+        exclude_window_titles: &[String],
+    ) -> CoreResult<(RgbaImage, FrameGeometry)> {
+        self.capture.capture_with_exclusions(target, exclude_window_titles)
     }
 
     fn pointer(
@@ -138,6 +150,7 @@ impl Backend for MacosBackend {
 
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         Self::require_input_permission()?;
+        self.show_typing_target(target);
         self.input.type_text(target, text, mode, &self.capture)
     }
 
@@ -158,12 +171,30 @@ impl Backend for MacosBackend {
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
         Self::require_input_permission()?;
+        self.show_typing_target(target);
         self.input.type_text_interruptible(target, text, mode, &self.capture, check_stop, delivered)
     }
 
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         Self::require_input_permission()?;
+        self.show_typing_target(target);
         self.input.key_chord(target, keys, mode, &self.capture)
+    }
+
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        Self::require_input_permission()?;
+        self.input.hold_keys(target, keys, mode, &self.capture, control)
+    }
+
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        Self::require_input_permission()?;
+        self.input.hold_mouse(target, hold, mode, &self.capture, control)
     }
 
     fn menu_items(&mut self, window: &DesktopWindow, path: &[String]) -> CoreResult<Vec<MenuItem>> {
@@ -254,8 +285,4 @@ impl Backend for MacosBackend {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         crate::cursor::screen_locked()
     }
-}
-
-fn permission_label(granted: bool) -> String {
-    if granted { "granted" } else { "denied" }.to_string()
 }

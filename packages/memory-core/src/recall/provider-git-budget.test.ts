@@ -69,7 +69,7 @@ describe("recall corpus git process budget", () => {
     const corpus = await loadRecallCorpus(repo)
 
     // then
-    expect(runs.map((run) => run.argv[0])).toEqual(["rev-parse", "ls-tree", "cat-file"])
+    expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree", "cat-file"])
     expect(corpus.documents).toHaveLength(FILE_COUNT)
     const note = corpus.documents.find((document) => document.path === "reference/note-07.md")
     expect(note?.description).toBe("Note 7 메모리 노트 🧠")
@@ -95,7 +95,7 @@ describe("recall corpus git process budget", () => {
     // then
     const catFiles = runs.filter((run) => run.argv[0] === "cat-file")
     expect(catFiles.map((run) => run.stdin)).toEqual([`${editedOid}\n`])
-    expect(runs).toHaveLength(3)
+    expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree", "cat-file"])
     expect(second.documents.find((document) => document.path === "reference/note-01.md")).toBe(unchanged)
     expect(second.documents.find((document) => document.path === "reference/note-02.md")?.description).toBe("Edited note")
     expect(second.documents.map((document) => document.path)).not.toContain("reference/note-03.md")
@@ -115,7 +115,7 @@ describe("recall corpus git process budget", () => {
     const second = await cache.load(repo)
 
     // then
-    expect(runs.map((run) => run.argv[0])).toEqual(["rev-parse", "ls-tree"])
+    expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree"])
     expect(second.revision).not.toBe(first.revision)
     expect(second.documents).toEqual(first.documents)
   }, GIT_INTEGRATION_TEST_TIMEOUT)

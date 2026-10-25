@@ -73,6 +73,7 @@ describe("computer-use telemetry projection", () => {
       input: false,
       ax: false,
       backgroundWindowInput: false,
+      cursorOverlay: false,
       deliveryModes: ["private-mode"],
       capturePermission: "private-capture-label",
       inputPermission: "private-input-label",

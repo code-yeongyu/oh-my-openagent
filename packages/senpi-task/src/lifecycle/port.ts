@@ -3,7 +3,7 @@ import type { TeardownStepDeadline } from "./teardown-budget"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ForgetOptions } from "../manager/types"
-import type { TaskRecord } from "../state"
+import type { AwaitingInputReason, TaskRecord, TaskStatus } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
@@ -25,11 +25,13 @@ export type DestroyCause =
   | "revive_failure"
   | "recovery_detach"
   | "target_gone"
+  | "redispatch"
 
 // The teardown surface the destruction port operates against. In production this wraps a live
 // ManagedChildHandle (in-process) or an rpc child handle (rpc); tests inject fakes. ONLY lifecycle
 // code ever calls abort/dispose/terminate on it - that is the single-writer rule.
 export type ResidentHandle = {
+  reconcileInputs?(): Promise<void>
   readonly task_id: string
   // "host-session" is a SESSION of the shared daemon: it has no pid, so nothing may signal it.
   readonly kind: "in-process" | "rpc" | "host-session"
@@ -42,6 +44,11 @@ export type ResidentHandle = {
   // Rpc: SIGTERM then SIGKILL escalation. Host-session: abort + close_session, never a signal.
   // In-process: no-op (no OS process to signal).
   terminate(): Promise<void>
+  // From here no transport recovery may bring the child back; a host reached again only ends it (omo#9403).
+  markStopping?(): void
+  // Host-session: publish `task_status` in the session's context while still attached, so a successor
+  // host drops a finished session's park instead of reopening it unattended (omo#10778).
+  publishTaskStatus?(status: TaskStatus): Promise<void>
 }
 
 // The live view of which handles are resident in THIS process, plus pending-mail state. Records
@@ -87,10 +94,18 @@ export type RespawnFailureCode =
   // was opened nowhere and waits for the next reconcile.
   | "store_index_unavailable"
   | "host_incompatible"
+  // The child's run is stopped: nothing launches until its Resume (which respawns it paused).
+  | "run_paused"
   | "respawn_failed"
 
 export type RespawnResult =
-  | { readonly ok: true; readonly handle: ManagedChildHandle }
+  | {
+      readonly ok: true
+      readonly handle: ManagedChildHandle
+      // The respawn re-joined a session whose last turn ended aborted (or never answered) and idle:
+      // the reattach stamps this on the record so the task reads "resumed, waiting for input" (senpi#3266).
+      readonly awaitingInput?: { readonly reason: AwaitingInputReason }
+    }
   | {
       readonly ok: false
       readonly disposition: "retryable" | "unrecoverable"
@@ -121,7 +136,11 @@ export type CapacityReservation =
   | { readonly ok: true; release(): void }
 
 export type RespawnPort = (record: TaskRecord, resumeSessionPath?: string) => Promise<RespawnResult>
-export type ReattachPort = (record: TaskRecord, handle: ManagedChildHandle) => Promise<ReattachResult>
+export type ReattachPort = (
+  record: TaskRecord,
+  handle: ManagedChildHandle,
+  awaitingInput?: { readonly reason: AwaitingInputReason },
+) => Promise<ReattachResult>
 export type ReserveReattachPort = (record: TaskRecord) => CapacityReservation
 
 export type LifecycleReattachPorts = {

@@ -7,6 +7,7 @@
 
 mod audit;
 mod budget;
+mod cancel_on_drop;
 mod grant;
 mod mutate;
 mod pointer;
@@ -24,6 +25,7 @@ mod worker_observe;
 mod worker_zoom;
 mod worker_clipboard;
 mod worker_input;
+mod worker_holds;
 mod worker_menus;
 
 pub use grant::ControlSlot;

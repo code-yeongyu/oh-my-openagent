@@ -11,12 +11,14 @@ import {
 import { stageDesktopEngineReleaseAsset, writeDesktopEngineChecksums } from "./desktop-engine-release"
 
 describe("desktop engine GitHub release assets", () => {
-  test("the publisher and acquisition use the same four concrete asset names", () => {
+  test("the publisher and acquisition use the same six concrete asset names", () => {
     expect(DESKTOP_ENGINE_RELEASE_HOSTS.map((host) => desktopEngineReleaseAssetName(host))).toEqual([
       "senpi-desktop-engine-darwin-arm64",
       "senpi-desktop-engine-darwin-x64",
       "senpi-desktop-engine-linux-x64",
+      "senpi-desktop-engine-linux-arm64",
       "senpi-desktop-engine-win32-x64.exe",
+      "senpi-desktop-engine-win32-arm64.exe",
     ])
     expect(DESKTOP_ENGINE_CHECKSUMS_ASSET).toBe("senpi-desktop-engine-checksums.txt")
   })

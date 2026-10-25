@@ -51,6 +51,7 @@ export function sessionOpenParams(settings: ComputerSettings, context: ComputerH
 	return {
 		display: settings.display,
 		macosCanary: settings.macosCanary,
+		showCursor: settings.showCursor,
 		allowHostRelayOnlyStop: settings.allowHostRelayOnlyStop,
 		auditPath: auditLog.enabled ? join(context.sessionManager.getSessionDir(), AUDIT_FILE_NAME) : null,
 		artifactDir: tmpdir(),

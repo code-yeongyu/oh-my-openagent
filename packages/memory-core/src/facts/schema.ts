@@ -26,6 +26,12 @@ export interface FactsQueueEntry {
   readonly range: FactsQueueRange
   readonly enqueuedAt: string
   readonly entries: readonly TranscriptEntry[]
+  /**
+   * The transcript entry right before `entries[0]` (reasoning skipped), when there is one. A queue entry starts at the
+   * user's message, so this is the assistant proposal that message answered; consent binding (#10488) needs it even
+   * after the previous queue entry was consumed.
+   */
+  readonly lead?: TranscriptEntry
 }
 
 /**
@@ -60,6 +66,7 @@ export interface FactsConsumedWatermark {
 
 export interface FactsQueueLayout {
   readonly queueDir: string
+  readonly parkedDir: string
   readonly cursorDir: string
   readonly consumedPath: string
   readonly failuresPath: string
@@ -69,6 +76,14 @@ export interface FactsQueueLayout {
 
 function hash(value: string, length: number): string {
   return createHash("sha256").update(value).digest("hex").slice(0, length)
+}
+
+export function queueConversationHash(conversationId: string): string {
+  return hash(conversationId, 12)
+}
+
+export function queueEntrySuffix(conversationId: string, endMessageId: string): string {
+  return `-${queueConversationHash(conversationId)}-${hash(endMessageId, 8)}.json`
 }
 
 /**
@@ -84,12 +99,13 @@ export function factsQueuePaths(identityPaths: MemoryIdentityPaths): FactsQueueL
   const cursorDir = join(queueDir, "cursor")
   return {
     queueDir,
+    parkedDir: join(queueDir, "parked"),
     cursorDir,
     consumedPath: join(queueDir, "consumed.json"),
     failuresPath: join(queueDir, "failures.json"),
-    cursorPath: (conversationId) => join(cursorDir, `${hash(conversationId, 12)}.json`),
+    cursorPath: (conversationId) => join(cursorDir, `${queueConversationHash(conversationId)}.json`),
     entryPath: (conversationId, endMessageId, at) =>
-      join(queueDir, `${queueTimestamp(at)}-${hash(conversationId, 12)}-${hash(endMessageId, 8)}.json`),
+      join(queueDir, `${queueTimestamp(at)}${queueEntrySuffix(conversationId, endMessageId)}`),
   }
 }
 
@@ -157,7 +173,9 @@ export function parseQueueEntry(raw: string): FactsQueueEntry | undefined {
   }
   const entries = parsed.entries.filter((row): row is TranscriptEntry => isTranscriptEntry(row))
   if (entries.length !== parsed.entries.length) return undefined
-  return { version: FACTS_QUEUE_VERSION, identity, sessionId, conversationId, range, enqueuedAt, entries }
+  if (parsed.lead !== undefined && !isTranscriptEntry(parsed.lead)) return undefined
+  const lead = parsed.lead === undefined ? {} : { lead: parsed.lead }
+  return { version: FACTS_QUEUE_VERSION, identity, sessionId, conversationId, range, enqueuedAt, entries, ...lead }
 }
 
 function isTranscriptEntry(value: unknown): value is TranscriptEntry {

@@ -3,7 +3,7 @@ import type { SpawnPaneResult } from "../types"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isCmuxCompatEnvironment } from "../cmux-detect"
 import { isInsideTmux } from "./environment"
-import { buildPaneAuthEnvironmentArgs, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildSubagentPaneTitle, buildTmuxPlaceholderCommand } from "./pane-command"
 
 export type ReplaceTmuxPaneDeps = {
 	readonly log: (message: string, data?: unknown) => void
@@ -68,7 +68,7 @@ export async function replaceTmuxPane(
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+	const title = buildSubagentPaneTitle(description)
 	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
 	if (titleResult.exitCode !== 0) {
 		log("[replaceTmuxPane] WARNING: failed to set pane title", {

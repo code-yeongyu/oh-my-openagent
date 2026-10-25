@@ -22,6 +22,7 @@ pub(crate) fn window() -> DesktopWindow {
         height: EDITOR_RECT.height.unsigned_abs(),
         focused: true,
         elevated: None,
+        is_on_screen: None,
     }
 }
 

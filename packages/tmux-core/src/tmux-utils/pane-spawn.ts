@@ -4,7 +4,7 @@ import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { buildPaneAuthEnvironmentArgs, buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
+import { buildPaneAuthEnvironmentArgs, buildSubagentPaneTitle, buildTmuxAttachCommand, buildTmuxPlaceholderCommand } from "./pane-command"
 import { isCmuxCompatEnvironment as _isCmuxCompatEnvironment } from "../cmux-detect"
 
 export type SpawnTmuxPaneDeps = {
@@ -107,7 +107,7 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+	const title = buildSubagentPaneTitle(description)
 	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
 	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxPane] WARNING: failed to set pane title", {

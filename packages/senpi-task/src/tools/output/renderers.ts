@@ -1,5 +1,6 @@
 import type { AgentToolResult, Theme, ThemeColor, ToolRenderResultOptions } from "@code-yeongyu/senpi"
 
+import { describeParentModelFallback } from "../../parent-model-fallback-text"
 import { formatStatusTarget, taskIdentityLabel } from "../../status-line"
 import {
   excerptRendererText,
@@ -64,6 +65,8 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
           category: details.snapshot.category,
           agentType: details.snapshot.agent_type,
           resolvedModel: details.snapshot.resolved_model,
+          effectiveModel: details.snapshot.effective_model,
+          parentModelFallback: details.snapshot.parent_model_fallback,
         }) ?? `model:${normalizeRendererText(details.snapshot.model)}`
       const statusLabel = details.snapshot.suspended?.explanation ?? normalizeRendererText(details.snapshot.status)
       return {
@@ -114,8 +117,12 @@ export function taskOutputModelText(snapshot: TaskSnapshot): string {
     snapshot.resolved_model !== undefined &&
     snapshot.effective_model.provider === snapshot.resolved_model.provider &&
     snapshot.effective_model.model_id === snapshot.resolved_model.model_id
-  if (effective === undefined || sameModel) return `model ${planned}`
-  return `model ${effective} (planned ${planned})`
+  const operatorMark = snapshot.effective_model?.switched_by_operator === true ? " (switched by operator)" : ""
+  const parentFallback = describeParentModelFallback(snapshot.parent_model_fallback, snapshot.parent_model)
+  const route = effective === undefined || sameModel
+    ? `model ${planned}${operatorMark}`
+    : `model ${effective}${operatorMark} (planned ${planned})`
+  return parentFallback === undefined ? route : `${route}; ${parentFallback}`
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

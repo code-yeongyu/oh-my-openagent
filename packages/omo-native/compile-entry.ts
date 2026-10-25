@@ -13,12 +13,13 @@ import {
 } from "./compile-runtime"
 import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
-import { compiledUpdate, fetchGitHubReleases, releaseAssetName, RELEASES_URL } from "./compiled-update"
+import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
+import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
-import { runServiceAuthCommand } from "../omo-opencode/src/cli/service-auth/commands"
+import { runServiceAuthCommand, SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
@@ -27,13 +28,18 @@ import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
 import { runSetup } from "./bin/lib/setup-import.js"
 import { runCompiledDoctor, type CompiledDoctorOptions } from "./compiled-doctor"
-import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
+import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine, loadCompiledModelCatalog } from "./compiled-diagnostic-runtime"
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
+import { runLoroSmoke } from "./loro-smoke"
+import { runAccountCommand } from "./account-cli"
+import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
+import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
+import { ExtraCaCertificatesError, installEngineCaTrust } from "./compiled-ca-trust"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -127,8 +133,20 @@ export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersi
 type CompiledLauncherSeams = { readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }> }
 
 export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string, migration: CompiledLauncherOptions = {}, seams: CompiledLauncherSeams = {}): Promise<boolean> {
+  if (args[0] === "loro-smoke") {
+    process.exitCode = await runLoroSmoke()
+    return true
+  }
   if (["login", "logout", "whoami"].includes(args[0] ?? "")) {
     await runServiceAuthCommand(args)
+    return true
+  }
+  if (args[0] === "sync") {
+    await runSyncCommand(args)
+    return true
+  }
+  if (args[0] === "account") {
+    await runAccountCommand(args)
     return true
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
@@ -142,6 +160,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     process.exitCode = 2
     return true
   }
+  if (refuseRetiredCommand(args)) return true
   // The compiled binary IS the engine's process, so the host CLI is reached by re-running this
   // executable with `host ...` - an early command that goes to the engine untouched. Spawning a
   // node path here would re-enter omo itself and leave a phantom session behind.
@@ -218,6 +237,8 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     await (migration.runSetup ?? runSetup)(args.slice(1), {
       loadCoverageRuntime: compiledDiagnosticRuntimeLoader(compiledPackageRoot ?? execDir),
       loadCoverageEngine: loadCompiledCoverageEngine,
+      loadModelCatalog: loadCompiledModelCatalog,
+      pluginRoot: join(compiledPackageRoot ?? execDir, "plugin"),
     })
     return true
   }
@@ -228,7 +249,53 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
 
 export { reexecProvisionedRuntime } from "./provisioned-handoff"
 
+const HELP_WITHOUT_ENGINE = `Usage: omo [options] [message...]
+       omo <command> [args]
+
+Some commands: setup, doctor, update, daemon, thread${SERVICE_ACCOUNTS_OPEN ? ", login, logout, whoami" : ""}
+
+The full command and option list, including what extensions add, needs the engine, which does
+not start while OMO_EXTRA_CA_CERTIFICATES is invalid. Fix or unset it, then run omo --help again.`
+
+/** The exact argv `--version` or `--help`, answered from local data only; anything else returns false. */
+async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
+  if (args.length !== 1) return false
+  if (args[0] === "--help") {
+    console.log(HELP_WITHOUT_ENGINE)
+    return true
+  }
+  if (args[0] !== "--version") return false
+  const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
+  const manifestFile = embedded?.length ? await selectRuntimeManifest(embedded) : undefined
+  if (manifestFile) {
+    const manifest = JSON.parse(await embeddedText(manifestFile)) as EmbeddedManifest
+    console.log(versionLine({ version: manifest.omoAiVersion, omoBuild: manifest.buildInfo, engineBuild: manifest.engineBuild }, manifest.enginePin))
+  } else {
+    const packageJson = readJson(join(dirname(fileURLToPath(import.meta.url)), "package.json")) as { version: string; omoBuild?: unknown }
+    console.log(versionLine(packageJson, "unknown"))
+  }
+  return true
+}
+
 async function main(): Promise<void> {
+  // The #10697 plaintext file goes before ANY command, including the answers below that return early.
+  removeLegacyServiceCredentials()
+  // Before anything opens TLS, and on every start: `host ensure`, the host daemon and the
+  // provisioned handoff all re-enter here (#10215). A bad value refuses to start (exit 78). Only the
+  // exact argv `--version` or `--help` is answered, from static local data, before anything else runs
+  // (#10236): the engine's own help loads extensions, which can install packages over the network.
+  try {
+    installEngineCaTrust()
+  } catch (error) {
+    if (!(error instanceof ExtraCaCertificatesError)) throw error
+    if (await answerUnderRefusedTrust(process.argv.slice(2))) {
+      process.stderr.write(`omo: ${error.message}; every other command refuses to start until it is fixed\n`)
+      process.exitCode = 0
+      return
+    }
+    process.stderr.write(`omo: ${error.message}; not starting with a trust set the caller did not intend\n`)
+    process.exit(78)
+  }
   const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
   if (!embedded?.length) {
     const execDir = dirname(fileURLToPath(import.meta.url))
@@ -263,6 +330,7 @@ async function main(): Promise<void> {
       arch: process.arch,
       fetchReleases: fetchGitHubReleases,
       args: process.argv.slice(2),
+      probeOwner: probePackageOwner,
     })
     ;(result.stream === "stderr" ? console.error : console.log)(result.output)
     process.exitCode = result.exitCode

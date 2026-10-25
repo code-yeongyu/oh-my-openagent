@@ -55,6 +55,21 @@ function input(root: string) {
 }
 
 describe("computer use doctor probe failures", () => {
+  test.each(["self-responsible", "unresolved"])("preserves the actual child's %s refusal in the public doctor report", async (reason) => {
+    const root = fixtureRoot()
+    const record = `SENPI_DESKTOP_LAUNCH_REFUSED ${JSON.stringify({ version: 1, reason })}\n`
+    const enginePath = writeEngine(root, `
+process.stdin.once("data", () => process.stderr.write(${JSON.stringify(record)}, () => {
+  process.exitCode = 1;
+  process.stdin.destroy();
+}));
+`)
+    writeConfig(root, enginePath)
+    const report = await computerUseDoctorReport({ ...input(root), launchEngine: runEngineScript, timeoutMs: 5_000 })
+    expect(report).toMatchObject({ kind: "failed", code: "launch-context-unavailable", reason })
+    expect(report).toHaveProperty("diagnostic")
+  })
+
   test("#given a mismatched engine ABI #when probed #then the report is an ABI failure with the engine path", async () => {
     // given
     const root = fixtureRoot()
@@ -63,6 +78,7 @@ const replies = {
   "engine.hello": { protocolVersion: "9", engineVersion: "0.0.0", buildSha: "fixture", abi: "other/9" },
   capabilities: {
     backend: "fake", capture: false, input: false, ax: false, backgroundWindowInput: false,
+    cursorOverlay: false,
     deliveryModes: [], capturePermission: "denied", inputPermission: "denied", axPermission: "denied",
     displayCount: 0, focusGuard: false, stopPath: "none", screenLocked: false
   }

@@ -26,6 +26,8 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"focus",
 	"focusedElement",
 	"focusedWindow",
+	"holdKeys",
+	"holdMouse",
 	"move",
 	"observe",
 	"menu.items",

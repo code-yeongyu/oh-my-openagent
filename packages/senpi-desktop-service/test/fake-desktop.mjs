@@ -46,8 +46,8 @@ const BUTTON = {
 	childCount: 0,
 };
 
-const POINTER_METHODS = new Set(["click", "moveMouse", "drag", "scroll"]);
-const NULL_METHODS = new Set(["typeText", "keyChord", "raiseWindow", "menus.select", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
+const POINTER_METHODS = new Set(["click", "moveMouse", "drag", "scroll", "holdMouse"]);
+const NULL_METHODS = new Set(["typeText", "keyChord", "holdKeys", "raiseWindow", "menus.select", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
 
 const MENU_TREE = [
 	{ title: "File", path: ["File"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },
@@ -96,7 +96,10 @@ export function createDesktop() {
 	const inputError = process.env.FAKE_ENGINE_INPUT_ERROR;
 	return (method, params) => {
 		const target = params?.target;
-		if (inputError !== undefined && (POINTER_METHODS.has(method) || method === "typeText" || method === "keyChord")) {
+		if (process.env.FAKE_ENGINE_PRE_HOLDS === "1" && ["holdKeys", "holdMouse"].includes(method)) {
+			return { error: { code: -32601, message: "Method not found", data: { reason: "unknown" } } };
+		}
+		if (inputError !== undefined && (POINTER_METHODS.has(method) || method === "typeText" || method === "keyChord" || method === "holdKeys")) {
 			const failure = error(INPUT_ERROR_RPC[inputError] ?? -32013, inputError, `input refused: ${inputError}`);
 			if (inputError === "PermissionDenied") {
 				failure.error.data.permission = {

@@ -15,6 +15,7 @@ fn window(width: u32, x: i32) -> DesktopWindow {
         width,
         height: 48,
         focused: true,
+        is_on_screen: None,
         elevated: None,
     }
 }

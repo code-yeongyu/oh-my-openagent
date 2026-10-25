@@ -5,6 +5,7 @@ import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { configureAccountKeysCommands } from "./account-keys/commands"
 import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
 import { configureRuntimeCommands } from "./runtime-commands"
@@ -231,6 +232,7 @@ configureRuntimeCommands(program)
 
 program.addCommand(createMcpOAuthCommand())
 configureServiceAuthCommands(program)
+configureAccountKeysCommands(program)
 
 export function runCli(): void {
   program.parse()

@@ -84,7 +84,7 @@ Under team mode, isolate and land per unit:
 
 ## Native Senpi Task Contract
 
-Senpi already exposes its real subagent spawn surface through the omo-senpi `task` component. Use it directly. Do not route delegation through external app-server threads or another harness.
+Senpi already exposes its real subagent spawn surface through the omo-senpi `task` component. Use it directly. Do not route delegation through external agent-protocol threads or another harness.
 
 | Intent | Native Senpi tool |
 | --- | --- |

@@ -17,7 +17,7 @@ import {
 } from "@oh-my-opencode/senpi-desktop-tool/registration"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { type ContributedSkill, readDiscoverCwd, resolveContributedSkill } from "../bundled-skills/contributed-skill"
+import { readDiscoverCwd, resolveContributedSkill } from "../bundled-skills/contributed-skill"
 import { loadSenpiOmoConfig } from "../config-resolution"
 import type { ComputerUseTelemetryObservers } from "../telemetry/omo-native-computer-use"
 import {
@@ -27,7 +27,8 @@ import {
   createComputerRuntimeLoader,
 } from "./runtime-loader"
 import { resolveOmoComputerSettings } from "./settings"
-import { skillStatusLine, toolActivatedNames, wireComputerControlEvents } from "./registration-support"
+import { watchFullAccess } from "./full-access"
+import { initialComputerState, skillStatusLine, toolActivatedNames, wireComputerControlEvents } from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
 import { wireComputerPermissionEvents } from "./permission-events"
 
@@ -120,17 +121,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
         }
       })()
 
-      const state: {
-        backend: string
-        telemetryContext: unknown
-        activationReported: boolean
-        skill: ContributedSkill | undefined
-      } = {
-        backend: "unavailable",
-        telemetryContext: undefined,
-        activationReported: false,
-        skill: undefined,
-      }
+      const state = initialComputerState()
       const runtime =
         available === undefined
           ? undefined
@@ -140,6 +131,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
               settings: available.settings,
               engineChild: options.engineChild,
               onPermissionRequired: reportPermission,
+              fullAccess: watchFullAccess(pi),
               onEngineError: (code) => {
                 if (state.telemetryContext !== undefined) telemetry.engineError(state.telemetryContext, code, state.backend)
               },

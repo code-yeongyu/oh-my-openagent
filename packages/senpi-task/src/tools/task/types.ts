@@ -5,6 +5,7 @@ import type { IsolationDetails, IsolationStartedDetails } from "../../isolation/
 import type { KernelToolErrorCode } from "../../kernel-tools/contract"
 import type { ExecutionModeGate, TaskManager } from "../../manager"
 import type {
+  EffectiveModelRecord,
   ResolvedModelRecord,
   TaskRunStats,
   TaskStartFailureKind,
@@ -18,6 +19,8 @@ import type { TaskToolParamsStatic } from "./params"
 export type TaskToolContext = {
   readonly cwd: string
   readonly sessionManager: { getSessionId(): string }
+  // The model the parent session runs right now: a category child's last fallback rung (#10750).
+  readonly model?: { readonly provider: string; readonly id: string } | undefined
   readonly getPromptCacheSafeWaitSeconds?: () => number | undefined
   // Transient parent JS kernel-tool capability, present only while a live JavaScript eval owns this
   // tool call. Read structurally (readKernelToolsCapability) so the engine pin may predate it.
@@ -42,6 +45,7 @@ export type LoadedSkill = {
 // v1 load_skills contract: resolve named skills to SKILL.md content and expose a ready-to-prepend
 // block plus which names resolved vs went missing (missing names never fail the spawn).
 export type SkillResolution = {
+  readonly rejected?: readonly { readonly name: string; readonly reason: string }[]
   readonly prepend: string
   readonly resolved: readonly string[]
   readonly missing: readonly string[]
@@ -51,6 +55,7 @@ export type SkillResolution = {
 export type SkillLoader = (names: readonly string[], cwd: string) => SkillResolution
 
 export type TaskSkillSummary = {
+  readonly rejected?: readonly { readonly name: string; readonly reason: string }[]
   readonly requested: readonly string[]
   readonly resolved: readonly string[]
   readonly missing: readonly string[]
@@ -147,6 +152,7 @@ export type TaskToolItemDetail = {
 }
 
 export type TaskToolDetails = {
+  readonly pause_seq?: number
   readonly task_id: string
   readonly run_epoch?: number
   readonly status: string
@@ -159,7 +165,7 @@ export type TaskToolDetails = {
   readonly model?: string
   readonly resolved_model?: ResolvedModelRecord
   // The model the child actually started on, read from the child itself (#9722).
-  readonly effective_model?: ResolvedModelRecord
+  readonly effective_model?: EffectiveModelRecord
   readonly fallback_attempts?: readonly ResolvedModelRecord[]
   readonly run_in_background?: boolean
   readonly queue_position?: number

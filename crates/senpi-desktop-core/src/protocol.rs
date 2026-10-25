@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::error::{ErrorCode, PermissionDeniedData};
+use crate::error::{CaptureUnavailableData, ErrorCode, PermissionDeniedData};
 use crate::methods::Notification;
 
 /// Engine protocol version reported by `engine.hello`.
@@ -26,7 +26,7 @@ pub const INVALID_PARAMS: i64 = -32_602;
 pub const ENGINE_ERROR_BASE: i64 = -32_000;
 
 /// Every `ErrorCode`, in declaration (ordinal) order.
-pub const ERROR_CODES: [ErrorCode; 23] = [
+pub const ERROR_CODES: [ErrorCode; 24] = [
     ErrorCode::PermissionDenied,
     ErrorCode::CaptureFailed,
     ErrorCode::InputFailed,
@@ -50,6 +50,7 @@ pub const ERROR_CODES: [ErrorCode; 23] = [
     ErrorCode::TransactionFailed,
     ErrorCode::InputBusy,
     ErrorCode::ControlRequired,
+    ErrorCode::CaptureUnavailable,
 ];
 
 /// The numeric JSON-RPC error code for `code`: `-32000 - ordinal`.
@@ -147,6 +148,8 @@ pub struct EngineErrorData {
     pub hint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission: Option<PermissionDeniedData>,
+    #[serde(default, rename = "captureUnavailable", skip_serializing_if = "Option::is_none")]
+    pub capture_unavailable: Option<CaptureUnavailableData>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

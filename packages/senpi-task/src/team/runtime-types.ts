@@ -38,6 +38,7 @@ export class SenpiTeamRuntimeError extends Error {
 // this structurally; kept narrow so the runtime never reaches past start/cancel/read.
 export type TeamRuntimeManagerPort = {
   start(spec: ManagerStartSpec): Promise<StartResult>
+  whenLaunched?(taskId: string): Promise<void>
   cancelTask(idOrName: string, reason?: string): Promise<CancelOutcome>
   get(taskId: string): TaskRecord | undefined
   getResidentHandle(taskId: string): { readonly sessionId: string | undefined } | undefined
@@ -59,6 +60,7 @@ export type CreateTeamDeps = {
   readonly stateDir: StateDirConfig
   readonly taskSettings: OmoTaskSettings
   readonly leadSessionId: string
+  readonly rootSessionId?: string
   readonly spawnDepth: number
   readonly now?: () => number
   readonly memberExtension?: TeamMemberExtensionConfig

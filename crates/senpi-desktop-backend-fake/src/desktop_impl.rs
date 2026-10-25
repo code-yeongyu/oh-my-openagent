@@ -11,43 +11,6 @@ use crate::fake::FakeBackend;
 use crate::method::FakeMethod;
 use crate::sink::{RecordedPointer, SinkOp};
 
-impl FakeBackend {
-    /// Native-size frame of `target`: the display composite, or the window at
-    /// one pixel per logical point.
-    fn frame(&self, target: &Target) -> CoreResult<(FrameGeometry, u32, u32)> {
-        match target {
-            Target::Desktop | Target::Display(_) => {
-                let selector = target.display_selector().unwrap_or(senpi_desktop_core::types::DisplaySelector::All);
-                let focused = self.windows.iter().find(|window| window.focused);
-                let mut displays = selector.select(self.displays.clone(), focused)?;
-                if displays.len() == 1 {
-                    displays[0].pixel_x = 0;
-                    displays[0].pixel_y = 0;
-                }
-                let width = displays.iter().map(|d| d.pixel_x.saturating_add(d.pixel_width)).max().unwrap_or(0);
-                let height = displays.iter().map(|d| d.pixel_y.saturating_add(d.pixel_height)).max().unwrap_or(0);
-                Ok((FrameGeometry::for_displays(&displays), width, height))
-            }
-            Target::Window(id) => {
-                let window = self.window(id)?;
-                let frame = FrameGeometry::for_window(window, window.width, window.height);
-                Ok((frame, window.width, window.height))
-            }
-        }
-    }
-
-    fn apply_scripted_resize(&mut self, target: &Target) {
-        let Target::Window(id) = target else { return };
-        let Some(resize) = self.resize_window.take_if(|resize| &resize.id == id) else {
-            return;
-        };
-        if let Some(window) = self.windows.iter_mut().find(|window| window.id == resize.id) {
-            window.width = resize.width;
-            window.height = resize.height;
-        }
-    }
-}
-
 impl Backend for FakeBackend {
     fn capabilities(&mut self) -> DesktopCapabilities {
         self.capabilities.clone()
@@ -64,7 +27,12 @@ impl Backend for FakeBackend {
     }
 
     /// Returns the native-size solid image; the session applies `caps`.
-    fn capture(&mut self, target: &Target, _caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(
+        &mut self,
+        target: &Target,
+        _caps: &CaptureCaps,
+        _exclude_window_titles: &[String],
+    ) -> CoreResult<(RgbaImage, FrameGeometry)> {
         self.begin(FakeMethod::Capture)?;
         if !self.capabilities.capture {
             return Err(DesktopError::capture_failed(
@@ -72,6 +40,11 @@ impl Backend for FakeBackend {
             ));
         }
         let (frame, width, height) = self.frame(target)?;
+        let frame = if self.legacy_capture {
+            frame.into_legacy_capture()
+        } else {
+            frame
+        };
         if width == 0 || height == 0 {
             return Err(DesktopError::capture_failed(
                 "fake scenario has nothing to capture",
@@ -188,6 +161,20 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.hold_keys_impl(target, keys, mode, control)
+    }
+
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.hold_mouse_impl(target, hold, mode, control)
+    }
+
     fn menu_items(
         &mut self,
         window: &DesktopWindow,
@@ -216,8 +203,13 @@ impl Backend for FakeBackend {
 
     fn release_all(&mut self) -> CoreResult<()> {
         self.begin(FakeMethod::ReleaseAll)?;
+        self.sink.release_held();
         self.record(SinkOp::ReleaseAll);
         Ok(())
+    }
+
+    fn emergency_release(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EmergencyRelease>> {
+        Some(std::sync::Arc::new(self.sink.clone()))
     }
 
     fn cursor_position(&mut self) -> CoreResult<Option<DesktopPoint>> {

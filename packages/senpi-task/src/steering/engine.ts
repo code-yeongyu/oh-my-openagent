@@ -25,6 +25,7 @@ import { createSteeringControls } from "./controls"
 import { createPendingSteering } from "./pending-steering"
 import { endDroppedSteering } from "../state/queued-steering"
 import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
+import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
@@ -76,9 +77,17 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       return { kind: "not_continuable", task_id: record.task_id,
         reason: [record.error_message, record.final_response].filter(Boolean).join("\n\n"), suggestion: TASK_OUTPUT_SUGGESTION }
     }
+    const held = port.sendWhileRunHeld?.(record, input.message)
+    if (held !== undefined) return held
 
     const deliverAs = input.deliverAs ?? DEFAULT_SEND_DELIVERY
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
+    // A first launch the host has not admitted yet (#10042): no session has ever existed for this
+    // task, so there is nothing to revive. Queue the message; the launch drains it once the child starts.
+    if (record.status === "running" && record.host_session === undefined && record.child_session_id === undefined
+      && port.isLaunching?.(record.task_id) === true && port.liveHandle(record.task_id) === undefined) {
+      return enqueuePending(record, input.message, deliverAs)
+    }
     if (port.isEvicting?.(record.task_id) === true) return evictionRefusal(record.task_id)
     // An accepted cancel is final: nothing may revive or steer the child it is stopping (omo#9403).
     if (record.status === "running" && record.cancel_requested !== undefined) {
@@ -162,6 +171,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       if (deliverAs === "steer") await handle.steer(message)
       else await handle.followUp(message)
     } catch (error) {
+      if (error instanceof InputUncertainError) return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
+      if (error instanceof InputConflictError) return { kind: "failed", task_id: record.task_id,
+        effect_id: error.effectId, reason: error.reason, detail: error.detail, action: error.action }
       // These typed refusals happen before delivery. Never replay an ambiguous transport failure.
       if (!(error instanceof HostSessionDetachedError) && !(error instanceof SessionHeldElsewhereError)) throw error
       const fresh = tryLoad(record.task_id)

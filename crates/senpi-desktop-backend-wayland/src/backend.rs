@@ -149,7 +149,7 @@ impl Backend for WaylandBackend {
     /// Reads the layout of an already connected libei session only; capture
     /// never opens an input session. A layout that cannot be read leaves the
     /// geometry unproven, so the frame refuses coordinate input.
-    fn capture(&mut self, target: &Target, _caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let layout = match &mut self.input {
             Input::Connected(libei) => libei.regions().ok(),
             Input::Untried | Input::Failed(_) => None,
@@ -205,6 +205,25 @@ impl Backend for WaylandBackend {
 
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], _mode: DeliveryMode) -> CoreResult<()> {
         self.prepare_input(target, "keyboard input")?.key_chord(keys)
+    }
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], _mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.prepare_input(target, "bounded keyboard input")?.hold_keys(keys, control)
+    }
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        _mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        let layout = self.frame_layout.clone();
+        let libei = self.prepare_input(target, "bounded pointer input")?;
+        if let Some(layout) = layout {
+            if libei.regions()? != layout {
+                return Err(DesktopError::invalid_coordinate_frame(LAYOUT_CHANGED));
+            }
+        }
+        libei.hold_mouse(hold, control)
     }
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {

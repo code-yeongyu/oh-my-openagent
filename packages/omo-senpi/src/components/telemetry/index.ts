@@ -11,7 +11,8 @@ import {
   TelemetryOsProvider,
   TelemetryProductConfig,
   TelemetryTransportFactory,
-} from "@oh-my-opencode/telemetry-core"
+} from "@oh-my-opencode/telemetry-core/injected"
+import { createLazyPostHogTransportFactory } from "./lazy-posthog"
 import { createLazyValue } from "../../extension/startup-deferral"
 import type { ComponentLogger } from "../../extension/types"
 
@@ -27,6 +28,7 @@ const DEFAULT_TIMEOUT_MS = 500
 const packageVersion = createLazyValue(readPackageVersion)
 
 export type SenpiTelemetryOptions = {
+  readonly diagnostics?: RecordDailyActiveInput["diagnostics"]
   readonly env?: TelemetryEnv
   readonly now?: Date
   readonly osProvider?: TelemetryOsProvider
@@ -58,12 +60,7 @@ export async function recordSenpiDailyActive(options: SenpiTelemetryOptions = {}
   const input = createRecordDailyActiveInput(options)
   await withTimeout(
     recordDailyActive(
-      options.transportFactory === undefined
-        ? input
-        : {
-            ...input,
-            transportFactory: options.transportFactory,
-          },
+      input,
     ),
     options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
   )
@@ -87,6 +84,11 @@ export const omoSenpiTelemetryComponent = createSenpiTelemetryComponent()
 function createRecordDailyActiveInput(options: SenpiTelemetryOptions): RecordDailyActiveInput {
   const env = options.env ?? process.env
   const baseInput = {
+    diagnostics: options.diagnostics,
+    transportFactory: options.transportFactory ?? createLazyPostHogTransportFactory({
+      diagnostics: options.diagnostics,
+      source: SENPI_TELEMETRY_SOURCE,
+    }),
     env,
     product: createSenpiTelemetryProductConfig(),
     reason: SESSION_START_REASON,

@@ -1,26 +1,30 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import { nowIso, type LifecycleContext } from "./context"
+import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
+import { markSuspensionReason } from "./host-session-record"
 import type { ResidentHandle } from "./port"
-import { withinTeardownBudget } from "./teardown-budget"
+import { stopOwnedChildren, stoppedOwnerTask } from "./stopped-owner"
+import { withinTeardownBudget, type TeardownStep } from "./teardown-budget"
 import type { SuspendFailure, SuspendInput, SuspendSummary } from "./types"
 
 /**
  * On session_shutdown, SUSPEND this session's children instead of destroying them: live handles
- * are still torn down (no-orphan law) but the records survive as persisted_only / rpc_detached so
+ * are detached or torn down, but the records survive as persisted_only / rpc_detached so
  * a later session resume can revive them. The scan covers TWO populations: registry handles AND
  * pending records owned by this session/host (pending children have no handle and no session file
  * yet, so a handle-only scan would strand them). Deliberately-stopped children (cancelled/lost
  * status, or the durable killed fact) are still DISPOSED through the destruction port - they must
- * never revive. When resume_children is off, the pre-feature dispose-all behavior runs unchanged.
+ * never revive. When resume_children is off, local children use the legacy destruction path.
  */
 export async function suspendOnSessionShutdown(
   context: LifecycleContext,
   input: SuspendInput,
 ): Promise<SuspendSummary> {
-  if (context.config.resume_children === false) return disposeAllOnShutdown(context)
+  const stoppedOwner = stoppedOwnerTask(context, input.parentSessionId, input.ownTaskId)
+  if (stoppedOwner !== undefined) return stopOwnedChildren(context, input, stoppedOwner)
+  if (context.config.resume_children === false) return disposeAllOnShutdown(context, input)
 
   const failures: SuspendFailure[] = []
   let suspendedInProcess = 0
@@ -46,6 +50,11 @@ export async function suspendOnSessionShutdown(
     }
     try {
       await suspendHandle(context, handle, input.reason)
+      // senpi#3493: a quit-parked record must say WHY it is still "running" - the owning session
+      // exited, so nothing revives the child until that session resumes and task_output can present
+      // it as "resuming (session quit)" instead of a bare running record. Other shutdown reasons
+      // keep today's behavior (a reload revives through the new generation; the opt-out disposes).
+      if (input.reason === "quit") markSuspensionReason(context, handle.task_id, "session_quit")
       if (handle.kind === "in-process") suspendedInProcess += 1
       else suspendedRpc += 1
     } catch (error) {
@@ -61,6 +70,7 @@ export async function suspendOnSessionShutdown(
       context.dequeuePending(record.task_id)
       context.store.transition(record.task_id, { type: "persist_only", timestamp: nowIso(context) })
       context.store.appendEvent(record.task_id, { type: "suspended", payload: { reason: input.reason } })
+      if (input.reason === "quit") markSuspensionReason(context, record.task_id, "session_quit")
       suspendedPending += 1
     } catch (error) {
       failures.push({ task_id: record.task_id, error: String(error) })
@@ -83,13 +93,23 @@ export async function suspendOnSessionShutdown(
 }
 
 // Suspend one resident handle: the registry forgets it FIRST (stale outcome tracking loses
-// ownership before abort settles the turn, so no cancelled/error terminal can land on the
-// suspended record), then live resources are torn down and the record is parked at its suspended
+// ownership before teardown settles the turn, so no cancelled/error terminal can land on the
+// suspended record), then local resources are torn down and the record is parked at its suspended
 // residency. The pre-dispose steps are best-effort so dispose ALWAYS runs.
 export async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
   context.registry.forget(handle.task_id, { path: "park" })
   const target = { taskId: handle.task_id, pid: handle.pid }
-  await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
+  if (handle.kind !== "host-session") {
+    await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
+  }
+  // A finished child's session stays loaded on the daemon after the detach: its terminal status goes
+  // out first, over the attachment, so a successor host drops the park instead of reopening it (omo#10778).
+  const status = context.store.load(handle.task_id)?.status
+  const publish = handle.publishTaskStatus?.bind(handle)
+  if (status !== undefined && TERMINAL_STATUSES.has(status) && publish !== undefined) {
+    await bestEffort(handle.task_id, "publish_task_status", () =>
+      withinTeardownBudget(context.teardownStepDeadline, target, "publish_task_status", () => publish(status)))
+  }
   if (handle.kind === "rpc") await bestEffort(handle.task_id, "terminate", () => withinTeardownBudget(context.teardownStepDeadline, target, "terminate", () => handle.terminate()))
   try {
     await withinTeardownBudget(context.teardownStepDeadline, target, "dispose", () => handle.dispose())
@@ -105,18 +125,27 @@ export async function suspendHandle(context: LifecycleContext, handle: ResidentH
   context.store.appendEvent(handle.task_id, { type: "suspended", payload: { reason } })
 }
 
-// resume_children === false restores the pre-feature behavior exactly: every resident handle is
-// destroyed through the port (cancel family) and pending records are left untouched.
-async function disposeAllOnShutdown(context: LifecycleContext): Promise<SuspendSummary> {
+// The opt-out still destroys local children and leaves pending records untouched. A daemon turn
+// belongs to the host, not the exiting parent; it detaches even when automatic revival is disabled.
+async function disposeAllOnShutdown(context: LifecycleContext, input: SuspendInput): Promise<SuspendSummary> {
   const entries = [...context.registry.entries()]
+  let suspendedRpc = 0
+  let disposed = 0
   for (const handle of entries) {
+    if (handle.kind === "host-session") {
+      if (!isOwnedChild(context.store.load(handle.task_id), context, input.parentSessionId)) continue
+      await suspendHandle(context, handle, input.reason)
+      suspendedRpc += 1
+      continue
+    }
     await destroyResidentTask(context, handle.task_id, "cancel")
+    disposed += 1
   }
   const summary: SuspendSummary = {
     suspended_in_process: 0,
-    suspended_rpc: 0,
+    suspended_rpc: suspendedRpc,
     suspended_pending: 0,
-    disposed: entries.length,
+    disposed,
     failures: [],
   }
   log("senpi-task session shutdown dispose-all (resume_children=false)", { total: entries.length })
@@ -131,7 +160,7 @@ function isOwnedChild(
   return record !== null && record.parent_session_id === parentSessionId && record.host_pid === context.hostPid
 }
 
-async function bestEffort(taskId: string, step: "abort" | "terminate", run: () => Promise<void>): Promise<void> {
+async function bestEffort(taskId: string, step: TeardownStep, run: () => Promise<void>): Promise<void> {
   try {
     await run()
   } catch (error) {

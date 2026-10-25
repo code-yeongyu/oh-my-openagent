@@ -1,11 +1,20 @@
 import { describe, expect, test } from "bun:test"
 
-import { classifyRunProcess, isLauncherDead } from "./run-liveness"
+import { classifyRunProcess, isLauncherDead, waitUntil } from "./run-liveness"
 
 const alive = () => "alive" as const
 const dead = () => "dead" as const
 
 describe("run process liveness across start-identity schemes", () => {
+  test("#given a run deadline minutes away #when its observer cancels #then the timer wait rejects immediately", async () => {
+    const controller = new AbortController()
+    const reason = new Error("observer deadline")
+    const pending = waitUntil(Date.now() + 60_000, Date.now, controller.signal)
+      .then(() => undefined, (error: unknown) => error)
+    controller.abort(reason)
+    expect(await pending).toBe(reason)
+  })
+
   test("#given a live pid recorded with ps-lstart and read back as proc-start-epoch #when classified #then the mismatch is not pid reuse and the process is alive", async () => {
     // given
     const recorded = "ps-lstart:Tue Sep 15 14:59:03 2026"

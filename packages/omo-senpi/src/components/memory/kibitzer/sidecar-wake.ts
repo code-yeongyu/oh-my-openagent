@@ -217,7 +217,7 @@ export function createWakeTransitions(core: SidecarCore, turns: TurnLifecycle, a
       }
     }
     core.activeTurn = undefined
-    turns.report(turn, end, nudges, current, outcome.status === "cancelled" ? undefined : outcome.model)
+    turns.report(turn, end, nudges, current, outcome.status === "cancelled" || outcome.status === "interrupted" ? undefined : outcome.model)
     switch (end.status) {
       case "cancelled":
         recovery.disposeChild()

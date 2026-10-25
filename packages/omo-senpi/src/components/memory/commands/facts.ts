@@ -1,15 +1,15 @@
 // /facts -- read-only view of the facts pipeline, plus the ONLY manual unpark path.
 //
 // `/facts retry` clears failure records and triggers one reconcile/launch attempt. It never
-// touches queue files or either watermark: parking is a launch-gating fact, not queue state,
-// so unparking must not move data. There is no automatic unparking anywhere in the pipeline.
+// changes either watermark. The store restores parked files to the hot queue under its
+// lock before clearing their records. There is no automatic unparking.
 
 import { FactsFailureStore, type FactsFailureFilter } from "@oh-my-opencode/memory-core"
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { parseCommandArgs } from "./args"
 import { formatFactsStatus, readFactsOverview } from "./facts-status"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 function conversationsIn(records: readonly { readonly conversationId: string }[]): string[] {
   return [...new Set(records.map((record) => record.conversationId))].sort()
@@ -52,10 +52,9 @@ async function runRetry(
   )
 }
 
-export function registerFactsCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerFactsCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("facts", {
-    description: "Show facts-extraction queue/backoff state, or manually retry parked batches.",
-    argumentHint: "[retry [--conversation <id>]]",
+    ...LAZY_MEMORY_COMMANDS.facts,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")

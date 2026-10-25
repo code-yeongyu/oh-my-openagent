@@ -10,6 +10,8 @@
 //   "release"     - reply, then flush every held reply
 //   "hang"        - never reply, ignore $/cancel
 //   "cancellable" - never reply until $/cancel names this id, then reply Cancelled
+//   "release-fails" - never reply until $/cancel names this id, then reply InputFailed with the
+//                   engine's merged "input release also failed" text (a hold whose key-up failed)
 //   "notify"      - emit one audit and one stopPath.changed notification, then reply
 //   "exit"        - exit with code 7 without replying
 //   otherwise     - reply { method, params, pid }
@@ -34,6 +36,7 @@ const capabilities = {
 	input: true,
 	ax: true,
 	backgroundWindowInput: true,
+	...(process.env.FAKE_ENGINE_CURSOR_OMITTED === "1" ? {} : { cursorOverlay: false }),
 	deliveryModes: ["background", "foreground"],
 	capturePermission: "granted",
 	inputPermission: "granted",
@@ -47,7 +50,15 @@ const capabilities = {
 };
 let suspended = false;
 // The foreground control grant this fake holds (B5); FAKE_ENGINE_CONTROL_BUSY=1 refuses grants InputBusy.
+// A stop drops it, as the engine's stop epoch does. FAKE_ENGINE_GLOBAL_INPUT_GATE=1 refuses input on the
+// desktop or a display target without it, ControlRequired before any input (#10788).
 let control = { active: false };
+const GLOBAL_INPUT = new Set(["click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse"]);
+const refusesGlobalInput = (method, params) =>
+	process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1" &&
+	GLOBAL_INPUT.has(method) &&
+	(params?.target === "desktop" || String(params?.target).startsWith("display:")) &&
+	!control.active;
 const CONTROL_GRANTED_AT = "2026-10-11T00:00:00.000Z";
 const status = () => ({
 	suspended,
@@ -64,6 +75,7 @@ const fail = (id, code, message, rpcCode = -32000) =>
 	send({ id, error: { code: rpcCode, message, data: { code, hint: null } } });
 const held = [];
 const cancellable = new Set();
+const releaseFails = new Set();
 
 function handle(request) {
 	const { id, method, params } = request;
@@ -82,6 +94,7 @@ function handle(request) {
 			return reply(id, status());
 		case "stopPath.stop":
 			suspended = true;
+			control = { active: false };
 			send({ method: "stopPath.changed", params: status() });
 			return reply(id, status());
 		case "stopPath.resume":
@@ -94,6 +107,9 @@ function handle(request) {
 		case "control.grant":
 			if (process.env.FAKE_ENGINE_CONTROL_BUSY === "1") {
 				return fail(id, "InputBusy", "another session holds the foreground control grant", -32021);
+			}
+			if (suspended && process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1") {
+				return fail(id, "Suspended", "a grant is refused while the stop is latched", -32015);
 			}
 			if (process.env.FAKE_ENGINE_GRANT_ERROR !== undefined) {
 				return fail(id, process.env.FAKE_ENGINE_GRANT_ERROR, `grant refused: ${process.env.FAKE_ENGINE_GRANT_ERROR}`);
@@ -108,10 +124,23 @@ function handle(request) {
 			return reply(id, null);
 		case "$/cancel":
 			if (cancellable.delete(params.id)) fail(params.id, "Cancelled", "request was cancelled by $/cancel");
+			if (releaseFails.delete(params.id)) {
+				fail(params.id, "Cancelled", "the hold request was cancelled; input release also failed: key up for shift failed");
+			}
 			return;
 	}
 	if (desktop !== undefined && params?.fake === undefined) {
 		if (method === stalled) return cancellable.add(id);
+		const refused = (code, message, rpcCode) => {
+			send({ method: "audit", params: { action: method, target: params?.target, delivery: "background", code, durationMs: 1 } });
+			return fail(id, code, message, rpcCode);
+		};
+		if (suspended && GLOBAL_INPUT.has(method) && process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1") {
+			return refused("Suspended", "input is suspended", -32015);
+		}
+		if (refusesGlobalInput(method, params)) {
+			return refused("ControlRequired", "desktop input needs the control grant", -32022);
+		}
 		const outcome = desktop(method, params);
 		if (outcome !== undefined) {
 			const { notifications = [], ...reply } = outcome;
@@ -130,6 +159,8 @@ function handle(request) {
 			return;
 		case "cancellable":
 			return cancellable.add(id);
+		case "release-fails":
+			return releaseFails.add(id);
 		case "notify":
 			send({ method: "audit", params: { action: method, target: "screen", delivery: "background", durationMs: 3 } });
 			send({ method: "stopPath.changed", params: status() });

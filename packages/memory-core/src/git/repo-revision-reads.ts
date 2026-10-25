@@ -2,11 +2,14 @@
 
 import type { GitExecResult } from "./exec"
 import { commandError } from "./repo-arguments"
-import { parseLogOutput, parseNulPaths } from "./repo-log"
+import { readHeadFromFiles } from "./repo-head"
+import { parseLogOutput, parseLogOutputWithPaths } from "./repo-log"
 import { parseCatFileBatch, parseLsTreeBlobs, parseLsTreeSized } from "./repo-tree"
 import type { GitLogOptions, GitTreeBlobEntry, GitTreeSizedEntry, MemoryCommit } from "./repo-types"
+import { STABLE_LOG_OUTPUT } from "./stable-log-output"
 
 export interface GitRevisionRunner {
+  readonly dir?: string
   /** Runs git and throws the command error on a non-zero exit. */
   run(argv: readonly string[], timeoutMs?: number): Promise<GitExecResult>
   /** Runs git and returns the result whatever the exit code. */
@@ -17,13 +20,15 @@ export class GitRevisionReads {
   constructor(private readonly git: GitRevisionRunner) {}
 
   async head(): Promise<string | null> {
+    const cached = this.git.dir === undefined ? undefined : readHeadFromFiles(this.git.dir)
+    if (cached !== undefined) return cached
     const result = await this.git.result(["rev-parse", "--verify", "HEAD"])
     if (result.code !== 0) return null
     return result.stdout.trim() || null
   }
 
   async headCommitTimestamp(): Promise<number | null> {
-    const result = await this.git.result(["show", "-s", "--format=%ct", "HEAD"])
+    const result = await this.git.result([...STABLE_LOG_OUTPUT, "show", "-s", "--format=%ct", "HEAD"])
     if (result.code !== 0) return null
     const timestamp = Number.parseInt(result.stdout.trim(), 10)
     return Number.isSafeInteger(timestamp) && timestamp >= 0 ? timestamp : null
@@ -62,7 +67,14 @@ export class GitRevisionReads {
   }
 
   async log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> {
-    const argv = ["log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI"]
+    const includePaths = options.includePaths === true
+    // Paths come from the same process: one `git diff-tree` per commit started thousands of processes at
+    // once for a range a few hours long, and starting each one blocks the event loop (senpi#3833, #10726).
+    // The flags keep diff-tree's answer: no paths for a root or merge commit, renames as delete plus add,
+    // and every path of a commit a pathspec selected.
+    const argv = includePaths
+      ? [...STABLE_LOG_OUTPUT, "-c", "log.showRoot=false", "log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI", "--name-only", "-z", "--no-renames", "--full-diff"]
+      : [...STABLE_LOG_OUTPUT, "log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI"]
     // `--fixed-strings` because callers pass trailer literals, `--all-match` because every one of them
     // must appear in the same commit. Filtering inside git means a caller after one trailer combination
     // no longer parses the whole history into memory to find it.
@@ -73,13 +85,7 @@ export class GitRevisionReads {
     if (options.since !== undefined) argv.push(`--since=${options.since.toISOString()}`)
     if (options.range !== undefined) argv.push(options.range)
     if (options.paths !== undefined && options.paths.length > 0) argv.push("--", ...options.paths)
-    const records = parseLogOutput((await this.git.run(argv, options.timeoutMs)).stdout)
-    if (options.includePaths !== true) return records
-    return Promise.all(records.map(async (commit) => ({
-      ...commit,
-      paths: parseNulPaths((await this.git.run([
-        "diff-tree", "--no-commit-id", "--name-only", "-z", "-r", commit.sha,
-      ])).stdout),
-    })))
+    const { stdout } = await this.git.run(argv, options.timeoutMs)
+    return includePaths ? parseLogOutputWithPaths(stdout) : parseLogOutput(stdout)
   }
 }

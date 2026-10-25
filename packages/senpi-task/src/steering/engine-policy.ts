@@ -93,14 +93,20 @@ export function buildRevived(record: TaskRecord, timestamp: string): TaskRecord 
     final_response: _final,
     error_message: _error,
     failure_kind: _failureKind,
+    interrupt_cause: _interruptCause,
     failure_reason: _failureReason,
     run_stats: _stats,
     terminal_at: _terminalAt,
     provisional_exit: _provisionalExit,
+    stop_reason: _stopReason,
+    deadline: _deadline,
+    awaiting_input: _awaitingInput,
     ...rest
   } = record
+  const priorRunsCost = foldPriorRunsCost(record)
   return {
     ...rest,
+    ...(priorRunsCost === undefined ? {} : { prior_runs_cost_usd: priorRunsCost }),
     status: "running",
     residency_state: "resident",
     updated_at: timestamp,
@@ -117,4 +123,15 @@ export function evictionRefusal(taskId: string): SendOutcome {
     reason: `Task ${taskId} is being evicted; send was not started.`,
     suggestion: "Use task_output to read the final result.",
   }
+}
+
+// The finished run's reported spend joins the earlier runs' before its run_stats is dropped, so the
+// task's lifetime cost (prior_runs_cost_usd + the current run's) survives every revive (senpi#2471).
+// A "partial" (lower-bound) cost counts too, as the live subagent cost ledger counts it; otherwise
+// a revive would drop it from the footer total.
+function foldPriorRunsCost(record: TaskRecord): number | undefined {
+  const status = record.run_stats?.cost_status
+  const finished = status === "reported" || status === "partial" ? record.run_stats?.cost_usd ?? 0 : 0
+  const total = (record.prior_runs_cost_usd ?? 0) + (Number.isFinite(finished) && finished > 0 ? finished : 0)
+  return total > 0 ? total : undefined
 }

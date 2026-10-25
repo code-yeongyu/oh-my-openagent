@@ -136,6 +136,7 @@ fn window_capture_keeps_the_full_frame_and_clears_the_off_root_area() {
         width: 200,
         height: 200,
         focused: false,
+        is_on_screen: None,
         elevated: None,
     };
     assert_eq!(frame, FrameGeometry::for_window(&full, 200, 200));
@@ -153,6 +154,7 @@ fn an_unchanged_partially_offscreen_window_keeps_a_targetable_full_frame() {
         width: 100,
         height: 100,
         focused: false,
+        is_on_screen: None,
         elevated: None,
     };
     let server = FakeServer::new(1280, 800)

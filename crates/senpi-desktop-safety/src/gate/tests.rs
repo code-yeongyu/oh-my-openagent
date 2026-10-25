@@ -201,6 +201,7 @@ fn stale_frame_rejects_only_coordinate_actions() {
         MutatingAction::MoveMouse,
         MutatingAction::Drag,
         MutatingAction::Scroll,
+        MutatingAction::HoldMouse,
     ];
 
     for action in MutatingAction::ALL {

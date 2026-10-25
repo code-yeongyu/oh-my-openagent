@@ -15,7 +15,7 @@ describe("Senpi category routing policy", () => {
 
     // then
     expect(routing).toEqual({
-      visualEngineering: { model: "anthropic/claude-fable-5-1", variant: "max" },
+      visualEngineering: { model: "google/gemini-4-argon", variant: "low" },
       quick: { model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" },
       unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "medium" },
       unspecifiedLow: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
@@ -43,6 +43,11 @@ describe("Senpi category routing policy", () => {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
         variant: "xhigh",
+      },
+      {
+        providers: ["zai", "zai-coding-cn", "opencode-go"],
+        model: "glm-5.3",
+        variant: "high",
       },
       {
         providers: ["chatgpt-subscription", "openai"],

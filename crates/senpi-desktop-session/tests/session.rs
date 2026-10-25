@@ -10,7 +10,7 @@ use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, ErrorCode};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
-use senpi_desktop_core::protocol_params::{CaptureParams, PointParams};
+use senpi_desktop_core::protocol_params::{CaptureParams, ControlGrantParams, PointParams};
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, Target,
 };
@@ -58,6 +58,7 @@ fn capture_desktop() -> Op {
     Op::Capture(CaptureParams {
         target: "desktop".to_owned(),
         caps: None,
+        exclude_window_titles: None,
     })
 }
 
@@ -69,6 +70,18 @@ fn click_desktop() -> Op {
         frame_id: None,
         opts: None,
     })
+}
+
+/// Desktop input needs the human-confirmed control grant (#10788).
+async fn grant(session: &Session) {
+    session
+        .submit(Op::ControlGrant(ControlGrantParams {
+            reason: "desktop click".to_owned(),
+            confirmation_id: "confirm-1".to_owned(),
+        }))
+        .wait()
+        .await
+        .expect("grants");
 }
 
 fn code(result: CoreResult<Response>) -> Option<ErrorCode> {
@@ -139,6 +152,7 @@ async fn capture_returns_a_frame_that_later_clicks_map_through() {
     };
     assert_eq!((capture.source_width, capture.source_height), (4800, 1800));
     assert!(capture.data.is_some_and(|data| data.starts_with("iVBORw0KGgo")));
+    grant(&session).await;
     assert_eq!(session.submit(click_desktop()).wait().await, Ok(Response::Unit));
 }
 
@@ -190,6 +204,7 @@ async fn an_abandoned_request_never_reaches_the_backend() {
         .await
         .expect("opens");
     session.submit(capture_desktop()).wait().await.expect("captures");
+    grant(&session).await;
     let slow = session.submit(Op::Windows);
     // When: the click's waiter gives up before the thread reaches it.
     drop(session.submit(click_desktop()));
@@ -274,7 +289,7 @@ impl Backend for PanicsOnDisplays {
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         Ok(Vec::new())
     }
-    fn capture(&mut self, _: &Target, _: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(&mut self, _: &Target, _: &CaptureCaps, _: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         unreachable!("capture is not exercised")
     }
     fn pointer(&mut self, _: &Target, _: PointerEvent, _: &FrameGeometry, _: DeliveryMode) -> CoreResult<()> {

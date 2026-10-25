@@ -22,6 +22,7 @@ fn window(app: &str, title: &str, pid: Option<u32>) -> DesktopWindow {
         width: 640,
         height: 480,
         focused: false,
+        is_on_screen: None,
         elevated: None,
     }
 }

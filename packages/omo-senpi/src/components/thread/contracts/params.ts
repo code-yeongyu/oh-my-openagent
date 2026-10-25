@@ -45,6 +45,13 @@ export const ThreadCreateParams = Type.Object({
       description: "Durable id of an existing thread to fork; the new thread starts with that transcript as prior context.",
     }),
   ),
+  skills: Type.Optional(
+    Type.Array(Type.String({ minLength: 1, maxLength: 64 }), {
+      minItems: 1,
+      maxItems: 16,
+      description: "Names of installed skills the new thread follows from its first turn, as if each were loaded with /skill. A path or text that is not a skill name refuses the create. The new session applies each name its own skill registry holds and logs any it does not; the result's thread.requested_skills echoes the names passed.",
+    }),
+  ),
   idempotency_key: IdempotencyKey,
 })
 

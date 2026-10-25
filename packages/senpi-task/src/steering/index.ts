@@ -6,6 +6,7 @@ export type {
   DestructionCause,
   DestructionPort,
   InterruptOutcome,
+  RedispatchOutcome,
   SendDelivery,
   SendInput,
   SendOutcome,

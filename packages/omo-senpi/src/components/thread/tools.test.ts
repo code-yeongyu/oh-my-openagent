@@ -7,6 +7,7 @@ import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { GatewayEndpointRef } from "./gateway/adapter"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { parseThreadLinkUrl } from "./thread-link"
 import { createThreadTools, RECEIPT_RECOVERY_MAX_KEYS, registerThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
 const directories: string[] = []
@@ -31,13 +32,13 @@ function fixture() {
     { provider: "openai", id: "gpt-x", name: "GPT X" },
     { provider: "anthropic", id: "claude-test", name: "Claude Test" },
   ]
-  const setSessionName = mock(async (sessionId: string, name: string) => {
+  const setSessionName = mock(async (sessionId: string, name: string, _durableId?: string) => {
     const index = sessions.findIndex((entry) => entry.sessionId === sessionId)
     sessions[index] = { ...sessions[index], name }
   })
-  const setModel = mock(async (_sessionId: string, provider: string, modelId: string) => ({ provider, id: modelId, name: "Selected model" }))
+  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => ({ provider, id: modelId, name: "Selected model" }))
   const getAvailableModels = mock(async (_sessionId: string) => models)
-  const setThinkingLevel = mock(async (_sessionId: string, _level: string, _scope?: "session" | "turn") => {})
+  const setThinkingLevel = mock(async (_sessionId: string, _level: string, _scope?: "session" | "turn", _durableId?: string) => {})
   const getAvailableThinkingLevels = mock(async (_sessionId: string) => ["off", "high"])
   const prompt = mock(async (_sessionId: string, _message: string) => ({ turnId: "turn-1" }))
   const host: ThreadHost = {
@@ -71,6 +72,16 @@ function runner(f: ReturnType<typeof fixture>, callerSessionId = "unknown-caller
 }
 
 describe("thread tool registration", () => {
+  test("#given a selected session #when model discovery observes a replacement #then the mutation retains the selected durable id", async () => {
+    const f = fixture()
+    f.getAvailableModels.mockImplementation(async () => {
+      f.sessions[0] = { ...f.sessions[0], durableSessionId: "replacement" }
+      return f.models
+    })
+    expect(await runner(f)("thread_set_model", { thread: "dur-peer", model: "openai/gpt-x" })).toMatchObject({ kind: "ok" })
+    expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
+  })
+
   test("registers exactly the seventeen contract tools with search metadata", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
@@ -133,17 +144,59 @@ describe("thread tool registration", () => {
   })
 })
 
+describe("thread links", () => {
+  const linkTarget = (link: unknown) => {
+    const match = /^\[[^\]]+\]\((omo-thread:\/\/v1\/[^)]+)\)$/.exec(String(link))
+    return match === null ? null : parseThreadLinkUrl(match[1])
+  }
+
+  test("#given thread tools that name a thread #when they succeed #then each result carries a link that names that thread", async () => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "other" })
+    const run = runner(f)
+
+    // when
+    const listed = await run("thread_list", {}, undefined, "call-list") as unknown as { threads: Array<{ thread_id: string; link?: string }> }
+    const created = await run("thread_create", { name: "fresh" }, undefined, "call-create") as unknown as { thread: { thread_id: string; link?: string } }
+    const read = await run("thread_read", { thread: "peer" }, undefined, "call-read") as unknown as { thread_id: string; link?: string }
+    const sent = await run("thread_send", { thread: "peer", message: "hi" }, "dur-other", "call-send") as unknown as { thread_id: string; link?: string }
+    const handed = await run("thread_handoff", { thread: "peer", message: "go" }, "dur-other", "call-handoff") as unknown as { thread: { thread_id: string; link?: string } }
+
+    // then
+    expect(listed.threads.length).toBeGreaterThan(0)
+    for (const thread of listed.threads) expect(linkTarget(thread.link)).toEqual({ threadId: thread.thread_id })
+    expect(linkTarget(created.thread.link)).toEqual({ threadId: created.thread.thread_id })
+    expect(linkTarget(read.link)).toEqual({ threadId: "dur-peer" })
+    expect(linkTarget(sent.link)).toEqual({ threadId: "dur-peer" })
+    expect(linkTarget(handed.thread.link)).toEqual({ threadId: "dur-peer" })
+    expect(String(read.link)).toStartWith("[peer]")
+  })
+})
+
 describe("thread session controls", () => {
   test("rename trims the name and routes by the live id while returning the durable id", async () => {
     const f = fixture()
     expect(await runner(f)("thread_rename", { thread: "peer", name: "  New Name  " })).toEqual({ kind: "ok", thread_id: "dur-peer", name: "New Name" })
-    expect(f.setSessionName.mock.calls).toEqual([["route-peer", "New Name"]])
+    expect(f.setSessionName.mock.calls).toEqual([["route-peer", "New Name", "dur-peer"]])
   })
 
   test("rename rejects another visible thread's trimmed case-insensitive name", async () => {
     const f = fixture()
     f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "  Taken  " })
     expect(await runner(f)("thread_rename", { thread: "peer", name: " TAKEN " })).toMatchObject({ kind: "error", error: { code: "name_conflict", next_action: expect.any(String) } })
+    expect(f.setSessionName).not.toHaveBeenCalled()
+  })
+
+  test.each([["alpha", "\uff41\uff4c\uff50\uff48\uff41"], ["alpha beta", "alpha  beta"]])("#given a thread named %p #when another is created or renamed to %p #then both are name_conflict, as addressing would treat the names as equal", async (existing, requested) => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: existing })
+    const run = runner(f)
+
+    // when / then
+    expect(await run("thread_create", { name: requested }, undefined, "call-create")).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(await run("thread_rename", { thread: "peer", name: requested }, undefined, "call-rename")).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 
@@ -173,7 +226,7 @@ describe("thread session controls", () => {
     const f = fixture()
     expect(await runner(f)("thread_set_model", { thread: "peer", model })).toEqual({ kind: "ok", thread_id: "dur-peer", model: { provider: "openai", id: "gpt-x" } })
     expect(f.getAvailableModels.mock.calls).toEqual([["route-peer"]])
-    expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x"]])
+    expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
   })
 
   test("set_model reports no match with at most twenty available provider/id values", async () => {
@@ -201,14 +254,14 @@ describe("thread session controls", () => {
     const f = fixture()
     f.models.push({ provider: "openai", id: "gpt-x-mini" })
     expect(await runner(f)("thread_set_model", { thread: "peer", model })).toEqual({ kind: "ok", thread_id: "dur-peer", model: { provider: "openai", id: "gpt-x" } })
-    expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x"]])
+    expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
   })
 
   test("set_model provider narrows a fragment shared across providers", async () => {
     const f = fixture()
     f.models.push({ provider: "other", id: "gpt-y" })
     expect(await runner(f)("thread_set_model", { thread: "peer", model: "gpt", provider: "other" })).toEqual({ kind: "ok", thread_id: "dur-peer", model: { provider: "other", id: "gpt-y" } })
-    expect(f.setModel.mock.calls).toEqual([["route-peer", "other", "gpt-y"]])
+    expect(f.setModel.mock.calls).toEqual([["route-peer", "other", "gpt-y", "dur-peer"]])
   })
 
   test("set_model refuses a cross-workspace id until all_scope is supplied", async () => {
@@ -221,13 +274,13 @@ describe("thread session controls", () => {
     expect(f.getAvailableModels).not.toHaveBeenCalled()
     expect(f.setModel).not.toHaveBeenCalled()
     expect(await run("thread_set_model", { thread: "dur-other", model: "gpt-x", all_scope: true }, undefined, "call-2")).toMatchObject({ kind: "ok", thread_id: "dur-other" })
-    expect(f.setModel.mock.calls).toEqual([["route-other", "openai", "gpt-x"]])
+    expect(f.setModel.mock.calls).toEqual([["route-other", "openai", "gpt-x", "dur-other"]])
   })
 
   test.each([undefined, "session", "turn"] as const)("set_reasoning passes and echoes scope %s", async (scope) => {
     const f = fixture()
     expect(await runner(f)("thread_set_reasoning", { thread: "peer", level: "high", ...(scope === undefined ? {} : { scope }) })).toEqual({ kind: "ok", thread_id: "dur-peer", level: "high", scope: scope ?? "session" })
-    expect(f.setThinkingLevel.mock.calls).toEqual([["route-peer", "high", scope === "turn" ? "turn" : undefined]])
+    expect(f.setThinkingLevel.mock.calls).toEqual([["route-peer", "high", scope === "turn" ? "turn" : undefined, "dur-peer"]])
     expect(f.getAvailableThinkingLevels).not.toHaveBeenCalled()
   })
 
@@ -260,7 +313,7 @@ describe("thread session controls", () => {
     const f = fixture()
     const result = await runner(f)(name, args, "dur-peer")
     expect(result).toMatchObject({ kind: "ok", thread_id: "dur-peer" })
-    if (name === "thread_rename") expect(f.setSessionName.mock.calls).toEqual([["route-peer", "New Name"]])
+    if (name === "thread_rename") expect(f.setSessionName.mock.calls).toEqual([["route-peer", "New Name", "dur-peer"]])
   })
 
   test.each([
@@ -313,6 +366,38 @@ describe("thread session controls", () => {
     f.sessions[0] = { ...f.sessions[0], name: "payments worker" }
     f.sessions.push({ sessionId: "route-self", durableSessionId: "dur-self", cwd: process.cwd(), name: "payments work" })
     expect(await runner(f)("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue" }, "dur-self")).toMatchObject({ kind: "ok", thread: { thread_id: "dur-peer" }, resolved_by: "fuzzy" })
+    expect(f.prompt).not.toHaveBeenCalled()
+  })
+
+  test("#given the best fuzzy match is a session in another workspace #when handing off without all_scope #then the best match in this workspace is chosen, and all_scope reaches the other one", async () => {
+    // given
+    const f = fixture()
+    const otherWorkspace = mkdtempSync(join(tmpdir(), "thread-fuzzy-scope-"))
+    directories.push(otherWorkspace)
+    f.sessions[0] = { ...f.sessions[0], name: "unrelated notes" }
+    f.sessions.push({ sessionId: "route-far", durableSessionId: "dur-far", cwd: otherWorkspace, name: "payments work" })
+    f.sessions.push({ sessionId: "route-near", durableSessionId: "dur-near", cwd: process.cwd(), name: "payments worker" })
+    const run = runner(f)
+
+    // when
+    const scoped = await run("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue" }, "dur-self", "call-scoped")
+    const wide = await run("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue", all_scope: true }, "dur-self", "call-wide")
+
+    // then
+    expect(scoped).toMatchObject({ kind: "ok", thread: { thread_id: "dur-near" }, resolved_by: "fuzzy" })
+    expect(wide).toMatchObject({ kind: "ok", thread: { thread_id: "dur-far" }, resolved_by: "fuzzy" })
+  })
+
+  test("#given a caller with no workspace root #when a fuzzy handoff runs without all_scope #then it is caller_context_missing, as the exact ladder answers, not not_found", async () => {
+    // given
+    const f = fixture()
+    f.sessions.push({ sessionId: "route-self", durableSessionId: "dur-self", cwd: process.cwd(), name: "self" })
+
+    // when
+    const result = await runner(f, "unknown-caller", "")("thread_handoff", { thread: "peer", match: "fuzzy", message: "continue" }, "dur-self", "call-blank-root")
+
+    // then
+    expect(result).toMatchObject({ kind: "error", error: { code: "caller_context_missing", next_action: expect.stringContaining("all_scope") } })
     expect(f.prompt).not.toHaveBeenCalled()
   })
 
@@ -374,7 +459,7 @@ describe("thread_send through the session gateway", () => {
     expect(result).toMatchObject({ kind: "ok", thread_id: "dur-tui", endpoint: { kind: "tui" }, effective_mode: "auto", delivery: { kind: "queued" }, deduplicated: false })
     const deliveryId = (result as { delivery_id?: string }).delivery_id
     expect(typeof deliveryId).toBe("string")
-    expect(g.wakes).toEqual([{ endpoint: { kind: "tui", socket: TUI_SOCKET, routing_id: "dur-tui" }, ids: [deliveryId as string] }])
+    expect(g.wakes).toEqual([{ endpoint: { kind: "tui", socket: TUI_SOCKET, routing_id: "dur-tui", durable_session_id: "dur-tui" }, ids: [deliveryId as string] }])
     expect(g.f.prompt).not.toHaveBeenCalled()
     const rows = await g.f.store.list({ target_durable_id: "dur-tui" })
     expect(rows.map((row) => ({ id: row.delivery_id, state: row.state, sender: row.sender }))).toEqual([{ id: deliveryId as string, state: "queued", sender: "session:dur-host" }])
@@ -635,7 +720,7 @@ describe("tool receipts the store could not settle", () => {
     const renameHeld = new Promise<void>((resolve) => { releaseRename = resolve })
     let renameStarted: () => void = () => undefined
     const started = new Promise<void>((resolve) => { renameStarted = resolve })
-    f.setSessionName.mockImplementation(async (sessionId: string, name: string) => {
+    f.setSessionName.mockImplementation(async (sessionId: string, name: string, _durableId?: string) => {
       renameStarted()
       await renameHeld
       const index = f.sessions.findIndex((entry) => entry.sessionId === sessionId)

@@ -4,16 +4,18 @@
 mod action;
 mod clock;
 mod gate;
+mod hold_signal;
 mod reset;
 mod stop_path;
 mod supervisor;
 
 pub use action::MutatingAction;
+pub use hold_signal::HoldSignal;
 pub use clock::{Clock, FakeClock, MonotonicClock};
 pub use gate::{gate, FrameContext, FrameId, GateError, LockState, PermissionGate, StopPathReason};
 pub use reset::{ResumeToken, UserReset};
 pub use stop_path::{Chord, HostRelay, StopPathError, StopPathListener};
 pub use supervisor::{
-    ActiveStopPath, StopPathFailure, StopPathId, StopPolicy, StopSource, Supervisor, SupervisorStatus, HEARTBEAT_FRESH_MS,
+    ActiveStopPath, DeafProbe, StopPathFailure, StopPathId, StopPolicy, StopSource, Supervisor, SupervisorStatus, HEARTBEAT_FRESH_MS,
     HEARTBEAT_INTERVAL_MS,
 };

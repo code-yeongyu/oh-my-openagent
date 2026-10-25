@@ -31,7 +31,7 @@ export type WorkpoolItem = WorkpoolInput & {
   readonly item_id: ItemId
   readonly status: "queued" | "assigned" | "completed" | "error" | "cancelled"
   readonly binding?: { readonly task_id: string; readonly run_epoch: number; readonly generation: number }
-  readonly delivery?: { readonly phase: "queued" | "dispatching" | "acknowledged"; readonly message_sha256?: string }
+  readonly delivery?: { readonly phase: "queued" | "dispatching" | "acknowledged"; readonly message_sha256?: string; readonly entry_ids?: readonly string[] }
   readonly data?: Json
   readonly error?: { readonly code: string; readonly message: string }
   readonly yield_sha256?: string
@@ -39,7 +39,7 @@ export type WorkpoolItem = WorkpoolInput & {
 export type WorkpoolWorker = {
   readonly task_id: string
   readonly run_epoch: number
-  readonly status: "busy" | "idle"
+  readonly status: "busy" | "idle" | "paused"
   readonly completed_turns: number
   readonly idle_since: number
 }
@@ -59,6 +59,7 @@ export type WorkpoolRecord = {
   readonly agent: WorkpoolAgent
   readonly worker_spec: WorkpoolSpec
   readonly status: "open" | "closing" | "cancelled"
+  readonly hold?: { readonly reason: "user_stop"; readonly pauseSeq: number }
   // Parent kernel-tool names requested at create. Plain data: the live capability and its fenced
   // descriptors are never persisted and are re-resolved at every NEW worker spawn.
   readonly kernel_tool_names?: readonly string[]

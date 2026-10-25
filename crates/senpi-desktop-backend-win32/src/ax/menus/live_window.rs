@@ -155,6 +155,7 @@ impl Window {
             height: 300,
             focused: false,
             elevated: Some(false),
+            is_on_screen: None,
         }
     }
 

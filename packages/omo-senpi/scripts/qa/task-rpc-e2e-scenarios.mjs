@@ -22,12 +22,22 @@ const PROJECT_OMO_CONFIG = {
 const CHILD_STEPS_COMPLETE = [{ type: "text", text: CHILD_FINAL_TEXT }]
 const CHILD_STEPS_HANG = [{ type: "hang" }]
 
+const TASKS_DIR_PLACEHOLDER = "<tasks-dir>"
+
+/** Binds the scenario's await_task steps to this run's task store. */
+export function bindTasksDir(steps, stateDir) {
+  return steps.map((step) => step.type === "await_task" ? { ...step, tasksDir: join(stateDir, "tasks") } : step)
+}
+
 export const SCENARIO_A_STEPS = [
   { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." } },
   { type: "tool_call", name: "task_send", arguments: { to: "p1", message: "steer: keep going" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
-  { type: "text", text: "rpc-process scenario A complete" },
+  // The background start returns before the host admits the child (#10042), so the parent waits for
+  // the child's terminal record instead of ending its turn first; the completion check then proves the
+  // completion lands while the parent is alive, not that the child happened to beat the parent's steps.
+  { type: "await_task", name: "p1", tasksDir: TASKS_DIR_PLACEHOLDER, timeoutMs: 60_000, text: "rpc-process scenario A complete" },
 ]
 
 export const hangingChildSteps = (name) => [

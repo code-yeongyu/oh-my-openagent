@@ -24,7 +24,7 @@ fn screen_point(x: f64, y: f64) -> CoreResult<POINT> {
     Ok(POINT { x, y })
 }
 
-fn child_at(root: Window, x: f64, y: f64) -> CoreResult<(Window, LPARAM)> {
+pub(super) fn child_at(root: Window, x: f64, y: f64) -> CoreResult<(Window, LPARAM)> {
     let (child, point) = root.deepest_child(screen_point(x, y)?).ok_or_else(|| {
         DesktopError::background_unavailable(
             "cannot map this point into an enabled target client area; use ax actions or delivery:\"foreground\"",

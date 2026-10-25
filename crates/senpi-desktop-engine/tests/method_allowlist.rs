@@ -28,6 +28,8 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("scroll", "exec", "public"),
     ("typeText", "exec", "public"),
     ("keyChord", "exec", "public"),
+    ("holdKeys", "exec", "public"),
+    ("holdMouse", "exec", "public"),
     ("raiseWindow", "exec", "public"),
     ("menus.items", "read", "public"),
     ("menus.select", "exec", "public"),

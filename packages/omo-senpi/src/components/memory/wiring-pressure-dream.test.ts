@@ -8,29 +8,12 @@ import { buildIdentityPaths, GitMemoryRepo } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import { createMemoryIdentityContext } from "./context"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
-import { rmEfaultTolerant } from "./teardown.test-support"
+import { rmWhenReleased } from "./teardown.test-support"
 import { createMemoryWiring } from "./wiring"
 
 const roots: string[] = []
-const TEMP_ROOT_RELEASE_TIMEOUT_MS = 30_000
-const TEMP_ROOT_RELEASE_POLL_MS = 50
-
-async function removeWhenReleased(root: string): Promise<void> {
-  const deadline = Date.now() + TEMP_ROOT_RELEASE_TIMEOUT_MS
-  for (;;) {
-    try {
-      await rmEfaultTolerant(root, { recursive: true, force: true })
-      return
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code
-      if ((code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") || Date.now() >= deadline) throw error
-      await new Promise((resolve) => setTimeout(resolve, TEMP_ROOT_RELEASE_POLL_MS))
-    }
-  }
-}
-
 afterEach(async () => {
-  for (const root of roots.splice(0)) await removeWhenReleased(root)
+  for (const root of roots.splice(0)) await rmWhenReleased(root)
 })
 
 describe("memory pressure dream wiring", () => {
