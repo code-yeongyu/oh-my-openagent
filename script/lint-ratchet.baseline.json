@@ -330,7 +330,7 @@
     "typescript/no-non-null-assertion": 1
   },
   "packages/omo-senpi/src/components/init-deep-advisor/component.test.ts": {
-    "typescript/no-non-null-assertion": 3
+    "typescript/no-non-null-assertion": 2
   },
   "packages/omo-senpi/src/components/init-deep-advisor/coverage.test.ts": {
     "typescript/no-non-null-assertion": 15
