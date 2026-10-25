@@ -49,6 +49,34 @@ export const OmoMemoryRecallEventCapsSchema = z.object({
   prompt: z.number().int().nonnegative().default(4000),
 }).strict()
 
+export const OMO_MEMORY_RECALL_CROSSLINGUAL_DEFAULTS = {
+  enabled: false,
+  api_key_env: "OPENGATEWAY_API_KEY",
+  judge_model: "sionic-ai/jev-omni",
+  translate_model: "openai/gpt-6-luna",
+  view_languages: ["en", "ko"],
+  timeout_ms: 30000,
+} as const
+
+// Opt-in cross-language rerank of the Kibitzer candidates (paid hosted calls; off by default).
+export const OmoMemoryRecallCrosslingualSchema = z.object({
+  enabled: z.boolean().default(false),
+  api_key_env: z.string().min(1).default("OPENGATEWAY_API_KEY"),
+  judge_model: z.string().min(1).default("sionic-ai/jev-omni"),
+  translate_model: z.string().min(1).default("openai/gpt-6-luna"),
+  view_languages: z.array(z.string().min(2).max(8)).max(4).default(["en", "ko"]),
+  timeout_ms: z.number().int().min(1000).max(120000).default(30000),
+}).strict()
+
+export const OmoMemoryRecallCrosslingualLayerSchema = z.object({
+  enabled: z.boolean().optional(),
+  api_key_env: z.string().min(1).optional(),
+  judge_model: z.string().min(1).optional(),
+  translate_model: z.string().min(1).optional(),
+  view_languages: z.array(z.string().min(2).max(8)).max(4).optional(),
+  timeout_ms: z.number().int().min(1000).max(120000).optional(),
+}).strict()
+
 export const OmoMemoryRecallSchema = z.object({
   enabled: z.boolean().default(true),
   max_items: z.number().int().min(1).max(5).default(2),
@@ -58,6 +86,7 @@ export const OmoMemoryRecallSchema = z.object({
   max_concurrent_wakes: z.number().int().positive().default(2),
   tool_budget: z.number().int().positive().default(8),
   query_expansion: z.boolean().default(false),
+  crosslingual: OmoMemoryRecallCrosslingualSchema.default({ ...OMO_MEMORY_RECALL_CROSSLINGUAL_DEFAULTS, view_languages: ["en", "ko"] }),
 }).strict()
 
 // ---------------------------------------------------------------------------
@@ -177,6 +206,7 @@ export const OmoMemoryRecallLayerSchema = z.object({
   max_concurrent_wakes: z.number().int().positive().optional(),
   tool_budget: z.number().int().positive().optional(),
   query_expansion: z.boolean().optional(),
+  crosslingual: OmoMemoryRecallCrosslingualLayerSchema.optional(),
 }).strict()
 
 export const OmoMemoryNudgeLayerSchema = z.object({
@@ -297,6 +327,7 @@ export const OmoMemorySettingsSchema = z.object({
     max_concurrent_wakes: 2,
     tool_budget: 8,
     query_expansion: false,
+    crosslingual: { ...OMO_MEMORY_RECALL_CROSSLINGUAL_DEFAULTS, view_languages: ["en", "ko"] },
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
@@ -334,6 +365,7 @@ export type OmoMemoryReflection = z.infer<typeof OmoMemoryReflectionSchema>
 export type OmoMemorySync = z.infer<typeof OmoMemorySyncSchema>
 export type OmoMemorySearch = z.infer<typeof OmoMemorySearchSchema>
 export type OmoMemoryRecallEventCaps = z.infer<typeof OmoMemoryRecallEventCapsSchema>
+export type OmoMemoryRecallCrosslingual = z.infer<typeof OmoMemoryRecallCrosslingualSchema>
 export type OmoMemoryRecall = z.infer<typeof OmoMemoryRecallSchema>
 export type OmoMemoryProjectScope = z.infer<typeof OmoMemoryProjectScopeSchema>
 export type OmoMemoryNudge = z.infer<typeof OmoMemoryNudgeSchema>

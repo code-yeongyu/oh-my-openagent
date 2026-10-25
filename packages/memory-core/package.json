@@ -14,6 +14,9 @@
     "./recall-store": {
       "import": "./src/recall/bm25-persist.ts"
     },
+    "./recall-crosslingual": {
+      "import": "./src/recall/crosslingual.ts"
+    },
     "./sync-engine": {
       "import": "./src/sync/engine/index.ts"
     },

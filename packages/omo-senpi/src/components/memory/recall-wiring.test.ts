@@ -45,6 +45,7 @@ interface WiringInput {
   readonly env?: Record<string, string | undefined>
   readonly logs?: Array<{ message: string; details?: unknown }>
   readonly ledgerFor?: (context: MemoryIdentityContext) => RecallLedgerType
+  readonly crosslingualFetch?: (url: string, init: RequestInit) => Promise<Response>
 }
 
 function wiringFor(input: WiringInput) {
@@ -58,6 +59,7 @@ function wiringFor(input: WiringInput) {
     createRepo: () => input.repo,
     env: input.env ?? {},
     ...(input.ledgerFor === undefined ? {} : { ledgerFor: input.ledgerFor }),
+    ...(input.crosslingualFetch === undefined ? {} : { crosslingualFetch: input.crosslingualFetch }),
     ...(input.logs === undefined
       ? {}
       : {
@@ -91,7 +93,7 @@ describe("resolveAgentRecallSettings", () => {
     // given
     const settings = memorySettings({
       recall: { ...memorySettings().recall, event_caps: { tool_args: 300, result_head: 900, assistant: 1500, prompt: 4000 } },
-      agents: { research: { recall: { category: "deep", tool_budget: 4, event_caps: { tool_args: 200 } } } },
+      agents: { research: { recall: { category: "deep", tool_budget: 4, event_caps: { tool_args: 200 }, crosslingual: { enabled: true } } } },
     })
 
     // when
@@ -108,6 +110,7 @@ describe("resolveAgentRecallSettings", () => {
       max_concurrent_wakes: 2,
       tool_budget: 4,
       query_expansion: false,
+      crosslingual: { enabled: true, api_key_env: "OPENGATEWAY_API_KEY", judge_model: "sionic-ai/jev-omni", translate_model: "openai/gpt-6-luna", view_languages: ["en", "ko"], timeout_ms: 30000 },
     })
     expect(other).toEqual({
       enabled: true,
@@ -118,6 +121,7 @@ describe("resolveAgentRecallSettings", () => {
       max_concurrent_wakes: 2,
       tool_budget: 8,
       query_expansion: false,
+      crosslingual: { enabled: false, api_key_env: "OPENGATEWAY_API_KEY", judge_model: "sionic-ai/jev-omni", translate_model: "openai/gpt-6-luna", view_languages: ["en", "ko"], timeout_ms: 30000 },
     })
   })
 })
@@ -479,5 +483,80 @@ describe("createMemoryRecallWiring collectCandidates", () => {
     // then
     expect(collected).toBeUndefined()
     expect(logs.length).toBeGreaterThan(0)
+  }, 30_000)
+})
+
+describe("createMemoryRecallWiring crosslingual rerank", () => {
+  const crosslingual = { enabled: true, api_key_env: "TEST_GATEWAY_KEY", judge_model: "sionic-ai/jev-omni", translate_model: "openai/gpt-6-luna", view_languages: ["en"], timeout_ms: 30000 }
+  const drainsNote = { relativePath: DRAINS_PATH, content: `---\ndescription: ${DRAINS_DESCRIPTION}\n---\n${DRAINS_BODY}` }
+
+  function gateway(strength: Record<string, number>, status = 200) {
+    const calls: { url: string; init: RequestInit }[] = []
+    const fetch = async (url: string, init: RequestInit): Promise<Response> => {
+      calls.push({ url, init })
+      if (status !== 200) return new Response(JSON.stringify({ error: { message: "fixture" } }), { status })
+      if (url.endsWith("/chat/completions")) return new Response(JSON.stringify({ choices: [{ message: { content: "rollout drains" } }] }))
+      const packet = JSON.parse(String(init.body)) as { model: string; state: { cards: Record<string, { identity: string }> }; questions: Record<string, unknown> }
+      const keys = Object.keys(packet.questions)
+      const cards = packet.state.cards
+      const score = (key: string): number => strength[cards[key]?.identity ?? ""] ?? 0
+      const answers = keys.length === 1 && Object.keys(cards).length === 2
+        ? { c0: { type: "noul", noul: score("c0") > score("c1") ? 0.8 : 0.2 } }
+        : Object.fromEntries(keys.map((key) => [key, { type: "noul", noul: score(key) }]))
+      return new Response(JSON.stringify({ model: packet.model, answers }))
+    }
+    return { fetch, calls }
+  }
+
+  test("#given the rerank enabled with a key #when candidates are collected #then the judge order replaces the lexical order", async () => {
+    // given
+    const { repo, context } = await fixture(tempDirs, [drainsNote])
+    const { fetch, calls } = gateway({ [DRAINS_PATH]: 0.9, [ROLLOUTS_PATH]: 0.1 })
+    const lexical = await wiringFor({ repo, identity: context, recall: { max_items: 2 } })
+      .collectCandidates(eventContext([userEntry("m1", KUBERNETES_PROMPT)]))
+    const wiring = wiringFor({ repo, identity: context, recall: { max_items: 2, crosslingual }, env: { TEST_GATEWAY_KEY: "secret" }, crosslingualFetch: fetch })
+
+    // when
+    const collected = await wiring.collectCandidates(eventContext([userEntry("m1", KUBERNETES_PROMPT)]))
+
+    // then
+    expect(lexical?.candidates[0]?.path).toBe(ROLLOUTS_PATH)
+    expect(collected?.candidates[0]?.path).toBe(DRAINS_PATH)
+    expect(calls[0]?.url.endsWith("/chat/completions")).toBe(true)
+    expect(calls.every((call) => call.init.redirect === "error")).toBe(true)
+    expect(calls.every((call) => (call.init.headers as Record<string, string>).authorization === "Bearer secret")).toBe(true)
+  }, 30_000)
+
+  test("#given the rerank enabled without a key #when candidates are collected #then nothing is sent and the lexical candidates stand", async () => {
+    // given
+    const { repo, context } = await fixture(tempDirs)
+    const { fetch, calls } = gateway({})
+    const logs: Array<{ message: string; details?: unknown }> = []
+    const wiring = wiringFor({ repo, identity: context, recall: { crosslingual }, crosslingualFetch: fetch, logs })
+
+    // when
+    const collected = await wiring.collectCandidates(eventContext([userEntry("m1", KUBERNETES_PROMPT)]))
+
+    // then
+    expect(calls).toHaveLength(0)
+    expect(collected?.candidates.map((candidate) => candidate.path)).toEqual([ROLLOUTS_PATH])
+    expect(logs.filter((log) => log.message.includes("crosslingual"))).toHaveLength(1)
+  }, 30_000)
+
+  test("#given a failing gateway #when candidates are collected twice #then the lexical candidates stand and one warning is logged", async () => {
+    // given
+    const { repo, context } = await fixture(tempDirs)
+    const { fetch } = gateway({}, 500)
+    const logs: Array<{ message: string; details?: unknown }> = []
+    const wiring = wiringFor({ repo, identity: context, recall: { crosslingual }, env: { TEST_GATEWAY_KEY: "secret" }, crosslingualFetch: fetch, logs })
+
+    // when
+    const first = await wiring.collectCandidates(eventContext([userEntry("m1", KUBERNETES_PROMPT)]))
+    const second = await wiring.collectCandidates(eventContext([userEntry("m2", KUBERNETES_PROMPT)]))
+
+    // then
+    expect(first?.candidates.map((candidate) => candidate.path)).toEqual([ROLLOUTS_PATH])
+    expect(second?.candidates.map((candidate) => candidate.path)).toEqual([ROLLOUTS_PATH])
+    expect(logs.filter((log) => log.message.includes("crosslingual"))).toHaveLength(1)
   }, 30_000)
 })

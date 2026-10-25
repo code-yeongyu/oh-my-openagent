@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:6845c0891661183e212fb8ac917f91fa032a16daa7f9c7ab7f35f20bd6241483:99d2de897e0dfb3e575fc673a9e449299c4c96b8ae79e43f669b68f72713da18
+// omo-codex-install:721fe0b75ce6b2b07e3841c3c4b6d76c49d899f04ddd5db4375ce431750e76ba:b2e590afaae2d2cb2a919d72499f4713c10e74a3a4725d3c0c0d5bc089129769
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19632,6 +19632,30 @@ var OmoMemoryRecallEventCapsSchema = object({
   assistant: number2().int().nonnegative().default(1500),
   prompt: number2().int().nonnegative().default(4000)
 }).strict();
+var OMO_MEMORY_RECALL_CROSSLINGUAL_DEFAULTS = {
+  enabled: false,
+  api_key_env: "OPENGATEWAY_API_KEY",
+  judge_model: "sionic-ai/jev-omni",
+  translate_model: "openai/gpt-6-luna",
+  view_languages: ["en", "ko"],
+  timeout_ms: 30000
+};
+var OmoMemoryRecallCrosslingualSchema = object({
+  enabled: boolean2().default(false),
+  api_key_env: string2().min(1).default("OPENGATEWAY_API_KEY"),
+  judge_model: string2().min(1).default("sionic-ai/jev-omni"),
+  translate_model: string2().min(1).default("openai/gpt-6-luna"),
+  view_languages: array(string2().min(2).max(8)).max(4).default(["en", "ko"]),
+  timeout_ms: number2().int().min(1000).max(120000).default(30000)
+}).strict();
+var OmoMemoryRecallCrosslingualLayerSchema = object({
+  enabled: boolean2().optional(),
+  api_key_env: string2().min(1).optional(),
+  judge_model: string2().min(1).optional(),
+  translate_model: string2().min(1).optional(),
+  view_languages: array(string2().min(2).max(8)).max(4).optional(),
+  timeout_ms: number2().int().min(1000).max(120000).optional()
+}).strict();
 var OmoMemoryRecallSchema = object({
   enabled: boolean2().default(true),
   max_items: number2().int().min(1).max(5).default(2),
@@ -19640,7 +19664,8 @@ var OmoMemoryRecallSchema = object({
   sidecar_max_tokens: number2().int().positive().default(48000),
   max_concurrent_wakes: number2().int().positive().default(2),
   tool_budget: number2().int().positive().default(8),
-  query_expansion: boolean2().default(false)
+  query_expansion: boolean2().default(false),
+  crosslingual: OmoMemoryRecallCrosslingualSchema.default({ ...OMO_MEMORY_RECALL_CROSSLINGUAL_DEFAULTS, view_languages: ["en", "ko"] })
 }).strict();
 var OmoMemoryProjectScopeSchema = object({
   nudge: boolean2().default(true),
@@ -19712,7 +19737,8 @@ var OmoMemoryRecallLayerSchema = object({
   sidecar_max_tokens: number2().int().positive().optional(),
   max_concurrent_wakes: number2().int().positive().optional(),
   tool_budget: number2().int().positive().optional(),
-  query_expansion: boolean2().optional()
+  query_expansion: boolean2().optional(),
+  crosslingual: OmoMemoryRecallCrosslingualLayerSchema.optional()
 }).strict();
 var OmoMemoryNudgeLayerSchema = object({
   enabled: boolean2().optional(),
@@ -19805,7 +19831,8 @@ var OmoMemorySettingsSchema = object({
     sidecar_max_tokens: 48000,
     max_concurrent_wakes: 2,
     tool_budget: 8,
-    query_expansion: false
+    query_expansion: false,
+    crosslingual: { ...OMO_MEMORY_RECALL_CROSSLINGUAL_DEFAULTS, view_languages: ["en", "ko"] }
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),

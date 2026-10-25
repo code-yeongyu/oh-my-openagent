@@ -399,6 +399,19 @@ describe("checkExtensionCurrent", () => {
     expect(await readFile(recallStoreOutputPath, "utf8")).not.toContain("#omo-recall-store-runtime")
   })
 
+  test("#given the split extension build #when recall inputs are inspected #then the opt-in crosslingual rerank loads only from the recall-store sidecar", async () => {
+    const { mainInputs, recallStoreInputs } = await sharedOutputs()
+    for (const suffix of [
+      "packages/memory-core/src/recall/crosslingual.ts",
+      "packages/omo-senpi/src/components/memory/recall-crosslingual.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(recallStoreInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    // The rerank ranks with the entry bundle's BM25 and tokenizer, handed in; a sidecar copy would be a second index.
+    expect(recallStoreInputs.some((input) => toPortableBuildPath(input).endsWith("packages/memory-core/src/recall/bm25.ts"))).toBe(false)
+  })
+
   test("#given the split extension build #when telemetry inputs are inspected #then PostHog lives only in its lazy sidecar", async () => {
     const { mainInputs, telemetryPosthogInputs, telemetryPosthogOutputPath } = await sharedOutputs()
     expect(mainInputs.some(input => /node_modules\/posthog-(?:node|core)\//.test(toPortableBuildPath(input)))).toBe(false)

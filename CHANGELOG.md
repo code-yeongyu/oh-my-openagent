@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Kibitzer recall can rerank its candidates across languages, opt-in.** With `memory.recall.crosslingual.enabled` and a decision-model key in `api_key_env` (default `OPENGATEWAY_API_KEY`), a wake's candidates come from the user's question plus English and Korean translations, a BM25 and TF-IDF cosine top-32 union, hosted pointwise scoring and a symmetric pairwise order of the best five. It is off by default; with no key nothing is sent, and any error or the `timeout_ms` deadline keeps today's lexical candidates with one warning per session. The code loads from the lazy recall-store sidecar only when enabled. ([#11248](https://github.com/code-yeongyu/oh-my-openagent/pull/11248))
+
 **OmO Native init-deep committed mode no longer dead-ends.** Committed mode now finishes through its own pull-request handoff instead of pointing at a skill that does not ship with OmO Native, and it reports how to finish by hand when no PR can be opened. Thanks to @HolisticDeveloper for the report and @surlymochan for the fix. ([#11228](https://github.com/code-yeongyu/oh-my-openagent/pull/11228), fixes [#9686](https://github.com/code-yeongyu/oh-my-openagent/issues/9686))
 
 **The stale-reflection-lock test leaves no background writer behind when removing its temporary root.** Its teardown closes the memory wiring and awaits facts reconciliation and maintenance before removal, so a late lock publication cannot recreate the directory and make the temp-leak guard blame another test. ([#11225](https://github.com/code-yeongyu/oh-my-openagent/pull/11225))

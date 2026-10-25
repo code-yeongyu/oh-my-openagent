@@ -20,7 +20,11 @@ import {
   RecallCorpusCache,
   type RecallDocument,
   RecallLedger,
+  buildExcerpt,
   planRecallQueries,
+  rankRecallDocumentsBm25,
+  recallTerms,
+  tokenizeRecallText,
   selectRecallCandidates,
   type RecallCandidate,
   type RecallNudge,
@@ -34,6 +38,7 @@ import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
 import { withProjectDocuments } from "./project-memory-nudge"
 import { createProjectSourceMentions } from "./project-recall-mentions"
 import { projectDocumentsOf, selectWithProjectSeats, type ProjectRecallCorpus } from "./project-recall-seats"
+import { loadCrosslingualRuntime, type CrosslingualRuntime } from "./recall-crosslingual-loader"
 import { createRecallDrain, type PendingNudgesPort } from "./recall-drain"
 import { createTranscriptMentionIndex } from "./recall-transcript-mentions"
 import {
@@ -57,7 +62,7 @@ export type ResolvedMemoryRecallSettings = OmoMemoryRecall
 
 /**
  * Base recall block under the bound agent's layer override, mirroring the nudge/reflection pattern.
- * `event_caps` merges per field, so an agent that tightens one cap keeps the root's other three.
+ * `event_caps` and `crosslingual` merge per field, so an agent that sets one field keeps the root's others.
  */
 export function resolveAgentRecallSettings(
   settings: OmoMemorySettings | undefined,
@@ -66,7 +71,12 @@ export function resolveAgentRecallSettings(
   const resolved = resolveMemorySettings(settings)
   const base = resolved.recall
   const override = resolved.agents[agentId]?.recall
-  return { ...base, ...override, event_caps: { ...base.event_caps, ...override?.event_caps } }
+  return {
+    ...base,
+    ...override,
+    event_caps: { ...base.event_caps, ...override?.event_caps },
+    crosslingual: { ...base.crosslingual, ...override?.crosslingual },
+  }
 }
 
 export interface MemoryRecallWiringOptions {
@@ -84,6 +94,10 @@ export interface MemoryRecallWiringOptions {
   readonly pendingFor?: (context: MemoryIdentityContext) => PendingNudgesPort
   readonly drainQueued?: (sessionId: string, context: MemoryIdentityContext) => RecallNudge[]
   readonly logger?: ComponentLogger
+  /** HTTP seam for memory.recall.crosslingual; the global fetch when omitted. */
+  readonly crosslingualFetch?: (url: string, init: RequestInit) => Promise<Response>
+  /** Loader seam for the rerank sidecar; the recall-store sidecar import when omitted. */
+  readonly crosslingualRuntime?: () => Promise<CrosslingualRuntime>
 }
 
 /** Everything the Kibitzer sidecar needs about one hook's lexical candidates. */
@@ -128,11 +142,35 @@ export interface MemoryRecallWiring {
 // or consume the hints produced by the Kibitzer sidecar.
 const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
 
+const CROSSLINGUAL_LEXICAL = { rankBm25: rankRecallDocumentsBm25, terms: recallTerms, tokens: tokenizeRecallText, excerpt: buildExcerpt }
+
 export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): MemoryRecallWiring {
   const corpusCache = options.corpusCache ?? new RecallCorpusCache()
   const transcriptMentions = createTranscriptMentionIndex()
   const projectSourceMentions = options.projectSource === undefined ? undefined : createProjectSourceMentions(options.projectSource)
   const createRepo = options.createRepo ?? defaultCreateRepo
+  const crosslingualWarned = new Set<string>()
+  const crosslingualRuntime = options.crosslingualRuntime ?? loadCrosslingualRuntime
+
+  async function crosslingualReranker(settings: ResolvedMemoryRecallSettings["crosslingual"], sessionId: string) {
+    try {
+      const runtime = await crosslingualRuntime()
+      return runtime.createCrosslingualReranker({
+        settings,
+        env: options.env,
+        lexical: CROSSLINGUAL_LEXICAL,
+        warned: crosslingualWarned,
+        ...(options.crosslingualFetch === undefined ? {} : { fetch: options.crosslingualFetch }),
+        ...(options.logger === undefined ? {} : { logger: options.logger }),
+      })
+    } catch (error) {
+      if (!crosslingualWarned.has(sessionId)) {
+        crosslingualWarned.add(sessionId)
+        options.logger?.warn("omo-senpi memory recall crosslingual rerank unavailable; lexical candidates kept", { error: describe(error) })
+      }
+      return undefined
+    }
+  }
   const ledgerFor = options.ledgerFor ?? ((context) => new RecallLedger(context.identityPaths.recallLedger))
   const pendingFor = options.pendingFor ?? ((context) => new PendingNudges(context.identityPaths.recallPending))
   const drain = createRecallDrain({
@@ -192,12 +230,20 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
 
     const ledger = ledgerFor(context)
     const surfaced = await ledger.surfacedPaths(session.id)
-    const candidates = selectWithProjectSeats(own.documents, projects, recall.max_items, (documents, extraQueries, identityId) =>
+    const lexical = selectWithProjectSeats(own.documents, projects, recall.max_items, (documents, extraQueries, identityId) =>
       selectRecallCandidates(documents, [...queries, ...extraQueries], {
         maxItems: recall.max_items,
         surfaced: pathsInCorpus(surfaced, identityId),
         excludePaths: pathsInCorpus(excludePaths, identityId),
       }))
+    // The rerank covers the bound memory only; child-project seats keep the lexical selection.
+    const reranker = recall.crosslingual.enabled && projects.length === 0
+      ? await crosslingualReranker(recall.crosslingual, session.id)
+      : undefined
+    const reranked = reranker === undefined
+      ? undefined
+      : await reranker(own.documents, { sessionId: session.id, question: texts[0] ?? "", maxItems: recall.max_items, surfaced, excludePaths })
+    const candidates = reranked !== undefined && reranked.length > 0 ? reranked : lexical
     if (candidates.length === 0) return undefined
     return {
       sessionId: session.id,

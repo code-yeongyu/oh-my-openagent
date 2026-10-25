@@ -1931,7 +1931,18 @@
             "sidecar_max_tokens": 48000,
             "max_concurrent_wakes": 2,
             "tool_budget": 8,
-            "query_expansion": false
+            "query_expansion": false,
+            "crosslingual": {
+              "enabled": false,
+              "api_key_env": "OPENGATEWAY_API_KEY",
+              "judge_model": "sionic-ai/jev-omni",
+              "translate_model": "openai/gpt-6-luna",
+              "view_languages": [
+                "en",
+                "ko"
+              ],
+              "timeout_ms": 30000
+            }
           },
           "type": "object",
           "properties": {
@@ -2007,6 +2018,61 @@
             "query_expansion": {
               "default": false,
               "type": "boolean"
+            },
+            "crosslingual": {
+              "default": {
+                "enabled": false,
+                "api_key_env": "OPENGATEWAY_API_KEY",
+                "judge_model": "sionic-ai/jev-omni",
+                "translate_model": "openai/gpt-6-luna",
+                "view_languages": [
+                  "en",
+                  "ko"
+                ],
+                "timeout_ms": 30000
+              },
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "api_key_env": {
+                  "default": "OPENGATEWAY_API_KEY",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "judge_model": {
+                  "default": "sionic-ai/jev-omni",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "translate_model": {
+                  "default": "openai/gpt-6-luna",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "view_languages": {
+                  "default": [
+                    "en",
+                    "ko"
+                  ],
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 8
+                  }
+                },
+                "timeout_ms": {
+                  "default": 30000,
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 120000
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2320,6 +2386,41 @@
                   },
                   "query_expansion": {
                     "type": "boolean"
+                  },
+                  "crosslingual": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "api_key_env": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "judge_model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "translate_model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "view_languages": {
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 8
+                        }
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 120000
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -4375,6 +4476,41 @@
                 },
                 "query_expansion": {
                   "type": "boolean"
+                },
+                "crosslingual": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "api_key_env": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "judge_model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "translate_model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "view_languages": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 8
+                      }
+                    },
+                    "timeout_ms": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 120000
+                    }
+                  },
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
@@ -4674,6 +4810,41 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "crosslingual": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "api_key_env": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "judge_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "translate_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "view_languages": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 2,
+                              "maxLength": 8
+                            }
+                          },
+                          "timeout_ms": {
+                            "type": "integer",
+                            "minimum": 1000,
+                            "maximum": 120000
+                          }
+                        },
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -6705,6 +6876,41 @@
                 },
                 "query_expansion": {
                   "type": "boolean"
+                },
+                "crosslingual": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "api_key_env": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "judge_model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "translate_model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "view_languages": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 8
+                      }
+                    },
+                    "timeout_ms": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 120000
+                    }
+                  },
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
@@ -7004,6 +7210,41 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "crosslingual": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "api_key_env": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "judge_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "translate_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "view_languages": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 2,
+                              "maxLength": 8
+                            }
+                          },
+                          "timeout_ms": {
+                            "type": "integer",
+                            "minimum": 1000,
+                            "maximum": 120000
+                          }
+                        },
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -9035,6 +9276,41 @@
                 },
                 "query_expansion": {
                   "type": "boolean"
+                },
+                "crosslingual": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "api_key_env": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "judge_model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "translate_model": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "view_languages": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 8
+                      }
+                    },
+                    "timeout_ms": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 120000
+                    }
+                  },
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
@@ -9334,6 +9610,41 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "crosslingual": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "api_key_env": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "judge_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "translate_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "view_languages": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 2,
+                              "maxLength": 8
+                            }
+                          },
+                          "timeout_ms": {
+                            "type": "integer",
+                            "minimum": 1000,
+                            "maximum": 120000
+                          }
+                        },
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -11371,6 +11682,41 @@
                   },
                   "query_expansion": {
                     "type": "boolean"
+                  },
+                  "crosslingual": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "api_key_env": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "judge_model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "translate_model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "view_languages": {
+                        "maxItems": 4,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 8
+                        }
+                      },
+                      "timeout_ms": {
+                        "type": "integer",
+                        "minimum": 1000,
+                        "maximum": 120000
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -11670,6 +12016,41 @@
                         },
                         "query_expansion": {
                           "type": "boolean"
+                        },
+                        "crosslingual": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "api_key_env": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "judge_model": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "translate_model": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "view_languages": {
+                              "maxItems": 4,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 2,
+                                "maxLength": 8
+                              }
+                            },
+                            "timeout_ms": {
+                              "type": "integer",
+                              "minimum": 1000,
+                              "maximum": 120000
+                            }
+                          },
+                          "additionalProperties": false
                         }
                       },
                       "additionalProperties": false
@@ -13701,6 +14082,41 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "crosslingual": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "api_key_env": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "judge_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "translate_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "view_languages": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 2,
+                              "maxLength": 8
+                            }
+                          },
+                          "timeout_ms": {
+                            "type": "integer",
+                            "minimum": 1000,
+                            "maximum": 120000
+                          }
+                        },
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -14000,6 +14416,41 @@
                             },
                             "query_expansion": {
                               "type": "boolean"
+                            },
+                            "crosslingual": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "api_key_env": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "judge_model": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "translate_model": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "view_languages": {
+                                  "maxItems": 4,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 2,
+                                    "maxLength": 8
+                                  }
+                                },
+                                "timeout_ms": {
+                                  "type": "integer",
+                                  "minimum": 1000,
+                                  "maximum": 120000
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "additionalProperties": false
@@ -16031,6 +16482,41 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "crosslingual": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "api_key_env": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "judge_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "translate_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "view_languages": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 2,
+                              "maxLength": 8
+                            }
+                          },
+                          "timeout_ms": {
+                            "type": "integer",
+                            "minimum": 1000,
+                            "maximum": 120000
+                          }
+                        },
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -16330,6 +16816,41 @@
                             },
                             "query_expansion": {
                               "type": "boolean"
+                            },
+                            "crosslingual": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "api_key_env": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "judge_model": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "translate_model": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "view_languages": {
+                                  "maxItems": 4,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 2,
+                                    "maxLength": 8
+                                  }
+                                },
+                                "timeout_ms": {
+                                  "type": "integer",
+                                  "minimum": 1000,
+                                  "maximum": 120000
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "additionalProperties": false
@@ -18361,6 +18882,41 @@
                       },
                       "query_expansion": {
                         "type": "boolean"
+                      },
+                      "crosslingual": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "api_key_env": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "judge_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "translate_model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "view_languages": {
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 2,
+                              "maxLength": 8
+                            }
+                          },
+                          "timeout_ms": {
+                            "type": "integer",
+                            "minimum": 1000,
+                            "maximum": 120000
+                          }
+                        },
+                        "additionalProperties": false
                       }
                     },
                     "additionalProperties": false
@@ -18660,6 +19216,41 @@
                             },
                             "query_expansion": {
                               "type": "boolean"
+                            },
+                            "crosslingual": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "api_key_env": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "judge_model": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "translate_model": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "view_languages": {
+                                  "maxItems": 4,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 2,
+                                    "maxLength": 8
+                                  }
+                                },
+                                "timeout_ms": {
+                                  "type": "integer",
+                                  "minimum": 1000,
+                                  "maximum": 120000
+                                }
+                              },
+                              "additionalProperties": false
                             }
                           },
                           "additionalProperties": false
