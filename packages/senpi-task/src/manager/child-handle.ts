@@ -9,6 +9,7 @@ import { HOST_TURN_RESUMED_EVENT } from "./host-turn-resumed"
 import type { EffectiveModel } from "../runners/pinned-model-equivalence"
 import type { ReconciledTurnNotice } from "../runners/rpc-host/reconcile-turn"
 import type { NativeRunPause } from "../pause/native-child-pause"
+import type { AbortConfirmation } from "../runners/abort-effect"
 
 export type { RunnerOutcome } from "../runners/in-process/child-handle"
 
@@ -72,7 +73,7 @@ export type ManagedChildHandle = {
   stopWhenReachable?(): Promise<void>
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
-  abort(): Promise<void>
+  abort(): Promise<void | AbortConfirmation>
   subscribe(listener: ManagedChildListener): () => void
   subscribeExtensionEvents?(listener: ChildExtensionListener): () => void
   waitForOutcome(): Promise<RunnerOutcome>

@@ -7,6 +7,7 @@ import type { TaskStatus } from "../../state"
 import type { ColdRevivalFailureCode } from "../../lifecycle/port"
 import type { SenpiShutdownErrorCode } from "../../team"
 import type { TeamSendDetails } from "../team/messaging"
+import type { AbortConfirmation } from "../../runners/abort-effect"
 
 // The minimal read of the harness context the control tools need to name the calling session. The
 // W1-V scope guard is fail-open without a caller id, so the tool layer resolves and passes it on
@@ -62,7 +63,7 @@ export type SendResultDetails =
     }
 
 export type CancelResultDetails =
-  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly status: TaskStatus; readonly undelivered_messages?: number }
+  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly status: TaskStatus; readonly undelivered_messages?: number; readonly abort?: AbortConfirmation }
   | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string; readonly undelivered_messages?: number }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus; readonly undelivered_messages?: number }

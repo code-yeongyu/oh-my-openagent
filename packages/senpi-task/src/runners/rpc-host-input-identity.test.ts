@@ -59,7 +59,7 @@ for (const conflict of [false, true]) {
     let timedOut = false
     class DeadlineClient extends HostSessionClient {
       override async send(command: Parameters<HostSessionClient["send"]>[0]): Promise<void> {
-        if (command.type !== "steer" || timedOut) return super.send(command)
+        if (command.type !== "steer" || timedOut) { await super.send(command); return }
         timedOut = true
         host.withholdReply("steer")
         const received = host.waitForCommand("steer")

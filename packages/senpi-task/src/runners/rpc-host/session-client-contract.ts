@@ -1,5 +1,6 @@
 import type { EffectiveModel } from "../pinned-model-equivalence"
 import type { HostRpcClientFactory, HostProtocolProbe } from "./session-transport"
+import type { AbortCommand } from "../abort-effect"
 
 export interface OpenedHostSession {
   /** Routing handle of this session on this connection - ephemeral, never a durable identity. */
@@ -21,7 +22,7 @@ export type HostSessionCommand =
   | { readonly type: "prompt"; readonly message: string; readonly streamingBehavior?: "steer" | "followUp"; readonly clientMessageId?: string }
   | { readonly type: "steer"; readonly message: string; readonly clientMessageId?: string }
   | { readonly type: "followUp"; readonly message: string; readonly clientMessageId?: string }
-  | { readonly type: "abort" }
+  | AbortCommand
   // Patch the context the attached session publishes (`set_session_context`); `null` deletes a key.
   | { readonly type: "set_session_context"; readonly patch: Readonly<Record<string, string | number | boolean | null>> }
 

@@ -109,7 +109,7 @@ export type SteeringHarness = {
   now(): number
 }
 
-export function makeHarness(): SteeringHarness {
+export function makeHarness(options: Pick<SteeringPort, "abortDeadline"> = {}): SteeringHarness {
   const store = createTaskRecordStore({ project_dir: tempProject() })
   const live = new Map<string, ManagedChildHandle>()
   const destruction = makeFakeDestruction()
@@ -119,6 +119,7 @@ export function makeHarness(): SteeringHarness {
   const sendCounts = new Map<string, number>()
   let clock = Date.parse("2026-07-06T00:00:00.000Z")
   const port: SteeringPort = {
+    ...options,
     store,
     tryBeginSend: (taskId) => {
       if (evicting.has(taskId)) return false

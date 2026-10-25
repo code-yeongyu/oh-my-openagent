@@ -31,6 +31,7 @@ import { createInputDelivery } from "../input-delivery"
 import { createRpcRunPause } from "../rpc/native-run-pause"
 import { createTurnClaim } from "../rpc/turn-claim"
 import { createTaskParentControl, TaskParentControlError } from "../task-parent-control"
+import { abortCommand } from "../abort-effect"
 
 /**
  * The steerable child handle over ONE daemon session: identical turn semantics to
@@ -193,7 +194,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       if (adopted) teardown.republishStatus()
       if (adopted) void inputEffects.reconcile().catch(error => log("senpi-task input reconciliation failed", { taskId, error: String(error) }))
     },
-    continueInput: (command) => inputEffects.send(command, identified => client.send(toHostInput(identified))),
+    continueInput: (command) => inputEffects.send(command, async identified => { await client.send(toHostInput(identified)) }),
     port: () => client,
     identity: identity.current,
     alive: () => intent === "running" && !parked && !detached && outcome === undefined,
@@ -231,7 +232,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
 
   const inputEffects = createInputEffects({
     taskId, store: options.inputStore,
-    send: command => recovery.issue(toHostInput(command)),
+    send: async command => { await recovery.issue(toHostInput(command)) },
   })
 
   const beginTurn = (): void => {
@@ -296,7 +297,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     abort: () => {
       abortedByUser = true
       if (stop.requested() && recovery.recovering()) return Promise.resolve()
-      return recovery.issue({ type: "abort" })
+      return recovery.issue(abortCommand())
     },
     transportRecovering: () => recovery.recovering() && outcome === undefined,
     markStopping: stop.markStopping,

@@ -5,6 +5,7 @@ import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
 import type { RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { HostUnavailableError, TASK_DAEMON_PROTOCOL_VERSION, TASK_DAEMON_REQUIRED_CAPABILITIES } from "./daemon"
 import type { HostRunHoldClient } from "./task-parent-wire"
+import type { AbortCommand, AbortConfirmation } from "../abort-effect"
 
 /**
  * How a child session reaches the daemon: the engine-client port omo depends on, the senpi adapter
@@ -27,7 +28,7 @@ export interface HostRpcClient extends HostRunHoldClient {
   prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp"; clientMessageId?: string }): Promise<HostPromptDisposition>
   steer(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
   followUp(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
-  abort(): Promise<void>
+  abort(options?: Omit<AbortCommand, "type" | "id" | "sessionId">): Promise<void | AbortConfirmation>
   getState(): Promise<RpcSessionState>
   getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>
   getEntries(since?: string): Promise<RpcEntriesResult>

@@ -25,6 +25,7 @@ import { createInputDelivery } from "../input-delivery"
 import { createRpcRunPause } from "./native-run-pause"
 import { createTurnClaim } from "./turn-claim"
 import { createTaskParentControl } from "../task-parent-control"
+import { abortCommand } from "../abort-effect"
 
 export type CreateRpcChildHandleOptions = {
   readonly inputStore?: import("../../store").TaskRecordStore
@@ -230,9 +231,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     // host rejects as busy degrades to followUp queueing rather than failing the delivery.
     steer: delivery.steer,
     followUp: (text) => delivery.runPrompt(text, "followUp"),
-    abort: () => {
+    abort: async () => {
       abortedByUser = true
-      return writeCommand({ type: "abort" }, "abort")
+      const response = await client.send(abortCommand())
+      assertOk(response, "abort")
+      return response.success && response.command === "abort" ? response.data : undefined
     },
     subscribe: (listener: ChildEventListener) => {
       const unsubscribe = listeners.registrations.subscribe(listener)

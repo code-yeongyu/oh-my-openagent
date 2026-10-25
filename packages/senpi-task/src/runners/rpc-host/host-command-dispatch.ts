@@ -1,11 +1,12 @@
 import type { HostSessionCommand } from "./session-client-contract"
 import type { HostPromptDisposition, HostQueuedInputDisposition, HostRpcClient } from "./session-transport"
+import type { AbortConfirmation } from "../abort-effect"
 
 // The runner does not consume the host's input disposition, so a delivered command settles with no value.
 const ignoreHostDisposition = (_disposition: HostPromptDisposition | HostQueuedInputDisposition): void => undefined
 
 /** Issue one child command on the engine client that holds the child's session. */
-export function dispatchHostCommand(client: HostRpcClient, routingId: string | undefined, command: HostSessionCommand): Promise<void> {
+export function dispatchHostCommand(client: HostRpcClient, routingId: string | undefined, command: HostSessionCommand): Promise<void | AbortConfirmation> {
   switch (command.type) {
     case "prompt":
       return client.prompt(
@@ -17,8 +18,10 @@ export function dispatchHostCommand(client: HostRpcClient, routingId: string | u
       return client.steer(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
     case "followUp":
       return client.followUp(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
-    case "abort":
-      return client.abort()
+    case "abort": {
+      const { type: _type, ...options } = command
+      return client.abort(options)
+    }
     case "set_session_context":
       return client.setSessionContext(command.patch, routingId)
     default:

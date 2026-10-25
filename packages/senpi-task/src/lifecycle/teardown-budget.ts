@@ -23,7 +23,7 @@ export async function withinTeardownBudget(
   deadline: TeardownStepDeadline,
   target: { readonly taskId: string; readonly pid: number | undefined },
   step: TeardownStep,
-  run: () => Promise<void>,
+  run: () => Promise<unknown>,
 ): Promise<void> {
   const work = Promise.resolve().then(run).then(() => "done" as const)
   const outcome = await Promise.race([work, deadline(step).then(() => "timed_out" as const)])

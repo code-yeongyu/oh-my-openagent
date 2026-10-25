@@ -31,6 +31,7 @@ import {
 } from "./session-wire"
 import { createHostTaskParentWire } from "./task-parent-wire"
 import type { TaskParentWire } from "../task-parent-control"
+import type { AbortConfirmation } from "../abort-effect"
 
 
 /**
@@ -137,7 +138,7 @@ export class HostSessionClient {
     }
   }
 
-  send(command: HostSessionCommand): Promise<void> {
+  send(command: HostSessionCommand): Promise<void | AbortConfirmation> {
     return dispatchHostCommand(this.connected(command.type), this.routingId, command)
   }
 

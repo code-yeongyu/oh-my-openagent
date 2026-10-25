@@ -26,7 +26,7 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
     pid: handle.pid,
     abort: () => handle.abort(),
     dispose: () => handle.dispose(),
-    terminate: () => (kind === "rpc" ? handle.abort() : Promise.resolve()),
+    terminate: async () => { if (kind === "rpc") await handle.abort() },
   }
 }
 

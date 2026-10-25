@@ -44,6 +44,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         task_id: outcome.task_id,
         previous_status: outcome.previous_status,
         status,
+        ...(outcome.abort === undefined ? {} : { abort: outcome.abort }),
         ...(outcome.undelivered_messages === undefined ? {} : { undelivered_messages: outcome.undelivered_messages }),
       })
     }

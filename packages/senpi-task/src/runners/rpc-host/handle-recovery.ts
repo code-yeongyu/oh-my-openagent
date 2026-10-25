@@ -12,6 +12,7 @@ import { log } from "@oh-my-opencode/utils"
 import type { HostTurnReconciliation } from "./reconcile-turn"
 import { armRecoveryBound, isTransportRecoveryExpired, withinBound, type RecoveryBound, type TransportRecoveryOptions } from "./transport-recovery"
 import { InputUncertainError } from "../input-effects"
+import type { AbortConfirmation } from "../abort-effect"
 
 export interface HandleRecoveryHost {
   continueInput?(command: import("../input-effects").InputCommand): Promise<void>
@@ -42,7 +43,7 @@ export interface HandleRecoveryHost {
 }
 
 export interface HandleRecovery {
-  issue(command: HostSessionCommand): Promise<void>
+  issue(command: HostSessionCommand): Promise<void | AbortConfirmation>
   onTransportGone(lost: HostSessionPort): void
   settled(): Promise<void>
   currentPort(): Promise<HostSessionPort>
@@ -67,18 +68,18 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
   let reattaching: Promise<void> | undefined
   let deliveries = 0
 
-  const issue = async (command: HostSessionCommand): Promise<void> => {
+  const issue = async (command: HostSessionCommand): Promise<void | AbortConfirmation> => {
     await reattaching
     const live = host.port()
     deliveries += 1
     try {
-      await live.send(command)
+      return await live.send(command)
     } catch (error) {
       if (!isTransportLossError(error) || host.reattach === undefined || !host.alive()) throw error
       await live.transportGone
       await reattaching
       if (!host.alive()) throw error
-      await host.port().send(command)
+      return await host.port().send(command)
     } finally {
       deliveries -= 1
     }

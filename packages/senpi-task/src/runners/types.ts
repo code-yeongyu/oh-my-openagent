@@ -5,6 +5,7 @@ import type { EffectiveModel } from "./pinned-model-equivalence"
 import type { TaskRecord } from "../state"
 import type { HostTurnReconciliation } from "./rpc-host/reconcile-turn"
 import type { NativeRunPause } from "../pause/native-child-pause"
+import type { AbortConfirmation } from "./abort-effect"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -70,7 +71,7 @@ export type ChildHandle = {
   readonly reportedModel?: EffectiveModel
   steer(text: string): Promise<void>
   followUp(text: string): Promise<void>
-  abort(): Promise<void>
+  abort(): Promise<void | AbortConfirmation>
   subscribe(listener: ChildEventListener): () => void
   subscribeExtensionEvents?(listener: ChildExtensionListener): () => void
   waitForIdle(): Promise<void>

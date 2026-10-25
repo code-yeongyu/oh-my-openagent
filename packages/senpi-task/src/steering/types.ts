@@ -3,6 +3,7 @@ import type { ColdRevivalFailureCode, DetachedRevivalResult, DetachedRevivalRoll
 import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { HostSessionIdentity, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
+import type { AbortConfirmation } from "../runners/abort-effect"
 
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
@@ -101,7 +102,7 @@ export type SendOutcome =
   | { readonly kind: "not_found"; readonly reason: string; readonly suggestion: string }
 
 export type InterruptOutcome =
-  | { readonly kind: "interrupted"; readonly task_id: string; readonly previous_status: TaskStatus }
+  | { readonly kind: "interrupted"; readonly task_id: string; readonly previous_status: TaskStatus; readonly abort?: AbortConfirmation }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 
@@ -113,7 +114,7 @@ export type CancelOptions = {
 }
 
 export type CancelOutcome =
-  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly undelivered_messages?: number }
+  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly undelivered_messages?: number; readonly abort?: AbortConfirmation }
   // The child is unreachable right now: the cancel runs on its host before anything else once it is
   // reachable (or the child ends when its connection does not come back), and only then is it cancelled.
   | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string; readonly undelivered_messages?: number }

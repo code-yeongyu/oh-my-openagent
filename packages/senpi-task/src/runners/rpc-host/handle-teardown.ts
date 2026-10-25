@@ -118,7 +118,7 @@ export async function endSessionOnHost(input: HostTeardownInput, next: "closed" 
       log("senpi-task host session teardown step failed", { taskId: input.taskId, step, error: String(error) })
     }
   }
-  if (next === "terminated") await settleWithin(bestEffort(() => input.port().send({ type: "abort" }), "abort"), ABORT_GRACE_MS)
+  if (next === "terminated") await settleWithin(bestEffort(async () => { await input.port().send({ type: "abort" }) }, "abort"), ABORT_GRACE_MS)
   await settleWithin(bestEffort(() => input.port().close(), "close_session"), input.closeGraceMs)
 }
 

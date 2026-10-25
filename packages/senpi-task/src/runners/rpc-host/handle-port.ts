@@ -15,6 +15,7 @@ import type { CatalogModelIdentity } from "../pinned-model-equivalence"
 import type { TaskRecord } from "../../state"
 import type { HostTurnReconciliation, InputEffectStatus, ReconciledTurnNotice } from "./reconcile-turn"
 import type { TaskParentWire } from "../task-parent-control"
+import type { AbortConfirmation } from "../abort-effect"
 
 /**
  * What a child handle needs FROM a daemon session and what it exposes TO the manager. The seam is
@@ -39,7 +40,7 @@ export interface HostSessionLiveness {
 export interface HostSessionPort {
   readonly socketPath: string
   readonly transportGone: Promise<unknown>
-  send(command: HostSessionCommand): Promise<void>
+  send(command: HostSessionCommand): Promise<void | AbortConfirmation>
   // The run hold commands over this connection; absent on ports that cannot carry them.
   taskParentWire?(): TaskParentWire
   getState(): Promise<HostSessionLiveness>

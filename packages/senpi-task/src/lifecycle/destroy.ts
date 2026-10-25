@@ -144,7 +144,7 @@ async function teardownHandle(context: LifecycleContext, handle: ResidentHandle,
   // because Senpi can float retry rejections from both abort() and active-session dispose(). Dispose
   // must always run at that safe boundary so teardown cannot leave a resident zombie occupying a slot.
   const target = { taskId: handle.task_id, pid: handle.pid }
-  const bounded = (step: "abort" | "terminate" | "dispose", run: () => Promise<void>) =>
+  const bounded = (step: "abort" | "terminate" | "dispose", run: () => Promise<unknown>) =>
     withinTeardownBudget(context.teardownStepDeadline, target, step, run)
   if (handle.kind === "in-process") {
     if (!skipInProcessAbort) await bestEffort(handle.task_id, "abort", () => bounded("abort", () => handle.abort()))

@@ -37,7 +37,7 @@ export type ResidentHandle = {
   readonly kind: "in-process" | "rpc" | "host-session"
   readonly pid: number | undefined
   // Interrupt an in-flight turn. Safe to call on an already-idle child.
-  abort(): Promise<void>
+  abort(): ReturnType<ManagedChildHandle["abort"]>
   // In-process: tear down the child session. Rpc: detach the protocol client + heartbeat.
   // Host-session: DETACH - the session keeps running on the daemon and the record parks.
   dispose(): Promise<void>
