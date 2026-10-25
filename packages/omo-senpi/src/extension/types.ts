@@ -64,6 +64,10 @@ export interface SenpiExtensionAPI {
    */
   registerMemoryReporter?(name: string, reporter: MemoryReporter): void
   registerCommand(name: string, options: Record<string, unknown>): void
+  registerShortcut?(shortcut: string, options: {
+    readonly description?: string
+    readonly handler: (ctx: unknown) => void | Promise<void>
+  }): void
   registerFlag(
     name: string,
     options: {
