@@ -22,8 +22,12 @@ const write = (dir: string, path: string, content: string) => { mkdirSync(join(d
 const read = (dir: string, path: string) => readFileSync(join(dir, path), "utf8")
 
 function scratch(): string {
-  const dir = mkdtempSync(join(tmpdir(), "changelog-fragments-cli-"))
+  // The space makes the repository path differ from its file URL's pathname ("%20"), the way every Windows path
+  // does ("/D:/..."): a CLI that runs git with the URL pathname as cwd fails here as it does on windows-latest.
+  const dir = mkdtempSync(join(tmpdir(), "changelog fragments cli-"))
   git(dir, "init", "-q", "-b", "dev")
+  // A runner's global core.autocrlf=true (windows-latest) would check files out with CRLF; the expectations are bytes.
+  git(dir, "config", "core.autocrlf", "false")
   cpSync(SCRIPT_DIR, join(dir, "script"), { recursive: true, filter: (p) => !p.includes("node_modules") })
   write(dir, "package.json", JSON.stringify({ files: ["packages/omo-senpi/src"] }))
   write(dir, "packages/omo-senpi/src/index.ts", "export const v = 1\n")

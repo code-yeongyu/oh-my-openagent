@@ -11,13 +11,16 @@
  */
 import { execFileSync } from "node:child_process"
 import { rm } from "node:fs/promises"
+import { fileURLToPath } from "node:url"
 import { fragmentPath, FRAGMENT_DIR, mergeUnreleased, unreleasedBody } from "./changelog-fragments"
 import { linkNotes } from "./changelog-release-assembly.ts"
 import { blockFromPrepend, combineFragments, markerLine, splitFragment } from "./package-log-blocks.ts"
 
 const root = new URL("../", import.meta.url)
 const at = (path: string) => new URL(path, root)
-const git = (...args: string[]) => execFileSync("git", args, { cwd: root.pathname, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+// A file URL's pathname is not a path: "/D:/a/..." on Windows, "%20" for a space. git needs the real directory.
+const rootPath = fileURLToPath(root)
+const git = (...args: string[]) => execFileSync("git", args, { cwd: rootPath, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
 const paragraphs = (body: string) => body.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part !== "")
 
 /** The paragraphs a branch added under Unreleased; throws on any other CHANGELOG.md edit. */
