@@ -4,7 +4,7 @@ import { fakeApi, minted, temporaryHome } from "./test-support"
 
 const launcher = join(resolve(import.meta.dir, "../../../../.."), "packages", "omo-native", "bin", "omo.js")
 
-async function closedOrigin(): Promise<string> {
+async function unreachableOrigin(): Promise<string> {
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response(null) })
   const origin = server.url.origin
   await server.stop(true)
@@ -33,7 +33,7 @@ async function omo(args: string[], api: string) {
 }
 
 test("login against an unreachable service stops before any sign-in step and says it can't reach the service", async () => {
-  const api = await closedOrigin()
+  const api = await unreachableOrigin()
   const result = await omo(["login"], api)
   expect(result.stderr).toBe(`Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`)
   expect(result.stdout).toBe("")

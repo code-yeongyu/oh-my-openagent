@@ -167,7 +167,7 @@ describe("DeviceKeyring", () => {
   test("signs the snapshot preimage with the omo-sync/v1/snapshot tag (spec §6 compaction)", async () => {
     const keyring = createInMemoryDeviceKeyring("fixture-device")
     // Spec preimage (docs/sync-design.md @21e075732e76 §6 compaction): canonical JSON of the
-    // full signed object {t, account, author, covers_seq, digest, link, keyring_head} — author
+    // full signed object {t, account, author, covers_seq, digest, link, keyring_head}; author
     // included. Field values mirror fixtures/sync-v1/snapshot.json (omo-service, synthetic);
     // author is flattened to the device principal id, as the wire signs it.
     const author = "HcahOcBrYYAu1Uf5BVu8YQ"
@@ -221,7 +221,7 @@ describe("DeviceKeyring", () => {
     const plaintext = new TextEncoder().encode(jcs({ version: 1, account, epoch, id, key_material: material }))
     const wrap = sealWrapWith(keyring.publicKeys().sealing, plaintext, aad)
     expect(await keyring.unseal(wrap, { account, epoch, id })).toEqual(plaintext)
-    // The full envelope — nested key_material included — must be canonical JSON byte-for-byte.
+    // The full envelope, nested key_material included, must be canonical JSON byte-for-byte.
     const openedText = new TextDecoder().decode(await keyring.unseal(wrap, { account, epoch, id }))
     expect(openedText).toBe(jcs({ version: 1, account, epoch, id, key_material: material }))
   })
@@ -336,5 +336,34 @@ describe("DeviceKeyring", () => {
       await expect(keyring.unseal(invalid, binding)).rejects.toThrow()
     }
     await expect(createInMemoryDeviceKeyring("other").unseal(box, binding)).rejects.toThrow()
+  })
+
+  test("review LOWs: a record may not carry the snapshot tag, and a snapshot reports the precise canonical violation", async () => {
+    const keyring = createInMemoryDeviceKeyring("fixture-device")
+    const encode = (text: string) => new TextEncoder().encode(text)
+    const refusal = async (request: Parameters<typeof keyring.sign>[0]) => {
+      try {
+        await keyring.sign(request)
+      } catch (error) {
+        return error instanceof DeviceKeyringSignError ? error.reason : "untyped"
+      }
+      return "signed"
+    }
+    expect(await refusal({ purpose: "record", canonicalJson: encode('{"t":"omo-sync/v1/snapshot"}') })).toBe("record-prefix")
+    expect(await refusal({ purpose: "snapshot", canonicalJson: encode('{ "t":"omo-sync/v1/snapshot" }') })).toBe("record-canonical-whitespace")
+    expect(await refusal({ purpose: "snapshot", canonicalJson: encode('{"z":1,"t":"omo-sync/v1/snapshot"}') })).toBe("record-canonical-order")
+  })
+
+  test("review LOWs: unseal refuses a non-integer epoch and a low-order enc with the one normal refusal", async () => {
+    const keyring = createInMemoryDeviceKeyring("receiver")
+    const binding = { account: "acct", epoch: 1, id: "device:receiver" }
+    const box = sealWrapWith(keyring.publicKeys().sealing, new Uint8Array(32), new TextEncoder().encode(JSON.stringify(binding)))
+    expect(await keyring.unseal(box, binding)).toHaveLength(32)
+    await expect(keyring.unseal(box, { ...binding, epoch: 1.5 })).rejects.toThrow("epoch")
+    const lowOrder = Uint8Array.from(box)
+    lowOrder.fill(0, 0, 32)
+    await expect(keyring.unseal(lowOrder, binding)).rejects.toThrow("sealed box does not open")
+    lowOrder[0] = 1
+    await expect(keyring.unseal(lowOrder, binding)).rejects.toThrow("sealed box does not open")
   })
 })

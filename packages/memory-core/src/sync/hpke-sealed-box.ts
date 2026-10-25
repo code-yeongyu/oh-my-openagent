@@ -59,7 +59,15 @@ export function openHpkeSealedBox(
     },
     format: "jwk",
   })
-  const dh = diffieHellman({ privateKey, publicKey: x25519PublicKeyFromRaw(enc) })
+  // RFC 9180 §7.1.4: a low-order enc yields an all-zero shared secret, which must be refused.
+  // The runtime may already throw on it; either way the caller sees the one refusal below.
+  let dh: Buffer
+  try {
+    dh = diffieHellman({ privateKey, publicKey: x25519PublicKeyFromRaw(enc) })
+  } catch {
+    throw new Error("sealed box does not open: wrong recipient or corrupted wrap")
+  }
+  if (dh.every((byte) => byte === 0)) throw new Error("sealed box does not open: wrong recipient or corrupted wrap")
 
   const kem = Buffer.concat([Buffer.from("KEM"), KEM_ID])
   const suite = Buffer.concat([Buffer.from("HPKE"), KEM_ID, KDF_ID, AEAD_ID])

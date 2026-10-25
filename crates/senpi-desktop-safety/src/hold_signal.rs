@@ -142,6 +142,8 @@ impl HoldSignal {
             if remaining.is_zero() {
                 return Ok(());
             }
+            #[cfg(any(test, feature = "test-support"))]
+            supervisor.hold_waiting_for_test();
             self.changed.wait_for(&mut state, remaining);
         }
     }

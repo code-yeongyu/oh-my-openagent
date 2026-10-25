@@ -15,9 +15,11 @@ const HOST_TARGETS = {
   "darwin-arm64": "aarch64-apple-darwin",
   "darwin-x64": "x86_64-apple-darwin",
   "linux-x64": "x86_64-unknown-linux-gnu",
+  "linux-arm64": "aarch64-unknown-linux-gnu",
   "win32-x64": "x86_64-pc-windows-msvc",
+  "win32-arm64": "aarch64-pc-windows-msvc",
 } as const
-const hostSchema = z.enum(["darwin-arm64", "darwin-x64", "linux-x64", "win32-x64"])
+const hostSchema = z.enum(["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "win32-x64", "win32-arm64"])
 
 const fixtureSchema = z.object({
   targets: z.record(z.string(), z.object({
@@ -50,7 +52,7 @@ export function loadDesktopEngineTargets(input: unknown): readonly DesktopEngine
     if (host === null || !(host in HOST_TARGETS)) {
       throw new Error(`available desktop engine ${target} has no supported host`)
     }
-    const expectedHost = target.startsWith("windows-") ? "win32-x64" : target.replace(/-baseline$/, "")
+    const expectedHost = target.replace(/^windows-/, "win32-").replace(/-baseline$/, "")
     if (host !== expectedHost) throw new Error(`desktop engine ${target} cannot use ${host}; expected ${expectedHost}`)
     const asset = desktopEngineReleaseAssetName(host)
     if (asset === null) throw new Error(`missing desktop engine release asset for ${host}`)

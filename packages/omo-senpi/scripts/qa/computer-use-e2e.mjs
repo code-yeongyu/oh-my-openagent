@@ -147,6 +147,12 @@ const observeRun = {
   action: "run",
   code: "const win = await desktop.window('101'); const seen = await win.observe({ silent: true }); await win.click(5, 5); return 'OBSERVE ' + [seen.frameId, seen.coordinateWidth, seen.coordinateHeight, seen.nodeCount, seen.ax.includes('[ref=e'), seen.truncated].join(' ')",
 }
+// This wire scenario observes routing and bounds. Native release ordering is
+// asserted against RecordingSink in the session tests, not exposed by the audit.
+const holdsRun = {
+  action: "run",
+  code: "await desktop.holdKeys(['shift', 'a'], { duration: 0.2 }); await desktop.screenshot({ silent: true }); await desktop.holdMouse(5, 5, { duration: 0.2, button: 'left' }); let refused = 'no'; try { await desktop.holdKeys(['shift'], { duration: 101 }) } catch (error) { refused = String(error?.message ?? error).slice(0, 80) } return 'HOLDS ok ' + refused",
+}
 const displayShotChain = { action: "call", chain: [{ method: "display", args: ["2"] }, { method: "screenshot" }] }
 const displayClickChain = { action: "call", chain: [{ method: "display", args: ["2"] }, { method: "click", args: [20, 10] }] }
 
@@ -166,6 +172,23 @@ const scenarios = [
         ["the observation carries a window frame", /^\S+$/.test(frameId ?? "") && Number(width) > 0 && Number(height) > 0],
         ["the observation carries a non-empty tree with refs", Number(nodes) > 0 && hasRefs === "true" && truncated === "false"],
         ["a click on the observed frame reached the engine", methods.includes("click")],
+      ]
+    },
+  },
+  {
+    name: "holds-are-bounded-and-routed",
+    permission: undefined,
+    steps: [
+      { type: "tool_call", name: "computer", arguments: holdsRun },
+      { type: "text", text: "done" },
+    ],
+    verify: ({ results, methods }) => {
+      const text = resultText(results.find((r) => r.toolName === "computer"))
+      return [
+        ["the holds run succeeded", results.find((r) => r.toolName === "computer")?.isError === false],
+        ["both bounded holds reached the engine", methods.includes("holdKeys") && methods.includes("holdMouse")],
+        ["a 101 s hold was refused with the duration bound", /HOLDS ok /.test(text) && /0\.\.=100/.test(text)],
+        ["the refused hold never reached the engine", methods.filter((m) => m === "holdKeys").length === 1],
       ]
     },
   },

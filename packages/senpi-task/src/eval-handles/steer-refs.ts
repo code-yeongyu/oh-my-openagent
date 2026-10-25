@@ -57,8 +57,11 @@ export async function sendRef(deps: SteerDeps, ref: HandleRef, message: string, 
     case "revived":
       return runAt(outcome.run_epoch).delivered(ref, `revived as epoch ${outcome.run_epoch}`)
     case "steered":
-    case "queued":
       return runAt(ref.run_epoch).delivered(ref, undefined)
+    case "held":
+      return runAt(ref.run_epoch).delivered(ref, "held until the run resumes")
+    case "queued":
+      return runAt(ref.run_epoch).queued(ref)
     case "stale":
       throw runAt(ref.run_epoch).stale(ref)
     case "scope_denied":

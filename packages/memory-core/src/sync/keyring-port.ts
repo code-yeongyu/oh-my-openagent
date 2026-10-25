@@ -5,7 +5,7 @@ import {
   generateKeyPairSync,
   sign as ed25519Sign,
 } from "node:crypto"
-import { CanonicalJsonError, requireCanonicalJson } from "./canonical-json"
+import { canonicalizeJson, CanonicalJsonError, type CanonicalJsonViolation, requireCanonicalJson } from "./canonical-json"
 import { openHpkeSealedBox } from "./hpke-sealed-box"
 
 /**
@@ -41,7 +41,7 @@ export type DeviceKeyringSignRequest =
     }
 
 /**
- * Refusal for any sign request outside the two typed purposes above. A
+ * Refusal for any sign request outside the three typed purposes above. A
  * DeviceKeyring is never a raw-bytes signing oracle: it signs exactly the
  * given digest or canonical JSON, and only after the request validates.
  */
@@ -53,7 +53,6 @@ export class DeviceKeyringSignError extends Error {
       | "digest-length"
       | "record-json"
       | "record-prefix"
-      | "record-canonical"
       | "record-canonical-duplicate-key"
       | "record-canonical-number"
       | "record-canonical-order"
@@ -83,6 +82,25 @@ function domainSeparatedMessage(purpose: DeviceKeyringSignRequest["purpose"], pa
   return Buffer.concat([Buffer.from(SIGNING_DOMAIN_TAGS[purpose], "ascii"), Buffer.from([0]), Buffer.from(payload)])
 }
 
+const CANONICAL_REASONS: Record<CanonicalJsonViolation, DeviceKeyringSignError["reason"]> = {
+  json: "record-json",
+  "duplicate-key": "record-canonical-duplicate-key",
+  number: "record-canonical-number",
+  order: "record-canonical-order",
+  escape: "record-canonical-escape",
+  whitespace: "record-canonical-whitespace",
+  encoding: "record-canonical-encoding",
+}
+
+function parseCanonical(bytes: Uint8Array, what: "record" | "snapshot"): unknown {
+  try {
+    return requireCanonicalJson(bytes)
+  } catch (error) {
+    if (!(error instanceof CanonicalJsonError)) throw error
+    throw new DeviceKeyringSignError(CANONICAL_REASONS[error.violation], `sign: ${what} preimage is not RFC 8785 canonical JSON: ${error.message}`)
+  }
+}
+
 function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
   if (typeof request !== "object" || request === null) {
     throw new DeviceKeyringSignError("unknown-purpose", "sign: request must be a typed sign request")
@@ -97,29 +115,7 @@ function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
     if (!(request.canonicalJson instanceof Uint8Array)) {
       throw new DeviceKeyringSignError("record-json", "sign: record needs RFC 8785 canonical JSON bytes")
     }
-    let parsed: unknown
-    try {
-      parsed = requireCanonicalJson(request.canonicalJson)
-    } catch (error) {
-      if (error instanceof CanonicalJsonError) {
-        const reason =
-          error.violation === "json"
-            ? "record-json"
-            : error.violation === "duplicate-key"
-              ? "record-canonical-duplicate-key"
-              : error.violation === "number"
-                ? "record-canonical-number"
-                : error.violation === "order"
-                  ? "record-canonical-order"
-                  : error.violation === "escape"
-                    ? "record-canonical-escape"
-                    : error.violation === "whitespace"
-                      ? "record-canonical-whitespace"
-                      : "record-canonical-encoding"
-        throw new DeviceKeyringSignError(reason, `sign: record preimage is not RFC 8785 canonical JSON: ${error.message}`)
-      }
-      throw error
-    }
+    const parsed = parseCanonical(request.canonicalJson, "record")
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed) || typeof (parsed as { t?: unknown }).t !== "string") {
       throw new DeviceKeyringSignError("record-json", 'sign: record preimage needs a top-level "t" string')
     }
@@ -127,10 +123,10 @@ function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
     if (!t.startsWith("omo-sync/v1/")) {
       throw new DeviceKeyringSignError("record-prefix", 'sign: record "t" must start with "omo-sync/v1/"')
     }
-    // The digest tag belongs to the object-digest purpose; a record carrying
-    // it would collapse the domain separation, so it is refused here too.
-    if (t === SIGNING_DOMAIN_TAGS["object-digest"]) {
-      throw new DeviceKeyringSignError("record-prefix", 'sign: record "t" must name a record or snapshot type, not the object-digest tag')
+    // A record never carries another purpose's tag as its type: snapshots sign under
+    // their own purpose, and the object-digest tag names no record.
+    if (t === SIGNING_DOMAIN_TAGS["object-digest"] || t === SIGNING_DOMAIN_TAGS.snapshot) {
+      throw new DeviceKeyringSignError("record-prefix", 'sign: record "t" must name a keyring record type, not another purpose\'s tag')
     }
     return request.canonicalJson
   }
@@ -138,15 +134,7 @@ function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
     if (!(request.canonicalJson instanceof Uint8Array)) {
       throw new DeviceKeyringSignError("record-json", "sign: snapshot needs RFC 8785 canonical JSON bytes")
     }
-    let parsed: unknown
-    try {
-      parsed = requireCanonicalJson(request.canonicalJson)
-    } catch (error) {
-      if (error instanceof CanonicalJsonError) {
-        throw new DeviceKeyringSignError("record-canonical", `sign: snapshot preimage is not RFC 8785 canonical JSON: ${error.message}`)
-      }
-      throw error
-    }
+    const parsed = parseCanonical(request.canonicalJson, "snapshot")
     const t = typeof parsed === "object" && parsed !== null ? (parsed as { t?: unknown }).t : undefined
     if (t !== SIGNING_DOMAIN_TAGS.snapshot) {
       throw new DeviceKeyringSignError("snapshot-prefix", 'sign: snapshot preimage "t" must be exactly "omo-sync/v1/snapshot"')
@@ -168,8 +156,8 @@ export interface DeviceKeyring {
   }
   /**
    * Ed25519 signature (64 bytes) over exactly the bytes of the request: the
-   * 32-byte object digest, or the record's canonical JSON. Never a raw-bytes
-   * oracle — anything outside the two typed purposes is refused with a
+   * 32-byte object digest, or the record's or snapshot's canonical JSON. Never a
+   * raw-bytes oracle: anything outside the three typed purposes is refused with a
    * DeviceKeyringSignError before any signing happens.
    */
   sign(request: DeviceKeyringSignRequest): Promise<Uint8Array>
@@ -195,15 +183,14 @@ export type WrapBinding = { readonly account: string; readonly epoch: number; re
 /** §8.1 wrap `info`: UTF-8 "omo-sync/v1/wrap" followed by one NUL byte. */
 const WRAP_INFO = Buffer.concat([Buffer.from("omo-sync/v1/wrap", "ascii"), Buffer.from([0])])
 
-const wrapAad = (binding: WrapBinding): Buffer =>
-  Buffer.from(
-    `{"account":${JSON.stringify(binding.account)},"epoch":${binding.epoch},"id":${JSON.stringify(binding.id)}}`,
-    "utf8",
-  )
+const wrapAad = (binding: WrapBinding): Uint8Array => {
+  if (!Number.isSafeInteger(binding.epoch) || binding.epoch < 0) throw new Error("unseal: the wrap epoch must be a non-negative integer")
+  return canonicalizeJson({ account: binding.account, epoch: binding.epoch, id: binding.id })
+}
 
 export { openHpkeSealedBox } from "./hpke-sealed-box"
 
-interface DeviceKeyMaterial {
+export interface DeviceKeyMaterial {
   /** PKCS#8 DER of the Ed25519 private key, base64url. */
   readonly signingPrivatePkcs8: string
   /** PKCS#8 DER of the X25519 private key, base64url. */

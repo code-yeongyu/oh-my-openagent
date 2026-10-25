@@ -1,15 +1,26 @@
 {
   "name": "@code-yeongyu/omo-senpi",
-  "version": "5.1.34-beta.1",
+  "version": "5.1.46",
   "private": true,
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
   "imports": {
+    "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
     "#omo-task-runtime": "./extensions/omo-task.js",
     "#omo-computer-use-runtime": "./extensions/omo-computer-use.js",
     "#omo-memory-doctor-runtime": "./extensions/omo-memory-doctor.js",
     "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
     "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
+    "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
+    "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
+    "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
+    "#omo-device-account-runtime": "./extensions/omo-device-account.js",
+    "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+    "#omo-session-history-runtime": "./extensions/omo-session-history.js",
+    "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
+    "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
+    "#omo-feedback-runtime": "./extensions/omo-feedback.js",
+    "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
     "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js"
   },
   "keywords": [
@@ -35,6 +46,8 @@
     "README.md",
     "NOTICE",
     "LICENSE",
-    "daemon-launch-spec.json"
+    "daemon-launch-spec.json",
+    "telemetry-schema.json",
+    "telemetry-schema.omo-cloud.json"
   ]
 }

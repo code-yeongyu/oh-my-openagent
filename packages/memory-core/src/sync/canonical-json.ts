@@ -11,8 +11,8 @@ export { canonicalizeJson } from "./canonical-json-serialize"
  * must prove the bytes it signs are canonical: parse strictly (duplicate keys
  * refused at every depth), re-serialize per RFC 8785 (UTF-16 property order,
  * ECMAScript number serialization, minimal string escapes), and require byte
- * equality with the input. Anything looser — a whitespace heuristic, or
- * `JSON.stringify` of the parsed value — either refuses valid records (spaces
+ * equality with the input. Anything looser (a whitespace heuristic, or
+ * `JSON.stringify` of the parsed value) either refuses valid records (spaces
  * inside strings) or signs non-canonical ones (unsorted keys, `1.0`, or
  * duplicate keys a lenient parser silently collapsed into one).
  */
@@ -23,8 +23,12 @@ export { canonicalizeJson } from "./canonical-json-serialize"
  * classifies the first way the input departs from the canonical form, so a
  * refusal can name the precise RFC 8785 violation instead of a bare mismatch.
  */
+/** Deeper documents are refused: no keyring record or snapshot nests anywhere near this. */
+export const MAX_CANONICAL_DEPTH = 64
+
 class Parser {
   private position = 0
+  private depth = 0
   constructor(private readonly text: string) {}
 
   parseDocument(): CanonicalJsonValue {
@@ -37,8 +41,13 @@ class Parser {
   private parseValue(): CanonicalJsonValue {
     this.skipInsignificant()
     const char = this.text[this.position]
-    if (char === "{") return this.parseObject()
-    if (char === "[") return this.parseArray()
+    if (char === "{" || char === "[") {
+      if (this.depth >= MAX_CANONICAL_DEPTH) throw this.fail("json", `nesting deeper than ${MAX_CANONICAL_DEPTH}`)
+      this.depth++
+      const value = char === "{" ? this.parseObject() : this.parseArray()
+      this.depth--
+      return value
+    }
     if (char === '"') return this.parseString().value
     if (char === "-" || (char >= "0" && char <= "9")) return this.parseNumber()
     for (const [word, literal] of [["null", null], ["true", true], ["false", false]] as const) {

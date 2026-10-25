@@ -4,7 +4,9 @@ export const DESKTOP_ENGINE_RELEASE_HOSTS = [
 	"darwin-arm64",
 	"darwin-x64",
 	"linux-x64",
+	"linux-arm64",
 	"win32-x64",
+	"win32-arm64",
 ] as const;
 
 export function desktopEngineReleaseAssetName(host: string): string | null {
@@ -12,8 +14,10 @@ export function desktopEngineReleaseAssetName(host: string): string | null {
 		case "darwin-arm64":
 		case "darwin-x64":
 		case "linux-x64":
+		case "linux-arm64":
 			return `senpi-desktop-engine-${host}`;
 		case "win32-x64":
+		case "win32-arm64":
 			return `senpi-desktop-engine-${host}.exe`;
 		default:
 			return null;

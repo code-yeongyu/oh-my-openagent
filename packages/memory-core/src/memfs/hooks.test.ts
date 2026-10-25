@@ -2,9 +2,15 @@ import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { existsSync, statSync } from "node:fs"
 import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import type { ClaimReceipt } from "../provenance"
+import { stampReceipt } from "../tools/claim-frontmatter"
+import { renderMemoryFile } from "./frontmatter"
 import { installHooks, resolveHooksDir } from "./hooks"
+import { stagedEntries, treeBlob } from "./memory-hook-git"
+import { COMMIT_MSG_HOOK_SCRIPT } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
 import { commit, createRepo, removeTempDirs, run, tempDir, writeFiles } from "./hooks.test-support"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 
 const VALID = "---\ndescription: Persona of the agent\n---\n\nbody\n"
 const LOCKED = "---\ndescription: Locked\nread_only: true\n---\n\nbody\n"
@@ -25,6 +31,32 @@ afterEach(removeTempDirs)
 
 setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
 
+describe("memory hook Git pathspec environment", () => {
+  for (const variable of ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const) {
+    it(`#given inherited ${variable} #when reading staged memory #then literal Git commands still succeed`, async () => {
+      const dir = await createRepo()
+      await seedServerFile(dir, "reference/z.md", VALID)
+      const expectedBlob = treeBlob(dir, "HEAD", "reference/z.md")
+      expect(expectedBlob).toBeDefined()
+      await writeFiles(dir, { "reference/z.md": `${VALID}updated\n` })
+      expect((await run(["git", "add", "-A"], dir)).code).toBe(0)
+      const expectedEntries = stagedEntries(dir)
+      expect(expectedEntries.map((entry) => entry.path)).toEqual(["reference/z.md"])
+      const saved = process.env[variable]
+      try {
+        process.env[variable] = "1"
+        expect(stagedEntries(dir)).toEqual(expectedEntries)
+        expect(treeBlob(dir, "HEAD", "reference/z.md")).toBe(expectedBlob)
+        expect((await run(["git", "commit", "-m", "memory write"], dir)).code).toBe(0)
+        expect(process.env[variable]).toBe("1")
+      } finally {
+        if (saved === undefined) delete process.env[variable]
+        else process.env[variable] = saved
+      }
+    })
+  }
+})
+
 describe("installHooks", () => {
   it("#given a repository #when hooks are installed twice #then both hooks stay executable and identical", async () => {
     // given
@@ -37,7 +69,7 @@ describe("installHooks", () => {
     const installed = installHooks(dir)
 
     // then
-    expect(installed.map((hook) => hook.name)).toEqual(["pre-commit", "post-commit"])
+    expect(installed.map((hook) => hook.name)).toEqual(["pre-commit", "commit-msg", "post-commit"])
     expect(await readFile(hookPath, "utf8")).toBe(first)
     if (process.platform !== "win32") {
       for (const hook of installed) {
@@ -54,14 +86,14 @@ describe("installHooks", () => {
     const bashOnly = [/<<</, /echo -e/, /(^|[\s=(])\$'/, /disown/, /env bash/]
 
     // when
-    await writeFiles(dir, { "pre-commit": PRE_COMMIT_HOOK_SCRIPT, "post-commit": POST_COMMIT_HOOK_SCRIPT })
+    await writeFiles(dir, { "pre-commit": PRE_COMMIT_HOOK_SCRIPT, "commit-msg": COMMIT_MSG_HOOK_SCRIPT, "post-commit": POST_COMMIT_HOOK_SCRIPT })
 
     // then
-    for (const script of [PRE_COMMIT_HOOK_SCRIPT, POST_COMMIT_HOOK_SCRIPT]) {
+    for (const script of [PRE_COMMIT_HOOK_SCRIPT, COMMIT_MSG_HOOK_SCRIPT, POST_COMMIT_HOOK_SCRIPT]) {
       expect(script.startsWith("#!/bin/sh\n")).toBe(true)
       for (const construct of bashOnly) expect(script).not.toMatch(construct)
     }
-    for (const hook of ["pre-commit", "post-commit"]) {
+    for (const hook of ["pre-commit", "commit-msg", "post-commit"]) {
       expect((await run(["sh", "-n", hook], dir)).code).toBe(0)
     }
   })
@@ -105,6 +137,22 @@ describe("pre-commit hook", () => {
     // then
     expect(result.code).toBe(0)
     expect(await run(["git", "log", "--oneline"], dir).then((log) => log.stdout)).toContain("memory write")
+  })
+
+  it("#given a note stamped with a claim receipt by the memory tool #when it is committed #then the hook accepts the provenance header (#10488)", async () => {
+    // given: exactly what the memory tool writes for a user receipt and for a downgraded claim
+    const dir = await createRepo()
+    const stamp = (claim: ClaimReceipt): string => renderMemoryFile(stampReceipt(undefined, { description: "Cleanup" }, "body\n", claim), "body\n")
+
+    // when
+    const result = await commit(dir, {
+      "reference/approved.md": stamp({ source: "user", userQuote: "Yes delete it.", approves: "0123456789abcdef" }),
+      "reference/suggested.md": stamp({ source: "agent", downgraded: true }),
+    }, "memory write\n\nOmo-Writer: memory-tool")
+
+    // then
+    expect(result.stdout + result.stderr).not.toContain("unknown frontmatter key")
+    expect(result.code).toBe(0)
   })
 
   it("#given a read_only file from the server #when an unrelated file changes #then the commit still succeeds", async () => {
@@ -282,6 +330,8 @@ describe("post-commit mirror push", () => {
   async function createMirror(): Promise<string> {
     const dir = await tempDir("memory-mirror-")
     await run(["git", "init", "--bare", "--quiet", "--initial-branch=main"], dir)
+    // A push otherwise starts receive-pack's detached `maintenance run --auto --quiet --detach` (#10945).
+    disableFixtureAutoMaintenance(dir, true)
     return dir
   }
 

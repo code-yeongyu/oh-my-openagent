@@ -15,6 +15,8 @@ export type TaskStartFailureKind = (typeof TASK_START_FAILURE_KINDS)[number]
 
 export const MODEL_START_FAILURE_REASONS = [
   "model_not_in_child_profile",
+  // No longer produced: a timed-out probe admits the start since #10863. Kept so records written by
+  // earlier versions (and the rollback contract) still parse.
   "catalog_probe_timed_out",
   "catalog_probe_failed",
 ] as const

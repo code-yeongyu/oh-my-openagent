@@ -107,6 +107,13 @@ function expectRecoveryNotice(lane: Lane, record: TaskRecord, confirmedStop: boo
   expect(record.fallback_closing_child !== undefined).toBe(!confirmedStop)
 }
 
+function hostTrace(host: FakeHost): string {
+  const commands = host.commands.map((command, index) =>
+    `${index} ${command.type} sid=${command.sessionId ?? ""} path=${String(command.payload.sessionPath ?? "")}`)
+  const sessions = host.sessions().map((row) => `${row.sessionPath} routing=${row.routingId} parked=${row.parked} attachments=${row.attachments}`)
+  return ["host commands:", ...commands, "host sessions:", ...sessions].join("\n")
+}
+
 describe("a child whose host transport drops", () => {
   test("#given a running child #when its socket closes and the host keeps the session #then it rejoins, new output arrives, and its lane frees for the next child", async () => {
     // given
@@ -298,7 +305,10 @@ describe("a child whose host transport drops", () => {
     // then
     await Promise.race([session.processExit, rejectAfter(10_000, "the child's process never exited")])
     expect(processAlive(session.processPid)).toBe(false)
-    expect(world.host.sessions().some((candidate) => candidate.sessionPath === child.host_session?.session_path)).toBe(false)
+    const relisted = world.host.sessions().filter((candidate) => candidate.sessionPath === child.host_session?.session_path)
+    // #10925: on loaded Windows CI the closed session is sometimes listed again; carry the host's command
+    // sequence in the failure so the next occurrence shows whether a reopen arrived after the close.
+    expect(relisted, relisted.length === 0 ? "" : hostTrace(world.host)).toEqual([])
   })
 
   test("#given a healthy child quiet past the bound #when the recovery clock runs out #then nothing is armed, it keeps running, and its lease stays held", async () => {
@@ -330,13 +340,15 @@ describe("a child whose host transport drops", () => {
     await world.host.restart()
     await commandsSeen(world.host, "open_session", 4)
     world.host.allowReply("open_session")
-    const pendingPrompt = world.host.waitForCommand("prompt")
+    // Hold every prompt unanswered: the first parked child's revival then stays in flight (claimed
+    // resident, cause recorded) instead of racing these assertions to land and clear its cause.
+    world.host.withholdReply("prompt")
 
     // when
     clock.expire()
 
-    // then
-    await pendingPrompt
+    // then - the pending child's first prompt and the revival's continuation have both been sent
+    await commandsSeen(world.host, "prompt", 4)
     for (const parked of [first, second]) {
       expect(parent.store.load(parked.task_id)?.status).not.toBe("error")
       expect(concurrencyOf(parent).leaseState(parked.task_id, parked.notification.run_epoch)).toBeUndefined()

@@ -140,6 +140,19 @@ export function parseTaskOutput(
   }
 }
 
+export function parseTaskList(
+  value: unknown,
+): { readonly value: { readonly parent_session_id: string } } | { readonly error: string } {
+  if (!isRecord(value)) return { error: "Request must be an object." }
+  if (typeof value.parent_session_id !== "string" || value.parent_session_id.trim().length === 0) {
+    return { error: "parent_session_id is required." }
+  }
+  if (value.parent_session_id.length > MAX_TASK_ID_LENGTH) {
+    return { error: `parent_session_id must be at most ${MAX_TASK_ID_LENGTH} characters.` }
+  }
+  return { value: { parent_session_id: value.parent_session_id } }
+}
+
 export function invalidArguments(reason: string) {
   return { kind: "invalid_arguments", reason } as const
 }

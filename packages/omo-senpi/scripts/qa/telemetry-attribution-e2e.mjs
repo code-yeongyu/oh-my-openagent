@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto"
 import { createServer } from "node:http"
 import { gunzipSync, gzipSync } from "node:zlib"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -10,6 +11,7 @@ import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
 import { createOwnedProcessRegistry, startSenpiRun } from "./team-e2e-runtime.mjs"
 import { parseEvents } from "./team-e2e-support.mjs"
 import { resolveSenpi } from "./team-e2e.mjs"
+import { telemetryLocalSinkEnv } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -30,6 +32,7 @@ const DEFAULT_EVIDENCE_DIR = resolve(
 const SCRIPT = { lead: [{ type: "text", text: "ATTRIBUTION-DONE" }] }
 const HEX64 = /^[0-9a-f]{64}$/
 const PINNED_DESKTOP_INSTALL_ID = "e".repeat(64)
+const sha256 = (value) => createHash("sha256").update(value).digest("hex")
 
 async function main() {
   const evidenceDir = evidenceDirectory(process.argv)
@@ -66,19 +69,25 @@ async function main() {
     cliCliExitZero: cliLane.status === 0,
     desktopSawNativeEvents: desktopEvents.length > 0,
     cliSawNativeEvents: cliEvents.length > 0,
-    desktopEveryEventSchemaV3: desktopEvents.every((event) => event.properties?.schema_version === 3),
-    cliEveryEventSchemaV3: cliEvents.every((event) => event.properties?.schema_version === 3),
+    desktopEveryEventSchemaV4: desktopEvents.every((event) => event.properties?.schema_version === 4),
+    cliEveryEventSchemaV4: cliEvents.every((event) => event.properties?.schema_version === 4),
     desktopEveryEventSurfaceDesktop: desktopEvents.every(
       (event) => event.properties?.surface === "desktop",
     ),
     cliEveryEventSurfaceCli: cliEvents.every((event) => event.properties?.surface === "cli"),
     desktopEnvPinWinsOverFile: desktopEvents.every(
-      (event) => event.properties?.install_id === PINNED_DESKTOP_INSTALL_ID,
+      (event) => event.distinct_id === sha256(PINNED_DESKTOP_INSTALL_ID)
+        && event.properties?.install_hash === event.distinct_id,
     ),
-    cliInstallIdIsHex64: cliEvents.every((event) => HEX64.test(String(event.properties?.install_id))),
-    cliInstallIdMatchesSandboxFile:
+    cliInstallHashIsHex64: cliEvents.every((event) => HEX64.test(String(event.properties?.install_hash))),
+    cliDistinctIdIsSha256OfSandboxFile:
       cliLane.persistedInstallId !== null &&
-      cliEvents.every((event) => event.properties?.install_id === cliLane.persistedInstallId),
+      cliEvents.every((event) => event.distinct_id === sha256(cliLane.persistedInstallId)
+        && event.properties?.install_hash === event.distinct_id),
+    noRawInstallIdShipped: [...desktopEvents, ...cliEvents].every((event) => !("install_id" in (event.properties ?? {}))),
+    machineHashIsHex64BeforeSunset: [...desktopEvents, ...cliEvents].every(
+      (event) => Date.now() >= Date.parse("2026-12-15T00:00:00Z") || HEX64.test(String(event.properties?.machine_hash)),
+    ),
     credentialIsolationClean: beforeCredential === afterCredential,
     realHomeInstallIdUntouched:
       (realInstallIdBefore === null) === (realInstallIdAfter === null) &&
@@ -122,11 +131,7 @@ async function runLane({ senpiBin, laneName, extraEnv }) {
       mockProviderEntry,
       parseEvents,
       extraEnv: {
-        DO_NOT_TRACK: "",
-        OMO_DISABLE_POSTHOG: "",
-        OMO_SENPI_DISABLE_POSTHOG: "",
-        OMO_SEND_ANONYMOUS_TELEMETRY: "",
-        OMO_SENPI_SEND_ANONYMOUS_TELEMETRY: "",
+        ...telemetryLocalSinkEnv(sinkUrl),
         // The host may export these ambiently (a dev-tree OmO Desktop service exports
         // the attribution pair to every child); OMO_ wins the agent-home resolution
         // loop, so every name must be pinned to the sandbox or the run leaks into the
@@ -135,7 +140,6 @@ async function runLane({ senpiBin, laneName, extraEnv }) {
         PI_CODING_AGENT_DIR: sandbox.agentDir,
         OMO_NATIVE_SURFACE: "",
         OMO_NATIVE_INSTALL_ID: "",
-        POSTHOG_HOST: sinkUrl,
         ...extraEnv,
       },
       onPid: (pid) => processes.onSpawn(pid),
@@ -223,7 +227,11 @@ function sanitize(requests) {
       properties: {
         schema_version: capture?.properties?.schema_version,
         surface: capture?.properties?.surface,
-        install_id: capture?.properties?.install_id,
+        distinct_id_is_install_hash: capture?.distinct_id === capture?.properties?.install_hash,
+        install_hash_shape: HEX64.test(String(capture?.properties?.install_hash)) ? "hex64" : "invalid",
+        event_id: capture?.properties?.event_id,
+        uuid_matches_event_id: capture?.uuid === capture?.properties?.event_id,
+        ci: capture?.properties?.ci,
         platform: capture?.properties?.platform,
         product_name: capture?.properties?.product_name,
       },
@@ -254,7 +262,7 @@ async function selfTest() {
   const host = await sink.ready
   const waited = sink.waitForEvent("session_started", 5_000, "self-test")
   const body = JSON.stringify({
-    batch: [{ event: "session_started", properties: { schema_version: 3, surface: "cli", install_id: "a".repeat(64) } }],
+    batch: [{ event: "session_started", properties: { schema_version: 4, surface: "cli", install_hash: "a".repeat(64) } }],
   })
   await fetch(`${host}/batch/`, {
     method: "POST",

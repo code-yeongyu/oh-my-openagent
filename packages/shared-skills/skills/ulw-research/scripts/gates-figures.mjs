@@ -27,14 +27,30 @@ function pixels(value) {
 	return match ? Number(match[1]) : null
 }
 
+function fromStyle(node, prop) {
+	return pixels(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, "i").exec(node.attrs.style ?? "")?.[1])
+}
+
+function viewBoxSize(node) {
+	const box = String(node.attrs.viewbox ?? "").trim().split(/[\s,]+/).map(Number)
+	return box.length === 4 && box.every(Number.isFinite) ? { width: box[2], height: box[3] } : null
+}
+
 /** Largest declared dimension: width/height attributes or style, else the viewBox. */
 function declaredSize(node) {
-	const style = node.attrs.style ?? ""
-	const fromStyle = (prop) => pixels(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, "i").exec(style)?.[1])
-	const sizes = [pixels(node.attrs.width), pixels(node.attrs.height), fromStyle("width"), fromStyle("height")].filter((n) => n !== null)
+	const sizes = [pixels(node.attrs.width), pixels(node.attrs.height), fromStyle(node, "width"), fromStyle(node, "height")].filter((n) => n !== null)
 	if (sizes.length) return Math.max(...sizes)
-	const box = String(node.attrs.viewbox ?? "").trim().split(/[\s,]+/).map(Number)
-	return box.length === 4 && box.every(Number.isFinite) ? Math.max(box[2], box[3]) : null
+	const box = viewBoxSize(node)
+	return box ? Math.max(box.width, box.height) : null
+}
+
+/**
+ * True when any declared dimension is zero, so the element cannot render visibly. Each axis reads its inline
+ * style first, then its attribute, then the viewBox. An undeclared axis is not zero: the browser sizes it.
+ */
+function hasZeroDimension(node) {
+	const box = viewBoxSize(node)
+	return ["width", "height"].some((axis) => (fromStyle(node, axis) ?? pixels(node.attrs[axis]) ?? box?.[axis] ?? null) === 0)
 }
 
 function isIcon(ctx, node) {
@@ -174,7 +190,7 @@ export const figureGates = [
 	{
 		codes: ["report_without_visual"],
 		run(ctx) {
-			if (visuals(ctx).some((node) => declaredSize(node) !== 0 && !isDecorative(node))) return []
+			if (visuals(ctx).some((node) => !hasZeroDimension(node) && !isDecorative(node))) return []
 			return [ctx.defect("report_without_visual", ctx.body, "the report has no chart, diagram, or figure image")]
 		},
 	},

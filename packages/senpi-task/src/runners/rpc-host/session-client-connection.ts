@@ -1,4 +1,4 @@
-import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionClientOptions } from "./session-client-contract"
+import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionReplaced, HostSessionClientOptions } from "./session-client-contract"
 import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
@@ -9,15 +9,14 @@ import { createChildExtensionEvents } from "../child-extension-events"
 import { socketAcceptsConnection } from "./busy-host"
 import { HostUnavailableError } from "./daemon"
 import { SESSION_PARKED_CAUSE } from "./exit-mapping"
+import { dispatchHostCommand } from "./host-command-dispatch"
 import {
   assertHostUsable,
   createSenpiRpcClient,
   probeWithEngine,
   RETRY_FALLBACK_PROFILE_CAPABILITY,
   toWireOpen,
-  type HostPromptDisposition,
   type HostProtocolProbe,
-  type HostQueuedInputDisposition,
   type HostRpcClient,
   type HostRpcClientFactory,
   type HostSessionOpenInput,
@@ -30,10 +29,9 @@ import {
   toOpenFailure,
   type HostControlRecord,
 } from "./session-wire"
+import { createHostTaskParentWire } from "./task-parent-wire"
+import type { TaskParentWire } from "../task-parent-control"
 
-
-// send() settles with no value: the runner does not consume the host's input disposition.
-const ignoreHostDisposition = (_disposition: HostPromptDisposition | HostQueuedInputDisposition): void => undefined
 
 /**
  * ONE senpi `RpcClient` per child, over the machine-wide daemon's public socket. The client probes
@@ -58,7 +56,10 @@ export class HostSessionClient {
   private readonly eventListeners = new Set<ChildEventListener>()
   private readonly parkedListeners = new Set<(event: HostSessionParked) => void>()
   private readonly closedListeners = new Set<(event: HostSessionClosed) => void>()
+  private readonly replacedListeners = new Set<(event: HostSessionReplaced) => void>()
   private client: HostRpcClient | undefined
+  // One wire per engine connection: a reattach's new connection declares task_parent again.
+  private readonly taskParentWires = new WeakMap<HostRpcClient, TaskParentWire>()
   private routingId: string | undefined
   private identity: SenpiHostProtocolInfo | undefined
   private reattached = false
@@ -137,23 +138,16 @@ export class HostSessionClient {
   }
 
   send(command: HostSessionCommand): Promise<void> {
-    const client = this.connected(command.type)
-    switch (command.type) {
-      case "prompt":
-        return client.prompt(
-          command.message,
-          { ...(command.streamingBehavior === undefined ? {} : { streamingBehavior: command.streamingBehavior }),
-            ...(command.clientMessageId === undefined ? {} : { clientMessageId: command.clientMessageId }) },
-        ).then(ignoreHostDisposition)
-      case "steer":
-        return client.steer(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
-      case "followUp":
-        return client.followUp(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
-      case "abort":
-        return client.abort()
-      default:
-        return unreachable(command)
-    }
+    return dispatchHostCommand(this.connected(command.type), this.routingId, command)
+  }
+
+  taskParentWire(): TaskParentWire {
+    const client = this.connected("task_parent")
+    const known = this.taskParentWires.get(client)
+    if (known !== undefined) return known
+    const wire = createHostTaskParentWire(client)
+    this.taskParentWires.set(client, wire)
+    return wire
   }
 
   getState(): Promise<RpcSessionState> {
@@ -187,6 +181,11 @@ export class HostSessionClient {
     return () => this.closedListeners.delete(listener)
   }
 
+  onReplaced(listener: (event: HostSessionReplaced) => void): () => void {
+    this.replacedListeners.add(listener)
+    return () => this.replacedListeners.delete(listener)
+  }
+
   /** End the session on the host (`close_session`), then drop this child's connection. */
   async close(): Promise<void> {
     this.extensionEvents.clear()
@@ -195,8 +194,11 @@ export class HostSessionClient {
     this.client = undefined
     this.routingId = undefined
     if (client === undefined) return
-    if (routingId !== undefined) await client.closeSession(routingId)
-    await client.stop()
+    try {
+      if (routingId !== undefined) await client.closeSession(routingId)
+    } finally {
+      await client.stop()
+    }
   }
 
   /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */
@@ -234,18 +236,44 @@ export class HostSessionClient {
       case "session_parked": {
         const sessionId = this.routingId ?? control.sessionId
         this.routingId = undefined
-        for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+        try {
+          for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+        } finally {
+          this.releaseEndedSession()
+        }
         return
       }
       case "session_closed": {
         const sessionId = this.routingId ?? control.sessionId ?? ""
         this.routingId = undefined
-        for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
+        try {
+          for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
+        } finally {
+          this.releaseEndedSession()
+        }
+        return
+      }
+      case "session_replaced": {
+        // The host keeps the routing handle live across the swap: the child follows the new
+        // identity instead of ending, and the next reattach reopens the NEW transcript (F9).
+        const sessionId = this.routingId ?? control.sessionId ?? ""
+        for (const listener of this.replacedListeners) {
+          listener({ sessionId, durableSessionId: control.durableSessionId, sessionFile: control.sessionFile })
+        }
         return
       }
       default:
         unreachable(control)
     }
+  }
+
+  // Notify the handle first so it marks itself parked/exited before the client goes; the engine's
+  // deliberate stop() never fires onDisconnect, so this release cannot start a recovery attach.
+  // Detach only this session's client; retained transcripts and sibling attach holds stay intact.
+  private releaseEndedSession(): void {
+    void this.detach().catch((error: unknown) => {
+      log("senpi-task ended host session detach failed", { socket: this.socketPath, error: String(error) })
+    })
   }
 
   // The child must never wait on a human: the deny/cancel answer is written and NOT awaited, so a

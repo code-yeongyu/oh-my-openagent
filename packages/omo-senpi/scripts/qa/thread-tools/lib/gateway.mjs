@@ -30,6 +30,8 @@ import { createConnection } from "node:net"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { withTelemetryOptOut } from "../../telemetry-opt-out-env.mjs"
+
 const here = dirname(fileURLToPath(import.meta.url))
 
 export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
@@ -295,7 +297,7 @@ export function watchTree(dir) {
 
 async function run(command, args, { cwd, env } = {}) {
   return await new Promise((resolvePromise) => {
-    const child = spawnChild(command, args, { cwd, env: env ?? process.env, stdio: ["ignore", "pipe", "pipe"] })
+    const child = spawnChild(command, args, { cwd, env: withTelemetryOptOut(env ?? process.env), stdio: ["ignore", "pipe", "pipe"] })
     const out = []
     const err = []
     child.stdout.on("data", (chunk) => out.push(chunk))
@@ -428,11 +430,10 @@ export function makeScratch(label, fake) {
     COLORTERM: "truecolor",
     PI_OFFLINE: "1",
     PI_TELEMETRY: "0",
-    DO_NOT_TRACK: "1",
     OMO_DISABLE_POSTHOG: "1",
   })
   watchTree(dir)
-  return { label, dir, home, agentDir, work, env }
+  return { label, dir, home, agentDir, work, env: withTelemetryOptOut(env) }
 }
 
 function mockModels(url) {

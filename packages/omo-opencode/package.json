@@ -9,6 +9,10 @@
       "types": "./src/config-migration/index.ts",
       "import": "./src/config-migration/index.ts"
     },
+    "./service-auth": {
+      "types": "./src/cli/service-auth/index.ts",
+      "import": "./src/cli/service-auth/index.ts"
+    },
     "./binary-downloader": {
       "types": "./src/shared/binary-downloader.ts",
       "import": "./src/shared/binary-downloader.ts"
@@ -41,6 +45,7 @@
     "@oh-my-opencode/utils": "workspace:*",
     "@opencode-ai/plugin": "1.18.31",
     "@opencode-ai/sdk": "1.18.31",
+    "@opencode/plugin": "2.0.32",
     "commander": "^15.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",

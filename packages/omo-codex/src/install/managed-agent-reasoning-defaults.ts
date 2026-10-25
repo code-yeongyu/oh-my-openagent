@@ -1,3 +1,5 @@
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+
 export interface PreservedAgentReasoning {
   readonly model: string | null
   readonly effort: string
@@ -22,7 +24,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "low" },
-        current: { model: "gpt-6-astra", effort: "low" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "low" },
       },
     ],
   ],
@@ -39,7 +41,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "low" },
-        current: { model: "gpt-6-astra", effort: "low" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "low" },
       },
     ],
   ],
@@ -48,7 +50,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     [
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "high" },
       },
     ],
   ],
@@ -57,7 +59,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
     [
       {
         previous: { model: "gpt-5.6-luna", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "high" },
       },
     ],
   ],
@@ -74,7 +76,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "high" },
       },
     ],
   ],
@@ -91,7 +93,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "high" },
       },
     ],
   ],
@@ -108,7 +110,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "high" },
       },
     ],
   ],
@@ -121,7 +123,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "medium" },
-        current: { model: "gpt-6-astra", effort: "medium" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "medium" },
       },
     ],
   ],
@@ -134,7 +136,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "medium" },
-        current: { model: "gpt-6-astra", effort: "medium" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "medium" },
       },
     ],
   ],
@@ -147,7 +149,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "high" },
       },
     ],
   ],
@@ -160,7 +162,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "high" },
-        current: { model: "gpt-6-astra", effort: "high" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "high" },
       },
     ],
   ],
@@ -177,7 +179,7 @@ const MANAGED_REASONING_DEFAULT_UPGRADES = new Map<string, readonly ManagedReaso
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "low" },
-        current: { model: "gpt-6-astra", effort: "low" },
+        current: { model: LATEST_MODEL_BY_FAMILY.gptAstra, effort: "low" },
       },
     ],
   ],

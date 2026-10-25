@@ -1,16 +1,11 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { isOmoTelemetryEnabled } from "@oh-my-opencode/omo-config-core"
-import {
-  isTelemetryClientEnabled,
-  type TelemetryDiagnosticInput,
-  type TelemetryEnv,
-} from "@oh-my-opencode/telemetry-core"
+import type { TelemetryDiagnosticInput, TelemetryEnv } from "@oh-my-opencode/telemetry-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
-import { loadSenpiOmoConfig } from "../config-resolution"
-import { createOmoNativeProductConfig, getOmoNativeStateDir } from "./product-identity"
+import { isOmoNativeTelemetryEnabled } from "./omo-native-session"
+import { getOmoNativeStateDir } from "./product-identity"
 
 const SOURCE = "omo-native-notice"
 const MARKER_FILE_NAME = "notice-shown"
@@ -53,7 +48,12 @@ export function createOmoNativeNoticeRegistration(
   return {
     register(pi, _ctx) {
       pi.on("session_start", (_payload, eventCtx) => {
-        if (!enabled(options, eventCtx, env, reportOnce)) return
+        // The single consent gate: a notice marker is a telemetry file, so it is written only when telemetry is on.
+        const consented = isOmoNativeTelemetryEnabled({
+          isConfigEnabled: options.isConfigEnabled,
+          diagnostics: (input) => reportOnce(isRecord(input) && "error" in input ? input.error : input),
+        }, eventCtx, env)
+        if (!consented) return
         const ui = notificationUi(eventCtx)
         if (ui === undefined || !claimNotice(stateDir, reportOnce)) return
         try {
@@ -63,34 +63,6 @@ export function createOmoNativeNoticeRegistration(
         }
       })
     },
-  }
-}
-
-function enabled(
-  options: OmoNativeNoticeOptions,
-  value: unknown,
-  env: TelemetryEnv,
-  diagnostics: (error: unknown) => void,
-): boolean {
-  return isTelemetryClientEnabled({ env, product: createOmoNativeProductConfig() })
-    && configEnabled(options, extractString(value, "cwd"), env, diagnostics)
-}
-
-function configEnabled(
-  options: OmoNativeNoticeOptions,
-  cwd: string | undefined,
-  env: TelemetryEnv,
-  diagnostics: (error: unknown) => void,
-): boolean {
-  if (options.isConfigEnabled !== undefined) return options.isConfigEnabled(cwd, env)
-  try {
-    const loaded = loadSenpiOmoConfig({ env: { ...env }, ...(cwd === undefined ? {} : { cwd }) })
-    if (loaded.diagnostics.length === 0) return isOmoTelemetryEnabled(loaded.config)
-    diagnostics(new Error(loaded.diagnostics.map(({ message }) => message).join("; ")))
-    return false
-  } catch (error) {
-    diagnostics(error)
-    return false
   }
 }
 
@@ -115,12 +87,6 @@ function notificationUi(value: unknown): NotificationUi | undefined {
   if (!isRecord(value)) return undefined
   const ui = value["ui"]
   return isRecord(ui) && typeof ui["notify"] === "function" ? ui as NotificationUi : undefined
-}
-
-function extractString(value: unknown, key: string): string | undefined {
-  if (!isRecord(value)) return undefined
-  const property = value[key]
-  return typeof property === "string" && property.length > 0 ? property : undefined
 }
 
 function errorCode(error: unknown): string | undefined {

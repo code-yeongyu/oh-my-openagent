@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -83,7 +84,7 @@ try {
       "--source-label", "senpi interactive mock-provider memory write",
     ]
     for (const input of inputs) args.push("--input", input)
-    const run = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 180_000 })
+    const run = spawnSync(process.execPath, args, { encoding: "utf8", env: withTelemetryOptOut(process.env), timeout: 180_000 })
     if (run.status !== 0) {
       record(`${label} capture`, false, (run.stderr ?? run.stdout ?? "").split("\n").slice(-3).join(" | "))
       return { transcript: "", ansi: "" }

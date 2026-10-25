@@ -75,7 +75,7 @@ export function createSteeringControls(
       return { kind: "cancelled", task_id: record.task_id, previous_status: "pending",
         ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
     }
-    if (record.status !== "running") {
+    if (record.status !== "running" && record.status !== "paused") {
       // A finished child can still hold its process or session (omo#9785); cancel is the way to release it.
       const undelivered = options?.abort === "skip" ? 0 : record.pending_steering?.length ?? 0
       if (undelivered > 0) clearPersistedQueue(record.task_id)
@@ -125,7 +125,7 @@ export function createSteeringControls(
         })
       }
     }
-    port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: "running", ...(reason !== undefined ? { reason } : {}) } })
+    port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: record.status, ...(reason !== undefined ? { reason } : {}) } })
     // Active in-process sessions reach their exact outcome boundary before deferred DAG disposal;
     // RPC children still terminate immediately. Lifecycle remains the sole destruction writer.
     if (options?.abort === "skip" && handle !== undefined && handle.terminate === undefined) {
@@ -133,7 +133,7 @@ export function createSteeringControls(
     } else {
       await port.destruction.destroyResidentTask(record.task_id, destructionCause)
     }
-    return { kind: "cancelled", task_id: record.task_id, previous_status: "running",
+    return { kind: "cancelled", task_id: record.task_id, previous_status: record.status,
       ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
   }
 

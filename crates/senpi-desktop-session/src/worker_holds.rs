@@ -22,6 +22,7 @@ impl Worker {
         params: &HoldKeysParams,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
+        let duration = hold_duration(params.duration)?;
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             keys: Some(&params.keys),
@@ -34,7 +35,6 @@ impl Worker {
         let supervisor = self.safety.supervisor.clone();
         let signal = self.hold_signal.clone().unwrap_or_else(|| supervisor.hold_signal());
         self.mutate(&mutation, cancelled, |worker| {
-            let duration = hold_duration(params.duration)?;
             let keys = parse_keys(&params.keys)?;
             if keys.is_empty() {
                 return Err(DesktopError::invalid_key("held keys must not be empty"));
@@ -65,6 +65,7 @@ impl Worker {
         params: &HoldMouseParams,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
+        let duration = hold_duration(params.duration)?;
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
@@ -78,7 +79,6 @@ impl Worker {
         let supervisor = self.safety.supervisor.clone();
         let signal = self.hold_signal.clone().unwrap_or_else(|| supervisor.hold_signal());
         self.mutate(&mutation, cancelled, |worker| {
-            let duration = hold_duration(params.duration)?;
             let keys = match params.keys.as_deref() {
                 None => Vec::new(),
                 Some([]) => Vec::new(),
@@ -111,7 +111,7 @@ impl Worker {
 
 fn hold_duration(seconds: f64) -> CoreResult<Duration> {
     if !seconds.is_finite() || !(0.0..=100.0).contains(&seconds) {
-        return Err(DesktopError::input_failed("hold duration must be finite seconds in 0..=100"));
+        return Err(DesktopError::internal("hold params bypassed duration parsing"));
     }
     Ok(Duration::from_secs_f64(seconds))
 }

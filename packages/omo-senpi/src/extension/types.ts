@@ -59,6 +59,8 @@ export interface SenpiExtensionAPI {
   getFlag(name: string): boolean | string | undefined
   /** The session's current name (`/name`, `set_session_name`); undefined when it has none. */
   getSessionName?(): string | undefined
+  /** The permission preset senpi enforces for this session (senpi #3301); undefined without the permission system. */
+  getPermissionPreset?(): string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */
@@ -74,14 +76,55 @@ export interface SenpiExtensionAPI {
   /** Feature-detected: senpi runtimes before 2026.10.7 have no eval-handle capability slot. */
   provideEvalHandleHost?(host: EvalHandleHost): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
-  appendEntry?(customType: string, data?: unknown): void
+  /** `options.startupBookkeeping` (senpi#3329): older hosts ignore the third argument. */
+  appendEntry?(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /**
+   * Every subscription account's latest limit windows, polled and kept by the engine (senpi#3684).
+   * Feature-detected: older hosts expose nothing, and the panel then shows no usage section.
+   */
+  getSubscriptionLimits?(): readonly SenpiAccountLimits[]
+  onSubscriptionLimits?(listener: (limits: SenpiAccountLimits) => void): () => void
+  /** The running senpi version (code-yeongyu/senpi#3674); hosts before it report none. */
+  readonly hostVersion?: string
+  /**
+   * senpi's one upload redactor (code-yeongyu/senpi#3674), the same path `/share` uses. Feature-detected: hosts older
+   * than the release that added it expose nothing, and nothing may be uploaded without it.
+   */
+  redactForUpload?(
+    text: string,
+    options?: { readonly extraLiterals?: readonly string[] },
+  ): { readonly text: string; readonly counts: Readonly<Record<string, number>> }
+  /**
+   * The engine's session lifecycle (senpi#3864). `markRunCompleted` tells it a workflow run finished inside the
+   * current epoch, so the epoch's `done` reads `completion.kind = "run"`. Feature-detected: hosts before senpi
+   * 2026.10.23-1 expose nothing.
+   */
+  readonly lifecycle?: {
+    markRunCompleted(run: { readonly runId: string }): void
+  }
   /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
   exec?(
     command: string,
     args: string[],
     options?: { cwd?: string; timeout?: number },
   ): Promise<{ stdout: string; stderr: string; code: number }>
+}
+
+/** One account's record in senpi's subscription-limit store, as `get_subscription_limits` serves it. */
+export interface SenpiAccountLimits {
+  readonly provider: string
+  readonly account: string
+  readonly windows: readonly {
+    readonly id: string
+    readonly label: string
+    readonly windowMinutes?: number
+    readonly usedPercent: number
+    readonly resetsAt?: string
+  }[]
+  readonly reportedAt: string
+  readonly plan?: string
+  readonly error?: string
 }
 
 export interface ComponentLogger {

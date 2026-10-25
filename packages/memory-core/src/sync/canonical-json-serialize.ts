@@ -27,7 +27,12 @@ export function compareUtf16(left: string, right: string): number {
   return Buffer.compare(a, b)
 }
 
-function serializeValue(value: CanonicalJsonValue, out: string[]): void {
+const MAX_SERIALIZE_DEPTH = 64
+
+function serializeValue(value: CanonicalJsonValue, out: string[], depth = 0): void {
+  if (typeof value === "object" && value !== null && depth >= MAX_SERIALIZE_DEPTH) {
+    throw new CanonicalJsonError("json", `nesting deeper than ${MAX_SERIALIZE_DEPTH}`)
+  }
   if (value === null) out.push("null")
   else if (typeof value === "boolean") out.push(value ? "true" : "false")
   else if (typeof value === "number") out.push(JSON.stringify(value))
@@ -36,7 +41,7 @@ function serializeValue(value: CanonicalJsonValue, out: string[]): void {
     out.push("[")
     value.forEach((element, index) => {
       if (index > 0) out.push(",")
-      serializeValue(element, out)
+      serializeValue(element, out, depth + 1)
     })
     out.push("]")
   } else {
@@ -46,7 +51,7 @@ function serializeValue(value: CanonicalJsonValue, out: string[]): void {
       .forEach((key, index) => {
         if (index > 0) out.push(",")
         out.push(escapeCanonicalString(key), ":")
-        serializeValue(value[key], out)
+        serializeValue(value[key], out, depth + 1)
       })
     out.push("}")
   }

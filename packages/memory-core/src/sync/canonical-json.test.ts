@@ -76,4 +76,22 @@ describe("canonical-json (RFC 8785)", () => {
     expect(Object.keys(parsed)).toEqual(["__proto__", "t"])
     expect(Object.getPrototypeOf(parsed)).toBe(Object.prototype)
   })
+
+  test("nesting deeper than 64 is a typed json violation on parse and on serialize, never a RangeError", () => {
+    const deep = (n: number) => "[".repeat(n) + "]".repeat(n)
+    expect(requireCanonicalJson(enc(deep(64)))).toBeDefined()
+    for (const n of [65, 200_000]) {
+      let failure: unknown
+      try {
+        requireCanonicalJson(enc(deep(n)))
+      } catch (error) {
+        failure = error
+      }
+      expect(failure).toBeInstanceOf(CanonicalJsonError)
+      expect((failure as CanonicalJsonError).violation).toBe("json")
+    }
+    let value: Json = []
+    for (let i = 0; i < 64; i++) value = [value]
+    expect(() => canonicalizeJson(value)).toThrow(CanonicalJsonError)
+  })
 })

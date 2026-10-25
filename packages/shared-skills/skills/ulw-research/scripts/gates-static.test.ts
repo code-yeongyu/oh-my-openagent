@@ -263,6 +263,19 @@ describe("report-level visuals", () => {
 		expect(chartCodes(htmlLabels)).toEqual(["chart_svg_no_text"])
 	})
 
+	test("#given a single visual with one zero dimension #when checked #then report_without_visual is raised; viewBox-only and unsized visuals still count", () => {
+		// given
+		const only = (el: string) => `<figure>${el}<figcaption>c</figcaption></figure>`
+		const flat = only('<img src="data:image/png;base64,iVBORw0KGgo=" alt="chart" width="600" height="0">')
+		const narrow = only('<svg width="0" height="300"><text>A</text></svg>')
+		const styled = only('<img src="data:image/png;base64,iVBORw0KGgo=" alt="chart" width="600" height="300" style="height: 0">')
+		const viewBoxOnly = only('<svg viewBox="0 0 600 300" aria-roledescription="flowchart-v2"><text>A</text></svg>')
+		const unsized = only('<img src="data:image/png;base64,iVBORw0KGgo=" alt="Deploys per week">')
+		// when / then
+		for (const html of [flat, narrow, styled]) expect(has(html, "report_without_visual")).toBe(true)
+		for (const html of [viewBoxOnly, unsized]) expect(has(html, "report_without_visual")).toBe(false)
+	})
+
 	test("#given figure images with no alt, a bare empty alt, role- and aria-marked decorative alts and a descriptive alt #when checked #then only the unmarked two raise image_missing_alt", () => {
 		// given
 		const img = (alt: string) => `<figure><img src="data:image/png;base64,iVBORw0KGgo=" ${alt} width="480" height="240"><figcaption>c</figcaption></figure>`

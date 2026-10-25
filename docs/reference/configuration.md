@@ -81,7 +81,7 @@ Two more shared base keys, read by the Senpi harness, pick the main session mode
 
 | Key | Type | Description |
 | --- | --- | --- |
-| `model_profiles` | record<string, `{ display_name?, family?, tier?, models? }`> | Named ordered model chains. A name matching a builtin (`daily-normal`, `daily-heavy`, `geeky-normal`, `geeky-heavy`) replaces it wholesale; any other name adds one. Entries use the same string or object shape as a category chain and may reference `models.<catalog>` entries. |
+| `model_profiles` | record<string, `{ display_name?, caution?, family?, tier?, models? }`> | Named ordered model chains. A name matching a builtin (`daily-normal`, `daily-heavy`, `geeky-normal`, `geeky-heavy`) replaces it wholesale; any other name adds one. Entries use the same string or object shape as a category chain and may reference `models.<catalog>` entries. |
 | `model_profile` | string | Which chain starts the session: a lane id such as `daily-normal`, or a literal `provider/model` that pins one exact model. Unset applies Daily · Normal (or the first lane that resolves) on a fresh session; the retired `recommended` id does the same. |
 
 Don't confuse these with `profiles.<name>` above: that key swaps configuration layers via `OMO_PROFILE`, while `model_profile` chooses a model within the loaded configuration. Builtin chains, session-start behavior, and override rules are in the [omo.json reference](./omo-json.md#model-profiles-native-harness).
@@ -394,7 +394,7 @@ Runtime priority:
 
 The same resolved chain drives spawn-time selection and runtime retry fallback, so a recovered task stays on the same category chain.
 
-In the Senpi harness, `model_profile` applies to OmO Desktop and headless sessions; the interactive TUI keeps the model it started with. An explicit `--model`, scoped model or resumed session is preserved. A fresh session otherwise uses `model_profile` as a literal pin or a named chain; unset config starts on Daily · Normal, or on the first of Daily · Heavy, Geeky · Normal and Geeky · Heavy that resolves; the retired `recommended` id starts the same default with one log line. If no candidate is available, a notice explains the unavailable profile and the current model stays. `categories.*` and `agents.*` overrides do not select the main session model, and `model_profile` does not select delegated children. See [Model Profiles](#model-profiles).
+In the Senpi harness, `model_profile` applies to OmO Desktop and headless sessions; the interactive TUI keeps the model it started with. An explicit `--model`, scoped model or resumed session is preserved. A fresh session otherwise uses `model_profile` as a literal pin or a named chain; unset config starts on Daily · Normal, or on the first of Daily · Heavy, Obsessive · Normal and Obsessive · Heavy that resolves; the retired `recommended` id starts the same default with one log line. If no candidate is available, a notice explains the unavailable profile and the current model stays. `categories.*` and `agents.*` overrides do not select the main session model, and `model_profile` does not select delegated children. See [Model Profiles](#model-profiles).
 
 In the OpenCode plugin, every merged category appears in `availableCategories`; hiding categories with a dead fallback chain is not implemented here. That dead-chain filtering, the `model_unavailable` spawn failure, and the `task.warnings.unavailable_categories` flag belong to the Senpi/core `task` system, documented in the [omo.json reference](./omo-json.md).
 
@@ -443,7 +443,7 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 | **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (high)` |
 | **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
 | **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `zai-coding-plan/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
-| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
+| **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `zai-coding-plan\|opencode-go/glm-5.3 (high)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
 | **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
 | **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
@@ -561,8 +561,59 @@ Configured under `memory` in `omo.json`, with per-agent overrides under `memory.
 | -------------------- | ---------- | ------------------------------------------------------------------------------- |
 | `enabled`            | `true`     | Master switch for the whole memory component                                     |
 | `agent`              | `"auto"`   | Which agent identity owns the memory repository                                  |
+| `auto_identity`      | `"path"`   | How `agent: "auto"` picks the identity: `"path"` or `"git"` (see below); root only, not per agent |
 | `compile_warn_tokens`| `30000`    | Warn when the compiled memory block exceeds this many tokens                     |
 | `agents`             | `{}`       | Per-agent overrides; any block below may be overridden field by field            |
+
+#### Sharing memory across git worktrees
+
+With `agent: "auto"`, the memory identity comes from the session's directory, so by default every
+git worktree of a repository gets its own, empty memory. Set `auto_identity: "git"` to resolve a
+linked worktree onto its main checkout instead: every worktree of one clone then reads and writes
+the main checkout's memory, and a subdirectory maps onto the same subdirectory of the main checkout.
+The main checkout keeps the identity it has today, so turning this on loses nothing. Worktrees of a
+bare repository share one memory named after the repository. Directories outside git, submodules
+(also inside a worktree), and repositories whose main working tree git does not record (a clone made
+with `--separate-git-dir` and no `core.worktree`) keep the path-derived identity, and an explicit
+`agent` name always wins. `auto_identity` is set on the `memory` block itself; the per-agent
+`agents` overrides do not accept it.
+
+Put the setting in the user config (`~/.omo/omo.jsonc`). Tools such as Orca create worktrees outside
+the main checkout, where its project `.omo/omo.jsonc` is not found. Sessions that are already bound
+keep their current memory; new sessions pick up the shared one. Changing `auto_identity` (on or
+off) rebinds the identity for new worktree sessions, and with it which memory sync stream they join:
+a worktree session with `"git"` reads and writes the main checkout's memory, and also syncs it
+when `memory.sync.enabled` is on and the device is signed in. A worktree opened through a symlinked
+path still maps to its main checkout. Git records the real path of the main checkout, though, so a
+main checkout opened through a symlinked path resolves differently from its worktrees; use an
+explicit `agent` name in that case.
+
+#### Memory from projects the session touches
+
+After a successful `read`, `edit` or `write` under a child project with existing memory, the tool
+result lists up to 30 of that project's note paths and descriptions, not their bodies. The nudge
+appears once per project and is re-armed after accepted compaction. A non-git workspace can link
+projects in through directory symlinks; links committed inside a git repository do not extend its
+scope. Links to an ancestor, home or a directory containing the memory root never widen scope.
+Linked worktrees use the session's bound `auto_identity` mode and absolute memory root.
+
+Kibitzer considers up to three recently touched projects. It ranks each project's committed notes
+apart from the session's own corpus and reserves up to half the available seats, rounded up, for
+projects in touch order. Unused seats go to the other side. Each repository uses the same persisted
+search-term cache as the session's own memory; an unreadable or unwritable cache is logged and recall
+continues. Project note keys are `@project/<identity>/<path>` so ledgers cannot confuse two projects'
+notes with the same name; delivered hints name the readable file path.
+
+| Option                 | Default | Description |
+| ---------------------- | ------- | ----------- |
+| `project_scope.nudge`   | `true`  | List a touched project's note paths and descriptions |
+| `project_scope.recall`  | `true`  | Include touched projects in Kibitzer recall and its memory tool |
+
+These switches belong to the root `memory` block and its harness/profile layers, not `agents`
+overrides. Turning both off revokes grants on the next file touch. Project access is read-only:
+enumeration, writes, the repository root itself, git metadata and the reserved `system/` tree stay
+denied. The exclusions are case-insensitive on every platform; symlinks cannot escape a granted
+repository, and grants are revoked when the session shuts down.
 
 #### Memory file list in the prompt
 
@@ -623,7 +674,17 @@ successful reflection clears the backoff. `/reflect` ignores it, so you can alwa
 | `reflection.merge`         | `"auto"` | `auto` or `integration` merge strategy                     |
 | `reflection.category`      | `"quick"`| Task executor category for the reflection child            |
 | `reflection.timeout_minutes`| `15`    | Hard timeout for a reflection run                          |
+| `reflection.max_concurrent_runs` | `1` | Concurrent reflection/dream children across memory identities |
 | `reflection.sandbox`       | `"auto"` | `auto`, `required`, or `off`                               |
+
+Reflection and dream supervisors share FIFO slots under
+`<OMO_MEMORY_HOME>/runtime/locks` (the default memory home is `~/.omo/memory`).
+Queued work waits without a timeout and is not dropped. Queue time does not
+consume the execution budget: admission shifts both durable deadlines before
+starting the child; model fallback attempts share the remaining execution budget.
+Set `max_concurrent_runs` consistently in the shared user configuration for all
+sessions using that memory home. This machine setting cannot be overridden for an
+individual identity. Separate memory homes have separate queues.
 
 #### Nudge
 
@@ -825,6 +886,16 @@ Records about individuals, stored as cards with an observation ledger.
 | `people.max_entries`      | `40`    | Maximum observation entries per person (1-100)     |
 | `people.max_entry_chars`  | `200`   | Maximum characters per entry (50-500)              |
 
+#### Agreements
+
+Standing agreements with your person, kept in `system/agreements.md` with how many times each was broken. The facts extractor counts a repeated correction against the agreement it repeats; past the threshold the agreement is flagged and you see a notice. Manage the list with `/agreements` (`list`, `add [--project] <text>`, `ack <id>`, `drop <id>`). Agreements you add can only be changed by you.
+
+| Option                             | Default | Description                                                    |
+| ---------------------------------- | ------- | -------------------------------------------------------------- |
+| `agreements.enabled`               | `true`  | Count repeated corrections and announce flagged agreements      |
+| `agreements.needs_human_threshold` | `3`     | Breaks at which an agreement is flagged as needing you (min 1)  |
+| `agreements.max_items`             | `64`    | Ledger size; at the cap the oldest never-reaffirmed agent item is evicted (8-256) |
+
 #### Soul
 
 | Option             | Default | Description                                            |
@@ -841,8 +912,8 @@ Records about individuals, stored as cards with an observation ledger.
 
 | Option           | Default | Description                                    |
 | ---------------- | ------- | ---------------------------------------------- |
-| `sync.enabled`   | `true`  | Sync the memory repository                      |
-| `sync.remote`    | -       | Optional git remote for the memory repository   |
+| `sync.enabled`   | `true`  | End-to-end encrypted memory sync on this device (needs sign-in and sync on for the account) |
+| `sync.remote`    | -       | Deprecated, ignored; the git mirror is set with `/memfs`  |
 | `search.enabled` | `true`  | Enable memory search                            |
 
 In Senpi, run `/sleeptime` to see every resolved memory value, including which ones a per-agent
@@ -931,10 +1002,10 @@ Run background subagents in separate tmux panes. Requires running inside tmux wi
 Configure git commit behavior:
 
 ```json
-{ "git_master": { "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
+{ "git_master": { "include_co_authored_by": true, "commit_footer": false, "git_env_prefix": "GIT_MASTER=1" } }
 ```
 
-`commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Commits keep your own git author and committer, and omo never adds a `Co-authored-by` trailer; `include_co_authored_by` is a deprecated no-op kept so existing configs still validate.
+`include_co_authored_by` (default `true`) adds `Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>` to every commit git-master writes, exactly once: it is passed with `git -c trailer.ifexists=addIfDifferent commit --trailer`, so amending or rewording a commit that already has it does not add a second copy, and after a squash git-master rewrites the joined message once. It needs git 2.32 or newer. Set it to `false` to keep the trailer out of your history. `commit_footer` (default `false`) opts in to an "Ultraworked with Sisyphus" footer in the commit body; a string replaces the builtin text. Either way, commits keep your own git author and committer.
 
 This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-native-harness).
 
@@ -1422,6 +1493,7 @@ The shared base and Senpi use an object:
 | `OMO_DEBUG` | Set to `1` (any non-empty value) to print omo-senpi component `info` diagnostics on stderr. Unset, those lines are silent. `warn` and `error` still print. Component logs never go to stdout. |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry |
 | `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1`, `true`, or `yes` to disable PostHog |
+| `OMO_DISABLE_TELEMETRY` | Set to `1`, `true`, or `yes` to disable anonymous telemetry in every omo package |
 | `OMO_CODEX_DISABLE_POSTHOG` | Set to `1`, `true`, or `yes` to disable PostHog telemetry for the `omo-codex` adapter. Global `OMO_DISABLE_POSTHOG` also disables Codex telemetry. |
 | `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, `no`, or `yes` to disable anonymous telemetry for `omo-codex` |
 | `OMO_CODEX_GIT_BASH_PATH` | Native Windows Codex installs only. Absolute path to Git Bash, for example `C:\Program Files\Git\bin\bash.exe`, when `where bash` cannot find it |

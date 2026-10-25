@@ -42,17 +42,16 @@ fn cancellation_and_stop_wake_a_waiting_hold() {
         // Given an interruption registered before starting the worker.
         let supervisor = supervisor();
         let signal = supervisor.hold_signal();
-        let (started, starting) = mpsc::channel();
+        let starting = supervisor.subscribe_hold_wait_for_test();
         let (done, completed) = mpsc::channel();
         let worker_signal = Arc::clone(&signal);
         let worker_supervisor = Arc::clone(&supervisor);
         let worker = thread::spawn(move || {
-            started.send(()).unwrap();
             done.send(worker_signal.wait(&worker_supervisor, Duration::from_secs(100)))
                 .unwrap();
         });
         starting.recv_timeout(Duration::from_secs(2)).unwrap();
-        // When either interruption lands, before or during the atomic wait.
+        // When either interruption lands only after the atomic park handshake.
         if stop {
             supervisor.trigger_stop(StopSource::Hotkey);
         } else {

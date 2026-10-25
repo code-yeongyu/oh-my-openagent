@@ -3,7 +3,6 @@ import type { JSX } from "react"
 
 import { CraftedSection } from "@/components/landing/sections/crafted"
 import { CtaSection } from "@/components/landing/sections/cta"
-import { DoriTeaserSection } from "@/components/landing/sections/dori-teaser"
 import { HeroSection } from "@/components/landing/sections/hero"
 import { KibitzerSection } from "@/components/landing/sections/kibitzer"
 import { MassUlwSection } from "@/components/landing/sections/mass-ulw"
@@ -25,7 +24,7 @@ export async function generateLandingMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: "OmO — Your tool for real work. But it's an agent.",
+    title: "OmO: Your tool for real work. But it's an agent.",
     description,
   }
 }
@@ -45,7 +44,6 @@ export async function LandingPage(): Promise<JSX.Element> {
       <PlatformsSection />
       <ReviewsSection />
       <CtaSection />
-      <DoriTeaserSection />
     </div>
   )
 }

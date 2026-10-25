@@ -9,7 +9,6 @@ import {
 	readdirSync,
 	renameSync,
 	rmSync,
-	statSync,
 	writeFileSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";

@@ -15,9 +15,18 @@ unsafe extern "C" fn enable(port: CfMachPortRef, enabled: bool) {
     count.set(count.get() + 1);
 }
 
-unsafe extern "C" fn keycode(_: CgEventRef, field: u32) -> i64 {
-    assert_eq!(field, KEYCODE_FIELD);
-    53
+thread_local! {
+    /// The `kCGEventSourceUnixProcessID` the fake event reports; 0 is the
+    /// hardware (HID) source, anything else a process that posted it.
+    static SOURCE_PID: Cell<i64> = const { Cell::new(0) };
+}
+
+unsafe extern "C" fn integer_field(_: CgEventRef, field: u32) -> i64 {
+    match field {
+        KEYCODE_FIELD => 53,
+        SOURCE_UNIX_PID_FIELD => SOURCE_PID.with(Cell::get),
+        other => panic!("unexpected event field {other}"),
+    }
 }
 
 unsafe extern "C" fn flags(_: CgEventRef) -> u64 {
@@ -30,7 +39,7 @@ fn callback(shared: &Shared, kind: u32, enabled: &Cell<u32>) {
         tap: Cell::new(ptr::from_ref(enabled).cast_mut().cast()),
         calls: TapCalls {
             enable,
-            keycode,
+            integer_field,
             flags,
         },
     };
@@ -52,6 +61,29 @@ fn shared(supervisor: Arc<Supervisor>) -> Shared {
         Hotkey::parse(&Chord::parse(DEFAULT_STOP_CHORD).unwrap()).unwrap(),
     )
     .unwrap()
+}
+
+#[test]
+fn a_posted_chord_never_stops_input() {
+    // given: the default chord, posted by another process (source pid != 0)
+    let shared = shared(Arc::new(Supervisor::new(Arc::new(FakeClock::new(0)))));
+    SOURCE_PID.with(|pid| pid.set(4242));
+    // when
+    callback(&shared, EVENT_KEY_DOWN, &Cell::new(0));
+    SOURCE_PID.with(|pid| pid.set(0));
+    // then: the in-memory suspension is synchronous, so its absence is final
+    assert!(!shared.supervisor.is_suspended(), "a synthetic chord stopped input");
+}
+
+#[test]
+fn a_physical_chord_stops_input_through_the_callback() {
+    // given: the default chord from the hardware source (pid 0)
+    let shared = shared(Arc::new(Supervisor::new(Arc::new(FakeClock::new(0)))));
+    SOURCE_PID.with(|pid| pid.set(0));
+    // when
+    callback(&shared, EVENT_KEY_DOWN, &Cell::new(0));
+    // then
+    assert!(shared.supervisor.is_suspended());
 }
 
 #[test]

@@ -6,10 +6,11 @@ Compile a node definition into an execution graph, admit each node the moment ev
 
 | Path | Purpose |
 |------|---------|
-| `types.ts` | Domain vocabulary: branded `DagRunId`/`DagNodeId`, 6 run statuses, 8 node states, route union (category XOR agent, no model-only route), `DAG_RUN_EVENT_TYPES` (17 boundary types), settings defaults (`max_runs_per_session: 16`, `retention_days: 7`), flat event envelope, unsequenced activity types. |
+| `types.ts` | Domain vocabulary: branded `DagRunId`/`DagNodeId`, 6 run statuses, 9 node states (`paused` holds a user-stopped node's child), route union (category XOR agent, no model-only route), `DAG_RUN_EVENT_TYPES` (26 boundary types: the 17 lifecycle events plus the 9 paused-run controls in `paused-events.ts`), settings defaults (`max_runs_per_session: 16`, `retention_days: 7`), flat event envelope, unsequenced activity types. |
 | `graph.ts` | `compileDag`: deterministic ordering, invalid-dep/cycle detection, wave groupings (informational metadata for event grouping + rendering), critical path, bottlenecks. |
 | `fingerprint.ts` | `dagFingerprint` (canonicalize -> sha256), `dagDefinitionFingerprint`, `nodeFingerprintInput`. |
-| `events.ts` | Pure builders for all 17 boundary events. No seq/lane metadata here. |
+| `events.ts` | Pure builders for the 17 lifecycle boundary events. No seq/lane metadata here. |
+| `paused-events.ts` | The 9 paused-run control events (`dag.guidance.*`, `dag.node.cancel_requested`, `dag.node.retry-staged`, `dag.node.pause-recovered`, `dag.node.pause-lost`) and their projection onto the run record. |
 | `journal.ts` | `createDagJournal` / `subscribeDagJournal`: sequenced append + checkpoint projection seam. |
 | `store.ts` | `createDagFileStore`: WAL append/read with torn-tail recovery, checkpoint/result/key persistence, run/key/task-owner locks, per-session cap on active (non-terminal) runs, retention pruning. Layout `<stateDir>/dag/{runs,events,results,keys,locks}`; key ids `dagKeyHash = sha256(parentSessionId + "\0" + runKey)`. Atomic temp+rename writes, fsync on by default. |
 | `manager.ts` | `createDagManager`: start/amend/replay, `DagRunRecordV1` projection, fingerprint-keyed run reuse; amendment guards `invalid_amendment`, `amend_running_node`, `run_still_active`. |

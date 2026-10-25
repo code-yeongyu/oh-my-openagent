@@ -4,6 +4,8 @@ import { getTranslations } from "next-intl/server"
 
 import { Link } from "@/i18n/routing"
 
+import { LanguageLinks } from "./language-links"
+
 const GITHUB_URL = "https://github.com/code-yeongyu/oh-my-openagent"
 const LEGAL_BASE = `${GITHUB_URL}/blob/dev/docs/legal`
 
@@ -60,7 +62,7 @@ const GROUPS: readonly FooterGroup[] = [
 const LINK_CLASS =
   "text-text-lo hover:text-text-hi focus-visible:outline-accent-32 inline-flex min-h-11 items-center text-sm transition-colors duration-[var(--dur-micro)] ease-standard focus-visible:outline-2 focus-visible:outline-offset-2"
 
-/** DESIGN.md §5 Footer: top hairline, py-12, 2 → 4 columns, mono meta copyright. */
+/** DESIGN.md §5 Footer: top hairline, py-12, 2 → 5 columns, mono meta copyright. */
 export async function Footer({ locale }: { readonly locale?: string } = {}): Promise<JSX.Element> {
   const t = locale
     ? await getTranslations({ locale, namespace: "footer" })
@@ -69,7 +71,7 @@ export async function Footer({ locale }: { readonly locale?: string } = {}): Pro
 
   return (
     <footer className="border-line bg-ink-0 border-t py-12">
-      <div className="mx-auto grid w-full max-w-[90rem] grid-cols-2 gap-x-6 gap-y-10 px-4 sm:px-5 lg:grid-cols-4 lg:px-8">
+      <div className="mx-auto grid w-full max-w-[90rem] grid-cols-2 gap-x-6 gap-y-10 px-4 sm:px-5 lg:grid-cols-5 lg:px-8">
         <div className="col-span-2 flex flex-col gap-4 lg:col-span-1">
           <div className="flex items-center gap-2.5">
             <Image src="/brand/omo-mark.svg" alt="" width={24} height={24} />
@@ -113,6 +115,7 @@ export async function Footer({ locale }: { readonly locale?: string } = {}): Pro
             </ul>
           </nav>
         ))}
+        <LanguageLinks label={t("language")} linkClassName={LINK_CLASS} />
       </div>
     </footer>
   )

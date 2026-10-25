@@ -3,7 +3,7 @@ use super::{deliver, InFlight, Queued};
 use crate::{
     engine::Engine,
     rpc::{reply_line, Failure},
-    settle::settle,
+    settle::{settle, settle_hold},
 };
 use senpi_desktop_core::error::DesktopError;
 use std::sync::Arc;
@@ -43,7 +43,13 @@ pub(super) async fn dispatch(
         let started = engine.begin(call);
         let (engine, out, in_flight) = (Arc::clone(&engine), out.clone(), in_flight.clone());
         waiters.spawn(async move {
-            let outcome = settle(started.wait(), cancel, || Err(Failure::cancelled())).await;
+            let outcome = match started.hold_signal() {
+                Some(signal) => {
+                    let budget = engine.hold_release_budget();
+                    settle_hold(started.wait(), cancel, || signal.cancel(), budget).await
+                }
+                None => settle(started.wait(), cancel, || Err(Failure::cancelled())).await,
+            };
             drop(permit);
             in_flight.finish(&id);
             deliver(&engine, &out, reply_line(id, outcome))

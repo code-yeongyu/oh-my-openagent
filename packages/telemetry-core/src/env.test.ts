@@ -26,6 +26,12 @@ const OPT_OUT_CASES = [
   ["codex send trims and lowercases", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: " FALSE " }, true],
   ["approved codex send yes convergence", { OMO_CODEX_SEND_ANONYMOUS_TELEMETRY: "yes" }, true],
   ["invalid disable value", { OMO_CODEX_DISABLE_POSTHOG: "maybe" }, false],
+  ["global telemetry disable 1", { OMO_DISABLE_TELEMETRY: "1" }, true],
+  ["global telemetry disable true", { OMO_DISABLE_TELEMETRY: "true" }, true],
+  ["global telemetry disable yes", { OMO_DISABLE_TELEMETRY: "yes" }, true],
+  ["global telemetry disable trims and lowercases", { OMO_DISABLE_TELEMETRY: " Yes " }, true],
+  ["global telemetry disable 0 keeps telemetry on", { OMO_DISABLE_TELEMETRY: "0" }, false],
+  ["global telemetry disable empty keeps telemetry on", { OMO_DISABLE_TELEMETRY: "" }, false],
 ] as const
 
 describe("telemetry API key configuration", () => {

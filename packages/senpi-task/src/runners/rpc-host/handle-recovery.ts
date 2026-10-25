@@ -9,6 +9,7 @@ import {
 } from "./reattach"
 import type { HostParkReason, HostSessionCommand } from "./session-client"
 import { log } from "@oh-my-opencode/utils"
+import type { HostTurnReconciliation } from "./reconcile-turn"
 import { armRecoveryBound, isTransportRecoveryExpired, withinBound, type RecoveryBound, type TransportRecoveryOptions } from "./transport-recovery"
 import { InputUncertainError } from "../input-effects"
 
@@ -25,6 +26,8 @@ export interface HandleRecoveryHost {
   turnSettled(): boolean
   adopt(next: HostSessionReattached): void
   turnResumed(): void
+  reconcile(reopened: boolean): Promise<HostTurnReconciliation>
+  beginContinuation(): void
   endLost(): void
   park(reason: HostParkReason): void
   /** The continuation that re-drives the in-flight turn after a reattach was not delivered. */
@@ -129,10 +132,12 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
           host.adopt(next)
         },
         turnResumed: host.turnResumed,
+        reconcile: host.reconcile,
         // A stop recorded while the reattached session was being read must run before any continuation:
         // the turn is not re-driven, and the recovery's end stops the adopted session (omo#9403).
         continueTurn: async (prompt) => {
           if (host.stopRequested()) return
+          host.beginContinuation()
           const command = { type: "prompt", message: prompt, streamingBehavior: "steer" } as const
           try {
             await withinBound(bound, host.continueInput === undefined ? host.port().send(command) : host.continueInput(command))

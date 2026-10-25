@@ -14,6 +14,9 @@ impl BackendFactory for Factory {
     }
 }
 
+/// How long the fixture hold lasts, in seconds; a hold's deadline is the operation timeout plus this.
+const HOLD_SECS: u64 = 100;
+
 pub(super) async fn held_client(owner: &Sessions, timeout: Duration) -> (Client, mpsc::Receiver<SinkOp>) {
     let (tx, rx) = mpsc::channel();
     let mut config = config();
@@ -46,7 +49,7 @@ pub(super) async fn held_client(owner: &Sessions, timeout: Duration) -> (Client,
             5,
             "holdKeys",
             json!({
-                "target":"desktop", "keys":["shift"], "duration":100,
+                "target":"desktop", "keys":["shift"], "duration":HOLD_SECS,
                 "opts":{"deliveryMode":"foreground"}
             }),
         )
@@ -117,8 +120,12 @@ async fn client_timeout_leaves_other_connection_and_agent_alive() {
     let (mut a, events) = held_client(&owner, Duration::from_secs(30)).await;
     let mut b = Client::new(&owner);
     tokio::time::pause();
-    // when
-    tokio::time::advance(Duration::from_secs(31)).await;
+    // when: virtual time passes the hold's deadline (operation timeout plus the hold).
+    tokio::time::advance(Duration::from_secs(30 + HOLD_SECS + 1)).await;
+    // The release then runs on the real worker thread under the close budget, so
+    // real time resumes before the reply is awaited; paused time must not
+    // auto-advance past that budget while the worker is still releasing.
+    tokio::time::resume();
     // then
     loop {
         let reply = a.next().await;
@@ -127,7 +134,6 @@ async fn client_timeout_leaves_other_connection_and_agent_alive() {
             break;
         }
     }
-    tokio::time::resume();
     event(events, |op| {
         matches!(op, SinkOp::HeldKey { down: false, .. })
     })

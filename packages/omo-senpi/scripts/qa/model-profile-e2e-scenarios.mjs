@@ -81,6 +81,13 @@ export const SCENARIOS = {
     registerProviders: ["zai"],
     expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
   },
+  "geeky-normal-astra": {
+    omoConfig: { model_profile: "geeky-normal" },
+    mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-6-astra"],
+    cliModel: undefined,
+    registerProviders: ["chatgpt-subscription"],
+    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
+  },
   "geeky-normal-gpt6-only-unavailable": {
     omoConfig: { model_profile: "geeky-normal" },
     mockModels: ["mock-1", "gpt-6-sol-fast", "gpt-6-sol"],
@@ -116,7 +123,7 @@ export const SCENARIOS = {
     registerProviders: ["github-copilot", "zai"],
     expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
   },
-  // No Daily lane resolves on a ChatGPT-only setup: the first lane that does, Geeky · Normal, applies.
+  // No Daily lane resolves on a ChatGPT-only setup: the first lane that does, Obsessive · Normal, applies.
   "unset-chatgpt-only-geeky-normal": {
     omoConfig: {},
     mockModels: ["mock-1", "gpt-6.1-sol"],

@@ -65,9 +65,9 @@ describe("/memory", () => {
     // then
     expect(text).toContain(`HEAD: ${(head ?? "").slice(0, 8)}`)
     expect(text).toContain("clean")
-    expect(text).toContain("### system/persona.md — Persona")
+    expect(text).toContain("### system/persona.md - Persona")
     expect(text).toContain("I am the test persona.")
-    expect(text).toContain("### system/projects/index.md — Project index")
+    expect(text).toContain("### system/projects/index.md - Project index")
     expect(text).toContain("- external/notes.md")
     expect(text).toContain("- skills/commit/SKILL.md")
     expect(text).not.toContain("Uncommitted")

@@ -140,7 +140,7 @@ function createMacOsKeychainKeyStore(name: string, run: RunSecretCommand): KeySt
       // `add-generic-password -w <value>` would put the secret on argv, where any process
       // can read it from the process list. `-w` with no value makes security prompt on the
       // TTY (twice), which breaks non-interactive use. `security -i` reads commands from
-      // stdin instead, so the whole add line — secret included — travels on stdin only.
+      // stdin instead, so the whole add line, secret included, travels on stdin only.
       // The -i parser splits on whitespace, so the value goes in a double-quoted argument
       // with `\` and `"` escaped; this round-trips arbitrary JSON bytes verbatim.
       const quoted = `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`

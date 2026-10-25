@@ -6,7 +6,8 @@ const DEFAULT_DEADLINE_MS = 5 * 60_000
 
 type TaskRuntime = typeof import("#omo-task-runtime")
 export type StartChildInput = Parameters<InProcessRunnerLike["start"]>[0]
-export type InProcessMemoryChildState = { cancelled: boolean; cancel?: () => void }
+/** `released` settles once a child that started (even after the run returned) has been disposed. */
+export type InProcessMemoryChildState = { cancelled: boolean; cancel?: () => void; released?: Promise<void> }
 
 export type MemoryChildResult =
   | { readonly status: "completed" }
@@ -121,8 +122,8 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
   } finally {
     clearTimeout(deadlineTimer)
     input.state.cancel = undefined
-    void setup.then(
-      (handle) => { if (handle !== undefined) void disposeOnce(handle, expired()) },
+    input.state.released = setup.then(
+      (handle) => handle === undefined ? undefined : disposeOnce(handle, expired()),
       () => undefined,
     )
   }

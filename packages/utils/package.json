@@ -13,6 +13,10 @@
       "types": "./src/atomic-write.ts",
       "import": "./src/atomic-write.ts"
     },
+    "./path-containment": {
+      "types": "./src/path-containment.ts",
+      "import": "./src/path-containment.ts"
+    },
     "./runtime": {
       "types": "./runtime.d.ts",
       "import": "./src/runtime/index.ts"
@@ -104,6 +108,10 @@
     "./zip-entry-listing/*": {
       "types": "./src/zip-entry-listing/*.ts",
       "import": "./src/zip-entry-listing/*.ts"
+    },
+    "./shell-quote": {
+      "types": "./src/shell-quote.ts",
+      "import": "./src/shell-quote.ts"
     }
   },
   "types": "./index.d.ts",
@@ -112,6 +120,7 @@
     "test": "bun test src/*.test.ts src/**/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/model-core": "workspace:*",
     "@oh-my-opencode/omo-config-core": "workspace:*",
     "js-yaml": "^5.4.2",
     "jsonc-parser": "^3.3.1"

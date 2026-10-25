@@ -1,0 +1,14 @@
+.callout {
+  border-radius: 0.75rem;
+  border-left: 3px solid var(--color-accent);
+}
+
+.tile {
+  border-radius: 16px;
+  background: var(--surface);
+  &.is-featured {
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: hsl(262 83% 58%);
+  }
+}

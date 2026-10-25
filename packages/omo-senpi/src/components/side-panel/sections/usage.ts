@@ -78,8 +78,7 @@ function providerRows(
     rows.push(windowRow(window, now, layout))
   }
   if (entry.error !== undefined) {
-    const retry = entry.retryAt === undefined ? "" : ` · retry ${resetLabel(entry.retryAt, now) ?? "soon"}`
-    rows.push({ text: `${entry.error}${retry}`, color: windows.length > 0 ? "dim" : "warning" })
+    rows.push({ text: entry.error, color: windows.length > 0 ? "dim" : "warning" })
   }
   const account = accountRow(entry)
   if (account !== undefined) rows.push(account)

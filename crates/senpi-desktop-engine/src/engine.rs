@@ -41,6 +41,8 @@ pub struct Engine {
     read_permits: Arc<Semaphore>,
     /// One mutating request in flight at a time.
     exec_permits: Arc<Semaphore>,
+    /// How long a cancelled hold may take to release its input (the configured close budget).
+    hold_release_budget: std::time::Duration,
 }
 
 impl Engine {
@@ -94,7 +96,9 @@ impl Engine {
             audit: Box::new(move |event| audited.push(Notification::Audit, event)),
             control_slot: stop_paths.control_slot(),
         };
+        let hold_release_budget = config.timeouts.close;
         Ok(Self {
+            hold_release_budget,
             session: Session::start_supervised(factory, config.timeouts, safety)?,
             resume_token: if shared_agent {
                 format!("{}{}", Ulid::generate(), Ulid::generate())
@@ -157,6 +161,11 @@ impl Engine {
 
     /// Enqueues `call` on the session thread now; the reply comes from
     /// [`Started::wait`].
+    /// The configured close budget a cancelled hold may use to release its input.
+    pub fn hold_release_budget(&self) -> std::time::Duration {
+        self.hold_release_budget
+    }
+
     pub fn begin(&self, call: SessionCall) -> Started {
         match call {
             SessionCall::Open(options) => Started {
@@ -200,6 +209,10 @@ pub struct Started {
 }
 
 impl Started {
+    pub fn hold_signal(&self) -> Option<Arc<senpi_desktop_safety::HoldSignal>> {
+        self.pending.hold_signal()
+    }
+
     /// # Errors
     /// The session's error for this request.
     pub async fn wait(self) -> Result<Value, Failure> {

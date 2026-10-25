@@ -210,6 +210,7 @@ describe("host-session handle reattach", () => {
     adaptRpcHandle(handle).subscribe((event) => observed.push(event.type))
     await handle.startInitialPrompt("do the work")
     original.loseTransport()
+    await reopened.answerState({ sessionId: "child", isStreaming: false })
     await promptSent.promise
     await handle.terminate()
     continuation.reject(new Error("continuation refused after cancellation"))

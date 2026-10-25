@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 
 interface CompiledBlockStructure {
   readonly sections: readonly string[]
@@ -64,6 +65,7 @@ export async function repoWith(files: Array<{ relativePath: string; content: str
   onTestFinished(() => rm(dir, { recursive: true, force: true }))
   const repo = new GitMemoryRepo({ dir, agentId: "fixture-agent" })
   await repo.init({ seedFiles: files })
+  disableFixtureAutoMaintenance(dir)
   return { dir, repo }
 }
 

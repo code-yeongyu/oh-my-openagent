@@ -7,7 +7,7 @@ import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { crashClaimDir } from "./process-crash-records"
 import { createOmoNativeSessionComponent } from "./omo-native-session"
-import { OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
+import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
 import {
   FIXED_NOW,
   createEnabledEnv,
@@ -244,10 +244,10 @@ describe("OmO Native process_crashed", () => {
       // then
       const [crash] = crashes(messages)
       expect(Object.keys(crash?.properties ?? {}).sort()).toEqual([
-        "$os", "$process_person_profile", "arch", "crashed_bun_version", "crashed_engine_version", "crashed_omo_version",
-        "detection", "install_id", "package_version", "platform", "process_kind", "product_name", "schema_version",
-        "shard_kind", "signal", "surface", "uptime_bucket", "uptime_ms",
-      ])
+        "$os", "arch", "crashed_bun_version", "crashed_engine_version", "crashed_omo_version", "detection",
+        "process_kind", "shard_kind", "signal", "uptime_bucket", "uptime_ms",
+        ...Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS),
+      ].sort())
       expect(crash?.properties?.shard_kind).toBe("p")
       const wire = JSON.stringify(crash)
       for (const secret of ["0123456789abcdef", endpoint, socket, "hashed:"]) expect(wire).not.toContain(secret)
@@ -271,7 +271,7 @@ describe("OmO Native process_crashed", () => {
       const [crash] = crashes(messages)
       const allowed = new Set<string>([
         ...OMO_NATIVE_PROPERTY_ALLOWLISTS.process_crashed,
-        "$process_person_profile", "install_id", "package_version", "platform", "product_name", "schema_version", "surface",
+        ...Object.keys(OMO_NATIVE_COMMON_PROPERTY_SCHEMAS),
       ])
       expect(Object.keys(crash?.properties ?? {}).filter((key) => !allowed.has(key))).toEqual([])
       expect(crash?.properties).toMatchObject({ exit_code: 1, signal: "none", crashed_engine_version: "unknown" })

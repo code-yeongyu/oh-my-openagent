@@ -31,6 +31,9 @@ export function agentEndOutcome(
   const abortedBy = readAbortedBy(event)
   // omo's own abort is a cancellation no matter how the run then reports its end.
   if (abortedByUser) return { status: "cancelled" }
+  // A host that replaced the session stopped the turn; that cause outranks a generic user abort.
+  const replaced = aborted ? replacementCause(event) : undefined
+  if (replaced !== undefined) return replaced
   const messageText = assistant === undefined ? undefined : extractAssistantText(assistant)
   const final = messageText ?? (observedText !== baseline ? observedText : undefined)
   if (aborted || stopReason === "error" || stopReason === "aborted") {
@@ -56,6 +59,24 @@ export function agentEndOutcome(
   return {
     status: "error",
     failure: { kind: "child-turn-failed", message: errorMessage ?? "RPC child turn produced no assistant output" },
+  }
+}
+
+/**
+ * A host that replaces a busy session (new_session, fork, switch_session) aborts its turn first and names
+ * the replacement on that agent_end (senpi#3357). The child did not ask for that stop: it is an interrupt
+ * the parent must hear about, resumable with task_send, never a failed turn.
+ */
+function replacementCause(event: unknown): RunnerOutcome | undefined {
+  const cause = isRecord(event) ? event.abortCause : undefined
+  if (!isRecord(cause) || cause.kind !== "session_replaced") return undefined
+  const by = readString(cause.reason)
+  const target = readString(cause.targetSessionId)
+  return {
+    status: "interrupted",
+    cause: "session_replaced",
+    message:
+      `The child's session was replaced${by === undefined ? "" : ` (${by})`}${target === undefined ? "" : ` by ${target}`}, which stopped its running turn. Use task_send to continue it in the new session.`,
   }
 }
 
