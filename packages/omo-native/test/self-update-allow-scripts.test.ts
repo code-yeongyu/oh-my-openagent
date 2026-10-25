@@ -20,7 +20,11 @@ function noticeLog(npm: string, packages: string[]): string {
     ...packages.map((pkg) => `40 warn install-scripts   ${pkg} (postinstall: node install.js)`),
   ].join("\n")
 }
-const decide = (npm: string, packages: string[]) => classifyAllowScriptsNotice(parseAllowScriptsNotice(noticeLog(npm, packages))!)
+function decide(npm: string, packages: string[]) {
+  const notice = parseAllowScriptsNotice(noticeLog(npm, packages))
+  if (!notice) throw new Error("fixture notice did not parse")
+  return classifyAllowScriptsNotice(notice)
+}
 
 // The fake behaves like npm 11+: it never runs an install script unless --allow-scripts is passed, and like
 // real npm it writes to its debug log in `<logs-dir>/<id>-debug-0.log` (`<n> warn install-scripts <line>`,
@@ -72,14 +76,16 @@ async function updateWithFakeNpm(options: { packages?: string[]; spec?: string; 
   return { code, lines, errors, argv, logsDir, logsDirKept, keptLogs }
 }
 
+type RecordedRunOptions = { env: Record<string, string>; stdio?: unknown; onBeforeSignalExit?: () => void }
+
 // An injected `run` that records the options it got, for the cases that need no fake shell script.
-async function updateWithRun(run: (options: Record<string, any>) => Promise<unknown>) {
+async function updateWithRun(run: (options: RecordedRunOptions) => Promise<unknown>) {
   const lines: string[] = []
   const code = await runSelfUpdate(["update"], {
     resolveUpdate: () => npmUpdate(),
     ...offline,
     readInstalled: () => ({ omo: "1.0.0", engine: "1" }),
-    run: async (_command, _args, options = {}) => run(options) as Promise<{ status: number | null; signal: string | null }>,
+    run: async (_command, _args, options = {}) => run(options as RecordedRunOptions) as Promise<{ status: number | null; signal: string | null }>,
     log: (line) => lines.push(line),
     error: () => {},
   })
@@ -124,7 +130,7 @@ describe("omo update allowScripts notice", () => {
       const header = "40 warn install-scripts 2 packages had install scripts blocked because they are not covered by allowScripts:"
       const notice = parseAllowScriptsNotice(header)
       expect(notice).toEqual({ blocked: true, packages: [] })
-      expect(formatAllowScriptsGuidance(npmUpdate(), notice!)).toEqual([])
+      if (notice) expect(formatAllowScriptsGuidance(npmUpdate(), notice)).toEqual([])
     })
   })
 
