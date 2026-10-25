@@ -8,8 +8,8 @@ import type { KernelToolGrant } from "../kernel-tools/resolve"
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { isWorkpoolYieldTool } from "../workpool/worker-tool-identity"
 import {
-  createChildHandle,
   createRestoredChildHandle,
+  createStagedChildHandle,
   discardUnstartedChildSession,
   type ChildHandle,
   type ChildCompletionPolicy,
@@ -42,6 +42,12 @@ export {
 export { RunnerError } from "./in-process/runner-error"
 
 export const DEFAULT_MAX_CHILD_DEPTH = 4
+
+export type StagedInProcessChild = {
+  readonly handle: ChildHandle
+  readonly promptText: string
+  begin(): void
+}
 
 export type DepthPolicy = {
   readonly maxDepth: number
@@ -163,6 +169,13 @@ export class InProcessRunner {
   }
 
   async start(spec: ChildSpec): Promise<ChildHandle> {
+    const staged = await this.startStaged(spec)
+    staged.begin()
+    return staged.handle
+  }
+
+  // Create the child session without sending its first prompt; `begin` sends it.
+  async startStaged(spec: ChildSpec): Promise<StagedInProcessChild> {
     if (spec.depth > this.#depthPolicy.maxDepth) {
       throw new RunnerError({
         kind: "depth-exceeded",
@@ -224,9 +237,9 @@ export class InProcessRunner {
         ...(spec.instructions !== undefined && { instructions: spec.instructions }),
       })
 
-    let handle: ChildHandle
+    let staged: { readonly handle: ChildHandle; begin(): void }
     try {
-      handle = createChildHandle({
+      staged = createStagedChildHandle({
         taskId: spec.taskId,
         session,
         promptText,
@@ -243,7 +256,7 @@ export class InProcessRunner {
     // id for same-host revival. Nothing about it reaches the record, the v1 spawn_spec or the
     // child's JSONL transcript.
     if (spec.kernelTools !== undefined) this.#kernelToolBindings?.bind(spec.taskId, spec.kernelTools)
-    return handle
+    return { handle: staged.handle, promptText, begin: staged.begin }
   }
 
   // Rebuild a persisted child from its session transcript WITHOUT replaying its prompt. The tool

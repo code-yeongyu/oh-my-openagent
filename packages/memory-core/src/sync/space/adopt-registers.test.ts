@@ -121,7 +121,7 @@ describe("(d) the structure-free read-back accounts a register line only by an a
   })
 
   test("a joined render alone never vouches for a component", () => {
-    expect(firstMissingFact(joined, "---\nk: w\n---\nx\n")).toBe('missing line "k: w"')
+    expect(firstMissingFact(joined, "---\nk: w\n---\nx\n", new Map())).toBe('missing line "k: w"')
   })
 
   test("a value that is not an active entry keeps the source with the reason", () => {

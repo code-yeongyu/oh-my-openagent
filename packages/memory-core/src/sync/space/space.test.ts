@@ -34,9 +34,9 @@ function fakeStore(initial: Record<string, string> = {}) {
 describe("resolveSpace (sync-design §3 binding keys)", () => {
   test("a named agent profile binds as named:", () => {
     const { store } = fakeStore()
-    const r = resolveSpace(store, { profile: "  Dori\n" })
-    expect(r.bindingKey).toBe("named:Dori")
-    expect(r.spaceId).toBe("852b47fac13bd6a2f0d23f5b5d4fa103")
+    const r = resolveSpace(store, { profile: "  Demo\n" })
+    expect(r.bindingKey).toBe("named:Demo")
+    expect(r.spaceId).toBe("6d38310f719ef126e78fa655f5d57d60")
     expect(r.wrote.space).toBe(r.spaceId)
     expect(store.get(SYNC_SPACE_CONFIG_KEY)).toBe(r.spaceId)
   })

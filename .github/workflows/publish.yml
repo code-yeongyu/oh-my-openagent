@@ -492,9 +492,13 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' packages/omo-senpi/package.json > tmp.json && mv tmp.json packages/omo-senpi/package.json
           node packages/omo-senpi/plugin/scripts/sync-version.mjs
           node packages/omo-codex/plugin/scripts/sync-hook-status-messages.mjs
-          # Stamp the authored ## [Unreleased] notes into this release's section so the released
-          # commit carries the notes the GitHub release body is later extracted from.
+          # Assemble the changes/unreleased fragments into this release's CHANGELOG section and
+          # delete them (same release commit), so the released commit carries the notes the GitHub
+          # release body is later extracted from.
           bun run script/stamp-release-changelog.ts "$VERSION"
+          # The stamp step assembled changes/unreleased/*.md into the released CHANGELOG section, wrote their
+          # log blocks into changes.md and packages/*/changes.md, and deleted the fragments; stage all of it.
+          git add changes changes.md packages/*/changes.md
           npm --prefix packages/omo-codex/plugin install --package-lock-only --ignore-scripts --no-audit --fund=false
           bun install --lockfile-only
 
@@ -1103,7 +1107,7 @@ jobs:
             - Extracts this version's CHANGELOG section from the prepared release source.
             - Fails closed when the section is absent, empty, or duplicated.
             - Runs before the platform builds so a source without notes cannot burn a tag.
-          JOB_SUMMARY_NEXT: Author the notes under [Unreleased] and prepare a fresh release state.
+          JOB_SUMMARY_NEXT: Add changes/unreleased fragments and prepare a fresh release state.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-platform:
@@ -1526,6 +1530,35 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Wait for every published package on the registry
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+          # ONE 60-minute deadline shared by every package, probe time included (each probe is capped at
+          # 15 s): well inside the job's 120-minute timeout, so a missing package fails with its name.
+          REGISTRY_WAIT_DEADLINE_SECONDS: "3600"
+        run: |
+          set -euo pipefail
+          # npm answers every publish with 202 "being processed": 5.1.38's oh-my-openagent printed
+          # "+ oh-my-openagent@5.1.38" at 10:09Z and was served only from 10:34Z, while this job only
+          # waited on omo-ai. Read EVERY main and platform package back at its exact version (no-cache),
+          # or fail naming what is missing and why.
+          # Platform packages come from package.json optionalDependencies (--platform-packages), the
+          # one list the release-platform test holds equal to build-binaries PLATFORMS, so this step
+          # cannot drift from the platforms that are built and published.
+          if [ "${LAZYCODEX_ONLY}" = "true" ]; then
+            node script/wait-registry-versions.mjs "lazycodex-ai@$VERSION"
+          else
+            # omo-ai carries its own version (a prerelease spells it differently from the wrappers).
+            SPECS=("oh-my-opencode@$VERSION" "oh-my-openagent@$VERSION" "omo-ai@$OMO_AI_VERSION")
+            if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
+              SPECS+=("lazycodex-ai@$VERSION")
+            fi
+            node script/wait-registry-versions.mjs --platform-packages "$VERSION" "${SPECS[@]}"
+          fi
 
       - name: Wait for omo-ai registry readiness
         if: inputs.lazycodex_only != true

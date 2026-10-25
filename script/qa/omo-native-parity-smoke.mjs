@@ -3,7 +3,7 @@
 // scripted session, omo doctor and omo setup --dry-run in isolated sandboxes, then fails on any
 // difference that is not an expected distribution line.
 import { spawn, spawnSync } from "node:child_process"
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import { basename, join, resolve } from "node:path"
@@ -175,12 +175,28 @@ function servePage() {
   return new Promise((resolveServer) => server.listen(0, "127.0.0.1", () => resolveServer(server)))
 }
 
+// The #10697 plaintext credentials file must be gone after ANY first command, including the release binary's
+// own early answers (--version) that never reach the launcher (#10658). Only a compiled binary takes that path.
+function legacyCredentialsSurvive(binary, root) {
+  const dirs = sandbox(root, "legacy-credentials")
+  const file = join(dirs.home, ".omo", "credentials.json")
+  writeFileSync(file, JSON.stringify({ signingPrivateKey: "synthetic-signing-private", sealingPrivateKey: "synthetic-sealing-private" }), { mode: 0o644 })
+  const env = scrubbedEnv({ HOME: dirs.home, USERPROFILE: dirs.home, TMPDIR: dirs.tmp, TEMP: dirs.tmp, TMP: dirs.tmp })
+  spawnSync(downloadedCopy(binary, dirs), ["--version"], { cwd: dirs.cwd, env, encoding: "utf8", timeout: COMMAND_BUDGET_MS, windowsHide: true })
+  return existsSync(file)
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   const root = mkdtempSync(join(tmpdir(), "omo-parity-"))
   const server = await servePage()
   try {
     const pageUrl = `http://127.0.0.1:${server.address().port}/page`
+    if (legacyCredentialsSurvive(options.binary, root)) {
+      process.stderr.write("FAIL the binary's first `--version` left the legacy plaintext ~/.omo/credentials.json\n")
+      process.exitCode = 1
+      return
+    }
     const binaryDirs = sandbox(root, "binary")
     const downloaded = downloadedCopy(options.binary, binaryDirs)
     const binary = await collect("binary", downloaded, root, pageUrl, binaryDirs)

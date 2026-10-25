@@ -6,7 +6,7 @@ import { type Authority, applyRecord, type FoldedRecord, isCancelledAdmission, i
 import { expectedEpoch, forcedRotationRefusal, keyWithinEpoch, type LinkMode, linksHold, signerKey } from "./chain-checks.ts"
 import { type ParsedBody, parseBody } from "./parse.ts"
 import type { RejectionCounter } from "./rejection.ts"
-import { type ReceiverCheck, receiverRefusal } from "./receiver.ts"
+import { holdReceiver, passReceiver, type ReceiverCheck, takeReceiver } from "./receiver.ts"
 import { checkRecordRules, type RuleRejection } from "./rules.ts"
 import { authorSigningKey, verifyRecordSig } from "./signatures.ts"
 
@@ -36,7 +36,7 @@ type ChainFields = {
   readonly head: Head | null
   readonly authority: Authority | null
   readonly history: ReadonlyArray<FoldedRecord>
-  /** Every verified keyring entry of an ANCHORED chain, wraps minted: the merged receiver re-reads them. */
+  /** Every verified keyring entry of an ANCHORED chain, wraps minted: a state holding no receiver folds one over them. */
   readonly received: ReadonlyArray<VerifiedKeyringEntry>
   /** The device's trust anchor; nothing is trusted and no wrap is minted until the chain meets it. */
   readonly anchor: ChainAnchor
@@ -127,12 +127,17 @@ export const emptyChain = (account: string, anchor: ChainAnchor): ChainState =>
 
 /**
  * Moves an anchored state's head forward to a snapshot position whose keyring head is the one this
- * state verified (snapshot import only); any other position, or an unanchored state, gets null.
+ * state verified (snapshot import only); any other position, or an unanchored state, gets null. At
+ * the same seq the head may not move sideways: only the verified link itself is accepted there.
  */
 export const atVerifiedHead = (state: ChainState, head: Head): ChainState | null => {
   if (!isChainState(state) || !state.anchored || state.head === null) return null
   if (head.keyring_link !== state.head.keyring_link || head.seq < state.head.seq) return null
-  return mintState({ ...state, head })
+  if (head.seq === state.head.seq && head.link !== state.head.link) return null
+  const moved = mintState({ ...state, head })
+  // Same keyring history, so the receiver goes with the copy instead of being refolded on its first append.
+  passReceiver(state, moved)
+  return moved
 }
 
 const seenKeyring = (state: ChainState): ReadonlyArray<KeyringEntry> => [...state.received, ...state.unanchored]
@@ -146,7 +151,8 @@ type StepResult =
  * record signature (against the authority folded from every earlier keyring record),
  * epoch, account binding, the per-kind rules of the section 8.2 verifier table, and
  * finally the content hash. Right after the link, the merged receiver's own refusals apply, so a
- * record it refuses is never folded here either.
+ * record it refuses is never folded here either. The receiver moves from state to state with the
+ * walk, so checking one new entry does not re-fold the verified chain before it.
  */
 export const verifyKeyringEntry = async (state: ChainState, entry: KeyringEntry, mode: LinkMode): Promise<StepResult> => {
   const malformed = envelopeRefusal(entry)
@@ -154,8 +160,20 @@ export const verifyKeyringEntry = async (state: ChainState, entry: KeyringEntry,
   if (!isChainState(state)) return { ok: false, reason: "untrusted_state" }
   if (state.anchor.account !== state.account) return { ok: false, reason: "untrusted_root" }
   if (!(await linksHold(state.head, entry, mode))) return { ok: false, reason: "link_mismatch" }
-  const refused = await receiverRefusal(seenKeyring(state), entry)
-  if (refused !== null) return { ok: false, reason: refused }
+  const receiver = await takeReceiver(state, seenKeyring(state))
+  const refused = await receiver.keyring(entry)
+  if (refused !== null) {
+    holdReceiver(state, receiver)
+    return { ok: false, reason: refused }
+  }
+  const step = await keyringStep(state, entry)
+  // The receiver has folded the entry in: only the state that verified it may keep it.
+  if (step.ok) holdReceiver(step.state, receiver)
+  return step
+}
+
+/** The client's own checks of a keyring record the merged receiver accepted, in verifyKeyringEntry's order. */
+const keyringStep = async (state: ChainState, entry: KeyringEntry): Promise<StepResult> => {
   const body = parseBody(entry.body)
   if (body === null) return { ok: false, reason: "bad_record" }
   const before = state.authority
@@ -204,7 +222,14 @@ const verifyBatchEntry = async (state: ChainState, entry: BatchEntry): Promise<S
   if (malformed !== null) return { ok: false, reason: malformed }
   if (!isChainState(state)) return { ok: false, reason: "untrusted_state" }
   if (!(await linksHold(state.head, entry, "main"))) return { ok: false, reason: "link_mismatch" }
-  const refused = await receiverRefusal(seenKeyring(state), entry)
+  const receiver = await takeReceiver(state, seenKeyring(state))
+  const step = await batchStep(state, entry, receiver.batch(entry))
+  // A batch never moves the receiver: it stays with whichever state the walk is at after this entry.
+  holdReceiver(step.ok ? step.state : state, receiver)
+  return step
+}
+
+const batchStep = async (state: ChainState, entry: BatchEntry, refused: ReceiverCheck | null): Promise<StepResult> => {
   if (refused !== null) return { ok: false, reason: refused }
   const forced = forcedRotationRefusal(state.forcedRotationAfter, null)
   if (forced !== null) return { ok: false, reason: forced }

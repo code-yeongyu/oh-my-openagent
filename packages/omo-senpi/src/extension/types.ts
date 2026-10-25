@@ -79,12 +79,52 @@ export interface SenpiExtensionAPI {
   /** `options.startupBookkeeping` (senpi#3329): older hosts ignore the third argument. */
   appendEntry?(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
+  /**
+   * Every subscription account's latest limit windows, polled and kept by the engine (senpi#3684).
+   * Feature-detected: older hosts expose nothing, and the panel then shows no usage section.
+   */
+  getSubscriptionLimits?(): readonly SenpiAccountLimits[]
+  onSubscriptionLimits?(listener: (limits: SenpiAccountLimits) => void): () => void
+  /** The running senpi version (code-yeongyu/senpi#3674); hosts before it report none. */
+  readonly hostVersion?: string
+  /**
+   * senpi's one upload redactor (code-yeongyu/senpi#3674), the same path `/share` uses. Feature-detected: hosts older
+   * than the release that added it expose nothing, and nothing may be uploaded without it.
+   */
+  redactForUpload?(
+    text: string,
+    options?: { readonly extraLiterals?: readonly string[] },
+  ): { readonly text: string; readonly counts: Readonly<Record<string, number>> }
+  /**
+   * The engine's session lifecycle (senpi#3864). `markRunCompleted` tells it a workflow run finished inside the
+   * current epoch, so the epoch's `done` reads `completion.kind = "run"`. Feature-detected: hosts before senpi
+   * 2026.10.23-1 expose nothing.
+   */
+  readonly lifecycle?: {
+    markRunCompleted(run: { readonly runId: string }): void
+  }
   /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
   exec?(
     command: string,
     args: string[],
     options?: { cwd?: string; timeout?: number },
   ): Promise<{ stdout: string; stderr: string; code: number }>
+}
+
+/** One account's record in senpi's subscription-limit store, as `get_subscription_limits` serves it. */
+export interface SenpiAccountLimits {
+  readonly provider: string
+  readonly account: string
+  readonly windows: readonly {
+    readonly id: string
+    readonly label: string
+    readonly windowMinutes?: number
+    readonly usedPercent: number
+    readonly resetsAt?: string
+  }[]
+  readonly reportedAt: string
+  readonly plan?: string
+  readonly error?: string
 }
 
 export interface ComponentLogger {

@@ -3,7 +3,8 @@
 // (each memory write) rebuilt all of it. Terms are interned to ids in one process-wide dictionary,
 // each document keeps two sorted typed arrays, and those arrays are cached per document object, which
 // RecallCorpusCache reuses across HEAD moves for every unchanged blob. A rebuild therefore tokenizes
-// only the changed notes and recounts document frequency from the cached arrays.
+// only the changed notes and recounts document frequency from the cached arrays. A new process can
+// also take a document's arrays from the persisted term store (bm25-store.ts) instead of tokenizing it.
 
 import type { RecallDocument } from "./provider"
 
@@ -12,12 +13,22 @@ export interface DocumentTermsInput {
   readonly length: number
 }
 
-export interface DocumentTerms {
-  readonly generation: number
+/** One document's terms outside the process dictionary: ids index a term list the holder carries. */
+export interface StoredDocumentTerms {
   /** Term ids, ascending. */
   readonly ids: Uint32Array
   readonly counts: Uint32Array
   readonly length: number
+}
+
+export interface DocumentTerms extends StoredDocumentTerms {
+  readonly generation: number
+}
+
+/** Documents' terms against a compact term list holding exactly the terms they use. */
+export interface RecallTermsSnapshot {
+  readonly terms: readonly string[]
+  readonly documents: readonly StoredDocumentTerms[]
 }
 
 export interface RecallBm25Index {
@@ -41,14 +52,17 @@ const recentLive: number[] = []
 
 let generation = 0
 let dictionary = new Map<string, number>()
+let vocabulary: string[] = []
 const DOCUMENT_TERMS = new WeakMap<RecallDocument, DocumentTerms>()
 const INDEXES = new WeakMap<readonly RecallDocument[], RecallBm25Index>()
+const ENCODED_LISTENERS = new WeakMap<readonly RecallDocument[], () => void>()
 
 function intern(term: string): number {
   const known = dictionary.get(term)
   if (known !== undefined) return known
   const id = dictionary.size
   dictionary.set(term, id)
+  vocabulary.push(term)
   return id
 }
 
@@ -66,16 +80,21 @@ function encode(input: DocumentTermsInput): DocumentTerms {
   return { generation, ids, counts: ordered, length: input.length }
 }
 
-function termsFor(document: RecallDocument, read: (document: RecallDocument) => DocumentTermsInput): DocumentTerms {
+function currentTerms(document: RecallDocument): DocumentTerms | undefined {
   const cached = DOCUMENT_TERMS.get(document)
-  if (cached !== undefined && cached.generation === generation) return cached
-  const terms = encode(read(document))
-  DOCUMENT_TERMS.set(document, terms)
-  return terms
+  return cached !== undefined && cached.generation === generation ? cached : undefined
 }
 
 function build(documents: readonly RecallDocument[], read: (document: RecallDocument) => DocumentTermsInput): RecallBm25Index {
-  const encoded = documents.map((document) => termsFor(document, read))
+  let fresh = 0
+  const encoded = documents.map((document) => {
+    const cached = currentTerms(document)
+    if (cached !== undefined) return cached
+    fresh += 1
+    const terms = encode(read(document))
+    DOCUMENT_TERMS.set(document, terms)
+    return terms
+  })
   const documentFrequency = new Uint32Array(dictionary.size)
   let live = 0
   let totalLength = 0
@@ -91,9 +110,11 @@ function build(documents: readonly RecallDocument[], read: (document: RecallDocu
   if (dictionary.size > 2 * Math.max(...recentLive) + DICTIONARY_SLACK) {
     generation += 1
     dictionary = new Map()
+    vocabulary = []
     recentLive.length = 0
     return build(documents, read)
   }
+  if (fresh > 0) ENCODED_LISTENERS.get(documents)?.()
   const terms = dictionary
   return {
     generation,
@@ -134,4 +155,37 @@ export function termCount(terms: DocumentTerms, id: number): number {
     else high = middle - 1
   }
   return 0
+}
+
+/**
+ * Calls `listener` after an index of `documents` is built that had to tokenize at least one of them,
+ * so a holder of a persisted copy (bm25-persist.ts) knows that copy is missing documents.
+ */
+export function onRecallDocumentsEncoded(documents: readonly RecallDocument[], listener: () => void): void {
+  ENCODED_LISTENERS.set(documents, listener)
+}
+
+/**
+ * The index internals a persisted store needs to seed and snapshot document terms. The store loads lazily in its
+ * own bundle (bm25-terms-transfer.ts holds the logic); only these accessors live with the index.
+ */
+export interface RecallTermAccess {
+  current(document: RecallDocument): DocumentTerms | undefined
+  /** Sets `document`'s terms from a store when it has none in the current generation. */
+  adopt(document: RecallDocument, stored: StoredDocumentTerms): void
+  intern(term: string): number
+  term(id: number): string | undefined
+  readonly vocabularySize: number
+}
+
+export const recallTermAccess: RecallTermAccess = {
+  current: currentTerms,
+  adopt(document, stored) {
+    if (currentTerms(document) === undefined) DOCUMENT_TERMS.set(document, { generation, ...stored })
+  },
+  intern,
+  term: (id) => vocabulary[id],
+  get vocabularySize() {
+    return vocabulary.length
+  },
 }

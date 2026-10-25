@@ -143,7 +143,7 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
         // The default skill discovery inside buildStartSpec reads the senpi barrel synchronously,
         // so the barrel is warmed here (memoized across every spawn in the process).
         await loadSenpiBarrel()
-        const spec = buildStartSpec(itemParams, target, parentSessionId, deps, ctx.cwd, granted?.grant)
+        const spec = buildStartSpec(itemParams, target, parentSessionId, deps, ctx.cwd, granted?.grant, ctx.model)
         if (spec.skills !== undefined) skillSummaries.set(item, spec.skills)
         return deps.manager.start(spec)
       },

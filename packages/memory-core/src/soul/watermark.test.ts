@@ -97,6 +97,38 @@ describe("consumeSoulNoticeDelta", () => {
     expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: soulSha })
   })
 
+  it("#given HEAD was read before an out-of-band soul commit landed #when consumed with that earlier HEAD #then the later commit is noticed exactly once", async () => {
+    // given: the prompt reads HEAD once and shares it; another process commits to the soul afterwards
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
+    expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toBeUndefined()
+    await commit(repo, "reference/note.md", "note\n", "note")
+    const readBefore = await repo.head()
+    const soulSha = await commit(
+      repo,
+      "system/persona.md",
+      "reflected persona\n",
+      "chore(reflection): merge run late\n\nOmo-Writer: reflection",
+    )
+    const staleHead = new Proxy(repo, {
+      get(target, property, receiver) {
+        if (property === "head") return async () => readBefore
+        const value = Reflect.get(target, property, receiver)
+        return typeof value === "function" ? value.bind(target) : value
+      },
+    })
+
+    // when
+    const duringPrompt = await consumeSoulNoticeDelta(staleHead, { noticesDir, locksDir })
+    const nextPrompt = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const after = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+
+    // then
+    const notices = [duringPrompt, nextPrompt, after].filter((notice) => notice !== undefined)
+    expect(notices).toEqual([{ sha: soulSha, subject: "chore(reflection): merge run late" }])
+    expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: soulSha })
+  })
+
   it("#given only in-band memory-tool soul commits since the watermark #when consumed #then no notice is emitted and the watermark stays put", async () => {
     // given
     const { repo, noticesDir, locksDir } = await fixture()

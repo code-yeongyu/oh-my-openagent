@@ -10,6 +10,7 @@ import type { DeviceKeyring } from "../keyring-port.ts";
 import { openBridgeSealedWrap } from "./key-material.ts";
 import { rotationAppend } from "./keyring-append.ts";
 import type {
+	KeyringAppendRequest,
 	RecoverBeginResult,
 	RecoverRefusal,
 	RecoveryBridge,
@@ -17,7 +18,7 @@ import type {
 	RecoveryTransport,
 	TransportRefusal,
 } from "./ports.ts";
-import { appendAndConfirmJoin } from "./recover-join.ts";
+import { appendAndConfirmJoin, rotationStored } from "./recover-join.ts";
 import { servedSaltInputs } from "./salt-inputs.ts";
 import { loadServedChain, recoveryCandidates } from "./served-chain.ts";
 import { holdWrites, releaseWriteHold } from "./write-hold.ts";
@@ -219,46 +220,44 @@ const recoverWithHandle = async (
 	);
 	if (!opened.ok) return refuse("wrap-refused");
 	const retained = opened.material;
+	let rotation: KeyringAppendRequest;
 	let rotated: Awaited<ReturnType<RecoveryTransport["appendKeys"]>>;
 	try {
-		rotated = await input.transport.appendKeys(
-			await rotationAppend(
-				input.keyring,
-				confirmed.head,
-				input.account,
-				confirmed.authority,
-				retained,
-				[device],
-				[confirmed.usedKey],
-			),
+		rotation = await rotationAppend(
+			input.keyring,
+			confirmed.head,
+			input.account,
+			confirmed.authority,
+			retained,
+			[device],
+			[confirmed.usedKey],
 		);
+		rotated = await input.transport.appendKeys(rotation);
 	} finally {
 		retained.current.fill(0);
 		for (const row of retained.history) row.key.fill(0);
 	}
-	input.onEvent?.("sync.recovery.recovered");
-	const readOnly: RecoverOutcome = {
-		ok: true,
-		state: "joined-read-only",
-		credentialId: recovered.credentialId,
+	const readOnly = (): RecoverOutcome => {
+		input.onEvent?.("sync.recovery.joined_read_only");
+		return {
+			ok: true,
+			state: "joined-read-only",
+			credentialId: recovered.credentialId,
+		};
 	};
-	if (!rotated.ok) return readOnly;
-	// An acknowledged rotation releases the hold only once a reload shows it stored (#10412 review r2 M2).
-	const stored = await loadServedChain(
-		input.transport,
-		input.account,
-		input.rejections,
-		anchor,
-	);
-	const storedAuthority = stored.ok ? stored.state.authority : null;
+	if (!rotated.ok) return readOnly();
 	if (
-		storedAuthority === null ||
-		storedAuthority.epoch !== confirmed.authority.epoch + 1 ||
-		storedAuthority.members.get(device.id)?.signing_public_key !==
-			device.signing_public_key
+		!(await rotationStored(
+			input,
+			anchor,
+			rotation,
+			confirmed.authority.epoch + 1,
+			device,
+		))
 	)
-		return readOnly;
+		return readOnly();
 	await releaseWriteHold(input.stateDir, input.account);
+	input.onEvent?.("sync.recovery.recovered");
 	return {
 		ok: true,
 		state: "recovered",

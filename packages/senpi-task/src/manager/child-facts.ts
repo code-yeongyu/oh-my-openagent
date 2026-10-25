@@ -1,9 +1,11 @@
 import { log } from "@oh-my-opencode/utils"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import type { ChildExtensionEvent } from "../runners/child-extension-events"
+import { currentRunStartEpoch, nextRunEpoch } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import { subscribeEffectiveModel } from "./observed-model"
+import { observeParentModelFallback, type FailedTurn } from "./parent-model-fallback"
 import { subscribeTranscriptLog } from "./transcript-log"
 
 const MOTION_EVENTS: ReadonlySet<string> = new Set(["agent_start", "turn_start", "tool_execution_start"])
@@ -16,6 +18,7 @@ export function subscribeChildFacts(input: {
   readonly now: () => number
   readonly runStats: Map<string, RunStatsTracker>
   readonly fallbackExhaustions: WeakSet<ManagedChildHandle>
+  readonly failedTurns: WeakMap<ManagedChildHandle, FailedTurn>
   readonly reopen: () => Promise<void>
   // The child demonstrably moved (a run, turn or tool started): a "resumed, waiting for input"
   // flag stamped before it no longer holds (senpi#3266).
@@ -24,10 +27,12 @@ export function subscribeChildFacts(input: {
 }): () => void {
   const { handle, taskId, now, runStats } = input
   const transcript = subscribeTranscriptLog(handle, input.store, taskId)
-  runStats.set(taskId, createRunStatsTracker(now(), now))
+  runStats.set(taskId, createRunStatsTracker(now(), now, currentRunStartEpoch(input.store.load(taskId))))
   const effectiveModel = subscribeEffectiveModel(handle, { store: input.store, taskId, now })
+  const parentFallback = observeParentModelFallback({ handle, store: input.store, taskId, now, failedTurns: input.failedTurns })
   const stats = handle.subscribe((event) => {
     if (event.type === "retry_fallback_exhausted") input.fallbackExhaustions.add(handle)
+    parentFallback(event)
     if (MOTION_EVENTS.has(event.type)) input.onMotion?.()
     runStats.get(taskId)?.accept(event)
   })
@@ -51,7 +56,9 @@ export function subscribeChildFacts(input: {
   })
   const extension = handle.subscribeExtensionEvents?.(input.onExtensionEvent)
   const resumed = handle.onSelfResumed?.(() => {
-    runStats.set(taskId, createRunStatsTracker(now(), now))
+    // The resumed turn is the run the reopen is about to start (buildRevived's nextRunEpoch).
+    const fresh = input.store.load(taskId)
+    runStats.set(taskId, createRunStatsTracker(now(), now, fresh === null ? undefined : nextRunEpoch(fresh)))
     void input.reopen().catch((error: unknown) =>
       log("senpi-task self-resumed turn reopen failed", { taskId, error: String(error) }))
   })

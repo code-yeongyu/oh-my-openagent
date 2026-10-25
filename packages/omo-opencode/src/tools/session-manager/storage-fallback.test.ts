@@ -410,7 +410,7 @@ describe("session-manager storage fallback", () => {
     const exists = await storage.sessionExists("ses_sqlite_scoped_out")
 
     expect(exists).toBe(true)
-    expect(mockClient.session.messages).toHaveBeenCalledWith({ path: { id: "ses_sqlite_scoped_out" } })
+    expect(mockClient.session.messages).toHaveBeenCalledWith({ path: { id: "ses_sqlite_scoped_out" }, query: { limit: 1 } })
   })
 
   test("#given semantic SDK error #when readSessionMessages runs #then rethrows instead of hiding bug", async () => {

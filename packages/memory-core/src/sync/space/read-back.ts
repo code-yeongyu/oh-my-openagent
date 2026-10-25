@@ -6,13 +6,17 @@
 // A key line is represented only by an active register entry or a set element of the result
 // (sync-design #454 §3): a register line is accounted for when its value is one of the key's
 // active entries, never because a joined " / " render happens to contain it, nor because a joined
-// render line is textually equal to the source line (review r10: `k: "a / b"` over the values a and b
-// is not the value "a / b"). The read rule is ACTIVE entries only, on purpose: a superseded value
+// line of the result's header is textually equal to the source line (review r10: `k: "a / b"` over
+// the values a and b is not the value "a / b"). A body line of the result is text, whatever key it
+// looks like (#10321). The read rule is ACTIVE entries only, on purpose: a superseded value
 // is no longer held, so a side file carrying only that value is kept. The write guard
 // (item/key-writers.ts addRegisterValue) is the other rule, ANY entry: a superseded value was
-// written once and is never written again. Kept-but-never-rewritten is the intended pair.
+// written once and is never written again. Kept-but-never-rewritten is the intended pair. So a
+// device that deliberately sets a key back to a value the space held earlier, through a side file,
+// does not get it adopted, and the side stays on disk: a snapshot cannot tell a revert from a stale
+// replay. Editing the main file writes the old value through an ordinary capture (#10321).
 
-import { splitItem, type FmValue } from "../item/frontmatter"
+import { splitHeader, splitItem, type FmValue } from "../item/frontmatter"
 
 const T2_HEADER =
   /^<!-- memory-sync \d{4}-\d{2}-\d{2}: the other machine had different frontmatter for .+; kept here so no fact is lost:$/
@@ -53,12 +57,12 @@ function valueSurvives(wanted: FmValue, actual: ResultFact): boolean {
   }
 }
 
-/** The result's keys: a register's components from `registers` when given, else its rendered value as one whole value. */
-function resultFacts(rendered: string, registers: ReadonlyMap<string, readonly string[]> | undefined): Map<string, ResultFact> {
+/** The result's keys: a register's components from `registers` when it has them, else its rendered value as one whole value. */
+function resultFacts(rendered: string, registers: ReadonlyMap<string, readonly string[]>): Map<string, ResultFact> {
   const facts = new Map<string, ResultFact>()
   for (const { key, value } of splitItem(rendered).fm ?? []) {
     if (value.kind === "set") facts.set(key, { kind: "set", elements: value.elements })
-    else if (value.kind === "reg") facts.set(key, { kind: "reg", values: registers?.get(key) ?? [value.value] })
+    else if (value.kind === "reg") facts.set(key, { kind: "reg", values: registers.get(key) ?? [value.value] })
   }
   return facts
 }
@@ -79,9 +83,8 @@ function isRepresentedKeyLine(line: string, facts: ReadonlyMap<string, ResultFac
   return false
 }
 
-/** A result line that renders a register of two or more components: it holds no single written value. */
-function isJoinedRegisterLine(line: string, registers: ReadonlyMap<string, readonly string[]> | undefined): boolean {
-  if (registers === undefined) return false
+/** A header line of the result that renders a register of two or more components: it holds no single written value. */
+function isJoinedRegisterLine(line: string, registers: ReadonlyMap<string, readonly string[]>): boolean {
   const entries = splitItem(`---\n${line}\n---\n`).fm
   const [entry] = entries ?? []
   return entries?.length === 1 && entry !== undefined && (registers.get(entry.key)?.length ?? 0) > 1
@@ -105,17 +108,27 @@ function droppableAllowance(source: readonly string[], hasHeader: boolean): Map<
 }
 
 /**
+ * The result's lines that count as held text. A joined register line counts for nothing, but only
+ * inside the result's own header: a body line is text, whatever key it looks like (#10321).
+ */
+function heldLines(rendered: string, registers: ReadonlyMap<string, readonly string[]>): string[] {
+  const lines = linesOf(rendered)
+  const parts = splitItem(rendered).fm === null ? null : splitHeader(rendered.replace(/^\uFEFF/, ""))
+  if (parts === null) return [...lines]
+  const headerEnd = 1 + linesOf(`${parts.header}\n`).length
+  return lines.filter((line, index) => index < 1 || index >= headerEnd || !isJoinedRegisterLine(line, registers))
+}
+
+/**
  * Name the first source line (LF text) the merged result does not hold as many times as the
  * source does, after the enumerated metadata allowance and represented key lines. Null means
- * the source is safe to delete.
+ * the source is safe to delete. `registers` is required (#10321): it is the space's active
+ * components per register key; a caller with no doc passes an empty map, which reads every
+ * rendered register as one whole value.
  */
-export function firstMissingFact(
-  rendered: string,
-  source: string,
-  registers?: ReadonlyMap<string, readonly string[]>,
-): string | null {
+export function firstMissingFact(rendered: string, source: string, registers: ReadonlyMap<string, readonly string[]>): string | null {
   const sourceLines = linesOf(source)
-  const have = countLines(linesOf(rendered).filter((line) => !isJoinedRegisterLine(line, registers)))
+  const have = countLines(heldLines(rendered, registers))
   const allowance = droppableAllowance(sourceLines, splitItem(source).fm !== null)
   const facts = resultFacts(rendered, registers)
   for (const [line, count] of countLines(sourceLines)) {

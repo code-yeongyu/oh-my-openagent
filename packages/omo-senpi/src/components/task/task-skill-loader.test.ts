@@ -8,7 +8,12 @@ import { OmoGitMasterSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
 import { createTaskSkillLoader, packagedSkillDirs } from "./task-skill-loader"
 
+const TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
 const CO_AUTHOR_TRAILER_PATTERN = /Co-authored-by:/i
+
+function occurrences(text: string, needle: string): number {
+  return text.split(needle).length - 1
+}
 
 const roots: string[] = []
 
@@ -101,10 +106,14 @@ describe("createTaskSkillLoader", () => {
     expect(resolution.prepend).not.toContain("PACKAGED BODY")
   })
 
-  test("#given default attribution settings #when the git-master skill is loaded #then the skill block stays untouched", () => {
+  test("#given default attribution settings #when the git-master skill is loaded #then the env-prefix section and one co-author directive ride the skill block", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
-    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
+    writeSkill(
+      pluginSkillsDir,
+      "GIT MASTER BODY\n\n```bash\ngit add -A .\ngit commit -m \"x\"\n```",
+      "git-master",
+    )
 
     const loader = createTaskSkillLoader({
       agentDir: tempDir(),
@@ -116,12 +125,30 @@ describe("createTaskSkillLoader", () => {
 
     expect(resolution.resolved).toEqual(["git-master"])
     expect(resolution.prepend).toContain("GIT MASTER BODY")
-    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
-    expect(resolution.prepend).not.toContain("sisyphus-dev-ai")
+    expect(resolution.prepend).toContain("GIT COMMAND PREFIX (MANDATORY)")
+    expect(resolution.prepend).toContain("GIT_MASTER=1 git add -A .")
+    expect(resolution.prepend).toContain('GIT_MASTER=1 git commit -m "x"')
+    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
+    expect(resolution.prepend).toContain("GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit")
     expect(resolution.prepend).not.toContain("Ultraworked with")
   })
 
-  test("#given the footer opted in #when the git-master skill is loaded #then only the footer directive rides the skill block", () => {
+  test("#given a git-master skill file that already carries the attribution directive #when it is loaded #then the directive is not appended again", () => {
+    const cwd = tempDir()
+    const pluginSkillsDir = tempDir()
+    const loadSettings = () => OmoGitMasterSettingsSchema.parse({ git_env_prefix: "" })
+    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
+    const firstLoad = createTaskSkillLoader({ agentDir: tempDir(), homeDir: tempDir(), pluginSkillsDirs: [pluginSkillsDir], loadSettings })
+    const firstSkill = firstLoad(["git-master"], cwd).skills?.find((skill) => skill.name === "git-master")
+    const savedDir = tempDir()
+    writeSkill(savedDir, firstSkill?.content ?? "", "git-master")
+
+    const resolution = createTaskSkillLoader({ agentDir: tempDir(), homeDir: tempDir(), pluginSkillsDirs: [savedDir], loadSettings })(["git-master"], cwd)
+
+    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
+  })
+
+  test("#given the footer opted in #when the git-master skill is loaded #then the footer and the co-author ride the skill block", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
@@ -136,11 +163,11 @@ describe("createTaskSkillLoader", () => {
 
     expect(resolution.prepend).toContain("GIT MASTER BODY")
     expect(resolution.prepend).toContain("Ultraworked with")
-    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
-    expect(resolution.prepend).not.toContain("users.noreply.github.com")
+    expect(resolution.prepend).toContain("GIT COMMAND PREFIX (MANDATORY)")
+    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
   })
 
-  test("#given attribution disabled #when the git-master skill is loaded #then the skill block stays untouched", () => {
+  test("#given attribution disabled and the env prefix disabled #when the git-master skill is loaded #then the skill block stays untouched", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
@@ -150,13 +177,42 @@ describe("createTaskSkillLoader", () => {
       homeDir: tempDir(),
       pluginSkillsDirs: [pluginSkillsDir],
       loadSettings: () =>
-        OmoGitMasterSettingsSchema.parse({ commit_footer: false, include_co_authored_by: false }),
+        OmoGitMasterSettingsSchema.parse({ commit_footer: false, include_co_authored_by: false, git_env_prefix: "" }),
     })
     const resolution = loader(["git-master"], cwd)
 
     expect(resolution.prepend).toContain("GIT MASTER BODY")
+    expect(resolution.prepend).not.toContain("GIT COMMAND PREFIX (MANDATORY)")
     expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
     expect(resolution.prepend).not.toContain("Ultraworked with")
+  })
+
+  test("#given senpi started from a non-bash login shell #when the git-master skill is loaded #then the prefix uses the bash form senpi's bash tool runs", () => {
+    const saved = { SHELL: process.env["SHELL"], PSModulePath: process.env["PSModulePath"] }
+    try {
+      process.env["SHELL"] = "/bin/tcsh"
+      process.env["PSModulePath"] = "C:\\Program Files\\PowerShell\\Modules"
+      const cwd = tempDir()
+      const pluginSkillsDir = tempDir()
+      writeSkill(pluginSkillsDir, "GIT MASTER BODY\n\n```bash\ngit status\n```", "git-master")
+
+      const loader = createTaskSkillLoader({
+        agentDir: tempDir(),
+        homeDir: tempDir(),
+        pluginSkillsDirs: [pluginSkillsDir],
+        loadSettings: () => OmoGitMasterSettingsSchema.parse({}),
+      })
+      const resolution = loader(["git-master"], cwd)
+
+      expect(resolution.prepend).toContain("\nGIT_MASTER=1 git status\n```")
+      expect(resolution.prepend).not.toContain("setenv")
+      expect(resolution.prepend).not.toContain("$env:")
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
   })
 
   test("#given the footer opted in #when a non-git-master skill is loaded #then no directive is injected", () => {

@@ -164,6 +164,54 @@ describe("resolveModelProfile", () => {
 })
 
 describe("builtin chain routing", () => {
+  it("resolves daily-normal to a custom models.json provider that is the only one serving its Opus id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["my-claude-proxy/claude-opus-5-5"],
+      customProviders: [{ provider: "my-claude-proxy", modelIds: ["claude-opus-5-5"] }],
+    })
+
+    expect(result).toMatchObject({
+      kind: "resolved",
+      provider: "my-claude-proxy",
+      modelId: "claude-opus-5-5",
+      reasoning: "medium",
+    })
+  })
+
+  it("keeps a listed built-in provider ahead of a custom provider serving the same id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["my-claude-proxy/claude-opus-5-5", OPUS_SUBSCRIPTION],
+      customProviders: [{ provider: "my-claude-proxy", modelIds: ["claude-opus-5-5"] }],
+    })
+
+    expect(result).toMatchObject({ kind: "resolved", provider: "anthropic-subscription", modelId: "claude-opus-5-5" })
+  })
+
+  it("picks the first declared custom provider when two serve the rung's id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["proxy-b/claude-opus-5-5", "proxy-a/claude-opus-5-5"],
+      customProviders: [
+        { provider: "proxy-a", modelIds: ["claude-opus-5-5"] },
+        { provider: "proxy-b", modelIds: ["claude-opus-5-5"] },
+      ],
+    })
+
+    expect(result).toMatchObject({ kind: "resolved", provider: "proxy-a", modelId: "claude-opus-5-5" })
+  })
+
+  it("still skips a gateway's vendor-prefixed copy and an undeclared provider serving the bare id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["opengateway/anthropic/claude-opus-5-5", "openrouter/claude-opus-5-5"],
+      customProviders: [{ provider: "opengateway", modelIds: ["claude-opus-5-5"] }],
+    })
+
+    expect(result.kind).toBe("unavailable")
+  })
+
   it("keeps daily-heavy on the Claude subscription when an OpenCode Zen key serves the same model", () => {
     const result = resolveModelProfile({ active: "daily-heavy", availableModels: [FABLE_ZEN, FABLE] })
 
@@ -198,7 +246,37 @@ describe("builtin chain routing", () => {
     }
   })
 
-  it("resolves geeky-normal to gpt-6.1-sol medium when the subscription serves it next to gpt-5.6-sol", () => {
+  it("resolves geeky-normal to gpt-6-astra medium when the subscription serves it beside the Sol tiers", () => {
+    const result = resolveModelProfile({ active: "geeky-normal", availableModels: [ASTRA, SOL_61, SOL_56] })
+
+    expect(result).toMatchObject({
+      kind: "resolved",
+      provider: "chatgpt-subscription",
+      modelId: "gpt-6-astra",
+      reasoning: "medium",
+    })
+  })
+
+  it("carries the Obsessive caution onto the resolved profile; an overlay inherits it and can replace it", () => {
+    const builtin = resolveModelProfile({ active: "geeky-normal", availableModels: [ASTRA] })
+    expect(builtin).toMatchObject({ kind: "resolved", profile: { caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK." } })
+
+    const inherited = resolveModelProfile({
+      profiles: { "geeky-normal": { models: [ASTRA] } },
+      active: "geeky-normal",
+      availableModels: [ASTRA],
+    })
+    expect(inherited).toMatchObject({ kind: "resolved", profile: { caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK." } })
+
+    const replaced = resolveModelProfile({
+      profiles: { "geeky-normal": { caution: "Handle with care.", models: [ASTRA] } },
+      active: "geeky-normal",
+      availableModels: [ASTRA],
+    })
+    expect(replaced).toMatchObject({ kind: "resolved", profile: { caution: "Handle with care." } })
+  })
+
+  it("resolves geeky-normal to gpt-6.1-sol medium when the subscription serves it next to gpt-5.6-sol and no Astra", () => {
     const result = resolveModelProfile({ active: "geeky-normal", availableModels: [SOL_56, SOL_61] })
 
     expect(result).toMatchObject({
@@ -234,7 +312,7 @@ describe("builtin chain routing", () => {
     })
   })
 
-  it("does not fall back to a GPT-6 model when geeky-normal's gpt-5.6-sol is missing", () => {
+  it("does not resolve an unranked GPT-6 Sol id when none of geeky-normal's rungs is served", () => {
     const result = resolveModelProfile({
       active: "geeky-normal",
       availableModels: [SOL_COPILOT, SOL_FAST],
@@ -380,7 +458,7 @@ describe("builtin chain routing", () => {
 
     expect(result).toEqual({
       kind: "resolved",
-      profile: { id: "geeky-normal", displayName: "Geeky · Normal", source: "user", family: "geeky", tier: "normal" },
+      profile: { id: "geeky-normal", displayName: "Obsessive · Normal", caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.", source: "user", family: "geeky", tier: "normal" },
       provider: "openai",
       modelId: "gpt-6-sol",
       reasoning: "high",

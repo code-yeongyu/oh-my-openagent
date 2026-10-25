@@ -77,12 +77,35 @@ const NAMED_KEYS = new Set([
   "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown",
 ]);
 
+export const DEFAULT_WAIT_FOR_TIMEOUT_MS = 10000;
+const WAIT_FOR_POLL_MS = 100;
+
+// `{WaitFor:<text>}` polls the rendered xterm buffer until it contains <text>,
+// so later tokens are not typed into a TUI that is still starting. A missing
+// marker fails loudly instead of falling through to the next token.
+async function waitForScreenText(page, text, timeoutMs) {
+  if (text === "") throw new Error("{WaitFor:} needs the text to wait for, e.g. {WaitFor:❯}");
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const screen = await page.evaluate(() => window.__screenText());
+    if (typeof screen === "string" && screen.includes(text)) return;
+    if (Date.now() >= deadline) {
+      throw new Error(`{WaitFor:${text}} timed out after ${timeoutMs} ms: the text never appeared in the terminal buffer`);
+    }
+    await new Promise((r) => setTimeout(r, Math.min(WAIT_FOR_POLL_MS, Math.max(0, deadline - Date.now()))));
+  }
+}
+
 // An `input` token wrapped in {Braces} is pressed as a named key; anything else
 // is typed literally. Both flow through the browser terminal (xterm onData ->
 // pty), so the interaction is genuinely driven in the web terminal.
-export async function driveInput(page, inputs, keyDelayMs) {
+export async function driveInput(page, inputs, keyDelayMs, { waitForTimeoutMs = DEFAULT_WAIT_FOR_TIMEOUT_MS } = {}) {
   for (const raw of inputs) {
     const match = /^\{(.+)\}$/.exec(raw);
+    if (match?.[1].startsWith("WaitFor:")) {
+      await waitForScreenText(page, match[1].slice("WaitFor:".length), waitForTimeoutMs);
+      continue;
+    }
     if (
       match?.[1] === "CtrlSlashByte" ||
       match?.[1] === "Ctrl7Byte"
@@ -125,7 +148,7 @@ function chromeCandidates(explicit) {
   return c.filter((x) => x && (x.includes("/") || x.includes("\\") ? existsSync(x) : true));
 }
 
-async function captureLive({ command, cwd, cols, rows, inputs, dwellMs, keyDelayMs, chromeBin, fromFile, redactStream }) {
+async function captureLive({ command, cwd, cols, rows, inputs, dwellMs, keyDelayMs, waitForTimeoutMs, chromeBin, fromFile, redactStream }) {
   healSpawnHelper();
   const puppeteer = (await import("puppeteer-core")).default;
   const executablePath = chromeCandidates(chromeBin)[0];
@@ -170,7 +193,7 @@ async function captureLive({ command, cwd, cols, rows, inputs, dwellMs, keyDelay
       });
       await new Promise((r) => setTimeout(r, 400));
       await page.focus("#t");
-      if (inputs.length) await driveInput(page, inputs, keyDelayMs);
+      if (inputs.length) await driveInput(page, inputs, keyDelayMs, { waitForTimeoutMs });
       await new Promise((r) => setTimeout(r, dwellMs));
       cleanupParts.push(`pty pid ${ptyProc.pid} killed`);
     }

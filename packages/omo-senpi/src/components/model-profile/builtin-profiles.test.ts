@@ -36,13 +36,20 @@ describe("BUILTIN_MODEL_PROFILES", () => {
   it("labels each profile by lane and gives every profile a distinct family/tier pair", () => {
     expect(BUILTIN_MODEL_PROFILES["daily-normal"]?.displayName).toBe("Daily · Normal")
     expect(BUILTIN_MODEL_PROFILES["daily-heavy"]?.displayName).toBe("Daily · Heavy")
-    expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.displayName).toBe("Geeky · Normal")
-    expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.displayName).toBe("Geeky · Heavy")
+    expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.displayName).toBe("Obsessive · Normal")
+    expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.displayName).toBe("Obsessive · Heavy")
     const pairs = LANE_IDS.map((id) => `${BUILTIN_MODEL_PROFILES[id]?.family}:${BUILTIN_MODEL_PROFILES[id]?.tier}`)
     expect(pairs).toEqual(["daily:normal", "daily:heavy", "geeky:normal", "geeky:heavy"])
     for (const id of EXPECTED_IDS) {
       expect(BUILTIN_MODEL_PROFILES[id]?.description.length ?? 0).toBeGreaterThan(0)
     }
+  })
+
+  it("carries the bold caution only on the Obsessive lanes", () => {
+    expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.caution).toBe("NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.")
+    expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.caution).toBe("NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.")
+    expect(BUILTIN_MODEL_PROFILES["daily-normal"]?.caution).toBeUndefined()
+    expect(BUILTIN_MODEL_PROFILES["daily-heavy"]?.caution).toBeUndefined()
   })
 
   it("starts unset config on Daily · Normal, then the other lanes in order; (#10029)", () => {
@@ -126,8 +133,9 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     ])
   })
 
-  it("runs geeky-normal as gpt-6.1-sol-fast then gpt-6.1-sol medium on the OpenAI lanes, then gpt-5.6-sol medium on every GPT lane", () => {
+  it("runs geeky-normal as gpt-6-astra medium on every GPT lane, then gpt-6.1-sol-fast and gpt-6.1-sol medium on the OpenAI lanes, then gpt-5.6-sol medium on every GPT lane", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.models).toEqual([
+      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "medium" },
       { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "medium" },
       { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
       { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },

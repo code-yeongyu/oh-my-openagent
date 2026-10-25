@@ -72,10 +72,6 @@ function collectEdges(declarations: readonly Declaration[]): Map<Side, Edge> {
 }
 
 export type Corner = "tl" | "tr" | "br" | "bl"
-export const ALL_CORNERS: ReadonlySet<Corner> = new Set(["tl", "tr", "br", "bl"])
-export const SIDE_CORNERS: Readonly<Record<Side, readonly [Corner, Corner]>> = {
-	top: ["tl", "tr"], right: ["tr", "br"], bottom: ["br", "bl"], left: ["tl", "bl"],
-}
 const CORNER_LONGHAND: Readonly<Record<string, Corner>> = {
 	"top-left": "tl", "top-right": "tr", "bottom-right": "br", "bottom-left": "bl",
 	"start-start": "tl", "start-end": "tr", "end-end": "br", "end-start": "bl",
@@ -104,18 +100,31 @@ export function roundedCorners(declarations: readonly Declaration[]): Set<Corner
 	return corners
 }
 
-export function hasEdgeStripe(declarations: readonly Declaration[], corners: ReadonlySet<Corner> = ALL_CORNERS): boolean {
-	const bySide = collectEdges(declarations)
-	const edges = [...bySide.values()]
-	const isStripe = (e: Edge) => !e.hidden && (e.width ?? 0) >= MIN_STRIPE_PX && e.color === "chromatic"
-	const bent = SIDES.some((s) => {
-		const edge = bySide.get(s)
-		return edge !== undefined && isStripe(edge) && SIDE_CORNERS[s].some((c) => corners.has(c))
-	})
-	if (!bent) return false
+const isStripe = (e: Edge) => !e.hidden && (e.width ?? 0) >= MIN_STRIPE_PX && e.color === "chromatic"
+
+export function hasEdgeStripe(declarations: readonly Declaration[]): boolean {
+	const edges = [...collectEdges(declarations).values()]
+	if (!edges.some(isStripe)) return false
 	const first = edges[0]
 	const uniform = edges.every((e) => e.width === first?.width && e.color === first?.color && e.hidden === first?.hidden)
 	return !uniform
+}
+
+function isInsetRing(value: string): boolean {
+	return splitTopLevel(value, ",").some((layer) => {
+		const tokens = splitTopLevel(layer, " ")
+		if (!tokens.some((t) => t.toLowerCase() === "inset")) return false
+		const [x = 0, y = 0, blur = 0, spread = 0] = tokens.map(parseLength).filter((n): n is number => n !== undefined)
+		return x === 0 && y === 0 && blur === 0 && spread >= MIN_STRIPE_PX && tokens.some((t) => looksLikeColor(t) && classifyColor(t) === "chromatic")
+	})
+}
+
+/** A uniform accent border (not a gradient border-image) or inset ring of MIN_STRIPE_PX or more. */
+export function hasAccentOutline(declarations: readonly Declaration[]): boolean {
+	const image = declarations.some(({ prop }) => prop === "border-image" || prop === "border-image-source")
+	const edges = [...collectEdges(declarations).values()]
+	const frame = !image && edges.every((e) => isStripe(e) && e.width === edges[0]?.width)
+	return frame || declarations.some(({ prop, value }) => prop === "box-shadow" && isInsetRing(value))
 }
 
 export function hasRadius(declarations: readonly Declaration[]): boolean {

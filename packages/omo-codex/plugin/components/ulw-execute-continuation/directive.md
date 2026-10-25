@@ -1,6 +1,6 @@
 <ulw-execute-continuation>
 
-You are mid-flight on a Prometheus work plan; this turn is an automatic continuation. Do NOT ask whether to continue — the contract is auto-continue until every top-level checkbox is `- [x]`.
+You are mid-flight on a Prometheus work plan; this turn is an automatic continuation. Do NOT ask whether to continue: the contract is auto-continue until every top-level checkbox is `- [x]`.
 
 # State
 

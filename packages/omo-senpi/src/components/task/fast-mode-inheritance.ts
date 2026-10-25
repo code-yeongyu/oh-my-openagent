@@ -1,4 +1,4 @@
-import { isPriorityAliasOf, type ResolvedChildPlan } from "@oh-my-opencode/senpi-task"
+import { isPriorityAliasOf, type PriorityPairingRegistry, type ResolvedChildPlan } from "@oh-my-opencode/senpi-task"
 
 import type { TaskModelRegistry } from "./planner"
 import type { ParentServiceTier } from "./runtime-context"
@@ -28,8 +28,8 @@ function splitModelReference(reference: string): ModelReference | undefined {
   return { provider: reference.slice(0, slash), id: reference.slice(slash + 1) }
 }
 
-function asFastVariant(candidate: unknown, base: ModelReference): FastVariant | undefined {
-  return isPriorityAliasOf(candidate, base)
+function asFastVariant(candidate: unknown, base: ModelReference, registry: PriorityPairingRegistry): FastVariant | undefined {
+  return isPriorityAliasOf(candidate, base, registry)
     ? { provider: base.provider, id: `${base.id}${FAST_MODEL_SUFFIX}`, upstreamModelId: base.id, serviceTier: "priority" }
     : undefined
 }
@@ -44,13 +44,13 @@ function asFastVariant(candidate: unknown, base: ModelReference): FastVariant | 
  */
 export function inheritParentFastMode(
   plan: ResolvedChildPlan,
-  registry: TaskModelRegistry | undefined,
+  registry: (TaskModelRegistry & PriorityPairingRegistry) | undefined,
   parentServiceTier: ParentServiceTier | undefined,
 ): ResolvedChildPlan {
   if (parentServiceTier !== "priority" || registry === undefined) return plan
   const base = splitModelReference(plan.model)
   if (base === undefined || base.id.endsWith(FAST_MODEL_SUFFIX)) return plan
-  const variant = asFastVariant(registry.find(base.provider, `${base.id}${FAST_MODEL_SUFFIX}`), base)
+  const variant = asFastVariant(registry.find(base.provider, `${base.id}${FAST_MODEL_SUFFIX}`), base, registry)
   if (variant === undefined) return plan
   const model = `${variant.provider}/${variant.id}`
   return {

@@ -903,7 +903,7 @@ describe("dag tool control verb refusal vocabulary", () => {
 })
 
 describe("dag tool control verb schema", () => {
-  test("#given the shipped tool #when its action union is read #then retry, send, and amend are offered with verb-teaching descriptions", () => {
+  test("#given the shipped tool #when its action union is read #then retry, send, amend, resume, cancel_node, and guide are offered", () => {
     // given
     const { manager } = fixture()
 
@@ -921,6 +921,9 @@ describe("dag tool control verb schema", () => {
       "retry",
       "send",
       "amend",
+      "resume",
+      "cancel_node",
+      "guide",
     ])
     expect(action.description).toContain("retry")
     expect(action.description).toContain("send")

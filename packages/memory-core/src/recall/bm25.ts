@@ -94,7 +94,8 @@ export function recallTerms(text: string): string[] {
   return tokenizeRecallText(text).map(stemEnglishToken)
 }
 
-function documentTerms(document: RecallDocument): DocumentTermsInput {
+/** A document's index terms and BM25 length: what the index and the persisted term store hold. */
+export function recallDocumentTerms(document: RecallDocument): DocumentTermsInput {
   const { tokens, standaloneHanCharacters } = tokenize(`${document.description}\n${document.body}`)
   // The stand-alone Han characters repeat text the run and its bigrams already count. Leaving them out
   // keeps every length as it was, so planned queries that hold no Han character after NFKC rank and
@@ -172,7 +173,7 @@ export function rankRecallDocumentsBm25(
   const queryTerms = [...new Set(queries.flatMap(recallTerms))]
   if (queryTerms.length === 0 || documents.length === 0) return []
 
-  const index = recallBm25IndexFor(documents, documentTerms)
+  const index = recallBm25IndexFor(documents, recallDocumentTerms)
   const averageLength = index.averageLength > 0 ? index.averageLength : 1
   const termScore = (id: number | undefined, terms: DocumentTerms): number => {
     if (id === undefined) return 0

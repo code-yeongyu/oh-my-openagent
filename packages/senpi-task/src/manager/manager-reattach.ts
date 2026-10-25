@@ -18,8 +18,8 @@ async function letGoOfRejected(handle: ManagedChildHandle): Promise<void> {
 
 /**
  * Bind a freshly respawned handle back onto its record: verify this host still holds the claim,
- * refuse a task that already has a live handle, then either refresh a terminal record's launch
- * facts or open a NEW run epoch for a continuing one. Every failure path tears the handle down, so
+ * refuse a task that already has a live handle, then refresh a terminal or paused record's launch
+ * facts or open a NEW run epoch for an ordinary continuing one. Every failure path tears the handle down, so
  * a rejected reattach never leaves a child nobody owns.
  */
 export async function reattachManagedTask(input: {
@@ -66,9 +66,10 @@ export async function reattachManagedTask(input: {
     attached = true
     const reconciled = input.store.load(fresh.task_id)
     if (reconciled !== null) fresh = reconciled
-    if (isTerminalRecord(fresh)) {
-      // The result stays, but the child now lives behind THIS handle: a daemon session reopened on a
-      // newer generation answers under a new instance and routing id, so its identity is restamped.
+    if (isTerminalRecord(fresh) || fresh.status === "paused") {
+      // Binding a paused child only restores control. Run Resume owns its next
+      // turn and subscription; observing the aborted old turn here would end it.
+      // A daemon reopened on a newer generation also needs its identity restamped.
       const identity = childIdentityOf(input.handle)
       const sessionId = input.handle.sessionId
       const childSession = sessionId === undefined || sessionId.length === 0 ? {} : { child_session_id: sessionId }

@@ -56,7 +56,7 @@ describe("omo doctor config lines", () => {
     const home = homeWithUserConfig(`{ "categories": { "plan-consultant": { "models": [{ "model": "provider/sonnet" }] }, "quick": { "model": "provider/quick" } } }`)
 
     expect(configDoctorLines({ cwd: home, env: { HOME: home } })).toEqual([
-      'WARN config: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": [{"model":"provider/sonnet"}] } }',
+      'WARN config: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": [{"model":"provider/sonnet"}] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning',
     ])
   })
 

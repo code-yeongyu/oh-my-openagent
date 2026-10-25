@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
+import { locales } from "../i18n/config"
 
-const LOCALES = ["en", "ko", "ja", "zh"] as const
+const LOCALES = locales
 
 test.describe("Work surface readability", () => {
   for (const locale of LOCALES) {

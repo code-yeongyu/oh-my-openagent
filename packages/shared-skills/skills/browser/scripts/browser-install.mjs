@@ -36,7 +36,7 @@ if (json) {
   console.log(`attached engine ready: ${summary.browsersConnected.map((b) => `${b.name} ${b.version}`).join(", ")}`)
 } else {
   console.log(`cli: ${result.cli.installed ? `${result.cli.bskBin} (${result.cli.version})` : "install failed"}`)
-  console.log(`daemon: ${result.daemon.running ? "running" : `not running${result.daemon.error ? ` — ${result.daemon.error}` : ""}`}`)
+  console.log(`daemon: ${result.daemon.running ? "running" : `not running${result.daemon.error ? ` - ${result.daemon.error}` : ""}`}`)
   console.log(summary.browser ? `browser: ${summary.browser.label} [${summary.browser.id}] (${summary.browser.reason})` : `browser: not identified (${result.identification.reason})`)
   for (const r of summary.registrations) {
     console.log(`extension for ${r.browser}: ${r.registered ? (r.alreadyPresent ? "already registered" : "registered") : `not registered (${r.reason})`}`)

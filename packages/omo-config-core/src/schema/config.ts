@@ -13,7 +13,7 @@ import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
-import { OmoGatewaySectionSchema } from "./gateway"
+import { OmoProvenanceSettingsSchema } from "./provenance"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -26,9 +26,16 @@ export const OmoOpenCodeHarnessConfigSchema = z.record(z.string(), z.unknown())
  */
 export const OmoDisabledSkillsSchema = z.array(z.string())
 
+/**
+ * Models no category, agent, model profile or task pin may run. An entry is `provider/model` or a
+ * bare model id (any provider), `*` matches any run of characters, case-insensitively. Like
+ * `disabled_skills`, every layer's list is unioned (`collectExcludedModels`).
+ */
+export const OmoExcludedModelsSchema = z.array(z.string())
+
 export const OmoTypedHarnessConfigSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  gateway: OmoGatewaySectionSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -42,9 +49,11 @@ export const OmoTypedHarnessConfigSchema = z.object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
 }).strict()
 
 export const OmoConfigProfileSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -59,6 +68,7 @@ export const OmoConfigProfileSchema = z.object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -66,8 +76,8 @@ export const OmoConfigProfileSchema = z.object({
 }).strict()
 
 export const OmoConfigSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
-  gateway: OmoGatewaySectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -82,6 +92,7 @@ export const OmoConfigSchema = z.object({
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
@@ -92,8 +103,8 @@ export const OmoConfigSchema = z.object({
 }).strict()
 
 export const OmoConfigLayerSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  gateway: OmoGatewaySectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -108,6 +119,7 @@ export const OmoConfigLayerSchema = z.object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),

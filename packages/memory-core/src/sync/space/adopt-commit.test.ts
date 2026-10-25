@@ -125,6 +125,29 @@ describe("the deletion gate reads back BOTH sides of the committed item: its ren
     }
   })
 
+  test("#10321: a body line under a joined key is text, so a side holding only that line is deleted", async () => {
+    const { doc, base } = await space("---\nk: x\n---\nk: zzz\n")
+    try {
+      const other = await newDoc("2")
+      try {
+        other.import(doc.export({ mode: "snapshot" }))
+        captureInto(other, base, itemFrontier(other), "---\nk: b\n---\nk: zzz\n")
+        captureInto(doc, base, itemFrontier(doc), "---\nk: a\n---\nk: zzz\n")
+        doc.import(other.export({ mode: "update", from: doc.oplogVersion() }))
+      } finally {
+        other.free()
+      }
+      const joined = renderDocContent(doc)
+      expect(joined).toBe('---\nk: "a / b"\n---\nk: zzz\n')
+      const files = [{ path: SIDE, text: "k: zzz\n" }]
+      const plan = planAdoption(files, stateOf(doc, joined))
+      expect(plan.removalCandidates).toEqual([SIDE])
+      expect(confirmRemovals(doc, plan, files)).toEqual({ remove: [SIDE], retained: [] })
+    } finally {
+      doc.free()
+    }
+  })
+
   test("render side: a body line the committed item does not hold keeps the side, whatever the registers hold", async () => {
     const { doc, base } = await space("---\nd: space\n---\nx\n")
     try {

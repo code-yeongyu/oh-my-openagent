@@ -4,14 +4,17 @@ import { join } from "node:path"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { doctorCoverageLines } from "./category-coverage.js"
+import { runDoctorModels } from "./model-chains.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
 import { doctorConfigLines } from "./config-doctor.js"
 import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
+import { reflectionLockReport } from "./doctor-reflection-lock.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
+import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
@@ -130,6 +133,7 @@ export function rollbackMigrateCall(request) {
 
 export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
+  removeLegacyServiceCredentials()
   reportLegacyFlatAdoption()
   const command = args[0]
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
@@ -177,26 +181,25 @@ export async function runLauncher(args = process.argv.slice(2)) {
   if (command === "doctor") {
     // Doctor is a launch too: it reports only what the launch-time preparation could not fix.
     preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
-    const [categoryCoverage, computerUse, configDiagnostics, gateway] = args[1] === "--reap"
+    if (args[1] === "--models") {
+      process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
+      return
+    }
+    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock] = args[1] === "--reap"
       ? [[], [], [], []]
       : await Promise.all([
           doctorCoverageLines({ agentDir: canonicalAgentDir() }),
           doctorComputerUseLines(),
           doctorConfigLines(),
-          import("./gateway.js").then((hook) => hook.gatewayDoctorLines()),
+          reflectionLockReport(),
         ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
       categoryCoverage,
       computerUse,
       configDiagnostics,
-      gateway,
+      reflectionLock,
     })
-    return
-  }
-  if (command === "gateway") {
-    const { runGatewayCommand } = await import("./gateway.js")
-    process.exitCode = await runGatewayCommand(args.slice(1))
     return
   }
   if (command === "setup") {

@@ -11,6 +11,8 @@ export interface ListenerRegistrations {
   subscribeExtensionEvents(listener: ChildExtensionListener): () => void
   onParked(listener: (event: HostSessionParked) => void): () => boolean
   onReplaced(listener: (event: HostSessionReplaced) => void): () => boolean
+  /** A durable session id learned after spawn (the open's own read failed); #10873. */
+  onDurableSessionId(listener: (id: string) => void): () => boolean
   onTurnResumed(listener: () => void): () => boolean
   onSelfResumed(listener: () => void): () => boolean
 }
@@ -21,6 +23,7 @@ export interface HandleListeners {
   emitEvent(event: ChildEvent): void
   emitParked(event: HostSessionParked): void
   emitReplaced(event: HostSessionReplaced): void
+  emitDurableSessionId(id: string): void
   emitTurnResumed(): void
   emitSelfResumed(): void
   clearActive(): void
@@ -69,6 +72,7 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
   }
   const parkedListeners = new Set<(event: HostSessionParked) => void>()
   const replacedListeners = new Set<(event: HostSessionReplaced) => void>()
+  const durableIdListeners = new Set<(id: string) => void>()
   const turnResumedListeners = new Set<() => void>()
   const resumedListeners = new Set<() => void>()
   let earlyResume = false
@@ -87,6 +91,10 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     onReplaced: (listener) => {
       replacedListeners.add(listener)
       return () => replacedListeners.delete(listener)
+    },
+    onDurableSessionId: (listener) => {
+      durableIdListeners.add(listener)
+      return () => durableIdListeners.delete(listener)
     },
     onTurnResumed: (listener) => {
       turnResumedListeners.add(listener)
@@ -118,6 +126,9 @@ export function createHandleListeners(options: HandleListenersOptions = {}): Han
     },
     emitReplaced: (event) => {
       for (const listener of replacedListeners) listener(event)
+    },
+    emitDurableSessionId: (id) => {
+      for (const listener of durableIdListeners) listener(id)
     },
     emitTurnResumed: () => {
       for (const listener of turnResumedListeners) listener()

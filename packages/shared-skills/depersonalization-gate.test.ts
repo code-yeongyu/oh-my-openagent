@@ -22,16 +22,17 @@ describe("#given the vendored shared skills #when the de-personalization gate ru
 		expect(violations).toEqual([]);
 	});
 
-	test("#then a planted personal token (jobdori) is caught", async () => {
+	test("#then a planted personal host token is caught case-insensitively", async () => {
 		// given
 		const dir = await mkdtemp(join(tmpdir(), "dp-gate-"));
 		try {
-			await writeFile(join(dir, "x.md"), "see jobdori machine for the build\n");
+			const host = String.fromCharCode(106, 111, 98, 100, 111, 114, 105);
+			await writeFile(join(dir, "x.md"), `see ${host} machine for the build\nsee ${host.toUpperCase()} too\n`);
 			// when
 			const violations = await runDepersonalizationGate([dir], dir);
 			// then
-			expect(violations.length).toBeGreaterThan(0);
-			expect(violations.some((v) => v.label.includes("jobdori"))).toBe(true);
+			expect(violations).toHaveLength(2);
+			expect(violations.every((v) => v.label === `personal-host:${host}`)).toBe(true);
 		} finally {
 			await rm(dir, { recursive: true, force: true });
 		}

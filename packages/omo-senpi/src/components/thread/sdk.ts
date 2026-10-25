@@ -9,6 +9,7 @@ import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
 import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/bindings"
 import type { GatewayRelay, RelayResult } from "./gateway/relay"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { resolveProvenance, type ProvenanceWorkspaces } from "./gateway/provenance-resolver"
 import type { ReportOpResult } from "./gateway/store-relay-ops"
 import type { StoreExtensionApi } from "./gateway/store-extensions"
 export type { StoreExtensionApi, StoreExtensionRegistration, StoreExtensionTransaction, StoreExtensionOperation, StoreExtensionResult, StoreExtensionRefusal, StoreExtensionRefusalCode } from "./gateway/store-extensions"
@@ -26,6 +27,11 @@ export type ThreadSdkOptions = {
   readonly uid: number
   readonly user: string
   readonly env?: Readonly<Record<string, string | undefined>>
+  /**
+   * The caller's `provenance.workspaces` table. The SDK is a standalone build that does not read omo.json itself;
+   * without a table, sends are classified by the caller's environment (`OMO_PROVENANCE_*`) and git owner only.
+   */
+  readonly provenanceWorkspaces?: ProvenanceWorkspaces
   /** The engine's `host status --all --include-workers --json` stdout; the caller owns how the engine is run. */
   readonly engineStatusAll?: () => Promise<string | undefined>
   /** Where the store worker sidecar is resolved from when this SDK is not loaded from `omo.js`. */
@@ -102,9 +108,10 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     env,
     ...(engineStatusAll === undefined ? {} : { statusAll: async () => parseHostStatusAll(await engineStatusAll()) }),
   })
-  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, resolveTarget: (address, request) => resolveForExtension(address, request), ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
+  const store = options.store ?? createGatewayStore({ agentDir: options.agentDir, senderProvenance: () => resolveProvenance({ cwd: options.cwd, env, ...(options.provenanceWorkspaces === undefined ? {} : { workspaces: options.provenanceWorkspaces }) }), resolveTarget: (address, request) => resolveForExtension(address, request), ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }) })
   const now = options.now ?? store.now
-  const surface: ThreadToolSurfaceOptions = { host, store, stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }
+  const workspaces = options.provenanceWorkspaces
+  const surface: ThreadToolSurfaceOptions = { host, store, env, ...(workspaces === undefined ? {} : { loadProvenanceWorkspaces: () => workspaces }), stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }
   const view = () => hostView(surface)
   const { engine, relay, endpoints, locate } = createGatewayServices(surface, () => hostView(surface, { offline: true }))
   // An extension call resolves its target while the store worker runs that call's transaction, so it

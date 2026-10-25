@@ -1,0 +1,6 @@
+export { type ApproveOutcome, approveDevice } from "./approve.ts"
+export { deviceKeyringFromMaterial } from "./device-keyring.ts"
+export { type EnableOutcome, enableSync } from "./enable.ts"
+export { type AccountHttp, AccountHttpError, createAccountHttp } from "./http.ts"
+export { type CeremonyClock, type JoinOutcome, joinAccount } from "./join.ts"
+export { createPairingHttp, type PairingHttp, type PendingApproval } from "./pairing-http.ts"

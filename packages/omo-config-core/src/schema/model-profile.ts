@@ -8,7 +8,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * A model profile is a named, ordered model chain a human picks by lane
- * (Daily / Geeky × Normal / Heavy) instead of by model id. It is NOT the `profiles`
+ * (Daily / Obsessive × Normal / Heavy) instead of by model id. It is NOT the `profiles`
  * key: that one is a VSCode-style config-layer overlay activated by `OMO_PROFILE`.
  *
  * `models` is optional on purpose. A layer that fails validation is rejected wholesale
@@ -16,9 +16,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * label-only override of a builtin profile drop the user's whole `categories`/`agents`/`teams`
  * layer. "No models after merging the builtins" is a runtime report, not a schema error.
  * `family` / `tier` are optional metadata a user overlay may set; they do not create an editor.
+ * `caution` is an optional one-line warning renderers show prominently; on an entry that replaces
+ * a builtin it carries over from that builtin when unset, like `display_name`.
  */
 const OmoModelProfileInputSchema = z.object({
   display_name: z.string().optional(),
+  caution: z.string().optional(),
   family: z.enum(["daily", "geeky"]).optional(),
   tier: z.enum(["normal", "heavy"]).optional(),
   models: z.array(z.union([z.string(), OmoFallbackModelObjectSchema])).optional(),

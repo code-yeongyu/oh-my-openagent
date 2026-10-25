@@ -4,8 +4,11 @@ import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
 import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { deliverItems } from "./deliver-items"
+import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
 import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
+import { createPrewarmDiagnostics } from "./prewarm-diagnostics"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
 import { releaseHerdrAgentHint } from "./herdr-agent-hint"
 
@@ -115,30 +118,44 @@ export function composeOmoSenpiExtension(
     // Install the capture registry and idle coordinator BEFORE the component loop so every component
     // (lsp registers earlier than task) has its tools captured and shares one injection arbiter.
     const captureRegistry = installToolCaptureRegistry(pi)
+    const prewarmDiagnostics = createPrewarmDiagnostics(pi, logger)
     // The 200ms batch window: every delivered notification (completions, team messages, the ulw
     // continuation) defers its flush through this timer, so everything that becomes ready within the
     // window collapses into ONE steer injection instead of N separate ones. The timer is unref'd and
     // cancellable like every sibling scheduler in this codebase (lead-poller-lifecycle's interval,
     // senpi-task's completion retry): retirement cancels the armed handle instead of leaving a live
     // 200ms timer behind after a `quit` shutdown.
+    const publishChildWork = publishWakeQueueChildWork(pi, logger)
     const idleCoordinator = new IdleInjectionCoordinator(
-      (message, options) =>
-        pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
+      (message, options) => deliverItems((native, delivery) => pi.sendMessage(native, delivery), { ...options, message }),
       {
         scheduleFlush: (flush) => {
           const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)
           timer.unref?.()
           return () => clearTimeout(timer)
         },
+        onChildWorkChange: publishChildWork,
+        onReceiptError: (error) =>
+          logger.warn("omo-senpi idle injection receipt failed", {
+            error: error instanceof Error ? error.message : String(error),
+          }),
       },
     )
+    publishWakeQueueBaselineOnSessionStart(pi, () => idleCoordinator.childWorkCount(), publishChildWork)
     // senpi emits session_shutdown on the old runner before it invalidates that generation; retire the
     // shared queue there so a 200ms flush armed before a reload cannot call pi.sendMessage on a stale
     // API and throw out of the timer queue (uncaughtException -> exit 1). Retirement hands every
     // still-queued injection back to its producer as a delivery failure, so a completion caught inside
     // the batch window is recorded as undelivered and redelivered after the reload.
     // See: https://github.com/code-yeongyu/oh-my-openagent/issues/7932
-    pi.on("session_shutdown", () => idleCoordinator.retire())
+    // A receipt error must not escape session_shutdown: later shutdown handlers (startup deferral) still run.
+    pi.on("session_shutdown", () => {
+      try {
+        idleCoordinator.retire()
+      } catch (error) {
+        logger.warn("omo-senpi idle injection receipt failed on shutdown", { error: error instanceof Error ? error.message : String(error) })
+      }
+    })
 
     // Startup work that is not needed before the first user turn (telemetry capture, the init-deep
     // advisor's git/fs preflight, the LSP project-config notice) is queued here instead of running
@@ -182,7 +199,7 @@ export function composeOmoSenpiExtension(
       }
 
       try {
-        await component.register(pi, ctx)
+        await component.register(prewarmDiagnostics.forComponent(component.name), ctx)
       } catch (error) {
         logger.error("omo-senpi component registration failed", { component: component.name, error })
       }

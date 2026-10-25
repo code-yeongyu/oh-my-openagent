@@ -36,6 +36,8 @@ export type ReconcileDeferredReason =
   // The child ran in a copy-on-write clone that is already settled and reclaimed; respawning it
   // would resume against a directory that no longer exists, so it is refused at every boundary.
   | "isolated_not_revivable"
+  // The child's run is stopped: it waits for the run's Resume, which no retry budget may end.
+  | "run_paused"
 
 export type ReconcileOutcome = {
   readonly task_id: string
@@ -56,6 +58,9 @@ export type CleanupResult = {
 export type SuspendInput = {
   readonly parentSessionId: string
   readonly reason: string
+  // The shutting-down session's own task id, from its host session context. A hosted child's record
+  // never carries child_session_id, so this is how that session finds its own task (#10818).
+  readonly ownTaskId?: string
 }
 
 export type SuspendFailure = {
@@ -69,6 +74,8 @@ export type SuspendSummary = {
   readonly suspended_pending: number
   readonly disposed: number
   readonly failures: readonly SuspendFailure[]
+  // Set when the session's own task was stopped: its children were stopped too and nothing detached.
+  readonly stopped_owner?: string
 }
 
 export type TaskLifecycle = {

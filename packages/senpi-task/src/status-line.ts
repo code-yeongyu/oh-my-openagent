@@ -1,5 +1,6 @@
 import { excerptRendererText, optionalRendererText } from "./renderer-text"
-import type { EffectiveModelRecord, ResolvedModelRecord, TaskRunStats } from "./state"
+import { parentModelFallbackToken } from "./parent-model-fallback-text"
+import type { EffectiveModelRecord, ParentModelFallback, ResolvedModelRecord, TaskRunStats } from "./state"
 
 // One status row must survive next to a spinner, elapsed clock and the terminal edge, so the human
 // label is bounded here rather than at each call site.
@@ -22,6 +23,7 @@ export type StatusTargetInput = {
   // Raw model string used when no resolved model metadata exists (live/legacy tasks).
   readonly model?: string
   readonly fallbackCount?: number
+  readonly parentModelFallback?: ParentModelFallback
 }
 
 export type StatusLineStats = Pick<TaskRunStats, "turns" | "tool_calls" | "failed_turns"> & {
@@ -82,7 +84,7 @@ export function formatStatusTarget(input: StatusTargetInput): string | undefined
   const target = formatTargetWithModel(input)
   if (target === undefined) return undefined
   const fallback = input.fallbackCount === undefined || input.fallbackCount <= 0 ? undefined : `fallback:${input.fallbackCount}`
-  return fallback === undefined ? target : `${target} · ${fallback}`
+  return [target, fallback, parentModelFallbackToken(input.parentModelFallback)].filter((token) => token !== undefined).join(" · ")
 }
 
 // The stats tokens of the canonical live-row grammar, as DISCRETE tokens so each surface keeps its

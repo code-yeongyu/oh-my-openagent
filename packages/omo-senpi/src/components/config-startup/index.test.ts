@@ -19,6 +19,7 @@ import {
   type SenpiStartupMigrationResult,
 } from "./index"
 
+
 function fileError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
 }
@@ -207,7 +208,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => migration,
@@ -238,7 +239,7 @@ describe("createConfigStartupComponent", () => {
     const migration = runSenpiStartupMigration(migrationOptions(fileSystem))
     const pi = new FakeExtensionAPI()
     const logs: string[] = []
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
       resolveCwd: () => "/project",
       runMigration: () => migration,
@@ -274,7 +275,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
@@ -298,7 +299,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
@@ -377,7 +378,7 @@ describe("notificationMessages", () => {
 
     // then
     expect(notices).toEqual([{
-      message: 'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }',
+      message: 'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }. If you also use task(category: "scout") on purpose, the key keeps working there; giving the agent its own models silences this warning',
       type: "warning",
     }])
   })
@@ -388,6 +389,25 @@ describe("notificationMessages", () => {
       config: {
         categories: { explore: { model: "a/b" } },
         agents: { explore: { models: ["x/y"] } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([])
+  })
+
+  test("#given a category named after an agent that sets a single model #when notices are built #then no category-shadow warning is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: { explore: { model: "a/b" } },
+        agents: { explore: { model: "x/y" } },
       },
       diagnostics: [],
       layers: [],

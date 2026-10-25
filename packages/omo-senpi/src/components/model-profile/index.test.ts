@@ -212,7 +212,7 @@ describe("createModelProfileComponent", () => {
     })
   })
 
-  test("#given unset with only the ChatGPT subscription #when the session starts #then the first lane that resolves, Geeky · Normal, is applied", async () => {
+  test("#given unset with only the ChatGPT subscription #when the session starts #then the first lane that resolves, Obsessive · Normal, is applied", async () => {
     const { pi, start } = harness({}, [SOL_61, UNRELATED])
 
     await start(STARTUP)
@@ -317,7 +317,18 @@ describe("createModelProfileComponent", () => {
     expect(appliedContent(pi)).toContain("anthropic/claude-fable-5-1 xhigh")
   })
 
-  test("#given geeky-normal with GPT-6.1 Sol Fast and GPT-6.1 Sol connected #when the session starts #then gpt-6.1-sol-fast medium is applied", async () => {
+  test("#given geeky-normal with GPT-6 Astra beside the Sol tiers #when the session starts #then gpt-6-astra medium is applied", async () => {
+    const { pi, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, SOL_61, SOL_61_FAST, SOL_56_COPILOT, UNRELATED])
+
+    await start(STARTUP)
+
+    expect(pi.sessionModels).toEqual([ASTRA])
+    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6-astra medium")
+    expect(appliedContent(pi)).toContain("**NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.**")
+  })
+
+  test("#given geeky-normal without GPT-6 Astra, with GPT-6.1 Sol Fast and GPT-6.1 Sol connected #when the session starts #then gpt-6.1-sol-fast medium is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_61, SOL_61_FAST, SOL_56_COPILOT, UNRELATED])
 
     await start(STARTUP)
@@ -327,7 +338,7 @@ describe("createModelProfileComponent", () => {
     expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol-fast medium")
   })
 
-  test("#given geeky-normal without the GPT-6.1 Sol Fast tier #when the session starts #then plain gpt-6.1-sol medium is applied", async () => {
+  test("#given geeky-normal with neither GPT-6 Astra nor the GPT-6.1 Sol Fast tier #when the session starts #then plain gpt-6.1-sol medium is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_56_COPILOT, SOL_61, UNRELATED])
 
     await start(STARTUP)
@@ -337,7 +348,7 @@ describe("createModelProfileComponent", () => {
     expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol medium")
   })
 
-  test("#given geeky-normal with only Copilot GPT-5.6 Sol #when the session starts #then gpt-5.6-sol medium is applied", async () => {
+  test("#given geeky-normal with only Copilot GPT-5.6 Sol, no Astra or 6.1 Sol #when the session starts #then gpt-5.6-sol medium is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_56_COPILOT, SOL, UNRELATED])
 
     await start(STARTUP)

@@ -117,6 +117,12 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
         ...(model === undefined ? {} : { model }),
       })
     }
+    case "set_session_context": {
+      const patch = typeof payload.patch === "object" && payload.patch !== null ? Object.fromEntries(Object.entries(payload.patch)) : {}
+      if (ports.table.patchContext(socket, routingId ?? "", patch)) return ok({})
+      return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
+        error: "session_not_attached", errorCode: "session_not_attached" })
+    }
     case "get_entries":
       return ok({ entries: [], leafId: null })
     case "get_available_models":

@@ -3,6 +3,9 @@
 // (common) and F (full) mappings apply; T (Turkic) mappings are locale variants and are
 // never used, and S (simple) lines are shadowed by their F lines.
 
+import { dirname, isAbsolute, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+
 import { readFileSync } from "../../fs/resilient"
 
 import dataPath from "./CaseFolding.txt" with { type: "file" }
@@ -12,7 +15,9 @@ let cached: ReadonlyMap<number, readonly number[]> | undefined
 function loadTable(): ReadonlyMap<number, readonly number[]> {
   if (cached !== undefined) return cached
   const table = new Map<number, readonly number[]>()
-  const text = readFileSync(dataPath, "utf8")
+  // The file loader names the asset relative to a plain bundle; anchor it to this module, never the cwd.
+  const file = isAbsolute(dataPath) ? dataPath : resolve(dirname(fileURLToPath(import.meta.url)), dataPath)
+  const text = readFileSync(file, "utf8")
   for (const line of text.split("\n")) {
     if (line === "" || line.startsWith("#")) continue
     const fields = line.split(";")

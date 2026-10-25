@@ -38,7 +38,7 @@ export const ed25519PublicKey = async (
 ): Promise<Uint8Array<ArrayBuffer>> => {
   const key = await importSigningSeed(seed);
   const jwk = await crypto.subtle.exportKey("jwk", key);
-  const x = typeof jwk.x === "string" ? jwk.x : "";
+  const x = jwk instanceof ArrayBuffer || typeof jwk.x !== "string" ? "" : jwk.x;
   return b64urlDecode(x);
 };
 
