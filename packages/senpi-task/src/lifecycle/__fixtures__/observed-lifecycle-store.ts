@@ -8,7 +8,7 @@ export function observeLifecycleStore(
   hooks: {
     changed(): void
     terminal(record: TaskRecord): void
-    event(type: string): void
+    event(type: string, payload: unknown): void
     beforeMutate(): void
   },
 ): TaskRecordStore {
@@ -45,7 +45,7 @@ export function observeLifecycleStore(
     },
     appendEvent(id, event) {
       const path = backing.appendEvent(id, event)
-      hooks.event(event.type)
+      hooks.event(event.type, event.payload)
       return path
     },
   }

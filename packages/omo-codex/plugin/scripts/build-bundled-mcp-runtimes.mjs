@@ -46,6 +46,7 @@ function buildRuntime(runtime) {
 			cwd: runtime.packageRoot,
 			shell: process.platform === "win32",
 			stdio: "inherit",
+			windowsHide: true,
 		});
 		if (install.error !== undefined) throw install.error;
 		if (install.status !== 0) process.exit(install.status ?? 1);
@@ -55,6 +56,7 @@ function buildRuntime(runtime) {
 		cwd: runtime.packageRoot,
 		shell: process.platform === "win32",
 		stdio: "inherit",
+		windowsHide: true,
 	});
 	if (result.error !== undefined) throw result.error;
 	if (result.status !== 0) process.exit(result.status ?? 1);

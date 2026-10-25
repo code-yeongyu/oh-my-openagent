@@ -1,3 +1,5 @@
+import { log } from "@oh-my-opencode/utils"
+
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
 import { splitModelDecorators } from "../../senpi/explicit-pin"
 import type { HostSessionLiveness } from "./handle-port"
@@ -7,7 +9,7 @@ import {
   type TaskStartFailureReason,
 } from "../../state"
 import { RunnerError } from "../in-process/runner-error"
-import { startedOnPinnedModel } from "../pinned-model-equivalence"
+import { differsOnlyByPriorityAlias, reportedEffectiveModel, startedOnPinnedModel } from "../pinned-model-equivalence"
 import type { RpcRunnerSpec } from "../types"
 import { HostUnavailableError } from "./daemon"
 import {
@@ -25,6 +27,7 @@ export async function openTaskHostSession(input: {
   readonly client: {
     open(request: HostSessionOpenInput): Promise<OpenedHostSession>
     getState?(): Promise<HostSessionLiveness>
+    getAvailableModels?(): Promise<readonly unknown[]>
     close?(): Promise<void>
   }
   readonly spec: RpcRunnerSpec
@@ -64,8 +67,13 @@ export async function openTaskHostSession(input: {
   const freshOpen = opened.attached !== true
   if (model !== undefined && freshOpen) {
     let effective: HostSessionLiveness["model"]
+    let serviceTier: string | undefined
+    let durableSessionId: string | undefined
     try {
-      effective = (await input.client.getState?.())?.model
+      const state = await input.client.getState?.()
+      effective = state?.model
+      serviceTier = state?.serviceTier
+      durableSessionId = state?.sessionId
     } catch (error) {
       await input.client.close?.().catch(() => undefined)
       throw new RunnerError({
@@ -81,21 +89,48 @@ export async function openTaskHostSession(input: {
         message: `the host reported no model after opening the requested ${model.provider}/${model.modelId}; refusing to start unverified`,
       })
     }
-    if (!startedOnPinnedModel(effective, { provider: model.provider, id: model.modelId })) {
+    const pinned = { provider: model.provider, id: model.modelId }
+    let pinnedEntry: unknown = pinned
+    if (differsOnlyByPriorityAlias(effective, pinned)) {
+      try {
+        if (input.client.getAvailableModels === undefined) throw new Error("get_available_models is unavailable")
+        const catalog = await input.client.getAvailableModels()
+        pinnedEntry = catalog.find(entry => typeof entry === "object" && entry !== null
+          && "provider" in entry && entry.provider === pinned.provider && "id" in entry && entry.id === pinned.id)
+      } catch (error) {
+        await input.client.close?.().catch(() => undefined)
+        throw new RunnerError({
+          kind: "model_unavailable",
+          message: `the host's model catalog could not be read for the requested ${pinned.provider}/${pinned.id}; refusing to start unverified`,
+          cause: error,
+        })
+      }
+    }
+    if (pinnedEntry === undefined || !startedOnPinnedModel(effective, pinned, pinnedEntry)) {
       await input.client.close?.().catch(() => undefined)
       throw new RunnerError({
         kind: "model_unavailable",
         message: `the host opened the child on ${effective.provider}/${effective.id} instead of the requested ${model.provider}/${model.modelId}; refusing the substitution`,
       })
     }
-    return { ...opened, reportedModel: effective }
+    return { ...opened, reportedModel: reportedEffectiveModel(effective, serviceTier), ...withDurableId(durableSessionId) }
   }
   if (freshOpen && input.client.getState !== undefined) {
-    const state = await input.client.getState().catch(() => undefined)
+    // Not fatal without a pin: the child still starts, and its first heartbeat learns the durable id,
+    // which the manager then stamps on the record (#10873). The failure is reported, never hidden.
+    const state = await input.client.getState().catch((error: unknown) => {
+      log("senpi-task host session open state read failed", { taskId: input.spec.task_id, error: String(error) })
+      return undefined
+    })
     const effective = state?.model
-    return effective === undefined ? opened : { ...opened, reportedModel: effective }
+    const reported = effective === undefined ? {} : { reportedModel: reportedEffectiveModel(effective, state?.serviceTier) }
+    return { ...opened, ...reported, ...withDurableId(state?.sessionId) }
   }
   return opened
+}
+
+function withDurableId(sessionId: unknown): { readonly durableSessionId?: string } {
+  return typeof sessionId === "string" && sessionId.length > 0 ? { durableSessionId: sessionId } : {}
 }
 
 function sessionFailureReason(error: unknown): TaskStartFailureReason | undefined {

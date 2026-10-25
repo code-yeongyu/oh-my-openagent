@@ -6,6 +6,7 @@ import { chmod, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/p
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { linkRootRuntimeBin } from "./codex-cache-bins"
+import { windowsCommandShim } from "./codex-cache-command-shim"
 
 async function createRepoFixture(): Promise<{ repoRoot: string; binDir: string; codexHome: string }> {
   const root = mkdtempSync(join(tmpdir(), "omo-codex-cache-bins-"))
@@ -142,7 +143,7 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     expect(link).not.toBeNull()
     const wrapper = await readFile(link?.path ?? "", "utf8")
     expect(wrapper).toContain('for /f "tokens=1,* delims==" %%A in (\'findstr /R /C:"NODE_REPL_NODE_PATH[ ]*=" "%CODEX_HOME%\\config.toml" 2^>nul\') do (')
-    expect(wrapper).toContain('if "!OMO_NODE_BINARY:~0,1!"=="^"" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"')
+    expect(wrapper).toContain('set "OMO_NODE_BINARY=!OMO_NODE_BINARY:"=!"')
     expect(wrapper).toContain(`if "!OMO_NODE_BINARY:~0,1!"=="'" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"`)
     expect(wrapper).toContain('if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "')
     expect(wrapper.indexOf("NODE_REPL_NODE_PATH")).toBeLessThan(wrapper.indexOf('if "%OMO_RUNTIME%"=="node"'))
@@ -151,6 +152,29 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
   })
 
   const posixOnly = process.platform === "win32" ? test.skip : test
+  const windowsOnly = process.platform === "win32" ? test : test.skip
+  windowsOnly("#given NODE_REPL_NODE_PATH quoted in config.toml #when cmd runs the generated shim #then it reaches the target", async () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "omo-codex-cmd-shim-"))
+    const codexHome = join(root, "codex")
+    await mkdir(codexHome, { recursive: true })
+    await writeFile(join(codexHome, "config.toml"), `NODE_REPL_NODE_PATH = "${process.execPath.replaceAll("\\", "\\\\")}"\n`)
+    const target = join(root, "target.js")
+    await writeFile(target, 'console.log("SHIM_REACHED")\n')
+    const shim = join(root, "probe.cmd")
+    await writeFile(shim, windowsCommandShim(target))
+
+    // when
+    const child = Bun.spawn(["cmd.exe", "/d", "/c", shim], { env: { ...Bun.env, CODEX_HOME: codexHome }, stderr: "pipe", stdout: "pipe" })
+    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    // then
+    expect(stderr).not.toContain("syntax of the command is incorrect")
+    expect(stdout).toContain("SHIM_REACHED")
+    expect(exitCode).toBe(0)
+    await rm(root, { recursive: true, force: true })
+  })
+
   posixOnly("#given posix wrapper target was removed #when running omo #then exits with reinstall guidance", async () => {
     // given
     const fixture = await createRepoFixture()

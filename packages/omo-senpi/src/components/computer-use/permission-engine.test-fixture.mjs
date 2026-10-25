@@ -2,7 +2,7 @@ import { createInterface } from "node:readline"
 
 const capabilities = {
   backend: "fake", displayServer: null, capture: true, input: true, ax: true,
-  backgroundWindowInput: true, deliveryModes: ["background", "foreground"],
+  backgroundWindowInput: true, cursorOverlay: false, deliveryModes: ["background", "foreground"],
   capturePermission: "granted", inputPermission: "granted", axPermission: "granted",
   displayCount: 1, focusGuard: true, stopPath: "global", stopReason: null,
   integrityLevel: null, screenLocked: false,

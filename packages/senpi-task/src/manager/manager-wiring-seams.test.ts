@@ -18,7 +18,7 @@ describe("manager wiring seams (W1-V F3/F7)", () => {
     expect(manager.getResidentHandle(started.task_id)).not.toBeUndefined()
 
     // when
-    manager.forget(started.task_id)
+    manager.forget(started.task_id, { path: "end" })
 
     // then
     expect(manager.residentTaskIds()).not.toContain(started.task_id)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DESKTOP_METHODS, ELEMENT_METHODS, WINDOW_METHODS } from "../../senpi-desktop-protocol/src/index";
+import { DESKTOP_METHODS, DISPLAY_METHODS, ELEMENT_METHODS, WINDOW_METHODS } from "../../senpi-desktop-protocol/src/index";
 import { computerPreludeAssets } from "../src/index";
 import { javascriptHelperNames, pythonHelperNames } from "./helper-names";
 
@@ -17,7 +17,7 @@ const allowlist = [...computerPreludeAssets.methodAllowlist].sort();
 describe("computer facade method allowlist", () => {
 	it("equals the union of the protocol tier tables", () => {
 		// Given
-		const tables = [DESKTOP_METHODS, WINDOW_METHODS, ELEMENT_METHODS];
+		const tables = [DESKTOP_METHODS, DISPLAY_METHODS, WINDOW_METHODS, ELEMENT_METHODS];
 
 		// When
 		const protocolUnion = [...new Set(tables.flatMap((table) => Object.keys(table)))].sort();

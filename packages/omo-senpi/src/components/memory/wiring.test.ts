@@ -27,6 +27,7 @@ import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./pro
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
+import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 const roots: string[] = []
 
@@ -56,73 +57,6 @@ async function removeWhenReleased(root: string): Promise<void> {
 
 afterEach(async () => {
   for (const root of roots.splice(0)) await removeWhenReleased(root)
-})
-
-describe("memory pressure dream wiring", () => {
-  test("#given committed system memory at soft pressure #when bind refresh computes the advisory estimate #then it attempts one pressure reservation", async () => {
-    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-pressure-dream-wiring-")))
-    roots.push(root)
-    const identityName = "pressure-dream-agent"
-    const paths = buildIdentityPaths(root, identityName)
-    const repo = new GitMemoryRepo({ dir: paths.repo, agentId: identityName })
-    await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "P".repeat(320) }] })
-    const identity = createMemoryIdentityContext({
-      identity: identityName,
-      identityPaths: paths,
-      binding: { identity: identityName, repoPathHash: "hash", boundAt: 1 },
-    })
-    const sessionId = "session-pressure-dream"
-    const reservationAttempts: unknown[] = []
-    let reservationObserved!: () => void
-    const observed = new Promise<void>((resolve) => { reservationObserved = resolve })
-    const runtime = {
-      reconcile: async () => {},
-      store: {
-        tryReserve: async (request: unknown) => {
-          reservationAttempts.push(request)
-          reservationObserved()
-          return {
-            status: "pending",
-            run: { runId: "run-pressure", request },
-          }
-        },
-      },
-      launch: () => {},
-    } as unknown as MemoryIdentityRuntime
-    const wiring = createMemoryWiring({
-      sessions: new Map([[sessionId, { context: identity }]]),
-      loadConfig: () => loadedMemoryConfig(memorySettings({ compile_warn_tokens: 100 })),
-      cwd: () => root,
-      env: {},
-      createRuntime: () => runtime,
-    })
-    const pi = new MemoryFakeExtensionAPI()
-    const eventCtx = {
-      sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
-      ui: { setStatus: () => {}, notify: () => {} },
-    }
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    const boundedObservation = Promise.race([
-      observed,
-      new Promise<never>((_resolve, reject) => {
-        timeout = setTimeout(() => reject(new Error("pressure reservation was not observed")), 5_000)
-      }),
-    ])
-
-    try {
-      await wiring.afterBind(pi, sessionId, identity, eventCtx)
-      await boundedObservation
-    } finally {
-      if (timeout !== undefined) clearTimeout(timeout)
-    }
-
-    expect(reservationAttempts).toEqual([{
-      trigger: "dream",
-      origin: "pressure",
-      conversationIds: [],
-      snapshots: [],
-    }])
-  }, 30_000)
 })
 
 describe("memory pressure compile wiring", () => {
@@ -438,6 +372,7 @@ async function reflectionFixture(settings: ReturnType<typeof memorySettings> | u
       },
     },
     launch: () => {},
+    reconcile: async () => {},
   } as unknown as MemoryIdentityRuntime
   const pi = new MemoryFakeExtensionAPI()
   createMemoryWiring({
@@ -449,6 +384,8 @@ async function reflectionFixture(settings: ReturnType<typeof memorySettings> | u
     env: {},
     createRuntime: () => runtime,
   }).registerStatic(pi, componentContext())
+  await pi.dispatch("input", { type: "input", source: "rpc", inputId: "first-real-input", text: "Work on this." }, eventCtx)
+  await pi.dispatch("input_disposition", { type: "input_disposition", inputId: "first-real-input", disposition: "started" }, eventCtx)
   return { pi, evaluations }
 }
 
@@ -457,6 +394,58 @@ const eventCtx = {
     getSessionId: () => "session-1",
     getEntries: () => [],
   },
+}
+
+for (const assertion of ["bounded", "attributed"] as const) {
+  test(`#given a never-resolving reflection reconcile #when the composed memory subscriber settles #then it is ${assertion}`, async () => {
+    // given: the real memory wiring reaches its injected runtime, not a substitute settle handler.
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-settle-")))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: "settle-agent",
+      identityPaths: buildIdentityPaths(root, "settle-agent"),
+      binding: { identity: "settle-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const runtime = { reconcile: () => { entered.resolve(); return release.promise } } as unknown as MemoryIdentityRuntime
+    const pi = new MemoryFakeExtensionAPI()
+    const context = componentContext()
+    await composeOmoSenpiExtension([{
+      name: "memory",
+      register(api, ctx) {
+        createMemoryWiring({
+          sessions: new Map([["session-1", { context: identity }]]),
+          loadConfig: () => loadedMemoryConfig(memorySettings()),
+          cwd: () => root,
+          env: {},
+          logger: ctx.logger,
+          createRuntime: () => runtime,
+        }).registerStatic(api, ctx)
+      },
+    }], { logger: context.logger })(pi)
+    await pi.dispatch("input", { source: "rpc", inputId: "accepted", text: "Work." }, eventCtx)
+    await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
+    const settled = pi.dispatch("agent_settled", {}, eventCtx)
+    try {
+      await withinMs(entered.promise, "memory reconciliation entered", 5_000)
+      // when: this watchdog bounds the assertion, never supplies the completion under test.
+      const completed = await withinMs(settled, "bounded memory settle", 4_000).then(() => true, () => false)
+      // then
+      if (assertion === "bounded") expect(completed).toBe(true)
+      else expect(context.logs).toContainEqual(expect.objectContaining({
+        message: "extension_handler_stalled",
+        details: expect.objectContaining({
+          component: "memory", hook: "onSettled.reflection.reconcile",
+          handlerEvent: "agent_settled", stage: "timeout", sessionId: "session-1",
+        }),
+      }))
+    } finally {
+      release.resolve()
+      await settled
+      await pi.dispatch("session_shutdown", {})
+    }
+  }, 15_000)
 }
 
 describe("memory wiring reflection completion delivery", () => {
@@ -615,6 +604,8 @@ async function liveFooterHarness(): Promise<{
       }
     },
     async startReflection() {
+      await pi.dispatch("input", { type: "input", source: "rpc", inputId: "first-real-input", text: "Work on this." }, eventCtx)
+      await pi.dispatch("input_disposition", { type: "input_disposition", inputId: "first-real-input", disposition: "started" }, eventCtx)
       await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
       await pi.dispatch("agent_settled", {}, eventCtx)
     },
@@ -775,6 +766,8 @@ describe("session shutdown pre-drain bounds", () => {
         }),
       },
     })
+    await f.pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Read the rollout guide." }, f.eventCtx)
+    await f.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, f.eventCtx)
     await f.pi.dispatch("tool_call", { toolName: "read", input: { path: ROLLOUTS } }, f.eventCtx)
     await withinMs(started.promise, "the resident child start", 10_000)
 

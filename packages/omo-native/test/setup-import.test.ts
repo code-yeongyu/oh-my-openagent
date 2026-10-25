@@ -257,7 +257,7 @@ describe("omo setup credential inheritance", () => {
 
     expect(result.status).toBe(0)
     expect(result.stdout).not.toContain("/login chatgpt-subscription")
-    expect(result.stdout).toContain("/login anthropic")
+    expect(result.stdout).toContain("/login anthropic-subscription")
   })
 
   test("#given a dry run with skipped credentials #when setup previews #then the same guidance is shown", () => {

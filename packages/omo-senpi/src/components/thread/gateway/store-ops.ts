@@ -37,13 +37,14 @@ import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
+import { isProvenance } from "./provenance-record"
 import { GATEWAY_MIGRATIONS, GatewaySchemaVersionError } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
   ClaimOutcome,
   ClaimRequest,
-  DeliveryEnvelope,
+  StoredDeliveryEnvelope,
   DeliveryRow,
   DeliveryState,
   EnqueueOutcome,
@@ -95,7 +96,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     seq: Number(record.seq),
     sender: String(record.sender),
     sender_turn: record.sender_turn === null ? null : String(record.sender_turn),
-    envelope: JSON.parse(String(record.envelope)) as DeliveryEnvelope,
+    envelope: JSON.parse(String(record.envelope)) as StoredDeliveryEnvelope,
     body: String(record.body),
     bytes: Number(record.bytes),
     mode_requested: record.mode_requested as DeliveryRow["mode_requested"],
@@ -274,19 +275,51 @@ function schemaVersion(ctx: StoreContext): number {
  * never wait behind another process's transaction); otherwise each step re-reads the version under
  * the lock, so two processes opening a fresh store at once apply every migration exactly once.
  */
+export class GatewayMigrationError extends Error {
+  readonly code = "gateway_migration_failed"
+  constructor(
+    readonly version: number,
+    message: string,
+  ) {
+    super(message)
+    this.name = "GatewayMigrationError"
+  }
+}
+
 export async function migrate(ctx: StoreContext): Promise<void> {
   if (schemaVersion(ctx) >= GATEWAY_MIGRATIONS.length) return
   for (;;) {
-    const applied = await transaction(ctx, "migrate", () => {
-      const version = schemaVersion(ctx)
-      if (version >= GATEWAY_MIGRATIONS.length) return false
-      for (const statement of GATEWAY_MIGRATIONS[version]) ctx.sql.exec(statement)
-      ctx.sql.exec(`PRAGMA user_version = ${version + 1}`)
-      return true
-    })
-    if (!applied) return
+    const version = schemaVersion(ctx)
+    if (version >= GATEWAY_MIGRATIONS.length) return
+    // The CHECK-widening v7 rebuild must run with foreign_keys OFF, which SQLite only honors when
+    // the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key
+    // actions from extension tables referencing `bindings`). The pragma is restored to its prior
+    // value afterwards, and foreign_key_check is verified from TypeScript before the bump commits.
+    const needsForeignKeysOff = GATEWAY_NEEDS_FK_OFF.has(version)
+    const priorForeignKeys = needsForeignKeysOff ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1) : 1
+    if (needsForeignKeysOff) ctx.sql.exec("PRAGMA foreign_keys = OFF")
+    try {
+      await transaction(ctx, "migrate", () => {
+        const current = schemaVersion(ctx)
+        if (current !== version) return
+        for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
+        if (needsForeignKeysOff) {
+          const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
+          const introduced = violations.filter((row) => row.parent === "bindings")
+          if (introduced.length > 0) {
+            throw new GatewayMigrationError(current + 1, `gateway schema ${current + 1} would leave a foreign-key violation referencing bindings; staying at v${current}`)
+          }
+        }
+        ctx.sql.exec(`PRAGMA user_version = ${current + 1}`)
+      })
+    } finally {
+      if (needsForeignKeysOff) ctx.sql.exec(`PRAGMA foreign_keys = ${priorForeignKeys === 0 ? "OFF" : "ON"}`)
+    }
   }
 }
+
+/** Migration indexes (0-based) whose steps must run with foreign_keys OFF; see migrate(). */
+const GATEWAY_NEEDS_FK_OFF: ReadonlySet<number> = new Set([6])
 
 type ReceiptRecord = {
   readonly args_hash: string
@@ -444,6 +477,7 @@ function checkBinding(ctx: StoreContext, request: EnqueueRequest): { readonly ex
 }
 
 export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promise<EnqueueOutcome> {
+  if (!isProvenance(request.provenance)) return refused("invalid_arguments", "Delivery provenance is required.")
   if (!DURABLE_ID_PATTERN.test(request.target_durable_id) || !DURABLE_ID_PATTERN.test(request.delivery_id)) {
     return refused("invalid_arguments", "The target session id is not a durable session id.")
   }
@@ -496,7 +530,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       seq: allocateSeq(ctx, request.target_durable_id),
       sender: request.sender_principal,
       sender_turn: request.sender_turn,
-      envelope: { origin: request.origin, actor: request.actor, via: placement.via, root_id: placement.root_id, hop: placement.hop, delivery_id: request.delivery_id },
+      envelope: { provenance: request.provenance, origin: request.origin, actor: request.actor, via: placement.via, root_id: placement.root_id, hop: placement.hop, delivery_id: request.delivery_id },
       body: request.body,
       bytes,
       mode_requested: request.mode,
@@ -846,6 +880,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           sender,
           sender_turn: null,
           envelope: {
+            provenance: { workspace: "unclassified", project: "legacy-mailbox" },
             origin: { external: { platform: "legacy_mailbox", account_id: user, chat_id: directory, thread_id: "@chat", message_id: item.operation_id } },
             actor: "legacy thread mailbox",
             via: [sender],

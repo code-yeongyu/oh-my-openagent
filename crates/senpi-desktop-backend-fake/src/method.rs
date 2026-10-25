@@ -19,6 +19,10 @@ pub enum FakeMethod {
     ClipboardRead,
     ClipboardWrite,
     KeyChord,
+    KeyPress,
+    KeyRelease,
+    MousePress,
+    MouseRelease,
     RaiseWindow,
     ReleaseAll,
     CursorPosition,
@@ -38,4 +42,6 @@ pub enum FakeMethod {
     AxFocusedElement,
     AxAttributes,
     AxOwner,
+    MenuItems,
+    MenuSelect,
 }

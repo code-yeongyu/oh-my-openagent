@@ -1,8 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
@@ -12,6 +11,7 @@ import type { ComponentContext } from "../../extension/types"
 import { AuthStorage, ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import { createModelProfileComponent, MODEL_PROFILE_APPLIED_TYPE, MODEL_PROFILE_UNAVAILABLE_TYPE } from "./index"
 import { sanitizedAuthErrorDetail } from "./request-auth"
+import { testTempDir } from "../../../test-support/temp-dir"
 
 const PRIVATE_MARKER = "SYNTHETIC_PRIVATE_MARKER_0a1b2c3d4e5f"
 const FAR_FUTURE = Date.now() + 24 * 60 * 60 * 1000
@@ -67,7 +67,7 @@ async function realRegistryWithModelsJson(
   modelsJson: Record<string, unknown>,
   register: (registry: InstanceType<typeof ModelRegistry>) => void,
 ) {
-  const agentDir = mkdtempSync(join(tmpdir(), "omo-model-profile-rotation-"))
+  const agentDir = testTempDir("omo-model-profile-rotation-")
   const modelsPath = join(agentDir, "models.json")
   writeFileSync(modelsPath, JSON.stringify(modelsJson))
   const storage = AuthStorage.inMemory(seed)
@@ -78,7 +78,7 @@ async function realRegistryWithModelsJson(
   return { registry, agentDir }
 }
 
-function drive(config: OmoConfig, registry: InstanceType<typeof ModelRegistry>, agentDir = mkdtempSync(join(tmpdir(), "omo-model-profile-real-"))) {
+function drive(config: OmoConfig, registry: InstanceType<typeof ModelRegistry>, agentDir = testTempDir("omo-model-profile-real-")) {
   const pi = new FakeExtensionAPI()
   const logs: string[] = []
   const ctx: ComponentContext = {

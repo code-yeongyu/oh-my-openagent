@@ -463,6 +463,62 @@ describe("sweepWorktrees --apply", () => {
     expect(await fs.stat(dirty)).toBeTruthy()
     expect(result.sweepCount).toBe(0)
   }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+
+  test("started from inside a linked worktree keeps that worktree and still removes its merged siblings", async () => {
+    const { base, repo } = await createFixture("wt-sweep-inside-")
+    const first = path.join(base, "wt-first")
+    const second = path.join(base, "wt-second")
+    const third = path.join(base, "wt-third")
+
+    await addMergedWorktree(repo, "first-branch", first)
+    await addMergedWorktree(repo, "second-branch", second)
+    await addMergedWorktree(repo, "third-branch", third)
+
+    const result = await sweepWorktrees({ cwd: second, apply: true })
+    const report = result.repos[0]!
+
+    expect(report.repo).toBe(repo)
+    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
+    expect(report.failed).toEqual([])
+    expect([...report.removed].sort()).toEqual([first, third].sort())
+    expect(await fs.stat(second)).toBeTruthy()
+    const porcelain = git(repo, ["worktree", "list", "--porcelain"])
+    expect(porcelain).toContain(toPosix(second))
+    expect(porcelain).not.toContain(toPosix(first))
+    expect(porcelain).not.toContain(toPosix(third))
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+
+  test("dry-run from inside a linked worktree reports it as KEEP(current) and removes nothing", async () => {
+    const { base, repo } = await createFixture("wt-sweep-inside-dry-")
+    const first = path.join(base, "wt-first")
+    const second = path.join(base, "wt-second")
+
+    await addMergedWorktree(repo, "first-branch", first)
+    await addMergedWorktree(repo, "second-branch", second)
+
+    const result = await sweepWorktrees({ cwd: second })
+    const report = result.repos[0]!
+
+    expect(report.repo).toBe(repo)
+    expect(decisionFor(report, first)).toMatchObject({ decision: "SWEEP" })
+    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
+    expect(report.removed).toEqual([])
+    expect(await fs.stat(first)).toBeTruthy()
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+
+  test("a locked worktree the sweep was started from keeps the locked reason", async () => {
+    const { base, repo } = await createFixture("wt-sweep-inside-locked-")
+    const second = path.join(base, "wt-second")
+
+    await addMergedWorktree(repo, "second-branch", second)
+    git(repo, ["worktree", "lock", second])
+
+    const result = await sweepWorktrees({ cwd: second, apply: true })
+    const report = result.repos[0]!
+
+    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "locked" })
+    expect(report.removed).toEqual([])
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 })
 
 describe("worktreeSweep output", () => {

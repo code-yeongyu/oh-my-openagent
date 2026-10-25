@@ -266,7 +266,7 @@ describe("reconcileOnSessionStart reattach", () => {
     const pointLookupMissRegistry = {
       get: () => undefined,
       entries: () => registry.entries(),
-      forget: (taskId: string) => registry.forget(taskId),
+      forget: (taskId: string, options: Parameters<FakeRegistry["forget"]>[1]) => registry.forget(taskId, options),
       hasPendingSends: (taskId: string) => registry.hasPendingSends(taskId),
     }
     const lifecycle = createTaskLifecycle({

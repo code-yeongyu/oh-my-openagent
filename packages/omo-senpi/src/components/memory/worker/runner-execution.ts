@@ -1,5 +1,6 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
+import { memoryHookChecker } from "./spawn-supervisor-support"
 
 import {
   GitMemoryRepo,
@@ -46,7 +47,7 @@ export async function executeReflectionRun(input: {
   const { run, resolution, loaded, options } = input
   const repo = new GitMemoryRepo({ dir: options.identity.paths.repo, agentId: options.identity.id })
   if (!existsSync(join(options.identity.paths.repo, ".git"))) {
-    await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir) } })
+    await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } })
   }
   let worktree: ReflectionWorktree | undefined
   try {
@@ -55,7 +56,7 @@ export async function executeReflectionRun(input: {
     maybeKillAt("after-worktree")
     const activeWorktree = worktree
     const reflection = resolveAgentReflectionSettings(loaded.config.memory, options.identity.id)
-    const hardDeadlineAt = input.now() + (options.deadlineMs ?? reflection.timeout_minutes * 60_000)
+    let hardDeadlineAt = input.now() + (options.deadlineMs ?? reflection.timeout_minutes * 60_000)
     const candidates: MemoryModelChain = [
       {
         model: resolution.model,
@@ -75,6 +76,13 @@ export async function executeReflectionRun(input: {
       warn: (message, details) => options.logger?.warn(message, details),
       surfaceName: "reflection",
       attempt: async (candidate, attemptNumber, nextAttempt) => {
+        // Queue time is excluded, but previous model attempts still consume the SAME run budget.
+        if (attemptNumber > 1) {
+          const previous = parseReservationRunLedger(await readRunJson<unknown>(
+            join(options.identity.paths.reflection, "runs", run.runId, "ledger.json"),
+          ))
+          hardDeadlineAt = previous.hardDeadlineAt
+        }
         const parentSessionFile = input.route?.route === "fork" ? options.resolveParentSessionFile?.() : undefined
         const parentCwd = input.route?.route === "fork" ? options.cwd : undefined
         const spawnArgs = await prepareReflectionCandidateSpawn({
@@ -88,6 +96,7 @@ export async function executeReflectionRun(input: {
           candidate,
           attempt: attemptNumber,
           hardDeadlineAt,
+          memoryRoot: options.memoryRoot,
           nextAttempt,
           config: loaded.config,
           identity: options.identity,

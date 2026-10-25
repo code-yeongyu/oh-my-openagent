@@ -39,6 +39,8 @@ describe("createSisyphusAgent", () => {
       // given - aliases that intentionally share a family are represented explicitly
       const cases: Array<[model: string, family: SisyphusPromptFamily]> = [
         ["opencode-go/kimi-k3", "kimi-k3"],
+        ["kimi-coding/k3.1-pro", "kimi-k3-1"],
+        ["moonshotai/kimi-k3.1-pro-highspeed", "kimi-k3-1"],
         ["moonshotai/kimi-k2.6", "kimi-k2-6"],
         ["opencode-go/kimi-k2.7", "kimi-k2-7"],
         ["moonshotai/kimi-k2.8", "kimi-k2-7"],

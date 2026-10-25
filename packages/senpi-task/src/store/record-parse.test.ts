@@ -22,6 +22,11 @@ function persisted(fields: Record<string, unknown>): Record<string, unknown> {
 }
 
 describe("record-parse launch evidence", () => {
+  test.each(["resolved_model", "effective_model"] as const)("service tier on %s survives JSON roundtrip", (field) => {
+    const model = { provider: "vendor", model_id: "luna-fast", display: "Luna", source: "explicit", service_tier: "priority" } as const
+    const stored = JSON.parse(JSON.stringify(persisted({ [field]: model })))
+    expect(parseTaskRecord(stored, "record.json")[field]).toEqual(model)
+  })
   test("isolation and v1 isolation preserve Windows paths through JSON", () => {
     const isolation = { backend: "rcopy", merged_dir: "C:\\clone\\child", base_dir: "C:\\base\\repo", mode: "branch", apply: false } as const
     const spawnSpec = { version: 1, cwd: "C:\\clone\\child", prompt: "Inspect", isolation } as const
@@ -36,6 +41,31 @@ describe("record-parse launch evidence", () => {
 
   test("legacy records omit isolation", () => {
     expect(parseTaskRecord(persisted({}), "record.json")).not.toHaveProperty("isolation")
+  })
+
+  test("awaiting_input survives JSON roundtrip (senpi#3266)", () => {
+    const awaiting = { reason: "resumed_turn_aborted", since: "2026-10-14T00:00:00.000Z" } as const
+    const stored = JSON.parse(JSON.stringify(persisted({ awaiting_input: awaiting })))
+    expect(parseTaskRecord(stored, "record.json").awaiting_input).toEqual(awaiting)
+  })
+
+  test.each([
+    { reason: "resumed_turn_unfinished", since: "2026-10-14T00:00:00.000Z" },
+  ])("awaiting_input reason %o survives JSON roundtrip", (awaiting) => {
+    const stored = JSON.parse(JSON.stringify(persisted({ awaiting_input: awaiting })))
+    expect(parseTaskRecord(stored, "record.json").awaiting_input).toEqual(awaiting)
+  })
+
+  test.each([
+    { awaiting_input: { reason: "resumed_turn_confused", since: "2026-10-14T00:00:00.000Z" } },
+    { awaiting_input: { reason: "resumed_turn_aborted" } },
+    { awaiting_input: "resumed_turn_aborted" },
+  ])("malformed awaiting_input is rejected", (override) => {
+    expect(() => parseTaskRecord(persisted(override), "record.json")).toThrow()
+  })
+
+  test("legacy records omit awaiting_input", () => {
+    expect(parseTaskRecord(persisted({}), "record.json")).not.toHaveProperty("awaiting_input")
   })
 
   test("settled isolation merge results round-trip without changing artifact paths", () => {

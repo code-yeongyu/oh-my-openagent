@@ -370,7 +370,7 @@ describe("steering pending cancellation", () => {
     expect(harness.store.load(record.task_id)?.pending_steering).toHaveLength(2)
 
     // when the manager forgets the task before it ever launches, then a stale start fires
-    harness.engine.dropPending(record.task_id)
+    harness.engine.dropPending(record.task_id, "task_forgotten")
     const fake = makeFakeHandle(record.task_id, "in-process")
     harness.setLive(record.task_id, fake.handle)
     await harness.engine.notifyStarted(record.task_id)
@@ -475,7 +475,7 @@ describe("durable prelaunch steering", () => {
     expect(tracked.order).toEqual([])
   })
 
-  test("#given a running child suspended to persisted_only #when sent #then it is not_continuable with the suspended reason copy and NO revive", async () => {
+  test("#given a running child parked persisted_only #when sent #then the message waits durably for recovery", async () => {
     // given (session shutdown suspended the resident: status kept, residency persisted_only)
     const harness = makeHarness()
     const record = harness.seedRecord()
@@ -485,13 +485,13 @@ describe("durable prelaunch steering", () => {
     // when
     const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "wake up" })
 
-    // then (no lazy revive-on-send: resume the session instead)
-    if (outcome.kind !== "not_continuable") throw new Error("expected not_continuable")
-    expect(outcome.reason).toContain("suspended - resumes when its session is resumed")
+    // then recovery owns revival, while steering owns the durable message
+    expect(outcome.kind).toBe("queued")
+    expect(harness.store.load(record.task_id)?.pending_steering?.map((entry) => entry.message)).toEqual(["wake up"])
     expect(harness.store.load(record.task_id)?.status).toBe("running")
   })
 
-  test("#given a running child suspended to rpc_detached #when sent #then it is not_continuable with the suspended reason copy", async () => {
+  test("#given a running child parked rpc_detached #when sent #then the message waits durably for recovery", async () => {
     // given
     const harness = makeHarness()
     const record = harness.seedRecord()
@@ -502,8 +502,8 @@ describe("durable prelaunch steering", () => {
     const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "wake up" })
 
     // then
-    if (outcome.kind !== "not_continuable") throw new Error("expected not_continuable")
-    expect(outcome.reason).toContain("suspended - resumes when its session is resumed")
+    expect(outcome.kind).toBe("queued")
+    expect(harness.store.load(record.task_id)?.pending_steering?.map((entry) => entry.message)).toEqual(["wake up"])
   })
 
   test("#given a persisted queue with one malformed entry #when the child starts after a restart #then the bad entry is dropped with a parse warning and the rest deliver in order", async () => {

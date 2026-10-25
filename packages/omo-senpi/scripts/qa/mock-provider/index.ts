@@ -52,6 +52,16 @@ interface Context {
   tools?: Array<{ name?: unknown }>
 }
 
+interface DeclaredTool {
+  name?: unknown
+}
+
+interface TranscriptMessage {
+  role?: unknown
+  toolsAdded?: DeclaredTool[]
+  toolsRemoved?: DeclaredTool[]
+}
+
 interface SimpleStreamOptions {
   signal?: AbortSignal
 }
@@ -171,11 +181,27 @@ export function stepToAssistantMessage(step: MockStep, callCount: number, modelI
 
 let callCount = 0
 
+/**
+ * The tool names a request declares. Senpi's `normalizeContext` moves declarations out of `tools` into the
+ * transcript's system messages as `toolsAdded`/`toolsRemoved` deltas, replayed in order like its
+ * `getCurrentTools`. `null` means the request carried no declaration source at all, which is not "no tools".
+ */
+export function declaredToolNames(context: Context): string[] | null {
+  if (Array.isArray(context.tools)) return context.tools.map((tool) => tool.name).filter((name): name is string => typeof name === "string")
+  const systemMessages = (Array.isArray(context.messages) ? (context.messages as TranscriptMessage[]) : []).filter((message) => message?.role === "system")
+  if (systemMessages.length === 0) return null
+  const current = new Set<string>()
+  for (const message of systemMessages) {
+    for (const tool of message.toolsRemoved ?? []) if (typeof tool.name === "string") current.delete(tool.name)
+    for (const tool of message.toolsAdded ?? []) if (typeof tool.name === "string") current.add(tool.name)
+  }
+  return [...current]
+}
+
 /** A driver that drops `mock-record-tools` in the cwd gets one line per request naming the tools it declared. */
 function recordDeclaredTools(cwd: string, context: Context): void {
   if (!existsSync(join(cwd, "mock-record-tools"))) return
-  const names = (context.tools ?? []).map((tool) => tool.name).filter((name) => typeof name === "string")
-  appendFileSync(join(cwd, "mock-tools.jsonl"), `${JSON.stringify(names)}\n`)
+  appendFileSync(join(cwd, "mock-tools.jsonl"), `${JSON.stringify(declaredToolNames(context))}\n`)
 }
 
 function streamMockResponse(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {

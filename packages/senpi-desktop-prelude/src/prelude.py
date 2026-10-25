@@ -70,11 +70,12 @@ def _make_computer():
     )
 
     class _Window:
-        __slots__ = ("id", "app", "title", "pid", "bounds", "focused")
+        __slots__ = ("id", "app", "title", "pid", "bounds", "focused", "menu")
 
         def __init__(self, snapshot):
-            for field in self.__slots__:
+            for field in ("id", "app", "title", "pid", "bounds", "focused"):
                 setattr(self, field, snapshot.get(field))
+            self.menu = _Menu(self._method)
 
         def __repr__(self):
             return f"<computer.Window id={self.id!r} app={self.app!r}>"
@@ -92,10 +93,40 @@ def _make_computer():
     _install(
         _Window,
         {
-            **{name: name for name in ("screenshot", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "ax")},
+            **{name: name for name in ("screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "ax")},
             "raise_": "raise",
         },
     )
+
+    class _Display:
+        __slots__ = ("id",)
+
+        def __init__(self, snapshot):
+            self.id = snapshot["id"]
+
+        def _method(self, method, args, kwargs):
+            return _call([_step("display", (self.id,), {}), _step(method, args, kwargs)])
+
+    _install(
+        _Display,
+        {name: name for name in ("screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse")},
+    )
+
+    class _Menu:
+        __slots__ = ("_call",)
+
+        def __init__(self, call):
+            self._call = call
+
+        def __repr__(self):
+            return "<computer.Window.menu>"
+
+        def items(self, path=None):
+            return self._call("menu.items", (path,), {})
+
+        def select(self, path, delivery=None):
+            args = (path,) if delivery is None else (path, {"delivery": delivery})
+            return self._call("menu.select", args, {})
 
     class _Clipboard:
         __slots__ = ()
@@ -109,11 +140,30 @@ def _make_computer():
         def write(self, text):
             return _call([_step("clipboard.write", (text,), {})])
 
+    class _Control:
+        __slots__ = ()
+
+        def __repr__(self):
+            return "<computer.control>"
+
+        def acquire(self, *args, **kwargs):
+            """Ask the human for the foreground-control grant; returns { active }."""
+            return _call([_step("control.acquire", args, kwargs)])
+
+        def release(self):
+            """Release the foreground-control grant."""
+            return _call([_step("control.release", (), {})])
+
+        def state(self):
+            """Read the foreground-control grant state."""
+            return _call([_step("control.state", (), {})])
+
     class _Computer:
-        __slots__ = ("clipboard",)
+        __slots__ = ("clipboard", "control")
 
         def __init__(self):
             self.clipboard = _Clipboard()
+            self.control = _Control()
 
         def __repr__(self):
             return "<computer>"
@@ -124,6 +174,10 @@ def _make_computer():
         def window(self, *args, **kwargs):
             """Resolve one window by opaque id or by `app`/`title` filter keywords."""
             return _window(self._method("window", args, kwargs))
+
+        def display(self, selector):
+            """Resolve one display id, 'active', or 'all' without changing the session default."""
+            return _Display(self._method("display", (selector,), {}))
 
         def focusedWindow(self):
             return _window(self._method("focusedWindow", (), {}))
@@ -155,7 +209,7 @@ def _make_computer():
 
     _install(
         _Computer,
-        {name: name for name in ("displays", "windows", "screenshot", "click", "doubleClick", "move", "drag", "scroll", "type", "press")},
+        {name: name for name in ("displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse")},
     )
     return _Computer()
 

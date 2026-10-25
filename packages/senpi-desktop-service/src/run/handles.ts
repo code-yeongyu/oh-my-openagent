@@ -1,36 +1,25 @@
 import { ELEMENT_METHODS, type EngineMethod, WINDOW_METHODS } from "@oh-my-opencode/senpi-desktop-protocol";
-import { type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from "./context";
+import { type FacadeMethod, facadeMethod, type RunScope } from "./context";
 import {
 	type AxNode,
 	type DesktopWindow,
+	type MenuItem,
 	expectResult,
 	isAttributePairs,
 	isAxNode,
+	isMenuItem,
 	isText,
 	listOf,
 	optional,
 } from "./engine-results";
-import { captureScreenshot, type ScreenshotOptions, type ScreenshotResult } from "./screenshot";
-
-export interface DeliveryOptions {
-	/** `background` targets the window without focusing it; `foreground` briefly activates it. */
-	readonly delivery?: string;
-}
-
-export interface ClickOptions extends DeliveryOptions {
-	readonly button?: string;
-	readonly count?: number;
-	readonly modifiers?: readonly string[];
-}
-
-export interface ScrollOptions extends DeliveryOptions {
-	readonly dx?: number;
-	readonly dy?: number;
-}
+import { type DeliveryOptions, InputTarget, pointerOptions, send } from "./input-target";
+import { observeWindow, type ObserveOptions, type ObservationResult } from "./observe";
+export { type ClickOptions, type DeliveryOptions, InputTarget, type ScrollOptions } from "./input-target";
 
 export interface AxOptions {
 	readonly all?: boolean;
 	readonly maxDepth?: number;
+	readonly maxNodes?: number;
 }
 
 export interface AxQuery {
@@ -47,77 +36,6 @@ export interface Bounds {
 	readonly height: number;
 }
 
-/** The engine `PointerOptions`; `undefined` fields are dropped on the wire. */
-function pointerOptions(options: ClickOptions = {}): object {
-	const { button, count, modifiers, delivery } = options;
-	return { button, count, modifiers, deliveryMode: delivery };
-}
-
-function chordKeys(chord: string | readonly string[]): readonly string[] {
-	if (typeof chord !== "string") return chord;
-	return chord
-		.split("+")
-		.map((key) => key.trim())
-		.filter((key) => key.length > 0);
-}
-
-/**
- * Input helpers aimed at one engine target (`desktop` or a window id). `x`/`y` are pixels of the
- * target's latest capture; the engine owns that frame and fails `InvalidCoordinateFrame` without one.
- */
-export class InputTarget {
-	readonly #target: string;
-	protected readonly method: FacadeMethod;
-
-	constructor(scope: RunScope, target: string, tiers: MethodTiers) {
-		this.#target = target;
-		this.method = facadeMethod(scope, tiers);
-	}
-
-	/** Facade `method` sending one engine request whose result carries nothing. */
-	protected send(method: string, engineMethod: EngineMethod, params: object): Promise<void> {
-		return this.method(method, async ({ call }) => {
-			await call(engineMethod, params);
-		});
-	}
-
-	screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult> {
-		return this.method("screenshot", (scope) => captureScreenshot(scope, this.#target, options));
-	}
-
-	click(x: number, y: number, options?: ClickOptions): Promise<void> {
-		return this.send("click", "click", { target: this.#target, x, y, opts: pointerOptions(options) });
-	}
-
-	doubleClick(x: number, y: number, options?: ClickOptions): Promise<void> {
-		const opts = pointerOptions({ ...options, count: 2 });
-		return this.send("doubleClick", "click", { target: this.#target, x, y, opts });
-	}
-
-	move(x: number, y: number): Promise<void> {
-		return this.send("move", "moveMouse", { target: this.#target, x, y });
-	}
-
-	drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<void> {
-		const path = points.map(([x, y]) => ({ x, y }));
-		return this.send("drag", "drag", { target: this.#target, path, opts: pointerOptions(options) });
-	}
-
-	scroll(x: number, y: number, options: ScrollOptions = {}): Promise<void> {
-		const { dx = 0, dy = 0 } = options;
-		return this.send("scroll", "scroll", { target: this.#target, x, y, dx, dy, opts: pointerOptions(options) });
-	}
-
-	type(text: string, options?: DeliveryOptions): Promise<void> {
-		return this.send("type", "typeText", { target: this.#target, text, opts: pointerOptions(options) });
-	}
-
-	press(chord: string | readonly string[], options?: DeliveryOptions): Promise<void> {
-		const params = { target: this.#target, keys: chordKeys(chord), opts: pointerOptions(options) };
-		return this.send("press", "keyChord", params);
-	}
-}
-
 /** A window resolved by `desktop.window()`; identity fields are a snapshot, every call goes by id. */
 export class WindowHandle extends InputTarget {
 	readonly id: string;
@@ -126,9 +44,11 @@ export class WindowHandle extends InputTarget {
 	readonly pid: number | undefined;
 	readonly bounds: Bounds;
 	readonly focused: boolean;
+	readonly #method: FacadeMethod;
 
 	constructor(scope: RunScope, window: DesktopWindow) {
 		super(scope, window.id, WINDOW_METHODS);
+		this.#method = facadeMethod(scope, WINDOW_METHODS);
 		this.id = window.id;
 		this.app = window.app;
 		this.title = window.title;
@@ -138,26 +58,46 @@ export class WindowHandle extends InputTarget {
 	}
 
 	raise(): Promise<void> {
-		return this.send("raise", "raiseWindow", { windowId: this.id });
+		return send(this.#method, "raise", "raiseWindow", { windowId: this.id });
 	}
+
+	/** The window's native menu: `items` lists children (empty path = the menu bar), `select` invokes a leaf. */
+	readonly menu = {
+		items: (path?: readonly string[]): Promise<readonly MenuItem[]> =>
+			this.#method("menu.items", async ({ call }) => {
+				const items = await call("menus.items", { windowId: this.id, path: [...(path ?? [])] });
+				return expectResult("menus.items", items, listOf(isMenuItem));
+			}),
+		select: (path: readonly string[], options?: { readonly delivery?: string }): Promise<void> =>
+			send(this.#method, "menu.select", "menus.select", {
+				windowId: this.id,
+				path: [...path],
+				// Foreground keys the target window and needs the control grant (#9888); omitted stays background.
+				...(options?.delivery === undefined ? {} : { deliveryMode: options.delivery }),
+			}),
+	};
 
 	/** The formatted accessibility tree, one node per line with `[ref=eN]` tags. */
 	ax(options?: AxOptions): Promise<string> {
-		return this.method("ax", async ({ call }) => {
+		return this.#method("ax", async ({ call }) => {
 			const snapshot = await call("ax.snapshot", { target: this.id, opts: options });
 			return expectResult("ax.snapshot", snapshot, isText).text;
 		});
 	}
 
+	observe(options?: ObserveOptions): Promise<ObservationResult> {
+		return this.#method("observe", (scope) => observeWindow(scope, this.id, options));
+	}
+
 	find(query: AxQuery): Promise<readonly ElementHandle[]> {
-		return this.method("find", async (scope) => {
+		return this.#method("find", async (scope) => {
 			const nodes = await scope.call("ax.query", { target: this.id, query });
 			return expectResult("ax.query", nodes, listOf(isAxNode)).map((node) => new ElementHandle(scope, node));
 		});
 	}
 
 	ref(ref: string): Promise<ElementHandle> {
-		return this.method("ref", (scope) => resolveElement(scope, ref));
+		return this.#method("ref", (scope) => resolveElement(scope, ref));
 	}
 }
 

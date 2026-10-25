@@ -95,20 +95,18 @@ describe("deferred revival retries end with their session (omo#9498 review)", ()
   }, 10_000)
 
   test("each deferral reason maps to what happens next", () => {
-    expect(deferralOutlookFor("model_unavailable", false)).toBe("retried_then_lost")
-    expect(deferralOutlookFor("lock_contended", false)).toBe("retried_then_lost")
-    expect(deferralOutlookFor("model_unavailable", true)).toBe("retried_not_lost")
-    expect(deferralOutlookFor("host_unreachable", true)).toBe("retried_not_lost")
-    expect(deferralOutlookFor("capacity", false)).toBe("waits_for_capacity")
-    expect(deferralOutlookFor("foreign_live_owner", false)).toBe("may_stay_with_live_owner")
-    expect(deferralOutlookFor("reattach_disabled", false)).toBe("not_retried")
-    expect(deferralOutlookFor("tools_unavailable", false)).toBe("not_retried")
+    for (const reason of ["model_unavailable", "lock_contended", "host_unreachable", "capacity", "foreign_live_owner", "reattach_disabled", "tools_unavailable"]) {
+      for (const host of [false, true]) expect(deferralOutlookFor(reason, host)).toBe("recovering")
+    }
+    for (const reason of ["host_incompatible", "spawn_spec_unavailable"]) {
+      for (const host of [false, true]) expect(deferralOutlookFor(reason, host)).toBe("ending")
+    }
   })
 
-  test("a daemon-hosted child is told it waits for its host, never that it will be marked lost", () => {
+  test("a daemon-hosted child reports the same bounded recovery outlook", () => {
     const daemonHosted = { ...hostSessionRecordInput("st_94980010", hostSession("st_94980010")), task_id: "st_94980010",
       residency_state: "rpc_detached", suspension_reason: "revival_deferred", revival_deferred_reason: "model_unavailable" }
     const text = notContinuableReason(daemonHosted as unknown as Parameters<typeof notContinuableReason>[0])
-    expect(text).toContain(deferralOutlookText("retried_not_lost"))
+    expect(text).toContain(deferralOutlookText("recovering"))
   })
 })

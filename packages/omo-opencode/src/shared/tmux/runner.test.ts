@@ -53,7 +53,8 @@ async function createFakeCmux(directoryPath: string, argsFilePath: string): Prom
 beforeEach(() => {
 	delete process.env.CMUX_SOCKET_PATH
 	delete process.env.TMUX
-	process.env.PATH = originalPath
+	if (originalPath === undefined) delete process.env.PATH
+	else process.env.PATH = originalPath
 })
 
 afterAll(async () => {
@@ -69,7 +70,8 @@ afterAll(async () => {
 		process.env.TMUX = originalTmux
 	}
 
-	process.env.PATH = originalPath
+	if (originalPath === undefined) delete process.env.PATH
+	else process.env.PATH = originalPath
 
 	for (const directoryPath of temporaryDirectories) {
 		await fs.rm(directoryPath, { recursive: true, force: true })

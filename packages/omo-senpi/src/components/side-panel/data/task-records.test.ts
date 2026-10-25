@@ -152,7 +152,7 @@ describe("suspended children", () => {
     const child = panelChildFromRecord(parked)
 
     // then
-    expect(child.status).toBe("suspended")
+    expect(child.status).toBe("resuming")
   })
 
   test("#given a finished record that still carries a reason #when mapped #then it stays finished", () => {
@@ -186,8 +186,8 @@ describe("a child the engine is no longer holding in this process", () => {
     const update = panelChildFromRecord({ ...running, residency_state: "rpc_detached" })
 
     // then
-    expect(update.status).toBe("suspended")
-    expect(update.parkedReason).toBe("rpc_detached")
+    expect(update.status).toBe("resuming")
+    expect(update.parkedReason).toBe("parent session restarted")
   })
 
   test("#given a resident running child #when mapped #then nothing changes", () => {
@@ -208,7 +208,7 @@ describe("a child the engine is no longer holding in this process", () => {
     })
 
     // then
-    expect(update.parkedReason).toBe("daemon_unavailable")
+    expect(update.parkedReason).toBe("task daemon unavailable")
   })
 
   test("#given a finished record whose residency was disposed #when mapped #then it stays finished", () => {

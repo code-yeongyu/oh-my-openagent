@@ -1,5 +1,6 @@
-import { DESKTOP_METHODS, type DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol";
-import { isDesktopCapabilities } from "../service/parse";
+import { randomUUID } from "node:crypto";
+import { DESKTOP_METHODS, DISPLAY_METHODS, type DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol";
+import { isDesktopCapabilities, isRecord } from "../service/parse";
 import { ComputerRunError, facadeMethod, type RunScope } from "./context";
 import {
 	type DesktopDisplay,
@@ -45,13 +46,21 @@ export function createDesktopFacade(scope: RunScope) {
 	const root = new InputTarget(scope, "desktop", DESKTOP_METHODS);
 	return {
 		capabilities: (): Promise<DesktopCapabilities> =>
-			method("capabilities", async ({ call }) =>
-				expectResult("capabilities", await call("capabilities", {}), isDesktopCapabilities),
-			),
+			method("capabilities", async ({ call }) => {
+				const capabilities = expectResult("capabilities", await call("capabilities", {}), isDesktopCapabilities);
+				return { ...capabilities, cursorOverlay: capabilities.cursorOverlay ?? false };
+			}),
 		displays: (): Promise<readonly DesktopDisplay[]> =>
 			method("displays", async ({ call }) =>
 				expectResult("displays", await call("displays", {}), listOf(isDisplay)),
 			),
+		/** A per-call display target, without changing the session's default capture; the engine refuses an unknown id at first use. */
+		display: (selector: string): Promise<InputTarget & { readonly id: string }> =>
+			method("display", async () => {
+				if (typeof selector !== "string" || selector.length === 0)
+					throw new ComputerRunError("assertion", "display requires an id, 'active', or 'all'");
+				return Object.assign(new InputTarget(scope, `display:${selector}`, DISPLAY_METHODS), { id: selector });
+			}),
 		windows: (filter?: WindowFilter): Promise<readonly DesktopWindow[]> =>
 			method("windows", async (run) => (await listWindows(run)).filter((window) => matchesFilter(window, filter))),
 		/** Exactly one window by opaque id or filter; an ambiguous filter throws listing the candidates. */
@@ -78,6 +87,7 @@ export function createDesktopFacade(scope: RunScope) {
 				return focused === undefined ? null : new WindowHandle(scope, focused);
 			}),
 		screenshot: root.screenshot.bind(root),
+		zoom: root.zoom.bind(root),
 		click: root.click.bind(root),
 		doubleClick: root.doubleClick.bind(root),
 		move: root.move.bind(root),
@@ -85,6 +95,8 @@ export function createDesktopFacade(scope: RunScope) {
 		scroll: root.scroll.bind(root),
 		type: root.type.bind(root),
 		press: root.press.bind(root),
+		holdKeys: root.holdKeys.bind(root),
+		holdMouse: root.holdMouse.bind(root),
 		/** The element under a point in global logical desktop coordinates (not screenshot pixels). */
 		elementAt: (x: number, y: number): Promise<ElementHandle | null> =>
 			method("elementAt", () => element("ax.elementAt", { target: "desktop", x, y })),
@@ -101,6 +113,69 @@ export function createDesktopFacade(scope: RunScope) {
 					await call("clipboard.write", { text });
 				}),
 		},
+		control: createControlFacade(scope, method),
+	};
+}
+
+/** Run time kept back from a pending confirm for `control.grant` and the action that follows it. */
+const CONFIRM_RUN_MARGIN_MS = 5_000;
+/** Less than this left for the confirm: a human could not read and answer it, so nobody is asked. */
+const MIN_CONFIRM_BUDGET_MS = 3_000;
+
+/** The `control.state` result shape, mirrored from the engine's `ControlStateResult` (#9651 B5). */
+export interface ControlState {
+	readonly active: boolean;
+	readonly reason?: string | null;
+	readonly grantedAt?: string | null;
+}
+
+function isControlState(value: unknown): value is ControlState {
+	return isRecord(value) && typeof value.active === "boolean";
+}
+
+/**
+ * `desktop.control`: the foreground-control grant. `acquire` asks the human through the run's confirm
+ * channel and only then calls the host-only `control.grant`; a "yes" that arrives after the run was
+ * aborted is discarded (the fence oh-my-pi's `#controlEpoch` guards, here the run's own signal).
+ */
+function createControlFacade(scope: RunScope, method: ReturnType<typeof facadeMethod>) {
+	const state = (): Promise<ControlState> =>
+		method("control.state", async ({ call }) =>
+			expectResult("control.state", await call("control.state", {}), isControlState),
+		);
+	return {
+		acquire: (options: { reason: string }): Promise<ControlState> =>
+			method("control.acquire", async ({ context, call }) => {
+				const reason = typeof options?.reason === "string" ? options.reason.trim() : "";
+				if (reason.length === 0) {
+					throw new ComputerRunError("assertion", "control.acquire requires a non-empty reason");
+				}
+				const current = expectResult("control.state", await call("control.state", {}), isControlState);
+				if (current.active) return current;
+				const confirm = scope.confirmControl;
+				if (confirm === undefined) return { active: false };
+				// The confirm must settle before the run budget ends, leaving time to send the grant and act on it.
+				const budgetMs = Math.max(0, context.deadline - Date.now() - CONFIRM_RUN_MARGIN_MS);
+				if (budgetMs < MIN_CONFIRM_BUDGET_MS) {
+					throw new ComputerRunError(
+						"assertion",
+						"control.acquire needs at least 8 s of run time left (time for the human to answer, then to act); call it earlier or give the run a longer timeout",
+					);
+				}
+				const approved = await confirm(reason, context.signal, budgetMs);
+				context.signal.throwIfAborted();
+				if (approved !== true) return { active: false };
+				return expectResult(
+					"control.grant",
+					await call("control.grant", { reason, confirmationId: randomUUID() }),
+					isControlState,
+				);
+			}),
+		release: (): Promise<void> =>
+			method("control.release", async ({ call }) => {
+				await call("control.revoke", {});
+			}),
+		state,
 	};
 }
 

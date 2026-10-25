@@ -21,7 +21,8 @@ permissions:
 jobs:
   retag:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9949.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/setup-node@v7
         with:

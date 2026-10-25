@@ -120,6 +120,11 @@ At start, run `NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)` and echo 
 
 When a `create_goal` tool exists, check `get_goal` first (continue a matching active goal; never duplicate), then register the run's goal before implementation with exactly `objective`, outcome-first: the concrete outcome that will be true (never an activity), named deliverable surfaces, the scenario contract as criteria that can fail, scope bounds, and the WHEN TO STOP line. No invented budgets or deadlines. No tool → record the same contract in the notepad and treat it as binding.
 
+## Task resources
+Before the first task command, create and record one `RUN_TMP=$(mktemp -d)` per task. Export `TMPDIR="$RUN_TMP" NODE_COMPILE_CACHE="$RUN_TMP/node-compile-cache" BUN_RUNTIME_TRANSPILER_CACHE_PATH="$RUN_TMP/bun-transpiler"` for every command; pass the same environment explicitly to children that do not inherit it. Give independent child tasks their own run roots.
+At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
+ALWAYS add a cleanup todo AT CREATION for each worktree, cache directory (including the run root), and QA resource (PID, tmux session, browser context, port, container, script or temp path); complete it only after a read-back teardown receipt.
+
 ## TODO DISCIPLINE
 
 Maintain a live todo list for every multi-step task: one atomic item per action (`path: <action> for <scenario> — verify by <check>`), exactly one in_progress, transitions marked the instant they happen, discovered work inserted immediately. Never batch completions.
@@ -168,7 +173,7 @@ lsp_diagnostics catches type errors only. Logic bugs, missing behavior, broken f
 | Adds tool/hook/feature | Test end-to-end in a real scenario. |
 | Modifies config handling | Load config. Verify parsed shape. |
 
-Name the exact tool + exact invocation per scenario (literal `curl` / `send-keys` / `page.click` + inputs + binary observable). Register every QA-spawned resource teardown as its own todo (scripts, tmux, browser contexts, PIDs, ports, temp dirs), execute it, capture the receipt. "This should work" / "tests pass" / "lsp clean" / a leftover process are NOT done — the surface artifact + clean teardown are.
+Name the exact tool and invocation per scenario. Tear down QA scripts, tmux assets, browser contexts, PIDs, ports, containers and QA temp paths inside `$RUN_TMP` before recording QA; leftover QA resources mean NOT done. Remove the run root and eligible worktrees at task end under Task resources.
 </MANUAL_QA_MANDATE>
 
 ## REVIEWER GATE (triggered)

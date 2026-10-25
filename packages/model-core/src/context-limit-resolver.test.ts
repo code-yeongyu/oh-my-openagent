@@ -169,4 +169,80 @@ describe("resolveActualContextLimit", () => {
       anthropicContext1MEnabled: false,
     })).toBe(1_000_000)
   })
+
+  const opus5Models = [
+    "claude-opus-5",
+    "claude-opus-5-fast",
+    "claude-opus-5-5",
+    "claude-opus-5.5",
+    "anthropic/claude-opus-5",
+    "anthropic/claude-opus-5-fast",
+    "anthropic/claude-opus-5.5",
+    "claude-opus-5@default",
+    "claude-opus-5-5@default",
+    "anthropic.claude-opus-5",
+    "us.anthropic.claude-opus-5",
+    "eu.anthropic.claude-opus-5-5",
+    "global.anthropic.claude-opus-5-5",
+    "jp.anthropic.claude-opus-5",
+    "au.anthropic.claude-opus-5-5",
+    "claude-opus-5-20261001",
+    "claude-opus-5-fast-20261001",
+    "claude-opus-5-5-20261001",
+    "anthropic/claude-opus-5-5-20261001",
+  ] as const
+
+  for (const providerID of ["anthropic", "google-vertex-anthropic", "aws-bedrock-anthropic"]) {
+    for (const modelID of opus5Models) {
+      it(`returns GA 1M for ${providerID}/${modelID} without explicit 1M mode`, () => {
+        // given
+        delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+        delete process.env[VERTEX_CONTEXT_ENV_KEY]
+        // when
+        const actualLimit = resolveActualContextLimit(providerID, modelID, {
+          anthropicContext1MEnabled: false,
+        })
+        // then
+        expect(actualLimit).toBe(1_000_000)
+      })
+
+      it(`honors the cached limit for ${providerID}/${modelID}`, () => {
+        // given
+        delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+        delete process.env[VERTEX_CONTEXT_ENV_KEY]
+        const modelContextLimitsCache = new Map([[`${providerID}/${modelID}`, 700_000]])
+        // when
+        const actualLimit = resolveActualContextLimit(providerID, modelID, {
+          anthropicContext1MEnabled: false,
+          modelContextLimitsCache,
+        })
+        // then
+        expect(actualLimit).toBe(700_000)
+      })
+    }
+  }
+
+  for (const modelID of ["claude-opus-5-6", "claude-opus-5-fastest", "claude-opus-5-5-202610"]) {
+    it(`keeps the default for unsupported Opus ID ${modelID}`, () => {
+      delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+      delete process.env[VERTEX_CONTEXT_ENV_KEY]
+      expect(resolveActualContextLimit("anthropic", modelID, {
+        anthropicContext1MEnabled: false,
+      })).toBe(200_000)
+    })
+  }
+
+  it("keeps 200K default for Anthropic models outside the GA 1M allowlist", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-5", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(200_000)
+  })
 })

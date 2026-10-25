@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import type { LifecycleContext } from "./context"
 
-export function newestSessionPath(context: LifecycleContext, taskId: string): string | undefined {
+export function newestSessionPath(context: Pick<LifecycleContext, "store">, taskId: string): string | undefined {
   const sessionDir = resolveChildSessionDir(join(context.store.stateDir, "children", taskId), taskId)
   try {
     let newest: { readonly path: string; readonly mtimeMs: number } | undefined

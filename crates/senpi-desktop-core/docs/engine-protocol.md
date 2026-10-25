@@ -13,17 +13,26 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `engine.hello` | read | no | no | `EmptyParams` | `HelloResult` | `ErrorCode` |
 | `session.open` | exec | yes | no | `DesktopSessionOptions` | `SessionOpenResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `session.close` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.grant` | exec | yes | no | `ControlGrantParams` | `ControlStateResult` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.revoke` | exec | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
+| `control.state` | read | no | no | `EmptyParams` | `ControlStateResult` | `ErrorCode` |
 | `capabilities` | read | no | no | `EmptyParams` | `DesktopCapabilities` | `ErrorCode` |
 | `displays` | read | no | no | `EmptyParams` | `Vec<DesktopDisplay>` | `ErrorCode` |
 | `windows` | read | no | no | `EmptyParams` | `Vec<DesktopWindow>` | `ErrorCode` |
 | `capture` | read | no | no | `CaptureParams` | `CaptureResult` | `ErrorCode` |
+| `captureRegion` | read | no | no | `CaptureRegionParams` | `CaptureResult` | `ErrorCode` |
+| `observe` | read | no | no | `ObserveParams` | `ObserveResult` | `ErrorCode` |
 | `click` | exec | no | no | `PointParams` | `null` | `ErrorCode` |
 | `moveMouse` | exec | no | no | `PointParams` | `null` | `ErrorCode` |
 | `drag` | exec | no | no | `DragParams` | `null` | `ErrorCode` |
 | `scroll` | exec | no | no | `ScrollParams` | `null` | `ErrorCode` |
 | `typeText` | exec | no | no | `TypeTextParams` | `null` | `ErrorCode` |
 | `keyChord` | exec | no | no | `KeyChordParams` | `null` | `ErrorCode` |
+| `holdKeys` | exec | no | no | `HoldKeysParams` | `null` | `ErrorCode` |
+| `holdMouse` | exec | no | no | `HoldMouseParams` | `null` | `ErrorCode` |
 | `raiseWindow` | exec | no | no | `RaiseWindowParams` | `null` | `ErrorCode` |
+| `menus.items` | read | no | no | `MenuPathParams` | `Vec<MenuItem>` | `ErrorCode` |
+| `menus.select` | exec | no | no | `MenuSelectParams` | `null` | `ErrorCode` |
 | `clipboard.read` | read | no | no | `EmptyParams` | `ClipboardText` | `ErrorCode` |
 | `clipboard.write` | exec | no | no | `ClipboardText` | `null` | `ErrorCode` |
 | `ax.snapshot` | read | no | no | `AxSnapshotParams` | `AxSnapshot` | `ErrorCode` |
@@ -56,7 +65,7 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 
 ## Errors
 
-An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-level rejection is the standard `-32601 Method not found` with `data: {reason: "unknown" | "hostOnly" | "testOnly"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`.
+An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-level rejection is the standard `-32601 Method not found` with `data: {reason: "unknown" | "hostOnly" | "testOnly"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`. `CaptureUnavailable` also carries `data: {captureUnavailable: {reason}}`; B9 defines the reason `"minimized"` for a window that exists but is minimized.
 
 | ErrorCode | JSON-RPC code |
 |---|---|
@@ -81,6 +90,9 @@ An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-
 | `CursorRestoreFailed` | `-32018` |
 | `FocusRestoreFailed` | `-32019` |
 | `TransactionFailed` | `-32020` |
+| `InputBusy` | `-32021` |
+| `ControlRequired` | `-32022` |
+| `CaptureUnavailable` | `-32023` |
 
 ## Conformance corpus
 

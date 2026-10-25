@@ -11,6 +11,12 @@
     "./fs": {
       "import": "./src/fs/resilient.ts"
     },
+    "./recall-store": {
+      "import": "./src/recall/bm25-persist.ts"
+    },
+    "./sync-engine": {
+      "import": "./src/sync/engine/index.ts"
+    },
     "./personas": {
       "import": "./src/personas/manifest.ts"
     },
@@ -19,13 +25,20 @@
     },
     "./process-start-time": {
       "import": "./src/locks/process-start-time.ts"
+    },
+    "./keyring": {
+      "import": "./src/sync/keyring-port.ts"
+    },
+    "./memory-hook": {
+      "import": "./src/memfs/memory-hook.ts"
     }
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "bun test src/"
   },
-  "devDependencies": {
+  "dependencies": {
+    "loro-crdt": "1.16.4",
     "yaml": "2.9.1"
   }
 }

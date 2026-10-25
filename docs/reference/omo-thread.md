@@ -181,7 +181,13 @@ Operations run in one `BEGIN IMMEDIATE`. The transaction surface is:
 - `all(columns, sql, params?, orderBy?)`, `one(columns, sql, params?)`, and `exec(sql, params?)`:
   one SQLite statement per call, using `?` parameters (`string | number | null`). Reads return
   records keyed by the explicit columns; `one` returns `undefined` when absent; `exec` returns
-  the changed-row count. Use `orderBy` for ordered reads. Only anonymous parameter tokens are
+  the changed-row count. Use `orderBy` for ordered reads: it lists the statement's output columns,
+  each optionally with `COLLATE BINARY|NOCASE|RTRIM`, `ASC`/`DESC` or `NULLS FIRST`/`NULLS LAST`
+  (`"created_at, id"`). Each name must match a column the statement returns (ASCII
+  case-insensitively), and the ORDER BY is rebuilt from that column's name and the fixed keywords.
+  Anything else, such as a `LIMIT`, an `OFFSET`, a table-qualified, quoted or unknown column, is
+  refused with `extension_schema_violation`; put a `LIMIT` in the statement itself
+  (`... ORDER BY created_at, id LIMIT ?`). Only anonymous parameter tokens are
   replaced; literal question marks in SQL strings, quoted identifiers and comments are preserved.
   `exec` can also create, alter and drop the extension's own objects during an operation, not
   just during migration. Identifiers and schema qualifiers follow SQLite's ASCII case folding.
@@ -359,7 +365,7 @@ that such a question closed only from a refused answer: `already_answered` after
 
 A binding attaches one session to one external thread, named by `(platform, account, chat,
 thread)`; `--thread` defaults to `@chat` (the chat itself). `--platform` is one of `discord`,
-`telegram`, `slack`, `notion`, `feishu`, `herdr` or `custom` (any other connector). Nothing here talks to a chat platform:
+`telegram`, `slack`, `notion`, `feishu`, `herdr`, `custom` or `whatsapp`. Nothing here talks to a chat platform:
 a connector drives the binding.
 
 - At most one `active` binding holds a thread. Binding a thread that is already held is

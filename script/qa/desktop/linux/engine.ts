@@ -123,10 +123,21 @@ export class Engine {
 		return reply.result ?? null;
 	}
 
-	/** Opens the session the way the host does after activation, then arms the stop paths. */
+	/**
+	 * Opens the session the way the host does after activation, arms the stop paths, then takes the
+	 * foreground-control grant the way the host does after the human confirms (#9651 B5): the
+	 * foreground scenarios need it, and background delivery ignores it.
+	 */
 	async activate(allowHostRelayOnlyStop: boolean): Promise<JsonObject> {
 		await this.result("session.open", { allowHostRelayOnlyStop });
-		return asObject(await this.result("stopPath.start", { chord: STOP_CHORD }));
+		const started = asObject(await this.result("stopPath.start", { chord: STOP_CHORD }));
+		await this.grant();
+		return started;
+	}
+
+	/** `control.grant` (host-only), as the host sends it once the human has confirmed. */
+	async grant(): Promise<void> {
+		await this.result("control.grant", { reason: "interactive-desktop QA", confirmationId: "qa-confirmed" });
 	}
 
 	/** One mutating request after the heartbeat that keeps the host-relay stop path fresh. */

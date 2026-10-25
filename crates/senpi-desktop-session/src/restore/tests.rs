@@ -23,6 +23,7 @@ fn background_click_never_warps_or_refocuses() {
 fn foreground_click_restores_front_then_cursor_in_that_order() {
     // Given
     let mut harness = harness(&two_windows());
+    harness.grant("one");
     let frame = harness.capture("101");
     // When
     harness
@@ -62,6 +63,7 @@ fn background_keys_hand_key_focus_back_without_touching_the_cursor() {
 fn focus_restore_failure_after_a_successful_click_has_no_primary() {
     // Given
     let mut harness = harness(&two_windows());
+    harness.grant("one");
     harness
         .faults
         .fail_next(FakeMethod::RestoreFrontWindow, ErrorCode::WindowNotFound);
@@ -72,10 +74,7 @@ fn focus_restore_failure_after_a_successful_click_has_no_primary() {
             .transaction(&foreground_click_mutation(), &|| false, foreground_click);
     // Then
     assert!(
-        matches!(
-            result,
-            Err(TransactionError::FocusRestoreFailed { primary: None, .. })
-        ),
+        matches!(result, Err(TransactionError::FocusRestoreFailed { primary: None, .. })),
         "{result:?}"
     );
     assert_eq!(focus_restored, Some(false));
@@ -85,9 +84,8 @@ fn focus_restore_failure_after_a_successful_click_has_no_primary() {
 fn focus_restore_failure_after_a_failed_click_keeps_the_primary() {
     // Given
     let mut harness = harness(&two_windows());
-    harness
-        .faults
-        .fail_next(FakeMethod::Click, ErrorCode::InputFailed);
+    harness.grant("one");
+    harness.faults.fail_next(FakeMethod::Click, ErrorCode::InputFailed);
     harness
         .faults
         .fail_next(FakeMethod::RestoreFrontWindow, ErrorCode::WindowNotFound);
@@ -107,12 +105,9 @@ fn focus_restore_failure_after_a_failed_click_keeps_the_primary() {
 fn cursor_restore_failure_after_a_failed_click_keeps_the_primary() {
     // Given
     let mut harness = harness(&two_windows());
-    harness
-        .faults
-        .fail_next(FakeMethod::Click, ErrorCode::InputFailed);
-    harness
-        .faults
-        .fail_next(FakeMethod::WarpCursor, ErrorCode::InputFailed);
+    harness.grant("one");
+    harness.faults.fail_next(FakeMethod::Click, ErrorCode::InputFailed);
+    harness.faults.fail_next(FakeMethod::WarpCursor, ErrorCode::InputFailed);
     // When
     let (result, _) = harness
         .worker
@@ -129,6 +124,7 @@ fn cursor_restore_failure_after_a_failed_click_keeps_the_primary() {
 fn a_failed_restore_reaches_the_wire_and_the_audit_as_focus_restore_failed() {
     // Given
     let mut harness = harness(&two_windows());
+    harness.grant("one");
     let frame = harness.capture("101");
     harness
         .faults
@@ -136,10 +132,7 @@ fn a_failed_restore_reaches_the_wire_and_the_audit_as_focus_restore_failed() {
     // When
     let reply = harness.process(click_window(&frame, delivery("foreground")));
     // Then
-    assert_eq!(
-        reply.map_err(|error| error.code),
-        Err(ErrorCode::FocusRestoreFailed)
-    );
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::FocusRestoreFailed));
     let audit = harness.audits().pop().expect("one audit");
     assert_eq!(
         (audit.code, audit.focus_restored),

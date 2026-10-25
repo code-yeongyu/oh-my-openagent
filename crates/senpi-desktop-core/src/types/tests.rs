@@ -20,6 +20,7 @@ fn unavailable_capabilities_serialize_the_frozen_camel_case_field_set() {
             "input",
             "ax",
             "backgroundWindowInput",
+            "cursorOverlay",
             "deliveryModes",
             "capturePermission",
             "inputPermission",
@@ -85,8 +86,16 @@ fn session_options_missing_fields_take_documented_defaults() {
     assert!(options.allow_host_relay_only_stop);
     assert_eq!(options.capture_caps.max_width, Some(1280));
     assert_eq!(options.capture_caps.max_bytes, DEFAULT_CAPTURE_MAX_BYTES);
+    assert!(options.show_cursor);
     assert_eq!(options.screenshot_gc, ScreenshotGc::default());
     assert_eq!((options.audit_path, options.artifact_dir), (None, None));
+}
+
+#[test]
+fn session_options_preserve_explicit_cursor_off() {
+    let options: DesktopSessionOptions =
+        serde_json::from_value(json!({"showCursor": false})).unwrap();
+    assert!(!options.show_cursor);
 }
 
 #[test]

@@ -6,7 +6,7 @@ import type { TaskRecordStore } from "../store"
 
 // `reconcile_lost`: a child whose handle cleanup rejected is recorded on its terminal record and ended
 // through the lifecycle's orphan path (pid signal or daemon session close).
-export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure" | "reconcile_lost"
+export type DestructionCause = "cancel" | "cancel_without_abort" | "fallback_handoff" | "revive_failure" | "reconcile_lost" | "recovery_detach" | "redispatch"
 
 // Structural port implemented by lifecycle (todo 12). Steering delegates ALL child destruction here
 // and NEVER calls dispose()/terminate()/SIGTERM itself (the dispose single-writer rule). Idempotent.
@@ -27,6 +27,11 @@ export type SteeringPort = {
   tryBeginSend?(taskId: string): boolean
   endSend?(taskId: string): void
   isEvicting?(taskId: string): boolean
+  // True while the task's launch is still being admitted by its host (#10042): no live handle yet, and
+  // the launch drains whatever is queued once the child starts.
+  isLaunching?(taskId: string): boolean
+  // The child's run admission is stopped: the send is held in the child (no turn). Undefined: send normally.
+  sendWhileRunHeld?(record: TaskRecord, message: string): Promise<SendOutcome> | undefined
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
@@ -70,6 +75,8 @@ export type SendInput = {
 export const DEFAULT_SEND_DELIVERY: SendDelivery = "followUp"
 
 export type SendOutcome =
+  | { readonly kind: "uncertain"; readonly task_id: string; readonly effect_id: string; readonly reason: string }
+  | { readonly kind: "failed"; readonly task_id: string; readonly effect_id: string; readonly reason: string; readonly detail: string; readonly action: string }
   | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
   | { readonly kind: "steered"; readonly task_id: string; readonly status: TaskStatus; readonly delivered: SendDelivery }
   | { readonly kind: "revived"; readonly task_id: string; readonly run_epoch: number }
@@ -82,6 +89,8 @@ export type SendOutcome =
     }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
+  // The child's run is stopped: the message is held in the child and delivered when the run resumes.
+  | { readonly kind: "held"; readonly task_id: string; readonly pause_seq: number; readonly entry_id: string }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was delivered. */
   | { readonly kind: "stale"; readonly task_id: string; readonly run_epoch: number; readonly reason: string }
@@ -104,19 +113,30 @@ export type CancelOptions = {
 }
 
 export type CancelOutcome =
-  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus }
+  | { readonly kind: "cancelled"; readonly task_id: string; readonly previous_status: TaskStatus; readonly undelivered_messages?: number }
   // The child is unreachable right now: the cancel runs on its host before anything else once it is
   // reachable (or the child ends when its connection does not come back), and only then is it cancelled.
-  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string }
+  | { readonly kind: "cancel_pending"; readonly task_id: string; readonly previous_status: TaskStatus; readonly reason: string; readonly undelivered_messages?: number }
   | { readonly kind: "noop"; readonly task_id: string; readonly status: TaskStatus; readonly reason: string }
   // The task had already finished; cancel released the child it still kept resident (omo#9785).
-  | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus }
+  | { readonly kind: "released"; readonly task_id: string; readonly status: TaskStatus; readonly undelivered_messages?: number }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was cancelled. */
   | { readonly kind: "stale"; readonly task_id: string; readonly status: TaskStatus; readonly run_epoch: number; readonly reason: string }
   | { readonly kind: "not_found"; readonly reason: string }
 
+// senpi#3266: the result of re-dispatching a flagged "resumed, waiting for input" task onto a
+// fresh live session. `redispatched` carries the NEW run epoch the task now runs under.
+export type RedispatchOutcome =
+  | { readonly kind: "redispatched"; readonly task_id: string; readonly run_epoch: number }
+  | { readonly kind: "invalid_state"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "respawn_failed"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
+  | { readonly kind: "scope_denied"; readonly task_id: string; readonly owning_session_id: string; readonly reason: string }
+  | { readonly kind: "not_found"; readonly reason: string }
+
 export type SteeringEngine = {
   hasPendingSends(taskId: string): boolean
+  hasInFlightSends(taskId: string): boolean
   // Internal manager grant consumption; ordinary task_send callers never supply a reservation.
   sendToTask(input: SendInput, reservation?: ReviveReservation): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>
@@ -125,7 +145,7 @@ export type SteeringEngine = {
   notifyStarted(taskId: string): Promise<void>
   // Called by the manager when a task is forgotten (destroyed/evicted/failed to launch) so buffered
   // messages for a child that will never start are not retained for the session.
-  dropPending(taskId: string): void
+  dropPending(taskId: string, reason: "cancelled" | "target_gone" | "task_forgotten"): void
 }
 
 export type { TaskRecord }

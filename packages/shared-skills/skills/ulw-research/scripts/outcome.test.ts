@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -22,8 +22,14 @@ import {
 const STAMP = "20260101-120000"
 const START_LOCAL = new Date(2026, 0, 1, 12, 0, 0)
 
+function tempRoot(): string {
+	const root = mkdtempSync(join(tmpdir(), "ulw-outcome-"))
+	onTestFinished(() => rmSync(root, { recursive: true, force: true }))
+	return root
+}
+
 function sessionDir(): string {
-	const dir = join(mkdtempSync(join(tmpdir(), "ulw-outcome-")), STAMP)
+	const dir = join(tempRoot(), STAMP)
 	mkdirSync(dir)
 	return dir
 }
@@ -57,7 +63,7 @@ describe("initManifest", () => {
 
 	test("#given a session dir without a YYYYMMDD-HHMMSS basename #when initialised #then it throws a typed error", () => {
 		// given
-		const dir = mkdtempSync(join(tmpdir(), "ulw-outcome-"))
+		const dir = tempRoot()
 		// when / then
 		expect(() => initManifest({ sessionDir: dir, promised: ["pdf"], lane: null })).toThrow(OutcomeError)
 	})
@@ -251,6 +257,35 @@ describe("readManifest and writeManifest", () => {
 		expect(existsSync(file)).toBe(false)
 		writeFileSync(file, "{not json")
 		expect(() => readManifest(file)).toThrow(OutcomeError)
+	})
+
+	test("#given a manifest file written before the fidelity gate (four gates) #when read and written back #then it loads and the file gains fidelity not_run", () => {
+		// given
+		const dir = sessionDir()
+		const file = join(dir, MANIFEST_FILENAME)
+		const old = {
+			schemaVersion: 1,
+			sessionDir: dir,
+			startedAt: START_LOCAL.toISOString(),
+			finishedAt: null,
+			elapsedMinutes: null,
+			lane: "no-format",
+			interview: null,
+			deliverables: [{ format: "pdf", status: "pending", promised: true, updatedAt: START_LOCAL.toISOString() }],
+			renders: [],
+			gates: { static: "pass", layout: "not_run", visual: "fail", proofread: "not_run" },
+			residualDefects: [],
+			repair: null,
+			sources: null,
+		}
+		writeFileSync(file, JSON.stringify(old))
+		// when
+		const manifest = readManifest(file)
+		writeManifest(file, manifest)
+		// then
+		const written = JSON.parse(readFileSync(file, "utf8"))
+		expect(written.gates).toEqual({ static: "pass", fidelity: "not_run", layout: "not_run", visual: "fail", proofread: "not_run" })
+		expect(written.schemaVersion).toBe(1)
 	})
 })
 

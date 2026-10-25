@@ -29,6 +29,20 @@ pub struct SessionOpenResult {
     pub resume_token: String,
 }
 
+/// `control.grant` and `control.state` reply: this session's live foreground
+/// control grant. `reason` and `granted_at` are present exactly when
+/// `active` is true.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ControlStateResult {
+    pub active: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// RFC 3339 UTC with milliseconds, matching the audit timestamps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub granted_at: Option<String>,
+}
+
 /// Which stop path currently guards input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]

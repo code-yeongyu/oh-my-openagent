@@ -15,7 +15,7 @@ afterEach(async () => {
   harness = undefined
 })
 
-const ENDPOINT = { kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1" } as const
+const ENDPOINT = { kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" } as const
 
 async function abandonedQuestion(refusal: string) {
   const h = (harness = createGatewayHarness())

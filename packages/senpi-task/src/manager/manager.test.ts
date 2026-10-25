@@ -65,7 +65,7 @@ function makeLifecycleManager(runner: ManagedRunner, config = settings({ default
         .residentTaskIds()
         .map((taskId) => toResidentHandle(getManager().getResidentHandle(taskId)))
         .filter((handle): handle is ResidentHandle => handle !== undefined),
-    forget: (taskId) => getManager().forget(taskId),
+    forget: (taskId, options) => getManager().forget(taskId, options),
     hasPendingSends: () => false,
   }
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })

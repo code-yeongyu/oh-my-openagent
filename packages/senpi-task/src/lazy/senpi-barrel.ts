@@ -112,6 +112,9 @@ export interface HostDecision {
 export interface EnsureHostInput {
   readonly socket: string
   readonly agentDir?: string
+  // senpi #3044: the host stops shortly after this caller exits once no peer or turn remains, instead of
+  // waiting out the idle window. Engine pins before 2026.10.10-12 ignore it.
+  readonly owner?: "caller"
   readonly hostArgs?: readonly string[]
   readonly env?: Readonly<Record<string, string | null>>
   readonly upgrade?: "never" | "if-engine-differs"

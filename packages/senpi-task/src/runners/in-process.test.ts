@@ -130,13 +130,17 @@ describe("InProcessRunner", () => {
   ])("#given %s #when start runs #then the child is accepted, not refused as a substitution (#9793)", async (_label, pinnedId, startedId) => {
     // given: senpi starts a -fast catalog pin on its base model with the priority tier remembered
     const fake = createFakeSession()
-    fake.session = { ...fake.session, model: { provider: "vendor-a", id: startedId } }
+    fake.session = {
+      ...fake.session,
+      ...{ effectiveServiceTier: "priority" },
+      model: { provider: "vendor-a", id: startedId, serviceTier: "priority", upstreamModelId: "pinned" },
+    }
     const runner = new InProcessRunner({ createSession: async () => fake.session })
 
     // when
     const handle = await runner.start(
       baseSpec({
-        model: realModel("vendor-a", pinnedId),
+        model: { ...realModel("vendor-a", pinnedId), serviceTier: "priority", upstreamModelId: "pinned" },
         selectedModel: `vendor-a/${pinnedId}`,
         resolvedModel: { provider: "vendor-a", model_id: pinnedId, display: `vendor-a/${pinnedId}`, source: "explicit" },
       }),

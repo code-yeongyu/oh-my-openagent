@@ -7,7 +7,7 @@ export const PROFILE_TYPES = [APPLIED_TYPE, UNKNOWN_TYPE, UNAVAILABLE_TYPE]
 // Builtin rungs are served only by their listed provider ids (#9146), so a scenario that expects a
 // builtin rung registers the ranked provider it should land on; bare `omo-mock` matches no rung.
 // `mock-1` keeps the recommended-models builtin inert except in its precedence scenario.
-export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-normal, recommended"
+export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-normal"
 
 // The refresh token the fixture OAuth lane in model-profile-e2e-mock-provider.ts refuses to
 // exchange (kept literal on both sides: the mock runs inside the senpi process, this file in node).
@@ -81,6 +81,13 @@ export const SCENARIOS = {
     registerProviders: ["zai"],
     expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
   },
+  "geeky-normal-astra": {
+    omoConfig: { model_profile: "geeky-normal" },
+    mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-6-astra"],
+    cliModel: undefined,
+    registerProviders: ["chatgpt-subscription"],
+    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
+  },
   "geeky-normal-gpt6-only-unavailable": {
     omoConfig: { model_profile: "geeky-normal" },
     mockModels: ["mock-1", "gpt-6-sol-fast", "gpt-6-sol"],
@@ -101,19 +108,37 @@ export const SCENARIOS = {
     registerProviders: ["opengateway", "kimi-coding"],
     expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
+  // Unset starts on Daily · Normal (#10029): with GLM connected beside GPT, its GLM rung wins.
   "unset-gpt-6-1-sol": {
     omoConfig: {},
     mockModels: ["mock-1", "gpt-6-sol", "gpt-6.1-sol", "glm-5.3"],
     cliModel: undefined,
     registerProviders: ["chatgpt-subscription", "zai"],
-    expect: { model: "gpt-6.1-sol", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
+    expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
   },
   "unset-copilot-gpt-6-sol": {
     omoConfig: {},
     mockModels: ["mock-1", "gpt-6-sol", "glm-5.3"],
     cliModel: undefined,
     registerProviders: ["github-copilot", "zai"],
-    expect: { model: "gpt-6-sol", provider: "github-copilot", notice: APPLIED_TYPE, thinking: "medium" },
+    expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
+  },
+  // No Daily lane resolves on a ChatGPT-only setup: the first lane that does, Obsessive · Normal, applies.
+  "unset-chatgpt-only-geeky-normal": {
+    omoConfig: {},
+    mockModels: ["mock-1", "gpt-6.1-sol"],
+    cliModel: undefined,
+    registerProviders: ["chatgpt-subscription"],
+    expect: { model: "gpt-6.1-sol", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
+  },
+  // The retired "recommended" id (#10029) starts the unset default: Daily · Normal's glm-5.3 here,
+  // never the old ladder's gpt-6.1-sol and never the unknown-profile notice.
+  "retired-recommended": {
+    omoConfig: { model_profile: "recommended" },
+    mockModels: ["mock-1", "gpt-6-sol", "gpt-6.1-sol", "glm-5.3"],
+    cliModel: undefined,
+    registerProviders: ["chatgpt-subscription", "zai"],
+    expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
   },
   "empty-registry": {
     omoConfig: { model_profile: "daily-normal" },
@@ -232,7 +257,7 @@ export const SCENARIOS = {
     },
   },
   // A stored Claude login whose refresh token the (offline) fixture exchange rejects, the way a
-  // revoked subscription login is: Recommended must not pin it, and the turn must run on the next
+  // revoked subscription login is: the default must not pin it, and the turn must run on the next
   // connected rung. `oauthProviders` gives the fixture lane an OAuth block; `authJson` is the
   // sandbox's stored credential, expired so the engine has to refresh it.
   "unset-rejected-login-falls-back": {

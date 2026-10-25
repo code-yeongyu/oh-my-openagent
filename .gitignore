@@ -46,8 +46,6 @@ test-injection/
 notepad.md
 oauth-success.html
 *.bun-build
-.dori-sync/
-.dori/
 .playwright-mcp/
 
 # Debugging / session artifacts (skill workspace residue)

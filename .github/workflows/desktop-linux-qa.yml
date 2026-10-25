@@ -30,13 +30,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-linux-qa-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   linux-desktop-qa:
     name: Linux interactive-desktop QA
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -45,7 +45,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts

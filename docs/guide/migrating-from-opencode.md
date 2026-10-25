@@ -122,17 +122,18 @@ The habits map like this. Every entry in the right column is a command or key th
 |---|---|
 | `/models` (pick a model) | `/model`, or `Ctrl+L`. `Ctrl+P` cycles to the next model. |
 | `/connect` (sign in to a provider) | `/login <provider>`. `/logout` (no argument) opens a picker of stored logins to sign out of. |
-| `/sessions` (open an earlier session) | `/resume`. `/fork` branches the current one, `/tree` shows the branch tree. |
+| `/sessions` (open an earlier session) | `/sessions` or `/resume`. From the shell, `omo -c` continues the last session and `omo -r` opens the picker. `/fork` branches the current one, `/tree` shows the branch tree. |
 | `/new` | `/new` |
 | `/compact` | `/compact`, with optional instructions after it. |
 | `/share` | `/share`, which uploads the session as a secret GitHub gist; it needs the `gh` CLI, signed in. |
 | `/export` | `/export` writes an HTML file; `/export <path>.jsonl` writes the raw session instead. |
-| `/help` | `/hotkeys` lists every key; `/settings` opens the settings list. |
+| `/help` | `/help`, a primer with the live keys and every command. `/hotkeys` lists only the keys; `/settings` opens the settings list. |
 | `/editor` (compose in $EDITOR) | `Ctrl+G` |
 | `/details` (show or hide tool output) | `Ctrl+O` |
 | `/exit` | `/exit` or `/quit`, or `Ctrl+D` on an empty prompt. |
 | `@file` (attach a file) | `@path`, with fuzzy suggestions; `Tab` accepts the highlighted one. |
 | `!command` (run a shell command) | `!command`. `!!command` runs it without adding the output to the context. |
+| `Ctrl+T` (cycle the model's variant) | `Shift+Tab` cycles the thinking level. `/thinking <level>` sets it, `/thinking` alone opens a picker, and `/efforts <level>` sets the reasoning effort on models with effort grades. |
 | `Tab` (switch between build and plan) | No equivalent. omo has one main session; `Shift+Tab` cycles the thinking level instead. Categories and agents you carried over live in `~/.omo/omo.jsonc` and drive delegation, not the main session. |
 | `/agents` | No equivalent. See the row above. |
 

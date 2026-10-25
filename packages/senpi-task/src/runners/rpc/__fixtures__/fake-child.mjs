@@ -7,9 +7,13 @@
 //   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities
 //   FAKE_COMMAND_LOG=path append every received command as one JSON line
 //   FAKE_RETRY_FALLBACK=refuse|hang|exit answer set_retry_fallback with an error, never answer it, or exit on it
+//   FAKE_PROTOCOL_INFO=after-prompt hold the get_protocol_info answer until a prompt arrives (a probe answered late)
 import { appendFileSync } from "node:fs"
 import { createInterface } from "node:readline"
 import { kill } from "node:process"
+
+let promptSeen = false
+let heldProtocolInfo
 
 function emit(payload) {
   process.stdout.write(`${JSON.stringify(payload)}\n`)
@@ -124,6 +128,10 @@ function handleCommand(cmd) {
       emit({ type: "agent_end", willRetry: false, messages: [] })
       return emit({ type: "agent_idle" })
     case "get_protocol_info":
+      if (process.env.FAKE_PROTOCOL_INFO === "after-prompt" && !promptSeen) {
+        heldProtocolInfo = cmd
+        return
+      }
       return respond("get_protocol_info", cmd.id, {
         data: {
           protocolVersion: 1,
@@ -161,6 +169,14 @@ function handleLine(line) {
   }
   const parsed = JSON.parse(trimmed)
   if (process.env.FAKE_COMMAND_LOG) appendFileSync(process.env.FAKE_COMMAND_LOG, `${JSON.stringify(parsed)}\n`)
+  if (parsed.type === "prompt" && !promptSeen) {
+    promptSeen = true
+    if (heldProtocolInfo) {
+      const held = heldProtocolInfo
+      heldProtocolInfo = undefined
+      handleCommand(held)
+    }
+  }
   if (parsed.type === "extension_ui_response") {
     const outcome = parsed.confirmed === false ? "denied" : parsed.cancelled ? "cancelled" : "confirmed"
     emit({ type: "session_info_changed", name: `ui:${outcome}` })

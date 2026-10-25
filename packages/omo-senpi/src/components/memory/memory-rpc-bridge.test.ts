@@ -19,6 +19,8 @@ import {
 import { createMemoryRpcGitRepo } from "./memory-rpc-snapshot-state"
 import { recapFixture } from "./worker/reflection-recap.test-support"
 import { readMemoryReflections } from "./memory-rpc-reflections"
+import type { MemoryRpcSync } from "./memory-rpc-sync"
+import type { SyncStatusReader } from "./sync-status-surface"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -109,6 +111,31 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
+  test.each(["cancel", "attach", "detach"] as const)(
+    "#given a pending status snapshot #when %s retires its observer #then it cannot publish into the next binding",
+    async (retire) => {
+      const context = await contextFixture()
+      const host = rpcHost()
+      const entered = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<string | null>()
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: () => stubRepo({ head: () => { entered.resolve(); return release.promise } }),
+      })
+      const controller = new AbortController()
+      bridge.attach("session-1")
+      const pending = bridge.sync(controller.signal)
+      await entered.promise
+      if (retire === "cancel") controller.abort()
+      else if (retire === "attach") bridge.attach("session-2")
+      else bridge.detach()
+      release.resolve("0123456789abcdef0123456789abcdef01234567")
+      await pending
+      expect(host.emits).toEqual([])
+    },
+  )
+
   test("#given a never-written identity #when backfill reads #then no runtime directories are created", async () => {
     const root = await mkdtemp(join(tmpdir(), "recap-read-only-"))
     roots.push(root)
@@ -461,3 +488,64 @@ describe("memory rpc bridge", () => {
 function minutesAgoISO(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString()
 }
+
+describe("memory rpc bridge sync field (omo #10637)", () => {
+  test("#given this device's sync is failing on a stranded lock #when the status is pulled #then the snapshot carries the same kind, reason, action and paths the TUI shows", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const repos: string[] = []
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () => stubRepo(),
+      syncStatus: async (repo) => {
+        repos.push(repo)
+        return {
+          kind: "failing",
+          since: Date.parse("2026-10-22T10:00:00.000Z"),
+          attempts: 2,
+          failure: { kind: "stranded_lock", paths: ["/m/.git/index.lock"], reason: "A git lock blocks sync.", action: "Run /memory unlock /m/.git/index.lock." },
+        }
+      },
+    })
+    bridge.attach("session-1")
+
+    const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
+
+    expect(repos).toEqual([context.identityPaths.repo])
+    expect(snapshot.sync).toEqual({
+      state: "failing",
+      failure: {
+        kind: "stranded_lock",
+        reason: "A git lock blocks sync.",
+        action: "Run /memory unlock /m/.git/index.lock.",
+        sinceISO: "2026-10-22T10:00:00.000Z",
+        attempts: 2,
+        paths: ["/m/.git/index.lock"],
+      },
+    })
+    bridge.dispose()
+  })
+
+  const cases: ReadonlyArray<readonly [string, SyncStatusReader, MemoryRpcSync | undefined]> = [
+    ["synced", async () => ({ kind: "synced", at: Date.parse("2026-10-22T10:00:00.000Z"), updatedWhileOffline: 0 }), { state: "synced", lastSyncedAtISO: "2026-10-22T10:00:00.000Z" }],
+    ["never synced", async () => ({ kind: "never_synced" }), { state: "never_synced" }],
+    ["paused at a refused entry", async () => ({ kind: "paused", seq: 1, code: "signature" }), { state: "paused" }],
+    ["unavailable on this device", async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }), { state: "unavailable" }],
+    ["off because its configuration is invalid", async () => ({ kind: "sync-config-invalid", variable: "OMO_SERVICE_API_URL", reason: "OMO_SERVICE_API_URL is not a valid service URL" }), { state: "unavailable" }],
+    ["not syncing on this device", async () => null, undefined],
+    ["a reader that throws", async () => Promise.reject(new Error("runner gone")), undefined],
+  ]
+  test.each(cases)("#given sync %s #when the status is pulled #then the sync field matches", async (_name, syncStatus, expected) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(), syncStatus })
+    bridge.attach("session-1")
+
+    const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
+
+    expect(snapshot.sync).toEqual(expected)
+    expect("sync" in snapshot).toBe(expected !== undefined)
+    bridge.dispose()
+  })
+})

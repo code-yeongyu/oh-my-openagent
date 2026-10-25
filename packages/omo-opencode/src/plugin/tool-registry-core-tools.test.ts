@@ -83,7 +83,11 @@ describe("#given disabled native skills in the registry skill context", () => {
 })
 
 describe("#given core skill tools are registered", () => {
-  test("#when core tools are created #then skill task and skill_mcp share the runtime skill resolver", () => {
+  test.each([
+    { agents: false, expected: false },
+    { agents: undefined, expected: true },
+    { agents: true, expected: true },
+  ])("#when claude_code.agents is $agents #then task receives the flag and shares the runtime skill resolver", ({ agents, expected }) => {
     const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)
     const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
     const createSkillMcpTool = mock((options: Parameters<ToolRegistryFactories["createSkillMcpTool"]>[0]) => fakeTool)
@@ -102,6 +106,7 @@ describe("#given core skill tools are registered", () => {
       }),
       pluginConfig: unsafeTestValue({
         disabled_agents: ["multimodal-looker"],
+        claude_code: { agents },
       }),
       managers: unsafeTestValue({
         backgroundManager: {},
@@ -123,6 +128,7 @@ describe("#given core skill tools are registered", () => {
 
     expect(typeof skillResolver).toBe("function")
     expect(createDelegateTask.mock.calls[0]?.[0].getLoadedSkills).toBe(skillResolver)
+    expect(createDelegateTask.mock.calls[0]?.[0].claudeCodeAgentsEnabled).toBe(expected)
     expect(createSkillMcpTool.mock.calls[0]?.[0].getLoadedSkills).toBe(skillResolver)
   })
 })

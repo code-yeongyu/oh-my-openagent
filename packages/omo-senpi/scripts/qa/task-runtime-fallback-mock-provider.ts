@@ -25,7 +25,7 @@ interface AssistantMessage {
     | { readonly type: "toolCall"; readonly id: string; readonly name: string; readonly arguments: Readonly<Record<string, unknown>> }
   )[]
   readonly api: "openai-completions"
-  readonly provider: "omo-fallback-mock"
+  readonly provider: string
   readonly model: string
   readonly usage: {
     readonly input: number
@@ -77,6 +77,14 @@ const SCENARIO = process.env.OMO_FALLBACK_SCENARIO ?? "user-fallback"
 const LIMIT_ERRORS: Readonly<Record<string, string>> = {
   "limit-account": "You've hit your session limit · resets 3pm (Asia/Seoul)",
   "limit-model": "You've hit your Fable weekly limit · resets Oct 2, 9am",
+  "parent-model-limit": "You've hit your session limit · resets 3pm (Asia/Seoul)",
+}
+// #10750: the parent runs on its own account (omo-fallback-parent) and the child's category names only
+// spent models, so the parent's model is the one rung left. "parent-model-after-tool" spends the child's
+// model after a tool call, so the parent's model must continue the same turn.
+const PARENT_MODEL_SCENARIOS: Readonly<Record<string, string>> = {
+  "parent-model-limit": "limitsolo",
+  "parent-model-after-tool": "toolsolo",
 }
 // "limit-after-tool" (#9512): the child's primary first makes a tool call, then hits a usage limit on
 // the request that carries the tool result, so the fallback has to happen inside the running turn.
@@ -101,7 +109,6 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     models: [
       mockModel("parent", "Parent"),
       mockModel("dead-primary", "Dead primary"),
-      mockModel("healthy-fallback", "Healthy fallback"),
       mockModel("limit-fable", "Usage-limited primary"),
       mockModel("limit-opus", "Same-account sibling"),
       mockModel("limit-after-tool", "Primary limited after a tool call"),
@@ -111,24 +118,19 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
       if (isChild(context)) {
         return streamMessage(childReply(model.id, context))
       }
-      parentCalls += 1
-      return streamMessage(parentCalls === 1
-        ? assistant(model.id, "toolUse", [{
-            type: "toolCall",
-            id: "fallback-task-call",
-            name: "task",
-            arguments: {
-              category: SCENARIO === "user-fallback"
-                ? "fallbackcat"
-                : SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === LIMIT_NEAR_COMPACTION
-                  ? "toolcat"
-                  : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick",
-              prompt: "complete through the configured fallback chain",
-              run_in_background: false,
-              name: "fallback-child",
-            },
-          }])
-        : assistant(model.id, "stop", [{ type: "text", text: "parent observed fallback completion" }]))
+      return streamMessage(parentReply(model.id))
+    },
+  })
+
+  pi.registerProvider("omo-fallback-parent", {
+    name: "omo runtime fallback parent account",
+    baseUrl: "file://omo-runtime-fallback-mock",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [mockModel("parent-gpt", "Parent session model")],
+    streamSimple(model, context) {
+      if (isChild(context)) return streamMessage(assistant(model.id, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, "omo-fallback-parent"))
+      return streamMessage(parentReply(model.id, "omo-fallback-parent"))
     },
   })
 
@@ -144,6 +146,18 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     models: [{ ...mockModel("gpt-6-luna-fast", "Dead chain rung one"), reasoning: true }],
     streamSimple(model, context) {
       return streamMessage(childReply(model.id))
+    },
+  })
+  // The healthy fallback is a second account: senpi 2026.10.12 (#3131) skips every model on a provider
+  // whose account hit its usage limit, so a fallback past an account-wide error lives on another provider.
+  pi.registerProvider("omo-fallback-healthy", {
+    name: "omo runtime fallback healthy account",
+    baseUrl: "file://omo-runtime-fallback-mock",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [mockModel("healthy-fallback", "Healthy fallback")],
+    streamSimple(model, context) {
+      return streamMessage(childReply(model.id, context, "omo-fallback-healthy"))
     },
   })
   pi.registerProvider("omo-fallback-other", {
@@ -186,7 +200,27 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   }
 }
 
-function childReply(modelId: string, context: Context): AssistantMessage {
+function parentReply(modelId: string, provider = "omo-fallback-mock"): AssistantMessage {
+  parentCalls += 1
+  if (parentCalls > 1) return assistant(modelId, "stop", [{ type: "text", text: "parent observed fallback completion" }], undefined, provider)
+  return assistant(modelId, "toolUse", [{
+    type: "toolCall",
+    id: "fallback-task-call",
+    name: "task",
+    arguments: {
+      category: PARENT_MODEL_SCENARIOS[SCENARIO] ?? (SCENARIO === "user-fallback"
+        ? "fallbackcat"
+        : SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === LIMIT_NEAR_COMPACTION
+          ? "toolcat"
+          : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick"),
+      prompt: "complete through the configured fallback chain",
+      run_in_background: false,
+      name: "fallback-child",
+    },
+  }], undefined, provider)
+}
+
+function childReply(modelId: string, context: Context, provider = "omo-fallback-mock"): AssistantMessage {
   if (SCENARIO === LIMIT_NEAR_COMPACTION && modelId === LIMIT_NEAR_COMPACTION) {
     return hasToolResult(context)
       ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
@@ -200,7 +234,7 @@ function childReply(modelId: string, context: Context): AssistantMessage {
           usage: { input: NEAR_COMPACTION_INPUT, output: 40, cacheRead: 0, cacheWrite: 0, totalTokens: NEAR_COMPACTION_INPUT + 40, cost: 0 },
         }
   }
-  if (SCENARIO === LIMIT_AFTER_TOOL && modelId === LIMIT_AFTER_TOOL) {
+  if ((SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === "parent-model-after-tool") && modelId === LIMIT_AFTER_TOOL) {
     return hasToolResult(context)
       ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
       : assistant(modelId, "toolUse", [{
@@ -216,7 +250,7 @@ function childReply(modelId: string, context: Context): AssistantMessage {
     return spent ? assistant(modelId, "error", [], limitError) : assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
   }
   if (modelId === "healthy-fallback") {
-    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, provider)
   }
   if (modelId === "deepseek-flash" && SCENARIO !== "chain-exhausted") {
     return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
@@ -260,12 +294,13 @@ function assistant(
   stopReason: StopReason,
   content: AssistantMessage["content"],
   errorMessage?: string,
+  provider = "omo-fallback-mock",
 ): AssistantMessage {
   return {
     role: "assistant",
     content,
     api: "openai-completions",
-    provider: "omo-fallback-mock",
+    provider,
     model,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
     stopReason,

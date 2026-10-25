@@ -5,6 +5,7 @@ export {
 	type ComputerCallPolicy,
 	type ComputerCallStep,
 	DESKTOP_METHODS,
+	DISPLAY_METHODS,
 	ELEMENT_METHODS,
 	isReadOnlyComputerCall,
 	WINDOW_METHODS,

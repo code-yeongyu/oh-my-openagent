@@ -86,14 +86,31 @@ pub enum PointerEvent {
 }
 
 pub trait Backend: Send {
+    /// Independent release ownership, usable without borrowing a busy backend.
+    /// Owners register this before admitting input into bounded fatal-stop mode.
+    fn emergency_release(&self) -> Option<std::sync::Arc<dyn EmergencyRelease>> {
+        None
+    }
+
     fn permission_denied(&mut self, _permission: TccPermission) -> DesktopError {
         DesktopError::permission_denied("input permission is not granted")
     }
 
     fn capabilities(&mut self) -> DesktopCapabilities;
+
+    /// Updates the display-only virtual cursor without changing admission.
+    fn set_show_cursor(&mut self, _enabled: bool) {}
+
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>>;
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>>;
-    fn capture(&mut self, target: &Target, caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)>;
+    /// Captures `target`. `exclude_window_titles` names windows a display
+    /// capture must leave out; backends without exclusion support ignore it.
+    fn capture(
+        &mut self,
+        target: &Target,
+        caps: &CaptureCaps,
+        exclude_window_titles: &[String],
+    ) -> CoreResult<(RgbaImage, FrameGeometry)>;
     fn pointer(
         &mut self,
         target: &Target,
@@ -131,7 +148,52 @@ pub trait Backend: Send {
         Ok(())
     }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
+    /// Native press/release around a session-owned interruptible wait.
+    /// Backends without bounded input refuse rather than synthesizing clicks.
+    fn hold_keys(
+        &mut self,
+        _target: &Target,
+        _keys: &[KeyName],
+        _mode: DeliveryMode,
+        _control: &crate::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        Err(DesktopError::input_failed("bounded key holds are unavailable on this backend"))
+    }
+
+    fn hold_mouse(
+        &mut self,
+        _target: &Target,
+        _hold: &crate::holds::MouseHold<'_>,
+        _mode: DeliveryMode,
+        _control: &crate::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        Err(DesktopError::input_failed("bounded mouse holds are unavailable on this backend"))
+    }
     fn raise_window(&mut self, id: &str) -> CoreResult<()>;
+
+    /// The immediate children of `window`'s menu at `path` (empty = the menu
+    /// bar). Backends without menus yet refuse with `AxUnsupported`.
+    fn menu_items(&mut self, _window: &DesktopWindow, _path: &[String]) -> CoreResult<Vec<crate::menus::MenuItem>> {
+        Err(DesktopError::ax_unsupported())
+    }
+
+    /// Invokes the leaf command `path` names in `window`'s menu. Backends
+    /// call `check_stop` at every menu level they open and immediately before
+    /// the native press, so a stop chord or cancel landing mid-walk dispatches
+    /// nothing. `delivery` is the session-admitted mode: background keys the
+    /// window without raising it; foreground raises and keys it (the session
+    /// admits foreground only under the control grant). Backends without menus
+    /// yet refuse with `AxUnsupported`.
+    fn menu_select(
+        &mut self,
+        _window: &DesktopWindow,
+        _path: &[String],
+        _delivery: DeliveryMode,
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        Err(DesktopError::ax_unsupported())
+    }
+
     fn ax(&mut self) -> Option<&mut dyn AxBackend>;
 
     /// Releases every button and key this backend may still hold down.
@@ -168,6 +230,11 @@ pub trait Backend: Send {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         Ok(false)
     }
+}
+
+/// Replays only tracked downs. Must not wait for the backend's input scope.
+pub trait EmergencyRelease: Send + Sync {
+    fn release_all(&self) -> CoreResult<()>;
 }
 
 /// The native window that owns an accessibility element.

@@ -14,7 +14,7 @@ pub(crate) fn displays(server: &impl XServer, selector: &DisplaySelector) -> Cor
         displays.push(root_display(server.screen()));
     }
     let mut selected: Vec<DesktopDisplay> = match selector {
-        DisplaySelector::All => displays,
+        DisplaySelector::Active | DisplaySelector::All => displays,
         DisplaySelector::Id(wanted) => displays
             .into_iter()
             .filter(|display| display.id == *wanted || display.name == *wanted)
@@ -24,7 +24,7 @@ pub(crate) fn displays(server: &impl XServer, selector: &DisplaySelector) -> Cor
         selected.iter().map(|display| display.x).min(),
         selected.iter().map(|display| display.y).min(),
     ) else {
-        return Err(DesktopError::capture_failed(
+        return Err(DesktopError::invalid_target(
             "configured X11 display was not found",
         ));
     };

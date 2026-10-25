@@ -202,7 +202,7 @@ class HoldingTaskManager implements TaskManager {
   interruptTask(): Promise<never> { throw new Error("not implemented") }
   cancelTask(): Promise<never> { throw new Error("not implemented") }
   list(): readonly [] { return [] }
-  forget(): void {}
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   subscribeChild(): () => void { return () => undefined }
   residentTaskIds(): readonly string[] { return [...this.#handles.keys()] }
   residencyChanged(): Promise<void> { return new Promise<void>(() => undefined) }

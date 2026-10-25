@@ -65,7 +65,11 @@ async function bind(options: {
 
   const eventCtx = sessionEventContext(options.hasUI)
   await pi.dispatch("session_start", { type: "session_start" }, eventCtx)
-  if (captured === undefined) throw new Error("session_start did not bind a memory identity")
+  expect(captured).toBeUndefined()
+  await pi.dispatch("input", { source: "interactive", inputId: "transient-input", text: "Continue." }, eventCtx)
+  await pi.dispatch("input_disposition", { inputId: "transient-input", disposition: "started" }, eventCtx)
+  await pi.dispatch("agent_settled", { type: "agent_settled" }, eventCtx)
+  if (captured === undefined) throw new Error("the first accepted settle did not create the memory runtime")
   return {
     pi,
     context: captured,

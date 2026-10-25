@@ -41,7 +41,8 @@ concurrency:
 jobs:
   deprecate:
     if: github.repository == 'code-yeongyu/oh-my-openagent'
-    runs-on: ubuntu-latest
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9941.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/setup-node@v7

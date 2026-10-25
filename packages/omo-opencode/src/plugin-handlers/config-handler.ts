@@ -19,6 +19,7 @@ import {
 } from "../features/claude-code-session-state";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
 import { getConfiguredDefaultAgent } from "./agent-config-assembly";
+import { openCodeShellTypeResolver } from "../shared/opencode-shell"
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
@@ -131,6 +132,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
   let agentConfigSnapshot: AgentConfigSnapshot | undefined;
 
   return async (config: Record<string, unknown>) => {
+    openCodeShellTypeResolver.setConfiguredShell(config.shell);
     const formatterConfig = config.formatter;
 
     setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])

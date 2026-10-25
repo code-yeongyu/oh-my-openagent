@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { liveAssetInventory } from "./live-asset-inventory.mjs"
 
-async function live({ advertised = false, broken = false } = {}, verify) {
+async function live({ advertised = false, marker = "data-dpl-id", broken = false } = {}, verify) {
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -14,7 +14,7 @@ async function live({ advertised = false, broken = false } = {}, verify) {
         )
       if (path === "/" || path === "/ko/manifesto")
         return new Response(
-          `<html${advertised ? ' data-dpl-id="new"' : ""}><link href="/_next/static/chunks/a.css?dpl=old"><script src="/_next/static/chunks/a.js"></script></html>`,
+          `<html${advertised ? ` ${marker}="new"` : ""}><link href="/_next/static/chunks/a.css?dpl=old"><script src="/_next/static/chunks/a.js"></script></html>`,
           {
             headers: {
               "content-type": "text/html",
@@ -73,5 +73,43 @@ test("an unavailable transitive asset blocks migration rather than publishing an
     // When: collection reaches that resource.
     // Then: deployment fails before publishing an incomplete inventory.
     await expect(liveAssetInventory(origin)).rejects.toThrow()
+  })
+})
+
+test("an operator reason waives only the identified-deployment refusal: the inventory is still built and verified", async () => {
+  // Given: the live deployment was made outside the retention pipeline (no history) and identifies itself.
+  await live({ advertised: true }, async (origin) => {
+    // When: an operator acknowledges the missing history with a reason.
+    const inventory = await liveAssetInventory(origin, {
+      acceptMissingHistory: "first deploy after the account move",
+    })
+    // Then: the full graph is collected and every recorded asset downloads.
+    const responses = await Promise.all(inventory.paths.map((path) => fetch(new URL(path, origin))))
+    expect(responses.every((response) => response.ok)).toBe(true)
+    expect(inventory.paths.some((path) => path.endsWith("lazy.js"))).toBe(true)
+  })
+})
+
+test("a blank reason does not waive the refusal", async () => {
+  await live({ advertised: true }, async (origin) => {
+    await expect(liveAssetInventory(origin, { acceptMissingHistory: "   " })).rejects.toThrow(
+      "asset history is missing",
+    )
+  })
+})
+
+test("the waiver never hides an unavailable asset", async () => {
+  await live({ advertised: true, broken: true }, async (origin) => {
+    await expect(
+      liveAssetInventory(origin, { acceptMissingHistory: "first deploy after the account move" }),
+    ).rejects.toThrow()
+  })
+})
+
+test("a deployment marked with its commit build id cannot be mistaken for a first migration either", async () => {
+  // Given: the live HTML carries the pipeline's data-omo-build marker, but its asset history is gone.
+  await live({ advertised: true, marker: "data-omo-build" }, async (origin) => {
+    // Then: bootstrap refuses, as it does for the older data-dpl-id marker.
+    await expect(liveAssetInventory(origin)).rejects.toThrow("asset history is missing")
   })
 })

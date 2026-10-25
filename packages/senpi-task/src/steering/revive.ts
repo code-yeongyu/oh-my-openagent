@@ -7,6 +7,7 @@ import { buildRevived, deliveryUncertain, evictionRefusal, lazyRevivalFailure, m
 import { bestEffortRollback } from "./revival-rollback"
 import { reviveRunningOnSend } from "./revive-running"
 import type { ReviveReservation, SendOutcome, SteeringPort } from "./types"
+import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 export async function reviveTerminal(
   port: SteeringPort,
@@ -132,6 +133,15 @@ async function deliverRevivedTerminal(
     reservation.commit()
     return { kind: "revived", task_id: record.task_id, run_epoch: revived.notification.run_epoch }
   } catch (error) {
+    if (error instanceof InputUncertainError) {
+      reservation.commit()
+      return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
+    }
+    if (error instanceof InputConflictError) {
+      reservation.release()
+      return { kind: "failed", task_id: record.task_id, effect_id: error.effectId,
+        reason: error.reason, detail: error.detail, action: error.action }
+    }
     if (poolDeliveryStarted && revived?.revive_delivery_uncertain !== undefined) {
       // A transport exception is not proof of rejection. Keep O9's pre-dispatch marker and
       // captured queue intact; pool recovery will never automatically replay this turn.

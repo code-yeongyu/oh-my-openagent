@@ -1,3 +1,5 @@
+[English](README.md) | [简体中文](README.zh-cn.md) | [日本語](README.ja.md) | [Русский](README.ru.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-br.md) | [Italiano](README.it.md)
+
 > [!NOTE]
 > **OmO Бета: OmO ❤️ Pi**
 > Установите одной командой `curl -fsSL https://get.omo.dev/install.sh | bash`: система памяти, CodeMode, подписки Anthropic. Всё включено.
@@ -10,12 +12,6 @@
 > | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** спонсирует OmO. Это OpenAI-совместимый шлюз, который объединяет множество провайдеров моделей под одним API. Спасибо за поддержку open source. |
 > | :-----| :----- |
 
-
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
->
-> > **OmO поддерживается Jobdori, ИИ-ассистентом, показанным выше. Познакомьтесь со своим Jobdori, Dori. <br />Присоединяйтесь к листу ожидания [здесь](https://sisyphuslabs.ai).**
 
 > [!TIP] Будьте с нами!
 >
@@ -41,7 +37,6 @@
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md) | [Русский](README.ru.md)
 
 </div>
 
@@ -59,6 +54,8 @@ omo
 В Windows запустите в PowerShell `irm https://get.omo.dev/install.ps1 | iex`. Скрипт ставит нативный `omo` для вашей ОС и процессора в `~/.local/bin` и сверяет его с контрольными суммами релиза. Если удобнее пакетный менеджер, `bun add -g omo-ai` (или `npm i -g omo-ai`) ставит тот же OmO. Пакет называется `omo-ai`, а пакет `omo` в npm не имеет к нам отношения. Windows CMD, исправление `PATH`, обновление и удаление описаны на [omo.dev/docs/install](https://omo.dev/docs/install).
 
 Откройте проект, запустите `omo` и опишите задачу. На этом настройка закончена.
+
+В сессии `/thinking <level>` задаёт, насколько глубоко думает модель (просто `/thinking` открывает выбор уровня), `Shift+Tab` переключает уровни по кругу, а `/efforts <level>` сразу задаёт усилие рассуждения на моделях с уровнями усилия. Чтобы вернуться к прошлой работе, `/resume` (или `/sessions`) открывает прошлые сессии; из оболочки `omo -c` продолжает последнюю, а `omo -r` открывает список. Остальные команды есть в `/help`.
 
 Переходите с OpenCode-версии или с LazyCodex? Один раз запустите `omo setup`. Команда перенесёт ключи провайдеров, пользовательских провайдеров, MCP-серверы, навыки и выбранные модели.
 

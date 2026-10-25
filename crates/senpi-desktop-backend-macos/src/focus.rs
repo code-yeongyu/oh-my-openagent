@@ -24,6 +24,7 @@ pub(crate) struct WindowInfo {
     pub(crate) window_number: u32,
     pub(crate) layer: i32,
     pub(crate) on_screen: bool,
+    pub(crate) cursor_overlay: bool,
 }
 
 #[link(name = "CoreGraphics", kind = "framework")]
@@ -36,6 +37,14 @@ fn first_front_window(windows: &[WindowInfo], pid: u32) -> Option<u32> {
         .iter()
         .find(|window| window.pid == pid && window.layer == 0 && window.on_screen)
         .map(|window| window.window_number)
+}
+
+/// Capture needs only WindowServer identity; never sends Accessibility IPC to the front app.
+pub(crate) fn front_window_id() -> CoreResult<Option<u32>> {
+    let Some(pid) = current_front_pid().and_then(|pid| u32::try_from(pid).ok()) else {
+        return Ok(None);
+    };
+    Ok(first_front_window(&window_info()?, pid))
 }
 
 /// The frontmost application's first visible, normal-layer WindowServer window.
@@ -89,14 +98,23 @@ pub(crate) fn window_info() -> CoreResult<Vec<WindowInfo>> {
     let number_key = CFString::from_str("kCGWindowNumber");
     let layer_key = CFString::from_str("kCGWindowLayer");
     let on_screen_key = CFString::from_str("kCGWindowIsOnscreen");
-    Ok(array
+    let title_key = CFString::from_str("kCGWindowName");
+    let mut unidentified_overlay = false;
+    let windows = array
         .iter()
         .filter_map(|entry| {
             // SAFETY: CoreGraphics window-info dictionaries have CFString keys
             // and CFType values; downcasts below reject absent or wrong types.
             let entry =
                 unsafe { CFRetained::cast_unchecked::<CFDictionary<CFString, CFType>>(entry) };
-            Some(WindowInfo {
+            // Title alone could match a user window; the helper panel also sits at its own level.
+            let cursor_overlay = entry.get(&title_key)
+                .and_then(|title| title.downcast::<CFString>().ok())
+                .is_some_and(|title| title.to_string() == crate::overlay::WINDOW_TITLE)
+                && entry.get(&layer_key)
+                    .and_then(|layer| layer.downcast::<CFNumber>().ok()?.as_i32())
+                    == Some(crate::overlay::WINDOW_LEVEL);
+            let window = (|| Some(WindowInfo {
                 pid: u32::try_from(entry.get(&pid_key)?.downcast::<CFNumber>().ok()?.as_i64()?)
                     .ok()?,
                 window_number: u32::try_from(
@@ -112,14 +130,24 @@ pub(crate) fn window_info() -> CoreResult<Vec<WindowInfo>> {
                     .downcast::<CFNumber>()
                     .ok()?
                     .as_i32()?,
+                // WindowServer omits kCGWindowIsOnscreen for off-screen windows (another Space,
+                // minimized, or not yet drawn); absence means off-screen, not unidentifiable.
                 on_screen: entry
-                    .get(&on_screen_key)?
-                    .downcast::<CFBoolean>()
-                    .ok()?
-                    .as_bool(),
-            })
+                    .get(&on_screen_key)
+                    .and_then(|value| value.downcast::<CFBoolean>().ok())
+                    .is_some_and(|value| value.as_bool()),
+                cursor_overlay,
+            }))();
+            if cursor_overlay && window.is_none() {
+                unidentified_overlay = true;
+            }
+            window
         })
-        .collect())
+        .collect();
+    if unidentified_overlay {
+        return Err(DesktopError::capture_failed("cannot identify a cursor-helper window"));
+    }
+    Ok(windows)
 }
 
 /// How long a restored application may take to come back and stay the user's front app.
@@ -249,6 +277,7 @@ pub(crate) fn mark_key_window(front: &FrontWindow) -> CoreResult<()> {
         width: 0,
         height: 0,
         focused: false,
+        is_on_screen: None,
         elevated: None,
     };
     let _ = ax::focus_key_window(&window);

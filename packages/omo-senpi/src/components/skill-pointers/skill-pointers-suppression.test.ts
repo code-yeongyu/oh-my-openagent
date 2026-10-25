@@ -4,6 +4,7 @@ import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import {
+  BROWSER_CUSTOM_TYPE,
   matchedSkillPointerNames,
   SKILL_POINTERS_DISABLED_FLAG,
   ULTIMATE_BROWSING_CUSTOM_TYPE,
@@ -87,7 +88,7 @@ describe("omo-senpi skill-pointers suppression", () => {
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
 
-      for (const tag of ["omo-ulw-loop-pointer", "omo-mass-ulw-pointer", "ultrawork-mode", "omo-ultrawork-reminder"]) {
+      for (const tag of ["omo-ulw-loop-pointer", "omo-mass-ulw-pointer", "omo-mass-ulw-mode", "ultrawork-mode", "omo-ultrawork-reminder"]) {
         const text = `<${tag}>ulw-loop</${tag}>`
         expect(matchedSkillPointerNames(text)).toEqual([])
         expectNoInjection(pi, await dispatchInput(pi, text))
@@ -150,13 +151,13 @@ describe("omo-senpi skill-pointers suppression", () => {
       expectNoInjection(pi, result)
     })
 
-    it("#when the prompt is a raw /skill: command for the only matched skill #then nothing is injected", async () => {
+    it("#when the prompt is a raw /skill: command for the only matched non-binding skill #then nothing is injected", async () => {
       // given
       const pi = new FakeExtensionAPI()
       await registerSkillPointers(pi)
 
       // when
-      const result = await dispatchInput(pi, "/skill:mass-ulw run the graph")
+      const result = await dispatchInput(pi, "/skill:ulw-plan draft the migration")
 
       // then
       expectNoInjection(pi, result)
@@ -173,6 +174,7 @@ describe("omo-senpi skill-pointers suppression", () => {
       // then
       expectPointerInjections(pi, result, [
         { customType: ULW_RESEARCH_CUSTOM_TYPE, skillName: "ulw-research" },
+        { customType: BROWSER_CUSTOM_TYPE, skillName: "browser" },
         { customType: ULTIMATE_BROWSING_CUSTOM_TYPE, skillName: "ultimate-browsing" },
       ])
     })

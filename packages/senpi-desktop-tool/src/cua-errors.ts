@@ -1,4 +1,5 @@
 import type { PermissionDeniedData } from "@oh-my-opencode/senpi-desktop-protocol";
+import type { DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-service";
 
 // Engine error codes and run failures as gajae-code's `COMPUTER_*` codes, each with its recovery hint.
 const ENGINE_TO_COMPUTER: Readonly<Record<string, string>> = {
@@ -11,6 +12,8 @@ const ENGINE_TO_COMPUTER: Readonly<Record<string, string>> = {
 	CursorRestoreFailed: "COMPUTER_CURSOR_RESTORE_FAILED",
 	FocusRestoreFailed: "COMPUTER_FOCUS_RESTORE_FAILED",
 	BackgroundUnavailable: "COMPUTER_BACKGROUND_UNAVAILABLE",
+	ControlRequired: "COMPUTER_CONTROL_REQUIRED",
+	InputBusy: "COMPUTER_INPUT_BUSY",
 	Cancelled: "COMPUTER_CANCELLED",
 	Timeout: "COMPUTER_CANCELLED",
 	timeout: "COMPUTER_CANCELLED",
@@ -37,6 +40,10 @@ function hint(code: string, stopHotkey: string): string | undefined {
 			return "Input may have completed, but the previous state was not restored. Ask the user to inspect the desktop before retrying.";
 		case "COMPUTER_BACKGROUND_UNAVAILABLE":
 			return "This window cannot take background input; use the computer tool's accessibility actions instead.";
+		case "COMPUTER_CONTROL_REQUIRED":
+			return "Call desktop.control.acquire({ reason }) in computer run code (computer.control.acquire in an eval kernel) and let the human confirm before acting in the foreground; do not retry this action until that returns { active: true }.";
+		case "COMPUTER_INPUT_BUSY":
+			return "Another session holds the foreground control grant; it is never stolen, so continue in the background or retry once that session releases it.";
 		default:
 			return undefined;
 	}
@@ -49,6 +56,11 @@ export interface ComputerFailure {
 	readonly settingsUrl?: string;
 	readonly app?: string;
 	readonly relaunchRequired?: boolean;
+	readonly reason?: DesktopLaunchContextError["reason"];
+}
+
+export function launchContextFailure(error: DesktopLaunchContextError): ComputerFailure {
+	return { code: "COMPUTER_LAUNCH_CONTEXT_REQUIRED", message: error.message, reason: error.reason };
 }
 
 export function computerFailure(

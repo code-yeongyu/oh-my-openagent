@@ -7,7 +7,7 @@ Single or `tasks:[...]` batch spawn of child tasks routed by category or agent. 
 | Path | Purpose |
 |------|---------|
 | `tool.ts` | `createTaskTool` / `TASK_TOOL_NAME` (`"task"`). |
-| `params.ts` | TypeBox `TaskToolParams`; `MAX_TASK_BATCH_ITEMS = 16` (schema `maxItems` + execution cap). Prompts MUST be English; `prompt` XOR `tasks`. |
+| `params.ts` | TypeBox `TaskToolParams`; batches have no per-call size cap - items beyond the run limit queue in `TaskConcurrency`. Prompts MUST be English; `prompt` XOR `tasks`. |
 | `argument-normalization.ts` | Batch item inheritance from top-level params; empty provider padding normalized before validation; item-level `run_in_background` mirrors survive. |
 | `validation.ts` | `validateTaskTarget`, `resolveSpawnItems`, `validateBatchShape`, `resolveRunInBackground`; codes `both_targets` / `no_target` / `category_with_model` / `run_in_background_conflict`. |
 | `categories.ts` / `description.ts` | Category/agent discovery and prompt description builders (plan-gated names get their own line). |
@@ -31,7 +31,7 @@ Single or `tasks:[...]` batch spawn of child tasks routed by category or agent. 
 ## Anti-patterns
 
 - NEVER combine `category` with `subagent_type`; NEVER combine category routing with `model` (a call-site override would bypass `categories.<name>.models` routing).
-- The batch cap (16) is enforced on both the schema and the execution path; keep them in sync.
+- Batches are uncapped per call: admission is governed only by `TaskConcurrency` lane/global limits, with items beyond the limit queued. Never reintroduce a per-call size cap in the schema or the execution path.
 - New spawn paths must consult the invocation gate; both single and batch routes do.
 
 ## QA

@@ -124,7 +124,7 @@ fn first_point(event: &PointerEvent) -> CoreResult<(f64, f64)> {
 }
 
 /// The `state` bit of a held pointer button, carried by its release.
-fn button_mask(detail: u8) -> u16 {
+pub(super) fn button_mask(detail: u8) -> u16 {
     let mask = match detail {
         1 => KeyButMask::BUTTON1,
         2 => KeyButMask::BUTTON2,

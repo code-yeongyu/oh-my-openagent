@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url"
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
 import { parseJsonEvents } from "./task-e2e-analysis.mjs"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-runtime-fallback-mock-provider.ts")
@@ -72,19 +73,19 @@ const scenarios = [
       categories: {
         fallbackcat: {
           model: "omo-fallback-mock/dead-primary",
-          fallback_models: ["omo-fallback-mock/healthy-fallback"],
+          fallback_models: ["omo-fallback-healthy/healthy-fallback"],
         },
       },
     },
     checks: (artifacts, stdoutText) => ({
       final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
       fallback_event: fallbackRecorded(artifacts.log),
-      final_model: artifacts.task?.model === "omo-fallback-mock/healthy-fallback" ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "omo-fallback-healthy/healthy-fallback" ? "PASS" : "FAIL",
       fallback_attempts: JSON.stringify(
         artifacts.task?.fallback_attempts?.map((model) => `${model.provider}/${model.model_id}`),
       ) === JSON.stringify([
         "omo-fallback-mock/dead-primary",
-        "omo-fallback-mock/healthy-fallback",
+        "omo-fallback-healthy/healthy-fallback",
       ]) ? "PASS" : "FAIL",
     }),
   },
@@ -159,7 +160,7 @@ const scenarios = [
       categories: {
         toolcat: {
           model: turn.model,
-          fallback_models: ["omo-fallback-mock/healthy-fallback"],
+          fallback_models: ["omo-fallback-healthy/healthy-fallback"],
         },
       },
     },
@@ -168,7 +169,38 @@ const scenarios = [
       fallback_event: fallbackRecorded(artifacts.log),
       // The task event log records each finished tool call as `tool_execution`; the hop must come after it.
       tool_ran_before_limit: /"type":"tool_execution","payload":\{"tool":"bash"/.test(artifacts.log) ? "PASS" : "FAIL",
-      final_model: artifacts.task?.model === "omo-fallback-mock/healthy-fallback" ? "PASS" : "FAIL",
+      final_model: artifacts.task?.model === "omo-fallback-healthy/healthy-fallback" ? "PASS" : "FAIL",
+      settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
+        ? "PASS"
+        : "FAIL",
+    }),
+  })),
+  // #10750: every model the child's category names is spent, and the parent session runs on another
+  // account. The child must finish on the parent's model, say why on its record, and leave settings alone;
+  // after a tool call the parent's model continues the same turn, so the tool runs exactly once.
+  ...[
+    { name: "parent-model-limit", category: "limitsolo", model: "omo-fallback-mock/limit-fable", toolRuns: 0 },
+    { name: "parent-model-after-tool", category: "toolsolo", model: "omo-fallback-mock/limit-after-tool", toolRuns: 1 },
+  ].map((solo) => ({
+    name: solo.name,
+    parent: { provider: "omo-fallback-parent", model: "parent-gpt" },
+    omoConfig: { categories: { [solo.category]: { model: solo.model } } },
+    checks: (artifacts, stdoutText) => ({
+      final_text: stdoutText.includes(finalText) ? "PASS" : "FAIL",
+      fallback_event: fallbackRecorded(artifacts.log),
+      final_model: artifacts.task?.model === "omo-fallback-parent/parent-gpt" ? "PASS" : "FAIL",
+      // #10797: a handoff no longer writes the next rung as observed, so the child itself must report it.
+      effective_model_observed: artifacts.task?.effective_model?.provider === "omo-fallback-parent"
+        && artifacts.task?.effective_model?.model_id === "parent-gpt"
+        ? "PASS"
+        : "FAIL",
+      parent_model_recorded: artifacts.task?.parent_model === "omo-fallback-parent/parent-gpt" ? "PASS" : "FAIL",
+      parent_model_reason: artifacts.task?.parent_model_fallback?.reason === "usage_limit"
+        && artifacts.task?.parent_model_fallback?.from_model === solo.model
+        && artifacts.task?.parent_model_fallback?.resets === "3pm (Asia/Seoul)"
+        ? "PASS"
+        : "FAIL",
+      tool_runs: (artifacts.log.match(/"type":"tool_execution","payload":\{"tool":"bash"/g) ?? []).length === solo.toolRuns ? "PASS" : "FAIL",
       settings_byte_identical: artifacts.settingsBefore !== undefined && artifacts.settingsBefore === artifacts.settingsAfter
         ? "PASS"
         : "FAIL",
@@ -267,6 +299,10 @@ function sandboxProcesses(sandbox, table = processTable()) {
 }
 
 function descendants(pid, table) {
+  if (process.platform === "win32") {
+    const args = windowsTreeKillArgs(pid)
+    return args.filter((_arg, index) => args[index - 1] === "/PID").map(Number).filter((child) => child !== pid)
+  }
   const direct = table.filter((row) => row.ppid === pid).map((row) => row.pid)
   return direct.flatMap((child) => [child, ...descendants(child, table)])
 }
@@ -349,9 +385,9 @@ async function runScenario(scenario, runner, outDir) {
         "--mode",
         "json",
         "--provider",
-        "omo-fallback-mock",
+        scenario.parent?.provider ?? "omo-fallback-mock",
         "--model",
-        "parent",
+        scenario.parent?.model ?? "parent",
         "--session-dir",
         sessionDir,
         "run the fallback category task and report its result",

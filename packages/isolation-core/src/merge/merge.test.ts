@@ -1,24 +1,13 @@
 import { expect, test } from "bun:test"
 import { cp, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { repo, git } from "../backends/git-fixture"
+import { git } from "../backends/git-fixture"
 import { captureBaseline } from "../git/baseline"
 import { captureDeltaPatch } from "../git/delta"
 import { mergeIsolatedChanges } from "./index"
 import { commitToBranch, mergeTaskBranch, IsolationCommitReplayError } from "./branch-mode"
+import { setup, startConcurrentMerges } from "./merge-fixture"
 
-async function setup(nested = false) {
-  const f = await repo()
-  if (nested) {
-    const inner = await repo()
-    await cp(inner.repoRoot, join(f.repoRoot, "inner"), { recursive: true })
-  }
-  const baseline = await captureBaseline(f.repoRoot)
-  const isolationDir = join(f.root, "child")
-  await cp(f.repoRoot, isolationDir, { recursive: true })
-  const options = { ...f, baseline, isolationDir, id: "test", artifactsDir: join(f.root, "artifacts"), apply: true, mode: "patch" as const }
-  return options
-}
 async function commit(dir: string, name: string, text = `${name}\n`) {
   await writeFile(join(dir, name), text)
   await git(dir, "add", name)
@@ -198,33 +187,16 @@ test("linked parent uses common git directory lock", async () => {
   expect(await text(linked, "new")).toBe("new\n")
 })
 test.each(["patch", "branch"] as const)("concurrent %s merges serialize acquire/release without timing assertions", async (mode: "patch" | "branch") => {
-  const f = await setup()
-  await writeFile(join(f.isolationDir, "one"), "one\n")
-  const other = join(f.root, "other")
-  await cp(f.repoRoot, other, { recursive: true })
-  await writeFile(join(other, "two"), "two\n")
-  const entered = Promise.withResolvers<void>()
-  const release = Promise.withResolvers<void>()
-  const queued = Promise.withResolvers<void>()
-  const events: string[] = []
-  const first = mergeIsolatedChanges({ ...f, mode, lockHook: async event => {
-    events.push(`first:${event}`)
-    if (event === "acquired") { entered.resolve(); await release.promise }
-  } })
-  await entered.promise
-  const second = mergeIsolatedChanges({ ...f, mode, id: "second", isolationDir: other, lockHook: event => {
-    events.push(`second:${event}`)
-    if (event === "waiting") queued.resolve()
-  } })
-  await queued.promise
-  release.resolve()
-  const results = await Promise.all([first, second])
+  const merges = startConcurrentMerges(mode)
+  const run = await merges.ready
+  merges.release()
+  const results = await Promise.all([run.first, run.second])
   const kind = mode === "patch" ? "applied" : "branch-merged"
   expect(results.map(r => r.kind)).toEqual([kind, kind])
-  expect(events).toEqual(["first:waiting", "first:acquired", "second:waiting", "first:released", "second:acquired", "second:released"])
-  expect(await text(f.repoRoot, "one")).toBe("one\n")
-  expect(await text(f.repoRoot, "two")).toBe("two\n")
-}, 15000)
+  expect(run.events).toEqual(["first:waiting", "first:acquired", "second:waiting", "first:released", "second:acquired", "second:released"])
+  expect(await text(run.f.repoRoot, "one")).toBe("one\n")
+  expect(await text(run.f.repoRoot, "two")).toBe("two\n")
+})
 test("dirty baseline filters user WIP out of each child commit", async () => {
   const f = await setup()
   await writeFile(join(f.repoRoot, "tracked"), "user WIP\n")

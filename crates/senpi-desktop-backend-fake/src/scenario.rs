@@ -25,6 +25,8 @@ pub struct FakeScenario {
     pub capabilities: DesktopCapabilities,
     /// Accessibility tree root per window id.
     pub ax: BTreeMap<String, FakeAxNode>,
+    /// Menu-bar children per window id; absent means the backend has no menus.
+    pub menus: BTreeMap<String, Vec<FakeMenuNode>>,
     /// Reports every AX element's owner as unknown, like a backend that
     /// cannot map an element to its native window.
     pub ax_owner_unknown: bool,
@@ -36,6 +38,9 @@ pub struct FakeScenario {
     pub resize_window: Option<ResizeWindow>,
     /// Failures queued at load time, as if `fail_next` had been called.
     pub fail_next: Vec<ScriptedFailure>,
+    /// Marks every capture's frame geometry `legacyCapture` (B9 fallback
+    /// shape), so the wire carries the flag.
+    pub legacy_capture: bool,
 }
 
 impl Default for FakeScenario {
@@ -45,12 +50,14 @@ impl Default for FakeScenario {
             windows: Vec::new(),
             capabilities: fake_capabilities(0),
             ax: BTreeMap::new(),
+            menus: BTreeMap::new(),
             ax_owner_unknown: false,
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
             delay_ms: DelayMs::default(),
             resize_window: None,
             fail_next: Vec::new(),
+            legacy_capture: false,
         }
     }
 }
@@ -123,11 +130,14 @@ pub struct ResizeWindow {
     pub height: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScriptedFailure {
     pub method: FakeMethod,
     pub code: ErrorCode,
+    /// `CaptureUnavailable` reason token, e.g. `"minimized"`.
+    #[serde(default)]
+    pub reason: Option<String>,
 }
 
 /// One scripted accessibility element and its subtree.
@@ -155,6 +165,21 @@ pub struct FakeAxNode {
     pub actions: Vec<String>,
     #[serde(default)]
     pub children: Vec<FakeAxNode>,
+}
+
+/// One scripted menu item and its submenu.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FakeMenuNode {
+    pub title: String,
+    #[serde(default = "enabled_by_default")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub checked: bool,
+    #[serde(default)]
+    pub shortcut: Option<String>,
+    #[serde(default)]
+    pub children: Vec<FakeMenuNode>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
@@ -190,6 +215,8 @@ struct RawScenario {
     #[serde(default)]
     ax: BTreeMap<String, FakeAxNode>,
     #[serde(default)]
+    menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    #[serde(default)]
     ax_owner_unknown: bool,
     #[serde(default = "default_cursor")]
     cursor: Option<DesktopPoint>,
@@ -201,6 +228,8 @@ struct RawScenario {
     resize_window: Option<ResizeWindow>,
     #[serde(default)]
     fail_next: Vec<ScriptedFailure>,
+    #[serde(default)]
+    legacy_capture: bool,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -211,6 +240,7 @@ impl TryFrom<RawScenario> for FakeScenario {
         let mut referenced = raw
             .ax
             .keys()
+            .chain(raw.menus.keys())
             .chain(raw.resize_window.iter().map(|resize| &resize.id));
         if let Some(unknown) = referenced.find(|id| !known(id)) {
             return Err(ScenarioError::UnknownWindow(unknown.clone()));
@@ -222,12 +252,14 @@ impl TryFrom<RawScenario> for FakeScenario {
             windows: raw.windows,
             capabilities,
             ax: raw.ax,
+            menus: raw.menus,
             ax_owner_unknown: raw.ax_owner_unknown,
             cursor: raw.cursor,
             capture_color: raw.capture_color,
             delay_ms: raw.delay_ms,
             resize_window: raw.resize_window,
             fail_next: raw.fail_next,
+            legacy_capture: raw.legacy_capture,
         })
     }
 }

@@ -158,7 +158,7 @@ describe("runtime fallback of a daemon-session child", () => {
       runner.finishClose.resolve()
       ownerLifecycle.dispose?.()
       owner.workpools.dispose()
-      owner.forget(task.task_id)
+      owner.forget(task.task_id, { path: "end" })
     }
   })
 })

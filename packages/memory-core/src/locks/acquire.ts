@@ -6,6 +6,7 @@ import { sweepStaleLockCandidates } from "./candidate-sweep"
 import { sweepDeadOwnerLocks } from "./dead-owner-sweep"
 import type { LockRecord } from "./lock-record"
 import { releaseLock } from "./lock-owner"
+import { provenDeadTakeoverFor, recordProvenDeadTakeover } from "./proven-dead-takeovers"
 import { currentCandidateFs } from "./publish"
 import { claimDirectorySweep, rearmCandidateSweep } from "./sweep-memo"
 
@@ -26,6 +27,7 @@ export async function acquireLock(
   options: AcquireLockOptions = {},
 ): Promise<void> {
   const lockDirectory = path.dirname(lockPath)
+  let reclaimedForThisAcquisition: LockRecord | undefined
   if (claimDirectorySweep(lockDirectory, (options.now ?? Date.now)())) {
     // Opportunistic hygiene: a failed sweep must never block or fail the acquisition it rides on.
     // A candidate it could not remove re-arms the sweep; a dead-owner lock it could not read or
@@ -39,9 +41,20 @@ export async function acquireLock(
     }).catch(() => {
       rearmCandidateSweep(lockDirectory)
     })
-    await sweepDeadOwnerLocks(lockDirectory)
+    await sweepDeadOwnerLocks(lockDirectory, {
+      onReclaimed: (reclaimedPath, previousOwner) => {
+        if (path.resolve(reclaimedPath) === path.resolve(lockPath)) reclaimedForThisAcquisition = previousOwner
+      },
+    })
   }
-  return acquireWithoutDirectorySweep(lockPath, record, options)
+  const outcome = await acquireWithoutDirectorySweep(lockPath, record, options)
+  // The hygiene sweep reclaimed THIS lock from a proven-dead owner on behalf of this acquisition, so
+  // the takeover proof belongs to it (omo #10199 r5 MEDIUM 3) - but only when nobody held the lock
+  // in between: an owner seen during the acquisition is the dead owner's successor (r5 delta LOW).
+  // A takeover the contender performed itself (stale-owner.ts) already bound its own proof and wins.
+  if (reclaimedForThisAcquisition !== undefined && !outcome.sawOtherOwner && provenDeadTakeoverFor(lockPath, record.nonce) === undefined) {
+    recordProvenDeadTakeover(lockPath, reclaimedForThisAcquisition, record.nonce)
+  }
 }
 
 export async function withLock<T>(

@@ -35,7 +35,11 @@ interface FakeEngine {
 
 function processRunner(
   capabilities: readonly string[],
-  options: { readonly retryFallback?: "refuse" | "hang" | "exit"; readonly fallbackChainDeadlineMs?: number } = {},
+  options: {
+    readonly retryFallback?: "refuse" | "hang" | "exit"
+    readonly protocolInfo?: "after-prompt"
+    readonly fallbackChainDeadlineMs?: number
+  } = {},
 ): FakeEngine {
   const warnings: string[] = []
   const log = join(tempDir(), "commands.jsonl")
@@ -50,6 +54,7 @@ function processRunner(
         FAKE_CAPABILITIES: capabilities.join(","),
         FAKE_COMMAND_LOG: log,
         ...(options.retryFallback === undefined ? {} : { FAKE_RETRY_FALLBACK: options.retryFallback }),
+        ...(options.protocolInfo === undefined ? {} : { FAKE_PROTOCOL_INFO: options.protocolInfo }),
       })
       children.push(child)
       return child
@@ -153,9 +158,30 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     // then
     await handle.waitForIdle()
     expect(handle.lastAssistantText()).toBe("hello")
-    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
+    // A cold child can answer the capability probe after the deadline too; either way the chain is never
+    // sent once the prompt is out (#9582 flake on windows-latest).
+    const types = engine.commands().map((command) => command.type)
+    expect(types.slice(0, 1)).toEqual(["get_protocol_info"])
+    expect(types.at(-1)).toBe("prompt")
     expect(engine.warnings).toHaveLength(1)
     expect(engine.warnings[0]).toContain("st_p7")
+    expect(engine.warnings[0]).toContain("no answer")
+  })
+
+  test("#given an engine that answers the capability probe only after the deadline #when a child with fallback models starts #then the chain is never sent after its first prompt", async () => {
+    // given
+    const engine = processRunner(["retry_fallback_command"], { protocolInfo: "after-prompt", fallbackChainDeadlineMs: 50 })
+
+    // when
+    const handle = await engine.runner.start(spec("st_p9", CHAINED))
+
+    // then
+    await handle.waitForIdle()
+    expect(handle.lastAssistantText()).toBe("hello")
+    // A round trip after the turn: the child reads stdin in order, so a chain written late is logged before it.
+    await handle.getEntries?.()
+    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "prompt", "get_entries"])
+    expect(engine.warnings).toHaveLength(1)
     expect(engine.warnings[0]).toContain("no answer")
   })
 

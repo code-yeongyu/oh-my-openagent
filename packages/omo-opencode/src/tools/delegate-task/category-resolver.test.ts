@@ -284,6 +284,7 @@ describe("resolveCategoryExecution", () => {
 		executorCtx.userCategories = {
 			quick: {
 				model: "openai/gpt-5.4-preview",
+				reasoning: "medium",
 				fallback_models: [
 					{
 						model: "openai/gpt-5.4",
@@ -300,12 +301,11 @@ describe("resolveCategoryExecution", () => {
 		//#then
 		expect(result.error).toBeUndefined()
 		expect(result.actualModel).toBe("openai/gpt-5.4-preview")
-		// variant comes from the builtin quick default (gpt-5.6-luna-fast at low), which a user model
-		// override inherits; the chain itself must not be inherited, which is what this test pins.
 		expect(result.categoryModel).toEqual({
 			providerID: "openai",
 			modelID: "gpt-5.4-preview",
-			variant: "low",
+			reasoning: "medium",
+			variant: "medium",
 		})
 		cacheSpy.mockRestore()
 		agentsSpy.mockRestore()
@@ -540,7 +540,6 @@ describe("resolveCategoryExecution", () => {
 		expect(result.categoryModel).toEqual({
 			providerID: "animal-gateway-xai",
 			modelID: "grok-4-fast-non-reasoning",
-			variant: "low",
 		})
 		expect(result.fallbackChain).toBeUndefined()
 	})

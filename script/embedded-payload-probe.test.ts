@@ -39,7 +39,7 @@ describe("reportEmbeddedPayload probe-root cleanup (#9045)", () => {
 		expect(probeRoots.some(existsSync)).toBe(false)
 	}, 60_000)
 
-	test("#given POSIX and a busy probe root #when the probe finishes #then the EBUSY surfaces", () => {
+	test.skipIf(process.platform === "win32")("#given POSIX and a busy probe root #when the probe finishes #then the EBUSY surfaces", () => {
 		const probeRoots: string[] = []
 		expect(() => reportEmbeddedPayload(stageDir, (root) => removeTempRoot(root, busyAfterRemoving(probeRoots), "linux"))).toThrow("EBUSY")
 		expect(probeRoots.length).toBe(1)

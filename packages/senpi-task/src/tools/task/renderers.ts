@@ -8,6 +8,8 @@ import {
   taskCallLines,
 } from "./call-renderer"
 import { formatTargetWithModel } from "../../status-line"
+import { priorityAliasBaseId } from "../../runners/pinned-model-equivalence"
+import { splitModelDecorators } from "../../senpi/explicit-pin"
 import {
   ELLIPSIS,
   excerptRendererText,
@@ -109,6 +111,23 @@ function fallbackCountToken(details: Pick<TaskToolDetails, "fallback_attempts">)
   return count > 0 ? `fallback:${count}` : undefined
 }
 
+function taskDowngradeToken(details: TaskToolDetails): string | undefined {
+  const effective = details.effective_model
+  const tier = optionalRendererText(effective?.service_tier)
+  if (effective === undefined || tier === undefined || tier === "priority") return undefined
+  const resolved = details.resolved_model
+  const { base: pin } = splitModelDecorators(details.model ?? "")
+  const separator = pin.indexOf("/")
+  const provider = resolved?.provider ?? pin.slice(0, separator)
+  const id = resolved?.model_id ?? pin.slice(separator + 1)
+  const baseId = priorityAliasBaseId(id)
+  if (baseId === undefined || effective.provider !== provider) return undefined
+  if (effective.model_id !== id && effective.model_id !== baseId) return undefined
+  // Legacy records lack catalog tier metadata; a successful alias-to-base start proves pairing.
+  if (resolved?.service_tier !== "priority" && effective.model_id !== baseId) return undefined
+  return `tier:${tier}`
+}
+
 function taskResultLine(details: TaskToolDetails, mode: string | undefined): string {
   const taskId = optionalRendererText(details.task_id)
   const reason = optionalRendererText(details.reason)
@@ -116,6 +135,7 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
   return joinRendererTokens([
     "task",
     taskTargetToken(details),
+    taskDowngradeToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
@@ -143,6 +163,7 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
 function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefined, width: number): string {
   const requiredWithoutTarget = [
     "task",
+    taskDowngradeToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
@@ -155,6 +176,7 @@ function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefin
   const required = [
     "task",
     compactTargetToken(details, targetWidth),
+    taskDowngradeToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),

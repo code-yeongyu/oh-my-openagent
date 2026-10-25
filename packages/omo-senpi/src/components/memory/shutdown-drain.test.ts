@@ -364,37 +364,28 @@ describe("session shutdown drain budget", () => {
     expect(queued.filter((name) => name.endsWith(".json") && name !== "consumed.json")).toHaveLength(1)
   })
 
-  test("#given a memory home that is not a directory #when bind-time reconcile rejects #then it is logged instead of crashing the host", async () => {
+  test("#given a memory home that is not a directory #when first-user-settle reconcile rejects #then it is logged instead of crashing the host", async () => {
     // given
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-")))
     tempDirs.push(root)
     await writeFile(join(root, "memory"), "not a directory", "utf8")
     const pi = new MemoryFakeExtensionAPI()
     const ctx = componentContext()
-    let signalWarn: ((message: string) => void) | undefined
-    const warned = new Promise<string>((resolve) => { signalWarn = resolve })
-    const baseWarn = ctx.logger.warn
-    ctx.logger.warn = (message, details) => {
-      baseWarn(message, details)
-      signalWarn?.(message)
-    }
     createMemoryComponent({
       env: { OMO_MEMORY_HOME: join(root, "memory") },
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      loadConfig: () => loadedMemoryConfig(memorySettings({ facts: { enabled: false, debounce_settles: 4 } })),
       resolveCwd: () => join(root, "project"),
     }).register(pi, ctx)
 
     // when
-    await pi.dispatch("session_start", {}, sessionContext({ sessionId: SESSION }))
-    const message = await Promise.race([
-      warned,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("waited 5s for the bind-time reconcile warning, never fired")), 5_000)
-      }),
-    ])
+    const eventCtx = sessionContext({ sessionId: SESSION })
+    await pi.dispatch("session_start", {}, eventCtx)
+    await pi.dispatch("input", { source: "interactive", inputId: "reconcile-input", text: "Continue." }, eventCtx)
+    await pi.dispatch("input_disposition", { inputId: "reconcile-input", disposition: "started" }, eventCtx)
+    await pi.dispatch("agent_settled", {}, eventCtx)
 
     // then
-    expect(message).toBe("memory bind-time reconcile failed")
+    expect(ctx.logs.filter((entry) => entry.message === "memory bind-time reconcile failed")).toHaveLength(1)
   })
 
   test("#given a pre-drain await that never resolves #when it is raced detached #then the handler returns at the deadline with the budget warning and the steps after it still run", async () => {

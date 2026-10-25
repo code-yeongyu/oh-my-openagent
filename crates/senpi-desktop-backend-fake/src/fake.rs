@@ -4,11 +4,12 @@ use image::Rgba;
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, Target};
+use std::collections::BTreeMap;
 
 use crate::ax_tree::AxTree;
 use crate::faults::Faults;
 use crate::method::FakeMethod;
-use crate::scenario::{DelayMs, FakeScenario, ResizeWindow};
+use crate::scenario::{DelayMs, FakeMenuNode, FakeScenario, ResizeWindow};
 use crate::sink::{RecordingSink, SinkOp};
 
 /// Scripted headless `Backend` + `AxBackend`: serves a [`FakeScenario`],
@@ -27,8 +28,10 @@ pub struct FakeBackend {
     pub(crate) capture_color: Rgba<u8>,
     delays: DelayMs,
     pub(crate) resize_window: Option<ResizeWindow>,
+    pub(crate) legacy_capture: bool,
     pub(crate) ax_tree: AxTree,
     pub(crate) ax_owner_unknown: bool,
+    pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
     pub(crate) sink: RecordingSink,
     faults: Faults,
 }
@@ -37,11 +40,17 @@ impl FakeBackend {
     pub fn new(scenario: FakeScenario) -> Self {
         let faults = Faults::default();
         for failure in &scenario.fail_next {
-            faults.fail_next(failure.method, failure.code);
+            let error = match &failure.reason {
+                Some(reason) => DesktopError::new(failure.code, format!("injected {:?} failure", failure.method))
+                    .with_capture_unavailable_reason(reason),
+                None => DesktopError::new(failure.code, format!("injected {:?} failure", failure.method)),
+            };
+            faults.fail_next_with(failure.method, error);
         }
         Self {
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
+            menus: scenario.menus,
             displays: scenario.displays,
             windows: scenario.windows,
             capabilities: scenario.capabilities,
@@ -50,6 +59,7 @@ impl FakeBackend {
             capture_color: Rgba(scenario.capture_color),
             delays: scenario.delay_ms,
             resize_window: scenario.resize_window,
+            legacy_capture: scenario.legacy_capture,
             sink: RecordingSink::default(),
             faults,
         }
@@ -107,7 +117,7 @@ impl FakeBackend {
             )));
         }
         match target {
-            Target::Desktop => Ok(()),
+            Target::Desktop | Target::Display(_) => Ok(()),
             Target::Window(id) => {
                 self.window(id)?;
                 if mode == DeliveryMode::Background && !self.capabilities.background_window_input {

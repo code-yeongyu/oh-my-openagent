@@ -5,6 +5,7 @@ import { MassUlwGraph } from "@/components/landing/dag/mass-ulw-graph"
 import { InstallTabs } from "@/components/landing/install-tabs"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
+import { desktopDownloadEnabled } from "@/lib/desktop-download"
 
 /**
  * DESIGN.md §4/§9 hero — `cover` pattern: `min-h-[100dvh]`, content vertically centered. At lg an
@@ -45,6 +46,13 @@ export async function HeroSection(): Promise<JSX.Element> {
               <Button size="lg" asChild>
                 <Link href="/docs/install">{t("hero.getStarted")}</Link>
               </Button>
+              {desktopDownloadEnabled() ? (
+                <Button variant="secondary" size="lg" asChild>
+                  <Link href="/download" data-testid="hero-desktop-cta">
+                    {t("hero.downloadDesktop")}
+                  </Link>
+                </Button>
+              ) : null}
               <Button variant="link" size="md" asChild>
                 <Link href="/manifesto">{t("hero.readManifesto")}</Link>
               </Button>

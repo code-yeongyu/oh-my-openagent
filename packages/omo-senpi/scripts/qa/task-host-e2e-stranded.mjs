@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createRunRoot, provisionRuntime, injectDaemonMockProvider, createScenarioSandbox } from "./task-host-e2e-sandbox.mjs"
@@ -36,10 +36,11 @@ export function terminalChildSnapshots(sandbox) {
   })
 }
 
-async function diagnose(bin, out) {
+async function diagnose(bin, out, { pluginRoot, resume = false } = {}) {
   mkdirSync(out, { recursive: true })
   const runRoot = createRunRoot()
   const runtime = provisionRuntime(bin, runRoot)
+  if (pluginRoot) cpSync(pluginRoot, runtime.pluginRoot, { recursive: true })
   const mockEntry = join(dirname(fileURLToPath(import.meta.url)), "task-e2e-mock-provider.ts")
   injectDaemonMockProvider(runtime.pluginRoot, mockEntry)
   const sandbox = createScenarioSandbox({ runRoot, home: runtime.home, bin }, "sA1", {
@@ -49,6 +50,33 @@ async function diagnose(bin, out) {
   let receipt
   const evidence = { binary: bin, runRoot, observationMs: 60_000 }
   try {
+    if (resume) {
+      parent = spawnParent(sandbox, mockEntry, "fan out sixteen daemon children from one parent", { capture: true })
+      evidence.parentExit = await parent.closed
+      evidence.parentOutput = parent.chunks.stdout
+      evidence.parentStderr = parent.chunks.stderr
+      evidence.afterParentExit = readTaskRecords(sandbox)
+      const parentFile = readdirSync(sandbox.sessionDir).find((name) => name.endsWith(".jsonl"))
+      if (!parentFile) throw new Error("print parent did not write a session")
+      const path = join(sandbox.sessionDir, parentFile)
+      evidence.hostFinished = await observeState(sandbox.root, () => {
+        const records = readTaskRecords(sandbox).filter((row) => row.host_session?.session_path)
+        return records.length > 0 && records.every((row) => {
+          const messages = jsonlLines(row.host_session.session_path).map((line) => JSON.parse(line)).filter((entry) => entry.type === "message")
+          return messages.at(-1)?.message?.stopReason === "stop"
+        }) ? records : undefined
+      })
+      if (!evidence.hostFinished) throw new Error("children did not finish on the retained host")
+      evidence.resumed = await observeState(sandbox.root, () => {
+        const records = readTaskRecords(sandbox)
+        return records.length === 16 && records.every((row) => row.status === "completed") ? records : undefined
+      }, { trigger: () => {
+        parent = spawnParent(sandbox, mockEntry, "collect the existing background results", { capture: true, session: path })
+      } })
+      if (!evidence.resumed) throw new Error("resumed parent did not adopt all sixteen results")
+      console.log(`STRANDED_RESUME ${JSON.stringify({ count: evidence.resumed.length, statuses: evidence.resumed.map(row => row.status), trailer: evidence.parentStderr })}`)
+      return
+    }
     evidence.first = await observeState(sandbox.root, () => {
       const rows = terminalChildSnapshots(sandbox).filter((row) => row.storeStatus === "running")
       return rows.length ? rows : undefined
@@ -86,5 +114,9 @@ async function diagnose(bin, out) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2)
-  await diagnose(resolve(args[args.indexOf("--bin") + 1]), resolve(args[args.indexOf("--out") + 1]))
+  const pluginIndex = args.indexOf("--plugin-root")
+  await diagnose(resolve(args[args.indexOf("--bin") + 1]), resolve(args[args.indexOf("--out") + 1]), {
+    ...(pluginIndex < 0 ? {} : { pluginRoot: resolve(args[pluginIndex + 1]) }),
+    resume: args.includes("--resume"),
+  })
 }

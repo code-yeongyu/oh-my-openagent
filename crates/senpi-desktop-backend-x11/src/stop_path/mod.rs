@@ -1,6 +1,7 @@
 //! The X11 `Global` stop path: on the dedicated `senpi-desktop-killswitch`
 //! thread an XI2 raw-key listener (its own x11rb connection) latches the
-//! supervisor when the stop chord goes down, and beats every 500 ms while a
+//! supervisor when the stop chord goes down on a physical keyboard (never
+//! from XTEST), and beats every 500 ms while a
 //! heartbeat round trip on that connection succeeds. Raw events are
 //! preferred over `XGrabKey`: they see the chord whichever client has focus
 //! or a grab, and never steal the keys from anyone.
@@ -9,6 +10,7 @@
 //! listener then parks until [`StopPathListener::restart`] reconnects it.
 
 mod chord;
+mod source;
 mod xi2;
 
 #[cfg(test)]
@@ -43,6 +45,8 @@ struct Control {
     failure: Option<String>,
     /// Stops this listener latched.
     stops: u64,
+    /// Key presses ignored because an XTEST device sent them.
+    xtest_ignored: u64,
     restart: bool,
     shutdown: bool,
 }
@@ -81,6 +85,10 @@ impl Shared {
     fn chord_pressed(&self) {
         self.supervisor.trigger_stop(StopSource::Hotkey);
         self.update(|control| control.stops = control.stops.saturating_add(1));
+    }
+
+    fn xtest_ignored(&self) {
+        self.update(|control| control.xtest_ignored = control.xtest_ignored.saturating_add(1));
     }
 
     /// Waits up to `timeout`; `true` once shutdown is requested.

@@ -127,14 +127,15 @@ describe("openTaskHostSession suffix and post-start model (#9722)", () => {
     // given: senpi starts a -fast catalog pin on its base model with the priority tier remembered
     const client = {
       open: () => Promise.resolve({ sessionId: "sess-1", attached: false, instanceId: "i-1", engineVersion: "v" }),
-      getState: () => Promise.resolve({ sessionId: "sess-1", model: { provider: "test", id: "model" } }),
+      getState: () => Promise.resolve({ sessionId: "sess-1", model: { provider: "test", id: "model" }, serviceTier: "priority" }),
+      getAvailableModels: async () => [{ provider: "test", id: "model-fast", serviceTier: "priority", upstreamModelId: "model" }],
     }
 
     // when
     const opened = await openTaskHostSession({ client, spec: { ...spec, model: "test/model-fast" }, sessionPath: "/tmp/session.jsonl" })
 
     // then
-    expect(opened.reportedModel).toEqual({ provider: "test", id: "model" })
+    expect(opened.reportedModel).toEqual({ provider: "test", id: "model", serviceTier: "priority" })
   })
 
   test("#given a -fast pin whose host state reports a differently suffixed model #when the session opens #then it is still refused as a substitution (#9793)", async () => {

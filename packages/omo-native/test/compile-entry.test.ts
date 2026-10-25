@@ -157,10 +157,16 @@ describe("compiled omo entry launcher parity", () => {
     expect(buildSenpiArgs(["install", "x"], "/provisioned")).toEqual(["install", "x"])
   })
 
-  test("app-server appends the provisioned plugin after its subcommand", () => {
-    expect(buildSenpiArgs(["app-server", "daemon", "start"], "/provisioned")).toEqual([
-      "app-server", "daemon", "start", "--extension", join("/provisioned", "plugin"),
-    ])
+  test("the retired app-server command is refused before the engine is imported (legacy state migration may run first) (#10033)", async () => {
+    const execDir = temp()
+    writeFileSync(join(execDir, "package.json"), JSON.stringify({ version: "1.2.3-test.0" }))
+    const savedExitCode = process.exitCode
+    try {
+      const handled = await runCompiledLauncher(["app-server", "--listen", "stdio://"], execDir)
+      expect({ handled, exitCode: process.exitCode }).toEqual({ handled: true, exitCode: 2 })
+    } finally {
+      process.exitCode = savedExitCode ?? 0
+    }
   })
 
   test("main commands prepend the provisioned plugin extension", () => {
@@ -402,7 +408,7 @@ describe("embedded runtime provisioning", () => {
       await runCompiledLauncher(["doctor"], root, "2026.8.28", root)
     } finally {
       console.log = originalLog
-      process.exitCode = originalExitCode
+      process.exitCode = originalExitCode ?? 0
     }
     expect(output.join("\n")).toContain("PASS plugin manifest: plugin/package.json")
     expect(output.join("\n")).toContain("INFO omo 9.2.1 (engine: senpi 2026.8.28; scheme nodef)")
@@ -436,7 +442,7 @@ describe("embedded runtime provisioning", () => {
       })
     } finally {
       console.log = originalLog
-      process.exitCode = originalExitCode
+      process.exitCode = originalExitCode ?? 0
     }
     const warning = output.join("\n").split("\n").find((line) => line.startsWith("WARN more than one OmO install is on PATH:"))
     expect(warning).toContain("(standalone omo binary 9.2.1) runs when you type omo")

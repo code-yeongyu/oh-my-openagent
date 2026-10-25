@@ -1,11 +1,11 @@
 ---
 name: ultimate-browsing
-description: "Renders, drives, and screenshots web pages: JS-rendered sources, clicks and forms, persistent logins, WAF-blocked hosts (platform-native readers, stealth Chrome), and the browsing lane of a research run, with screenshots as provenance. Not for plain search or unblocked static fetch."
+description: "Reaches web pages the user's browser cannot open: WAF-blocked and bot-scored hosts, platform-native readers (Chinese and social platforms), archive snapshots with provenance, and a browser you own for stealth or throwaway profiles. Not for plain search, an unblocked static fetch, or a page the user's browser can open."
 ---
 
 # Ultimate Browsing
 
-Web access for everything a plain fetch cannot finish: a page that renders in JS, a click or a form, a screenshot, a login that must persist across pages, or a host that blocks generic fetchers (WAF / 403 / Cloudflare). Start at the cheapest tier that can do the job and climb only when it cannot:
+Web access for the hosts the user's browser cannot open (WAF / 403 / Cloudflare / bot-scored pages) and for platforms with a native reader. Reading and interaction on a page the user's browser can open belong to the `browser` skill's attached engine, not here. Start at the cheapest tier that can reach the blocked host and climb only when it cannot:
 
 **Tier 1 — insane-search** (headless extraction + WAF bypass) -> **Tier 1.5 — agent-reach** (platform-native APIs, esp. Chinese platforms) -> **Tier 2 — a real browser** through omowright from js eval: 2a the owned engine (a browser your code launches, CloakBrowser for stealth), 2b the attached engine (the user's own signed-in browser).
 
@@ -14,29 +14,27 @@ Web access for everything a plain fetch cannot finish: a page that renders in JS
 ```
 User request
   |
-  +- extract text/data from a URL --------------------- TIER 1  insane-search
+  +- a page the user's browser can open (read, click, screenshot, QA, login)  NOT this skill (browser skill, attached engine)
+  +- simple search query ------------------------------ NOT this skill (use web-search)
+  |
   +- URL blocked / 403 / Cloudflare / WAF ------------- TIER 1  insane-search
   +- YouTube/Vimeo/TikTok subtitles or metadata ------- TIER 1  insane-search (yt-dlp)
-  +- read an article / blog / Reddit / HN / arXiv ----- TIER 1  insane-search
+  +- archive snapshot of a dead or changed page ------- TIER 1  insane-search (surrogates, provenance-tagged)
   |
   +- Chinese platform (xhs/douyin/weibo/bilibili/v2ex/wechat)  TIER 1.5 agent-reach
   +- podcast transcript / stock forum ----------------- TIER 1.5 agent-reach
   +- Twitter feed / LinkedIn profile / GitHub via CLI - TIER 1.5 agent-reach
   |
-  +- Tier 1/1.5 returned empty or partial ------------- TIER 2  2a owned engine -> 2b attached engine
-  +- click / fill form / scroll / interact ------------ TIER 2  2a owned engine -> 2b attached engine
-  +- screenshot / render / play video ----------------- TIER 2  2a owned engine -> 2b attached engine
-  +- login session across pages / the user's account --- TIER 2  2b attached engine (their browser)
-  +- test web app / QA / dogfood ---------------------- TIER 2  2a owned engine -> 2b attached engine
-  |
-  +- simple search query ------------------------------ NOT this skill (use web-search)
+  +- Tier 1/1.5 returned empty or partial ------------- TIER 2  2a owned engine (stealth)
+  +- a blocked host that also needs a click, a scroll or a screenshot  TIER 2  2a owned engine
+  +- the user's account on a host the owned engine cannot pass  TIER 2  2b attached engine (their browser)
 ```
 
 Read the matching reference before acting: [`references/insane-search/README.md`](references/insane-search/README.md), [`references/agent-reach/README.md`](references/agent-reach/README.md), or [`references/chrome-stealth.md`](references/chrome-stealth.md).
 
 ## Tier 1 — insane-search (headless extraction)
 
-**When**: content extraction, blocked-URL bypass, media metadata — no browser UI needed.
+**When**: blocked-URL bypass, media metadata, archive surrogates — no browser UI needed.
 **Why first**: ~10x faster than a browser, no process spin-up; handles most "fetch this blocked page" requests via curl_cffi TLS impersonation, yt-dlp (1858 sites), official public APIs, mobile URL transforms, **Phase-2.5 surrogate archives** (Wayback / archive.today snapshots, provenance-tagged — see [`references/insane-search/cache-archive.md`](references/insane-search/cache-archive.md)), a key-gated Jina Reader (`JINA_API_KEY`), and a Playwright real-Chrome fallback. The engine lives **inside this skill** at `engine/` and is invoked as a module. Surrogate results are dated COPIES: a result whose `provenance` is `snapshot` must be reported with its `snapshot_timestamp`, never presented as the live page.
 
 ```bash
@@ -56,7 +54,7 @@ The full engine harness (rules R1-R7, the Phase 0 official-API index, the no-sit
 
 ### Escalate to Tier 1.5 or Tier 2 when
 - The target is a Chinese / social platform with a native reader -> Tier 1.5.
-- insane-search returns empty/partial, or the page needs JS interaction, a screenshot, a persistent login, or media playback -> Tier 2.
+- insane-search returns empty/partial, or the blocked page needs JS interaction, a screenshot, or media playback -> Tier 2.
 
 ## Tier 1.5 — agent-reach (platform-native readers)
 
@@ -82,7 +80,7 @@ Routing table, per-platform auth (set `TWITTER_*` env vars, `gh auth login`, a t
 
 ## Tier 2 — a real browser (real interaction)
 
-**When**: real interaction is needed (clicks, forms, screenshots, video, persistent login), or Tier 1/1.5 failed.
+**When**: Tier 1/1.5 failed on a blocked host, or that host needs interaction (clicks, scroll, screenshots, video). A page the user's browser can open is the `browser` skill's job, attached engine first.
 
 Both tiers are omowright, staged inside the `browser` skill and loaded from js eval:
 
@@ -110,9 +108,9 @@ try {
 
 The rest of the surface (CUA coordinates, captcha solving, routes, traces, frames, human handoff) is in the `browser` skill's `references/owned-engine/`. A stealth binary is not proof of access: inspect the rendered result and report challenges that remain.
 
-### Tier 2b — attached engine (logged-in pages)
+### Tier 2b — attached engine (the user's account on a blocked host)
 
-When the page needs the user's account, drive the browser they are already signed into instead of cloning their profile: `connectBrowserSkill()` → `session.navigate` → `bskSnapshot(session)` / `session.observe()` → `session.click` → `session.stop()`. NEVER launch against or clear cookies/cache/site data from the user's live profile, and never fall back to the owned engine for an authenticated criterion: if no extension is connected, run the `browser` skill's onboarding script and relay its one human step. The full loop is the `browser` skill.
+When the blocked flow needs the user's account, drive the browser they are already signed into instead of cloning their profile: `connectBrowserSkill()` → `session.navigate` → `bskSnapshot(session)` / `session.observe()` → `session.click` → `session.stop()`. NEVER launch against or clear cookies/cache/site data from the user's live profile, and never fall back to the owned engine for an authenticated criterion: if no extension is connected, run the `browser` skill's onboarding script and relay its one human step. The full loop is the `browser` skill.
 
 ### Cookie login (cross-platform)
 

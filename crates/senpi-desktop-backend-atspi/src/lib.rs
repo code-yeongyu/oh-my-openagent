@@ -10,6 +10,8 @@ mod apps;
 mod bus;
 mod connection;
 mod live;
+mod menu_target;
+mod menus;
 mod owner;
 mod permission;
 mod props;
@@ -17,6 +19,9 @@ mod text;
 
 use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::menus::MenuItem;
+
+use crate::menu_target::MenuTarget;
 use senpi_desktop_core::types::DesktopWindow;
 
 pub use bus::{AtSpiBus, BusResult, Extents, ScreenPoint};
@@ -67,6 +72,42 @@ impl<B: AtSpiBus> AtSpiAx<B> {
     /// compositor exposes none.
     pub fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         apps::windows(&mut self.bus)
+    }
+
+    /// The items of `window`'s menu bar, or of the submenu `path` names.
+    /// `windows` is the host backend's full window list, which proves a
+    /// frame is `window` when window ids are native.
+    pub fn menu_items(
+        &mut self,
+        window: &DesktopWindow,
+        windows: &[DesktopWindow],
+        path: &[String],
+    ) -> CoreResult<Vec<MenuItem>> {
+        let target = self.menu_target(window, windows);
+        menus::items(&mut self.bus, target, path)
+    }
+
+    /// Runs the menu command `path` names through its own declared action;
+    /// `relist` reads the host's window list again before the action, and
+    /// `check_stop` runs at every level and immediately before the action.
+    pub fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        windows: &[DesktopWindow],
+        relist: &dyn Fn() -> CoreResult<Vec<DesktopWindow>>,
+        path: &[String],
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        let target = self.menu_target(window, windows);
+        menus::select(&mut self.bus, target, relist, path, check_stop)
+    }
+
+    fn menu_target<'a>(&self, window: &'a DesktopWindow, windows: &'a [DesktopWindow]) -> MenuTarget<'a> {
+        MenuTarget {
+            window,
+            ids: self.window_ids,
+            windows,
+        }
     }
 
     /// Re-reads the registry, so enabling a toolkit later turns `granted` on.
@@ -151,6 +192,12 @@ mod action_tests;
 mod fake;
 #[cfg(test)]
 mod live_tests;
+#[cfg(test)]
+mod menus_binding_tests;
+#[cfg(test)]
+mod menus_live_tests;
+#[cfg(test)]
+mod menus_tests;
 #[cfg(test)]
 mod owner_correlate_tests;
 #[cfg(test)]

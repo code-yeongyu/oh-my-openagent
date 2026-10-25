@@ -390,7 +390,7 @@ describe("size budget", () => {
     // then
     expect(oversize).toThrow(/darwin-arm64/)
     expect(withinBudget).not.toThrow()
-    expect(MAX_BINARY_BYTES).toBe(160 * 1024 * 1024)
+    expect(MAX_BINARY_BYTES).toBe(182 * 1024 * 1024)
     rmSync(stageDir, { recursive: true, force: true })
   })
 

@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -14,12 +14,6 @@ import { createMemoryPromptHandler } from "./prompt"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 export const IDENTITY = "prompt-agent"
-
-const tempDirs: string[] = []
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
-})
 
 export class CountingRepo extends GitMemoryRepo {
   headCalls = 0
@@ -50,7 +44,7 @@ export class CountingRepo extends GitMemoryRepo {
 
 export async function fixture(personaBody = "first"): Promise<{ repo: CountingRepo; context: MemoryIdentityContext }> {
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-prompt-")))
-  tempDirs.push(dir)
+  onTestFinished(() => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))
   const repo = new CountingRepo({ dir: join(dir, "repo"), agentId: IDENTITY })
   await repo.init({
     seedFiles: [{ relativePath: "system/persona.md", content: `---\ndescription: Persona\n---\n${personaBody}\n` }],

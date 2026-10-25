@@ -4,7 +4,8 @@ import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity } from "./commands.test-support"
-import { derivePeopleGraph, registerPeopleCommand, resolvePersonQuery } from "./people"
+import { registerPeopleCommand } from "./people"
+import { derivePeopleGraph, resolvePersonQuery } from "./people-runtime"
 import { LIMITS, peopleFixture, tempDirs } from "./people.test-support"
 
 describe("people graph derivation", () => {

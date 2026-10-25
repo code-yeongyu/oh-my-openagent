@@ -17,6 +17,7 @@ import { createMemoryIdentityContext, type MemoryIdentityContext } from "./conte
 import { createMemoryNoticeWiring, type MemoryNoticeWiringOptions } from "./memory-notice-wiring"
 import { MemoryFakeExtensionAPI } from "./memory.test-support"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
+import { AGREEMENT_FLAGGED_ENTRY_TYPE } from "./agreement-notice"
 
 const IDENTITY = "memory-notice-agent"
 const roots: string[] = []
@@ -131,7 +132,7 @@ describe("createMemoryNoticeWiring direct surface", () => {
     expect(() => wiring.onCommit(context, SOUL_COMMIT)).not.toThrow()
   })
 
-  test("#given registration #when the component registers #then the soul entry renderer is registered", async () => {
+  test("#given registration #when the component registers #then the soul and agreement-flagged entry renderers are registered", async () => {
     // given
     const { context } = await fixture()
     const pi = new MemoryFakeExtensionAPI()
@@ -140,6 +141,6 @@ describe("createMemoryNoticeWiring direct surface", () => {
     wiringFor(context).register(pi)
 
     // then
-    expect(pi.entryRenderers.map((registration) => registration.customType)).toEqual([SOUL_UPDATED_ENTRY_TYPE])
+    expect(pi.entryRenderers.map((registration) => registration.customType)).toEqual([SOUL_UPDATED_ENTRY_TYPE, AGREEMENT_FLAGGED_ENTRY_TYPE])
   })
 })

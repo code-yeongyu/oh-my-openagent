@@ -110,7 +110,7 @@ export async function permissionOwner(sessionContext?: Readonly<Record<string, s
       for (const id of taskEngine.manager.residentTaskIds()) {
         const handle = taskEngine.manager.getResidentHandle(id)
         await handle?.dispose()
-        taskEngine.manager.forget(id)
+        taskEngine.manager.forget(id, { path: "end" })
       }
       await fixture.close()
     },

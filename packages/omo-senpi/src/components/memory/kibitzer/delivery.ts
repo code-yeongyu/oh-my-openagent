@@ -16,6 +16,7 @@ export interface KibitzerDeliveryOptions {
     options: { readonly deliverAs: "steer" },
   ) => unknown
   readonly appendEntry: (customType: string, data: unknown) => void
+  readonly resolveSource?: (sessionId: string, path: string) => string | undefined
   readonly logger?: ComponentLogger
 }
 
@@ -68,7 +69,9 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
     }
 
     const state = stateFor(sessionId)
-    for (const nudge of nudges) {
+    for (const accepted of nudges) {
+      const source = options.resolveSource?.(sessionId, accepted.path)
+      const nudge: RecallNudge = source === undefined ? accepted : { ...accepted, source }
       state.nudges.set(nudge.path, nudge)
       if (options.coordinator === undefined) continue
       const key = `kibitzer:${nudge.path}`

@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, jest, spyOn, test } from "bun:test"
+import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
 
 import { createManagerResidencyRegistry } from "../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle } from "../lifecycle/create"
@@ -6,7 +7,7 @@ import { hostRunnerHarness } from "../runners/rpc-host.test-support"
 import type { ResolvedModelRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
-import { baseSpec, cleanupProjects, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
@@ -27,8 +28,8 @@ function rung(id: string): ResolvedModelRecord {
 }
 
 describe("runtime fallback over a live daemon session", () => {
-  for (const acknowledged of [true, false] as const) {
-    test(`#given the failed rung's close_session is ${acknowledged ? "acknowledged" : "never acknowledged"} #when fallback runs #then ${acknowledged ? "the next rung replaces it" : "the task fails and the next rung never starts beside it"}`, async () => {
+  for (const [acknowledged, lateReply] of [[true, false], [true, true], [false, false]] as const) {
+    test(`#given the failed rung's close_session is ${acknowledged ? (lateReply ? "acknowledged after its close grace" : "acknowledged") : "never acknowledged"} #when fallback runs #then ${acknowledged ? "the next rung replaces it" : "the task fails and the next rung never starts beside it"}`, async () => {
       // given
       const project = tempProject()
       const store = createTaskRecordStore({ project_dir: project })
@@ -61,10 +62,39 @@ describe("runtime fallback over a live daemon session", () => {
       })
       const task = await manager.start(baseSpec())
       if (task.kind !== "started") throw new Error("expected the task to start")
+      await launchSettled(manager, task.task_id)
       const [original] = host.sessions()
       if (original === undefined) throw new Error("expected the failed rung's session")
+      store.mutate(task.task_id, record => ({ ...record, pending_steering: [
+        { id: "queued-1", message: "Q1", deliver_as: "steer" },
+        { id: "queued-2", message: "Q2", deliver_as: "steer" },
+      ] }))
+      let deliveries = 0
+      const drained = Promise.withResolvers<void>()
+      const append = store.appendEvent.bind(store)
+      spyOn(store, "appendEvent").mockImplementation((id, event) => {
+        const result = append(id, event)
+        if (id === task.task_id && event.type === "steered") {
+          deliveries += 1
+          if (deliveries === 2) drained.resolve()
+        }
+        return result
+      })
       if (!acknowledged) host.withholdReply("close_session")
+      // The Windows failure (#9489): the acknowledgement lands after the 50 ms grace. It is released by a real
+      // timer armed before the grace clock is frozen, so it arrives in real time either way.
+      const releaseClose = lateReply ? host.holdReply("close_session") : undefined
+      const lateClose = releaseClose === undefined ? undefined : setTimeout(releaseClose, 200)
       const settled = acknowledged ? undefined : manager.waitFor(task.task_id, { signal: AbortSignal.timeout(10_000) })
+      const nextOpened = acknowledged ? host.waitForCommand("prompt") : undefined
+      let timeout: ReturnType<typeof setTimeout> | undefined
+      // Arm a real watchdog before freezing the grace clock: socket I/O still runs in real time.
+      const deadline = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`fallback did not settle within 10s; task status: ${store.load(task.task_id)?.status ?? "missing"}`)), 10_000)
+      })
+      // Keep both 50 ms close graces frozen until the real host confirms the close, so a slow
+      // socket reply cannot turn the acknowledged case into an unconfirmed close (#9489).
+      if (acknowledged) jest.useFakeTimers()
 
       try {
         // when
@@ -74,19 +104,28 @@ describe("runtime fallback over a live daemon session", () => {
 
         // then
         if (acknowledged) {
-          const nextOpened = host.waitForCommand("prompt")
-          await nextOpened
+          await Promise.race([nextOpened, deadline])
+          jest.useRealTimers()
+          await bounded(drained.promise)
+          expect(launched).toHaveLength(2)
+          expect(store.load(task.task_id)?.pending_steering).toBeUndefined()
+          expect(deliveries).toBe(2)
+          expect(store.load(task.task_id)?.model).toBe("test/next")
+          expect(host.commands.filter(command => command.type === "steer").map(command => command.payload.message)).toEqual(["Q1", "Q2"])
           expect(host.sessions().map((session) => session.sessionPath)).not.toContain(original.sessionPath)
         } else {
           if (settled === undefined) throw new Error("expected a terminal wait for the unconfirmed close")
-          const record = await settled
+          const record = await Promise.race([settled, deadline])
           expect(record.status).toBe("error")
           expect(launched).toHaveLength(1)
           expect(record.fallback_closing_child?.host_session?.session_path ?? record.host_session?.session_path).toBe(original.sessionPath)
         }
       } finally {
+        if (acknowledged) jest.useRealTimers()
+        clearTimeout(timeout)
+        if (lateClose !== undefined) clearTimeout(lateClose)
         for (const handle of launched) await handle.dispose()
-        for (const id of manager.residentTaskIds()) manager.forget(id)
+        for (const id of manager.residentTaskIds()) manager.forget(id, { path: "end" })
         lifecycle.dispose?.()
         manager.workpools.dispose()
       }

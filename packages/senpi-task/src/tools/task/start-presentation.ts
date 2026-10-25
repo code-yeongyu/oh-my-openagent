@@ -8,7 +8,9 @@ export type StartLabels = {
 }
 
 export function backgroundStartText(started: StartedResult, labels: StartLabels): string {
-  const queue = started.queue_position !== undefined ? ` queued at position ${started.queue_position}` : ""
+  const queue = started.queue_position !== undefined
+    ? ` queued at position ${started.queue_position}`
+    : started.starting === true ? ", the task host is still admitting it; a failed start arrives as its notification" : ""
   const label = labels.taskSummary ?? labels.description ?? started.name
   const base =
     label === started.task_id

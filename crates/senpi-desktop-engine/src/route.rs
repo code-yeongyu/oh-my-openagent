@@ -2,11 +2,10 @@
 //! once, by the session thread in submission order, or by the connection
 //! (`$/cancel`).
 
-use senpi_desktop_core::methods::Method;
+use senpi_desktop_core::methods::{Effect, Method};
 use senpi_desktop_core::protocol::{MethodRejection, RequestId};
 use senpi_desktop_core::protocol_params::{
-    AdvanceClockParams, CancelParams, EmptyParams, StopPathResumeParams, StopPathStartParams,
-    StopPathStopParams,
+    AdvanceClockParams, CancelParams, EmptyParams, StopPathResumeParams, StopPathStartParams, StopPathStopParams,
 };
 use senpi_desktop_core::types::DesktopSessionOptions;
 use senpi_desktop_safety::{Chord, StopPolicy};
@@ -37,7 +36,18 @@ impl Engine {
     }
 
     fn route_method(&self, method: Method, params: Value) -> Result<Route, Failure> {
-        let op = |op| Ok(Route::Session(SessionCall::Op(op)));
+        let op = |op| {
+            let widens_input = match method.spec().effect {
+                Effect::Read => false,
+                Effect::Exec => method != Method::ControlRevoke,
+            };
+            // Only pending stops bypass a potentially stuck worker. Committed
+            // stops keep normal session dispatch and its refusal audit.
+            if widens_input && self.stop_paths().supervisor().stop_pending() {
+                return Err(Failure::Engine(senpi_desktop_safety::GateError::Suspended.into()));
+            }
+            Ok(Route::Session(SessionCall::Op(op)))
+        };
         match method {
             Method::EngineHello => {
                 parse::<EmptyParams>(params)?;
@@ -54,6 +64,9 @@ impl Engine {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Session(SessionCall::Close))
             }
+            Method::ControlGrant => op(Op::ControlGrant(parse(params)?)),
+            Method::ControlRevoke => parse::<EmptyParams>(params).and_then(|_| op(Op::ControlRevoke)),
+            Method::ControlState => parse::<EmptyParams>(params).and_then(|_| op(Op::ControlState)),
             Method::Capabilities => {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Immediate(to_result(self.capabilities())))
@@ -61,12 +74,16 @@ impl Engine {
             Method::Displays => parse::<EmptyParams>(params).and_then(|_| op(Op::Displays)),
             Method::Windows => parse::<EmptyParams>(params).and_then(|_| op(Op::Windows)),
             Method::Capture => op(Op::Capture(parse(params)?)),
+            Method::CaptureRegion => op(Op::CaptureRegion(parse(params)?)),
+            Method::Observe => op(Op::Observe(parse(params)?)),
             Method::Click => op(Op::Click(parse(params)?)),
             Method::MoveMouse => op(Op::MoveMouse(parse(params)?)),
             Method::Drag => op(Op::Drag(parse(params)?)),
             Method::Scroll => op(Op::Scroll(parse(params)?)),
             Method::TypeText => op(Op::TypeText(parse(params)?)),
             Method::KeyChord => op(Op::KeyChord(parse(params)?)),
+            Method::HoldKeys => op(Op::HoldKeys(parse(params)?)),
+            Method::HoldMouse => op(Op::HoldMouse(parse(params)?)),
             Method::RaiseWindow => op(Op::RaiseWindow(parse(params)?)),
             Method::AxSnapshot => op(Op::AxSnapshot(parse(params)?)),
             Method::AxQuery => op(Op::AxQuery(parse(params)?)),
@@ -86,8 +103,7 @@ impl Engine {
             }
             Method::StopPathStart => {
                 let chord = parse::<StopPathStartParams>(params)?.chord;
-                let chord =
-                    Chord::parse(&chord).map_err(|error| Failure::InvalidParams(error.to_string()))?;
+                let chord = Chord::parse(&chord).map_err(|error| Failure::InvalidParams(error.to_string()))?;
                 Ok(self.stop_path_changed(to_result(self.stop_paths().start(&chord))))
             }
             Method::StopPathHeartbeat => {
@@ -102,11 +118,18 @@ impl Engine {
             }
             Method::StopPathResume => {
                 let token = parse::<StopPathResumeParams>(params)?.token;
+                if self.shared_agent() {
+                    return Err(Failure::Engine(senpi_desktop_core::error::DesktopError::permission_denied(
+                        "a connection cannot clear the shared agent stop latch",
+                    )));
+                }
                 let resumed = self.stop_paths().resume(&token).map_err(Failure::Engine);
                 Ok(self.stop_path_changed(resumed.and_then(to_result)))
             }
             Method::ClipboardRead => parse::<EmptyParams>(params).and_then(|_| op(Op::ClipboardRead)),
             Method::ClipboardWrite => op(Op::ClipboardWrite(parse(params)?)),
+            Method::MenusItems => op(Op::MenuItems(parse(params)?)),
+            Method::MenusSelect => op(Op::MenusSelect(parse(params)?)),
             Method::Cancel => Ok(Route::Cancel(parse::<CancelParams>(params)?.id)),
             Method::TestAdvanceClock => {
                 let Some(clock) = self.fake_clock() else {

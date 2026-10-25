@@ -238,6 +238,27 @@ describe("compileDag validation", () => {
 
     expect(second.errors[0]?.nodeIds).toEqual(first.errors[0]?.nodeIds ?? [])
   })
+
+  it.each([
+    ["a parent-directory segment", "../../../etc/pwn"],
+    ["a forward slash", "a/b"],
+    ["a backslash", "a\\b"],
+    ["a colon", "a:b"],
+    ["a NUL byte", "a\0b"],
+    ["a lone dot", "."],
+    ["a double dot", ".."],
+    ["an empty id", ""],
+  ])("#given a node id with %s #when compiled #then rejected as invalid_node_id and no graph produced", (_label, unsafeId) => {
+    const result = compileDag(definition([node(unsafeId)]), { at: AT })
+
+    expect(result.ok).toBe(false)
+    expect(result.nodes).toEqual([])
+    expect(result.errors.map((error) => error.code)).toEqual(["invalid_node_id"])
+  })
+
+  it("#given a dot-only three-character id #when compiled #then it is accepted, because only the traversal segments are refused", () => {
+    expect(compileDag(definition([node("...")]), { at: AT }).ok).toBe(true)
+  })
 })
 
 describe("compileDag size bounds", () => {
