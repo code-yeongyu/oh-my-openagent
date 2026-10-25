@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**A background task whose last turn hits the output-token limit without a result is reported as failed, not completed.** A child whose final turn stopped on the output cap with no text and no tool call (`finish: "length"`) used to reach the parent as `[BACKGROUND TASK COMPLETED]`. It now fails with `stopped at output limit (N tokens), no result`, which the parent notification, `background_output` and its full-session view show, and the child session and its tmux pane are closed as on completion. A capped turn that still delivered text or a tool call completes as before, with a note that the output was cut at the limit. ([#10052](https://github.com/code-yeongyu/oh-my-openagent/issues/10052), [#10516](https://github.com/code-yeongyu/oh-my-openagent/pull/10516))
-
 - Memory path-state recovery and commit hooks now keep literal Git lookups working when global glob or case-insensitive pathspec modes are enabled ([#11130](https://github.com/code-yeongyu/oh-my-openagent/issues/11130), [#11167](https://github.com/code-yeongyu/oh-my-openagent/pull/11167)). (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
 
 **A user Stop pauses the workflow run it started instead of cancelling it.** DAG nodes, workpool workers and task children hold where they are; a message to the paused run or Resume continues it from where it stopped. ([#10808](https://github.com/code-yeongyu/oh-my-openagent/pull/10808), fixes [#6752](https://github.com/code-yeongyu/oh-my-openagent/issues/6752)) (batch [#11187](https://github.com/code-yeongyu/oh-my-openagent/pull/11187))
