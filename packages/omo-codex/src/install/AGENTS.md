@@ -52,4 +52,4 @@ Everything the `lazycodex` install/upgrade surface does: plugin cache install, `
 
 - `bun --cwd packages/omo-codex test` (all) / `bun test packages/omo-codex/src/install/<file>.test.ts` (focused)
 - `bun --cwd packages/omo-codex run typecheck` (tsgo)
-- Regenerate the published Node bundle: `bun run build:codex-install` (repo root)
+- Regenerate the published Node bundle: `bun run build:codex-install` (repo root) to test locally; never commit `install-dist/` in a PR (#9903: `bundle-regen.yml` commits it on dev after the merge)

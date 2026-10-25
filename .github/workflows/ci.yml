@@ -777,8 +777,10 @@ jobs:
       # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
       # which are backslash-separated on Windows, so the source digest is platform-dependent and
       # a committed artifact can never match on every OS. One platform is enough to catch drift.
+      # Feature PRs don't commit bundles (#9903): bundle-regen.yml rebuilds them on dev after each merge,
+      # so committed bytes are only meaningful on dev pushes. PRs build from source in the senpi tests below.
       - name: Verify committed Senpi plugin bundle is current
-        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest' && github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail

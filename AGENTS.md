@@ -417,6 +417,10 @@ Adding `run-full-ci` or `ci:full-matrix` launches `ci-full-matrix-label.yml`, wh
 | `package-labels.yml` | issues opened/edited + pull_request_target | Auto-applies package labels (`opencode` / `lazycodex` / `lazycodex-generated`) |
 | `stats.yml` | weekly cron (Sun) / dispatch | Runs `script/stats.ts` (npm + GitHub-release download counts) |
 
+## GENERATED BUNDLES
+
+Feature PRs never commit generated bundles (#9903, `script/generated-bundles.json`; the `Generated bundles gate` refuses them): build locally to test, and `bundle-regen.yml` regenerates and commits them on dev after the merge. The release-state job regenerates them itself, so a release never ships stale bundles. A branch that still carries bundle changes drops them by restoring each listed path from `origin/dev` (`git checkout origin/dev -- <path>`, or `git rm --cached <path>` for a bundle dev does not have yet); see #9903.
+
 ## PR MERGE POLICY
 
 - **PRs into `dev` MUST use merge commits.**

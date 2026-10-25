@@ -1,0 +1,11 @@
+{
+  "$comment": "Generated build outputs (#9903). Feature PRs never commit these; the bundle-regen workflow regenerates them on dev after each merge, and the release-state job regenerates them for a release. Patterns are anchored regular expressions over repo-relative paths, read by script/generated-bundles.ts and by external merge tooling.",
+  "patterns": [
+    "^packages/omo-senpi/plugin/extensions/[^/]+\\.m?js$",
+    "^packages/omo-senpi/plugin/extensions/assets\\.generated\\.json$",
+    "^packages/omo-senpi/plugin/runtime/(?:agent-toolkit-sdk|dag|thread-sdk)/[^/]+\\.js$",
+    "^packages/omo-senpi/plugin/runtime/rollback-migrate\\.js$",
+    "^packages/omo-senpi/plugin/scripts/install\\.mjs$",
+    "^packages/omo-codex/scripts/install-dist/install-local\\.mjs$"
+  ]
+}

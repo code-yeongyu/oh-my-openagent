@@ -1,0 +1,50 @@
+name: Generated bundles gate
+
+# #9903: a feature PR never commits a generated bundle (script/generated-bundles.json); bundle-regen.yml
+# rebuilds them on dev after the merge. Only the release-state PR may carry them.
+on:
+  pull_request:
+    branches: [dev]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generated-bundles-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  generated-bundles:
+    name: Generated bundles gate
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - name: Refuse committed generated bundles
+        env:
+          GENERATED_BUNDLES_BASE: ${{ github.event.pull_request.base.sha }}
+          GENERATED_BUNDLES_HEAD: ${{ github.event.pull_request.head.sha }}
+          GENERATED_BUNDLES_BRANCH: ${{ github.event.pull_request.head.ref }}
+          GENERATED_BUNDLES_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: bun script/check-generated-bundles.ts
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Generated bundles gate
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Refuses a PR that commits a generated bundle (#9903); the release-state PR is the only exception.
+          JOB_SUMMARY_NEXT: Restore the listed paths from origin/dev; the bot regenerates them after the merge.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
