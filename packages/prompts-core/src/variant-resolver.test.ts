@@ -69,6 +69,7 @@ describe("resolveVariant", () => {
 
     expect(resolveVariant({ modelID: "kimi-k3", variants: orderedVariants })).toBe("kimi-k3")
     expect(resolveVariant({ modelID: "kimi-for-coding/k3p1", variants: orderedVariants })).toBe("kimi-k3")
+    expect(resolveVariant({ modelID: "kimi-for-coding/k3-256k", variants: orderedVariants })).toBe("kimi-k3")
     expect(resolveVariant({ modelID: "kimi-k2.7", variants: orderedVariants })).toBe("kimi-k2-7")
     expect(resolveVariant({ modelID: "kimi-k2-6", variants: orderedVariants })).toBe("kimi")
   })

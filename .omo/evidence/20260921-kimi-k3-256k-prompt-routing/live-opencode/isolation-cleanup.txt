@@ -1,0 +1,20 @@
+opencode_version=1.14.31
+host_db_path=<HOST_OPENCODE_DB>
+host_db_session_count_before=3
+sandbox_path=<TEMP_SANDBOX>
+home_isolated=true
+xdg_data_isolated=true
+xdg_config_isolated=true
+xdg_state_isolated=true
+xdg_cache_isolated=true
+autoupdate_disabled=true
+models_fetch_disabled=true
+server_cleanup scenario=target-k3-256k msys_pid=1317 winpid=29060 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+server_cleanup scenario=positive-k3 msys_pid=1404 winpid=41020 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+server_cleanup scenario=k2-control msys_pid=1486 winpid=52556 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+server_cleanup scenario=default-control msys_pid=1570 winpid=39004 port=4096 method=tree-terminated pid_gone=true winpid_gone=true port_http_closed=true port_listener_gone=true
+sandbox_removed=true
+host_db_session_count_after=3
+host_db_session_count_unchanged=true
+assertions_passed=79
+assertions_failed=0
