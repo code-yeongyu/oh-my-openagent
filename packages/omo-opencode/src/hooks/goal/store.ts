@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "
 import { join } from "node:path"
 import { GoalFileSchema, type Goal, type GoalFile, type GoalStoreRef, type GoalUpdate } from "./types"
 
-const STORE_VERSION = 1
+const STORE_VERSION = 2
 
 export function goalFilePath(ref: GoalStoreRef): string {
   return join(ref.baseDir, `${encodeURIComponent(ref.sessionID)}.json`)
@@ -26,7 +26,13 @@ export function readGoal(ref: GoalStoreRef): Goal | null {
   }
 
   const parsed = parseGoalFile(raw)
-  return parsed.goal
+  const goal = parsed.goal
+  if (goal && parsed.version === 1) {
+    const migrated: Goal = { ...goal, childSessionIDs: goal.childSessionIDs ?? [] }
+    writeGoal(ref, migrated)
+    return migrated
+  }
+  return goal
 }
 
 export function writeGoal(ref: GoalStoreRef, goal: Goal | null): void {
@@ -56,6 +62,7 @@ export function createGoal(ref: GoalStoreRef, objective: string): Goal {
   const goal: Goal = {
     id: randomUUID(),
     sessionID: ref.sessionID,
+    childSessionIDs: [],
     objective: objective.trim(),
     status: "active",
     tokensUsed: 0,
@@ -82,6 +89,9 @@ export function updateGoal(ref: GoalStoreRef, update: GoalUpdate): Goal | null {
     tokensUsed: update.tokensUsed ?? existing.tokensUsed,
     timeUsedSeconds: update.timeUsedSeconds ?? existing.timeUsedSeconds,
     updatedAt: now,
+    ...(update.parentGoalID !== undefined ? { parentGoalID: update.parentGoalID } : {}),
+    ...(update.rootGoalID !== undefined ? { rootGoalID: update.rootGoalID } : {}),
+    ...(update.childSessionIDs !== undefined ? { childSessionIDs: [...update.childSessionIDs] } : {}),
   }
 
   if (update.status === "active" && existing.status !== "active") {

@@ -11,6 +11,7 @@ import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
 import { publishSyncTaskMetadata } from "./sync-task-metadata"
 import { runSyncTaskLoop } from "./sync-task-runner"
 import { cleanupSyncSessionSideEffects, registerSyncSessionSideEffects } from "./sync-session-lifecycle"
+import { inheritGoalToChild } from "./goal-inheritance"
 import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 export async function executeSyncTask(
@@ -96,6 +97,10 @@ export async function executeSyncTask(
     }
 
     await registerSyncSession(sessionID)
+
+    if (args.inherit_goal !== false) {
+      inheritGoalToChild({ projectDir: directory, parentSessionID: parentContext.sessionID, childSessionID: sessionID })
+    }
 
     taskId = `sync_${sessionID.slice(0, 8)}`
     const startTime = new Date()

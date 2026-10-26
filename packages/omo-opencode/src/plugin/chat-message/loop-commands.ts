@@ -31,7 +31,7 @@ export function handleGoalMessage(args: {
     const objective = promptText.trim()
     if (
       isFirstMessage
-      && pluginConfig.default_mode?.goal
+      && (pluginConfig.default_mode?.goal || pluginConfig.goal?.auto_start)
       && objective.length > 0
       && objective.length <= MAX_OBJECTIVE_LENGTH
     ) {

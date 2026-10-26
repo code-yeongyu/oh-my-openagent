@@ -8,6 +8,9 @@ export type GoalStatus = z.infer<typeof GoalStatusSchema>
 export const GoalSchema = z.object({
   id: z.string(),
   sessionID: z.string(),
+  parentGoalID: z.string().optional(),
+  rootGoalID: z.string().optional(),
+  childSessionIDs: z.array(z.string()).default([]),
   objective: z.string(),
   status: GoalStatusSchema,
   tokensUsed: z.number().int().nonnegative(),
@@ -21,7 +24,7 @@ export const GoalSchema = z.object({
 export type Goal = z.infer<typeof GoalSchema>
 
 export const GoalFileSchema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
   goal: GoalSchema.nullable(),
 })
 
@@ -45,6 +48,9 @@ export type GoalUpdate = {
   readonly status?: GoalStatus
   readonly tokensUsed?: number
   readonly timeUsedSeconds?: number
+  readonly parentGoalID?: string
+  readonly rootGoalID?: string
+  readonly childSessionIDs?: readonly string[]
 }
 
 export const GoalToolSnapshotSchema = z.object({

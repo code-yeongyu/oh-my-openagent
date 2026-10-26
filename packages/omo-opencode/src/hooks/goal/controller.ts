@@ -1,11 +1,16 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { clearGoal, createGoal, readGoal, updateGoal } from "./store"
-import type { Goal, GoalStatus, TokenUsageSnapshot } from "./types"
+import type { Goal, GoalStatus, GoalUpdate, TokenUsageSnapshot } from "./types"
 import { validateObjective } from "./validation"
 
 export type GoalControllerOptions = {
   readonly projectDir: string
+}
+
+export type GoalLink = {
+  readonly parentGoalID?: string
+  readonly rootGoalID?: string
 }
 
 export type TuiLoopSnapshot = {
@@ -48,19 +53,34 @@ export function createGoalController(options: GoalControllerOptions) {
   }
 
   return {
-    setGoal(sessionID: string, rawObjective: string): Goal {
-      const objective = validateObjective(rawObjective)
+    setGoal(sessionID: string, rawObjective: string, link?: GoalLink): Goal {
+      const objective =
+        typeof rawObjective === "string" ? validateObjective(rawObjective) : validateObjective("")
       const ref = storeRef(sessionID)
       clearGoal(ref)
-      const goal = createGoal(ref, objective)
+      let goal = createGoal(ref, objective)
+      if (link && (link.parentGoalID !== undefined || link.rootGoalID !== undefined)) {
+        const updated = updateGoal(ref, {
+          ...(link.parentGoalID !== undefined ? { parentGoalID: link.parentGoalID } : {}),
+          ...(link.rootGoalID !== undefined ? { rootGoalID: link.rootGoalID } : {}),
+        })
+        if (updated !== null) goal = updated
+      }
       writeTuiMirror(sessionID, goal)
       return goal
     },
-
     getGoal(sessionID: string): Goal | null {
       return readGoal(storeRef(sessionID))
     },
-
+    addChildSession(sessionID: string, childSessionID: string): Goal | null {
+      const ref = storeRef(sessionID)
+      const existing = readGoal(ref)
+      if (existing === null) return null
+      if (existing.childSessionIDs.includes(childSessionID)) return existing
+      const updated = updateGoal(ref, { childSessionIDs: [...existing.childSessionIDs, childSessionID] } as GoalUpdate & { readonly childSessionIDs: readonly string[] })
+      if (updated) writeTuiMirror(sessionID, updated)
+      return updated
+    },
     pauseGoal(sessionID: string): Goal | null {
       const goal = updateGoal(storeRef(sessionID), { status: "paused" })
       if (goal !== null) writeTuiMirror(sessionID, goal)

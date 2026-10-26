@@ -18,6 +18,7 @@ export type GoalHook = {
   readonly resumeGoal: (sessionID: string) => Goal | null
   readonly clearGoal: (sessionID: string) => boolean
   readonly markComplete: (sessionID: string) => Goal | null
+  readonly onSessionCreated: (sessionID: string, firstMessage: string) => void
   readonly event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
 }
 
@@ -72,7 +73,23 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
     }
   }
 
+  function handleSessionCreated(sessionID: string, firstMessage: string): void {
+    if (options.autoStart !== true) return
+    if (controller.getGoal(sessionID) !== null) return
+    const objective = firstMessage.trim().slice(0, 2000)
+    if (!objective) return
+    controller.setGoal(sessionID, objective)
+  }
+
   async function handleSessionDeleted(sessionID: string): Promise<void> {
+    const goal = controller.getGoal(sessionID)
+    if (goal !== null) {
+      const parentGoalID = (goal as { parentGoalID?: string }).parentGoalID
+      if (typeof parentGoalID === "string" && parentGoalID.length > 0) {
+        controller.markComplete(sessionID)
+        return
+      }
+    }
     controller.clearGoal(sessionID)
   }
 
@@ -83,6 +100,7 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
     resumeGoal: controller.resumeGoal,
     clearGoal: controller.clearGoal,
     markComplete: controller.markComplete,
+    onSessionCreated: (sessionID, firstMessage) => handleSessionCreated(sessionID, firstMessage),
 
     event: async (input) => {
       const { event } = input
@@ -94,6 +112,11 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
         case "session.idle":
           await handleSessionIdle(sessionID)
           break
+        case "session.created": {
+          const message = (event.properties as { message?: string })?.message ?? ""
+          handleSessionCreated(sessionID, message)
+          break
+        }
         case "session.deleted":
           await handleSessionDeleted(sessionID)
           break

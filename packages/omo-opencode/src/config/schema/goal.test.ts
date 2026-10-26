@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { GoalConfigSchema } from "./goal"
 
 describe("GoalConfigSchema", () => {
-  test("defaults enabled and auto_start to false", () => {
+  test("defaults enabled to false and auto_start to true", () => {
     const result = GoalConfigSchema.parse({})
 
     expect(result.enabled).toBe(false)
-    expect(result.auto_start).toBe(false)
+    expect(result.auto_start).toBe(true)
     expect(result.default_max_iterations).toBe(100)
   })
 

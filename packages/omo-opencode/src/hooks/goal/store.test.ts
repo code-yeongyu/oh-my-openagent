@@ -21,7 +21,7 @@ describe("goal store", () => {
     expect(goal.sessionID).toBe(ref.sessionID)
     expect(goal.lastStartedAt).toBeGreaterThan(0)
     const raw = readFileSync(goalFilePath(ref), "utf-8")
-    expect(raw).toContain('"version": 1')
+    expect(raw).toContain('"version": 2')
     expect(raw).toContain('"Ship the dashboard"')
   })
 
