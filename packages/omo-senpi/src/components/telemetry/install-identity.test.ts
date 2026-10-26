@@ -198,7 +198,7 @@ describe("temp-home detection is path-correct on every platform (#10935)", () =>
     expect(automatedRunReason({ HOME: join(root, "inner") }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
   })
 
-  it.skipIf(process.platform === "win32")("#given literal dot-dot after a symlink in HOME #then temp detection agrees with the native home", () => {
+  it.skipIf(process.platform === "win32")("#given literal dot-dot after a symlink in HOME #then temp detection agrees with where the id is written", () => {
     const base = home()
     const root = join(base, "temp")
     const outside = join(base, "outside")
@@ -208,7 +208,9 @@ describe("temp-home detection is path-correct on every platform (#10935)", () =>
     symlinkSync(join(outside, "subdir"), join(root, "jump"))
     const rawHome = `${root}/jump/../home`
 
-    expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBeUndefined()
+    // path.join(rawHome, ".omo") collapses `jump/..` lexically, so the id would land in <root>/home: inside temp.
+    expect(join(rawHome, ".omo")).toBe(join(root, "home", ".omo"))
+    expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
     expect(automatedRunReason({ HOME: join(root, "home") }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
   })
 })

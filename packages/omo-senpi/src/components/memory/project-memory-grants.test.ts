@@ -183,7 +183,10 @@ describe("project memory read grants (#10044)", () => {
     expect(isGrantedProjectMemoryRead(setup.own, join(foreignRepo, "note.md"))).toBe(true)
     const remainders = ["missing/../note.md", "a/./b", "a//b", "new/dir/"]
     const granted = remainders.map((remainder) => [remainder, isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/${remainder}`)])
-    expect(Object.fromEntries(granted)).toEqual(Object.fromEntries(remainders.map((remainder) => [remainder, false])))
+    // Win32 collapses `missing/..` lexically before the kernel sees the path, so the raw opener reads the same
+    // note.md and granting it is correct there; POSIX keeps `missing/..` a real lookup, which fails.
+    const expected = (remainder: string) => process.platform === "win32" && remainder === "missing/../note.md"
+    expect(Object.fromEntries(granted)).toEqual(Object.fromEntries(remainders.map((remainder) => [remainder, expected(remainder)])))
   })
 
   test("#given a dangling link in a granted repo #when a read names it #then it is not treated as a missing note", async () => {
@@ -205,6 +208,19 @@ describe("project memory read grants (#10044)", () => {
     expect(isGrantedProjectMemoryRead(setup.own, setup.foreignFile, {
       realpath: (input) => {
         if (input === setup.foreignFile) throw Object.assign(new Error("permission denied"), { code: "EACCES" })
+        return realpathSync.native(input)
+      },
+    })).toBe(false)
+  })
+
+  test("#given a granted repo #when a missing remainder sits under a FILE and resolution reports ENOENT (as Windows does) #then no read is granted", async () => {
+    const { setup, foreignRepo } = projectGrantFixture()
+    await grantProjectMemoryRead(setup.own, foreignRepo)
+    const below = `${setup.foreignFile}/missing.md`
+
+    expect(isGrantedProjectMemoryRead(setup.own, below, {
+      realpath: (input) => {
+        if (input === below) throw Object.assign(new Error("no such file"), { code: "ENOENT" })
         return realpathSync.native(input)
       },
     })).toBe(false)
