@@ -1,6 +1,6 @@
 import { MirrorPlanError } from "./mirror-plan"
 import { withRetry } from "./mirror-retry"
-import { putVerified, type R2Credentials } from "./r2-signed-put"
+import { deleteVerified, putVerified, type R2Credentials } from "./r2-signed-put"
 
 export interface R2Store {
   exists(key: string): Promise<boolean>
@@ -12,7 +12,10 @@ export interface R2Store {
   countObjects(prefix: string): Promise<number>
 }
 
-/** Every key is relative to `prefix`; a dry run gets a scratch prefix so it can never touch real objects. */
+/**
+ * Every key is relative to `prefix`; a dry run gets a scratch prefix so it can never touch real objects.
+ * Reads use Bun's S3 client; every write and delete uses the signed transport, which retries and reports diagnostics.
+ */
 export function createR2Store(credentials: R2Credentials, prefix: string): R2Store {
   const client = new Bun.S3Client({
     accessKeyId: credentials.accessKeyId,
@@ -57,7 +60,7 @@ export function createR2Store(credentials: R2Credentials, prefix: string): R2Sto
       if (full(under) === "" || !full(under).endsWith("/")) {
         throw new MirrorPlanError(`refusing to delete the unbounded prefix "${full(under)}"`)
       }
-      for (const key of await listKeys(under)) await client.delete(key)
+      for (const key of await listKeys(under)) await withRetry(`delete ${key}`, () => deleteVerified(credentials, key))
     },
     async countObjects(under) {
       return (await listKeys(under)).length

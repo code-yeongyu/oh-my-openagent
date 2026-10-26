@@ -24,6 +24,30 @@ describe("R2 write diagnostics", () => {
     }
   })
 
+  test("keeps cf-ray and a redacted excerpt of a non-XML error body", async () => {
+    // given
+    const fetch = spyOn(globalThis, "fetch").mockResolvedValue(new Response(
+      `<html>\n  <title>502 Bad Gateway</title>\n  ${credentials.accessKeyId} ${credentials.secretAccessKey}\n</html>`,
+      { status: 502, headers: { "cf-ray": "ray-502" } },
+    ))
+    // when
+    try {
+      await putVerified(credentials, "channels/_scratch/test", new Blob(["5.1.48\n"]), "a".repeat(64), {})
+      throw new Error("expected R2 write failure")
+    } catch (error) {
+      // then
+      expect(error).toMatchObject({ status: 502, code: "UnknownError", requestId: "ray-502", cfRay: "ray-502" })
+      const message = String(error)
+      expect(message).toContain("PUT channels/_scratch/test -> HTTP 502")
+      expect(message).toContain("<title>502 Bad Gateway</title> <redacted> <redacted>")
+      expect(message).toContain("cfRay=ray-502")
+      expect(message).not.toContain(credentials.secretAccessKey)
+      expect(message).not.toContain(credentials.accessKeyId)
+    } finally {
+      fetch.mockRestore()
+    }
+  })
+
   test("redacts the whole secret before an overlapping access key", async () => {
     const overlapping = { ...credentials, accessKeyId: "test-key", secretAccessKey: "prefix-test-key-suffix" }
     const fetch = spyOn(globalThis, "fetch").mockResolvedValue(new Response(
