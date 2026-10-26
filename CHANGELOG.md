@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Goals no longer die silently: hierarchy, enforceable budget, and child inheritance.** Goals gain parent/root linkage with a v2 store (auto-migration), real `auto_start` (plus `default_mode.goal` as legacy alias), and `inherit_goal` propagation into sync and background child sessions with remaining-budget handoff. Idle iterations pause on budget, errors accumulate stalls and pause at `max_stalls` (default 3), and `session.error`/`session.compacted` reactivate active goals. Completing a goal requires evidence text (`require_completion_evidence`, default on), a `_index.json` tracks goal trees, and the parent continuation prompt includes a child-session status table.
+
 ## [5.1.48] - 2026-10-25
 
 **OmO Native stops waiting on a stalled turn-end subscriber after two seconds.** Memory recovery remains retryable without treating the cancelled wait as a failed reflection run, and stall diagnostics identify the component and hook instead of only `omo.js`. Thanks to @floweredao for the report. ([#11254](https://github.com/code-yeongyu/oh-my-openagent/pull/11254), Part of [#11249](https://github.com/code-yeongyu/oh-my-openagent/issues/11249)) ([#11280](https://github.com/code-yeongyu/oh-my-openagent/pull/11280))
