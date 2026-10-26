@@ -4,7 +4,7 @@ import * as realFs from "node:fs"
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { describe, expect, mock, onTestFinished, test } from "bun:test"
+import { afterAll, describe, expect, mock, onTestFinished, test } from "bun:test"
 
 const fault: { failWrites: boolean } = { failWrites: false }
 const realModule = { ...realFs }
@@ -22,6 +22,11 @@ mock.module("node:fs", () => ({
     throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" })
   },
 }))
+
+afterAll(() => {
+  mock.module("node:fs", () => realModule)
+  mock.restore()
+})
 
 const { createBoulderState, writeBoulderState } = await import("./storage/write-state")
 const { getBoulderFilePath } = await import("./storage/path")
