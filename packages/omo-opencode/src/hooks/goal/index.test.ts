@@ -82,6 +82,14 @@ describe("createGoalHook", () => {
     expect(hook.getGoal("s1")?.stallCount).toBe(0)
   })
 
+  test("session.compacted re-injects for active goal", async () => {
+    const ctx = makePluginInput()
+    const hook = createGoalHook(ctx, { projectDir: ctx.directory })
+    hook.setGoal("s1", "Ship it")
+    await hook.event({ event: { type: "session.compacted", properties: { sessionID: "s1" } } })
+    expect(hook.getGoal("s1")?.status).toBe("active")
+  })
+
   test("session.idle injects continuation for active goal", async () => {
     const ctx = makePluginInput()
     const hook = createGoalHook(ctx, { projectDir: ctx.directory })

@@ -103,6 +103,12 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
     controller.updateProgress(sessionID, { stallCount })
   }
 
+  async function handleSessionCompacted(sessionID: string): Promise<void> {
+    const goal = controller.getGoal(sessionID)
+    if (goal === null || goal.status !== "active") return
+    await handleSessionIdle(sessionID)
+  }
+
   async function handleSessionDeleted(sessionID: string): Promise<void> {
     const goal = controller.getGoal(sessionID)
     if (goal !== null) {
@@ -141,6 +147,9 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
         }
         case "session.error":
           await handleSessionError(sessionID)
+          break
+        case "session.compacted":
+          await handleSessionCompacted(sessionID)
           break
         case "session.deleted":
           await handleSessionDeleted(sessionID)
