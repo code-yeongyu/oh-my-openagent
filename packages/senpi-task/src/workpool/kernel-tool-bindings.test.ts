@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
 
 import { createKernelToolBindings, type KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import { resolveKernelToolGrant, type KernelToolGrant } from "../kernel-tools/resolve"
@@ -28,6 +29,29 @@ async function poolWithTools(bindings: KernelToolBindingRegistry) {
  * binding is gone by key, and the engine holds no other entry.
  */
 describe("workpool parent kernel-tool bindings", () => {
+  test("#given a parked worker whose bound revival is refused #when its pool closes #then no busy worker or parent binding remains", async () => {
+    // given
+    const bindings = createKernelToolBindings()
+    const { f } = await poolWithTools(bindings)
+    const worker = await f.start("a")
+    f.yieldResults(worker.taskId, worker.epoch, [{ key: "a", data: 1 }])
+    await f.settle(worker.taskId)
+    await f.park(worker.taskId)
+    f.store.mutate(worker.taskId, record => ({ ...record, spawn_spec: { version: 1, cwd: join(f.root, "missing"), prompt: "recorded" } }))
+    const failed = f.event("admission_failed")
+    // when
+    f.push("refused")
+    f.manager.workpools.close(f.caller, f.pool.pool_id)
+    const refusal = await failed
+    // then
+    expect(refusal.error?.code).toBe("cwd_unavailable")
+    expect(f.inspect().items.find(item => item.key === "refused")).toMatchObject({ status: "error", error: { code: "cwd_unavailable" } })
+    expect(f.inspect().workers.filter(entry => entry.status === "busy")).toEqual([])
+    expect(f.resumes).toEqual([])
+    expect(bindings.get(f.pool.pool_id)).toBeUndefined()
+    expect(bindings.keys()).toEqual([])
+  })
+
   test("#given a pool with parent tools #when it is cancelled #then the binding is released", async () => {
     const bindings = createKernelToolBindings()
     const { f } = await poolWithTools(bindings)

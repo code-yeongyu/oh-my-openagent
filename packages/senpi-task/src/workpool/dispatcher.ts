@@ -1,8 +1,12 @@
 import type { WorkpoolAdmission } from "./ports"
+import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
+import { messageability } from "../state"
+import { oneShotPolicyDenial } from "../steering/engine-policy"
 import type { ResumeCredential } from "../pause/admission-barrier"
 import { reconcileWorkerTurn, reconcileWorkpool, uncertainItem } from "./reconcile"
 import type { WorkpoolStore } from "./store"
-import { WorkpoolError, type PoolId, type WorkpoolEvent, type WorkpoolRecord, type WorkpoolWorker } from "./types"
+import { beginWorkerTurn } from "./worker-turn"
+import { WorkpoolError, type PoolId, type WorkpoolEvent, type WorkpoolItem, type WorkpoolRecord, type WorkpoolWorker } from "./types"
 
 export function orderIdleWorkers(workers: readonly WorkpoolWorker[]): readonly WorkpoolWorker[] {
   return workers.filter(worker => worker.status === "idle").toSorted((a, b) =>
@@ -58,6 +62,8 @@ export function createWorkpoolDispatcher(ports: {
         !admission.hasFreeSlot(pool.worker_spec.plan.model)) break
       if (idle !== undefined) reservedWorkers.add(idle.task_id)
       let boundTask: string | undefined = recovery?.task_id
+      let beganTurn = false
+      let bindingRevision = item.binding?.admission_revision
       const current = (): boolean => {
         const latest = store.load(poolId)
         return !disposed && latest.hold === undefined && latest.generation === pool.generation && (latest.status === "open" || latest.status === "closing") &&
@@ -69,7 +75,7 @@ export function createWorkpoolDispatcher(ports: {
         authorize: () => ports.authorize(store.load(poolId)),
         bind: (taskId, epoch) => {
           let bound = false
-          store.mutate(poolId, latest => {
+          const committed = store.mutate(poolId, latest => {
             if (!current()) return latest
             const anchor = latest.items.find(candidate => candidate.item_id === item.item_id)
             if (anchor?.status !== "queued" && !(anchor?.status === "assigned" && anchor.delivery?.phase === "queued" && anchor.binding?.task_id === taskId && anchor.binding.run_epoch === epoch)) return latest
@@ -78,11 +84,17 @@ export function createWorkpoolDispatcher(ports: {
             const prior = latest.workers.find(worker => worker.task_id === taskId)
             const worker: WorkpoolWorker = { task_id: taskId, run_epoch: epoch, status: "busy", completed_turns: prior?.completed_turns ?? 0, idle_since: prior?.idle_since ?? 0 }
             return { ...latest,
-              items: latest.items.map(candidate => candidate.item_id === item.item_id || (idle !== undefined && candidate.status === "queued")
-                ? { ...candidate, status: "assigned", binding: { task_id: taskId, run_epoch: epoch, generation: pool.generation }, delivery: { phase: "queued" } } : candidate),
+              items: latest.items.map(candidate => candidate.item_id === item.item_id || (idle !== undefined && candidate.status === "queued") ||
+                (candidate.status === "assigned" && candidate.delivery?.phase === "queued" && candidate.binding?.task_id === taskId &&
+                  candidate.binding.run_epoch === epoch && candidate.binding.generation === pool.generation)
+                ? { ...candidate, status: "assigned", binding: { task_id: taskId, run_epoch: epoch, generation: pool.generation, admission_revision: latest.revision + 1 }, delivery: { phase: "queued" } } : candidate),
               workers: [...latest.workers.filter(candidate => candidate.task_id !== taskId), worker],
             }
           })
+          if (bound) {
+            bindingRevision = committed.revision
+          }
+          if (!bound) pending.delete(item.item_id)
           if (bound) for (const assigned of store.load(poolId).items) {
             if (assigned.item_id === item.item_id || assigned.binding?.task_id !== taskId) continue
             pending.get(assigned.item_id)?.cancel()
@@ -90,15 +102,55 @@ export function createWorkpoolDispatcher(ports: {
           }
           return bound
         },
+        begin: (taskId, epoch, prefix) => {
+          const captured = beginWorkerTurn(stores, { pool_id: poolId, generation: pool.generation, task_id: taskId, run_epoch: epoch }, prefix)
+          if (captured !== undefined) beganTurn = true
+          return captured
+        },
         event: event => {
           if (event.kind === "admission_failed") {
             pending.delete(item.item_id)
             if (store.load(poolId).hold !== undefined) return
-            store.mutate(poolId, latest => latest.generation !== pool.generation ? latest : { ...latest, items: latest.items.map(candidate => {
-              const affected = candidate.item_id === item.item_id || (boundTask !== undefined && candidate.binding?.task_id === boundTask && candidate.binding.run_epoch === event.run_epoch)
-              if (!affected || (candidate.status !== "queued" && candidate.status !== "assigned")) return candidate
-              return event.error?.code === "delivery_uncertain" ? uncertainItem(candidate, latest, event.task_id === undefined ? null : admission.tasks.load(event.task_id)) : { ...candidate, status: "error", error: event.error }
-            }), workers: latest.workers.filter(worker => worker.task_id !== event.task_id || admission.get(worker.task_id)?.status === "running") })
+            // Queued turns remain revision-fenced; the request that began a dispatched identity owns its cleanup even if a later recovery bind replaced that revision.
+            const beganThisTurn = (candidate: WorkpoolItem): boolean => candidate.status === "assigned" && candidate.delivery !== undefined &&
+              candidate.delivery.phase !== "queued" && beganTurn && candidate.binding?.task_id === event.task_id && candidate.binding?.run_epoch === event.run_epoch
+            const othersTurn = (candidate: WorkpoolItem): boolean => (candidate.status === "queued" || candidate.status === "assigned") && !beganThisTurn(candidate) &&
+              (candidate.binding?.admission_revision !== bindingRevision || (candidate.status === "assigned" && candidate.delivery !== undefined &&
+                candidate.delivery.phase !== "queued" && (!beganTurn || candidate.binding?.task_id !== event.task_id || candidate.binding?.run_epoch !== event.run_epoch)))
+            store.mutate(poolId, latest => {
+              if (latest.generation !== pool.generation) return latest
+              const refused: WorkpoolItem[] = []
+              const items = latest.items.map(candidate => {
+                const affected = candidate.item_id === item.item_id || (boundTask !== undefined && candidate.binding?.task_id === boundTask && candidate.binding.run_epoch === event.run_epoch)
+                if (!affected || (candidate.status !== "queued" && candidate.status !== "assigned") || othersTurn(candidate)) return candidate
+                refused.push(candidate)
+                return event.error?.code === "delivery_uncertain" ? uncertainItem(candidate, latest, event.task_id === undefined ? null : admission.tasks.load(event.task_id)) : { ...candidate, status: "error" as const, error: event.error }
+              })
+              for (const candidate of refused) {
+                const binding = candidate.binding
+                if (binding === undefined || candidate.delivery?.phase !== "queued" || event.error?.code === "delivery_uncertain") continue
+                admission.tasks.mutate(binding.task_id, task => {
+                  const pending = (task.pending_steering ?? []).filter(entry => entry.id !== candidate.item_id ||
+                    entry.workpool?.pool_id !== poolId || entry.workpool.generation !== binding.generation ||
+                    entry.workpool.item_id !== candidate.item_id || entry.workpool.run_epoch !== binding.run_epoch)
+                  return pending.length === (task.pending_steering?.length ?? 0) ? task : { ...task, pending_steering: pending }
+                })
+              }
+              return { ...latest, items, workers: latest.workers.filter(worker => {
+                if (worker.task_id !== event.task_id || !refused.some(candidate =>
+                  (candidate.binding?.task_id === worker.task_id && candidate.binding.run_epoch === worker.run_epoch && candidate.binding.generation === latest.generation) ||
+                  (candidate.item_id === item.item_id && idle?.task_id === worker.task_id && idle.run_epoch === worker.run_epoch))) return true
+                const task = admission.get(worker.task_id)
+                return task?.status === "running" || (event.error?.code === "delivery_uncertain" && worker.status === "busy" && worker.run_epoch === event.run_epoch) ||
+                  (worker.status === "busy" && items.some(candidate => candidate.error?.code === "delivery_uncertain" &&
+                    candidate.binding?.generation === latest.generation && candidate.binding.task_id === worker.task_id && candidate.binding.run_epoch === worker.run_epoch)) ||
+                  (worker.status === "idle" && task !== undefined && task.parent_session_id === latest.parent_session_id &&
+                  oneShotPolicyDenial(task) === undefined && (isColdRevivalCandidate(task) ||
+                    messageability(task.status, task.residency_state, task.execution_mode, task.killed) === "revive")) ||
+                  latest.items.some(candidate => othersTurn(candidate) && candidate.binding?.task_id === worker.task_id &&
+                    candidate.binding.run_epoch === worker.run_epoch && candidate.binding.generation === latest.generation)
+              }) }
+            })
             if (event.error?.code === "delivery_uncertain" && event.task_id !== undefined && event.run_epoch !== undefined) observeCompletion(pool, event.task_id, event.run_epoch)
             schedule(poolId)
           }

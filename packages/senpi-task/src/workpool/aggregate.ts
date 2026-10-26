@@ -41,12 +41,12 @@ export function aggregateResults(pool: WorkpoolRecord): readonly WorkpoolAggrega
 export function deliverAggregate(
   pool: WorkpoolRecord,
   port: WorkpoolAggregatePort | undefined,
-  persist: (state: { readonly delivered: boolean; readonly accepted: boolean }) => void,
+  persist: (state: { readonly delivered: boolean; readonly accepted: boolean }) => boolean,
   onFailure?: (error: unknown) => void,
 ): boolean {
   const results = aggregateResults(pool)
   if (results === undefined || port === undefined) return false
-  persist({ delivered: false, accepted: true })
+  if (!persist({ delivered: false, accepted: true })) return false
   try {
     port.enqueue({ pool_id: pool.pool_id, generation: pool.generation, results }, {
       ack: () => persist({ delivered: true, accepted: true }),
