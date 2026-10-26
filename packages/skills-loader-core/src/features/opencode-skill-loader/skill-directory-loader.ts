@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import * as fs from "node:fs/promises"
 import { join } from "node:path"
 import type { DiscoveredProjectDirectory } from "../../shared/project-discovery-dirs"
@@ -27,6 +28,7 @@ export async function loadSkillsFromDir(options: {
   const namePrefix = options.namePrefix ?? ""
   const depth = options.depth ?? 0
   const maxDepth = options.maxDepth ?? 2
+  if (!existsSync(discovered)) return []
   const skillMap = new Map<string, LoadedSkill>()
   try {
     const canonical = checkSkillPath(discovered, provenance, true)
