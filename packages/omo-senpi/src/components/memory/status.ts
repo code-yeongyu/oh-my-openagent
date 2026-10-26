@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
+import type { SyncStatusReader } from "./sync-status-surface"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
@@ -12,6 +13,7 @@ export const MEMORY_PRESSURE_SOFT_RATIO = 0.8
 export const MEMORY_STATUS_MAX_WIDTH = 60
 /** A streak at or above this many consecutive failures earns the `!N` badge. */
 const STREAK_BADGE_THRESHOLD = 3
+export const SYNC_BLOCKED_SEGMENT = " sync blocked"
 /** Shared health history bound so footer and RPC streaks are computed from the same window. */
 export const MEMORY_HEALTH_SCAN_LIMIT = 20
 const SECOND_MS = 1_000
@@ -38,6 +40,8 @@ export interface MemoryStatusSegments {
   readonly backlogSteps: number
   readonly streak: number
   readonly parked: boolean
+  /** Memory sync for this repository is failing (#10637); never trimmed from the line. */
+  readonly syncBlocked?: boolean
 }
 
 export interface MemoryStatusResult {
@@ -58,6 +62,8 @@ export interface RefreshMemoryStatusInput {
   readonly requestPressureDream?: () => void
   /** Bound session whose reflection backlog feeds the ` (+N)` segment; omitted means no backlog. */
   readonly sessionId?: string
+  /** Reads the repository's sync status for the ` sync blocked` segment; omitted means no segment. */
+  readonly syncStatus?: SyncStatusReader
 }
 
 export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Promise<MemoryStatusResult> {
@@ -72,7 +78,7 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
       ? null
       : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
     if (age !== null) {
-      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId)
+      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus)
       input.ui.setStatus(
         MEMORY_STATUS_KEY,
         formatMemoryStatusLine(input.context.identity, age, segments),
@@ -108,23 +114,30 @@ export async function readMemoryStatusSegments(
   repo: GitRepoForStatus,
   context: MemoryIdentityContext,
   sessionId: string | undefined,
+  syncStatus?: SyncStatusReader,
 ): Promise<MemoryStatusSegments> {
-  const [dirty, backlogSteps, streak, parked] = await Promise.all([
+  const [dirty, backlogSteps, streak, parked, syncBlocked] = await Promise.all([
     readDirty(repo),
     readBacklogSteps(context, sessionId),
     readStreak(context),
     readParked(context),
+    readSyncBlocked(context, syncStatus),
   ])
-  return { dirty, backlogSteps, streak, parked }
+  return { dirty, backlogSteps, streak, parked, syncBlocked }
 }
 
-/** Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused]`, dropping segments right-to-left to fit. */
+/**
+ * Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused][ sync blocked]`, dropping the optional
+ * segments right-to-left to fit. ` sync blocked` is never dropped: it is the one segment that asks
+ * the person to act.
+ */
 export function formatMemoryStatusLine(
   identity: string,
   age: string,
   segments: MemoryStatusSegments,
 ): string {
   const base = `mem:${identity} ${age}`
+  const sync = segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : ""
   const optional: string[] = [
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
@@ -133,10 +146,19 @@ export function formatMemoryStatusLine(
   ]
   // Drop right-to-left (`paused`, then `!N`, then `(+N)`, then `*`) until the line fits the budget.
   for (let keep = optional.length; keep > 0; keep -= 1) {
-    const candidate = base + optional.slice(0, keep).join("")
+    const candidate = base + optional.slice(0, keep).join("") + sync
     if (candidate.length <= MEMORY_STATUS_MAX_WIDTH) return candidate
   }
-  return base
+  return base + sync
+}
+
+async function readSyncBlocked(context: MemoryIdentityContext, syncStatus: SyncStatusReader | undefined): Promise<boolean> {
+  if (syncStatus === undefined) return false
+  try {
+    return (await syncStatus(context.identityPaths.repo))?.kind === "failing"
+  } catch {
+    return false
+  }
 }
 
 async function readDirty(repo: GitRepoForStatus): Promise<boolean> {

@@ -137,7 +137,7 @@ fn cases() -> Vec<Case> {
         }),
         case("InvalidCoordinateFrame", json!({}), |e| {
             make_stop_path_live(e);
-            click(e, "desktop")
+            click(e, WINDOW)
         }),
         case("StaleRef", json!({}), |e| {
             open(e);

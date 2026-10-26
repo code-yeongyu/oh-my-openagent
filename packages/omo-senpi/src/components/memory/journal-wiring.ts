@@ -31,7 +31,7 @@ export interface MemoryJournalWiringOptions {
 export interface MemoryJournalWiring {
   register(pi: SenpiExtensionAPI): void
   journalFor(sessionId: string): TranscriptJournal
-  reconcileSession(eventCtx: unknown): Promise<AppendResult>
+  reconcileSession(eventCtx: unknown, signal?: AbortSignal): Promise<AppendResult>
 }
 
 const NOOP_APPEND: AppendResult = { appended: 0, skipped: 0 }
@@ -59,11 +59,11 @@ export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): 
     return journal
   }
 
-  async function reconcileSession(eventCtx: unknown): Promise<AppendResult> {
+  async function reconcileSession(eventCtx: unknown, signal?: AbortSignal): Promise<AppendResult> {
     const surface = readBranchSurface(eventCtx)
     if (surface === undefined) return NOOP_APPEND
     try {
-      return await journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries))
+      return await journalFor(surface.sessionId).reconcile(projectSessionEntries(surface.entries), signal)
     } catch (error: unknown) {
       // A contended journal lock is best-effort bookkeeping: the next settle or session_start
       // reconcile is idempotent (keyed by source_line_id), so degrade instead of surfacing an

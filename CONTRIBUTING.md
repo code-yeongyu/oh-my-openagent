@@ -21,6 +21,7 @@ First off, thanks for taking the time to contribute! This document provides guid
   - [Adding a New Hook](#adding-a-new-hook)
   - [Adding a New Tool](#adding-a-new-tool)
   - [Adding a New MCP Server](#adding-a-new-mcp-server)
+- [Security](#security)
 - [QA Discipline](#qa-discipline)
 - [Pull Request Process](#pull-request-process)
   - [PR Checklist](#pr-checklist)
@@ -60,7 +61,7 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ### Prerequisites
 
-- **Bun** 1.4.0 (CI-pinned) - The only package manager for the workspace itself
+- **Bun** 1.4.4 (CI-pinned) - The only package manager for the workspace itself
 - **Node** 24 - Required for vendored packages (lsp-tools-mcp, lsp-daemon, git-bash-mcp) and the Codex plugin build via npm
 - **git** - Version control
 - **tmux** (optional) - Enables the `interactive_bash` tool and Team Mode visualization
@@ -132,7 +133,7 @@ All harnesses delegate to these scripts:
 
 | Harness | Wiring |
 | ------- | ------ |
-| GitHub Codespaces / VS Code Dev Containers | `.devcontainer/devcontainer.json` runs `postCreateCommand: script/agent/setup.sh` on `.devcontainer/Dockerfile` (Node 24 + Bun 1.4.0 + tmux) |
+| GitHub Codespaces / VS Code Dev Containers | `.devcontainer/devcontainer.json` runs `postCreateCommand: script/agent/setup.sh` on `.devcontainer/Dockerfile` (Node 24 + Bun 1.4.4 + tmux) |
 | Plain Docker | `script/agent/docker-dev.sh` builds the Dockerfile and opens a shell |
 | Cursor cloud agents | `.cursor/environment.json` `install` runs setup on environment creation |
 | Claude Code | `.claude/settings.json` `SessionStart` hook runs setup; `SessionEnd` hook launches cleanup |
@@ -324,6 +325,10 @@ export function createMyHook(deps: { logger: Logger }) {
 2. Register it inside `createBuiltinMcps()` in `packages/omo-opencode/src/mcp/index.ts`
 3. Add the MCP name to `McpNameSchema` in `packages/omo-opencode/src/mcp/types.ts`
 4. Document in README if it requires external setup
+
+## Security
+
+Report suspected vulnerabilities privately, as described in [`SECURITY.md`](SECURITY.md), never in a public issue or pull request. If your change touches a trust boundary (credentials, config loading, tool permissions, the installer or update path, or the engine's RPC endpoints), say in the PR body what it could weaken and how you checked it.
 
 ## QA Discipline
 

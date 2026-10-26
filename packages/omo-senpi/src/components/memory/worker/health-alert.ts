@@ -1,5 +1,8 @@
+import { dirname } from "node:path"
+
 import type { EntryRenderer } from "@code-yeongyu/senpi"
 
+import { locateReflectionChildLog } from "./child-log"
 import { safeNotify, type ReflectionCompletionApi, type ReflectionLiveSession } from "./completion"
 import {
   detailExcerpt,
@@ -102,7 +105,9 @@ export async function emitReflectionHealthAlert(
   if (isModelUnreachableDetail(health.lastFailure?.detail)) return false
   if (!once(`${live.sessionId}:${health.fingerprint}`)) return false
   const failure = health.lastFailure
-  const recommendation = reflectionRemediation(failure?.reason, failure?.detail)
+  // Completion records live in `<reflectionDir>/completions`, next to the `runs` directories.
+  const childLog = await locateReflectionChildLog(dirname(completionsDir), failure?.runId)
+  const recommendation = reflectionRemediation(failure?.reason, failure?.detail, childLog)
   const cause = childFailureCause(failure?.detail)
   const launcher = failure?.launcher
   const thisRuntime = context?.currentLauncher?.runtime

@@ -3,7 +3,7 @@ import type { TeardownStepDeadline } from "./teardown-budget"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ForgetOptions } from "../manager/types"
-import type { AwaitingInputReason, TaskRecord } from "../state"
+import type { AwaitingInputReason, TaskRecord, TaskStatus } from "../state"
 import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import type { TaskRecordStore } from "../store"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
@@ -44,6 +44,11 @@ export type ResidentHandle = {
   // Rpc: SIGTERM then SIGKILL escalation. Host-session: abort + close_session, never a signal.
   // In-process: no-op (no OS process to signal).
   terminate(): Promise<void>
+  // From here no transport recovery may bring the child back; a host reached again only ends it (omo#9403).
+  markStopping?(): void
+  // Host-session: publish `task_status` in the session's context while still attached, so a successor
+  // host drops a finished session's park instead of reopening it unattended (omo#10778).
+  publishTaskStatus?(status: TaskStatus): Promise<void>
 }
 
 // The live view of which handles are resident in THIS process, plus pending-mail state. Records
@@ -89,6 +94,8 @@ export type RespawnFailureCode =
   // was opened nowhere and waits for the next reconcile.
   | "store_index_unavailable"
   | "host_incompatible"
+  // The child's run is stopped: nothing launches until its Resume (which respawns it paused).
+  | "run_paused"
   | "respawn_failed"
 
 export type RespawnResult =

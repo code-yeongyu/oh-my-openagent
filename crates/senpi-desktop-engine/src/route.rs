@@ -2,7 +2,7 @@
 //! once, by the session thread in submission order, or by the connection
 //! (`$/cancel`).
 
-use senpi_desktop_core::methods::Method;
+use senpi_desktop_core::methods::{Effect, Method};
 use senpi_desktop_core::protocol::{MethodRejection, RequestId};
 use senpi_desktop_core::protocol_params::{
     AdvanceClockParams, CancelParams, EmptyParams, StopPathResumeParams, StopPathStartParams, StopPathStopParams,
@@ -36,7 +36,18 @@ impl Engine {
     }
 
     fn route_method(&self, method: Method, params: Value) -> Result<Route, Failure> {
-        let op = |op| Ok(Route::Session(SessionCall::Op(op)));
+        let op = |op| {
+            let widens_input = match method.spec().effect {
+                Effect::Read => false,
+                Effect::Exec => method != Method::ControlRevoke,
+            };
+            // Only pending stops bypass a potentially stuck worker. Committed
+            // stops keep normal session dispatch and its refusal audit.
+            if widens_input && self.stop_paths().supervisor().stop_pending() {
+                return Err(Failure::Engine(senpi_desktop_safety::GateError::Suspended.into()));
+            }
+            Ok(Route::Session(SessionCall::Op(op)))
+        };
         match method {
             Method::EngineHello => {
                 parse::<EmptyParams>(params)?;
@@ -107,6 +118,11 @@ impl Engine {
             }
             Method::StopPathResume => {
                 let token = parse::<StopPathResumeParams>(params)?.token;
+                if self.shared_agent() {
+                    return Err(Failure::Engine(senpi_desktop_core::error::DesktopError::permission_denied(
+                        "a connection cannot clear the shared agent stop latch",
+                    )));
+                }
                 let resumed = self.stop_paths().resume(&token).map_err(Failure::Engine);
                 Ok(self.stop_path_changed(resumed.and_then(to_result)))
             }

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { ReattachOutcomeInfo, TransportLostInfo } from "./rpc-host/handle-reattach"
 import { isHostSessionHandle } from "./rpc-host"
 import { childSpec, ensuredDaemon, hostRunnerHarness } from "./rpc-host.test-support"
+import { bounded } from "../lifecycle/__fixtures__/live-parent-clock"
 
 // Todo 10: the runner tells the parent's crash notice when each child starts recovering from a lost
 // host and how that recovery ended, without changing what recovery does.
@@ -63,16 +64,21 @@ describe("RpcHostRunner shard events", () => {
     const seen = recorder()
     const runner = runnerOver(host, { ...NO_WAIT, shardEvents: seen.events })
     const handle = await runner.start(childSpec())
+    if (!isHostSessionHandle(handle)) throw new Error("the child did not open on the host")
+    const parked = Promise.withResolvers<string>()
+    handle.onParked((event) => parked.resolve(event.reason))
 
     // when
     host.crash()
-    const reported = await seen.outcome
+    const reported = await bounded(seen.outcome)
 
     // then
     expect(seen.lost.map((info) => info.turnWasInFlight)).toEqual([true])
     expect(reported.outcome).toBe("lost")
     expect(reported.newInstanceId).toBeUndefined()
-    expect((await handle.waitForExit()).kind).toBe("crashed")
+    expect(await bounded(parked.promise)).toBe("daemon_unavailable")
+    expect(handle.exitOutcome()).toBeUndefined()
+    await handle.dispose?.()
   })
 
   test("#given two children on one host generation #when it dies #then the FIRST loss already names both and the supervisor the runner ensured", async () => {

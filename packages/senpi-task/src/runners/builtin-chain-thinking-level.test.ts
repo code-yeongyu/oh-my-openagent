@@ -94,6 +94,7 @@ describe("builtin category chains run at a thinking level the model accepts (#93
     { machine: ["opencode-go"], category: "quick", model: "opencode-go/minimax-m3", effort: "low", why: "the quick lane's own level" },
     { machine: ["xiaomi"], category: "unspecified-low", model: "xiaomi/mimo-v2.6-pro", effort: "high", why: "the level it already ran at" },
     { machine: ["alibaba-token-plan"], category: "unspecified-low", model: "alibaba-token-plan/qwen3.8-max-preview", effort: "high", why: "the level it already ran at" },
+    { machine: ["zai"], category: "unspecified-low", model: "zai/glm-5.3", effort: "high", why: "its GLM rung's level (#10306)" },
   ])("#given only $machine is logged in #when $category starts a child #then it runs $model at $effort, $why", async ({ machine: providers, category, model, effort }) => {
     // given: every rung ahead of the expected one is served by a provider this machine lacks
     const machine = await machineLoggedInTo(providers)

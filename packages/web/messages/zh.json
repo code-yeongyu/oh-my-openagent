@@ -27,7 +27,8 @@
     "discord": "Discord",
     "x": "X @justsisyphus",
     "privacy": "隐私政策",
-    "terms": "服务条款"
+    "terms": "服务条款",
+    "language": "语言"
   },
   "landing": {
     "hero": {
@@ -37,6 +38,7 @@
       "getStarted": "开始使用",
       "readManifesto": "阅读宣言",
       "downloadDesktop": "下载桌面应用",
+      "downloadDesktopBeta": "下载桌面应用测试版",
       "installLabel": "一条命令，一个工具"
     },
     "command": {
@@ -178,13 +180,6 @@
       "subtitle": "安装 OmO，打开项目，说出要做的事。设置就这么多。",
       "installNow": "立即安装",
       "readTheDocs": "阅读文档"
-    },
-    "dori": {
-      "eyebrow": "剧透",
-      "title": "你睡觉的时候，有人一直在干活。",
-      "body": "不是 OmO。是同一群人请来的新同事。他不下班，工资用 token 结算。",
-      "cta": "认识 Dori",
-      "alt": "从页面底部探出头来、手里拿着石头的白色小狗 Dori"
     },
     "dag": {
       "region": "打开工作流图的 OmO 桌面端",

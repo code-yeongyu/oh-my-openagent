@@ -15,10 +15,10 @@ class Host extends FakeExtensionAPI {
   async executeTool() { return { content: [] } }
 }
 
-test.each(["linux", "win32"])("status preserves %s-arm64 absence after failed first use without acquisition", async (platform) => {
+test.each([["linux", "riscv64"], ["win32", "ia32"]])("status preserves %s-%s absence after failed first use without acquisition", async (platform, arch) => {
   const root = mkdtempSync(join(tmpdir(), "cu-unsupported-"))
   const pi = new Host()
-  const locator = { platform, arch: "arm64", execDir: root, repoRoot: root, packageDir: root, runtimeDir: "" }
+  const locator = { platform, arch, execDir: root, repoRoot: root, packageDir: root, runtimeDir: "" }
   let starts = 0
   const messages: string[] = []
   const fetch = spyOn(globalThis, "fetch").mockImplementation(Object.assign(() => {
@@ -55,7 +55,7 @@ test.each(["linux", "win32"])("status preserves %s-arm64 absence after failed fi
     expect(starts).toBe(1)
     expect(messages.at(-1)).toContain("native-unavailable")
     await handler("status", ctx)
-    expect(messages.at(-1)).toContain(`No senpi-desktop-engine is built for ${platform}-arm64`)
+    expect(messages.at(-1)).toContain(`No senpi-desktop-engine is built for ${platform}-${arch}`)
     expect(messages.at(-1)).toContain("engine: native-unavailable")
     expect(starts).toBe(1)
     expect(fetch).not.toHaveBeenCalled()

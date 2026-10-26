@@ -7,6 +7,7 @@ export type TaskReader = { get(taskId: string): TaskRecord | undefined }
 const PHASES: Record<TaskStatus, HandlePhase> = {
   pending: "pending",
   running: "pending",
+  paused: "pending",
   completed: "succeeded",
   error: "failed",
   cancelled: "cancelled",

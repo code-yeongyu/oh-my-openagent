@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { buildChildContext } from "./session-context"
-import { readMemberSessionIdentity, readSessionAncestry, readSessionRole } from "./session-role"
+import { readMemberSessionIdentity, readSessionAncestry, readSessionRole, readSessionTraceparent } from "./session-role"
 import type { RpcSpawnSpec } from "../rpc/spawn"
 
 const NO_ENV: NodeJS.ProcessEnv = {}
@@ -110,5 +110,35 @@ describe("readSessionAncestry (#9036)", () => {
 
     // when / then
     expect(readSessionAncestry({ sessionContext: context }, NO_ENV)).toEqual({ depth: 2, rootSessionId: "root" })
+  })
+})
+
+describe("readSessionTraceparent", () => {
+  const delegating = "00-4bf92f3577b34da6a3ce929d0e0e4736-b7ad6b7169203331-01"
+  const stale = "00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01"
+
+  test("#given a child spec carrying the delegating turn's traceparent #when the daemon context is built #then the reader recovers it, ignoring a stale process env", () => {
+    // given
+    const context = buildChildContext({ task_id: "st_1", cwd: "/p", state_dir: "/s", prompt: "work", traceparent: delegating }).context
+
+    // when / then
+    expect(readSessionTraceparent({ sessionContext: context }, { OMO_SENPI_TASK_RPC_CHILD: "1", OMO_SENPI_TASK_TRACEPARENT: stale }))
+      .toBe(delegating)
+  })
+
+  test("#given a daemon child launched without one #when read #then there is none, even with a stale env value", () => {
+    // given
+    const context = buildChildContext({ task_id: "st_1", cwd: "/p", state_dir: "/s", prompt: "work" }).context
+
+    // when / then
+    expect(context["traceparent"]).toBeUndefined()
+    expect(readSessionTraceparent({ sessionContext: context }, { OMO_SENPI_TASK_RPC_CHILD: "1", OMO_SENPI_TASK_TRACEPARENT: stale }))
+      .toBeUndefined()
+  })
+
+  test("#given the per-child process env #when read #then only an omo-spawned child adopts it; an ordinary session ignores the variable", () => {
+    // given / when / then
+    expect(readSessionTraceparent({}, { OMO_SENPI_TASK_RPC_CHILD: "1", OMO_SENPI_TASK_TRACEPARENT: delegating })).toBe(delegating)
+    expect(readSessionTraceparent({}, { OMO_SENPI_TASK_TRACEPARENT: delegating })).toBeUndefined()
   })
 })

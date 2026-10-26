@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { wireHarness } from "./event-bridge.test-harness"
-import { taskRecord } from "./event-bridge.test-fixtures"
+import { fakeSummary, taskRecord } from "./event-bridge.test-fixtures"
 
 afterEach(() => { stderr?.mockRestore() })
 let stderr: ReturnType<typeof spyOn<typeof process.stderr, "write">> | undefined
@@ -66,4 +66,32 @@ describe("shutdown background notice", () => {
       expect(stderr).not.toHaveBeenCalled()
     })
   }
+
+  // A session whose own task was stopped can never be resumed (#10818): there is nothing to collect there.
+  test("#given the session's own task was stopped #when its session quits #then no 'resume to collect' notice is shown", async () => {
+    const summary = { ...fakeSummary, stopped_owner: "st_000000b0" }
+    const { pi } = wireHarness("parent-session", { records: children(), summary })
+    const notices: string[] = []
+    await pi.dispatch("session_shutdown", { reason: "quit" }, {
+      hasUI: true, mode: "interactive", ui: { notify: (message: string) => notices.push(message) },
+    })
+    expect(notices).toEqual([])
+  })
+
+  test("#given a stopped owner whose children failed to stop #when its session quits #then one warning counts only the children that ever started", async () => {
+    const records = {
+      st_000000a1: taskRecord({ task_id: "st_000000a1", status: "running", runner_kind: "host-session", started_at: "2026-10-22T00:00:00.000Z" }),
+      st_000000a2: taskRecord({ task_id: "st_000000a2", status: "running", runner_kind: "host-session", started_at: "2026-10-22T00:00:00.000Z" }),
+      st_000000a3: taskRecord({ task_id: "st_000000a3", status: "cancelled", execution_mode: "process" }),
+    }
+    const failures = ["st_000000a1", "st_000000a2", "st_000000a3"].map((task_id) => ({ task_id, error: "close_session failed" }))
+    const { pi } = wireHarness("parent-session", { records, summary: { ...fakeSummary, failures, stopped_owner: "st_000000b0" } })
+    const notices: Array<{ message: string; level: string | undefined }> = []
+    await pi.dispatch("session_shutdown", { reason: "quit" }, {
+      hasUI: true, mode: "interactive", ui: { notify: (message: string, level?: string) => notices.push({ message, level }) },
+    })
+    expect(notices).toHaveLength(1)
+    expect(notices[0]?.level).toBe("warning")
+    expect(notices[0]?.message.startsWith("2 ")).toBe(true)
+  })
 })

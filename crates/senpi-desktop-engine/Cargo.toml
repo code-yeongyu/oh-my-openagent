@@ -23,8 +23,13 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["io-std", "macros", "sync", "time"] }
 ulid.workspace = true
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
+libc.workspace = true
 senpi-desktop-backend-macos = { path = "../senpi-desktop-backend-macos" }
+senpi-desktop-xpc = { path = "../senpi-desktop-xpc" }
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 core-graphics.workspace = true

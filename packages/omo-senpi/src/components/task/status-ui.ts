@@ -5,6 +5,7 @@ import {
   HOST_TURN_RESUMED_EVENT,
   type ListScope,
   type ListedTask,
+  type LiveRunStats,
   type ManagedChildEvent,
   type TaskRecord,
   type TaskRunStats,
@@ -18,6 +19,8 @@ import {
   isTerminal,
   LIVE_STATUS_REFRESH_MS,
 } from "./status-row-format"
+import { createTreeCostFeed } from "./subagent-cost-feed"
+import type { StoreMutation } from "./store-mutation-observer"
 
 export { buildWidgetRows, formatTaskRow } from "./status-row-format"
 
@@ -34,6 +37,8 @@ export interface StatusUiManager {
   subscribeChild?(taskId: string, listener: (event: ManagedChildEvent) => void): () => void
   // In-flight turns/tools/tok-s for a live child; absent rows simply omit the stats tokens.
   runStatsSnapshot?(taskId: string): TaskRunStats | undefined
+  // In-flight stats tagged with their run, for the footer's subagent tree cost (senpi#2471).
+  liveRunStats?(taskId: string): LiveRunStats | undefined
 }
 
 // The captured-UI facts the sync reads: the live ui handle (undefined when none is captured, so every
@@ -70,6 +75,8 @@ export interface TaskStatusUi {
   scheduleSync(): void
   // Immediate render (used on session/model events and internally by the debounce timer).
   syncNow(): void
+  // One store mutation (from the store wrapper): updates the footer's subagent tree cost in place.
+  observeRecord(change: StoreMutation): void
   // Cancel any pending debounce timer so shutdown does not leave a render scheduled past teardown.
   dispose(): void
 }
@@ -89,6 +96,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   let pending: TimerHandle | undefined
   let liveRefresh: TimerHandle | undefined
   const reportedRenderFaults = new Set<string>()
+  const treeCost = createTreeCostFeed(deps)
 
   // Render runs from bare timer callbacks; an uncontained throw escapes as an uncaughtException
   // and kills the host process (the beta.20 pi-tui incident). Warn once per distinct fault so the
@@ -215,6 +223,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   }
 
   function dispose(): void {
+    treeCost.dispose()
     if (pending !== undefined) {
       timers.clear(pending)
       pending = undefined
@@ -226,7 +235,15 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     cachedRecords = []
   }
 
-  return { scheduleSync, syncNow: () => containRenderFault(syncNow), dispose }
+  return {
+    scheduleSync,
+    syncNow: () => containRenderFault(() => {
+      treeCost.ensureSeeded()
+      syncNow()
+    }),
+    observeRecord: (change) => containRenderFault(() => treeCost.observe(change)),
+    dispose,
+  }
 }
 
 function activityFromEvent(event: ManagedChildEvent): string | undefined {

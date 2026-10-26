@@ -6,6 +6,8 @@ const BOOKKEEPING_CUSTOM_TYPES = new Set([
   "senpi.hooks.stop-state",
   "pi-rules.scan",
   "senpi-memory.session-binding",
+  "rpc_client_message_admission",
+  "rpc_effect",
 ])
 
 export async function sessionTailNeedsContinuation(
@@ -13,10 +15,7 @@ export async function sessionTailNeedsContinuation(
   ignoredUserPrompt?: string,
 ): Promise<boolean> {
   try {
-    const tail = await readConversationTail(sessionPath)
-    if (tail === undefined) return false
-    if (tail.turnUser !== undefined && isIgnoredUserPrompt(tail.turnUser, ignoredUserPrompt)) return false
-    return messageNeedsContinuation(tail.lastMessage)
+    return tailNeedsContinuation(await readConversationTail(sessionPath), ignoredUserPrompt)
   } catch {
     return false
   }
@@ -44,18 +43,27 @@ export async function sessionTailContinuationBlocker(sessionPath: string): Promi
  */
 export async function sessionTailFinishedText(sessionPath: string): Promise<string | undefined> {
   try {
-    const tail = await readConversationTail(sessionPath)
-    const last = tail?.lastMessage
-    if (last === undefined || last.role !== "assistant" || last.stopReason !== "stop") return undefined
-    if (messageNeedsContinuation(last) || !Array.isArray(last.content)) return undefined
-    const text = last.content
-      .filter((part): part is { type: "text"; text: string } => isRecord(part) && part.type === "text" && typeof part.text === "string")
-      .map((part) => part.text)
-      .join("")
-    return text.length > 0 ? text : undefined
+    return tailFinishedText(await readConversationTail(sessionPath))
   } catch {
     return undefined
   }
+}
+
+function tailNeedsContinuation(tail: ConversationTail | undefined, ignoredUserPrompt?: string): boolean {
+  if (tail === undefined) return false
+  if (tail.turnUser !== undefined && isIgnoredUserPrompt(tail.turnUser, ignoredUserPrompt)) return false
+  return messageNeedsContinuation(tail.lastMessage)
+}
+
+function tailFinishedText(tail: ConversationTail | undefined): string | undefined {
+  const last = tail?.lastMessage
+  if (last === undefined || last.role !== "assistant" || last.stopReason !== "stop") return undefined
+  if (messageNeedsContinuation(last) || !Array.isArray(last.content)) return undefined
+  const text = last.content
+    .filter((part): part is { type: "text"; text: string } => isRecord(part) && part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("")
+  return text.length > 0 ? text : undefined
 }
 
 function messageNeedsContinuation(message: SessionMessageEntry["message"]): boolean {
@@ -68,13 +76,36 @@ function messageNeedsContinuation(message: SessionMessageEntry["message"]): bool
 }
 
 type TailVerdict =
-  | { readonly kind: "message"; readonly message: SessionMessageEntry["message"] }
+  | { readonly kind: "message"; readonly message: SessionMessageEntry["message"]; readonly entryId?: string }
+  | { readonly kind: "end"; readonly event: Record<string, unknown> }
   | { readonly kind: "skip" }
   | { readonly kind: "stop" }
 
-type ConversationTail = {
+export type ConversationTail = {
   readonly lastMessage: SessionMessageEntry["message"]
   readonly turnUser?: SessionMessageEntry["message"]
+  readonly entryId?: string
+  readonly endEvent?: Record<string, unknown>
+}
+
+export async function sessionTailReconciliation(
+  sessionPath: string,
+  ignoredUserPrompts: readonly string[] = [],
+): Promise<(ConversationTail & { readonly finishedText?: string; readonly needsContinuation: boolean; readonly endsAtIgnoredUserPrompt: boolean }) | undefined> {
+  try {
+    const tail = await readConversationTail(sessionPath)
+    if (tail === undefined) return undefined
+    return {
+      ...tail,
+      finishedText: tailFinishedText(tail),
+      needsContinuation: tailNeedsContinuation(tail) && ignoredUserPrompts.every(prompt => tailNeedsContinuation(tail, prompt)),
+      endsAtIgnoredUserPrompt: tail.lastMessage.role === "user" &&
+        ignoredUserPrompts.some(prompt => isIgnoredUserPrompt(tail.lastMessage, prompt)),
+    }
+  } catch (error) {
+    if (error instanceof SyntaxError || (error instanceof Error && "code" in error && error.code === "ENOENT")) return undefined
+    throw error
+  }
 }
 
 // Walk back from the ACTUAL final non-empty JSONL record over bookkeeping entries to the last
@@ -95,6 +126,8 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
     let bytes = Math.min(size, INITIAL_TAIL_BYTES)
     let processedTailLines = 0
     let lastMessage: SessionMessageEntry["message"] | undefined
+    let entryId: string | undefined
+    let endEvent: Record<string, unknown> | undefined
     for (;;) {
       const start = size - bytes
       const buffer = Buffer.allocUnsafe(bytes)
@@ -108,21 +141,23 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
         const line = complete[index]?.trim() ?? ""
         if (line.length === 0) continue
         const verdict = classifyRecord(line)
+        if (verdict.kind === "end" && endEvent === undefined) endEvent = verdict.event
         if (verdict.kind === "message") {
           if (lastMessage === undefined) {
             lastMessage = verdict.message
-            if (!messageNeedsContinuation(lastMessage)) return { lastMessage }
+            entryId = verdict.entryId
+            if (!messageNeedsContinuation(lastMessage)) return { lastMessage, entryId, endEvent }
           }
           if (verdict.message.role === "user") {
-            return { lastMessage, turnUser: verdict.message }
+            return { lastMessage, turnUser: verdict.message, entryId, endEvent }
           }
           if (verdict.message.role === "assistant" && !messageNeedsContinuation(verdict.message)) {
-            return { lastMessage }
+            return { lastMessage, entryId, endEvent }
           }
         }
         if (verdict.kind === "stop" && lastMessage === undefined) return undefined
       }
-      if (start === 0) return lastMessage === undefined ? undefined : { lastMessage }
+      if (start === 0) return lastMessage === undefined ? undefined : { lastMessage, entryId, endEvent }
       processedTailLines = complete.length
       bytes = Math.min(size, bytes * 2)
     }
@@ -133,17 +168,26 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
 
 function classifyRecord(line: string): TailVerdict {
   const parsed: unknown = JSON.parse(line)
-  if (isSessionMessageEntry(parsed)) return { kind: "message", message: parsed.message }
+  if (isSessionMessageEntry(parsed)) return {
+    kind: "message", message: parsed.message,
+    ...(typeof parsed.id === "string" ? { entryId: parsed.id } : {}),
+  }
+  if (isRecord(parsed) && parsed.type === "agent_end") return { kind: "end", event: parsed }
+  if (isRecord(parsed) && parsed.type === "custom" && isRecord(parsed.data) && parsed.data.type === "agent_end") {
+    return { kind: "end", event: parsed.data }
+  }
   if (isNamedBookkeepingEntry(parsed)) return { kind: "skip" }
   return { kind: "stop" }
 }
 
 type SessionMessageEntry = {
   readonly type: "message"
+  readonly id?: string
   readonly message: {
     readonly role?: string
     readonly content?: unknown
     readonly stopReason?: string
+    readonly errorMessage?: string
   }
 }
 

@@ -33,6 +33,15 @@ export function dagEventLane(type: DagRunEventType): DagEventLane {
     case "dag.definition.amended":
     case "dag.diagnostic.added":
     case "dag.stream.overflow":
+    case "dag.guidance.added":
+    case "dag.guidance.edited":
+    case "dag.guidance.removed":
+    case "dag.guidance.dispatching":
+    case "dag.guidance.delivered":
+    case "dag.node.cancel_requested":
+    case "dag.node.retry-staged":
+    case "dag.node.pause-recovered":
+    case "dag.node.pause-lost":
       return "boundary"
     default: {
       const exhaustive: never = type
@@ -152,12 +161,14 @@ export function dagNodeRetriedEvent(input: {
   priorTaskId?: string
   execAttempt: number
   promptChanged: boolean
+  automatic?: Extract<DagRunEventPayload, { readonly type: "dag.node.retried" }>["automatic"]
 }): DagRunEventPayload {
   const payload: DagRunEventPayload = {
     type: "dag.node.retried",
     nodeId: input.nodeId,
     execAttempt: input.execAttempt,
     promptChanged: input.promptChanged,
+    ...(input.automatic === undefined ? {} : { automatic: input.automatic }),
   }
   if (input.priorTaskId !== undefined) {
     return { ...payload, priorTaskId: input.priorTaskId }

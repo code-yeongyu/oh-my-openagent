@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { telemetryLocalSinkEnv, withTelemetryOptOut } from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { mockProviderSource, pluginRoot, prompts } from "./omo-native-telemetry-provider.mjs"
 
 export function createSandbox(label, configEnabled) {
@@ -58,13 +59,13 @@ function cleanEnvironment(sandbox, port, extraEnv) {
     env[key] = value
   }
   return {
-    ...env,
+    ...withTelemetryOptOut(env),
+    ...telemetryLocalSinkEnv(`http://127.0.0.1:${port}`),
     ...extraEnv,
     HOME: sandbox.home,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     SENPI_CODING_AGENT_SESSION_DIR: sandbox.sessionDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-    POSTHOG_HOST: `http://127.0.0.1:${port}`,
     POSTHOG_API_KEY: "phc_test",
     OMO_SENPI_QA: "1",
     PI_OFFLINE: "1",

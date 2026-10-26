@@ -13,12 +13,13 @@ import {
 } from "./compile-runtime"
 import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
-import { compiledUpdate, fetchGitHubReleases, releaseAssetName, RELEASES_URL } from "./compiled-update"
+import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
+import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
-import { runServiceAuthCommand } from "../omo-opencode/src/cli/service-auth/commands"
+import { runServiceAuthCommand, SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
@@ -27,12 +28,14 @@ import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
 import { runSetup } from "./bin/lib/setup-import.js"
 import { runCompiledDoctor, type CompiledDoctorOptions } from "./compiled-doctor"
-import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
+import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine, loadCompiledModelCatalog } from "./compiled-diagnostic-runtime"
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
+import { runAccountCommand } from "./account-cli"
+import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
 import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
@@ -138,6 +141,14 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     await runServiceAuthCommand(args)
     return true
   }
+  if (args[0] === "sync") {
+    await runSyncCommand(args)
+    return true
+  }
+  if (args[0] === "account") {
+    await runAccountCommand(args)
+    return true
+  }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
   migrateLegacyBunGlobalManifest(execDir)
   adoptLegacyFlatState()
@@ -226,6 +237,8 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     await (migration.runSetup ?? runSetup)(args.slice(1), {
       loadCoverageRuntime: compiledDiagnosticRuntimeLoader(compiledPackageRoot ?? execDir),
       loadCoverageEngine: loadCompiledCoverageEngine,
+      loadModelCatalog: loadCompiledModelCatalog,
+      pluginRoot: join(compiledPackageRoot ?? execDir, "plugin"),
     })
     return true
   }
@@ -239,7 +252,7 @@ export { reexecProvisionedRuntime } from "./provisioned-handoff"
 const HELP_WITHOUT_ENGINE = `Usage: omo [options] [message...]
        omo <command> [args]
 
-Some commands: setup, doctor, update, daemon, thread, login, logout, whoami
+Some commands: setup, doctor, update, daemon, thread${SERVICE_ACCOUNTS_OPEN ? ", login, logout, whoami" : ""}
 
 The full command and option list, including what extensions add, needs the engine, which does
 not start while OMO_EXTRA_CA_CERTIFICATES is invalid. Fix or unset it, then run omo --help again.`
@@ -265,6 +278,8 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  // The #10697 plaintext file goes before ANY command, including the answers below that return early.
+  removeLegacyServiceCredentials()
   // Before anything opens TLS, and on every start: `host ensure`, the host daemon and the
   // provisioned handoff all re-enter here (#10215). A bad value refuses to start (exit 78). Only the
   // exact argv `--version` or `--help` is answered, from static local data, before anything else runs
@@ -315,6 +330,7 @@ async function main(): Promise<void> {
       arch: process.arch,
       fetchReleases: fetchGitHubReleases,
       args: process.argv.slice(2),
+      probeOwner: probePackageOwner,
     })
     ;(result.stream === "stderr" ? console.error : console.log)(result.output)
     process.exitCode = result.exitCode

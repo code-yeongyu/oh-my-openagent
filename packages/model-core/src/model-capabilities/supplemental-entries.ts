@@ -1,6 +1,8 @@
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
+import { FABLE_55_LAUNCH } from "../fable-55-launch"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
+	[FABLE_55_LAUNCH.id]: FABLE_55_LAUNCH,
 	"kimi-k3": {
 		id: "kimi-k3",
 		family: "kimi",

@@ -14,6 +14,8 @@ export class R2UploadError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code: string = "UnknownError",
+    readonly requestId: string | null = null,
   ) {
     super(message)
     this.name = "R2UploadError"
@@ -61,5 +63,13 @@ export async function putVerified(
 ): Promise<void> {
   const { url, headers } = signPut(credentials, key, sha256Hex, metadata)
   const response = await fetch(url, { method: "PUT", body: file, headers: { ...headers, "content-length": String(file.size) } })
-  if (!response.ok) throw new R2UploadError(`PUT ${key} -> ${response.status} ${(await response.text()).slice(0, 300)}`, response.status)
+  if (!response.ok) {
+    const body = await response.text()
+    const redact = (value: string) => value.replaceAll(credentials.secretAccessKey, "<redacted>").replaceAll(credentials.accessKeyId, "<redacted>")
+    const code = redact(/<Code>([^<]*)<\/Code>/.exec(body)?.[1] ?? "UnknownError")
+    const id = response.headers.get("x-amz-request-id") || /<RequestId>([^<]*)<\/RequestId>/.exec(body)?.[1] || response.headers.get("cf-ray") || null
+    const requestId = id === null ? null : redact(id)
+    const message = redact(`PUT ${key} -> HTTP ${response.status} ${code}: ${/<Message>([^<]*)<\/Message>/.exec(body)?.[1] ?? response.statusText}; requestId=${requestId ?? "(not provided)"}`)
+    throw new R2UploadError(message, response.status, code, requestId)
+  }
 }

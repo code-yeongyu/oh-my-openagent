@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { isolationDetails, isolationLine } from "../isolation/details"
 import { messageability } from "../state"
 import type { TaskRecord } from "../state"
+import { activeParentModelFallback } from "../manager/parent-model-rung"
+import { describeParentModelFallback } from "../parent-model-fallback-text"
 import { formatTargetWithModel } from "../status-line"
 import { formatRunDuration } from "../tools/run-stats-format"
 import {
@@ -16,6 +18,7 @@ import { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 import type { CompletionDetails, ParentNotifierMessage } from "./types"
 import { defaultTranscriptReader } from "../tools/output/transcript"
 import { renderTranscript } from "../tools/output/render"
+import { withParkedSteeringNotice } from "../state/queued-steering"
 
 export const FINAL_RESPONSE_TRANSPORT_LIMIT = 32_000
 
@@ -30,6 +33,9 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
   const runStats = record.run_stats
   const tokens = options.tokens ?? runStats?.total_tokens
   const base: CompletionDetails = {
+    runRef: record.owner?.kind === "dag" ? { kind: "dag", id: record.owner.runId }
+      : record.team_run_id !== undefined ? { kind: "team", id: record.team_run_id }
+        : { kind: "task", id: record.task_id },
     task_id: record.task_id,
     name: record.name ?? record.task_id,
     status: record.status,
@@ -43,6 +49,9 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
       ? {}
       : { fallback_models: record.fallback_models }),
     ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
+    ...(record.effective_model === undefined ? {} : { effective_model: record.effective_model }),
+    ...(record.parent_model === undefined ? {} : { parent_model: record.parent_model }),
+    ...(activeParentModelFallback(record) === undefined ? {} : { parent_model_fallback: activeParentModelFallback(record) }),
     duration_ms: durationMs(record),
     ...(runStats === undefined ? {} : { run_stats: runStats }),
     final_response: finalResponse.text,
@@ -77,14 +86,22 @@ export function completionMessageLines(details: readonly CompletionDetails[], wi
   return details.flatMap((detail) => completionDetailLines(detail, width))
 }
 
+// A completed task keeps sends it acknowledged but never delivered (#9861): they wait on the record
+// and go first on the next continuation. Pool assignments belong to their own admitted turn.
+function parkedSteeringCount(record: TaskRecord): number {
+  return (record.pending_steering ?? []).filter((entry) => entry.workpool === undefined).length
+}
+
 function finalResponseForNotification(record: TaskRecord, stateDir: string | undefined): { readonly text: string; readonly file?: string } {
   const entries = record.failure_kind === "suspended_unresumable" && stateDir !== undefined
     ? defaultTranscriptReader({ taskId: record.task_id, stateDir }).entries
     : []
   const tail = entries.length === 0 ? undefined : renderTranscript(entries, { mode: "tail", tailLines: 60 }).text
   const source = record.failure_kind === "suspended_unresumable"
-    ? [record.error_message, record.final_response, tail].filter(Boolean).join("\n\n")
-    : record.final_response ?? record.error_message ?? ""
+    ? [record.error_message, tail, record.final_response].filter(Boolean).join("\n\n")
+    : record.status === "completed"
+      ? withParkedSteeringNotice(record.final_response ?? record.error_message ?? "", parkedSteeringCount(record))
+      : record.final_response ?? record.error_message ?? ""
   if (source.length <= FINAL_RESPONSE_TRANSPORT_LIMIT) return { text: source }
   if (stateDir === undefined) return { text: source.slice(0, FINAL_RESPONSE_TRANSPORT_LIMIT) }
 
@@ -120,6 +137,7 @@ function completionDetailLines(detail: CompletionDetails, width: number | undefi
       category: detail.category,
       agentType: detail.agent_type,
       resolvedModel: detail.resolved_model,
+      effectiveModel: detail.effective_model,
       model: detail.model,
     }),
     fallbackToken(detail),
@@ -139,8 +157,11 @@ function completionDetailLines(detail: CompletionDetails, width: number | undefi
   const resultPrefix = 'result:"'
   const resultFilePrefix = "result_file:"
   const nextPrefix = "next:"
+  const parentModelPrefix = "model_note:"
+  const parentModel = describeParentModelFallback(detail.parent_model_fallback, detail.parent_model)
   return [
     ...summaryLines,
+    ...(parentModel === undefined ? [] : [`${parentModelPrefix}${excerptForWidth(parentModel, width, parentModelPrefix, "")}`]),
     ...(response.length === 0
       ? []
       : [`${resultPrefix}${excerptForWidth(response, width, resultPrefix, '"')}"`]),

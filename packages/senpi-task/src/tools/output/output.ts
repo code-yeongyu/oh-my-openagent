@@ -4,6 +4,7 @@ import type { Static } from "typebox"
 
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
+import { hostLivenessText } from "../../state/host-liveness"
 import { isolationLine } from "../../isolation/details"
 import { defaultResolveCallerSessionId, toolResult } from "../control"
 import { renderTaskOutputCall, renderTaskOutputResult, taskOutputModelText } from "./renderers"
@@ -121,6 +122,7 @@ function withNotices(text: string, deps: TaskOutputDeps): string {
 
 function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
+  if (snapshot.host_liveness !== undefined && snapshot.host_liveness.state !== "running") parts.push(hostLivenessText(snapshot.host_liveness))
   if (snapshot.lease !== undefined) parts.push(`lease: ${snapshot.lease}`)
   if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
   if (snapshot.awaiting_input !== undefined) parts.push(snapshot.awaiting_input.explanation)

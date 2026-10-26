@@ -1,23 +1,18 @@
-import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionClientOptions } from "./session-client-contract"
+import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionReplaced, HostSessionClientOptions } from "./session-client-contract"
 import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
-import { loadSenpiBarrel, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
+import type { SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { createChildExtensionEvents } from "../child-extension-events"
 import { socketAcceptsConnection } from "./busy-host"
-import { HostUnavailableError } from "./daemon"
 import { SESSION_PARKED_CAUSE } from "./exit-mapping"
+import { dispatchHostCommand } from "./host-command-dispatch"
 import {
-  assertHostUsable,
   createSenpiRpcClient,
   probeWithEngine,
-  RETRY_FALLBACK_PROFILE_CAPABILITY,
-  toWireOpen,
-  type HostPromptDisposition,
   type HostProtocolProbe,
-  type HostQueuedInputDisposition,
   type HostRpcClient,
   type HostRpcClientFactory,
   type HostSessionOpenInput,
@@ -27,13 +22,13 @@ import {
   isAgentSessionEvent,
   isRoutedTo,
   parseControlRecord,
-  toOpenFailure,
   type HostControlRecord,
 } from "./session-wire"
+import { createHostTaskParentWire } from "./task-parent-wire"
+import type { TaskParentWire } from "../task-parent-control"
+import { confirmHostSessionAbsent } from "./session-close-proof"
+import { openHostSessionConnection } from "./session-client-opening"
 
-
-// send() settles with no value: the runner does not consume the host's input disposition.
-const ignoreHostDisposition = (_disposition: HostPromptDisposition | HostQueuedInputDisposition): void => undefined
 
 /**
  * ONE senpi `RpcClient` per child, over the machine-wide daemon's public socket. The client probes
@@ -58,10 +53,14 @@ export class HostSessionClient {
   private readonly eventListeners = new Set<ChildEventListener>()
   private readonly parkedListeners = new Set<(event: HostSessionParked) => void>()
   private readonly closedListeners = new Set<(event: HostSessionClosed) => void>()
+  private readonly replacedListeners = new Set<(event: HostSessionReplaced) => void>()
   private client: HostRpcClient | undefined
+  // One wire per engine connection: a reattach's new connection declares task_parent again.
+  private readonly taskParentWires = new WeakMap<HostRpcClient, TaskParentWire>()
   private routingId: string | undefined
   private identity: SenpiHostProtocolInfo | undefined
   private reattached = false
+  private confirmingClose = false
 
   constructor(options: HostSessionClientOptions) {
     this.socketPath = options.socketPath
@@ -90,39 +89,14 @@ export class HostSessionClient {
   }
 
   async open(input: HostSessionOpenInput): Promise<OpenedHostSession> {
-    const probed = await this.probeProtocolInfo(this.socketPath)
-    if (probed === undefined && (await this.socketAccepts(this.socketPath))) {
-      throw new HostUnavailableError("host_busy", {
-        fallbackAllowed: false,
-        detail: "the daemon accepts connections but did not answer get_protocol_info",
-      })
-    }
-    const identity = assertHostUsable(probed)
-    const client = await this.createClient({
+    const { opened, identity, retryFallbackDropped } = await openHostSessionConnection(input, {
       socketPath: this.socketPath,
+      createClient: this.createClient,
+      probeProtocolInfo: this.probeProtocolInfo,
+      socketAccepts: this.socketAccepts,
       onDisconnect: (error) => this.handleTransportLoss(error),
-    })
-    client.onEvent((record) => this.ingest(record))
-    await client.start()
-    this.client = client
-    // An older host would ignore the field and run the child on its own settings; leave it off there
-    // and report that the chain was not applied, so the caller can say so once.
-    const profileHonored = identity.capabilities.includes(RETRY_FALLBACK_PROFILE_CAPABILITY)
-    const retryFallbackDropped = !profileHonored && input.retryFallback !== undefined
-    const wire = toWireOpen(profileHonored ? input : withoutRetryFallback(input))
-    const opened = await client.openSession(wire).catch(async (error: unknown) => {
-      this.client = undefined
-      await client.stop()
-      // The host went away with the open in flight: that is an unreachable host, not a session the
-      // host refused, so the start failure carries the host reason instead of a bare session error.
-      const { isTransportGoneError } = await loadSenpiBarrel()
-      if (isTransportGoneError(error)) {
-        throw new HostUnavailableError("host_unreachable", {
-          fallbackAllowed: false,
-          detail: `the host went away during open_session: ${error instanceof Error ? error.message : String(error)}`,
-        })
-      }
-      throw toOpenFailure(error, input.sessionPath)
+      onEvent: (record) => this.ingest(record),
+      bindClient: (client) => { this.client = client },
     })
     this.identity = identity
     this.routingId = opened.sessionId
@@ -137,23 +111,16 @@ export class HostSessionClient {
   }
 
   send(command: HostSessionCommand): Promise<void> {
-    const client = this.connected(command.type)
-    switch (command.type) {
-      case "prompt":
-        return client.prompt(
-          command.message,
-          { ...(command.streamingBehavior === undefined ? {} : { streamingBehavior: command.streamingBehavior }),
-            ...(command.clientMessageId === undefined ? {} : { clientMessageId: command.clientMessageId }) },
-        ).then(ignoreHostDisposition)
-      case "steer":
-        return client.steer(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
-      case "followUp":
-        return client.followUp(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
-      case "abort":
-        return client.abort()
-      default:
-        return unreachable(command)
-    }
+    return dispatchHostCommand(this.connected(command.type), this.routingId, command)
+  }
+
+  taskParentWire(): TaskParentWire {
+    const client = this.connected("task_parent")
+    const known = this.taskParentWires.get(client)
+    if (known !== undefined) return known
+    const wire = createHostTaskParentWire(client)
+    this.taskParentWires.set(client, wire)
+    return wire
   }
 
   getState(): Promise<RpcSessionState> {
@@ -187,6 +154,11 @@ export class HostSessionClient {
     return () => this.closedListeners.delete(listener)
   }
 
+  onReplaced(listener: (event: HostSessionReplaced) => void): () => void {
+    this.replacedListeners.add(listener)
+    return () => this.replacedListeners.delete(listener)
+  }
+
   /** End the session on the host (`close_session`), then drop this child's connection. */
   async close(): Promise<void> {
     this.extensionEvents.clear()
@@ -195,7 +167,23 @@ export class HostSessionClient {
     this.client = undefined
     this.routingId = undefined
     if (client === undefined) return
-    if (routingId !== undefined) await client.closeSession(routingId)
+    try {
+      if (routingId !== undefined) await client.closeSession(routingId)
+    } finally {
+      await client.stop()
+    }
+  }
+
+  /** Only a live post-close host listing releases ownership; ACKs and frames are not proof. */
+  async closeConfirmed(): Promise<void> {
+    const client = this.connected("close_session")
+    const routingId = this.routingId
+    if (routingId === undefined) throw new HostSessionDetachedError("close_session")
+    this.confirmingClose = true
+    await confirmHostSessionAbsent(client, routingId, () => this.client === client)
+    this.extensionEvents.clear()
+    this.client = undefined
+    this.routingId = undefined
     await client.stop()
   }
 
@@ -232,20 +220,48 @@ export class HostSessionClient {
         this.answerUi(control)
         return
       case "session_parked": {
+        if (this.confirmingClose) return
         const sessionId = this.routingId ?? control.sessionId
         this.routingId = undefined
-        for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+        try {
+          for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+        } finally {
+          this.releaseEndedSession()
+        }
         return
       }
       case "session_closed": {
+        if (this.confirmingClose) return
         const sessionId = this.routingId ?? control.sessionId ?? ""
         this.routingId = undefined
-        for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
+        try {
+          for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
+        } finally {
+          this.releaseEndedSession()
+        }
+        return
+      }
+      case "session_replaced": {
+        // The host keeps the routing handle live across the swap: the child follows the new
+        // identity instead of ending, and the next reattach reopens the NEW transcript (F9).
+        const sessionId = this.routingId ?? control.sessionId ?? ""
+        for (const listener of this.replacedListeners) {
+          listener({ sessionId, durableSessionId: control.durableSessionId, sessionFile: control.sessionFile })
+        }
         return
       }
       default:
         unreachable(control)
     }
+  }
+
+  // Notify the handle first so it marks itself parked/exited before the client goes; the engine's
+  // deliberate stop() never fires onDisconnect, so this release cannot start a recovery attach.
+  // Detach only this session's client; retained transcripts and sibling attach holds stay intact.
+  private releaseEndedSession(): void {
+    void this.detach().catch((error: unknown) => {
+      log("senpi-task ended host session detach failed", { socket: this.socketPath, error: String(error) })
+    })
   }
 
   // The child must never wait on a human: the deny/cancel answer is written and NOT awaited, so a
@@ -267,9 +283,4 @@ export class HostSessionClient {
 
 function unreachable(value: never): never {
   throw new Error(`unhandled host session command: ${JSON.stringify(value)}`)
-}
-
-function withoutRetryFallback(input: HostSessionOpenInput): HostSessionOpenInput {
-  const { retryFallback: _retryFallback, ...rest } = input
-  return rest
 }

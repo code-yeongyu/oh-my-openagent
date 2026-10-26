@@ -4,8 +4,11 @@ export {
   COST_REPORT_STATUSES,
   DURATION_SOURCE_STATUSES,
   isSpawnSpecV1,
+  PARENT_MODEL_FALLBACK_REASONS,
   RESIDENCY_STATES,
   RESOLVED_MODEL_SOURCES,
+  EFFECTIVE_MODEL_SOURCES,
+  EFFECTIVE_MODEL_CHANGE_KINDS,
   RUNNER_KINDS,
   SUSPENSION_REASONS,
   TASK_STATUSES,
@@ -23,8 +26,15 @@ export type {
   HostSessionIdentity,
   LegacyProcessSpawnSpec,
   Messageability,
+  ParentModelFallback,
+  ParentModelFallbackPhase,
+  ParentModelFallbackReason,
   PendingSteeringEntry,
   ResidencyState,
+  EffectiveModelRecord,
+  EffectiveModelSource,
+  EffectiveModelChange,
+  EffectiveModelChangeKind,
   ResolvedModelRecord,
   ResolvedModelSource,
   RunnerKind,
@@ -37,6 +47,7 @@ export type {
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
+  LiveRunStats,
   TaskSpawnSpec,
   TaskStatus,
   TaskTransition,
@@ -50,7 +61,7 @@ export type { TaskId } from "./id"
 export { messageability } from "./messageability"
 export { isTransportLostMessage, TRANSPORT_LOST_REASON } from "./transport-loss"
 export { markRecordLostForReconciliation, transitionTaskRecord } from "./transitions"
-export { fenceRun, nextRunEpoch, type RunFence } from "./run-fence"
+export { currentRunStartEpoch, fenceRun, LEGACY_RUN_START_EPOCH, nextRunEpoch, type RunFence } from "./run-fence"
 export {
   TASK_START_FAILURE_KINDS,
   TASK_START_FAILURE_REASONS,

@@ -3,6 +3,7 @@
 // allow: SIZE_OK - PostHog telemetry tests share one client/env fixture; this release adds telemetry config regressions and future additions should split by capture path.
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
 import type {
   TelemetryCaptureMessage,
   TelemetryTransportFactory,
@@ -13,6 +14,7 @@ type CapturedPostHogMessage = TelemetryCaptureMessage
 type PostHogModule = Awaited<ReturnType<typeof importPostHogModule>>
 
 let activePostHogModule: PostHogModule | null = null
+let restoreTelemetryEnv: () => void
 
 async function importPostHogModule(): Promise<typeof import("./posthog")> {
   return import(`./posthog?test=${Date.now()}-${Math.random()}`)
@@ -60,12 +62,14 @@ function createCapturingTransportFactory(
 
 describe("posthog client creation", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     clearTelemetryEnv()
   })
 
   afterEach(() => {
     resetPostHogModuleTestSeams()
     clearTelemetryEnv()
+    restoreTelemetryEnv()
   })
 
   it("returns a no-op client when PostHog construction throws", async () => {
@@ -167,12 +171,14 @@ describe("posthog client creation", () => {
 
 describe("posthog disable env var parsing", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     clearTelemetryEnv()
   })
 
   afterEach(() => {
     resetPostHogModuleTestSeams()
     clearTelemetryEnv()
+    restoreTelemetryEnv()
   })
 
   const disableValues = ["TRUE", "True", "Yes", "YES", " 1 ", " true "]
@@ -265,12 +271,14 @@ describe("posthog disable env var parsing", () => {
 
 describe("posthog trackActive emission contract", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     clearTelemetryEnv()
   })
 
   afterEach(() => {
     resetPostHogModuleTestSeams()
     clearTelemetryEnv()
+    restoreTelemetryEnv()
   })
 
   it("emits exactly one omo_daily_active and never omo_hourly_active when captureDaily is true", async () => {

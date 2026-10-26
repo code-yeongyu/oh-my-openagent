@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 21, 2026
+Last updated: October 16, 2026
 
 This Privacy Policy explains how oh-my-opencode and oh-my-openagent collect, use, and protect information related to the published CLI package, the OpenCode plugin, and the project website or repository materials where they apply.
 
@@ -19,7 +19,7 @@ When anonymous telemetry is enabled, the Application may collect the following a
 - `omo_daily_active`, sent at most once per UTC day per machine when the plugin loads (`reason: "plugin_loaded"`) or when the `run` CLI is invoked (`reason: "run_started"`), used to estimate daily, weekly, and monthly active installations
 - `omo_codex_daily_active`, sent at most once per UTC day per machine when the `omo-codex` adapter is installed (`reason: "install_completed"`) or when its Codex plugin runtime fires on a Codex `SessionStart` hook (`reason: "session_start"`), with the same opt-out posture as `omo_daily_active`
 - Anonymous machine metadata bundled with that event, such as package version, plugin name, runtime, OS family, locale, and timezone
-- A pseudonymous installation identifier derived from a one-way hash of the local hostname
+- Pseudonymous installation identifiers: a random install id created and stored on your machine, and a one-way hash of the local hostname
 - The OmO Native event family for the omo-senpi adapter: anonymous product events such as session start, prompt classification buckets, turn token and cost totals, skill and feature usage, parallelism summaries, per-delegation aggregate metrics, and category configuration snapshots. Payloads contain only booleans, counters, buckets, and allowlisted enum values; the full schema is published in [senpi-telemetry.md](../reference/senpi-telemetry.md)
 - Per-delegation aggregate metrics for delegated subagent tasks: terminal status, category and model identifiers masked to a known list, durations, token and cost totals, and follow-up message counts. No task names, prompts, responses, error messages, or file paths are collected; custom category and model names are masked to `custom`
 - The device-reported timezone (an IANA zone name), sent with the session start event
@@ -96,3 +96,5 @@ We may update this Privacy Policy from time to time. Material updates will be re
 ## 9. Contact
 
 Questions about this Privacy Policy should be raised through the project repository issue tracker or the maintainer contact channels published in the repository.
+
+To request erasure of the telemetry recorded for your machine, or for any question that involves your telemetry identifier, use the repository's [private vulnerability reporting form](https://github.com/code-yeongyu/oh-my-openagent/security/advisories/new) (Security tab, "Report a vulnerability") instead of a public issue, and put the identifier only in that private report.

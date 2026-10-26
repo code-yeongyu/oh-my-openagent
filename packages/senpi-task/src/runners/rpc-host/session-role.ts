@@ -1,5 +1,5 @@
 import { isTeamMemberProcess } from "../../team/member-extension/identity"
-import { OMO_SENPI_TASK_DEPTH, OMO_SENPI_TASK_ROOT_SESSION_ID, OMO_SENPI_TASK_RPC_CHILD } from "../rpc/spawn"
+import { OMO_SENPI_TASK_DEPTH, OMO_SENPI_TASK_ROOT_SESSION_ID, OMO_SENPI_TASK_RPC_CHILD, OMO_SENPI_TASK_TRACEPARENT } from "../rpc/spawn"
 
 /**
  * The READER of what `buildChildContext` writes. One extension set serves every session of the
@@ -66,6 +66,19 @@ export function readSessionAncestry(pi: unknown, env: NodeJS.ProcessEnv = proces
   if (role !== undefined && role.length > 0) return childAncestry(context?.["depth"], context?.["root_session_id"])
   if (!isTeamMemberProcess(env) && env[OMO_SENPI_TASK_RPC_CHILD] !== "1") return undefined
   return childAncestry(env[OMO_SENPI_TASK_DEPTH], env[OMO_SENPI_TASK_ROOT_SESSION_ID])
+}
+
+/**
+ * The delegating turn's traceparent this omo-spawned session inherited, from the same two channels as
+ * its ancestry. An ordinary session never reads the variable, so an ambient value cannot parent it.
+ * Unvalidated: the telemetry consumer accepts only a well-formed W3C value.
+ */
+export function readSessionTraceparent(pi: unknown, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const context = readSessionContext(pi)
+  const role = context?.["role"]
+  if (role !== undefined && role.length > 0) return context?.["traceparent"]
+  if (!isTeamMemberProcess(env) && env[OMO_SENPI_TASK_RPC_CHILD] !== "1") return undefined
+  return env[OMO_SENPI_TASK_TRACEPARENT]
 }
 
 function childAncestry(depth: string | undefined, rootSessionId: string | undefined): SessionAncestry {

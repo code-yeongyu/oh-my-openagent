@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto"
+
 import type * as z from "zod"
 
 import { OmoConfigLayerSchema } from "../schema"
@@ -45,6 +47,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+// Retired top-level sections: accepted and dropped silently; compared by digest.
+export const RETIRED_SECTION_DIGESTS: ReadonlySet<string> = new Set([
+  "447f75a8ebdbdb79a57f0b8cebbfba183820cf54a8119ac01449b30499e5ef0e",
+  "4ea5ee68fea05586106890ded5733820bb77d919cda27bc4b8139b7cd33b8889",
+])
+
+function isRetiredSection(key: string): boolean {
+  return RETIRED_SECTION_DIGESTS.has(createHash("sha256").update(key.toLowerCase()).digest("hex"))
+}
+const HARNESS_BLOCKS = new Set(["[opencode]", "[native]", "[senpi]", "[codex]"])
+
 function sanitizeUnsafeKeys(
   value: unknown,
   path: readonly string[] = [],
@@ -66,6 +79,11 @@ function sanitizeUnsafeKeys(
   }
   const sanitized: Record<string, unknown> = {}
   for (const [key, entry] of Object.entries(value)) {
+    const isConfigContainer = path.length === 0
+      || (path.length === 1 && HARNESS_BLOCKS.has(path[0] ?? ""))
+      || (path.length === 2 && path[0] === "profiles")
+      || (path.length === 3 && path[0] === "profiles" && HARNESS_BLOCKS.has(path[2] ?? ""))
+    if (isConfigContainer && isRetiredSection(key)) continue
     if (isUnsafeObjectKey(key)) {
       issues.push({ keys: [key], path })
       continue

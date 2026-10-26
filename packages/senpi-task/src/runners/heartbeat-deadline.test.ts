@@ -105,7 +105,7 @@ for (const kind of ["stdio", "host"] as const) {
       settleWaiters: () => persisted.resolve(), tryRuntimeFallback: async () => false,
     })
     tracker.trackOutcome(record.task_id, managed, record.model, record.notification.run_epoch)
-    await clock.advance(40_000)
+    await clock.advance(kind === "host" ? 170_000 : 40_000)
     const waitForOutcome = h.handle.waitForOutcome
     if (waitForOutcome === undefined) throw new Error("the child handle did not expose its outcome wait")
     expect(await Promise.race([waitForOutcome(), Promise.resolve("still pending")]))
@@ -117,12 +117,15 @@ for (const kind of ["stdio", "host"] as const) {
       manager: { get: (id) => store.load(id) ?? undefined, list: () => store.list().records.map((record) => ({ record })) },
       stateDir: root,
     }, { task_id: record.task_id }, record.parent_session_id)
-    expect(output.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "text", text: expect.stringMatching(/Action: /) })]))
-    if (kind === "stdio") expect(h.terminated()).toBe(1)
+    expect(output.details).toMatchObject({ kind: "status", snapshot: { status: "error" } })
+    if (kind === "stdio") {
+      expect(h.terminated()).toBe(1)
+      expect(store.load(record.task_id)?.error_message).toContain("Action:")
+    }
     else {
-      expect(h.port.detaches).toBe(1)
-      expect(h.port.closes).toBe(0)
-      expect(h.port.sent).toEqual([])
+      expect(h.port.detaches).toBe(0)
+      expect(h.port.closes).toBe(1)
+      expect(h.port.sent).toEqual([{ type: "abort" }])
     }
     h.emit({ type: "agent_start" })
     h.emit({ type: "agent_end" })

@@ -4,6 +4,7 @@ import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocol
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
 import type { RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { HostUnavailableError, TASK_DAEMON_PROTOCOL_VERSION, TASK_DAEMON_REQUIRED_CAPABILITIES } from "./daemon"
+import type { HostRunHoldClient } from "./task-parent-wire"
 
 /**
  * How a child session reaches the daemon: the engine-client port omo depends on, the senpi adapter
@@ -16,12 +17,13 @@ export type HostPromptDisposition = Awaited<ReturnType<RpcClient["prompt"]>>
 export type HostQueuedInputDisposition = Awaited<ReturnType<RpcClient["steer"]>>
 
 /** omo's structural view of the engine's `RpcClient`; the pinned engine may predate its fields. */
-export interface HostRpcClient {
+export interface HostRpcClient extends HostRunHoldClient {
   start(): Promise<void>
   stop(): Promise<void>
   onEvent(listener: (record: unknown) => void): () => void
   openSession(options: HostOpenSessionWire): Promise<{ sessionId: string; attached?: boolean }>
   closeSession(sessionId?: string): Promise<void>
+  listSessions?(options: { include_workers: boolean }): Promise<readonly { sessionId: string }[]>
   sendExtensionUIResponse(response: RpcExtensionUIResponse): Promise<void>
   prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp"; clientMessageId?: string }): Promise<HostPromptDisposition>
   steer(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
@@ -31,6 +33,7 @@ export interface HostRpcClient {
   getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
+  setSessionContext(patch: Readonly<Record<string, string | number | boolean | null>>, sessionId?: string): Promise<void>
 }
 
 /** A session's own fallback policy, held in memory by the host (senpi `retry_fallback_profile`). */

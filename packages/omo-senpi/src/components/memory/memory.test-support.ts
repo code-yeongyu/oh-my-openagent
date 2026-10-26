@@ -13,11 +13,11 @@ export type SessionEntryFixture = {
 }
 
 export class MemoryFakeExtensionAPI extends FakeExtensionAPI {
-  readonly entries: Array<{ customType: string; data: unknown }> = []
+  readonly entries: Array<{ customType: string; data: unknown; options?: { readonly startupBookkeeping?: boolean } }> = []
   readonly entryRenderers: Array<{ customType: string; renderer: unknown }> = []
 
-  appendEntry(customType: string, data?: unknown): void {
-    this.entries.push({ customType, data })
+  appendEntry(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void {
+    this.entries.push(options === undefined ? { customType, data } : { customType, data, options })
   }
 
   registerEntryRenderer(customType: string, renderer: unknown): void {
@@ -29,12 +29,14 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
   return {
     enabled: true,
     agent: "auto",
+    auto_identity: "path",
     reflection: {
       enabled: true,
       trigger: { step_count: 25, on_compaction: true },
       merge: "auto",
       category: "quick",
       timeout_minutes: 15,
+      max_concurrent_runs: 1,
       sandbox: "auto",
     },
     nudge: { enabled: true, every_user_turns: 10 },
@@ -48,11 +50,13 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
       auto_select_max_chars: 150000,
     },
     people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
+    agreements: { enabled: true, needs_human_threshold: 3, max_items: 64 },
     soul: { edit_notice: true },
     write_notice: { enabled: true },
     sync: { enabled: true },
     search: { enabled: true },
     recall: { enabled: true, max_items: 2, category: "quick", event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }, sidecar_max_tokens: 48000, max_concurrent_wakes: 2, tool_budget: 8, query_expansion: false },
+    project_scope: { nudge: true, recall: true },
     projection: { max_entries_per_directory: 40, max_bytes: 24576 },
     compile_warn_tokens: 30000,
     agents: {},

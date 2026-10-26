@@ -13,6 +13,7 @@ import {
   normalizeRendererText,
   optionalRendererText,
 } from "./entry-renderers"
+import { locateReflectionChildLog } from "./child-log"
 import { childFailureCause } from "./failure-detail"
 import { reflectionRemediation } from "./remediation"
 
@@ -79,7 +80,8 @@ export async function emitReflectionParkAlert(
   if (park.parkedAt === undefined || nextProbeAt === undefined) return false
   if (!once(`${live.sessionId}:parked:${park.parkedAt}`)) return false
   const failure = park.lastFailure
-  const recommendation = reflectionRemediation(failure?.reason, failure?.detail)
+  const childLog = await locateReflectionChildLog(reflectionDir, failure?.runId)
+  const recommendation = reflectionRemediation(failure?.reason, failure?.detail, childLog)
   const cause = childFailureCause(failure?.detail)
   const entry: ReflectionParkedEntry = {
     schemaVersion: 1,

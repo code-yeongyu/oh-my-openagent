@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { log } from "@oh-my-opencode/utils"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
-import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
+import { HostSessionDetachedError, HostSessionUnresponsiveError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
 import type { SendDelivery, SendOutcome, SteeringPort } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
@@ -115,6 +115,8 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       || fresh.residency_state !== "resident" || queue === undefined || queue.length === 0) return false
     const handle = port.liveHandle(taskId)
     if (handle === undefined) return false
+    const liveness = handle.liveness?.()
+    if (liveness !== undefined && liveness.state !== "running") return false
     const delivered = new Set<string>()
     for (const entry of queue) {
       try {
@@ -126,6 +128,7 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
         })
         delivered.add(entry.id)
       } catch (error) {
+        if (error instanceof HostSessionUnresponsiveError) break
         log("senpi-task steering queued delivery failed", {
           taskId,
           error: error instanceof Error ? error.message : String(error),

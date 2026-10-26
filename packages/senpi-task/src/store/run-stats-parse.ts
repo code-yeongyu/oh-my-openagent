@@ -69,6 +69,7 @@ function readCostStatus(record: Record<string, unknown>): CostReportStatus | und
   if (status === undefined) return undefined
   switch (status) {
     case "reported":
+    case "partial":
     case "unavailable":
     case "invalid":
       return status

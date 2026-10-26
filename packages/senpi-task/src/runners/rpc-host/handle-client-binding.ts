@@ -1,7 +1,7 @@
 import type { ChildEventListener } from "../types"
 import type { ChildExtensionEvent } from "../child-extension-events"
 import type { HostSessionPort } from "./handle-port"
-import type { HostSessionClosed, HostSessionParked } from "./session-client"
+import type { HostSessionClosed, HostSessionParked, HostSessionReplaced } from "./session-client"
 
 export interface HandleClientBindingHost {
   currentPort(): HostSessionPort
@@ -10,6 +10,7 @@ export interface HandleClientBindingHost {
   onExtensionEvent?(event: ChildExtensionEvent): void
   onParked(event: HostSessionParked): void
   onClosed(event: HostSessionClosed): void
+  onReplaced?(event: HostSessionReplaced): void
   onTransportGone(port: HostSessionPort): void
 }
 
@@ -28,6 +29,10 @@ export function bindHostSessionPort(port: HostSessionPort, host: HandleClientBin
   })
   port.onClosed((event) => {
     if (host.currentPort() === port) host.onClosed(event)
+  })
+  port.onReplaced?.((event) => {
+    if (host.currentPort() !== port || !host.acceptsLifecycleEvent()) return
+    host.onReplaced?.(event)
   })
   void port.transportGone.then(() => host.onTransportGone(port))
 }

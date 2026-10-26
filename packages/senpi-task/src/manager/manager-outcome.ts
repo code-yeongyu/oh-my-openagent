@@ -3,10 +3,14 @@ import { log } from "@oh-my-opencode/utils"
 import type { SuspensionReason, TaskRecord, TaskRunStats, TaskTransition } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
+import type { HostSessionReplaced } from "../runners/rpc-host/session-client"
 import type { ForgetOptions } from "./types"
 import { terminalFailureMessage } from "./credential-failure"
 import { nowIso } from "./manager-helpers"
 import { createProvisionalExitTracker, type ExitConfirmationSchedule } from "./provisional-exit"
+import { settlePaused } from "./settle-paused"
+import type { ResumedChildTurn } from "../pause/ports"
+import { publishHostTaskStatus } from "./host-task-status"
 
 export type ManagedOutcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
 
@@ -39,6 +43,8 @@ export type OutcomeTrackerPorts = {
   // A cancel is waiting to stop this task: the run ends as cancelled, never as the failure the stop
   // causes. Settles once that cancel finished, whether or not its own record write landed.
   readonly stopSettlement?: (taskId: string) => Promise<void> | undefined
+  readonly pauseSettlement?: (taskId: string, epoch: number) => Promise<void> | undefined
+  readonly parkSlot?: (taskId: string, epoch: number) => void
   // Merges (or retains) an isolated child's clone. Awaited BEFORE the terminal record is written, so
   // every result builder - the foreground waiter, the completion notification, task_output - reads
   // one record that already carries merge_result. A late merge would publish "done" before the
@@ -47,7 +53,7 @@ export type OutcomeTrackerPorts = {
 }
 
 export type OutcomeTracker = {
-  readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number) => void
+  readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number, turn?: ResumedChildTurn) => void
   // The manager no longer owns this task's handle: stop watching it for parks.
   readonly release: (taskId: string) => void
 }
@@ -114,6 +120,7 @@ function errnoField(error: unknown, key: "code" | "syscall" | "path"): string | 
 
 export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker {
   const provisional = createProvisionalExitTracker(ports)
+  const turns = new Map<string, object>()
   // A terminal outcome is never lost to a persistence fault (#8050). When the store cannot write the
   // terminal record (Windows EPERM on the rename after the store's own retries), the run is still
   // settled: the residency is released through forget() and every waiter receives a synthesized
@@ -122,6 +129,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   function persistTerminal(taskId: string, owned: TaskRecord, timestamp: string, transition: TaskTransition): void {
     try {
       ports.store.transition(taskId, transition)
+      publishHostTaskStatus(ports.liveHandle(taskId), taskId, ports.tryLoad(taskId)?.status)
     } catch (error) {
       log("senpi-task manager terminal record write failed", {
         taskId,
@@ -181,10 +189,59 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   // that stays resident after its turn is exactly the session a host idle sweep parks.
   const parkWatches = new Map<string, () => void>()
 
+  // The host swapped the session under its live routing handle: the child keeps running on a NEW
+  // transcript and durable id, so the record follows - no park, no release. Nothing later may
+  // reattach-by-path into the abandoned transcript (F9).
+  function replaceOwned(taskId: string, handle: ManagedChildHandle, epoch: number, event: HostSessionReplaced): void {
+    if (ownedRecord(ports, taskId, handle, epoch) === null) return
+    ports.store.mutate(taskId, (fresh) => {
+      if (fresh.host_session === undefined) return fresh
+      return {
+        ...fresh,
+        host_session: { ...fresh.host_session, session_path: event.sessionFile },
+        child_session_id: event.durableSessionId,
+        updated_at: nowIso(ports.now),
+      }
+    })
+    ports.store.appendEvent(taskId, {
+      type: "replaced",
+      payload: { session_path: event.sessionFile, durable_session_id: event.durableSessionId },
+    })
+  }
+
+  // One replace watch per task beside the park watch: a resident child whose turn ended is exactly
+  // the session a raw client can still issue `new_session` on.
+  const replaceWatches = new Map<string, () => void>()
+
+  function watchReplaced(taskId: string, handle: ManagedChildHandle, epoch: number): void {
+    const stopReplaced = handle.onReplaced?.((event) => replaceOwned(taskId, handle, epoch, event))
+    const stopDurable = handle.onDurableSessionId?.((id) => stampDurableId(taskId, handle, epoch, id))
+    if (stopReplaced === undefined && stopDurable === undefined) return
+    replaceWatches.set(taskId, () => {
+      stopReplaced?.()
+      stopDurable?.()
+    })
+  }
+
+  // The open's own state read did not return the durable id, so this run stamped none at spawn; the
+  // first id its handle learns is this run's, and replaces whatever the record still carries from a
+  // predecessor run (a relaunch onto a new transcript, #10892). Each handle stamps once: a later report
+  // from the same handle is stale, and a known id moves only through replaceOwned (#10873).
+  const stampedDurableIds = new WeakSet<ManagedChildHandle>()
+  function stampDurableId(taskId: string, handle: ManagedChildHandle, epoch: number, id: string): void {
+    if (stampedDurableIds.has(handle) || ownedRecord(ports, taskId, handle, epoch) === null) return
+    stampedDurableIds.add(handle)
+    ports.store.mutate(taskId, (fresh) =>
+      fresh.child_session_id === id ? fresh : { ...fresh, child_session_id: id, updated_at: nowIso(ports.now) })
+  }
+
   function release(taskId: string): void {
+    turns.delete(taskId)
     provisional.release(taskId)
     parkWatches.get(taskId)?.()
     parkWatches.delete(taskId)
+    replaceWatches.get(taskId)?.()
+    replaceWatches.delete(taskId)
   }
 
   function watchParks(taskId: string, handle: ManagedChildHandle, epoch: number): void {
@@ -208,13 +265,24 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     persistTerminal(taskId, owned, timestamp, { type: "cancel", timestamp, ...(runStats === undefined ? {} : { run_stats: runStats }) })
   }
 
-  function trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number): void {
+  function trackOutcome(taskId: string, handle: ManagedChildHandle, model: string, epoch: number, turn?: ResumedChildTurn): void {
     watchParks(taskId, handle, epoch)
-    handle
-      .waitForOutcome()
+    watchReplaced(taskId, handle, epoch)
+    const tracking = {}
+    turns.set(taskId, tracking)
+    const outcomePromise = turn?.outcome ?? handle.waitForOutcome()
+    outcomePromise
       .then(async (outcome) => {
+        if (turns.get(taskId) !== tracking) return
         const stopped = ports.stopSettlement?.(taskId)
         if (stopped !== undefined) return await settleStopped(taskId, handle, model, epoch, stopped)
+        const paused = ports.pauseSettlement?.(taskId, epoch)
+        if (paused !== undefined) {
+          if (await settlePaused(ports, taskId, handle, epoch, paused)) return
+          if (turns.get(taskId) !== tracking) return
+          const stoppedNow = ports.stopSettlement?.(taskId)
+          if (stoppedNow !== undefined) return await settleStopped(taskId, handle, model, epoch, stoppedNow)
+        }
         const owned = ownedRecord(ports, taskId, handle, epoch)
         if (owned === null) return
         const timestamp = nowIso(ports.now)
@@ -222,15 +290,39 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         if (outcome.status === "error") {
           const input = { taskId, handle, model, epoch, outcome, runStats, timestamp }
           const commit = (): void => {
+            if (turns.get(taskId) !== tracking) return
             const stopped = ports.stopSettlement?.(taskId)
-            const settling = stopped === undefined
-              ? settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
-              : settleStopped(taskId, handle, model, epoch, stopped)
+            const paused = ports.pauseSettlement?.(taskId, epoch)
+            const settling = stopped !== undefined
+              ? settleStopped(taskId, handle, model, epoch, stopped)
+              : paused !== undefined
+                ? settlePaused(ports, taskId, handle, epoch, paused).then(handled => {
+                  if (!handled && turns.get(taskId) === tracking) return settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
+                })
+                : settleErrorOutcome({ ...input, timestamp: nowIso(ports.now) })
             void settling.catch((error: unknown) => {
               log("senpi-task manager error outcome tracking failed", { taskId, error: String(error) })
             })
           }
           if (!provisional.defer(input, owned, commit)) commit()
+          return
+        }
+
+        // The run stopped for a reason the parent did not ask for - another client's user abort (F10a,
+        // partial text kept) or its session being replaced (cause and message) - so it is terminal and
+        // resumable, never a failure: no fail transition, no failure notification, no runtime fallback.
+        if (outcome.status === "interrupted") {
+          ports.releaseSlot(taskId, model, epoch)
+          const settlingInterrupted = settleIsolationFor(ports, owned, false)
+          if (settlingInterrupted !== undefined) await settlingInterrupted
+          persistTerminal(taskId, owned, timestamp, {
+            type: "interrupt",
+            timestamp,
+            ...(outcome.message === undefined ? {} : { error_message: outcome.message }),
+            ...(outcome.cause === undefined ? {} : { interrupt_cause: outcome.cause }),
+            ...(outcome.finalResponse === undefined ? {} : { final_response: outcome.finalResponse }),
+            ...(runStats === undefined ? {} : { run_stats: runStats }),
+          })
           return
         }
 

@@ -100,6 +100,17 @@ describe("validateNudges", () => {
 })
 
 describe("PendingNudges", () => {
+  it("#given a project nudge with a readable source #when restored from disk #then its source and qualified ledger key survive", async () => {
+    const dir = await createPendingDir()
+    const source = join(dir, "project", "reference", "deploy.md")
+    const nudge = { path: "@project/child-1234abcd/reference/deploy.md", hint: "Nightly deployment.", source }
+    await new PendingNudges(dir).write("project-session", [nudge])
+
+    const restored = await new PendingNudges(dir).take("project-session")
+
+    expect(restored).toEqual([nudge])
+  })
+
   it("#given written nudges #when taken #then they return once and the file is gone", async () => {
     // given
     const dir = await createPendingDir()

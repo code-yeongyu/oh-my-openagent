@@ -5,12 +5,21 @@ export function withDroppedSteeringNotice(message: string, count: number): strin
 export function withDroppedSteeringNotice(message: string | undefined, count: number): string | undefined
 export function withDroppedSteeringNotice(message: string | undefined, count: number): string | undefined {
   if (count === 0) return message
-  const notice = `${count} queued message${count === 1 ? " was" : "s were"} not delivered.`
+  const notice = `${count} queued message${count === 1 ? " was" : "s were"} not delivered. Resend ${count === 1 ? "it" : "them"} to a new task.`
   return message?.endsWith(notice) === true ? message : [message, notice].filter(Boolean).join("\n")
+}
+export function withParkedSteeringNotice(message: string, count: number): string {
+  if (count === 0) return message
+  const notice = `${count} message${count === 1 ? " sent to this task is" : "s sent to this task are"} still queued: ${count === 1 ? "it" : "they"} will be delivered first, in order, when you continue it with task_send.`
+  return message.endsWith(notice) ? message : [message, notice].filter(Boolean).join("\n\n")
 }
 /** A terminal turn's later queued continuation owes its own terminal result when its target ends. */
 export function endDroppedSteering(record: TaskRecord, timestamp: string, count: number): TaskRecord {
-  const error_message = withDroppedSteeringNotice(record.error_message ?? "Task target is no longer available.", count)
+  const error_message = withDroppedSteeringNotice(
+    record.status === "completed" ? "The task finished; its continuation is no longer available."
+      : record.error_message ?? "Task target is no longer available.",
+    count,
+  )
   if (record.status === "completed" || record.status === "error" || record.status === "interrupted") {
     return {
       ...record, status: "error", killed: true, failure_kind: "suspended_unresumable",

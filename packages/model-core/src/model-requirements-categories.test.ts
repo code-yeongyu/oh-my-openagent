@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
+import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
   test("writing only activates when one of its own chain models is available", () => {
@@ -95,6 +96,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         model: "gemini-4-argon",
         variant: "low",
       },
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -161,7 +167,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("unspecified-low follows the approved 8-rung chain headed by claude-sonnet-5-5 medium", () => {
+  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -184,6 +190,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
         variant: "xhigh",
+      },
+      {
+        providers: ["zai-coding-plan", "opencode-go"],
+        model: "glm-5.3",
+        variant: "high",
       },
       {
         providers: ["openai", "chatgpt-subscription"],
@@ -254,6 +265,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(chain).toEqual([
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",

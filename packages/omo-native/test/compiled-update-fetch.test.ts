@@ -71,13 +71,14 @@ describe("compiled update GitHub authentication", () => {
     }
   })
 
-  for (const failure of [401, 403, 500, "network"] as const) {
+  for (const failure of [401, 403, 500, "network", "json"] as const) {
     test(`#given a rejected token #when anonymous retry fails with ${failure} #then it names the variables without leaking credentials`, async () => {
       const original = { GH_TOKEN: process.env.GH_TOKEN, GITHUB_TOKEN: process.env.GITHUB_TOKEN }
       const fetchSpy = spyOn(globalThis, "fetch")
         .mockRejectedValue(new Error("unexpected release lookup"))
         .mockResolvedValueOnce(new Response("expired-test-token", { status: 401 }))
       if (failure === "network") fetchSpy.mockRejectedValueOnce(new Error("expired-test-token"))
+      else if (failure === "json") fetchSpy.mockResolvedValueOnce(new Response("expired-test-token"))
       else fetchSpy.mockResolvedValueOnce(new Response("secondary-test-token", { status: failure }))
 
       try {

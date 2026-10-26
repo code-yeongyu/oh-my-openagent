@@ -30,6 +30,7 @@ export function buildChildContext(spec: ChildContextSpec): ChildSessionContext {
     state_dir: spec.state_dir,
     ...(spec.depth === undefined ? {} : { depth: String(spec.depth) }),
     ...(spec.root_session_id === undefined ? {} : { root_session_id: spec.root_session_id }),
+    ...(spec.traceparent === undefined ? {} : { traceparent: spec.traceparent }),
   }
 
   if (spec.memberEnv !== undefined) {

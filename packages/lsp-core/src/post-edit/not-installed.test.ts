@@ -34,8 +34,8 @@ function touch(path: string, text = ""): string {
 
 const FULL_NUDGE = [
 	"LSP server 'typescript' for .ts is NOT INSTALLED.",
-	"To install in THIS repository (preferred — no global install needed):",
-	"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
+	"To install in THIS repository (preferred, no global install needed):",
+	"ACTION REQUIRED: ASK THE USER whether to install this LSP server.",
 ].join("\n");
 
 function notInstalled(

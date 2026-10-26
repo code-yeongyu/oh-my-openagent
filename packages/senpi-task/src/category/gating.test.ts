@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { resolveCategory } from "./index"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 type FakeModel = {
   readonly provider: string
@@ -38,7 +39,7 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("anthropic/claude-fable-5-1")
+      expect(result.attemptedModel).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
       expect(result.availableCategories).not.toContain("architect")
     })
 
@@ -267,7 +268,7 @@ describe("category activation gating", () => {
 
     test("#when artistry resolves on a fable-only registry #then it is a PRIMARY hit, which is why it cannot prove fallback", () => {
       // given
-      const models = registry([model("anthropic", "claude-fable-5-1")])
+      const models = registry([model("anthropic", FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1")])
 
       // when
       const result = resolveCategory("artistry", {}, models)

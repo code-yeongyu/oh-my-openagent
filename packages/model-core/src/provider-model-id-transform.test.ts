@@ -14,6 +14,8 @@ describe("provider model id transform", () => {
     // then
     expect(transformed).toBe("k3")
     expect(transformed256k).toBe("k3-256k")
+    expect(transformModelForProvider(provider, "kimi-k3.1-pro")).toBe("k3.1-pro")
+    expect(transformModelForProvider(provider, "kimi-k3.1-pro-highspeed")).toBe("k3.1-pro-highspeed")
   })
 
   test("passes through unrelated models unchanged", () => {

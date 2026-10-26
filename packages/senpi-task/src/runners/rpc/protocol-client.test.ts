@@ -225,7 +225,10 @@ describe("RpcProtocolClient", () => {
     const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE", syscall: "write" })
 
     // when
+    const exited = new Promise<void>((resolve) => client.onExit(() => resolve()))
     stdin.emit("error", epipe)
+    child.emit("close", 1, null)
+    await exited
 
     // then
     expect(client.exited).toBe(true)

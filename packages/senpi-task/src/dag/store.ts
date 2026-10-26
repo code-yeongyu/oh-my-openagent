@@ -7,6 +7,7 @@ import { defaultSignaller } from "../lifecycle/context"
 import { resolveStateDir } from "../store/state-dir"
 import { DAG_SETTINGS_DEFAULTS, isSafeDagPathSegment, type DagEventLane, type DagRunEvent, type DagRunId, type DagRunStatus, type DagSettings, isTerminalDagRunStatus } from "./types"
 import type { DagRunEventType } from "./events"
+import { decodePausedNodes, decodePausedTransition, encodePausedNodes, encodePausedTransition } from "./paused-node-encoding"
 
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
@@ -172,7 +173,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       fs.mkdirSync(dirname(path), { recursive: true })
       const fd = fs.openSync(path, "a")
       try {
-        fs.writeSync(fd, `${JSON.stringify(event)}\n`)
+        fs.writeSync(fd, `${JSON.stringify(encodePausedTransition(event))}\n`)
         if (fsyncWrites) fs.fsyncSync(fd)
       } finally {
         fs.closeSync(fd)
@@ -215,7 +216,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       writeCheckpointWithinSessionLimit(
         paths,
         runId,
-        checkpoint,
+        encodePausedNodes(checkpoint),
         maxRunsPerSession,
         platform,
         fsyncWrites,
@@ -229,7 +230,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       const value = readJsonFile(path, runId, now)
       if (value === null) return null
       assertSupportedSchema(value, path, runId, now)
-      return value as T
+      return decodePausedNodes(value as T)
     },
     writeKey(record) {
       assertSupportedSchema(record, paths.key(record.parentSessionId, record.runKey), record.runId, now)
@@ -549,7 +550,7 @@ function parseEvent(value: unknown, path: string, runId: DagRunId, now: () => nu
   if (!isRecord(value) || typeof value.seq !== "number" || typeof value.type !== "string") {
     throw corrupt(path, runId, "invalid DAG event envelope", now)
   }
-  return value as DagRunEvent
+  return decodePausedTransition(value as DagRunEvent)
 }
 
 function parseJson(text: string, path: string, runId?: DagRunId, now: () => number = Date.now): unknown {
