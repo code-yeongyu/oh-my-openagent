@@ -64,16 +64,27 @@ export function replaceCommand(url: string, destination: string, platform: NodeJ
 }
 
 export const fetchGitHubReleases: FetchReleases = async () => {
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
-  const response = await fetch(RELEASES_API, {
+  const token = process.env.GH_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim()
+  const headers = { Accept: "application/vnd.github+json", "User-Agent": "omo" }
+  let response = await fetch(RELEASES_API, {
     headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": "omo",
+      ...headers,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     signal: AbortSignal.timeout(15_000),
   })
-  if (!response.ok) throw new Error(`GitHub answered ${response.status}`)
+  const rejectedToken = Boolean(token) && response.status === 401
+  if (rejectedToken) {
+    try {
+      response = await fetch(RELEASES_API, { headers, signal: AbortSignal.timeout(15_000) })
+    } catch {
+      throw new Error("GitHub anonymous retry failed after HTTP 401; check GH_TOKEN or GITHUB_TOKEN")
+    }
+  }
+  if (!response.ok) {
+    const hint = rejectedToken || response.status === 403 ? "; check GH_TOKEN or GITHUB_TOKEN" : ""
+    throw new Error(`GitHub answered ${response.status}${hint}`)
+  }
   return response.json()
 }
 
