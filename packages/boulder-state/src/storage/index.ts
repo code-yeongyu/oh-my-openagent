@@ -30,6 +30,8 @@ export {
 export { endTaskTimer, startTaskTimer, upsertTaskSessionState, upsertTaskSessionStateForWork } from "./task"
 export {
   addBoulderWork,
+  BoulderStateWriteError,
+  type BoulderWriteResult,
   clearBoulderState,
   completeBoulder,
   createBoulderState,

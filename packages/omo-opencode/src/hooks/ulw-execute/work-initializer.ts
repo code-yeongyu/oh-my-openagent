@@ -1,4 +1,5 @@
 import { addBoulderWork, createBoulderState, getPlanName, writeBoulderState } from "../../features/boulder-state"
+import { log } from "../../shared/logger"
 import { buildAutoSelectedPlanContextInfoOnly } from "./context-info-formatters"
 import { ensureNotepadScaffold } from "./notepad-scaffold"
 
@@ -19,7 +20,9 @@ export function createNewWorkOrInitialize(params: {
 
   if (!created) {
     const initializedState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
-    writeBoulderState(directory, initializedState)
+    const written = writeBoulderState(directory, initializedState)
+    if (!written.ok)
+      log("[ulw-execute] boulder state write failed", { error: written.error.message, code: written.error.code })
   }
 
   ensureNotepadScaffold({ directory, planName: getPlanName(planPath) })
@@ -38,7 +41,9 @@ export function buildAutoSelectedPlanContextWithStateInit(params: {
   const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory, reason } = params
 
   const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
-  writeBoulderState(directory, newState)
+  const written = writeBoulderState(directory, newState)
+  if (!written.ok)
+    log("[ulw-execute] boulder state write failed", { error: written.error.message, code: written.error.code })
 
   ensureNotepadScaffold({ directory, planName: getPlanName(planPath), timestamp })
 
