@@ -1,13 +1,10 @@
 import { join } from "node:path"
 
-import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
+import type { ExtensionContext } from "@code-yeongyu/senpi"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import {
-  isExtensionContext,
-  isSessionStartEvent,
-} from "../onboarding/component"
+import { isExtensionContext } from "../onboarding/component"
 import { getOnboardingMarkerMtime } from "../onboarding/state"
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
 import { gitToplevel } from "./git-helpers"
@@ -39,23 +36,28 @@ export function createInitDeepAdvisorComponent(
   return {
     name: "init-deep-advisor",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      pi.on("session_start", (rawPayload: unknown, rawEventCtx: unknown) => {
-        if (!isSessionStartEvent(rawPayload)) return
-        const payload: SessionStartEvent = rawPayload
-        if (payload.reason !== "startup") return
+      const attempted = new Set<string>()
+      pi.on("before_agent_start", (rawPayload: unknown, rawEventCtx: unknown) => {
+        if (!isFirstRealPrompt(rawPayload)) return
         if (!isExtensionContext(rawEventCtx)) return
         const eventCtx: ExtensionContext = rawEventCtx
-        // The preflight spawns `git rev-parse` and stats the onboarding marker before it can even
-        // decide the advisor is ineligible - measured at ~20 ms on the session_start dispatch path,
-        // inside the engine's `interactiveMode.init` phase. Nothing observes the advisor before the
-        // first paint (it opens a dialog the user answers afterwards), so the whole run, decision
-        // included, moves one tick past it.
+        const sessionKey = advisorSessionKey(eventCtx)
+        if (attempted.has(sessionKey)) return
+        attempted.add(sessionKey)
+        // The advisor used to run on session_start with reason "startup", which every senpi RPC
+        // open_session also reports with hasUI, so a host app's background sessions (model
+        // probes, auth, prepared drafts) spawned git, stat'ed the onboarding marker, and could
+        // open a dialog in a session nobody sees. Like onboarding after the #2197 fix, it now
+        // waits for the first real prompt in an interactive session: a session that opens and
+        // closes without one never runs any advisor work, and a preview, an extension-triggered
+        // turn, or a delivery never consumes the session's one attempt. The run itself stays
+        // deferred off the dispatch path, so the dialog never blocks the prompt that armed it.
         deferUntilAfterFirstPaint(ctx, "init-deep-advisor", () => {
           void runAdvisor(pi, ctx, eventCtx, dependencies.runAfterPreflight).catch((error) => {
             ctx.logger.warn("init-deep-advisor failed", { error })
           })
         })
-      })
+      }, { previewSafe: true })
     },
   }
 }
@@ -100,6 +102,9 @@ function advisorPreflight(
   eventCtx: ExtensionContext,
 ): AdvisorPreflight | null {
   if (!eventCtx.hasUI) return null
+  // The onboarding entry rule from the #2197 fix: only an interactive session can show and
+  // answer the advisor. Hosts that report no session kind fail closed, as in onboarding.
+  if (pi.sessionKind !== "interactive") return null
   if (pi.getFlag("omo-senpi-init-deep-advisor-disabled") === true) return null
   const onboardingStateDir = getOmoNativeStateDir(process.env)
   const stateDir = join(onboardingStateDir, "init-deep-advisor-state")
@@ -109,6 +114,19 @@ function advisorPreflight(
   const markerMtime = getOnboardingMarkerMtime(onboardingStateDir)
   if (markerMtime === null || markerMtime >= processStartTime) return null
   return { root, stateDir }
+}
+
+function isFirstRealPrompt(value: unknown): boolean {
+  return isRecord(value) && value["trigger"] === "prompt" && value["preview"] !== true
+}
+
+function advisorSessionKey(eventCtx: ExtensionContext): string {
+  const getSessionId = eventCtx.sessionManager?.getSessionId
+  if (typeof getSessionId === "function") {
+    const sessionId: unknown = Reflect.apply(getSessionId, eventCtx.sessionManager, [])
+    if (typeof sessionId === "string" && sessionId.length > 0) return sessionId
+  }
+  return eventCtx.cwd ?? process.cwd()
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
