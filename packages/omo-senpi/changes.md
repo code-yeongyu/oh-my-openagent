@@ -1,6 +1,7 @@
 ## 2026-10-25 - Remove automatic engine crash telemetry
 
 The session-start component no longer reads, claims or sends earlier process crash records. Retire the legacy crash capture entry point and its reviewed writer site. Recording-transport coverage requires zero crash events while normal session telemetry continues. Preserve operational crash files and user-initiated reports. No replacement signal or local bundle regeneration is included.
+
 ## 2026-10-20 - git-master adds the sisyphus-dev-ai co-author trailer by default (#10713)
 
 `components/git-master/directive.ts` builds the attribution directive whenever `git_master.include_co_authored_by` (default `true` again, no longer a no-op) or `commit_footer` is on. Its commit example is `git -c trailer.ifexists=addIfDifferent commit -m ... --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`, under the `git_env_prefix` from #10613, so git keeps one copy when the message already carries the trailer. A squash joins messages without `--trailer`, so the directive asks for one `--amend` rewrite afterwards. `skill-content.ts` runs the shared template rewrite with `include_co_authored_by: false`, because the directive carries attribution, and both channels (the `read` hook and `task-skill-loader.ts`) append the directive only when the text does not already contain `<commit_attribution>`. `scripts/qa/git-master-attribution-e2e.mjs` now expects the trailer exactly once by default, and adds an `include_co_authored_by: false` run that expects none.
