@@ -312,7 +312,9 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
     const root = resolve(candidate)
     if (root === undefined || paths.dirname(root) === root) return false
     try {
-      return isPathInside(path, candidate, options)
+      // The install id is written under path.join(home, ...), which resolves `..` lexically, so judge that same
+      // lexically resolved path (the helper's contract for lexical openers), not the raw HOME.
+      return isPathInside(paths.resolve(path), candidate, options)
     } catch {
       return false
     }

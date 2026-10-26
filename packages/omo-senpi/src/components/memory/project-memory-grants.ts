@@ -82,6 +82,9 @@ function canonicalAllowingMissing(input: string, canonicalPath: (path: string) =
     try {
       const ancestor = canonicalPath(current)
       if (missing.length === 0) return ancestor
+      // A missing remainder can only live under a directory. POSIX reports a file ancestor as ENOTDIR, but
+      // Windows reports ENOENT, so the walk would otherwise grant `<note>/missing.md` there.
+      if (!lstatSync(ancestor).isDirectory()) throw Object.assign(new Error(`not a directory: ${ancestor}`), { code: "ENOTDIR" })
       return (ancestor.endsWith(paths.sep) ? ancestor : ancestor + paths.sep) + missing.join(paths.sep)
     } catch (error) {
       // A dangling link is an entry, not a missing note: its target could appear outside the repo later.
