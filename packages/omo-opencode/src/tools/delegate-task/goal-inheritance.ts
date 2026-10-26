@@ -9,9 +9,11 @@ export function inheritGoalToChild(args: {
     const controller = createGoalController({ projectDir: args.projectDir })
     const parent = controller.getGoal(args.parentSessionID)
     if (parent === null || parent.status !== "active") return false
+    const remaining = Math.max(1, parent.maxIterations - parent.iteration)
     controller.setGoal(args.childSessionID, parent.objective, {
       parentGoalID: parent.id,
       rootGoalID: parent.rootGoalID ?? parent.id,
+      maxIterations: remaining,
     })
     controller.addChildSession(args.parentSessionID, args.childSessionID)
     return true

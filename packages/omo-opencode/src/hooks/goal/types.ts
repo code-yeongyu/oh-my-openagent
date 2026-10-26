@@ -15,6 +15,10 @@ export const GoalSchema = z.object({
   status: GoalStatusSchema,
   tokensUsed: z.number().int().nonnegative(),
   timeUsedSeconds: z.number().int().nonnegative(),
+  iteration: z.number().int().nonnegative().default(0),
+  maxIterations: z.number().int().positive().default(100),
+  stallCount: z.number().int().nonnegative().default(0),
+  pauseReason: z.string().optional(),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
   lastStartedAt: z.number().int().nonnegative().optional(),
@@ -51,6 +55,10 @@ export type GoalUpdate = {
   readonly parentGoalID?: string
   readonly rootGoalID?: string
   readonly childSessionIDs?: readonly string[]
+  readonly iteration?: number
+  readonly maxIterations?: number
+  readonly stallCount?: number
+  readonly pauseReason?: string
 }
 
 export const GoalToolSnapshotSchema = z.object({

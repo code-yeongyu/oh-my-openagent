@@ -49,6 +49,39 @@ describe("createGoalHook", () => {
     expect(hook.getGoal("s1")).toBeNull()
   })
 
+  test("session.idle pauses goal at budget", async () => {
+    const ctx = makePluginInput()
+    const hook = createGoalHook(ctx, { projectDir: ctx.directory, maxIterations: 1 })
+    hook.setGoal("s1", "Ship it")
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "s1" } } })
+    expect(hook.getGoal("s1")?.status).toBe("active")
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "s1" } } })
+    expect(hook.getGoal("s1")?.status).toBe("paused")
+    expect(hook.getGoal("s1")?.pauseReason).toBe("budget")
+  })
+
+  test("session.error stalls then pauses", async () => {
+    const ctx = makePluginInput()
+    const hook = createGoalHook(ctx, { projectDir: ctx.directory, maxStalls: 2 })
+    hook.setGoal("s1", "Ship it")
+    await hook.event({ event: { type: "session.error", properties: { sessionID: "s1" } } })
+    expect(hook.getGoal("s1")?.status).toBe("active")
+    expect(hook.getGoal("s1")?.stallCount).toBe(1)
+    await hook.event({ event: { type: "session.error", properties: { sessionID: "s1" } } })
+    expect(hook.getGoal("s1")?.status).toBe("paused")
+    expect(hook.getGoal("s1")?.pauseReason).toBe("stalled")
+  })
+
+  test("session.idle resets stall count", async () => {
+    const ctx = makePluginInput()
+    const hook = createGoalHook(ctx, { projectDir: ctx.directory, maxStalls: 5 })
+    hook.setGoal("s1", "Ship it")
+    await hook.event({ event: { type: "session.error", properties: { sessionID: "s1" } } })
+    expect(hook.getGoal("s1")?.stallCount).toBe(1)
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "s1" } } })
+    expect(hook.getGoal("s1")?.stallCount).toBe(0)
+  })
+
   test("session.idle injects continuation for active goal", async () => {
     const ctx = makePluginInput()
     const hook = createGoalHook(ctx, { projectDir: ctx.directory })

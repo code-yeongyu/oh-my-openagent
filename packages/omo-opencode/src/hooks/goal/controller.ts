@@ -10,6 +10,7 @@ export type GoalControllerOptions = {
 
 export type GoalLink = {
   readonly parentGoalID?: string
+  readonly maxIterations?: number
   readonly rootGoalID?: string
 }
 
@@ -59,6 +60,10 @@ export function createGoalController(options: GoalControllerOptions) {
       const ref = storeRef(sessionID)
       clearGoal(ref)
       let goal = createGoal(ref, objective)
+      if (link?.maxIterations !== undefined) {
+        const withBudget = updateGoal(ref, { maxIterations: link.maxIterations })
+        if (withBudget !== null) goal = withBudget
+      }
       if (link && (link.parentGoalID !== undefined || link.rootGoalID !== undefined)) {
         const updated = updateGoal(ref, {
           ...(link.parentGoalID !== undefined ? { parentGoalID: link.parentGoalID } : {}),
@@ -81,6 +86,12 @@ export function createGoalController(options: GoalControllerOptions) {
       if (updated) writeTuiMirror(sessionID, updated)
       return updated
     },
+    updateProgress(sessionID: string, update: GoalUpdate): Goal | null {
+      const goal = updateGoal(storeRef(sessionID), update)
+      if (goal !== null) writeTuiMirror(sessionID, goal)
+      return goal
+    },
+
     pauseGoal(sessionID: string): Goal | null {
       const goal = updateGoal(storeRef(sessionID), { status: "paused" })
       if (goal !== null) writeTuiMirror(sessionID, goal)

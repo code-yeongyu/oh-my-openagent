@@ -7,6 +7,8 @@ export const GoalConfigSchema = z.object({
   auto_start: z.boolean().default(true),
   /** Default continuation iteration cap, preserved for Ralph Loop behavioral parity (default: 100) */
   default_max_iterations: z.number().min(1).max(1000).default(100),
+  /** Consecutive error stalls before a goal auto-pauses (default: 3) */
+  max_stalls: z.number().min(1).max(10).default(3),
 })
 
 export type GoalConfig = z.infer<typeof GoalConfigSchema>

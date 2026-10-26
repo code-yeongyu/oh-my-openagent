@@ -165,7 +165,9 @@ export function createSessionHooks(args: {
     ? safeHook("goal", () =>
         createGoalHook(ctx, {
           projectDir: ctx.directory,
-          autoStart: pluginConfig.goal?.auto_start ?? false,
+          autoStart: pluginConfig.goal?.auto_start ?? true,
+          maxIterations: pluginConfig.goal?.default_max_iterations,
+          maxStalls: pluginConfig.goal?.max_stalls,
           ultrawork: pluginConfig.default_mode?.ultrawork ?? false,
           getSessionExists: async (sessionId) => await sessionExists(sessionId),
         }))

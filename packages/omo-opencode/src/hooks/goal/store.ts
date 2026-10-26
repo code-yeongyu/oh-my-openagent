@@ -67,6 +67,9 @@ export function createGoal(ref: GoalStoreRef, objective: string): Goal {
     status: "active",
     tokensUsed: 0,
     timeUsedSeconds: 0,
+    iteration: 0,
+    maxIterations: 100,
+    stallCount: 0,
     createdAt: now,
     updatedAt: now,
     lastStartedAt: now,
@@ -92,6 +95,10 @@ export function updateGoal(ref: GoalStoreRef, update: GoalUpdate): Goal | null {
     ...(update.parentGoalID !== undefined ? { parentGoalID: update.parentGoalID } : {}),
     ...(update.rootGoalID !== undefined ? { rootGoalID: update.rootGoalID } : {}),
     ...(update.childSessionIDs !== undefined ? { childSessionIDs: [...update.childSessionIDs] } : {}),
+    ...(update.iteration !== undefined ? { iteration: update.iteration } : {}),
+    ...(update.maxIterations !== undefined ? { maxIterations: update.maxIterations } : {}),
+    ...(update.stallCount !== undefined ? { stallCount: update.stallCount } : {}),
+    ...(update.pauseReason !== undefined ? { pauseReason: update.pauseReason } : {}),
   }
 
   if (update.status === "active" && existing.status !== "active") {
