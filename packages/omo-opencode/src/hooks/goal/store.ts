@@ -35,6 +35,45 @@ export function readGoal(ref: GoalStoreRef): Goal | null {
   return goal
 }
 
+export type GoalIndexEntry = {
+  readonly sessionIDs: readonly string[]
+  readonly parentGoalID?: string
+  readonly rootGoalID?: string
+  readonly status: string
+}
+
+export function goalIndexPath(baseDir: string): string {
+  return join(baseDir, "_index.json")
+}
+
+export function readGoalIndex(baseDir: string): Record<string, GoalIndexEntry> {
+  try {
+    const raw = readFileSync(goalIndexPath(baseDir), "utf-8")
+    const parsed = JSON.parse(raw) as Record<string, GoalIndexEntry>
+    return typeof parsed === "object" && parsed !== null ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeGoalIndexEntry(baseDir: string, goal: Goal | null, sessionID: string): void {
+  const path = goalIndexPath(baseDir)
+  const index = readGoalIndex(baseDir)
+  if (goal === null) {
+    for (const [goalID, entry] of Object.entries(index)) {
+      const kept = entry.sessionIDs.filter((id) => id !== sessionID)
+      if (kept.length === 0) delete index[goalID]
+      else index[goalID] = { ...entry, sessionIDs: kept }
+    }
+  } else {
+    const prev = index[goal.id]
+    const sessionIDs = prev ? Array.from(new Set([...prev.sessionIDs, sessionID])) : [sessionID]
+    index[goal.id] = { sessionIDs, ...(goal.parentGoalID !== undefined ? { parentGoalID: goal.parentGoalID } : {}), ...(goal.rootGoalID !== undefined ? { rootGoalID: goal.rootGoalID } : {}), status: goal.status }
+  }
+  ensureGoalStoreDir(baseDir)
+  writeFileSync(path, JSON.stringify(index, null, 2), "utf-8")
+}
+
 export function writeGoal(ref: GoalStoreRef, goal: Goal | null): void {
   ensureGoalStoreDir(ref.baseDir)
   const filePath = goalFilePath(ref)
@@ -42,6 +81,7 @@ export function writeGoal(ref: GoalStoreRef, goal: Goal | null): void {
   const file: GoalFile = { version: STORE_VERSION, goal }
   writeFileSync(tempPath, JSON.stringify(file, null, 2), "utf-8")
   renameSync(tempPath, filePath)
+  writeGoalIndexEntry(ref.baseDir, goal, ref.sessionID)
 }
 
 export function clearGoal(ref: GoalStoreRef): boolean {

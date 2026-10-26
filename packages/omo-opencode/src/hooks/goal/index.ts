@@ -57,7 +57,7 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
     controller.updateProgress(sessionID, { iteration: goal.iteration + 1, ...(goal.stallCount > 0 ? { stallCount: 0 } : {}) })
     inFlightContinuations.add(sessionID)
     try {
-      const promptText = buildContinuationPrompt(goal)
+      const promptText = buildContinuationPrompt(goal) + buildChildWatchdogSection(sessionID, goal)
       const promptResult = await dispatchInternalPrompt({
         mode: "async",
         client: ctx.client,
@@ -80,6 +80,19 @@ export function createGoalHook(ctx: PluginInput, options: GoalHookOptions): Goal
     } finally {
       inFlightContinuations.delete(sessionID)
     }
+  }
+
+  function buildChildWatchdogSection(sessionID: string, goal: Goal): string {
+    if (goal.childSessionIDs.length === 0) return ""
+    const lines = goal.childSessionIDs.map((childID) => {
+      const child = controller.getGoal(childID)
+      if (child === null) return `- ${childID}: no goal record (finished or cleared)`
+      return `- ${childID}: ${child.status} (iteration ${child.iteration}/${child.maxIterations}, stalls ${child.stallCount}${child.pauseReason ? `, paused: ${child.pauseReason}` : ""})`
+    })
+    return ""
+      + "\n\nDelegated child sessions:\n"
+      + lines.join("\n")
+      + "\nYou may pause, resume, or redirect a child via update_goal with its session_id.";
   }
 
   function handleSessionCreated(sessionID: string, firstMessage: string): void {

@@ -8,6 +8,9 @@ describe("GoalConfigSchema", () => {
     expect(result.enabled).toBe(false)
     expect(result.auto_start).toBe(true)
     expect(result.default_max_iterations).toBe(100)
+    expect(result.require_completion_evidence).toBe(true)
+    expect(result.inherit_to_children).toBe(true)
+    expect(result.max_stalls).toBe(3)
   })
 
   test("parses explicit goal config", () => {

@@ -148,6 +148,7 @@ export function createCoreTools(args: {
     Object.assign(tools, createGoalTools({
       controller: goalController,
       getSessionID: getMainSessionID,
+      requireCompletionEvidence: pluginConfig.goal?.require_completion_evidence ?? true,
     }))
   }
 

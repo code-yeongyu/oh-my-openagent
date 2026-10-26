@@ -70,6 +70,19 @@ describe("createGoalTools", () => {
     expect(result).toContain("no session_id")
   })
 
+  test("update_goal rejects complete without evidence", async () => {
+    const markCalls: string[] = []
+    const markComplete = (sessionID: string) => {
+      markCalls.push(sessionID)
+      return makeGoal({ status: "complete" })
+    }
+    const deps = makeDeps({ markComplete }, "s1")
+    const tools = createGoalTools(deps)
+    const result = await tools.update_goal.execute({ status: "complete" }, {} as never)
+    expect(result).toContain("Error")
+    expect(markCalls).toEqual([])
+  })
+
   test("update_goal completes goal", async () => {
     const markCalls: string[] = []
     const markComplete = (sessionID: string) => {
@@ -80,9 +93,10 @@ describe("createGoalTools", () => {
     const deps = makeDeps({ markComplete, getGoal }, "s1")
     const tools = createGoalTools(deps)
 
-    const result = await tools.update_goal.execute({ status: "complete" }, {} as never)
+    const result = await tools.update_goal.execute({ status: "complete", evidence: "Shipped and verified" }, {} as never)
 
     expect(markCalls).toEqual(["s1"])
+    expect(result).not.toContain("Error")
     expect(result).toContain('"status": "complete"')
   })
 

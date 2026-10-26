@@ -5,6 +5,7 @@ import { GoalToolResponseSchema } from "./types"
 export type GoalToolsDeps = {
   readonly controller: GoalController
   readonly getSessionID: () => string | undefined
+  readonly requireCompletionEvidence?: boolean
 }
 
 function formatResponse(goal: ReturnType<GoalController["getGoal"]>): string {
@@ -21,6 +22,7 @@ The objective should be concise (under 2000 characters) and describe the desired
     args: {
       objective: tool.schema.string().describe("Concise outcome the session should achieve"),
       session_id: tool.schema.string().optional().describe("Session ID to target (default: current session)"),
+      evidence: tool.schema.string().optional().describe("Completion evidence (required when status is complete)")
     },
     execute: async (args, _context) => {
       const sessionID = args.session_id ?? deps.getSessionID()
@@ -42,6 +44,7 @@ Use this to pause, resume, complete, or change the objective of the current goal
       status: tool.schema.enum(["active", "paused", "complete"]).optional().describe("New goal status"),
       objective: tool.schema.string().optional().describe("New objective text"),
       session_id: tool.schema.string().optional().describe("Session ID to target (default: current session)"),
+      evidence: tool.schema.string().optional().describe("Completion evidence (required when status is complete)")
     },
     execute: async (args, _context) => {
       const sessionID = args.session_id ?? deps.getSessionID()
@@ -56,6 +59,9 @@ Use this to pause, resume, complete, or change the objective of the current goal
       } else if (args.status === "active") {
         deps.controller.resumeGoal(sessionID)
       } else if (args.status === "complete") {
+        if (deps.requireCompletionEvidence !== false && (args.evidence === undefined || args.evidence.trim().length === 0)) {
+          return "Error: completion evidence is required. Describe what was verified and where (files, tests, command output) in the evidence argument."
+        }
         deps.controller.markComplete(sessionID)
       }
       return formatResponse(deps.controller.getGoal(sessionID))
@@ -70,6 +76,7 @@ export function getGoalTool(deps: GoalToolsDeps): ToolDefinition {
 Returns the current objective, status, and usage accounting. Returns null if no goal is active.`,
     args: {
       session_id: tool.schema.string().optional().describe("Session ID to target (default: current session)"),
+      evidence: tool.schema.string().optional().describe("Completion evidence (required when status is complete)")
     },
     execute: async (args, _context) => {
       const sessionID = args.session_id ?? deps.getSessionID()
