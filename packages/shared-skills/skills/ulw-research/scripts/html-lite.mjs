@@ -130,6 +130,8 @@ export function parseHtml(source) {
 	const flushText = (to) => {
 		if (to > textStart) {
 			const node = makeNode("#text", {}, top(), lineAt(starts, textStart))
+			node.source_start = textStart
+			node.source_end = to
 			node.text = decodeEntities(src.slice(textStart, to))
 			top().children.push(node)
 		}
@@ -157,7 +159,7 @@ export function parseHtml(source) {
 			const tag = readTag(src, lt + 2)
 			if (tag.name !== "body" && tag.name !== "html") {
 				for (let k = stack.length - 1; k > 0; k--) {
-					if (stack[k].tag === tag.name) { stack.length = k; break }
+					if (stack[k].tag === tag.name) { stack[k].source_end = lt; stack.length = k; break }
 				}
 			}
 			at = textStart = tag.end
@@ -169,6 +171,8 @@ export function parseHtml(source) {
 			if (P_CLOSERS.has(tag.name)) closeWithin("p", P_SCOPE)
 			if (tag.name === "li") closeWithin("li", LI_SCOPE)
 			const node = makeNode(tag.name, tag.attrs, top(), lineAt(starts, lt))
+			node.source_start = tag.end
+			node.source_end = src.length
 			top().children.push(node)
 			if (tag.name === "body") sawBody = true
 			if (tag.attrs.id) root.ids.set(tag.attrs.id, (root.ids.get(tag.attrs.id) ?? 0) + 1)

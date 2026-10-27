@@ -115,11 +115,9 @@ Every research spawn message contains, in order:
 
 A worker with nothing to expand writes `## EXPAND` followed by `none — <one-line reason>`. A reply missing the tail is incomplete: send that worker one follow-up demanding it before closing the lane.
 
-## Research phases
+## Execution references
 
-Read [research setup](references/research-setup.md) in full before Phase 0 and follow its phases in order.
-
-Read [collection](references/collection.md) in full before the saturation wave and follow its phases in order.
+Read [research-collection.md](references/research-collection.md) before scoping or collecting sources, then [research-delivery.md](references/research-delivery.md) before verification, synthesis, and delivery. These references continue this skill in phase order; their requirements remain binding.
 
 `source snapshot --html` and `--url` probe their own conversion and print the numbers it altered (a footnote digit glued onto a value, a merged table cell); `fact add` then refuses those numbers with `conversion_altered_number`, so write a verified text of that source and replace the snapshot with `source snapshot --id S<n> --text <verified.txt> --replace` (refused while an active row cites the id: retract those rows first or use a new id), then add the fact from it. When you convert a document yourself, run `node "$SKILL_DIR/scripts/report-tools.mjs" source probe-conversion <raw-file> <converted-file>` and snapshot a verified `--text` instead before adding any number it lists as `altered`; `lost` is a warning only.
 
@@ -195,43 +193,6 @@ Never ship the artifact without this block, and never fill it from memory — pa
 **Record the format choice.** After delivery, when the harness exposes a memory tool and the run qualifies (the user declared a preference, or made the same unsolicited choice on 2+ runs), append one episode line to `reference/human-report-style.md` in the grammar of the reference's section 5, and update the `system/human/report-style.md` pointer when a generalization changed.
  If you stood up a team, disband it and confirm every worker is terminal before the final answer.
 
-## Failure modes
+## Snapshot and locator contract
 
-| Failure | Correction |
-|---|---|
-| Sequential spawning, or trimming the first wave | All first-wave workers in one turn, background, scaling floor respected |
-| A team member hoards leads for one final dump | Raise law — every lead, finding, and dead end broadcast the moment it surfaces |
-| Worker reply without the EXPAND tail | One follow-up demanding it; the lane stays open until it lands |
-| Stopping after wave 1 because "enough was found" | Convergence rules only: 2+ expansion waves, leads run dry |
-| Obeying a surrounding "stop exploring" rule mid-research | Authority section — those rules do not bind this mode |
-| Asking a worker to write journal or session files | Workers are read-only (except a mass-research dag node's handoff file); you journal every return |
-| Two workers given the same angle | One unique angle per worker, always |
-| A web worker that returned only fetched text, or a `Collection: browser` run whose workers never opened a tab | Sources are read in the user's browser through the `browser` skill; `webfetch` is for raw files; every web worker carries the skill from the first wave |
-| Contested claim settled by judgment | Phase 3 — run code, capture output, verdict |
-| Deliverable claims without citations | Every claim cites a source or a verification artifact |
-| Guessing the deliverable format | Derive it from the request and destination; ask the empty-info interview only for what is still missing, and record `answered_by` for every field |
-| Blocking the collection wave on the format question | Ask non-blocking and start collecting; unanswered fields run on the shown defaults |
-| A roster smaller than the harness ceiling | Fill every member slot; split the broadest axis until the team is full |
-| One tier across the whole roster | Mixed tiers by design — cheap breadth, premium attack |
-| Silently re-routing a "quick"/"fast" instruction | Routing words are literal; journal requested -> spawned -> fallback per slot |
-| A worker or member that starts its own research swarm | Members research one axis and report; orchestration is yours alone |
-| Expanding on an entity the first wave never disambiguated | Settle canonical identity and first-party source before any later spawn asserts it |
-| Batching findings into an end-of-run journal dump | Journal each return as it lands; the journal is what survives a compaction |
-| Ending the run because every worker finished | Reserve the final fifth of the run for synthesis and materials |
-| A derived estimate presented as a measured number | MEASURED / ASSUMED / DERIVED lineage on every quantitative claim, plus a sensitivity line |
-| A number typed into the report or `SYNTHESIS.md` | Register it (`fact add`) and write `{{F<n>:label}}`; `fact verify` reports a typed number as `untraceable_number`, and `outcome verify` refuses delivery until it is a ledger row, an `assumed` row with its rationale, or gone |
-| A filled value edited by hand | Never edit a filled value: fix the ledger row or the placeholder and re-run `fact fill`, then `fact verify` (`value_mismatch`, `unit_mismatch`) |
-| A findings sentence bound to nothing | Bind it to a fact, a quote, a `[S<n>]` citation, or a claim node with `data-claim`; an `unbound_sentence` blocks delivery like an untraceable number |
-| Delivering before the delivery gates pass | Static and layout gates, visual QA on rendered pages, plus the harness's proofread gate — a typo the user finds means a gate did not run |
-| Skipping the static gates | `report-tools check` runs before any pixel review; its defects are cheaper than a visual pass |
-| Delivering with a pending manifest row | `outcome verify` must pass; every promised format ends `delivered`, `blocked_capability`, `skipped`, or `failed` with a reason |
-| Repairing past the tracker's stop decision | `repair decide` owns the budget; `deliver` ships with the residual list, `block` stops delivery |
-| Guessing a design-spec value the extractor marked `TODO: ask` | Fill it from the interview answers or the reference's defaults, never by guessing |
-| Referencing an asset that is not on disk | Verify the asset manifest before rendering; re-render whatever is missing |
-| A figure stretched, cropped, or styled off the report's design language | `design-spec.md` binds every asset: fixed containers, contain-fit with aspect preserved, spec fonts and palette in charts and Mermaid |
-| Chasing an interesting find with no ENTER trigger | Excursions need a named trigger; everything else stays a queued lead |
-| An excursion that never came back, or drifted into a new mission | EXIT rules are unconditional; depth 3 means promote it to an axis or record it as a gap |
-| An excursion whose result was never folded back | Every EXIT writes what it changed in the top-level answer, `none` included, and mirrors into the loop ledger |
-| Ending with file paths while an inline HTML page tool is available | Show the report inline first (the gated `report.html` or its inline edition), then the paths and the summary |
-| A visual reproduction checked only against itself | Reference compare: real source frames next to renders at the same moments, a critique per pair, fixes, and the pairs in the report |
-| Delivering without the closing briefing | Paste the block `outcome briefing` prints; never compute or recall its numbers by hand |
+- `sources/` and `fact-ledger.json` — one directory per source snapshot and the ledger built from them. The snapshot and locator contract (raw bytes, converted-only sources, byte locators, `source refresh`) is defined once, in [fact-ledger.md](references/fact-ledger.md#snapshot-and-locator-contract); every number and quotation reaches the report through a ledger placeholder.

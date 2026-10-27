@@ -50,7 +50,7 @@ Always required, never null: `fact_id`, `kind`, `raw` (string), `quote` (string)
 | `snapshot_sha256` | sha256 | sha256 | sha256 or null | sha256 or null | sha256 or null |
 | `rationale` | string or null | string or null | string or null | non-empty | string or null |
 | `exact` | from `value` | null | reduced rational | rational or null | reduced rational |
-| `context` | null | null | written by derive (object or null) | null | written by derive (object or null) |
+| `context` | quote context or null (legacy) | quote context or null (legacy) | written by derive (object or null) | null | written by derive (object or null) |
 | `operation` | null | null | sum/diff/growth/share/ratio/expr | null | `convert` |
 | `precision` | null | null | `{ places, sigfigs }` | null | `{ places, sigfigs }` |
 | `compatibility` | null | null | checked or unchecked (expr) | null | checked or unchecked (expr) |
@@ -61,8 +61,12 @@ Always required, never null: `fact_id`, `kind`, `raw` (string), `quote` (string)
   it when the caller leaves it null. Derived and converted rows get it from
   derive (plan todo 9): a converted value's rational comes from the original and the factor,
   not from the rounded `value`, so `addRow` never computes it from `value`.
-- `locator` is `{ artifact, char_start <= char_end, page?, line?, table?, row_label?,
-  col_label? }`.
+- `locator` is `{ artifact, char_start <= char_end, unit?, page?, line?, table?, row_label?,
+  col_label? }`: `char_start/char_end` are a half-open byte range of `artifact` (raw.bin, or
+  text.txt for a declared or converted extraction) in its own encoding; new rows write
+  `unit: "bytes"`. No unit marks a legacy text locator.
+- Source `snapshot_sha256` binds the pinned body exactly (raw.bin; text.txt for converted-only). Source `context` is `{prefix, suffix}`, each
+  at most 32 Unicode characters copied around the value span, or the whole quote for Q rows.
 - All other fields are nullable with the types in `fact-ledger-schema.mjs`.
 
 Exact rational integer strings are canonical: no leading zeros, negative zero, negative denominator,
