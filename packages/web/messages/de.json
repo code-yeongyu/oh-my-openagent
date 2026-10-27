@@ -38,6 +38,7 @@
       "getStarted": "Loslegen",
       "readManifesto": "Manifest lesen",
       "downloadDesktop": "Desktop-App herunterladen",
+      "downloadDesktopBeta": "Desktop-Beta herunterladen",
       "installLabel": "Ein Befehl, ein Tool"
     },
     "command": {
@@ -179,13 +180,6 @@
       "subtitle": "OmO installieren, Projekt öffnen, Aufgabe beschreiben. Das ist das gesamte Setup.",
       "installNow": "Jetzt installieren",
       "readTheDocs": "Docs lesen"
-    },
-    "dori": {
-      "eyebrow": "Spoiler",
-      "title": "Jemand hat gearbeitet, während du schläfst.",
-      "body": "Nicht OmO. Ein neuer Kollege vom selben Team. Er macht nie Feierabend, und du bezahlst ihn in Tokens.",
-      "cta": "Lerne Dori kennen",
-      "alt": "Dori, ein weißer Cartoon-Hund mit einem Stein in den Pfoten, der vom unteren Seitenrand nach oben schaut"
     },
     "dag": {
       "region": "OmO Desktop mit geöffnetem Workflow-Graphen",

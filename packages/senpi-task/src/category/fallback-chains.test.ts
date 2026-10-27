@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
-// Coupling guard: this test file must NEVER import @oh-my-opencode/model-core.
+// Coupling guard: this test file must NEVER import chain data from @oh-my-opencode/model-core. The one
+// allowed import is the FABLE_55_RELEASED launch switch, which gates the literal provisional 5.5 rows.
 // packages/model-core/src/category-model-requirements.ts is the source of truth; this file is the
 // independent transcription that catches drift between the two mirrors (senpi adds the kimi-coding
 // provider id to kimi rungs, heads every claude-* rung with the anthropic-subscription subscription lane,
@@ -31,11 +33,13 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
     expect(CATEGORY_FALLBACK_CHAINS).toEqual({
       "visual-engineering": [
         { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
+        ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" },
       ],
       architect: [
+        ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" }
       ],
       ultrabrain: [
@@ -56,6 +60,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "high" }
       ],
       artistry: [
+        ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
         { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }

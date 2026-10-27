@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { signInHint } from "./accounts-gate"
 import { terminalText } from "./terminal-text"
 
 export class SignInError extends Error {
@@ -52,18 +53,59 @@ export const deviceListSchema = z.object({
 export type ListedDevice = z.infer<typeof deviceListSchema>["devices"][number]
 export type ChooseDevice = (devices: readonly ListedDevice[]) => Promise<string | null>
 
+const REFUSAL_CODES = [
+  "unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked", "entitlement_required",
+  "authorization_pending", "slow_down", "access_denied", "expired_token", "rate_limited",
+  "internal", "unavailable", "forbidden", "invalid_request", "not_found",
+] as const
+export type RefusalCode = (typeof REFUSAL_CODES)[number] | "unknown"
+const isKnownRefusal = (code: string): code is (typeof REFUSAL_CODES)[number] => (REFUSAL_CODES as readonly string[]).includes(code)
+
+/** What a refused request asks of the person; the message keys on this, never on the server's text. */
+export type RefusalGuidance = "sign_in_again" | "wait" | "service_trouble" | "update_omo" | "account_deleted" | "account_refused"
+
+export function refusalGuidance(code: RefusalCode, status: number): RefusalGuidance {
+  switch (code) {
+    case "unauthorized": case "reauth_required": case "invalid_grant": case "device_revoked": case "expired_token":
+      return "sign_in_again"
+    case "rate_limited": case "slow_down":
+      return "wait"
+    case "internal": case "unavailable":
+      return "service_trouble"
+    case "invalid_request": case "not_found":
+      return "update_omo"
+    case "account_deleted":
+      return "account_deleted"
+    case "entitlement_required": case "forbidden": case "access_denied": case "authorization_pending":
+      return "account_refused"
+    case "unknown":
+      if (status === 401) return "sign_in_again"
+      if (status === 429) return "wait"
+      if (status >= 500) return "service_trouble"
+      return "account_refused"
+  }
+}
+
+export function refusalMessage(guidance: RefusalGuidance): string {
+  switch (guidance) {
+    case "sign_in_again": return `Your OmO sign-in ended. ${signInHint("again")}`
+    case "wait": return "OmO accounts got too many requests from this computer. Wait a minute, then try again."
+    case "service_trouble": return "OmO accounts are having trouble right now. Try again in a few minutes."
+    case "update_omo": return "This version of omo can't complete that request. Update omo with omo update, then try again."
+    case "account_deleted": return "This OmO account was deleted. Sign in with another account to keep using OmO."
+    case "account_refused": return "OmO accounts refused this request for your account. Check your account and its devices, then try again."
+  }
+}
+
 export class ApiRefusal extends SignInError {
-  readonly code: string
+  readonly code: RefusalCode
   readonly #detail: z.infer<typeof limitSchema> | undefined
   readonly #retryAfter: string | null
   constructor(code: string, readonly status: number, detail?: z.infer<typeof limitSchema>, retryAfter: string | null = null) {
+    const known: RefusalCode = isKnownRefusal(code) ? code : "unknown"
     // Server messages and unknown codes can contain credentials; never echo either.
-    super("The service refused this request. Sign in again or check your account.", status === 429 || status >= 500)
-    this.code = [
-      "unauthorized", "account_deleted", "reauth_required", "invalid_grant", "entitlement_required",
-      "authorization_pending", "slow_down", "access_denied", "expired_token", "rate_limited",
-      "internal", "unavailable", "forbidden", "invalid_request", "not_found",
-    ].includes(code) ? code : "unknown"
+    super(refusalMessage(refusalGuidance(known, status)), status === 429 || status >= 500)
+    this.code = known
     this.#detail = detail
     this.#retryAfter = retryAfter
   }

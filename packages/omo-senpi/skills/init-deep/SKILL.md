@@ -234,7 +234,7 @@ Ask the user: **Local or committed?**
 
 Capture the answer as `USER_MODE_CHOICE`. The explicit answer is authoritative:
 - `local` keeps the generated guidance personal to this checkout.
-- `committed` reruns the change through the `work-with-pr` skill so the generated guidance lands through a reviewed PR.
+- `committed` lands the generated guidance through a reviewed PR, via the committed-mode PR handoff at the end of this phase.
 - If no explicit answer is available, tracked `AGENTS.md` status is the fallback.
 
 Run these commands after the review is complete:
@@ -269,13 +269,25 @@ fi
 find . -name AGENTS.md -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/build/*'
 ```
 
-When switching from local mode to committed mode, remove the managed block before rerunning through `work-with-pr`:
+When switching from local mode to committed mode, remove the managed block before rerunning in committed mode:
 
 ```bash
 EXCLUDE=$(git rev-parse --git-path info/exclude) && sed -i.bak "/# >>> omo-senpi init-deep local (managed)/,/# <<< omo-senpi init-deep local (managed)/d" "$EXCLUDE" && rm -f "$EXCLUDE.bak"
 ```
 
 `USER_MODE_CHOICE=committed` selects committed mode even when `AGENTS.md` is untracked. `USER_MODE_CHOICE=local` selects local mode even when `AGENTS.md` is tracked. `.git/info/exclude` cannot hide changes to an already tracked file, so explicit local mode on a tracked `AGENTS.md` is informational only and the file remains visible to git.
+
+### Committed-mode PR handoff
+
+Committed mode is self-contained: it never requires a skill outside the shipped payload.
+
+- If the current environment provides a `work-with-pr` skill (some repositories define one project-locally), run the handoff through it: it knows that repository's branch, review, and merge conventions.
+- Otherwise run the generic handoff:
+  1. Create a dedicated branch for the guidance change. Follow the repository's branch naming if it defines one; otherwise use `docs/init-deep`. Never commit generated guidance straight to the default branch.
+  2. Commit only the AGENTS.md files this run generated or updated.
+  3. Push the branch and open a pull request against the repository's default branch (or the integration branch its contribution docs name). The PR body lists every file written, with its score and one-line role, matching the final report below.
+  4. Stop there. Merging follows the repository's own review process: never merge the guidance PR yourself, and never treat a hosting tool's defaults as the repository's conventions.
+- If no PR route exists (no remote, no hosting CLI or credentials, offline checkout), leave the change committed on the local branch and say so in the final report: name the branch, state that the PR could not be opened, and give the exact push and PR-open commands for the user to run. Never fall back to committing on the default branch, and never silently downgrade to local mode.
 
 ---
 

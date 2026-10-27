@@ -4,13 +4,14 @@ import type { AccountHttp, PairingHttp, PendingApproval } from "../../memory-cor
 import { createInMemoryDeviceKeyring } from "../../memory-core/src/sync/keyring-port"
 import { Command } from "commander"
 
-import { SignInError } from "../../omo-opencode/src/cli/service-auth/protocol"
+import { ApiRefusal, refusalGuidance, SignInError } from "../../omo-opencode/src/cli/service-auth/protocol"
+import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
-import type { SyncContext } from "../sync-context"
+import { signedInSyncContext, type SyncContext } from "../sync-context"
 
 const initialExitCode = process.exitCode
 afterEach(() => {
-  process.exitCode = initialExitCode
+  process.exitCode = initialExitCode ?? 0
 })
 
 const unused = (): never => {
@@ -50,6 +51,36 @@ async function runSync(args: string[], dependencies: Partial<SyncCommandDependen
 }
 
 describe("omo sync", () => {
+  test.each([
+    ["forbidden", 403, "account_refused"],
+    ["entitlement_required", 403, "account_refused"],
+    ["account_deleted", 410, "account_deleted"],
+    ["unauthorized", 401, "sign_in_again"],
+    ["unrecognized", 403, "account_refused"],
+  ] as const)("maps /v1/me refusal %s through shared guidance", async (code, status, guidance) => {
+    // given a valid local sign-in and a service refusal
+    const api = fakeApi(() => refusal(code, undefined, status))
+    const store = memorySecrets().store(api)
+    await store.write({ ...grant, ...privateKeys })
+    // when sync reads the signed-in account
+    const error = await signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store }).catch(error => error)
+    // then the refusal preserves machine values, not server prose
+    expect(error).toBeInstanceOf(ApiRefusal)
+    if (!(error instanceof ApiRefusal)) throw error
+    expect(error).toMatchObject({ code: code === "unrecognized" ? "unknown" : code, status })
+    expect(refusalGuidance(error.code, error.status)).toBe(guidance)
+  })
+
+  test.each(["not json", "{}", '{"error":{"code":42}}'])("maps malformed /v1/me refusal by status: %s", async body => {
+    // given an unreadable refusal body
+    const api = fakeApi(() => new Response(body, { status: 403 }))
+    const store = memorySecrets().store(api)
+    await store.write({ ...grant, ...privateKeys })
+    // when sync reads the account, then the status fallback remains available
+    await expect(signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store }))
+      .rejects.toMatchObject({ code: "unknown", status: 403 })
+  })
+
   test("recover points at the desktop passkey flow or approval from another device, and exits 2", async () => {
     const result = await runSync(["sync", "recover"], {})
     expect(result.exit).toBe(EXIT_UNSUPPORTED_HERE)

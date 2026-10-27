@@ -16,7 +16,7 @@ import { readFile, realpathSync, stat } from "../fs/resilient"
 import type { GitMemoryRepo } from "../git"
 import { parseMemoryFile } from "../memfs"
 import { recallDocumentTerms } from "./bm25"
-import { onRecallDocumentsEncoded, recallTermAccess } from "./bm25-index"
+import { onRecallDocumentsEncoded, recallTermAccess, recallTermFigures } from "./bm25-index"
 import type { RecallTermIndex, RecallTermPersistence } from "./bm25-persist"
 
 export interface RecallDocument {
@@ -164,6 +164,41 @@ function acquireSharedCache(dir: string, options: RecallCorpusCacheOptions): Rec
   return cache
 }
 
+// Every cache in the process, read only when a memory report is taken (oh-my-openagent#9442).
+const liveCaches = new Set<WeakRef<RecallCorpusCache>>()
+const releaseLiveCache = new FinalizationRegistry<WeakRef<RecallCorpusCache>>((ref) => {
+  liveCaches.delete(ref)
+})
+
+/** The recall layer's figures in the on-demand memory report. */
+export interface RecallMemoryFigures {
+  /** Caches holding a parsed corpus; a shared corpus counts once however many sessions hold it. */
+  readonly corpusCaches: number
+  readonly documents: number
+  /** UTF-16 size of every held document's path, description and body. */
+  readonly documentTextBytes: number
+  /** Term id and count arrays the BM25 index keeps for those documents. */
+  readonly termArrayBytes: number
+  /** Terms in the process-wide BM25 dictionary. */
+  readonly vocabularyTerms: number
+}
+
+export function recallMemoryFigures(): RecallMemoryFigures {
+  const documents = new Set<RecallDocument>()
+  let corpusCaches = 0
+  for (const ref of liveCaches) {
+    const held = ref.deref()?.heldDocuments()
+    if (held === undefined) continue
+    corpusCaches += 1
+    for (const document of held) documents.add(document)
+  }
+  let documentTextBytes = 0
+  for (const document of documents) {
+    documentTextBytes += 2 * (document.path.length + document.description.length + document.body.length)
+  }
+  return { corpusCaches, documents: documents.size, documentTextBytes, ...recallTermFigures(documents) }
+}
+
 const REF_NAME = /^refs\/[A-Za-z0-9._\-/]+$/
 
 /**
@@ -223,6 +258,15 @@ export class RecallCorpusCache {
   constructor(options: RecallCorpusCacheOptions = {}) {
     this.options = options
     this.resolveHead = options.head ?? ((repo) => repo.head())
+    const ref = new WeakRef<RecallCorpusCache>(this)
+    liveCaches.add(ref)
+    releaseLiveCache.register(this, ref)
+  }
+
+  /** The parsed documents this cache holds itself, `undefined` before its first load (memory report only). */
+  heldDocuments(): Iterable<RecallDocument> | undefined {
+    if (this.blobs === undefined) return undefined
+    return [...this.blobs.loaded.values()].flatMap((blob) => (blob.document === undefined ? [] : [blob.document]))
   }
 
   async load(repo: GitMemoryRepo): Promise<RecallCorpus> {

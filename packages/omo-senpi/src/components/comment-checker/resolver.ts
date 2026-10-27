@@ -41,8 +41,9 @@ export function resolveSenpiCommentCheckerBinary(options: SenpiCommentCheckerBin
 export function defaultCommentCheckerCacheDir(
   platform: NodeJS.Platform = process.platform,
   env: Record<string, string | undefined> = process.env,
+  cacheDirName: string = COMMENT_CHECKER_CACHE_DIR_NAME,
 ): string {
-  return commentCheckerCacheDir({ platform, env, homedir: homedir(), cacheDirName: COMMENT_CHECKER_CACHE_DIR_NAME })
+  return commentCheckerCacheDir({ platform, env, homedir: homedir(), cacheDirName })
 }
 
 function findExecutableOnPath(binaryName: string): string | null {

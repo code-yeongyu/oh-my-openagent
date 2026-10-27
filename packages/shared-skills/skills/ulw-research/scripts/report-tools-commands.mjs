@@ -5,7 +5,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
 import { CliError, parseArgs, readJsonFile, writeJsonAtomic } from "./cli-support.mjs"
-import { REPAIR_DEFAULTS } from "./contracts.mjs"
+import { GATE_NAMES, GATE_STATUSES, REPAIR_DEFAULTS } from "./contracts.mjs"
 import { parseLineageMode, parsePalette, renderDesignSpec } from "./design-spec.mjs"
 import { extractFromHtml, extractFromPath, fetchHtml } from "./format-extract.mjs"
 import { checkLayout } from "./gates-layout.mjs"
@@ -80,12 +80,16 @@ export function runLayoutProbe(argv) {
 }
 
 export function runRepairDecide(argv) {
-	const args = parseArgs(argv)
+	const args = parseArgs(argv, { repeatable: ["defects"] })
 	const statePath = args.required("state")
 	const now = nowFrom(args.flags)
-	const defectsInput = readJsonFile(args.required("defects"))
-	const defects = Array.isArray(defectsInput) ? defectsInput : defectsInput.defects
-	if (!Array.isArray(defects)) throw new CliError("--defects must be a JSON array or a check result with a defects array")
+	// Every --defects file (check result, fidelity record, or bare array) joins one defect list.
+	const defects = args.required("defects").flatMap((path) => {
+		const input = readJsonFile(path)
+		const list = Array.isArray(input) ? input : input.defects
+		if (!Array.isArray(list)) throw new CliError(`--defects ${path} must be a JSON array or a check result with a defects array`)
+		return list
+	})
 	const state = existsSync(statePath)
 		? deserializeState(readText(statePath))
 		: createTracker({
@@ -122,20 +126,20 @@ function manifestPath(flags) {
 	return join(sessionDirFrom(flags), outcome.MANIFEST_FILENAME)
 }
 
-export function runOutcome(argv) {
+export async function runOutcome(argv) {
 	const [sub, ...rest] = argv
 	const args = parseArgs(rest, { booleans: ["json"] })
 	const file = sub === "state" ? null : manifestPath(args.flags)
 	switch (sub) {
 		case "init": {
 			const promised = args.required("promised").split(",").map((s) => s.trim()).filter(Boolean)
-			const manifest = outcome.initManifest({ sessionDir: sessionDirFrom(args.flags), promised, lane: args.flags.lane ?? null, now: nowFrom(args.flags) })
+			const manifest = outcome.initManifest({ sessionDir: sessionDirFrom(args.flags), promised, lane: args.flags.lane ?? null, now: nowFrom(args.flags), startedAt: args.flags["started-at"] })
 			outcome.writeManifest(file, manifest)
 			return { json: { command: "outcome init", path: file, deliverables: manifest.deliverables }, exitCode: 0 }
 		}
 		case "set": {
 			const [format, status] = args.positionals
-			if (!format || !status) throw new CliError("usage: outcome set <format> <status> [--path p] [--reason r] [--pages n]")
+			if (!format || !status) throw new CliError("usage: outcome set <format> <status> [--path p] [--reason r] [--pages n] [--verified-by fidelity-defects.json] [--rendered-from source]")
 			const manifest = outcome.readManifest(file)
 			const detail = {}
 			if (args.flags.path !== undefined) {
@@ -144,13 +148,14 @@ export function runOutcome(argv) {
 			}
 			if (args.flags.reason !== undefined) detail.reason = args.flags.reason
 			if (args.flags.pages !== undefined) detail.pages = args.int("pages")
+			for (const [flag, key] of [["verified-by", "verifiedBy"], ["rendered-from", "renderedFrom"]]) if (args.flags[flag] !== undefined) detail[key] = resolve(args.flags[flag])
 			outcome.writeManifest(file, outcome.setDeliverable(manifest, format, status, { ...detail, now: nowFrom(args.flags) }))
 			return { json: { command: "outcome set", format, status }, exitCode: 0 }
 		}
 		case "gate": {
 			const [gate, status] = args.positionals
-			if (!gate || !status) throw new CliError("usage: outcome gate <static|layout|visual|proofread> <pass|fail|not_run>")
-			outcome.writeManifest(file, outcome.setGate(outcome.readManifest(file), gate, status))
+			if (!gate || !status) throw new CliError(`usage: outcome gate <${GATE_NAMES.join("|")}> <${GATE_STATUSES.join("|")}>`)
+			outcome.writeManifest(file, outcome.setGate(outcome.readManifest(file), gate, status, { reason: args.flags.reason, now: nowFrom(args.flags) }))
 			return { json: { command: "outcome gate", gate, status }, exitCode: 0 }
 		}
 		case "render": {
@@ -169,11 +174,17 @@ export function runOutcome(argv) {
 			return { json: { command: "outcome state", state }, summary: `state: ${state}`, exitCode: 0 }
 		}
 		case "verify": {
-			const result = outcome.verifyManifest(outcome.readManifest(file))
+			const manifest = outcome.readManifest(file)
+			const base = outcome.verifyManifest(manifest)
+			const { fidelityProblems } = await import("./fidelity-records.mjs")
+			const problems = [...base.problems, ...fidelityProblems(sessionDirFrom(args.flags), manifest)]
+			const result = { ok: problems.length === 0, problems }
 			return { json: { command: "outcome verify", ...result }, summary: `verify: ${result.ok ? "OK" : `${result.problems.length} problem(s)`}`, exitCode: result.ok ? 0 : 1 }
 		}
 		case "finish": {
 			const manifest = outcome.readManifest(file)
+			const refused = (await import("./fidelity-records.mjs")).fidelityProblems(sessionDirFrom(args.flags), manifest)
+			if (refused.length > 0) return { json: { command: "outcome finish", refused: true, problems: refused }, summary: `finish: refused (${refused.map((p) => p.code).join(", ")})`, exitCode: 1 }
 			const ledgerPath = args.flags.ledger ?? join(sessionDirFrom(args.flags), "sources-ledger.md")
 			const now = nowFrom(args.flags)
 			const facts = outcome.briefingFacts(manifest, existsSync(ledgerPath) ? readText(ledgerPath) : "", now)

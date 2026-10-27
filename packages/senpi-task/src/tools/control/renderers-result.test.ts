@@ -22,6 +22,7 @@ const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
 type SendResultRenderCase = readonly [name: string, details: SendResultDetails, expected: string]
 
 const SEND_RESULT_RENDER_CASES = [
+  ["unresponsive", { kind: "unresponsive", task_id: "st_1", retryable: true, reason: "HOST_STATUS_SENTINEL" }, "[muted]task_send unresponsive st_1: HOST_STATUS_SENTINEL[/muted]"],
   ["uncertain", { kind: "uncertain", task_id: "st_1", effect_id: "st_1:0:1", reason: "Delivery pending." }, "[warning]task_send Delivery pending. Effect id: st_1:0:1[/warning]"],
   ["failed", { kind: "failed", task_id: "st_1", effect_id: "st_1:0:1", reason: "conflict", detail: "Different input", action: "Use a new id" }, "[error]task_send conflict: Different input. Action: Use a new id.[/error]"],
   ["steered", { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" }, "[accent]task_send delivered st_1 as steer (running)[/accent]"],

@@ -3,9 +3,21 @@
 // supplies one DeviceAccountSource; everything after it is the same code for the TUI, the CLI and
 // the desktop. Private keys stay in the credential store and reach only the keyring built from them.
 
-import { type Credentials, createCredentialStore, type CredentialStore, createSession, quietNotice, serviceOrigin, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
+import {
+  type Credentials,
+  createCredentialStore,
+  type CredentialStore,
+  createSession,
+  KeychainApprovalPendingError,
+  quietNotice,
+  serviceOrigin,
+  SignInError,
+} from "@oh-my-opencode/omo-opencode/service-auth"
 
 import type { DeviceKeyMaterial, DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
+
+import { SyncConfigError } from "../sync-config-error"
+import { SyncSessionDeferredError } from "../sync-session-deferred"
 
 export type KeyringFactory = (material: DeviceKeyMaterial) => Promise<DeviceKeyring>
 
@@ -42,17 +54,34 @@ export function createCliAccountSource(options: {
   readonly store?: CredentialStore
   readonly fetch?: typeof fetch
 }): DeviceAccountSource {
-  const api = serviceOrigin(options.api ?? options.env?.OMO_SERVICE_API_URL ?? DEFAULT_SERVICE_API)
+  const configured = options.api === undefined ? options.env?.OMO_SERVICE_API_URL : undefined
+  let api: string
+  try {
+    api = serviceOrigin(options.api ?? configured ?? DEFAULT_SERVICE_API)
+  } catch (error) {
+    if (configured !== undefined) throw new SyncConfigError("OMO_SERVICE_API_URL", error)
+    throw error
+  }
   const doFetch = options.fetch ?? fetch
+  // A keychain waiting for its approval dialog is not a signed-out device: sync defers this pass and retries.
   return async () => {
+    try {
+      return await resolve()
+    } catch (error) {
+      if (error instanceof KeychainApprovalPendingError) throw new SyncSessionDeferredError(error.message, error)
+      throw error
+    }
+  }
+  async function resolve(): Promise<DeviceAccount | null> {
     let store: CredentialStore
     let credentials: Credentials | null
     try {
       // A host runs under a TUI: the CLI's keyring-fallback notice must not write over it, and the fallback is
       // the same libsecret path the CLI uses (#10658 review).
-      store = options.store ?? createCredentialStore(api, undefined, undefined, undefined, quietNotice)
+      store = options.store ?? createCredentialStore(api, { notice: quietNotice })
       credentials = await store.read()
     } catch (error) {
+      if (error instanceof KeychainApprovalPendingError) throw error
       // A host with no usable OS credential store (plain Node, a locked or absent keyring) cannot be
       // signed in; that is the signed-out state, not a sync failure on every session bind.
       if (error instanceof SignInError) return null
@@ -66,7 +95,14 @@ export function createCliAccountSource(options: {
       accountId: await accountIdOf(api, await accessToken(), doFetch),
       keyring: (build) => build({ signingPrivatePkcs8: base64url(credentials.signingPrivateKey), sealingPrivatePkcs8: base64url(credentials.sealingPrivateKey) }),
       accessToken,
-      signedOut: async () => (await store.read()) === null,
+      signedOut: async () => {
+        try {
+          return (await store.read()) === null
+        } catch (error) {
+          if (error instanceof KeychainApprovalPendingError) return false
+          throw error
+        }
+      },
     }
   }
 }

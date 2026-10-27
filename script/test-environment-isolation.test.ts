@@ -14,7 +14,8 @@ function runChildBunTest(cwd: string, env: NodeJS.ProcessEnv, files: readonly st
   const result = spawnSync(process.execPath, ["test", "--parallel=1", "--no-isolate", ...files], { cwd, env, encoding: "utf8", timeout: CHILD_BUDGET_MS })
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`
   if (result.error !== undefined || result.signal !== null) {
-    throw new Error(`child bun test did not finish (${result.error?.message ?? `signal ${result.signal}`}) within ${CHILD_BUDGET_MS} ms:\n${output}`)
+    const cause = result.error?.message ?? `killed by signal ${result.signal}`
+    throw new Error(`child bun test did not complete (${cause}; budget ${CHILD_BUDGET_MS} ms):\n${output}`)
   }
   return { status: result.status, output }
 }
@@ -84,7 +85,7 @@ describe("test file environment integrity", () => {
 })
 
 describe("process.env replacement", () => {
-  test("#given a file that assigns a new object to process.env #when the next file pins TMPDIR #then teardown names the file and os.tmpdir() follows the pin again", () => {
+  test("#given a file that assigns a new object to process.env #when the next file pins the temp dir (TMPDIR, TEMP, TMP) #then teardown names the file and os.tmpdir() follows the pin again", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-env-replace-"))
     try {
       const integrityPath = resolve(import.meta.dir, "../test-support/environment-integrity.ts")
@@ -104,7 +105,7 @@ describe("process.env replacement", () => {
         'import { tmpdir } from "node:os"',
         // os.tmpdir() reads TMPDIR on POSIX and TEMP/TMP on win32: pin all three, and restore them so this file leaks nothing.
         'const names = ["TMPDIR", "TEMP", "TMP"] as const',
-        `test("next file pins TMPDIR", () => { const previous = names.map((name) => process.env[name]); for (const name of names) process.env[name] = ${JSON.stringify(pinned)}; try { expect(tmpdir()).toBe(${JSON.stringify(pinned)}) } finally { names.forEach((name, index) => { const value = previous[index]; if (value === undefined) delete process.env[name]; else process.env[name] = value }) } })`,
+        `test("next file pins the temp dir", () => { const previous = names.map((name) => process.env[name]); for (const name of names) process.env[name] = ${JSON.stringify(pinned)}; try { expect(tmpdir()).toBe(${JSON.stringify(pinned)}) } finally { names.forEach((name, index) => { const value = previous[index]; if (value === undefined) delete process.env[name]; else process.env[name] = value }) } })`,
       ].join("\n"))
       const env: NodeJS.ProcessEnv = { ...process.env }
       delete env.CI
@@ -112,7 +113,10 @@ describe("process.env replacement", () => {
       const result = runChildBunTest(root, env, [swapPath, nextPath])
       const output = result.output
       expect(output).toContain("a-swap.test.ts replaced process.env with another object")
-      expect(output).toContain("(pass) next file pins TMPDIR")
+      expect(output).toContain("(pass) next file pins the temp dir")
+      // The next file restores what it pins, so the swap is the run's only failure: the exit status proves the guard.
+      expect(output).not.toContain("b-next.test.ts leaked process.env")
+      expect(output).not.toContain("b-next.test.ts replaced process.env")
       expect(result.status).not.toBe(0)
     } finally {
       removeTreeSync(root)
@@ -122,7 +126,9 @@ describe("process.env replacement", () => {
   test("#given the repository's test sources #when scanned #then none assigns a new object to process.env", () => {
     const repoRoot = resolve(import.meta.dir, "..")
     const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8" }).split("\0")
-    const testSource = /(\.(test|spec)\.[cm]?[jt]sx?$|^test-support\/|\.test-support\.[cm]?[jt]s$)/
+    // Everything that can run inside a bun test process: test files, shared test support, the root preloads
+    // (test-setup.ts, test-env.ts, ...) and helpers under tests/ or __tests__/ directories.
+    const testSource = /(\.(test|spec)\.[cm]?[jt]sx?$|^test-support\/|\.test-support\.[cm]?[jt]s$|^test-[^/]+\.[cm]?[jt]s$|(^|\/)(tests|__tests__)\/.+\.[cm]?[jt]sx?$)/
     const assignment = /\bprocess\.env\s*=(?!=)/
     // The integrity check puts the process's own environment object back; this file writes a swap fixture.
     const allowed = new Set(["test-support/environment-integrity.ts", "script/test-environment-isolation.test.ts"])

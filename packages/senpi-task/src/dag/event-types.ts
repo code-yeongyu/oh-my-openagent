@@ -1,5 +1,6 @@
 import type { TaskStartFailureKind } from "../state/start-failure"
 import type { DagNodeId, DagRunId, DagNodeState, DagNodeCounts, DagNodeError, DagDiagnostic, DagEventLane } from "./types"
+import type { PausedDagEvent } from "./paused-events"
 
 export const DAG_NODE_TRANSITION_REASONS = [
   { kind: "unblocked" },
@@ -25,7 +26,7 @@ export type DagNodeTransitionReason =
   // run, a team, a task spawn) - the only explanation the /dag view has for a quiet run.
   | { readonly kind: "residency_queued"; readonly residents: number; readonly heldByOtherOwners: number }
 
-// The journaled payload union. EXACTLY 17 members; every member is written to the WAL with a
+// The journaled payload union; every member is written to the WAL with a
 // WAL-assigned seq. Live activity telemetry is NOT here - see DagActivityEvent below.
 export const DAG_RUN_EVENT_TYPES = [
   "dag.run.created",
@@ -45,9 +46,19 @@ export const DAG_RUN_EVENT_TYPES = [
   "dag.definition.amended",
   "dag.diagnostic.added",
   "dag.stream.overflow",
+  "dag.guidance.added",
+  "dag.guidance.edited",
+  "dag.guidance.removed",
+  "dag.guidance.dispatching",
+  "dag.guidance.delivered",
+  "dag.node.cancel_requested",
+  "dag.node.retry-staged",
+  "dag.node.pause-recovered",
+  "dag.node.pause-lost",
 ] as const
 
 export type DagRunEventPayload =
+  | PausedDagEvent
   | {
       readonly type: "dag.run.created"
       readonly runKey: string
@@ -57,7 +68,7 @@ export type DagRunEventPayload =
       readonly edgeCount: number
     }
   | { readonly type: "dag.run.started"; readonly generation: number }
-  | { readonly type: "dag.run.paused"; readonly reason?: string }
+  | { readonly type: "dag.run.paused"; readonly reason?: string; readonly pauseSeq?: number }
   | { readonly type: "dag.run.resumed"; readonly generation: number }
   | { readonly type: "dag.run.completed"; readonly counts: DagNodeCounts }
   | {

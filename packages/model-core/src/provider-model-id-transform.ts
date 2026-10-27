@@ -58,6 +58,8 @@ function transformModelForProviderUsingAnthropicBehavior(
 	if (provider === "kimi-coding" || provider === "kimi-for-coding") {
 		if (model === "kimi-k3") return "k3"
 		if (model === "kimi-k3-256k") return "k3-256k"
+		if (model === "kimi-k3.1-pro") return "k3.1-pro"
+		if (model === "kimi-k3.1-pro-highspeed") return "k3.1-pro-highspeed"
 	}
 	return model
 }

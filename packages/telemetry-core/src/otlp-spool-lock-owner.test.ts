@@ -71,21 +71,46 @@ describe("a lock is only ever its owner's", () => {
     expect(spoolNames(dir)).toEqual([live])
   })
 
-  test("#given stale locks naming our own pid #then the sweep deletes the one from an earlier boot and keeps this process's own", () => {
+  test("#given stale locks naming our own pid #then the sweep deletes the one from an earlier boot and keeps the one this process holds", () => {
     // given
     const { dir, ctx } = spool()
     const earlierBoot = lockName(batchName("logs", createBatchId(Date.now())))
-    const thisBoot = lockName(batchName("traces", createBatchId(Date.now())))
+    const heldSource = batchName("traces", createBatchId(Date.now()))
+    const held = lockName(heldSource)
     writeFileSync(join(dir, earlierBoot), `${ctx.pid} ${"e".repeat(32)} nonce`)
-    writeFileSync(join(dir, thisBoot), `${ctx.pid} ${ctx.bootId} nonce`)
+    const token = tryLockSync(dir, heldSource, ctx)
     const stale = new Date(Date.now() - CLAIM_LEASE_MS - 1_000)
     utimesSync(join(dir, earlierBoot), stale, stale)
-    utimesSync(join(dir, thisBoot), stale, stale)
+    utimesSync(join(dir, held), stale, stale)
 
     // when
     sweepSpool({ ...ctx, isPidAlive: (pid) => pid === ctx.pid })
 
     // then
-    expect(spoolNames(dir)).toEqual([thisBoot])
+    expect(spoolNames(dir)).toEqual([held])
+    if (token !== null) unlock(dir, heldSource, token)
+  })
+
+  test("#given a stale lock of this process that its unlock could not delete #when the sweep runs #then the lock is deleted", () => {
+    // given
+    const { dir, ctx } = spool()
+    const source = batchName("logs", createBatchId(Date.now()))
+    const token = tryLockSync(dir, source, ctx)
+    expect(token).not.toBeNull()
+    const left: unknown[] = []
+    const lockPath = join(dir, lockName(source))
+    const kept = readFileSync(lockPath, "utf8")
+    unlinkSync(lockPath)
+    // A lock the unlock could not delete: the unlock ran (and gave up) while the file stayed behind.
+    unlock(dir, source, token ?? "", (error) => left.push(error))
+    writeFileSync(lockPath, kept)
+    const stale = new Date(Date.now() - CLAIM_LEASE_MS - 1_000)
+    utimesSync(lockPath, stale, stale)
+
+    // when
+    sweepSpool(ctx)
+
+    // then
+    expect(existsSync(lockPath)).toBe(false)
   })
 })

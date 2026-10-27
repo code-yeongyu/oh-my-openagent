@@ -1,5 +1,5 @@
 export { createHttpTransport, SyncHttpError, type HttpTransportOptions } from "./adapters/http-transport"
-export { type EngineStatus, SyncEngine } from "./engine"
+export { type EngineStatus, type SyncFailure, type SyncFailureKind, SyncEngine } from "./engine"
 // The sync sidecar re-exports the Loro loader so a packaged install can prove the wasm beside it loads.
 export { loadLoroRuntime } from "../../crdt/loro-runtime"
 export { caseFold } from "../item/casefold"

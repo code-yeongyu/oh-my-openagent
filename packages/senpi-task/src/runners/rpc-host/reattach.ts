@@ -23,10 +23,13 @@ export interface HostSessionReattachRefused {
 /**
  * The runner's side of transport recovery: re-ensure the RECORDED endpoint (`session.socket`) and
  * reopen this session by path there. Resolves undefined when the retries are exhausted; the handle
- * then ends the child as it always did (`crashed`, `transport_gone`). Never throws.
+ * then ends the child as it always did (`crashed`, `transport_gone`). Never throws. `abandoned` turns
+ * true once the caller stopped waiting (its recovery bound ran out): no further attempt starts then,
+ * because the parked session now belongs to live-parent recovery, which may already have closed it.
  */
 export type HostSessionReattach = (
   session: HostSessionFacts,
+  abandoned?: () => boolean,
 ) => Promise<HostSessionReattached | HostSessionReattachRefused | undefined>
 
 /** A command met a dead transport: the senpi client's loss error, or the session client already emptied. */

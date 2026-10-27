@@ -11,6 +11,7 @@ import {
   buildGptSisyphusAgentConfig,
   buildGrokSisyphusAgentConfig,
 } from "./sisyphus-agent-config";
+import { withRefusalRule } from "./refusal-rule";
 import { buildFallbackSisyphusPrompt } from "./sisyphus-dynamic-prompt";
 import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
@@ -23,6 +24,7 @@ import { buildGrok4SisyphusPrompt } from "./sisyphus/grok-4";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildKimiK27SisyphusPrompt } from "./sisyphus/kimi-k2-7";
 import { buildKimiK3SisyphusPrompt } from "./sisyphus/kimi-k3";
+import { buildKimiK31SisyphusPrompt } from "./sisyphus/kimi-k3-1";
 import type { AgentMode } from "./types";
 import {
   isClaudeFable5Model,
@@ -40,6 +42,7 @@ import {
   isKimiK2CodeModel,
   isKimiK2Model,
   isKimiK3Model,
+  isKimiK31Model,
 } from "./types";
 
 const MODE: AgentMode = "primary";
@@ -52,6 +55,7 @@ const MODE: AgentMode = "primary";
  * body is the wrong family and must be rebuilt (issue #5297/#5316).
  */
 export type SisyphusPromptFamily =
+  | "kimi-k3-1"
   | "kimi-k3"
   | "kimi-k2-7"
   | "kimi-k2-6"
@@ -66,6 +70,7 @@ export type SisyphusPromptFamily =
   | "fallback";
 
 export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily {
+  if (isKimiK31Model(model)) return "kimi-k3-1";
   if (isKimiK3Model(model)) return "kimi-k3";
   if (isKimiK2CodeModel(model)) return "kimi-k2-7";
   if (isKimiK2Model(model)) return "kimi-k2-6";
@@ -88,12 +93,37 @@ export function createSisyphusAgent(
   availableCategories?: AvailableCategory[],
   useTaskSystem = false,
 ): AgentConfig {
+  const config = createSisyphusAgentForFamily(
+    model,
+    availableAgents,
+    availableToolNames,
+    availableSkills,
+    availableCategories,
+    useTaskSystem,
+  );
+  return config.prompt === undefined ? config : { ...config, prompt: withRefusalRule(config.prompt) };
+}
+
+function createSisyphusAgentForFamily(
+  model: string,
+  availableAgents?: AvailableAgent[],
+  availableToolNames?: string[],
+  availableSkills?: AvailableSkill[],
+  availableCategories?: AvailableCategory[],
+  useTaskSystem = false,
+): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
   const skills = availableSkills ?? [];
   const categories = availableCategories ?? [];
   const agents = availableAgents ?? [];
 
   switch (resolveSisyphusPromptFamily(model)) {
+    case "kimi-k3-1":
+      return buildGptSisyphusAgentConfig(
+        MODE,
+        model,
+        buildKimiK31SisyphusPrompt(model, agents, tools, skills, categories, useTaskSystem),
+      );
     case "kimi-k3":
       return buildGptSisyphusAgentConfig(
         MODE,

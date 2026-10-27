@@ -38,6 +38,7 @@
       "getStarted": "Inizia",
       "readManifesto": "Leggi il manifesto",
       "downloadDesktop": "Scarica l'app desktop",
+      "downloadDesktopBeta": "Scarica la beta desktop",
       "installLabel": "Un comando, uno strumento"
     },
     "command": {
@@ -179,13 +180,6 @@
       "subtitle": "Installa OmO, apri il tuo progetto, descrivi il lavoro. La configurazione è tutta qui.",
       "installNow": "Installa ora",
       "readTheDocs": "Leggi la documentazione"
-    },
-    "dori": {
-      "eyebrow": "Spoiler",
-      "title": "Qualcuno ha lavorato mentre dormivi.",
-      "body": "Non OmO. Un nuovo assunto dallo stesso team. Non stacca mai e lo paghi in token.",
-      "cta": "Conosci Dori",
-      "alt": "Dori, un cane bianco dei cartoni con una pietra in mano, che fa capolino dal fondo della pagina"
     },
     "dag": {
       "region": "OmO desktop con il grafo del workflow aperto",

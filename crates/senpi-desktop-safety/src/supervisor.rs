@@ -24,7 +24,12 @@ use parking_lot::Mutex;
 use crate::{clock::Clock, reset::UserReset};
 
 mod stop;
+pub(crate) mod authority;
 mod emergency;
+mod deafness;
+mod status;
+
+pub use deafness::DeafProbe;
 
 /// Max age of a stop path's heartbeat before it stops counting (ms).
 pub const HEARTBEAT_FRESH_MS: u64 = 2_000;
@@ -75,12 +80,15 @@ pub struct StopPolicy {
     pub allow_host_relay_only: bool,
 }
 
-/// Why the global stop-chord listener failed to start; the gate turns
+/// Why the global stop-chord listener cannot authorize input; the gate turns
 /// `AccessibilityDenied` into a permission error instead of a missing stop path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StopPathFailure {
     Unavailable,
     AccessibilityDenied,
+    /// The listener runs but cannot hear the chord: another process enabled
+    /// macOS Secure Event Input, which hides key events from every event tap.
+    SecureInput,
 }
 
 /// Snapshot of supervisor state used for gating and status reporting.
@@ -129,10 +137,13 @@ impl StopPathState {
 
 /// Kill-switch state shared by the session loop and every stop path.
 pub struct Supervisor {
+    #[cfg(test)]
+    activation_hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     #[cfg(any(test, feature = "test-support"))]
     hold_waiting: Mutex<Option<std::sync::mpsc::Sender<()>>>,
     hold_signals: Mutex<Vec<Weak<crate::HoldSignal>>>,
     suspended: AtomicBool,
+    authority: Option<Arc<authority::AuthorityAdmission>>,
     published: AtomicBool,
     stop_commit_lock: Mutex<()>,
     emergency: Mutex<Option<emergency::EmergencyWorker>>,
@@ -144,6 +155,7 @@ pub struct Supervisor {
     stopped_by: Mutex<Option<StopSource>>,
     stop_paths: Mutex<HashMap<StopPathId, StopPathState>>,
     global_failure: Mutex<Option<StopPathFailure>>,
+    deafness: deafness::Deafness,
     clock: Arc<dyn Clock>,
     stop_commit: Option<Arc<dyn Fn() + Send + Sync>>,
 }
@@ -153,10 +165,13 @@ impl Supervisor {
     #[must_use]
     pub fn new(clock: Arc<dyn Clock>) -> Self {
         Self {
+            #[cfg(test)]
+            activation_hook: Mutex::new(None),
             #[cfg(any(test, feature = "test-support"))]
             hold_waiting: Mutex::new(None),
             hold_signals: Mutex::new(Vec::new()),
             suspended: AtomicBool::new(false),
+            authority: None,
             published: AtomicBool::new(false),
             stop_commit_lock: Mutex::new(()),
             emergency: Mutex::new(None),
@@ -166,6 +181,7 @@ impl Supervisor {
             stopped_by: Mutex::new(None),
             stop_paths: Mutex::new(HashMap::new()),
             global_failure: Mutex::new(None),
+            deafness: deafness::Deafness::default(),
             clock,
             stop_commit: None,
         }
@@ -190,11 +206,6 @@ impl Supervisor {
             *supervisor.stopped_by.get_mut() = Some(StopSource::Api);
         }
         supervisor
-    }
-
-    /// The latest global listener start result; success clears a previous failure.
-    pub fn note_global_failure(&self, failure: Option<StopPathFailure>) {
-        *self.global_failure.lock() = failure;
     }
 
     /// Record that a stop path is live (or not); going live counts as a beat.
@@ -242,8 +253,8 @@ impl Supervisor {
         }
     }
 
-    /// How many stops this supervisor observed; a control grant's epoch at
-    /// grant time is how the session tells a later stop happened.
+    /// Invalidation epoch: stops and authority activation invalidate old holds
+    /// and grants. This is NOT the immediate authority request generation.
     #[must_use]
     pub fn stop_epoch(&self) -> u64 {
         self.stop_epoch.load(Ordering::SeqCst)
@@ -251,6 +262,9 @@ impl Supervisor {
 
     /// Lift suspension. User-only: the proof comes from the host's resume token.
     pub fn reset(&self, _proof: UserReset) {
+        if self.authority.is_some() {
+            return;
+        }
         let _commit = self.stop_commit_lock.lock();
         let mut stopped_by = self.stopped_by.lock();
         *stopped_by = None;
@@ -260,7 +274,10 @@ impl Supervisor {
 
     #[must_use]
     pub fn is_suspended(&self) -> bool {
-        self.suspended.load(Ordering::SeqCst)
+        match &self.authority {
+            Some(authority) => authority.is_suspended(),
+            None => self.suspended.load(Ordering::SeqCst),
+        }
     }
 
     /// Lifts suspension without a [`UserReset`], for tests only: compiled
@@ -268,6 +285,9 @@ impl Supervisor {
     /// enable, so no production build can call it.
     #[cfg(any(test, feature = "test-support"))]
     pub fn reset_for_test(&self) {
+        if self.authority.is_some() {
+            return;
+        }
         let _commit = self.stop_commit_lock.lock();
         let mut stopped_by = self.stopped_by.lock();
         *stopped_by = None;
@@ -281,46 +301,6 @@ impl Supervisor {
     pub fn set_fatal_exit_for_test(&mut self, exit: impl Fn(i32) + Send + Sync + 'static) {
         self.fatal_exit = Arc::new(exit);
     }
-
-    #[must_use]
-    pub fn status(&self) -> SupervisorStatus {
-        let now_ms = self.clock.now_ms();
-        let (global, relay) = {
-            let paths = self.stop_paths.lock();
-            let state = |id| paths.get(&id).copied().unwrap_or_default();
-            (state(StopPathId::Global), state(StopPathId::HostRelay))
-        };
-        let (stop_path, heartbeat_fresh) = if global.fresh_at(now_ms) {
-            (ActiveStopPath::Global, true)
-        } else if relay.fresh_at(now_ms) {
-            (ActiveStopPath::HostRelay, true)
-        } else if global.live {
-            (ActiveStopPath::Global, false)
-        } else if relay.live {
-            (ActiveStopPath::HostRelay, false)
-        } else {
-            (ActiveStopPath::None, false)
-        };
-        let (suspended, stopped_by) = {
-            let stopped_by = self.stopped_by.lock();
-            (self.suspended.load(Ordering::SeqCst), *stopped_by)
-        };
-        SupervisorStatus {
-            suspended,
-            global_live: global.live,
-            host_relay_live: relay.live,
-            heartbeat_fresh,
-            stop_path,
-            stopped_by,
-            global_failure: *self.global_failure.lock(),
-        }
-    }
-
-    /// Whether side-effecting input may fire right now under `policy`.
-    #[must_use]
-    pub fn input_allowed(&self, policy: &StopPolicy) -> bool {
-        !self.is_suspended() && self.status().input_allowed(policy)
-    }
 }
 
 #[cfg(test)]
@@ -331,7 +311,26 @@ mod tests;
 mod persistence_tests;
 
 #[cfg(test)]
+#[path = "supervisor/authority_race_tests.rs"]
+mod authority_race_tests;
+
+#[cfg(test)]
+#[path = "supervisor/authority_tests.rs"]
+mod authority_tests;
+
+#[cfg(test)]
+#[path = "supervisor/authority_test_support.rs"]
+mod authority_test_support;
+
+#[cfg(test)]
+#[path = "supervisor/authority_schedule_tests.rs"]
+mod authority_schedule_tests;
+
+#[cfg(test)]
 mod stop_timeout_tests;
+
+#[cfg(test)]
+mod deafness_tests;
 
 #[cfg(test)]
 mod emergency_tests;

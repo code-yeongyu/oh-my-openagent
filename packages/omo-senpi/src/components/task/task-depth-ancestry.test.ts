@@ -218,7 +218,7 @@ describe("task depth ancestry across a process launch (#9036)", () => {
       omoConfig: child.omoConfig,
       cwd,
       agentNames: new Set(Object.keys(child.agents)),
-      ...(child.ancestry === undefined ? {} : { ancestry: child.ancestry }),
+      resolveAncestry: child.resolveAncestry,
     })
 
     // when

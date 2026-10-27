@@ -34,6 +34,8 @@ export interface OpenDeviceSyncOptions {
   readonly session: SyncSession
   readonly machineId?: string
   readonly log?: (line: string) => void
+  /** Called when the failure the status shows appears, changes kind or clears. */
+  readonly onStatusChange?: () => void
 }
 
 export interface DeviceSync {
@@ -82,6 +84,7 @@ export async function openDeviceSync(options: OpenDeviceSyncOptions): Promise<De
       lock: writer,
       clock: systemClock,
       ...(options.log === undefined ? {} : { log: options.log }),
+      ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
     })
     let closed = false
     return {

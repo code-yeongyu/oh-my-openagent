@@ -103,6 +103,9 @@ export function senpiEnvironment(senpiRoot, overrides = {}) {
   // Anything resolving the product by name must re-enter through this launcher, otherwise it
   // would reach the engine directly and lose the brand.
   env.OMO_BIN = join(packageRoot, "bin", "omo.js")
+  // The plugin names this command when part of the install is missing (#11379). SENPI_BRAND carries it
+  // too, but the engine scrubs that at startup, before any plugin file can fail to load.
+  env.OMO_REINSTALL_COMMAND = updateTarget().command
   const merged = { ...env, ...overrides }
   // Only the interactive launch writes this record of the herdr hint it set (herdr-agent-hint.js),
   // after this function returns. No engine started here may carry one from the parent environment

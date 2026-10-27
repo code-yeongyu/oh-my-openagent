@@ -34,6 +34,7 @@ const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
   "context",
   "session_start",
+  "session_hold_changed",
   "session_before_reload",
   "session_resumed",
   "session_before_switch",
@@ -44,7 +45,7 @@ const TASK_EVENTS = [
   "before_agent_start",
   "agent_end",
 ]
-const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_shutdown"]
+const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_start", "session_shutdown"]
 const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "session_shutdown"]
 const TASK_COMMANDS = ["dag", "task-kill", "tasks"]
 
@@ -93,7 +94,7 @@ function fakeUi(): CapturedUi {
   }
 }
 
-const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, dispose: () => {} }
+const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, observeRecord: () => {}, dispose: () => {} }
 const noopResumptionChannels = {
   emitSessionStart: () => Promise.resolve(),
   emitShutdown: () => Promise.resolve(),

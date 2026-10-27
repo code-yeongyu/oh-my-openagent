@@ -9,6 +9,7 @@ import {
   RETIRED_MODEL_PROFILE_IDS,
 } from "./builtin-profiles"
 import { KNOWN_MODELS } from "../telemetry/model-vocabulary"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const LANE_IDS = ["daily-normal", "daily-heavy", "geeky-normal", "geeky-heavy"] as const
 const EXPECTED_IDS = LANE_IDS
@@ -123,8 +124,13 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 medium", "kimi-k3 max", "glm-5.3 max"])
   })
 
-  it("runs daily-heavy as fable xhigh only", () => {
+  it("runs daily-heavy as Fable 5.5 then 5.1 at xhigh", () => {
     expect(BUILTIN_MODEL_PROFILES["daily-heavy"]?.models).toEqual([
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "xhigh",
+      }] : []),
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",

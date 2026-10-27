@@ -16,6 +16,7 @@ import {
 import type { DagNodeId, DagRunId } from "@oh-my-opencode/senpi-task/dag"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { deliverItems } from "../../extension/deliver-items"
 import { IdleInjectionCoordinator, type IdleInjectionMessage } from "../../extension/idle-injection-coordinator"
 import { createDagWake } from "./dag-wake"
 import { wireDagVerificationContext } from "./dag-verification-context"
@@ -50,7 +51,7 @@ function harness(receiverModel: unknown, includeUlw = false) {
   runtime.captureFrom({ model: receiverModel, isIdle: () => false })
   let scheduled: (() => void) | undefined
   const delivered: IdleInjectionMessage[] = []
-  const coordinator = new IdleInjectionCoordinator((message) => { delivered.push(message) }, {
+  const coordinator = new IdleInjectionCoordinator((message, options) => deliverItems(native => { delivered.push(native) }, { ...options, message }), {
     scheduleFlush: (flush) => { scheduled = flush },
   })
   const notifier = createParentNotifier(pi, coordinator, () => true, undefined, () => runtime.parentModel())
@@ -64,6 +65,34 @@ function completeRun(target: ReturnType<typeof harness>, type = "dag.run.complet
 }
 
 describe("DAG receiving-model routing", () => {
+  test("#given native node and run envelopes #when ULW and DAG policies switch together #then the native identities and current segment ranges survive", async () => {
+    const target = harness({ id: SOL }, true)
+    const node = { ...details(), final_response: SENPI_ULTRAWORK_DIRECTIVE }
+    target.notifier.enqueue(buildCompletionMessage([node]))
+    completeRun(target)
+    target.flush()
+    let payload: unknown = { messages: target.delivered.map(message => ({ ...message, role: "custom" })) }
+    for (const entry of target.pi.handlers.filter(entry => entry.event === "context")) {
+      const result = await entry.handler(payload, { model: { id: ASTRA } })
+      if (result !== undefined) payload = result
+    }
+    const contents = [
+      buildCompletionMessage([{ ...node, final_response: SENPI_ASTRA_ULTRAWORK_DIRECTIVE }], ASTRA_DAG_VERIFICATION_DIRECTIVE).content,
+      `DAG "release" completed: 1 completed, 0 failed, 0 cancelled, 0 skipped (1 total)\n\n${ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE}`,
+    ]
+    // One wake carries both segments; each keeps its own range through the receiver's rewrite.
+    const [nodeText, runText] = contents.map(content => content ?? "")
+    const ranges = [[0, nodeText.length], [nodeText.length + 2, nodeText.length + 2 + runText.length]]
+    const sent = target.delivered[0]
+    expect(target.delivered).toHaveLength(1)
+    expect(payload).toEqual({ messages: [{
+      ...sent, role: "custom", content: `${nodeText}\n\n${runText}`,
+      details: sent?.details.map((detail, index) => ({ ...detail, contentRange: ranges[index] })),
+    }] })
+    const nodeRange = sent?.details[0]?.contentRange
+    expect(sent?.content.slice(0, nodeRange?.[1])).toEndWith(DAG_VERIFICATION_DIRECTIVE)
+  })
+
   for (const [receiver, child, astra] of [
     [ASTRA, SOL, true],
     ["gateway/openai/gpt-6-astra-fast", SOL, true],
@@ -213,13 +242,17 @@ describe("DAG receiving-model routing", () => {
     target.notifier.enqueue(buildCompletionMessage([details()]))
     target.notifier.enqueue(buildCompletionMessage([plain]))
     target.flush()
+    // One idle flush is one itemized delivery: both completions ride one wake, each in its own segment.
+    expect(target.delivered).toHaveLength(1)
     const message = { ...target.delivered[0], role: "custom" }
+    const plainText = buildCompletionMessage([plain]).content
     // when
     const results = await target.pi.dispatch("context", { messages: [message] }, { model: { id: ASTRA } })
-    // then: the emitted plain result is byte-preserved and the DAG's policy artifact is selected.
-    const expected = buildCompletionMessage([details()], ASTRA_DAG_VERIFICATION_DIRECTIVE).content + "\n\n" + buildCompletionMessage([plain]).content
-    expect(results).toEqual([{ messages: [{ ...message, content: expected, details: [
-      { ...message.details?.[0], contentRange: [0, buildCompletionMessage([details()], ASTRA_DAG_VERIFICATION_DIRECTIVE).content.length] },
+    // then: the plain segment is byte-preserved and only the DAG segment selects the Astra policy.
+    const expected = buildCompletionMessage([details()], ASTRA_DAG_VERIFICATION_DIRECTIVE).content
+    expect(message.content?.endsWith(`\n\n${plainText}`)).toBe(true)
+    expect(results).toEqual([{ messages: [{ ...message, content: `${expected}\n\n${plainText}`, details: [
+      { ...message.details?.[0], contentRange: [0, expected.length] },
       message.details?.[1],
     ] }] }])
   })

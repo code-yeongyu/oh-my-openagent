@@ -49,7 +49,7 @@ Understand the current memory landscape before changing anything. Start with the
 Read `$AUDIT_PATH` and repair findings before consolidation:
 - `link_dangling`: point at the file now holding the content, or remove a link whose target is gone for good; report which.
 - `content_duplicate`: merge into the more specific home and leave a one-line pointer in the other.
-- `path_orphan`: use `git mv` into the home its content belongs to.
+- `path_orphan`: use `git mv` into the home its content belongs to. If the file has no frontmatter (the finding says so), add a one-line `description:` frontmatter in the same commit as the move; a bare move of such a file is refused by completion validation and would be dropped. If you cannot write an honest description, leave the file where it is.
 - `frontmatter_invalid`: leave to the writer owning the file unless only the description is missing.
 
 Never touch `system/boundaries.md` or `system/agreements.md`, and never delete evidence. Report unresolved findings with reasons.
@@ -75,7 +75,7 @@ Read `$SYSTEM_TOKENS_PATH` before consolidating. When its `totalTokens` is great
 
 **Contradiction handling**: when files disagree, never silently pick a winner. Keep both versions, mark the disagreement on each entry (a contradiction comment naming the other file and the evidence dates), and surface the conflict in your final report so a human decides. Identical duplicates may still be deduped; genuinely conflicting content may not.
 
-Throughout, edit surgically. Persona and behavioral files are load-bearing: append, modify specific entries, adjust wording. Never rewrite them wholesale or silently overwrite established identity. Keep description frontmatter and `[[path]]` cross-references accurate as content moves.
+Throughout, edit surgically. Persona and behavioral files are load-bearing: append, modify specific entries, adjust wording. Never rewrite them wholesale or silently overwrite established identity. Keep `[[path]]` cross-references accurate as content moves. A `description` is one line of at most 1024 characters saying what the note is and when to read it. Keep history, changelogs, and topic lists in the body, never append them to the description.
 Never write or copy a `provenance:` frontmatter line; only the memory tool writes one, and the commit hook refuses a hand-written one. When you move or merge a note, leave that line out of the new file. When you edit a note whose `provenance:` line starts with `user said`, delete that line (it is a legacy header that no longer means anything) and add the trailer `Omo-Provenance-Stripped: <path>` to your commit message, one per note.
 
 

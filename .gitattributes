@@ -21,3 +21,7 @@ packages/memory-core/src/sync/crypto/vendor/** -text
 # Generated OpenTelemetry protobuf code, vendored byte-identical from the collector and pinned by its SHA256SUMS:
 # no line-ending conversion and no whitespace checks (the upstream generator leaves trailing blanks).
 packages/telemetry-core/src/otlp-proto/** -text -whitespace
+
+# The engine's vendored copy of the telemetry collector's registry is pinned byte for byte by hash (schema-registry/PINS.json,
+# telemetry-artifact.test.ts): no line-ending conversion on any platform.
+packages/omo-senpi/src/components/telemetry/schema-registry/** -text

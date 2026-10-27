@@ -38,6 +38,7 @@
       "getStarted": "Commencer",
       "readManifesto": "Lire le manifeste",
       "downloadDesktop": "Télécharger l'application de bureau",
+      "downloadDesktopBeta": "Télécharger la bêta de bureau",
       "installLabel": "Une commande, un outil"
     },
     "command": {
@@ -179,13 +180,6 @@
       "subtitle": "Installez OmO, ouvrez votre projet, décrivez la tâche. Voilà, c'est tout.",
       "installNow": "Installer maintenant",
       "readTheDocs": "Lire la doc"
-    },
-    "dori": {
-      "eyebrow": "Spoiler",
-      "title": "Quelqu'un travaille pendant que vous dormez.",
-      "body": "Pas OmO. Une nouvelle recrue de la même équipe. Il ne pointe jamais à la sortie, et vous le payez en tokens.",
-      "cta": "Découvrir Dori",
-      "alt": "Dori, un chien blanc de dessin animé tenant un rocher, qui jette un coup d'œil depuis le bas de la page"
     },
     "dag": {
       "region": "Application de bureau OmO avec le graphe de workflow ouvert",

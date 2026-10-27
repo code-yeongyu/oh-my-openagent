@@ -66,6 +66,8 @@ function resolveListedTask(manager: SendManager, to: string): ReturnType<SendMan
 
 export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTask"]>>): SendToolResult {
   switch (outcome.kind) {
+    case "unresponsive":
+      return toolResult(outcome.reason, outcome)
     case "uncertain":
       return toolResult(`${outcome.reason} Effect id: ${outcome.effect_id}`, outcome)
     case "failed":
@@ -101,6 +103,13 @@ export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTa
       })
     case "capacity_deferred":
       return toolResult(outcome.reason, { kind: "capacity_deferred", task_id: outcome.task_id, reason: outcome.reason })
+    case "held":
+      return toolResult(`Held for ${outcome.task_id}: its run is stopped, and the message is delivered when the run resumes.`, {
+        kind: "held",
+        task_id: outcome.task_id,
+        pause_seq: outcome.pause_seq,
+        entry_id: outcome.entry_id,
+      })
     case "queued":
       return toolResult(`Queued for ${outcome.task_id} at position ${outcome.queue_position}.`, {
         kind: "queued",

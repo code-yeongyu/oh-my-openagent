@@ -3,6 +3,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { resolveModelProfile } from "./resolve"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const OPUS = "anthropic/claude-opus-5-5"
 const OPUS_SUBSCRIPTION = "anthropic-subscription/claude-opus-5-5"
@@ -164,6 +165,70 @@ describe("resolveModelProfile", () => {
 })
 
 describe("builtin chain routing", () => {
+  it("prefers Fable 5.5 at the existing effort without changing listed providers", () => {
+    // given
+    const availableModels = [
+      "opencode/claude-fable-5-5",
+      "anthropic-subscription/claude-fable-5-5",
+      FABLE,
+    ]
+    // when
+    const result = resolveModelProfile({ active: "daily-heavy", availableModels })
+    // then
+    expect(result).toMatchObject({
+      // While FABLE_55_RELEASED is false the 5.5 rung is absent, so listed 5.5 copies are never picked.
+      kind: "resolved", provider: "anthropic-subscription", modelId: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1", reasoning: "xhigh",
+    })
+  })
+
+  it("resolves daily-normal to a custom models.json provider that is the only one serving its Opus id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["my-claude-proxy/claude-opus-5-5"],
+      customProviders: [{ provider: "my-claude-proxy", modelIds: ["claude-opus-5-5"] }],
+    })
+
+    expect(result).toMatchObject({
+      kind: "resolved",
+      provider: "my-claude-proxy",
+      modelId: "claude-opus-5-5",
+      reasoning: "medium",
+    })
+  })
+
+  it("keeps a listed built-in provider ahead of a custom provider serving the same id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["my-claude-proxy/claude-opus-5-5", OPUS_SUBSCRIPTION],
+      customProviders: [{ provider: "my-claude-proxy", modelIds: ["claude-opus-5-5"] }],
+    })
+
+    expect(result).toMatchObject({ kind: "resolved", provider: "anthropic-subscription", modelId: "claude-opus-5-5" })
+  })
+
+  it("picks the first declared custom provider when two serve the rung's id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["proxy-b/claude-opus-5-5", "proxy-a/claude-opus-5-5"],
+      customProviders: [
+        { provider: "proxy-a", modelIds: ["claude-opus-5-5"] },
+        { provider: "proxy-b", modelIds: ["claude-opus-5-5"] },
+      ],
+    })
+
+    expect(result).toMatchObject({ kind: "resolved", provider: "proxy-a", modelId: "claude-opus-5-5" })
+  })
+
+  it("still skips a gateway's vendor-prefixed copy and an undeclared provider serving the bare id", () => {
+    const result = resolveModelProfile({
+      active: "daily-normal",
+      availableModels: ["opengateway/anthropic/claude-opus-5-5", "openrouter/claude-opus-5-5"],
+      customProviders: [{ provider: "opengateway", modelIds: ["claude-opus-5-5"] }],
+    })
+
+    expect(result.kind).toBe("unavailable")
+  })
+
   it("keeps daily-heavy on the Claude subscription when an OpenCode Zen key serves the same model", () => {
     const result = resolveModelProfile({ active: "daily-heavy", availableModels: [FABLE_ZEN, FABLE] })
 
@@ -294,6 +359,7 @@ describe("builtin chain routing", () => {
         availableModels: [
           "openrouter/anthropic/claude-opus-5.5",
           "opengateway/anthropic/claude-fable-5-1",
+          "opengateway/anthropic/claude-fable-5-5",
           "openrouter/moonshotai/kimi-k3",
           "openrouter/openai/gpt-6-astra",
           "openrouter/openai/gpt-5.6-sol",

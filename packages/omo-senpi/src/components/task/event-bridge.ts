@@ -1,7 +1,8 @@
 import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
-import { readSessionContext, readSessionRole } from "@oh-my-opencode/senpi-task"
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
+import { ownHostedTaskId } from "./own-task-identity"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
 import type { LiveTaskContext } from "./runtime-context"
@@ -11,10 +12,12 @@ import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
 import { wireDagVerificationContext } from "./dag-verification-context"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
+import { isRunHoldChange, type EngineRunPauseBridge } from "./run-pause-bridge"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
 type EventBridgeState = {
+  readonly runPause?: Pick<EngineRunPauseBridge, "restore" | "reconciled" | "changed">
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
@@ -46,10 +49,19 @@ export function wireEventBridge(
   deps: EventBridgeDeps = {},
 ): void {
   const guidanceGuard = createOncePerSessionGuard()
+  const runPause = state.runPause ?? engine.runPause?.bridge
   wireDagVerificationContext(pi, engine.runtime)
   const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
+  if (runPause !== undefined) {
+    pi.on("session_hold_changed", (payload, eventCtx) => {
+      engine.runtime.captureFrom(asLiveContext(eventCtx))
+      const sessionId = engine.runtime.sessionId()
+      if (sessionId !== undefined && isRunHoldChange(payload)) return runPause.changed(sessionId, payload)
+      return undefined
+    })
+  }
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
@@ -57,8 +69,10 @@ export function wireEventBridge(
     // A child session that has not reported its own id yet has nothing to reconcile: its records
     // belong to the parent. The role comes from the session (shared daemon), else from the env.
     if (readSessionRole(pi) !== undefined && sessionId === undefined) return
+    if (sessionId !== undefined) await runPause?.restore(sessionId)
     transitions.onSessionStart(sessionId)
     const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
+    if (sessionId !== undefined) await runPause?.reconciled(sessionId)
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
     for (const outcome of reconciliation.outcomes) {
       const record = engine.manager.get(outcome.task_id)
@@ -85,7 +99,7 @@ export function wireEventBridge(
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
     }
     await tickLeadPollersBestEffort(ctx, state)
-    if (sessionId !== undefined) engine.manager.workpools?.attach({ sessionId, rootSessionId: sessionId, depth: 0, cwd: engine.runtime.cwd() })
+    if (sessionId !== undefined) engine.manager.workpools?.attach({ sessionId })
     statusUi.scheduleSync()
     taskRpc.attach()
   })
@@ -156,10 +170,10 @@ export function wireEventBridge(
               engine.settings.process_runner !== "child-process" && engine.settings.resume_children !== false)
           ))
         : []
-      const ownTaskId = readSessionContext(pi)?.["task_id"]
-      const summary = await engine.lifecycle.suspendOnSessionShutdown({
-        parentSessionId: sessionId, reason, ...(ownTaskId === undefined || ownTaskId.length === 0 ? {} : { ownTaskId }),
-      })
+      const ownTaskId = ownHostedTaskId(pi, engine.stateDir)
+      const summary = await engine.lifecycle.suspendOnSessionShutdown(
+        ownTaskId === undefined ? { parentSessionId: sessionId, reason } : { parentSessionId: sessionId, reason, ownTaskId },
+      )
       const notify = (notice: string, level: "info" | "warning"): void => {
         if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
         else liveContext.ui?.notify(notice, level)

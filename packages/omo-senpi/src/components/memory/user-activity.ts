@@ -6,20 +6,32 @@ import { isRecord, sessionIdFrom } from "./wiring-context"
 export function createMemoryUserActivity(env: NodeJS.ProcessEnv = process.env) {
   const accepted = new Set<string>()
   const reconciled = new Set<string>()
+  const inFlight = new Map<string, Promise<void>>()
   const inputs = new Map<string, string>()
   return {
     has: (sessionId: string): boolean => accepted.has(sessionId),
+    hasReconciled: (sessionId: string): boolean => reconciled.has(sessionId),
     hasInput: (sessionId: string): boolean =>
       accepted.has(sessionId) || inputs.values().some((owner) => owner === sessionId),
     reset(sessionId: string): void {
       accepted.delete(sessionId)
       reconciled.delete(sessionId)
+      inFlight.delete(sessionId)
       for (const [inputId, owner] of inputs) if (owner === sessionId) inputs.delete(inputId)
     },
     async reconcileOnce(sessionId: string, reconcile: () => Promise<void>): Promise<void> {
       if (!accepted.has(sessionId) || reconciled.has(sessionId)) return
-      await reconcile()
-      reconciled.add(sessionId)
+      const existing = inFlight.get(sessionId)
+      if (existing !== undefined) return existing
+      const task = Promise.resolve().then(() => {
+        if (inFlight.get(sessionId) === task) return reconcile()
+      }).then(() => {
+        if (inFlight.get(sessionId) === task) reconciled.add(sessionId)
+      }).finally(() => {
+        if (inFlight.get(sessionId) === task) inFlight.delete(sessionId)
+      })
+      inFlight.set(sessionId, task)
+      await task
     },
     register(pi: SenpiExtensionAPI): void {
       pi.on("input", (payload, eventCtx) => {

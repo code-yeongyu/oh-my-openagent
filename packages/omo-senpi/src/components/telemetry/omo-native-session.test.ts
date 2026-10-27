@@ -12,7 +12,7 @@ import {
 } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { getSenpiTelemetryStateDir, SENPI_TELEMETRY_EVENT_NAME } from "./index"
-import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir } from "./product-identity"
+import { OMO_NATIVE_COMMON_PROPERTY_SCHEMAS, OMO_NATIVE_PROPERTY_ALLOWLISTS, getOmoNativeStateDir, getOmoNativeInstallIdPath } from "./product-identity"
 import { createOmoNativeSessionComponent } from "./omo-native-session"
 import {
   FIXED_NOW,
@@ -255,7 +255,7 @@ describe("OmO Native session telemetry", () => {
       await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("identity"))
 
       // then
-      const installId = readFileSync(join(getOmoNativeStateDir(createEnabledEnv(agentDir)), "install-id"), "utf8").trim()
+      const installId = readFileSync(getOmoNativeInstallIdPath(createEnabledEnv(agentDir)), "utf8").trim()
       const installHash = createHash("sha256").update(installId).digest("hex")
       const native = recorder.messages.filter(({ event }) => event !== SENPI_TELEMETRY_EVENT_NAME)
       expect(native.length).toBeGreaterThan(0)
@@ -277,7 +277,7 @@ describe("OmO Native session telemetry", () => {
       writeInventory(agentDir)
       const recorder = createRecorder()
       const env = createEnabledEnv(agentDir)
-      const installIdPath = join(getOmoNativeStateDir(env), "install-id")
+      const installIdPath = getOmoNativeInstallIdPath(env)
       await register(agentDir, recorder).dispatch("session_start", { type: "session_start", reason: "startup" }, sessionCtx("before"))
       const firstId = readFileSync(installIdPath, "utf8").trim()
       rmSync(installIdPath)

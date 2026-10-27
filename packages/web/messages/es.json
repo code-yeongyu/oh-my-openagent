@@ -38,6 +38,7 @@
       "getStarted": "Empezar",
       "readManifesto": "Leer el manifiesto",
       "downloadDesktop": "Descargar la app de escritorio",
+      "downloadDesktopBeta": "Descargar la beta de escritorio",
       "installLabel": "Un comando, una herramienta"
     },
     "command": {
@@ -179,13 +180,6 @@
       "subtitle": "Instala OmO, abre tu proyecto y describe la tarea. Eso es todo.",
       "installNow": "Instalar ahora",
       "readTheDocs": "Leer la documentación"
-    },
-    "dori": {
-      "eyebrow": "Spoiler",
-      "title": "Alguien ha estado trabajando mientras duermes.",
-      "body": "No es OmO. Es un nuevo fichaje del mismo equipo. No tiene horario de salida y le pagas en tokens.",
-      "cta": "Conoce a Dori",
-      "alt": "Dori, un perro blanco de dibujo animado sosteniendo una piedra, asomándose desde la parte inferior de la página"
     },
     "dag": {
       "region": "App de escritorio de OmO con el grafo de flujo de trabajo abierto",

@@ -5,6 +5,7 @@ import type { OmoSenpiComponent } from "../../extension/types"
 import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
+  isTelemetryClientEnabled,
   recordDailyActive,
   type RecordDailyActiveInput,
   TelemetryEnv,
@@ -12,7 +13,7 @@ import {
   TelemetryProductConfig,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core/injected"
-import { createLazyPostHogTransportFactory } from "./lazy-posthog"
+import { createSenpiTelemetryTransportFactory } from "./otlp"
 import { createLazyValue } from "../../extension/startup-deferral"
 import type { ComponentLogger } from "../../extension/types"
 
@@ -83,14 +84,17 @@ export const omoSenpiTelemetryComponent = createSenpiTelemetryComponent()
 
 function createRecordDailyActiveInput(options: SenpiTelemetryOptions): RecordDailyActiveInput {
   const env = options.env ?? process.env
+  const product = createSenpiTelemetryProductConfig()
   const baseInput = {
     diagnostics: options.diagnostics,
-    transportFactory: options.transportFactory ?? createLazyPostHogTransportFactory({
+    transportFactory: options.transportFactory ?? createSenpiTelemetryTransportFactory({
+      env,
+      consent: () => isTelemetryClientEnabled({ env, product }),
       diagnostics: options.diagnostics,
       source: SENPI_TELEMETRY_SOURCE,
     }),
     env,
-    product: createSenpiTelemetryProductConfig(),
+    product,
     reason: SESSION_START_REASON,
     source: SENPI_TELEMETRY_SOURCE,
     stateDir: options.stateDir ?? getSenpiTelemetryStateDir(env),

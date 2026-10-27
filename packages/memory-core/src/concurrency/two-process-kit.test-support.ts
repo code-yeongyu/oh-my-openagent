@@ -11,6 +11,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 import { exitedWithin, probeUntil } from "../locks/process-liveness.test-support"
 
 export const TEARDOWN_GRACE_MS = 2_000
@@ -193,6 +194,7 @@ export function createConcurrencyKit(): ConcurrencyKit {
     }
     await mkdir(identity.paths.repo, { recursive: true })
     await git(identity.paths.repo, ["init", "-b", "main"])
+    disableFixtureAutoMaintenance(identity.paths.repo)
     await git(identity.paths.repo, ["config", "commit.gpgsign", "false"])
     const contentionPath = join(root, "contention-attempts.log")
     await writeFile(contentionPath, "")

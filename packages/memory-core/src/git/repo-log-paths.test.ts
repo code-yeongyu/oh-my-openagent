@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { createNodeGitExec, GitMemoryRepo, type GitExec } from "./index"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
@@ -48,6 +49,7 @@ async function repoWithRootSpacedRenameAndMerge(exec: GitExec): Promise<{ readon
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-log-paths-")))
   tempDirs.push(dir)
   await run(dir, ["init", "-q", "-b", "main"])
+  disableFixtureAutoMaintenance(dir)
   await commitFiles(dir, { "system/persona.md": "p\n" }, "root")
   for (let index = 0; index < 8; index += 1) {
     await commitFiles(dir, { [`reference/note ${index}.md`]: `${index}\n` }, `note ${index}\n\nOmo-Session: s${index % 2}`)

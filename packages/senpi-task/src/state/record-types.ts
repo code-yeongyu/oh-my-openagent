@@ -97,6 +97,7 @@ export type PendingSteeringEntry = {
 }
 
 export type TaskRecordInput = {
+  readonly task_id?: string
   readonly name?: string
   readonly task_summary?: string
   readonly description?: string
@@ -137,6 +138,12 @@ export type TaskRecordInput = {
   readonly host_session?: HostSessionIdentity
 }
 
+export type RecordedRunPause = {
+  readonly parent_session_id: string
+  readonly parent_pause_seq: number
+  readonly run_ref: { readonly kind: "dag" | "task" | "workpool" | "team"; readonly id: string }
+}
+
 export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly effect_seq?: number
   /** The exact id of the last identified input this task sent; reconciliation reads its receipt by it. */
@@ -151,6 +158,7 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly started_at?: string
   /** Live snapshot metadata from the owning handle, not a persisted liveness claim. */
   readonly last_seen_at?: string
+  readonly host_liveness?: import("./host-liveness").HostLivenessStatus
   readonly terminal_at?: string
   readonly pid?: number
   readonly host_pid?: number
@@ -175,6 +183,10 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   }
   readonly killed?: boolean
   readonly run_stats?: TaskRunStats
+  // USD the provider reported for this task's EARLIER runs: each revive folds the finished run's
+  // reported `run_stats.cost_usd` in before it drops `run_stats`, so a task's lifetime spend is this
+  // plus the current run's. Absent while no earlier run reported a positive cost.
+  readonly prior_runs_cost_usd?: number
   readonly notification: TaskNotification
   readonly revive_delivery_uncertain?: ReviveDeliveryUncertainty
   readonly resumed_run_epoch?: number
@@ -196,6 +208,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly awaiting_input?: TaskAwaitingInput
   // One parked episode's absolute deadline; retry writes and parent restarts must not extend it.
   readonly recovery_deadline_at?: number
+  // The run that paused this child (senpi#3811): a restarted host re-holds it under exactly this owner.
+  readonly run_pause?: RecordedRunPause
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly fallback_handoff_epoch?: number

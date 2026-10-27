@@ -13,6 +13,7 @@ import {
   createLegacyConfigMigrationPlans,
   type ConfigMigrationDiscoveryFileSystem,
   type ConfigMigrationPathOperations,
+  type CreateLegacyConfigMigrationPlansOptions,
 } from "@oh-my-opencode/omo-opencode/config-migration"
 import { DEVIN_SWE2_SERVED_LANES, isUnservedDevinSWE2Selector } from "@oh-my-opencode/model-core"
 import { categoryShadowedAgentNames, categoryShadowMessage } from "@oh-my-opencode/senpi-task/category-shadow"
@@ -66,6 +67,21 @@ function migratedSources(results: readonly MigrationRunResult[]): readonly strin
     : []))].sort()
 }
 
+function legacyPlanOptions(
+  options: SenpiStartupMigrationOptions,
+  homeDir: string,
+): CreateLegacyConfigMigrationPlansOptions {
+  return {
+    ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
+    cwd: options.cwd,
+    ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
+    environment: options.environment ?? process.env,
+    homeDir,
+    pathOperations: options.pathOperations ?? (options.platform === "win32" ? win32 : posix),
+    ...(options.platform === undefined ? {} : { platform: options.platform }),
+  }
+}
+
 /** Runs the shared, lock-protected migration engine before Senpi reads its unified configuration. */
 export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions): SenpiStartupMigrationResult {
   const homeDir = homeDirectory(options)
@@ -89,15 +105,7 @@ export function runSenpiStartupMigration(options: SenpiStartupMigrationOptions):
       ...(options.onBoundary === undefined ? {} : { onBoundary: options.onBoundary }),
       ...(options.pid === undefined ? {} : { pid: options.pid }),
       discover: () => [
-        ...createLegacyConfigMigrationPlans({
-          ...(options.backupTimestamp === undefined ? {} : { backupTimestamp: options.backupTimestamp }),
-          cwd: options.cwd,
-          ...(options.discoveryFileSystem === undefined ? {} : { fileSystem: options.discoveryFileSystem }),
-          environment,
-          homeDir,
-          pathOperations,
-          ...(options.platform === undefined ? {} : { platform: options.platform }),
-        }),
+        ...createLegacyConfigMigrationPlans(legacyPlanOptions(options, homeDir)),
         // Native-only: what it reports is what the native harness ignores.
         createOpenCodeRoutingNoticePlan({
           environment,
@@ -142,7 +150,7 @@ export function createConfigStartupComponent(options: ConfigStartupComponentOpti
   const argv = options.argv ?? process.argv.slice(2)
   return {
     name: "config-startup",
-    register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+    async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
       if (isMetadataOnlyLaunch(argv)) return
       const cwd = resolveCwd()
       const migration = runMigration({ cwd })

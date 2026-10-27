@@ -3,8 +3,9 @@ import { type AccountHttp, createAccountHttp, createPairingHttp, deviceKeyringFr
 import type { DeviceKeyring } from "../memory-core/src/sync/keyring-port"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
-import { type CredentialStore, createCredentialStore } from "../omo-opencode/src/cli/service-auth/keystore"
-import { serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
+import { signInHint } from "../omo-opencode/src/cli/service-auth/accounts-gate"
+import { type CredentialStore, createCredentialStore, INTERACTIVE_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
+import { ApiRefusal, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 
 export interface SyncContext {
@@ -29,14 +30,18 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 export async function signedInSyncContext(options: SyncContextOptions): Promise<SyncContext> {
   const api = serviceOrigin(options.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
-  const store = options.store ?? createCredentialStore(api)
+  const store = options.store ?? createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
   const credentials = await store.read()
-  if (credentials === null) throw new SignInError("Not signed in. Run omo login first.")
+  if (credentials === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
   const session = createSession({ api, store })
   const token = () => session.accessToken()
   const doFetch = options.fetch ?? fetch
   const me = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${await token()}` } })
-  if (!me.ok) throw new SignInError(`The account could not be read (${me.status}). Try again, or run omo login.`)
+  if (!me.ok) {
+    const body: unknown = await me.json().catch(() => null)
+    const code = isRecord(body) && isRecord(body["error"]) ? body["error"]["code"] : undefined
+    throw new ApiRefusal(typeof code === "string" ? code : "unknown", me.status)
+  }
   const body: unknown = await me.json()
   const account = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
   if (typeof account !== "string" || account === "") throw new SignInError("The service named no account for this sign-in.")

@@ -4,7 +4,7 @@ import type { OtlpWireProjection } from "./otlp-config"
 import type { ResourceAttributes } from "./otlp-encode"
 import type { OtlpFetch } from "./otlp-http"
 import type { SpanAllowlist } from "./otlp-wal"
-import type { TelemetryDiagnosticInput, TelemetryEnv, TelemetryTransport } from "./types"
+import type { TelemetryDiagnosticInput, TelemetryEnv, TelemetryTransport, TurnTracing } from "./types"
 
 export type CreateOtlpTelemetryTransportInput = {
   readonly productEnvPrefix: string
@@ -42,6 +42,8 @@ export type CreateOtlpTelemetryTransportInput = {
   readonly flushAt?: number
   readonly flushIntervalMs?: number
   readonly sweepIntervalMs?: number
+  /** Runs `run` every `ms`; the default is an unref'd `setInterval`, so the timers never keep the host alive. */
+  readonly scheduleEvery?: (run: () => Promise<void>, ms: number) => { readonly cancel: () => void }
   readonly shutdownTimeoutMs?: number
   readonly capBytes?: number
   readonly maxAgeMs?: number
@@ -51,6 +53,8 @@ export type OtlpTelemetryTransport = TelemetryTransport & {
   readonly sampling: { readonly rawTurnRate: 1 }
   /** The only direct API: spans, filtered by `spans`. Log records reach the wire only through `capture`. */
   readonly tracer: Tracer
+  /** Turn spans for the session adapter, through `tracer` and filtered by `spans`. */
+  readonly traces: TurnTracing
   readonly endpoint: string
   readonly ready: Promise<void>
   readonly flush: () => Promise<void>

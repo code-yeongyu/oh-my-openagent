@@ -212,6 +212,124 @@ describe("prometheus-md-only", () => {
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
+    describe("#given the patch-based edit tools (omo#11367)", () => {
+      const patch = (...lines: string[]) => ["*** Begin Patch", ...lines, "*** End Patch"].join("\n")
+
+      test("#when apply_patch adds a file outside .omo/*.md #then it is blocked", async () => {
+        // given
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "apply_patch", sessionID: TEST_SESSION_ID, callID: "call-1" }
+        const output = { args: { patchText: patch("*** Add File: .git/hooks/post-checkout", "+#!/bin/sh") } }
+
+        // when / then
+        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+          "File operations restricted to .omo/*.md plan files only",
+        )
+      })
+
+      test("#when apply_patch moves an allowed plan file outside .omo #then it is blocked", async () => {
+        // given
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "apply_patch", sessionID: TEST_SESSION_ID, callID: "call-1" }
+        const output = {
+          args: { patchText: patch("*** Update File: .omo/plans/a.md", "*** Move to: src/a.ts", "@@", "-x", "+y") },
+        }
+
+        // when / then
+        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+          "File operations restricted to .omo/*.md plan files only",
+        )
+      })
+
+      test("#when apply_patch only touches .omo/*.md #then it is allowed", async () => {
+        // given
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "apply_patch", sessionID: TEST_SESSION_ID, callID: "call-1" }
+        const output = { args: { patchText: patch("*** Add File: .omo/plans/work-plan.md", "+# Plan") } }
+
+        // when / then
+        await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
+      })
+
+      test("#when patch headers omit the space after the colon #then they are still checked", async () => {
+        // given: opencode accepts `*** Add File:path` and `*** Move to:path`
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "apply_patch", sessionID: TEST_SESSION_ID, callID: "call-1" }
+
+        for (const patchText of [
+          patch("*** Add File:.git/hooks/post-checkout", "+#!/bin/sh"),
+          patch("*** Update File: .omo/plans/a.md", "*** Move to:src/evil.ts", "@@", "-x", "+y"),
+        ]) {
+          // when / then
+          await expect(hook["tool.execute.before"](input, { args: { patchText } })).rejects.toThrow(
+            "File operations restricted to .omo/*.md plan files only",
+          )
+        }
+      })
+
+      test("#when patch headers use CRLF line endings or leading whitespace #then they are still checked", async () => {
+        // given: opencode trims each header line, so these forms still write the named file
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "apply_patch", sessionID: TEST_SESSION_ID, callID: "call-1" }
+
+        for (const patchText of [
+          ["*** Begin Patch", "*** Add File: src/evil.ts", "+x", "*** End Patch"].join("\r\n"),
+          patch("   *** Add File: src/evil.ts", "+x"),
+        ]) {
+          // when / then
+          await expect(hook["tool.execute.before"](input, { args: { patchText } })).rejects.toThrow(
+            "File operations restricted to .omo/*.md plan files only",
+          )
+        }
+      })
+
+      test("#when apply_patch carries no readable patch body #then it is blocked", async () => {
+        // given
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "apply_patch", sessionID: TEST_SESSION_ID, callID: "call-1" }
+
+        // when / then
+        await expect(hook["tool.execute.before"](input, { args: { body: "*** Add File: src/x.ts" } })).rejects.toThrow(
+          "File operations restricted to .omo/*.md plan files only",
+        )
+      })
+
+      test("#when MultiEdit names its file with file_path #then it is checked", async () => {
+        // given
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "MultiEdit", sessionID: TEST_SESSION_ID, callID: "call-1" }
+
+        // when / then
+        await expect(
+          hook["tool.execute.before"](input, { args: { file_path: "/tmp/test/src/index.ts", edits: [] } }),
+        ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+      })
+
+      test("#when a hashline edit renames a plan file out of .omo #then it is blocked", async () => {
+        // given
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "edit", sessionID: TEST_SESSION_ID, callID: "call-1" }
+        const output = { args: { filePath: "/tmp/test/.omo/plans/a.md", rename: "/tmp/test/src/a.ts", edits: [] } }
+
+        // when / then
+        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+          "File operations restricted to .omo/*.md plan files only",
+        )
+      })
+
+      test("#when multiedit targets a source file #then it is blocked", async () => {
+        // given
+        const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+        const input = { tool: "multiedit", sessionID: TEST_SESSION_ID, callID: "call-1" }
+        const output = { args: { filePath: "/tmp/test/src/index.ts", edits: [] } }
+
+        // when / then
+        await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+          "File operations restricted to .omo/*.md plan files only",
+        )
+      })
+    })
+
     test("should allow Prometheus to write .md files inside .omo/", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
@@ -376,7 +494,7 @@ describe("prometheus-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should handle missing filePath gracefully", async () => {
+    test("should fail closed on a write whose file argument it cannot read (omo#11367)", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
@@ -391,7 +509,7 @@ describe("prometheus-md-only", () => {
       // when / #then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).resolves.toBeUndefined()
+      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
     test("should inject planning warning when Prometheus calls task", async () => {

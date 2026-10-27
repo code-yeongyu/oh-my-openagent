@@ -1,3 +1,4 @@
+import { rfc3339 } from "./bindings"
 import { createGatewayEngine, type GatewayEngineOptions, type GatewayResolve } from "./engine"
 import { checkExtensionSchema, extensionSchema, extensionSql } from "./extension-sql"
 import { orderByClause, orderByTerms, singleExtensionStatement } from "./extension-statement"
@@ -20,7 +21,12 @@ export class ExtensionTransactionBusyError extends Error {
   }
 }
 
-export function extensionTransaction(ctx: ops.StoreContext, name: string, now: number, resolveTarget: GatewayResolve) {
+/** A transaction helper called with arguments it cannot serve; the op fails as `invalid_arguments`. */
+export class ExtensionArgumentError extends Error {
+  readonly code = "invalid_arguments"
+}
+
+export function extensionTransaction(ctx: ops.StoreContext, name: string, now: number, resolveTarget: GatewayResolve, senderProvenance: GatewayEngineOptions["senderProvenance"]) {
   let active = true
   // Helpers that are running right now. A joined helper can hold a savepoint open across an await,
   // so a statement run in that gap would land inside it and vanish with a data refusal's rollback.
@@ -91,6 +97,7 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
   const engine = createGatewayEngine({
     store,
     endpoints,
+    senderProvenance,
     resolve: async (address, request) => {
       const result = await resolveTarget(address, request)
       return result.kind === "error" ? result : { kind: "ok", target: { ...result.target, endpoint: null, liveness: "dead" } }
@@ -118,6 +125,12 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
     unbind: (request) => schedule(() => api.unbind(request)),
     rebind: (request) => schedule(() => api.rebind(request)),
     bindingFor: (request) => schedule(() => relay.bindingFor(ctx, { ...request, now })),
+    // Read-only: "active" is exactly bindingFor's (status active, not expired at the transaction's now), without its expiry write.
+    bindingsForSession: (sessionDurableId) => schedule(async () => {
+      if (typeof sessionDurableId !== "string" || sessionDurableId.length === 0) throw new ExtensionArgumentError("bindingsForSession needs a non-empty session durable id.")
+      const active = relay.selectBindings(ctx, "session_durable_id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > ?)", [sessionDurableId, rfc3339(now)])
+      return active.toSorted((left, right) => (left.binding_id < right.binding_id ? -1 : left.binding_id > right.binding_id ? 1 : 0))
+    }),
     outboxPending: (request) => schedule(() => api.outbox(request)),
   }
   return {

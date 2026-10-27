@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { parse } from "jsonc-parser"
 
 import type { SenpiOmoConfigResult } from "../config-resolution"
+
 import { notificationMessages, runSenpiStartupMigration } from "./index"
 
 const NOTICE_MIGRATION_ID = "2026-09-opencode-routing-notice"

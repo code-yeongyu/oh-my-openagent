@@ -8,7 +8,12 @@ import { OmoGitMasterSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
 import { createTaskSkillLoader, packagedSkillDirs } from "./task-skill-loader"
 
+const TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
 const CO_AUTHOR_TRAILER_PATTERN = /Co-authored-by:/i
+
+function occurrences(text: string, needle: string): number {
+  return text.split(needle).length - 1
+}
 
 const roots: string[] = []
 
@@ -101,7 +106,7 @@ describe("createTaskSkillLoader", () => {
     expect(resolution.prepend).not.toContain("PACKAGED BODY")
   })
 
-  test("#given default attribution settings #when the git-master skill is loaded #then the env-prefix section rides the skill block and no footer is added", () => {
+  test("#given default attribution settings #when the git-master skill is loaded #then the env-prefix section and one co-author directive ride the skill block", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(
@@ -123,12 +128,27 @@ describe("createTaskSkillLoader", () => {
     expect(resolution.prepend).toContain("GIT COMMAND PREFIX (MANDATORY)")
     expect(resolution.prepend).toContain("GIT_MASTER=1 git add -A .")
     expect(resolution.prepend).toContain('GIT_MASTER=1 git commit -m "x"')
-    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
-    expect(resolution.prepend).not.toContain("sisyphus-dev-ai")
+    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
+    expect(resolution.prepend).toContain("GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit")
     expect(resolution.prepend).not.toContain("Ultraworked with")
   })
 
-  test("#given the footer opted in #when the git-master skill is loaded #then only the footer directive rides the skill block", () => {
+  test("#given a git-master skill file that already carries the attribution directive #when it is loaded #then the directive is not appended again", () => {
+    const cwd = tempDir()
+    const pluginSkillsDir = tempDir()
+    const loadSettings = () => OmoGitMasterSettingsSchema.parse({ git_env_prefix: "" })
+    writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
+    const firstLoad = createTaskSkillLoader({ agentDir: tempDir(), homeDir: tempDir(), pluginSkillsDirs: [pluginSkillsDir], loadSettings })
+    const firstSkill = firstLoad(["git-master"], cwd).skills?.find((skill) => skill.name === "git-master")
+    const savedDir = tempDir()
+    writeSkill(savedDir, firstSkill?.content ?? "", "git-master")
+
+    const resolution = createTaskSkillLoader({ agentDir: tempDir(), homeDir: tempDir(), pluginSkillsDirs: [savedDir], loadSettings })(["git-master"], cwd)
+
+    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
+  })
+
+  test("#given the footer opted in #when the git-master skill is loaded #then the footer and the co-author ride the skill block", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
     writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
@@ -144,8 +164,7 @@ describe("createTaskSkillLoader", () => {
     expect(resolution.prepend).toContain("GIT MASTER BODY")
     expect(resolution.prepend).toContain("Ultraworked with")
     expect(resolution.prepend).toContain("GIT COMMAND PREFIX (MANDATORY)")
-    expect(resolution.prepend).not.toMatch(CO_AUTHOR_TRAILER_PATTERN)
-    expect(resolution.prepend).not.toContain("users.noreply.github.com")
+    expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
   })
 
   test("#given attribution disabled and the env prefix disabled #when the git-master skill is loaded #then the skill block stays untouched", () => {

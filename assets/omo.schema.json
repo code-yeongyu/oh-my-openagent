@@ -5,6 +5,45 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "git_owners": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -40,14 +79,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "gateway": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {},
-      "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
     },
     "$schema": {
       "type": "string"
@@ -899,7 +930,7 @@
           ]
         },
         "include_co_authored_by": {
-          "default": false,
+          "default": true,
           "type": "boolean"
         },
         "git_env_prefix": {
@@ -1620,6 +1651,7 @@
             "merge": "auto",
             "category": "quick",
             "timeout_minutes": 15,
+            "max_concurrent_runs": 1,
             "sandbox": "auto"
           },
           "type": "object",
@@ -1663,6 +1695,12 @@
             },
             "timeout_minutes": {
               "default": 15,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_concurrent_runs": {
+              "default": 1,
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -1968,6 +2006,24 @@
             },
             "query_expansion": {
               "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "project_scope": {
+          "default": {
+            "nudge": true,
+            "recall": true
+          },
+          "type": "object",
+          "properties": {
+            "nudge": {
+              "default": true,
+              "type": "boolean"
+            },
+            "recall": {
+              "default": true,
               "type": "boolean"
             }
           },
@@ -2302,6 +2358,11 @@
         "enabled": {
           "default": true,
           "type": "boolean"
+        },
+        "rawTurnSampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       },
       "additionalProperties": false
@@ -2495,6 +2556,45 @@
     "[native]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -2527,14 +2627,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -4067,6 +4159,11 @@
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
                 },
+                "max_concurrent_runs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "sandbox": {
                   "type": "string",
                   "enum": [
@@ -4277,6 +4374,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -4602,6 +4711,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -4772,6 +4886,45 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -4804,14 +4957,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -6344,6 +6489,11 @@
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
                 },
+                "max_concurrent_runs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "sandbox": {
                   "type": "string",
                   "enum": [
@@ -6554,6 +6704,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -6879,6 +7041,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -7049,6 +7216,45 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -7081,14 +7287,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -8621,6 +8819,11 @@
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
                 },
+                "max_concurrent_runs": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "sandbox": {
                   "type": "string",
                   "enum": [
@@ -8831,6 +9034,18 @@
                   "maximum": 9007199254740991
                 },
                 "query_expansion": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
                   "type": "boolean"
                 }
               },
@@ -9156,6 +9371,11 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
             }
           },
           "additionalProperties": false
@@ -9332,6 +9552,45 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "workspaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "git_owners": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "formatOnMutation": {
             "type": "object",
             "properties": {
@@ -10896,6 +11155,11 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "max_concurrent_runs": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "sandbox": {
                     "type": "string",
                     "enum": [
@@ -11106,6 +11370,18 @@
                     "maximum": 9007199254740991
                   },
                   "query_expansion": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "project_scope": {
+                "type": "object",
+                "properties": {
+                  "nudge": {
+                    "type": "boolean"
+                  },
+                  "recall": {
                     "type": "boolean"
                   }
                 },
@@ -11431,6 +11707,11 @@
             "properties": {
               "enabled": {
                 "type": "boolean"
+              },
+              "rawTurnSampleRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
               }
             },
             "additionalProperties": false
@@ -11601,6 +11882,45 @@
           "[native]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -11633,14 +11953,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -13173,6 +13485,11 @@
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "max_concurrent_runs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "sandbox": {
                         "type": "string",
                         "enum": [
@@ -13383,6 +13700,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -13708,6 +14037,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -13878,6 +14212,45 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -13910,14 +14283,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -15450,6 +15815,11 @@
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "max_concurrent_runs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "sandbox": {
                         "type": "string",
                         "enum": [
@@ -15660,6 +16030,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -15985,6 +16367,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -16155,6 +16542,45 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -16187,14 +16613,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -17727,6 +18145,11 @@
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
                       },
+                      "max_concurrent_runs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "sandbox": {
                         "type": "string",
                         "enum": [
@@ -17937,6 +18360,18 @@
                         "maximum": 9007199254740991
                       },
                       "query_expansion": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
                         "type": "boolean"
                       }
                     },
@@ -18262,6 +18697,11 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
                   }
                 },
                 "additionalProperties": false
@@ -28052,7 +28492,7 @@
         "git_master": {
           "default": {
             "commit_footer": false,
-            "include_co_authored_by": false,
+            "include_co_authored_by": true,
             "git_env_prefix": "GIT_MASTER=1"
           },
           "type": "object",
@@ -28065,7 +28505,7 @@
               ]
             },
             "include_co_authored_by": {
-              "default": false,
+              "default": true,
               "type": "boolean"
             },
             "git_env_prefix": {

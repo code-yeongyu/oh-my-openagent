@@ -1,5 +1,11 @@
 # Agent-Model Matching Guide
 
+## Launch-gated Fable 5.5 preparation
+
+Claude Fable 5.5 is not released. `claude-fable-5-5` is a provisional ID, not a verified catalog entry. The builtin chains prepare 5.5 immediately ahead of 5.1 at the same effort and on the same providers. While `FABLE_55_RELEASED` is false (`packages/model-core/src/fable-55-launch.ts`), those rungs are skipped on every routing path, including a cold provider-models cache, so 5.1 stays the model that runs. The tables on this page show that routing as it is today. Only after release does 5.5 take the rung ahead of each 5.1 rung and the 5.1 defaults of `architect`, `artistry` and `plan-consultant`, and only then does the `architect` gate accept `claude-fable-5-5`. After release, a rung still needs the adopted senpi catalog to list the model. No 5.5 pricing, limits, accepted efforts or prompt preset are claimed here.
+
+Launch data lives in `packages/model-core/src/fable-55-launch.ts` (`FABLE_55_LAUNCH`). Set its ID, capability flags, modalities and context/input/output limits from the live listing, set `FABLE_55_EFFORTS` to the efforts the listing accepts (the max/xhigh on the 5.5 rungs are carried over from 5.1), and adopt the matching senpi release before enabling the routing commit. Recognition and routing are separate commits so recognition can land without promoting 5.5 if evaluation does not justify it.
+
 > **For agents and users**: the four model-profile lanes that pick the main agent's model, which models carry tuned prompt presets, how curated agents and categories keep their own chains, and how to change any of it without breaking things.
 
 **OmO Native sets all of this up on its own, so you can probably skip this page.** With nothing in `omo.json`, a fresh session starts on Daily · Normal (Claude Opus 5.5, then Kimi K3, then GLM 5.3, whichever you have connected), or on the first other lane that resolves, and every category and curated agent picks its model from its own chain against the providers you are logged in to. A category that none of your providers can serve is left off the main agent's list, so it is never picked and then fails. Read on when you want to change a default, or when you want to know why a session landed on the model it did.
@@ -124,7 +130,7 @@ If one premium model is quota-limited while your other models are effectively un
 2. **Prefer a low-frequency, high-leverage role.** `plan-consultant` contributes one gap-analysis pass per plan generation. High-accuracy planning runs one `plan-reviewer` pass per round and repeats after any rejection. Both are far cheaper places for a rare model than the main agent, which runs throughout the workflow.
 3. **Avoid execution-heavy slots.** The category worker, `explore`, and `librarian` are high-volume. They're usually poor homes for the rarest model.
 
-Claude Fable 5.1 is the first rung of `plan-consultant`, of the `architect` and `artistry` categories, the second rung of `visual-engineering` (behind Argon at low), and of Daily · Heavy. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` has no fallback rung, so it disappears when Fable is missing unless you configure it yourself.
+Provisional Claude Fable 5.5 precedes Fable 5.1 in `plan-consultant`, `architect`, `artistry` and Daily · Heavy. In `visual-engineering`, both Fable rungs follow Argon at low. With a tight Fable allocation, move the categories off it first, since each runs once per delegated task of its kind, and keep `plan-consultant`, which runs once per plan, at a lower effort. `architect` falls back only to Fable 5.1, so it disappears when both Fable generations are missing unless you configure it yourself.
 
 ```jsonc
 {

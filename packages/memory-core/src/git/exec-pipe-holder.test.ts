@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { createNodeGitExec } from "./exec"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { settlesWithin } from "./settles-within.test-support"
 import { probeUntil } from "../locks/process-liveness.test-support"
 
@@ -30,6 +31,7 @@ async function repoWithPipeHoldingHook(): Promise<{ readonly repo: string; reado
   const repo = realpathSync.native(await mkdtemp(join(tmpdir(), "git-pipe-holder-")))
   roots.push(repo)
   execFileSync("git", ["init", "-q", "-b", "main", repo])
+  disableFixtureAutoMaintenance(repo)
   execFileSync("git", ["-C", repo, "config", "user.email", "t@example.invalid"])
   execFileSync("git", ["-C", repo, "config", "user.name", "t"])
   execFileSync("git", ["-C", repo, "config", "core.hooksPath", join(repo, ".git", "hooks")])

@@ -208,7 +208,10 @@ async function applyOperations(root: string, operations: readonly PatchOperation
     await writeFile(path, Buffer.from(content, "utf8"))
   }
   for (const path of pendingDeletes) {
-    if (!pendingWrites.has(path) && await exists(path)) await unlink(path)
+    if (!pendingWrites.has(path)) {
+      if (await exists(path)) await unlink(path)
+      else affectedPaths.delete(relative(root, path).replace(/\\/g, "/"))
+    }
   }
   return { affectedPaths: [...affectedPaths], strippedPaths }
 }

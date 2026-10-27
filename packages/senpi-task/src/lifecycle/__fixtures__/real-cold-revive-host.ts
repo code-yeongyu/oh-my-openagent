@@ -26,6 +26,11 @@ export type HostColdReviveResult = {
   readonly finalResponse: string | undefined
   readonly sessionPath: string
   readonly transcriptRetained: boolean
+  /** The `task_status` the parked session publishes; the host takes a patch only from an attached connection. */
+  readonly parkedTaskStatus: unknown
+  readonly revivedTaskStatus: unknown
+  /** The `running` patch reached the host before the revival's message did. */
+  readonly runningPublishedBeforeSend: boolean
 }
 
 export async function realColdReviveHostSession(): Promise<HostColdReviveResult> {
@@ -49,11 +54,16 @@ export async function realColdReviveHostSession(): Promise<HostColdReviveResult>
     assert.deepEqual(await parent.lifecycle.reclaimIdleResidents?.(), [taskId])
     const parked = parent.store.load(taskId)
     assert(parked?.host_session !== undefined)
+    const sessionPath = parked.host_session.session_path
+    const onHost = () => world.host.sessions().find((live) => live.sessionPath === sessionPath)
+    const parkedSession = onHost()
 
     const sent = await runTaskSend(parent.manager, { to: taskId, message: "CONTINUE_HOST_SENTINEL" }, "parent-cold")
     const revived = parent.store.load(taskId)
     assert(revived !== null)
-    const sessionPath = parked.host_session.session_path
+    const commands = world.host.commands
+    const runningAt = commands.findIndex((command) => command.type === "set_session_context" && taskStatusOf(command.payload.patch) === "running")
+    const sendAt = commands.findIndex((command) => command.type === "prompt" && command.payload.message === "CONTINUE_HOST_SENTINEL")
     return {
       parkedResidency: parked.residency_state,
       revivedResidency: revived.residency_state,
@@ -65,8 +75,15 @@ export async function realColdReviveHostSession(): Promise<HostColdReviveResult>
       finalResponse: settled.final_response,
       sessionPath,
       transcriptRetained: world.host.sessions().some((live) => live.sessionPath === sessionPath),
+      parkedTaskStatus: taskStatusOf(parkedSession?.context),
+      revivedTaskStatus: taskStatusOf(onHost()?.context),
+      runningPublishedBeforeSend: runningAt !== -1 && sendAt !== -1 && runningAt < sendAt,
     }
   } finally {
     await world.cleanup()
   }
+}
+
+function taskStatusOf(context: unknown): unknown {
+  return typeof context === "object" && context !== null && "task_status" in context ? context.task_status : undefined
 }

@@ -22,6 +22,8 @@ export type HostSessionCommand =
   | { readonly type: "steer"; readonly message: string; readonly clientMessageId?: string }
   | { readonly type: "followUp"; readonly message: string; readonly clientMessageId?: string }
   | { readonly type: "abort" }
+  // Patch the context the attached session publishes (`set_session_context`); `null` deletes a key.
+  | { readonly type: "set_session_context"; readonly patch: Readonly<Record<string, string | number | boolean | null>> }
 
 /** Why a child parked itself instead of reattaching. */
 export type HostParkReason = "host_incompatible" | "own_host_unreachable" | "store_index_unavailable" | "daemon_unavailable"

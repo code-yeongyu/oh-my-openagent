@@ -12,6 +12,7 @@ import { exitedWithin, probeUntil } from "../locks/process-liveness.test-support
 import { installHooks } from "../memfs/hooks"
 import { assertRepoIntegrity, git } from "../concurrency/two-process-kit.test-support"
 import { GitMemoryRepo } from "./repo"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { sweepStrandedGitLockFiles } from "./repo-lock-sweep"
 import { findOpenFileHolderPids, unreadableFdDirMeansHeld } from "./open-file-holders"
 
@@ -96,6 +97,7 @@ describe("stranded git lock sweep vs LIVE writers (omo #10199 review)", () => {
     const dir = join(root, "repo")
     const repo = new GitMemoryRepo({ dir, agentId: "live-commit-msg", installHooks: (d) => void installHooks(d) })
     await repo.init()
+    disableFixtureAutoMaintenance(dir)
     const sentinel = join(root, "commit-msg-started")
     const release = join(root, "commit-msg-release")
     await writeSlowHook(dir, "commit-msg", [
@@ -145,6 +147,7 @@ describe("stranded git lock sweep vs LIVE writers (omo #10199 review)", () => {
     const dir = join(root, "repo")
     const repo = new GitMemoryRepo({ dir, agentId: "live-ref-txn", installHooks: (d) => void installHooks(d) })
     await repo.init()
+    disableFixtureAutoMaintenance(dir)
     const states = join(root, "ref-txn-states")
     const release = join(root, "ref-txn-release")
     await writeSlowHook(dir, "reference-transaction", [

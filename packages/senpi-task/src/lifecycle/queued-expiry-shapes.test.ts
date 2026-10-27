@@ -65,3 +65,52 @@ for (const mode of ["in-process", "child-process", "host-session"] as const) {
     })
   }
 }
+
+// #10866: a message queued after expiry read the claimed record but before it cleared the queue is dropped
+// too, so the failure message, steer_dropped and suspended_unresumable must all count it.
+test("queued expiry counts a message queued after its read in the message and both events", async () => {
+  const f = liveParentFixture("in-process")
+  f.dispose()
+  const id = await f.start()
+  f.state.closeRefused = false
+  f.store.mutate(id, record => ({
+    ...record, residency_state: "persisted_only", recovery_deadline_at: 0,
+    pending_steering: [{ id: "queued", message: "Q1", deliver_as: "steer" }],
+  }))
+  const observed = f.store.load(id)
+  if (observed === null) throw new Error("missing expiry record")
+  const context = resolveContext(f.deps)
+  const real = context.store
+  let injected = false
+  // A send lands right before the write that clears the queue: after any read expiry took to count it.
+  const store = new Proxy(real, {
+    get: (target, key) => {
+      if (key === "mutate") {
+        return (taskId: string, mutation: Parameters<typeof real.mutate>[1]) => {
+          const current = target.load(taskId)
+          if (!injected && current !== null && (current.pending_steering?.length ?? 0) > 0 && mutation(current)?.pending_steering === undefined) {
+            injected = true
+            target.mutate(taskId, record => ({
+              ...record,
+              pending_steering: [...(record.pending_steering ?? []), { id: "late", message: "Q2", deliver_as: "steer" as const }],
+            }))
+          }
+          return target.mutate(taskId, mutation)
+        }
+      }
+      const value: unknown = Reflect.get(target, key)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
+
+  await expireSuspendedChild({ ...context, store }, observed, () => true)
+
+  expect(injected).toBe(true)
+  expect(f.store.load(id)?.pending_steering).toBeUndefined()
+  expect(f.messages[0]?.content).toContain("2 queued messages were not delivered.")
+  expect(f.recordedEvents.filter(event => event.type === "steer_dropped").map(event => event.payload))
+    .toEqual([{ count: 2, reason: "target_gone" }])
+  expect(f.recordedEvents.find(event => event.type === "suspended_unresumable")?.payload)
+    .toMatchObject({ undelivered_messages: 2 })
+  f.manager.workpools.dispose()
+})

@@ -358,6 +358,7 @@ await runLauncher(["say", "hi"])
           command: "npm i -g omo-ai@beta",
           changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
         })
+        expect(capture(fixture).env.OMO_REINSTALL_COMMAND).toBe(brand.update.command)
       })
 
       // The launcher may re-exec itself under bun; whichever runtime wins, the engine must be told

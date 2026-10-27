@@ -8,6 +8,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { assertRepoIntegrity, git } from "../concurrency/two-process-kit.test-support"
+import { disableFixtureAutoMaintenance } from "./test-repo-config.test-support"
 import { createNodeGitExec } from "./exec"
 import { buildIdentityPaths } from "../identity"
 import { acquireLock, createLockRecord, getProcessStartIdentity, memoryWriterLockPath, releaseLock } from "../locks"
@@ -47,6 +48,7 @@ async function identityRepo(agentId: string) {
   await mkdir(paths.repo, { recursive: true })
   await mkdir(paths.locks, { recursive: true })
   await git(paths.repo, ["init", "-b", "main"])
+  disableFixtureAutoMaintenance(paths.repo)
   for (const [key, value] of [["commit.gpgsign", "false"], ["user.name", "Kernel Liveness"], ["user.email", "kernel@omo.local"]] as const) {
     await git(paths.repo, ["config", key, value])
   }
