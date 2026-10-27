@@ -18,6 +18,7 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
     model: record.model,
     run_stats: record.run_stats,
     ...(record.effective_model === undefined ? {} : { effective_model: record.effective_model }),
+    ...(record.model_fallback === undefined ? {} : { model_fallback: record.model_fallback }),
     failure_kind: record.failure_kind,
     failure_reason: record.failure_reason,
     ...(includeLifecycle && {

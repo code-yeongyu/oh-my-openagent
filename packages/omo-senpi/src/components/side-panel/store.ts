@@ -5,6 +5,8 @@ export interface PanelChild {
   readonly id: string
   readonly name: string
   readonly category?: string
+  readonly model?: string
+  readonly fallback?: string
   readonly status: PanelChildStatus
   /** Why the engine is holding this child, when it is holding one. */
   readonly parkedReason?: string
@@ -26,6 +28,8 @@ export interface PanelChildUpdate {
   readonly id: string
   readonly name?: string
   readonly category?: string
+  readonly model?: string
+  readonly fallback?: string
   readonly status?: PanelChildStatus
   readonly parkedReason?: string
   readonly host?: string
@@ -99,6 +103,8 @@ export function createPanelStore(now: () => number = Date.now): PanelStore {
         id: update.id,
         name: update.name ?? previous?.name ?? update.id,
         category: update.category ?? previous?.category,
+        model: update.model ?? previous?.model,
+        fallback: "fallback" in update ? update.fallback : previous?.fallback,
         status,
         ...(parkedReason === undefined ? {} : { parkedReason }),
         ...(host === undefined ? {} : { host }),
@@ -139,6 +145,8 @@ function sameChild(left: PanelChild, right: PanelChild): boolean {
   return (
     left.name === right.name &&
     left.category === right.category &&
+    left.model === right.model &&
+    left.fallback === right.fallback &&
     left.status === right.status &&
     left.parkedReason === right.parkedReason &&
     left.host === right.host &&

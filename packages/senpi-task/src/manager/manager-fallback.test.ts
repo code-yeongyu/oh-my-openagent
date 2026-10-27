@@ -105,6 +105,7 @@ describe("TaskManager configured runtime fallback", () => {
       requested_model: { display: "vendor-a/primary-model" },
       resolved_model: { display: "vendor-b/fallback-model" },
       fallback_models: [],
+      model_fallback: { from: "vendor-a/primary-model", reason: "provider capacity exhausted" },
     })
 
     const secondHandle = runner.handles.get(result.task_id)

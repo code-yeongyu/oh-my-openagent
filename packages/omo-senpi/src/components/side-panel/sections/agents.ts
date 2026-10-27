@@ -50,6 +50,9 @@ export function buildAgentRows(children: readonly PanelChild[], now: number, wid
       color: COLOR[child.status],
       action: { kind: "agent", id: child.id },
     })
+    for (const detail of [child.model, child.fallback]) {
+      if (detail !== undefined) rows.push({ text: truncateVisible(`  ${detail}`, width), color: "muted", action: { kind: "agent", id: child.id } })
+    }
   }
   return rows
 }
@@ -63,6 +66,8 @@ export function buildAgentCardRows(child: PanelChild, now: number): readonly Pan
   if (child.status !== "resuming" && child.status !== "ending") rows.push(field("elapsed", duration((child.finishedAt ?? now) - child.startedAt)))
   if (child.parkedReason !== undefined) rows.push(field("reason", child.parkedReason, "muted"))
   if (child.category !== undefined) rows.push(field("category", child.category))
+  if (child.model !== undefined) rows.push(field("model", child.model))
+  if (child.fallback !== undefined) rows.push(field("fallback", child.fallback, "muted"))
   if (child.host !== undefined) rows.push(field("runs", child.host, "muted"))
   if (child.activity !== undefined) rows.push(field("doing", child.activity, "muted"))
   if (child.turns !== undefined) rows.push(field("turns", String(child.turns), "muted"))

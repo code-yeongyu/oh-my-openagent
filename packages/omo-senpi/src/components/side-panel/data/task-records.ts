@@ -1,4 +1,4 @@
-import { recoveryPresentation } from "@oh-my-opencode/senpi-task"
+import { formatModelFallback, recoveryPresentation, type ModelFallbackRecord } from "@oh-my-opencode/senpi-task"
 import type { PanelChildStatus, PanelChildUpdate } from "../store"
 
 /**
@@ -18,6 +18,10 @@ export interface PanelTaskRecord {
   readonly description?: string
   readonly name?: string
   readonly category?: string
+  readonly model?: string
+  readonly effective_model?: { readonly display: string }
+  readonly resolved_model?: { readonly display: string }
+  readonly model_fallback?: ModelFallbackRecord
   readonly agent_type?: string
   /** Set while the engine is holding a child rather than running it; absent means it is not parked. */
   readonly failure_kind?: string
@@ -82,6 +86,8 @@ export function panelChildFromRecord(record: PanelTaskRecord): PanelChildUpdate 
     id: record.task_id,
     name: label(record),
     ...(record.category === undefined ? {} : { category: record.category }),
+    model: record.effective_model?.display ?? record.resolved_model?.display ?? record.model,
+    fallback: formatModelFallback(record.model_fallback),
     status: childStatus(record),
     ...(recoveryPresentation(record) !== undefined
       ? { parkedReason: recoveryPresentation(record)?.cause }

@@ -19,6 +19,7 @@ import {
   readOptionalTaskStartFailureReason,
 } from "./start-failure-parse"
 import { parseRunStats } from "./run-stats-parse"
+import { parseModelFallback } from "./model-fallback-parse"
 import {
   parseOptionalAwaitingInput,
   parseOptionalCancelRequest,
@@ -82,6 +83,8 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const resolvedModel = parseOptionalResolvedModel(value, "resolved_model")
   const resolvedTier = isRecord(value["resolved_model"]) ? readOptionalString(value["resolved_model"], "service_tier") : undefined
   const effectiveModel = parseOptionalEffectiveModel(value)
+  const modelFallback = parseModelFallback(value["model_fallback"])
+  const modelFailure = parseModelFallback(value["model_failure"])
   const parentModel = readOptionalString(value, "parent_model")
   const parentModelFallback = parseOptionalParentModelFallback(value)
   const effectiveTier = isRecord(value["effective_model"]) ? readOptionalString(value["effective_model"], "service_tier") : undefined
@@ -150,6 +153,8 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(requestedModel === undefined ? {} : { requested_model: requestedModel }),
     ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
     ...(fallbackAttempts === undefined ? {} : { fallback_attempts: fallbackAttempts }),
+    ...(modelFallback === undefined ? {} : { model_fallback: modelFallback }),
+    ...(modelFailure === undefined ? {} : { model_failure: modelFailure }),
     ...(resolvedModel === undefined ? {} : {
       resolved_model: { ...resolvedModel, ...(resolvedTier === undefined ? {} : { service_tier: resolvedTier }) },
     }),

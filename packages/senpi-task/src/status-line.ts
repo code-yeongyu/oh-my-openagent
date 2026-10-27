@@ -1,4 +1,5 @@
 import { excerptRendererText, optionalRendererText } from "./renderer-text"
+import { formatModelFallback, type ModelFallbackRecord } from "./state/model-fallback"
 import { parentModelFallbackToken } from "./parent-model-fallback-text"
 import type { EffectiveModelRecord, ParentModelFallback, ResolvedModelRecord, TaskRunStats } from "./state"
 
@@ -23,6 +24,7 @@ export type StatusTargetInput = {
   // Raw model string used when no resolved model metadata exists (live/legacy tasks).
   readonly model?: string
   readonly fallbackCount?: number
+  readonly modelFallback?: ModelFallbackRecord
   readonly parentModelFallback?: ParentModelFallback
 }
 
@@ -76,7 +78,9 @@ export function formatTargetWithModel(input: StatusTargetInput): string | undefi
     ? (model === undefined ? identity : `${identity}(${model})`)
     : (model !== undefined ? `model:${model}` : undefined)
   if (target === undefined) return undefined
-  return input.effectiveModel?.switched_by_operator === true ? `${target} (switched by operator)` : target
+  const marked = input.effectiveModel?.switched_by_operator === true ? `${target} (switched by operator)` : target
+  const fallback = formatModelFallback(input.modelFallback)
+  return fallback === undefined ? marked : `${marked} · ${fallback}`
 }
 
 // WHERE it runs: the routing target plus the model actually resolved for it.

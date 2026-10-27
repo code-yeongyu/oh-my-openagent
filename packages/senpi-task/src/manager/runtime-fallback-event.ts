@@ -1,5 +1,6 @@
 import type { EffectiveModelRecord, EffectiveModelSource, ResolvedModelRecord, TaskRecord } from "../state"
 import { type ManagedChildEvent } from "./child-handle"
+import { modelFailure, runtimeFallbackNotice } from "./model-fallback-facts"
 import { isParentModelRung } from "./parent-model-rung"
 
 export type ModelEventStore = {
@@ -50,6 +51,19 @@ export function applyModelEvent(
     ...(store.isOwnEffect === undefined ? {} : { isOwnEffect: store.isOwnEffect }),
   }
   switch (event.type) {
+    case "message_end": {
+      const record = resolved.load(taskId)
+      if (record == null) return
+      const message = event.message
+      if (typeof message !== "object" || message === null || Reflect.get(message, "role") !== "assistant") return
+      const failure = modelFailure(event, record)
+      if (failure !== undefined) resolved.replace({ ...record, model_failure: failure })
+      else if (record.model_failure !== undefined) {
+        const { model_failure: _cleared, ...rest } = record
+        resolved.replace(rest)
+      }
+      return
+    }
     case "retry_fallback_applied":
       return applyFallbackApplied(resolved, taskId, event)
     case "retry_fallback_reverted":
@@ -77,12 +91,21 @@ function applyFallbackApplied(
     record.resolved_model,
     resolvedModel,
   )
+  const limit = readEventString(event, "limit")
+  const from = readEventString(event, "from")
+  const origin = from === undefined ? undefined : parseModelSelector(from, resolvedModel.source)?.display ?? from
+  const failure = record.model_failure?.from === (origin ?? record.effective_model?.display ?? record.model)
+    ? record.model_failure : undefined
+  const notice = runtimeFallbackNotice(record, failure?.reason ?? readEventString(event, "reason") ?? "provider error",
+    limit === "model" || limit === "account" ? limit : undefined, origin)
+  const { model_failure: _consumed, ...rest } = record
   store.replace({
-    ...record,
+    ...rest,
     model: resolvedModel.display,
     resolved_model: resolvedModel,
     effective_model: toEffectiveRecord(resolvedModel, "fallback"),
     fallback_attempts: fallbackAttempts,
+    model_fallback: notice,
     updated_at: new Date().toISOString(),
     ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
   })
@@ -102,8 +125,9 @@ function applyFallbackReverted(
     ? parseModelSelector(selector, record.resolved_model?.source ?? "category")
     : undefined) ?? record.fallback_attempts?.[0]
   if (restored === undefined) return
+  const { model_fallback: _reverted, model_failure: _failure, ...rest } = record
   store.replace({
-    ...withoutStaleParentFallback(record, restored),
+    ...withoutStaleParentFallback(rest, restored),
     model: restored.display,
     resolved_model: restored,
     effective_model: toEffectiveRecord(restored, "fallback-revert"),

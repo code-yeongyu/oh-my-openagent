@@ -1,0 +1,18 @@
+{
+  "role": "assistant",
+  "content": [],
+  "api": "openai-codex-responses",
+  "provider": "chatgpt-subscription",
+  "model": "gpt-6-astra",
+  "usage": {
+    "input": 0,
+    "output": 0,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "totalTokens": 0,
+    "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0 }
+  },
+  "stopReason": "error",
+  "timestamp": 1793010000000,
+  "errorMessage": "You have hit your ChatGPT usage limit (pro plan). Buy credits at https://chatgpt.com/settings/usage. To keep going now, add an OpenAI API key, sign in with another ChatGPT account, or switch providers. Try again in ~820 min."
+}
