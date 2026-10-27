@@ -366,6 +366,12 @@ function convertRecordObjects(record, baseDir, noticeFor) {
   return { result: converted.result, refusal: undefined }
 }
 
+// A refusal in the shape every converter returns: no config, and the reason with the notice
+// that tells the user what to do about it.
+function refusalOf(reason, notice) {
+  return { config: undefined, refusal: { reason, notice } }
+}
+
 // The environment of an mcp server, in whichever shape the engine supports. A remote server has
 // one too: the engine's server schema carries `env` for stdio and http alike, and OpenCode
 // spells the field `environment` on a local server and `env` on either.
@@ -449,13 +455,10 @@ function convertOauth(name, oauth) {
   for (const scope of typeof oauth.scope === "string" ? oauth.scope.split(/\s+/).filter(Boolean) : []) {
     const converted = convertPlainField(scope)
     if (converted.refused) {
-      return {
-        config: undefined,
-        refusal: {
-          reason: converted.reason,
-          notice: `NOTICE opencode: mcp server ${name} oauth scope has ${converted.reason}; oauth scopes cannot hold a reference value; not imported - inline the value`,
-        },
-      }
+      return refusalOf(
+        converted.reason,
+        `NOTICE opencode: mcp server ${name} oauth scope has ${converted.reason}; oauth scopes cannot hold a reference value; not imported - inline the value`,
+      )
     }
     scopes.push(converted.value)
   }
@@ -465,13 +468,10 @@ function convertOauth(name, oauth) {
   if (typeof oauth.clientId === "string" && oauth.clientId !== "") {
     const converted = convertPlainField(oauth.clientId)
     if (converted.refused) {
-      return {
-        config: undefined,
-        refusal: {
-          reason: converted.reason,
-          notice: `NOTICE opencode: mcp server ${name} oauth clientId has ${converted.reason} which omo does not write in the clientId field; not imported - inline the value`,
-        },
-      }
+      return refusalOf(
+        converted.reason,
+        `NOTICE opencode: mcp server ${name} oauth clientId has ${converted.reason} which omo does not write in the clientId field; not imported - inline the value`,
+      )
     }
     clientId = converted.value
   }

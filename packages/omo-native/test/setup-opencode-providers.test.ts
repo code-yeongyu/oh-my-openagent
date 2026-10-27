@@ -157,6 +157,19 @@ const ACME = {
   },
 }
 
+// A custom provider whose apiKey points at a file, in the shape OpenCode reads.
+function providerReferencingAFile(item: Fixture, secretPath: string): void {
+  opencode(item, {
+    provider: {
+      acme: {
+        npm: "@ai-sdk/openai-compatible",
+        options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
+        models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
+      },
+    },
+  })
+}
+
 describe("omo setup opencode custom provider import", () => {
   describe("#given openai-compatible and anthropic custom providers in the opencode config", () => {
     describe("#when setup is accepted", () => {
@@ -200,15 +213,7 @@ describe("omo setup opencode custom provider import", () => {
         const item = fixture()
         const secretPath = join(item.tmp, "api-key")
 
-        opencode(item, {
-          provider: {
-            acme: {
-              npm: "@ai-sdk/openai-compatible",
-              options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
-              models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
-            },
-          },
-        })
+        providerReferencingAFile(item, secretPath)
 
         const result = await run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "1" })
         const auth = readAuthStore(join(item.agentDir, "auth.json"))
@@ -228,15 +233,7 @@ describe("omo setup opencode custom provider import", () => {
         const item = fixture()
         const secretPath = join(item.tmp, "api-key")
 
-        opencode(item, {
-          provider: {
-            acme: {
-              npm: "@ai-sdk/openai-compatible",
-              options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
-              models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
-            },
-          },
-        })
+        providerReferencingAFile(item, secretPath)
 
         const result = await run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "0" })
         const auth = readAuthStore(join(item.agentDir, "auth.json"))

@@ -196,7 +196,7 @@ describe("opencode asset plan", () => {
           },
         }, { referenceObjects: true })
 
-        const authorization = (plan.mcpServers[0].config as any).headers.Authorization
+        const authorization = (plan.mcpServers[0].config as { headers: Record<string, { $file: string }> }).headers.Authorization
         expect(authorization.$file).toBeTypeOf("string")
         expect(authorization.$file.startsWith("/")).toBe(true)
         expect(authorization.$file.endsWith("/local-secret.txt")).toBe(true)
