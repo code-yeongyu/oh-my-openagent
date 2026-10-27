@@ -47,7 +47,7 @@ function rowChecks(snap, id, referenced, cited, flag) {
 	}
 }
 
-export function sourceChecks(ctx, rows, cited, sourcesDir, flag) {
+export function sourceChecks(ctx, rows, cited, sourcesDir, flag, unreadable = new Set()) {
 	const referenced = new Map()
 	for (const key of cited.keys()) {
 		const row = rows.get(key)
@@ -57,6 +57,7 @@ export function sourceChecks(ctx, rows, cited, sourcesDir, flag) {
 	for (const match of proseText(ctx.body).matchAll(/\[S(\d+)\]/g)) ids.add(`S${match[1]}`)
 	const meta = new Map()
 	for (const id of ids) {
+		if (unreadable.has(id)) continue
 		const backing = referenced.get(id) ?? []
 		let snap
 		try {

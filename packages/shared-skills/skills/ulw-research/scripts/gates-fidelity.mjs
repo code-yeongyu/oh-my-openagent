@@ -41,8 +41,8 @@ export function deliveryBlockReason(defect) {
 }
 
 function withIntegrity(defect) {
-	const { code, severity, selector, line, message, hint } = defect
-	return { code, severity, integrity: DEFECT_CODES[code].integrity, selector, line, message, hint }
+	const { code, severity, selector, line, message, hint, part, fact_id } = defect
+	return { code, severity, integrity: DEFECT_CODES[code].integrity, selector, line, message, hint, ...(part ? { part } : {}), ...(fact_id ? { fact_id } : {}) }
 }
 
 function compareDefects(a, b) {
