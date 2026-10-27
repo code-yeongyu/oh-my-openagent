@@ -21,10 +21,12 @@ function session(text: string, kind = "document") {
 
 const add = (dir: string) => run(["fact", "add", "--session-dir", dir, "--source", "S1", "--find", "Span", "--label", "span", "--json"])
 
+// fact verify needs the edition's fill map under the current brief, so the edition is filled, not hand-written.
 async function verify(dir: string) {
 	const row = readLedger(dir).rows[0]
-	const report = join(dir, "report.html")
-	writeFileSync(report, `<h2>Findings</h2><p><data data-fact="${row.fact_id}">${row.raw}</data> [S1].</p>`)
+	const [source, report] = [join(dir, "report.src.html"), join(dir, "report.html")]
+	writeFileSync(source, `<h2>Findings</h2><p>{{${row.fact_id}:${row.label}}} [S1].</p>`)
+	await run(["fact", "fill", source, "--out", report, "--session-dir", dir])
 	return run(["fact", "verify", report, "--session-dir", dir])
 }
 
