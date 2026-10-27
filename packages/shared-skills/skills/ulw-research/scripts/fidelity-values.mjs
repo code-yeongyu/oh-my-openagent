@@ -173,7 +173,7 @@ export function valueChecks(ctx, ledger, fillMap, sourcesDir, options = {}) {
 	const entries = fillEntriesByNode(facts, options.fillEntries)
 	for (const node of facts) {
 		const row = rows.get(node.attrs["data-fact"])
-		const problem = row && row.kind !== "quote" && !factProblem(row, proseText(node), node.attrs) && valueUnitProblem(node, row, entries.get(node))
+		const problem = row && row.kind !== "quote" && !factProblem(row, proseText(node), node.attrs, rows) && valueUnitProblem(node, row, entries.get(node))
 		if (problem) flag(problem[0], node, problem[1])
 	}
 	for (const tr of ctx.all.filter((node) => node.tag === "tr" && node.attrs["data-row-kind"] !== "comparison")) {
