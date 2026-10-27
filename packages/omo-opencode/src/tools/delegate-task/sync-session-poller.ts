@@ -7,9 +7,12 @@ import { normalizeSDKResponse } from "../../shared"
 
 export { isSessionComplete } from "./sync-session-turns"
 
+// allow: SIZE_OK - one polling state machine; splitting its timers and turn state would obscure ordering invariants.
+
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const CHILD_WAKE_GRACE_MS = 5_000
 const MAX_NON_ACTIVE_STATUS_STALENESS_POLLS = 10
+const STALL_TIMEOUT_MS = 30_000
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -29,6 +32,26 @@ function abortSyncSession(client: OpencodeClient, sessionID: string, reason: str
 
 function isActiveSessionStatus(status: { type: string } | undefined): boolean {
   return status !== undefined && ACTIVE_SESSION_STATUSES.has(status.type)
+}
+
+function isKnownInactiveSessionStatus(status: { type: string } | undefined): boolean {
+  return status?.type === "idle"
+}
+
+function getStallProgressSignature(messages: SessionMessage[]): string {
+  return JSON.stringify([
+    messages.length,
+    ...messages.map((message) => [
+      message.info?.role === "assistant" ? message.info.id ?? null : null,
+      message.info?.role === "assistant" ? message.info.finish ?? null : null,
+      ...(message.parts ?? []).map((part) => [part.type ?? null, part.text ?? null]),
+    ]),
+  ])
+}
+
+function getCurrentTurnMessages(messages: SessionMessage[]): SessionMessage[] {
+  const latestUserIndex = messages.findLastIndex((message) => message.info?.role === "user")
+  return latestUserIndex < 0 ? [] : messages.slice(latestUserIndex + 1)
 }
 
 function hasMessagesAfterAnchor(
@@ -68,13 +91,18 @@ export async function pollSyncSession(
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
+    stallTimeoutMs?: number
+    now?: () => number
+    wait?: (milliseconds: number) => Promise<void>
   },
   timeoutMs?: number
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
   const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
   const maxTurns = input.maxAssistantTurns ?? DEFAULT_MAX_ASSISTANT_TURNS
-  const pollStart = Date.now()
+  const now = input.now ?? Date.now
+  const waitForPoll = input.wait ?? wait
+  const pollStart = now()
   let inactiveStart = pollStart
   let pollCount = 0
   let nonActivePollsSinceMessageFetch = 0
@@ -83,6 +111,9 @@ export async function pollSyncSession(
   let timedOut = false
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
+  let stallProgressSignature: string | undefined
+  let stallSince = 0
+  const stallTimeoutMs = input.stallTimeoutMs ?? STALL_TIMEOUT_MS
   let lastObservedAssistantId: string | undefined
   let lastObservedMessageCount: number | undefined
   const childSettleMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
@@ -111,14 +142,14 @@ export async function pollSyncSession(
     if (childWaitAssistantId === undefined || currentAssistantId !== childWaitAssistantId) {
       return false
     }
-    childSettleStartedAt ||= Date.now()
-    return Date.now() - childSettleStartedAt < childSettleMs
+    childSettleStartedAt ||= now()
+    return now() - childSettleStartedAt < childSettleMs
   }
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse, maxTurns })
 
   while (true) {
-    const inactiveElapsedMs = Date.now() - inactiveStart
+    const inactiveElapsedMs = now() - inactiveStart
     if (inactiveElapsedMs >= maxPollTimeMs) {
       timedOut = true
       break
@@ -140,7 +171,7 @@ export async function pollSyncSession(
             error: errorMessage,
           })
           if (attempt < abortFetchAttempts) {
-            await wait(syncTiming.POLL_INTERVAL_MS)
+            await waitForPoll(syncTiming.POLL_INTERVAL_MS)
           }
         }
       }
@@ -163,10 +194,11 @@ export async function pollSyncSession(
       return `Task aborted.\n\nSession ID: ${input.sessionID}`
     }
 
-    await wait(syncTiming.POLL_INTERVAL_MS)
+    await waitForPoll(syncTiming.POLL_INTERVAL_MS)
     pollCount++
 
     let sessionStatus: ({ type: string; updatedAt?: string | number; revision?: string | number; messageCount?: number } & Record<string, unknown>) | undefined
+    let statusObservationFailed = false
     try {
       const statusResult = await client.session.status()
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
@@ -175,22 +207,38 @@ export async function pollSyncSession(
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       log("[task] Poll status fetch failed, checking messages", { sessionID: input.sessionID, error: errorMessage })
+      statusObservationFailed = true
     }
 
     if (pollCount % 10 === 0) {
       log("[task] Poll status", {
         sessionID: input.sessionID,
         pollCount,
-        elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
+        elapsed: Math.floor((now() - pollStart) / 1000) + "s",
         inactiveElapsed: Math.floor(inactiveElapsedMs / 1000) + "s",
         sessionStatus: sessionStatus?.type ?? "not_in_status",
       })
     }
 
     const isActive = isActiveSessionStatus(sessionStatus)
+
+    // Stall-state maintenance. An ACTIVE observation always resets the stall
+    // window, and so must a FAILED observation: an unavailable observation is
+    // not evidence of an idle stall. But a SUCCESSFUL status response that
+    // omits the session IS known-inactive evidence: real OpenCode drops idle
+    // sessions from the status map entirely (verified end-to-end on 1.18.15 —
+    // an interrupted-stream child settles idle, emits session.idle, and
+    // disappears from the map), so "absent from a successful response" is the
+    // real-world signal of a quiescent session, alongside an explicit "idle".
+    // This runs BEFORE the staleness dedup below so that guard's `continue`
+    // cannot preserve a pre-outage stall window through polls that produced
+    // no valid observation at all.
+    const hasKnownInactiveStatus = !statusObservationFailed && (sessionStatus === undefined || isKnownInactiveSessionStatus(sessionStatus))
+    if (isActive || !hasKnownInactiveStatus) stallSince = 0
+
     const statusRevision = sessionStatus && (sessionStatus.updatedAt ?? sessionStatus.revision ?? sessionStatus.messageCount ?? sessionStatus.type)
     const statusChanged = statusRevision !== undefined && String(statusRevision) !== lastStatusRevision
-    if (statusChanged) inactiveStart = Date.now()
+    if (statusChanged) inactiveStart = now()
 
     // An active status (busy/retry/running) is not progress by itself: a child that hit a
     // terminal provider error can sit in "busy" forever with an unchanged message set.
@@ -221,7 +269,7 @@ export async function pollSyncSession(
       (messages.length !== lastObservedMessageCount || currentAssistantId !== lastObservedAssistantId)
     lastObservedMessageCount = messages.length
     lastObservedAssistantId = currentAssistantId
-    if (messageStateChanged) inactiveStart = Date.now()
+    if (messageStateChanged) inactiveStart = now()
 
     const sessionError = getTerminalSessionError(messages)
     if (sessionError) {
@@ -238,6 +286,64 @@ export async function pollSyncSession(
       log("[task] Poll complete - terminal finish detected", { sessionID: input.sessionID, pollCount })
       break
     }
+
+    // Stall detection: a session that is inactive, whose last assistant message
+    // carries the abnormal "unknown" finish (produced by opencode when a model
+    // stream is interrupted mid-turn), and that has not produced any new
+    // messages is effectively dead. Fail fast instead of waiting out the full
+    // inactivity timeout (30 minutes by default). If the stalled session still
+    // contains a substantive assistant text/reasoning deliverable, treat it as
+    // complete so the parent does not lose the result.
+    //
+    // Note: a missing finish (undefined) is deliberately NOT stall-detected -
+    // it can transiently appear while a subagent is mid-generation, and
+    // aborting such a session would kill a healthy task.
+    //
+    // Sessions waiting on their own background children (or a pending parent
+    // wake) are also NOT stall-detected: like the isSessionComplete branch
+    // above, they are legitimately quiescent while child work is in flight.
+    const relevantMessages =
+      input.anchorMessageCount !== undefined ? messages.slice(input.anchorMessageCount) : messages
+    const progressSignature = getStallProgressSignature(relevantMessages)
+    const currentTurnMessages = getCurrentTurnMessages(relevantMessages)
+    const lastAssistantForStall = currentTurnMessages.findLast((m) => m.info?.role === "assistant")
+    const lastFinishForStall = lastAssistantForStall?.info?.finish
+    if (
+      hasKnownInactiveStatus &&
+      lastFinishForStall === "unknown" &&
+      progressSignature === stallProgressSignature &&
+      !isAwaitingChildContinuation(lastAssistantForStall?.info?.id)
+    ) {
+      const stallNow = now()
+      stallSince ||= stallNow
+      if (stallNow - stallSince >= stallTimeoutMs) {
+        const hasDeliverable = currentTurnMessages.some((message) => {
+          if (message.info?.role !== "assistant") return false
+          return (message.parts ?? []).some((p) => {
+            if (p.type !== "text" && p.type !== "reasoning") return false
+            return (p.text ?? "").trim().length > 0
+          })
+        })
+        if (hasDeliverable) {
+          log("[task] Poll complete - stalled session with deliverable treated as complete", {
+            sessionID: input.sessionID,
+            pollCount,
+          })
+          break
+        }
+        log("[task] Poll stalled - no deliverable, failing fast", {
+          sessionID: input.sessionID,
+          pollCount,
+          stallMs: now() - stallSince,
+        })
+        abortSyncSession(client, input.sessionID, "stall_timeout")
+        if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
+        return `Subagent stalled: session was inactive with finish="${lastFinishForStall}" and produced no new messages for ${stallTimeoutMs}ms. The model stream was likely interrupted. Session ID: ${input.sessionID}`
+      }
+    } else {
+      stallSince = 0
+    }
+    stallProgressSignature = progressSignature
 
     // Count new assistant turns to circuit-break infinite loops. This runs while the status
     // is still active too: a child looping through tool calls never leaves "busy", and every
