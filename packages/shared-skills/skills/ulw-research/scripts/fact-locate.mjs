@@ -103,7 +103,8 @@ export function locateFind(text, { find, unitExpected, sourceId }) {
 	return result.unit === expected ? result : { error: "unit_expected_mismatch", expected, found: result.unit, candidates: [result] }
 }
 
-function cellsOf(row) {
+/** A row's cells by visual column (a colspan cell repeats). */
+export function cellsOf(row) {
 	const cells = []
 	for (const cell of row.children.filter((child) => child.tag === "td" || child.tag === "th")) {
 		const span = Math.max(1, Number.parseInt(cell.attrs.colspan ?? "1", 10) || 1)
@@ -112,7 +113,7 @@ function cellsOf(row) {
 	return cells
 }
 
-function rowsOf(table) {
+export function rowsOf(table) {
 	const rows = []
 	const walk = (node) => {
 		for (const child of node.children) {

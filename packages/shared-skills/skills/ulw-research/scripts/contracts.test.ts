@@ -28,7 +28,7 @@ import { SEVERITIES, STATIC_CODES_EXPECTED, LAYOUT_CODES_EXPECTED, FIDELITY_BLOC
 describe("DEFECT_CODES", () => {
 	test("#given the code table #when every code is inspected #then it has a severity, a hint, and an integrity flag", () => {
 		expect(Object.keys(DEFECT_CODES).sort()).toEqual(
-			[...STATIC_CODES_EXPECTED, "missing_promised_deliverable", ...LAYOUT_CODES_EXPECTED, ...FIDELITY_CODES_EXPECTED, "conversion_altered_number"].sort(),
+			[...STATIC_CODES_EXPECTED, "missing_promised_deliverable", ...LAYOUT_CODES_EXPECTED, ...FIDELITY_CODES_EXPECTED, "conversion_altered_number", "unit_unbound"].sort(),
 		)
 		for (const [code, entry] of Object.entries(DEFECT_CODES)) {
 			expect(SEVERITIES.has(entry.severity), `${code} severity`).toBe(true)
@@ -71,6 +71,7 @@ describe("DEFECT_CODES", () => {
 		expect([DEFECT_CODES.conversion_altered_number?.severity, DEFECT_CODES.conversion_altered_number?.integrity]).toEqual(["blocker", true])
 		for (const code of FIDELITY_MAJORS) expect([code, DEFECT_CODES[code]?.severity, DEFECT_CODES[code]?.integrity]).toEqual([code, "major", false])
 		for (const code of FIDELITY_MINORS) expect([code, DEFECT_CODES[code]?.severity, DEFECT_CODES[code]?.integrity]).toEqual([code, "minor", false])
+		expect([DEFECT_CODES.unit_unbound?.severity, DEFECT_CODES.unit_unbound?.integrity]).toEqual(["minor", false])
 		expect(DEFECT_CODES).not.toHaveProperty("incompatible_populations")
 	})
 })
@@ -80,7 +81,7 @@ describe("code groups", () => {
 		expect([...STATIC_CODES].sort()).toEqual(STATIC_CODES_EXPECTED.slice().sort())
 		expect([...LAYOUT_CODES].sort()).toEqual(LAYOUT_CODES_EXPECTED.slice().sort())
 		expect([...MANIFEST_CODES]).toEqual(["missing_promised_deliverable"])
-		expect([...FIDELITY_CODES].sort()).toEqual([...FIDELITY_CODES_EXPECTED, "conversion_altered_number"].sort())
+		expect([...FIDELITY_CODES].sort()).toEqual([...FIDELITY_CODES_EXPECTED, "conversion_altered_number", "unit_unbound"].sort())
 		const union = [...STATIC_CODES, ...LAYOUT_CODES, ...MANIFEST_CODES, ...FIDELITY_CODES].sort()
 		expect(union).toEqual(Object.keys(DEFECT_CODES).sort())
 		expect(new Set(union).size).toBe(union.length)
