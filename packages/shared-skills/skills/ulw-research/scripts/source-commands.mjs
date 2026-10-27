@@ -134,6 +134,19 @@ export async function acquire(flags) {
 	return { ...runCommand(flags.command, flags.cwd), extractor: TOOL_EXTRACTOR }
 }
 
+/**
+ * `--replace` with `--text` alone (the conversion_altered_number recovery) keeps the source's raw.bin and
+ * declares the verified text its extraction, so value rows locate in text.txt while the original bytes stay
+ * pinned; plain `--text` without `--replace`, or over an id with no raw.bin, stays converted-only.
+ */
+function declareOverKeptRaw(sourcesDir, id, input) {
+	const dir = join(sourcesDir, String(id))
+	if (input.kind !== "converted-only" || !existsSync(join(dir, "raw.bin")) || !existsSync(join(dir, "meta.json"))) return
+	const before = JSON.parse(readFileSync(join(dir, "meta.json"), "utf8"))
+	Object.assign(input, { url: before.url, raw: readFileSync(join(dir, "raw.bin")), kind: before.kind, declared: true })
+	delete input.path
+}
+
 export async function runSource(argv) {
 	const [sub, ...rest] = argv
 	if (sub === "refresh") return (await import("./source-refresh.mjs")).runRefresh(rest)
@@ -150,6 +163,7 @@ export async function runSource(argv) {
 		return { json: { command: "source snapshot", status: "fail", exitCode: 1, error: "snapshot_pinned", message, rows: pinned }, summary: `source snapshot: ${message}`, exitCode: 1 }
 	}
 	const { receipt, ...input } = await acquire(args.flags)
+	if (replace) declareOverKeptRaw(sourcesDir, id, input)
 	if (args.flags.kind !== undefined) input.kind = args.flags.kind
 	if (args.flags.provenance !== undefined) input.provenance = args.flags.provenance
 	if (args.flags.revision !== undefined) input.revision = args.flags.revision

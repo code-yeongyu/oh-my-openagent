@@ -100,6 +100,7 @@ function snapshotText(input) {
 /** Which source-view text source the input makes, with the bytes it pins. */
 function bodiesOf(input) {
 	if (input.kind === "converted-only") return { mode: "converted", raw: null, textBody: Buffer.from(snapshotText(input)) }
+	if (input.declared === true) return { mode: "declared", raw: Buffer.from(input.raw), textBody: Buffer.from(snapshotText(input)) }
 	if (input.raw === undefined && typeof input.html === "string") return { mode: "html", raw: Buffer.from(input.html), textBody: null }
 	if (input.raw === undefined) return { mode: "decoded", raw: Buffer.from(snapshotText(input)), textBody: null }
 	const raw = Buffer.from(input.raw)
