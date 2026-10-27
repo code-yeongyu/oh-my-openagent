@@ -1,6 +1,10 @@
 /// <reference types="bun-types" />
 
 import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import { createPaneAuthDirectory } from "@oh-my-opencode/tmux-core"
 
 import { canVisualize, createTeamLayout, removeTeamLayout, type TeamLayoutCleanupTarget, type TeamLayoutDeps } from "./layout"
 
@@ -214,7 +218,7 @@ describe("team-layout-tmux", () => {
     expect(directories).toEqual(["/tmp/##{session_name}/##(touch c)", "./w/##{pane_id}"])
   })
 
-  test("#given env auth set #when createTeamLayout runs #then send-keys attach commands omit secrets while split-window forwards pane env", async () => {
+  test("#given env auth set #when createTeamLayout runs #then no argv contains the password and the pane consumes its private file", async () => {
     // given — fixtures assembled at runtime (never literals) so static secret
     // scanners don't flag a username/password pair (GitGuardian false-positive,
     // #4466). The embedded single quote still exercises the shell-escape path.
@@ -224,6 +228,8 @@ describe("team-layout-tmux", () => {
     const originalUser = process.env.OPENCODE_SERVER_USERNAME
     process.env.OPENCODE_SERVER_PASSWORD = fixturePassword
     process.env.OPENCODE_SERVER_USERNAME = fixtureUsername
+    const cleanupAuthDirectory = createPaneAuthDirectory()
+    const sandbox = mkdtempSync(join(tmpdir(), "team-pane-auth-"))
     try {
       const { createTeamLayout } = await loadLayoutModule()
       const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
@@ -237,7 +243,6 @@ describe("team-layout-tmux", () => {
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
       if (attach === undefined) throw new Error("expected attach command")
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
       expect(attach).not.toContain("OPENCODE_SERVER_USERNAME")
       expect(attach).not.toContain(fixturePassword)
       expect(attach).not.toContain(fixtureUsername)
@@ -245,9 +250,34 @@ describe("team-layout-tmux", () => {
       const splitWindow = commands.find((args) => args[0] === "split-window")
       expect(splitWindow).toBeDefined()
       expect(splitWindow).toContain("-e")
-      expect(splitWindow).toContain(`OPENCODE_SERVER_PASSWORD=${fixturePassword}`)
+      expect(commands.some((args) => args.some((arg) => arg.includes(fixturePassword)))).toBe(false)
+      expect(splitWindow?.some((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))).toBe(true)
       expect(splitWindow).toContain(`OPENCODE_SERVER_USERNAME=${fixtureUsername}`)
+      if (process.platform === "win32") return // POSIX shell and mode checks require Unix.
+      const file = splitWindow?.find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+      if (!file) throw new Error("missing team pane password file")
+      expect(statSync(file).mode & 0o777).toBe(0o600)
+      expect(statSync(dirname(file)).mode & 0o777).toBe(0o700)
+      writeFileSync(join(sandbox, "opencode"), [
+        "#!/bin/sh",
+        'test "$OPENCODE_SERVER_PASSWORD" = "$EXPECTED_PASSWORD" || exit 2',
+        'test ! -e "$EXPECTED_FILE" || exit 3',
+        'for arg in "$@"; do test "$arg" != "$EXPECTED_PASSWORD" || exit 4; done',
+        "printf auth-ok",
+      ].join("\n"), { mode: 0o700 })
+      const attachCommand = commands.find((args) => args[0] === "send-keys")?.[3]
+      if (!attachCommand) throw new Error("missing attach command")
+      const child = Bun.spawn(["/bin/sh", "-c", attachCommand], {
+        env: { ...process.env, PATH: `${sandbox}:${process.env.PATH ?? ""}`, OPENCODE_SERVER_PASSWORD: "",
+          OPENCODE_SERVER_PASSWORD_FILE: file, EXPECTED_PASSWORD: fixturePassword, EXPECTED_FILE: file },
+        stdout: "pipe", stderr: "pipe",
+      })
+      expect(await child.exited).toBe(0)
+      expect(await new Response(child.stdout).text()).toBe("auth-ok")
+      expect(existsSync(file)).toBe(false)
     } finally {
+      cleanupAuthDirectory()
+      rmSync(sandbox, { recursive: true, force: true })
       if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
       if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = originalUser
     }
@@ -268,7 +298,7 @@ describe("team-layout-tmux", () => {
       const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
+      expect(attach).not.toMatch(/\bOPENCODE_SERVER_PASSWORD(?:_FILE)?\b/)
     } finally {
       if (originalPwd !== undefined) process.env.OPENCODE_SERVER_PASSWORD = originalPwd
     }

@@ -1,3 +1,7 @@
+## 2026-10-26 - Reinstall and sign-in guidance (#11390)
+
+The launcher sets `OMO_REINSTALL_COMMAND` (`updateTarget().command`) for the engine so the plugin can name the reinstall command after `SENPI_BRAND` is scrubbed. `runThreadCommand` takes a `reinstall` step from its caller (npm: the reinstall command; compiled: the releases page). `omo update` on an install already at the channel version whose engine tree cannot be resolved exits 1 with the reinstall command. `omo sync` reads the account refusal body's code through `ApiRefusal`, using the shared guidance and falling back to HTTP status for unknown or malformed bodies. Forbidden accounts are not told to sign in again; deleted accounts get the account-deleted action both here and during session refresh.
+
 Review #10496 round 2 (#10478). `applySetupStages` now tracks the files its own earlier stages wrote and passes them to `staleGuard`; `staleSetupTargets(plans, ids, written)` ignores those paths. Before this, an apply of every stage with a custom-provider key stopped halfway: the credentials stage rewrote auth.json, then the provider stage compared auth.json against the scan-time bytes and answered `stale` after credentials were written. A skill directory planned as new is now stale when anything exists at its path (it was read as a file, so the check never fired). `omo setup` passes no guard and is unchanged.
 
 ## 2026-10-18 - Onboarding apply refuses stale targets and rides the engine's credential store (#10496)

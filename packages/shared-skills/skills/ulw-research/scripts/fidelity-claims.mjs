@@ -64,7 +64,7 @@ export function claimChecks(ctx, rows, provenanceOf, flag) {
 		const id = fact.attrs["data-fact"]
 		if (!nearest) {
 			const need = unmarkedRequires(rows.get(id))
-			const mark = need && `{{${CLAIM_KINDS[need].prefix}:${id}}} (${CLAIM_ATTRIBUTE}="${need}")`
+			const mark = need && `{{${CLAIM_KINDS[need].prefix}:${id}:${rows.get(id).label}}} (${CLAIM_ATTRIBUTE}="${need}")`
 			if (need) flag("claim_kind_mismatch", fact, `${id} is a ${rows.get(id).kind} row cited with no mark; an unmarked numeral reads as a fact, so mark it ${mark}`)
 			continue
 		}

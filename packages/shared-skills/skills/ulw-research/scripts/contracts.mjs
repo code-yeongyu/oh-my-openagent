@@ -58,6 +58,7 @@ export const DEFECT_CODES = deepFreeze({
 	pointer_label_mismatch: { severity: "blocker", integrity: true, hint: "The placeholder's label is not the row's label; check the id, then the label." },
 	quote_anchor_unresolved: { severity: "blocker", integrity: true, hint: "A from or to anchor is missing or occurs more than once in the quote; pick unique anchor words." },
 	unit_duplicated: { severity: "blocker", integrity: true, hint: "The unit after the placeholder repeats the row's unit; use :value or remove the unit." },
+	conversion_altered_number: { severity: "blocker", integrity: true, hint: "The source conversion altered this number (sources/S<n>/conversion.json lists it); snapshot a verified text of the source over it with `source snapshot --id S<n> --text <verified.txt> --replace` (refused while an active row cites S<n>; then retract those rows or use a new id), then re-add the fact." },
 	polish_diff_fail: { severity: "blocker", integrity: true, hint: "The polish pass changed numbers, tickers, table rows, claim ids, markup, or hidden content; revert to the pre-polish artifact and apply the language fixes only." },
 	fidelity_interview_incomplete: { severity: "blocker", integrity: true, hint: "A fidelity field is pending or missing in brief.md; answer the open question or record its default, then rerun." },
 	derived_not_allowed: { severity: "blocker", integrity: true, hint: "The brief allows no derived or assumed numbers; cite a source row directly or change the brief with the requester." },
@@ -92,6 +93,7 @@ export const DEFECT_CODES = deepFreeze({
 	verification_claim_unmarked: { severity: "minor", integrity: false, hint: "The sentence reads as a check we ran but carries no verified mark; mark it {{V:F<n>:label}} on a recorded command-output row, or reword it." },
 	scope_widened_warn: { severity: "minor", integrity: false, hint: "The sentence uses a broader scope word than the quote; confirm the scope or narrow it." },
 	particle_unverified: { severity: "minor", integrity: false, hint: "The particle after this value could not be checked; read it aloud and fix it by hand if wrong." },
+	unit_unbound: { severity: "minor", integrity: false, hint: "Use the full fact placeholder, or write the unit right after :value (with or without a space; a Korean particle may follow), as its :unit element, or in the matching table column header." },
 	fallback_without_entity: { severity: "minor", integrity: false, hint: "The replacement quote has no entity for attribution; set one on the row." },
 	meaning_drift_warn: { severity: "minor", integrity: false, hint: "A separate reader found the sentence changes scope, subject, or certainty; rewrite from the quote." },
 	polish_edit_unlocated: { severity: "minor", integrity: false, hint: "The edit's before-text was not found exactly once; re-propose against the current text." },
@@ -101,9 +103,11 @@ export const DEFECT_CODES = deepFreeze({
 
 /** Codes only the fidelity verifier raises (fact ledger, fill, verify, meaning, polish). */
 export const FIDELITY_CODES = Object.freeze([
+	"unit_unbound",
 	"unresolved_placeholder", "value_mismatch", "unit_mismatch", "quote_not_verbatim", "claim_status_invalid",
 	"incompatible_operands", "pointer_label_mismatch", "quote_anchor_unresolved", "unit_duplicated", "polish_diff_fail",
 	"fidelity_interview_incomplete", "derived_not_allowed", "source_outside_floor", "brief_changed", "snapshot_hash_mismatch",
+	"conversion_altered_number",
 	"chart_value_untraceable", "quote_unbound", "edition_unverified", "untraceable_number", "unsupported_verification", "claim_kind_mismatch",
 	"conflicting_readings", "hedge_dropped", "direction_flipped", "causality_added", "qualifier_dropped", "unbound_sentence",
 	"meaning_drift_confirmed", "meaning_unverified", "polish_edit_rejected", "polish_hedging_decreased", "polish_text_churn", "snapshot_mismatch",

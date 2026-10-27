@@ -20,6 +20,7 @@ import { parseHtml } from "./html-lite.mjs"
 
 /** Every code this gate can raise. */
 export const FIDELITY_GATE_CODES = Object.freeze([
+	"unit_unbound",
 	"fidelity_interview_incomplete", "unresolved_placeholder", "value_mismatch", "unit_mismatch", "quote_not_verbatim",
 	"quote_unbound", "claim_status_invalid", "snapshot_hash_mismatch", "chart_value_untraceable", "untraceable_number",
 	"unsupported_verification", "conflicting_readings", "hedge_dropped", "direction_flipped", "causality_added",
@@ -41,8 +42,8 @@ export function deliveryBlockReason(defect) {
 }
 
 function withIntegrity(defect) {
-	const { code, severity, selector, line, message, hint } = defect
-	return { code, severity, integrity: DEFECT_CODES[code].integrity, selector, line, message, hint }
+	const { code, severity, selector, line, message, hint, part, fact_id } = defect
+	return { code, severity, integrity: DEFECT_CODES[code].integrity, selector, line, message, hint, ...(part ? { part } : {}), ...(fact_id ? { fact_id } : {}) }
 }
 
 function compareDefects(a, b) {
@@ -94,17 +95,17 @@ function incomplete(parsed) {
 
 /**
  * @param {string} html the filled report
- * @param {{ ledger: { rows: object[] }, sourcesDir?: string | null, claims?: object | null, fillMap?: object[] | null,
+ * @param {{ ledger: { rows: object[] }, sourcesDir?: string | null, claims?: object | null, fillMap?: object[] | null, fillEntries?: object[] | null,
  *   brief: string | object, baseDir?: string, recompute?: (ledger: object, row: object) => { ok: boolean } }} options
  *   `brief` is the brief.md text or parseFidelityBlock output; `baseDir` resolves data-chart-source paths.
  * @returns {{ defects: object[], gatesRun: string[] }}
  */
-export function checkFidelity(html, { ledger, sourcesDir = null, claims = null, fillMap = null, brief, baseDir, recompute } = {}) {
+export function checkFidelity(html, { ledger, sourcesDir = null, claims = null, fillMap = null, fillEntries = null, brief, baseDir, recompute } = {}) {
 	const parsed = brief && typeof brief === "object" ? brief : parseFidelityBlock(String(brief ?? ""))
 	if (!isLocked(parsed)) return { defects: [incomplete(parsed)], gatesRun: ["fidelity_interview_incomplete"] }
 	const ctx = buildContext(parseHtml(html), { baseDir })
 	const defects = [
-		...valueChecks(ctx, ledger, fillMap, sourcesDir, { recompute, asOf: parsed.fields["as of"] }),
+		...valueChecks(ctx, ledger, fillMap, sourcesDir, { recompute, asOf: parsed.fields["as of"], fillEntries }),
 		...bindingChecks(ctx, claims, ledger),
 	]
 	const pairs = fidelityPairs(ctx, ledger, sourcesDir)

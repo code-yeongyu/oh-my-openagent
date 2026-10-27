@@ -29,6 +29,7 @@ export const COMMANDS = Object.freeze([
 	"fact derive",
 	"source snapshot",
 	"source refresh",
+	"source probe-conversion",
 	"claims index",
 ])
 
