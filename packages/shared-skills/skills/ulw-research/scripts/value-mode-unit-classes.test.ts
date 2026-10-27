@@ -153,6 +153,51 @@ describe("class 2: a unit hand-edited after fill", () => {
 	}, 120000)
 })
 
+// Class 2b: a currency sign on both sides of the element's edge. Fill renders a prefix currency value from its raw text,
+// so the sign may sit inside the element ($<data>$12</data>) as well as outside it. Every bound sign, outside before the
+// element or inside it (prefix or suffix), must agree with the row's currency; two signs that disagree flag.
+// EN forms $, US$, USD, euro sign, pound sign; KO forms won sign, won, dalleo, man-won. A form of the row's own currency at
+// another scale (won sign under a man-won row) is the element numeral's value and scale reading, not a sign position: skipped.
+const PREFIX_SIGNS: [form: string, unit: string][] = [["$", "USD"], ["US$", "USD"], ["USD ", "USD"], ["\u20AC", "EUR"], ["\u00A3", "GBP"], ["\u20A9", "KRW"]]
+const SUFFIX_SIGNS: [form: string, unit: string][] = [["\u20AC", "EUR"], [" \u20AC", "EUR"], [" USD", "USD"], ["\u00A3", "GBP"], ["\uC6D0", "KRW"], [" \uC6D0", "KRW"], ["\uB2EC\uB7EC", "USD"], [" \uB2EC\uB7EC", "USD"], ["\uB9CC\uC6D0", "KRW"]]
+const SIGN_ROW_UNITS = ["USD", "EUR", "GBP", "KRW", "KRW-e4"]
+const KO = /[\u20A9\uAC00-\uD7A3]/u
+type SignCase = { position: string; outside: string; inside: string; unit: string; expected: Verdict }
+function signCases(): SignCase[] {
+	const cases: SignCase[] = []
+	const insides: [form: string, unit: string, where: string][] = [["", "", ""], ...PREFIX_SIGNS.map(([f, u]): [string, string, string] => [`${f}320`, u, "prefix"]), ...SUFFIX_SIGNS.map(([f, u]): [string, string, string] => [`320${f}`, u, "suffix"])]
+	for (const [outside, outsideUnit] of [["", ""], ...PREFIX_SIGNS]) for (const [inside, insideUnit, where] of insides) for (const unit of SIGN_ROW_UNITS) {
+		const bound = [outsideUnit, insideUnit].filter(Boolean)
+		if (bound.some((u) => u !== unit && dimensionOf(u) === dimensionOf(unit))) continue
+		const agree = bound.every((u) => dimensionOf(u) === dimensionOf(unit))
+		const position = !outsideUnit && !insideUnit ? "no sign" : !insideUnit ? "outside-before only" : !outsideUnit ? `inside-${where} only` : dimensionOf(outsideUnit) !== dimensionOf(insideUnit) ? "outside vs inside conflicting" : "outside and inside agreeing"
+		const label = outsideUnit && !insideUnit && !agree ? "outside disagreeing with the row" : position
+		cases.push({ position: label, outside, inside: inside || "320", unit, expected: bound.length === 0 ? "unit_unbound" : agree ? "pass" : "unit_mismatch" })
+	}
+	return cases
+}
+/** The row's value is what the element's text reads ("320 man-won" inside is 3,200,000 won), so the value check passes and the unit is what is asked. */
+function signed(outside: string, inside: string, unit: string): Verdict {
+	const value = inside.includes("\uB9CC") ? "3200000" : "320"
+	const html = `<h2>Findings</h2><p>Up to ${escapeHtml(outside)}<data class="fact" value="${value}" data-fact="F1" data-unit="${escapeHtml(unit)}" data-fact-mode="value">${escapeHtml(inside)}</data> [S4].</p>`
+	const ledger = { rows: [{ ...F1, unit, value, raw: `${value} ${unit}`, exact: { num: value, den: "1" } }] }
+	return verdictOf((valueChecks(buildContext(parseHtml(html), {}), ledger, null, null) as { code: string }[]).map((d) => d.code))
+}
+
+describe("class 2b: a currency sign outside and inside a value-mode element", () => {
+	test("#given every EN and KO sign outside before, inside as prefix or suffix, both, or none #when read #then every bound sign must agree with the row and with each other", () => {
+		const cases = signCases()
+		const positions = ["outside-before only", "inside-prefix only", "inside-suffix only", "outside and inside agreeing", "outside vs inside conflicting", "outside disagreeing with the row", "no sign"]
+		for (const position of positions) {
+			const here = cases.filter((row) => row.position === position)
+			if (position !== "no sign") expect([position, here.some((row) => KO.test(row.outside + row.inside)), here.some((row) => !KO.test(row.outside + row.inside) && row.outside + row.inside !== "320")]).toEqual([position, true, true])
+			else expect(here.length).toBe(SIGN_ROW_UNITS.length)
+		}
+		const wrong = cases.map((row) => ({ ...row, actual: signed(row.outside, row.inside, row.unit) })).filter((row) => row.actual !== row.expected)
+		expect(wrong).toEqual([])
+	}, 120000)
+})
+
 // Class 3: unit prefix shadowing. Every pair of aliases of different units where one (spaces removed) starts the other
 // ("%" / "%p", "m" / "mm" / "min", "k" / "km", "M" / "MB", cheon / cheon-won, peosenteu / peosenteu pointeu) and every alias that
 // starts a qualifier word (cho / chogwa). The longer unit is read whole, never as its prefix.
