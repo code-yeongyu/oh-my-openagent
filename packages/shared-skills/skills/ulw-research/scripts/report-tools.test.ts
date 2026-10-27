@@ -17,7 +17,10 @@ describe("help and usage", () => {
 	test("#given --help --json #when run #then it lists exactly the command matrix", async () => {
 		const result = await run(["--help", "--json"])
 		expect(result.json.commands).toEqual([...COMMANDS])
-		expect(COMMANDS).toEqual(["check", "layout-probe", "repair decide", "outcome init", "outcome set", "outcome gate", "outcome render", "outcome state", "outcome verify", "outcome finish", "outcome briefing", "format-extract", "fact add", "fact quote", "fact retract", "fact export", "fact fill", "fact verify", "fact derive", "source snapshot", "claims index"])
+		expect(result.json.usage["source snapshot"]).toContain("--raw <file>")
+		expect(result.json.usage["source snapshot"]).toContain("converted-only")
+		expect(Object.keys(result.json.usage)).toEqual(["source snapshot", "source refresh"])
+		expect(COMMANDS).toEqual(["check", "layout-probe", "repair decide", "outcome init", "outcome set", "outcome gate", "outcome render", "outcome state", "outcome verify", "outcome finish", "outcome briefing", "format-extract", "fact add", "fact quote", "fact retract", "fact export", "fact fill", "fact verify", "fact derive", "source snapshot", "source refresh", "source probe-conversion", "claims index"])
 	})
 
 	test("#given no arguments under node #when spawned #then it exits 2 with a usage line on stderr", () => {

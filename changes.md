@@ -1,3 +1,67 @@
+## 2026-10-26 - A failed paused-child restore cannot wedge parent admission (#11401)
+
+An acknowledged child could fail to restore after the parent quit and reopened. Its resume exception escaped before the parent installed its Resume and reopened admission, leaving subsequent task calls held even after the native Stop was released. Record that participant as lost with the restore failure, finish the parent transaction, and retain its acknowledged cutoff for retries when no live child handle exists yet.
+
+## 2026-10-25 - Atomic stop-authority admission (#11333)
+
+Add an opt-in, suspended-by-default authority supervisor with one combined
+generation/stopped atomic word, exact-word activation, monotonic durable
+coverage and idempotent drain. Opaque activation proofs have no production
+constructor until the authenticated broker integration. Deterministic tests
+cover callback/activation interleavings, the real input gate, replay, coalescing,
+exhaustion and legacy reset compatibility. This does not yet select the new
+authority for O2 or address marker deletion by a same-user process (#10238);
+that is tracked in protected-stop-record design issue #11340.
+
+The Win32 callback and worker now share a host-testable pending-stop handoff.
+Its deterministic physical-chord simulation checks one committed generation,
+trigger auto-repeat and duplicate worker drains without a Windows VM or sleeps.
+
+## 2026-10-26 - Keep installed Codex plugins fingerprintable (#11328)
+
+Materialize dependency links and remove unsupported npm executable links while preserving regular third-party shims before activating the installed plugin. Reject unsupported filesystem entries before replacing an existing cache.
+
+## 2026-10-25 - Recover hosted task liveness (#11317)
+
+Keep probe failures nonterminal and close only the affected session after a bounded recovery window. Preserve ownership while closure is unconfirmed.
+
+## 2026-10-21 - Launch-gated Fable 5.5 routing preparation (#10798)
+
+Every builtin Fable 5.1 chain/profile rung gains a provisional Fable 5.5 rung
+immediately ahead of it, with the same providers and max/xhigh effort. The 5.1
+rung stays available, including the architect gate, and gateway copies cannot
+satisfy builtin rungs. Routing remains a separate final commit from recognition;
+launch requires verified catalog values, evaluation and adoption of a senpi
+release listing the model. No release date, price or unverified limit is assumed.
+
+While `FABLE_55_RELEASED` is false, `launchRungs` drops the 5.5 rung from every
+builtin chain and profile, `launchDefaultModelId` keeps the artistry/architect
+defaults on 5.1, the architect gate lists only 5.1, and the resolution pipeline
+skips a launch-gated default or rung. `fable-55-launch-gate.test.ts` walks every
+agent and category through model-core, delegate-core and getFirstFallbackModel on
+cold, null and warm caches and asserts none resolves to the provisional id.
+`FABLE_55_EFFORTS` records that the xhigh/max efforts on the 5.5 rungs are carried
+over from 5.1 (`measured: false`); once released, `launchRungs` throws on a 5.5 rung
+whose effort is not in `accepted`, and a test fails while `measured` is still false.
+The agent-model-matching guide shows today's 5.1 routing.
+
+## 2026-10-21 - Launch-gated Fable 5.5 recognition (#10798)
+
+Recognize the provisional `claude-fable-5-5` ID in supplemental model capabilities
+and the telemetry vocabulary, with family and refusal detection covered by the
+existing Fable predicates. `FABLE_55_LAUNCH` holds the provisional ID and all
+unverified capability and context values; limits remain unknown until the live
+listing is available, and runtime metadata takes precedence. Recognition alone
+does not change any routing defaults.
+
+## 2026-10-25 - Bun 1.4.4 type declarations (#11311)
+
+All 11 package manifests that declare `bun-types` or `@types/bun` now pin 1.4.4, matching the CI/runtime update in #10895. The six affected lockfiles change only Bun type entries (including the `../mcp-stdio-core` entries in the `lsp-tools-mcp` and `lsp-daemon` package-locks). The teammode and web manifests move from `^1.4.3` to an exact `1.4.4` on purpose, matching every other manifest. The Codex installer bundle was regenerated in the canonical Linux container; the Senpi bundles and bundle-inputs map remain unchanged.
+
+## 2026-10-25 - Bun 1.4.4 in CI, release workflows and the devcontainer (#10895)
+
+Every `oven-sh/setup-bun` step in `.github/workflows` installs Bun 1.4.4 instead of 1.4.3, and the Bun install-cache keys move from `bun-1.4.3-` to `bun-1.4.4-`, so no job restores a cache built by 1.4.3. `.devcontainer/Dockerfile` installs `bun-v1.4.4`, `script/agent/setup.sh` expects 1.4.4, and AGENTS.md, CONTRIBUTING.md and the devcontainer README name 1.4.4. `bun-types` and `@types/bun` stay at 1.4.3: moving them regenerates the lockfiles and the committed Codex installer bundle, which inlines `packages/omo-codex/package.json`. `bun install --frozen-lockfile` under 1.4.4 leaves every lockfile unchanged.
+
 ## 2026-10-23 - Inside OmO Desktop the browser skill is the terminal's, plus the app's built-in browser (sisyphuslabs/omo-desktop-app#4227)
 
 Under `OMO_BROWSER_ENGINE` (the desktop sets it for every session) `loadOmowright()` used to return a guarded library: on the default engine (`builtin`) it refused `connectBrowserSkill()` and every owned creator (`connectPipe`, `connectCloakProfile`, `connect`), refused every export outside an allowlist, and wrapped the user's-browser session with state events, Stop and an ask-before-irreversible question (#9486). An agent on default settings had no browser unless it knew to call `connectBuiltinBrowser()`, the app showed nothing, and agents went looking for a way around it. Product direction (2026-10-23): inside the app the agent's browser path is the same as in the terminal, and the app's built-in browser is offered in addition.

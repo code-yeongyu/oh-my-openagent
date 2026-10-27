@@ -1,3 +1,11 @@
+## 2026-10-26 - Keep parent Resume independent of a failed child restore (#11401)
+
+The run controller records resume-effect failures for acknowledged participants as well as participants already outside custody. A persisted acknowledgement supplies the retry cutoff when the failed child's engine is unavailable. A newer Stop still supersedes the failed old Resume.
+
+## 2026-10-25 - Keep unresponsive sessions owned until confirmed closed (#11317)
+
+Add deterministic stalled-host coverage, authoritative post-close absence checks, bounded heartbeat backoff, same-session steering recovery, and session liveness status observations. Keep probes active during streaming and release turn waiters on every exit.
+
 ## 2026-10-23 - Report refused starts before teardown (#10402)
 
 First-prompt refusals settle the launch without waiting for child termination and

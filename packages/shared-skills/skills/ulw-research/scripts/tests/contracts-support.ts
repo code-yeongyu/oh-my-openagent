@@ -75,6 +75,7 @@ const FIDELITY_BLOCKERS = [
 	"chart_value_untraceable",
 	"quote_unbound",
 	"edition_unverified",
+	"snapshot_not_raw",
 ]
 
 const FIDELITY_MAJORS = [
@@ -110,6 +111,8 @@ const FIDELITY_MINORS = [
 	"polish_edit_unlocated",
 	"polish_link_changed",
 	"polish_name_changed",
+	"relocated",
+	"quote_converted_only",
 ]
 
 const FIDELITY_CODES_EXPECTED = [...FIDELITY_BLOCKERS, ...FIDELITY_MAJORS, ...FIDELITY_MINORS]

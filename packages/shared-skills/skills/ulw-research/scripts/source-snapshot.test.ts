@@ -40,13 +40,14 @@ describe("snapshotFromHtml", () => {
 })
 
 describe("writeSnapshot", () => {
-	test("#given html #when written #then text.txt, source.html, meta.json, sentences.jsonl and acronyms.json exist and sha256 covers text.txt", () => {
+	test("#given html #when written #then raw.bin preserves the body and sha256 covers its bytes", () => {
 		const sources = tempDir()
 		const result = writeSnapshot(sources, "S4", { url: "https://example.test/bridge", html: S4_HTML, extractor: "tool:source-snapshot@1", observed_at: "2026-10-23T00:00:00Z" })
 		expect(result.dir).toBe(join(sources, "S4"))
-		for (const name of ["text.txt", "source.html", "meta.json", "sentences.jsonl", "acronyms.json"]) expect(existsSync(join(result.dir, name))).toBe(true)
-		const text = readFileSync(join(result.dir, "text.txt"))
-		expect(result.sha256).toBe(createHash("sha256").update(text).digest("hex"))
+		for (const name of ["raw.bin", "text.txt", "source.html", "meta.json", "sentences.jsonl", "acronyms.json"]) expect(existsSync(join(result.dir, name))).toBe(true)
+		const raw = readFileSync(join(result.dir, "raw.bin"))
+		expect(raw.toString("utf8")).toBe(S4_HTML)
+		expect(result.sha256).toBe(createHash("sha256").update(raw).digest("hex"))
 		expect(readFileSync(join(result.dir, "source.html"), "utf8")).toBe(S4_HTML)
 		const meta = JSON.parse(readFileSync(join(result.dir, "meta.json"), "utf8"))
 		expect(meta).toEqual({
@@ -58,6 +59,8 @@ describe("writeSnapshot", () => {
 			revision: null,
 			kind: "page",
 			provenance: "unknown",
+			text_source: "html",
+			charset: "utf-8",
 		})
 	})
 

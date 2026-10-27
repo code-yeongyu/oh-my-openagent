@@ -9,21 +9,46 @@ import { isAllowedFile } from "./path-policy"
 
 const TASK_TOOLS = ["task", "call_omo_agent"]
 
-// opencode's patch parser matches these headers with no trailing space and trims the rest
-// (`*** Add File:src/x` is a valid header), so the guard matches the same grammar (omo#11367).
-const PATCH_PATH_HEADER = /^\s*\*\*\* (?:Add File|Update File|Delete File|Move to):(.*)$/
+// Mirror OpenCode's LF splitting and prefix/slice/trim semantics, not JS regex line terminators:
+// https://github.com/anomalyco/opencode/blob/32f278b48f1a495611165d8a9f1ace0b512933e2/packages/opencode/src/patch/index.ts#L66-L96
+// parsePatch splits on "\n" at L187; CR, U+2028 and U+2029 remain part of the header remainder.
+const PATCH_PATH_HEADERS = ["*** Add File:", "*** Update File:", "*** Delete File:", "*** Move to:"]
 
 /**
  * Every path an apply_patch body touches (added, updated, deleted and move targets), or undefined
- * when no patch body is found, which the caller treats as blocked.
+ * when a body or mutation header cannot be classified, which the caller treats as blocked.
  */
 function patchedPaths(args: Record<string, unknown>): string[] | undefined {
   const patch = [args.patchText, args.input, args.patch].find((value): value is string => typeof value === "string")
   if (patch === undefined) return undefined
   const paths: string[] = []
-  for (const line of patch.split(/\r?\n/)) {
-    const match = PATCH_PATH_HEADER.exec(line)
-    if (match) paths.push((match[1] ?? "").trim())
+  const lines = patch.trim().split("\n")
+  let inUpdateBody = false
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    // Only an unindented "***" ends executor Update chunks; leading spaces are context.
+    if (inUpdateBody && !line.startsWith("***")) continue
+    inUpdateBody = false
+    const header = PATCH_PATH_HEADERS.find((prefix) => line.startsWith(prefix))
+    if (header !== undefined) {
+      const path = line.slice(header.length).trim()
+      if (!path) return undefined
+      paths.push(path)
+      if (header === "*** Update File:") {
+        inUpdateBody = true
+        if (lines[i + 1]?.startsWith("*** Move to:")) {
+          const destination = lines[++i].slice("*** Move to:".length).trim()
+          if (!destination) return undefined
+          paths.push(destination)
+        }
+      }
+    } else if (
+      line.trimStart().startsWith("***") &&
+      !["*** Begin Patch", "*** End Patch", "*** End of File"].includes(line.trim())
+    ) {
+      // Includes indented headers: the executor does not classify them, so fail closed.
+      return undefined
+    }
   }
   return paths
 }
