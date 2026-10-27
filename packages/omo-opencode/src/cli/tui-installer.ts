@@ -27,6 +27,7 @@ import { getNoModelProvidersWarning, hasAnyConfiguredProvider } from "./provider
 import { ensureTuiPluginEntry } from "./config-manager/add-tui-plugin-to-tui-config"
 import { refreshOpenCodePluginSandboxes } from "./config-manager/refresh-opencode-plugin-sandbox"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as componentCheck from "./install-component-check"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -135,6 +136,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     }
     spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
     await astGrepInstall.installAstGrepForOpenCode({ log: p.log.warn })
+    await componentCheck.reportComponentHealth({ info: p.log.info, warn: p.log.warn })
   }
 
   if (config.hasOpenCode && !config.hasClaude) {

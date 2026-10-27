@@ -1,10 +1,21 @@
+import type { LspComponentReport } from "@oh-my-opencode/lsp-core/lsp/component-check"
+
 export type DoctorMode = "default" | "status" | "verbose"
 export type DoctorTarget = "opencode" | "codex"
+
+export interface DoctorComponentOptions {
+  readonly cwd?: string
+  /** LSP language ids (or aliases such as bash, ts, yml) that fail the doctor unless they work. */
+  readonly requiredLanguages?: readonly string[]
+  /** False resolves components without starting them. */
+  readonly probe?: boolean
+}
 
 export interface DoctorOptions {
   mode: DoctorMode
   json?: boolean
   target?: DoctorTarget
+  components?: DoctorComponentOptions
 }
 
 export interface DoctorIssue {
@@ -74,6 +85,37 @@ export interface DoctorResult {
   codex?: CodexDoctorSummary
   /** Latest published version on the installed channel; null when the registry lookup failed. */
   latestVersion: string | null
+  /** Per-component functional results (OpenCode target only). */
+  components?: ComponentsReport
+}
+
+/**
+ * `ok` = exercised and worked, `present` = found but only presence can be checked, `missing` =
+ * not installed, `failed` = installed but did not work, `unauthenticated` = gh without a login,
+ * `skipped` = the component is disabled in the OMO config.
+ */
+export type ToolComponentStatus = "ok" | "present" | "missing" | "failed" | "unauthenticated" | "skipped"
+
+export type ToolComponentId = "lsp-bridge" | "ast-grep" | "comment-checker" | "gh"
+
+export interface ToolComponentReport {
+  readonly id: ToolComponentId
+  readonly status: ToolComponentStatus
+  readonly path: string | null
+  readonly version: string | null
+  /** The account a credentialed tool runs as (gh), never a token. */
+  readonly account?: string | null
+  readonly detail: string
+  readonly remediation: readonly string[]
+}
+
+export interface ComponentsReport {
+  readonly cwd: string
+  readonly probed: boolean
+  readonly requiredLanguages: readonly string[]
+  /** Null when the LSP tools bridge is disabled, so no language can use LSP at all. */
+  readonly lsp: LspComponentReport | null
+  readonly tools: readonly ToolComponentReport[]
 }
 
 export interface CodexConfigSummary {

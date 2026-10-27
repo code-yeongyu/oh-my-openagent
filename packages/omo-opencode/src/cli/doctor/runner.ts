@@ -1,9 +1,13 @@
 import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./framework/types"
-import { getAllCheckDefinitions, getCodexCheckDefinitions, gatherSystemInfo, gatherToolsSummary, gatherCodexSummary, gatherEditionDistTags, resolveLatestVersion } from "./checks"
+import { getAllCheckDefinitions, getCodexCheckDefinitions, gatherSystemInfo, gatherToolsSummary, gatherComponents, gatherCodexSummary, gatherEditionDistTags, resolveLatestVersion } from "./checks"
 import { EXIT_CODES } from "./framework/constants"
 import { formatDoctorOutput, formatJsonOutput } from "./framework/formatter"
 
-const DOCTOR_TIMEOUT_MS = 30_000
+// Component probes start real language servers side by side. A cold tsserver measured 8s on a
+// loaded host, and one probe may take up to 30s (initialize) + 20s (request); the budget covers
+// that with room, so a slow but working server is not cut off.
+const DOCTOR_TIMEOUT_MS = 120_000
+const DOCTOR_TIMEOUT_LABEL = `${DOCTOR_TIMEOUT_MS / 1000}s`
 
 class DoctorTimeoutError extends Error {
   constructor() {
@@ -46,7 +50,7 @@ export function determineExitCode(results: CheckResult[]): number {
 
 function buildTimeoutResult(start: number, options: DoctorOptions): DoctorResult {
   const timeoutResult: DoctorResult = {
-    results: [{ name: "Timeout", status: "fail", message: "Doctor timed out after 30s", issues: [{ title: "Doctor timeout", description: "Checks did not complete within 30s. A subprocess may be hanging.", severity: "error" }] }],
+    results: [{ name: "Timeout", status: "fail", message: `Doctor timed out after ${DOCTOR_TIMEOUT_LABEL}`, issues: [{ title: "Doctor timeout", description: `Checks did not complete within ${DOCTOR_TIMEOUT_LABEL}. A subprocess may be hanging.`, severity: "error" }] }],
     systemInfo: { opencodeVersion: null, opencodePath: null, pluginVersion: null, loadedVersion: null, bunVersion: null, configPath: null, configValid: false, isLocalDev: false },
     tools: { lspServers: [], astGrepCli: false, commentChecker: false, ghCli: { installed: false, authenticated: false, username: null }, mcpBuiltin: [], mcpUser: [] },
     summary: { total: 1, passed: 0, failed: 1, warnings: 0, skipped: 0, duration: Math.round(performance.now() - start) },
@@ -57,7 +61,7 @@ function buildTimeoutResult(start: number, options: DoctorOptions): DoctorResult
   if (options.json) {
     console.log(formatJsonOutput(timeoutResult))
   } else {
-    console.error("\nDoctor timed out after 30s. A subprocess may be hanging.")
+    console.error(`\nDoctor timed out after ${DOCTOR_TIMEOUT_LABEL}. A subprocess may be hanging.`)
     console.error("Try running with --verbose to identify the stuck check.\n")
   }
 
@@ -68,12 +72,14 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   const start = performance.now()
 
   const target = options.target ?? "opencode"
-  const allChecks = target === "codex" ? getCodexCheckDefinitions() : getAllCheckDefinitions()
+  const componentOptions = options.components ?? {}
+  const allChecks = target === "codex" ? getCodexCheckDefinitions() : getAllCheckDefinitions(componentOptions)
 
   const checksPromise = Promise.all([
     Promise.all(allChecks.map(runCheck)),
     gatherSystemInfo(),
-    gatherToolsSummary(),
+    gatherToolsSummary(componentOptions),
+    target === "codex" ? Promise.resolve(undefined) : gatherComponents(componentOptions),
     target === "codex" ? gatherCodexSummary() : Promise.resolve(undefined),
     gatherEditionDistTags(target),
   ])
@@ -86,11 +92,12 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   let results: CheckResult[]
   let systemInfo: Awaited<ReturnType<typeof gatherSystemInfo>>
   let tools: Awaited<ReturnType<typeof gatherToolsSummary>>
+  let components: Awaited<ReturnType<typeof gatherComponents>> | undefined
   let codex: Awaited<ReturnType<typeof gatherCodexSummary>> | undefined
   let distTags: Awaited<ReturnType<typeof gatherEditionDistTags>>
 
   try {
-    ;[results, systemInfo, tools, codex, distTags] = await Promise.race([checksPromise, timeoutPromise])
+    ;[results, systemInfo, tools, components, codex, distTags] = await Promise.race([checksPromise, timeoutPromise])
   } catch (error) {
     clearTimeout(timer)
     if (error instanceof DoctorTimeoutError) {
@@ -114,6 +121,7 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
     target,
     codex,
     latestVersion: resolveLatestVersion({ target, systemInfo, codex, distTags }),
+    ...(components === undefined ? {} : { components }),
   }
 
   if (options.json) {

@@ -1,32 +1,21 @@
 import { describe, expect, it } from "bun:test"
-import type { ToolsSummary } from "../framework/types"
 import { buildToolIssues } from "./tools"
 
-function completeSummary(overrides: Partial<ToolsSummary> = {}): ToolsSummary {
-    return {
-      astGrepCli: true,
-      commentChecker: true,
-    ghCli: { authenticated: true, installed: true, username: "octocat" },
-    lspServers: [{ extensions: [".ts"], id: "typescript" }],
-    mcpBuiltin: [],
-    mcpUser: [],
-    ...overrides,
-  }
-}
-
 describe("buildToolIssues", () => {
-  it("#given no ast-grep CLI #when building issues #then references the ast-grep skill instead of MCP tool names", () => {
-    // given
-    const summary = completeSummary({ astGrepCli: false })
-
+  it("#given every user MCP is valid #when building issues #then reports none (tool health belongs to Components)", () => {
     // when
-    const issues = buildToolIssues(summary)
+    const issues = buildToolIssues(0)
+
+    // then
+    expect(issues).toEqual([])
+  })
+
+  it("#given invalid user MCP servers #when building issues #then reports their count", () => {
+    // when
+    const issues = buildToolIssues(2)
 
     // then
     expect(issues).toHaveLength(1)
-    expect(issues[0]?.title).toBe("AST-Grep unavailable")
-    expect(issues[0]?.affects).toEqual(["ast-grep skill"])
-    expect(issues[0]?.fix).toContain("ast-grep skill")
-    expect(issues[0]?.fix).toContain("sg automatically")
+    expect(issues[0]?.description).toContain("2 user MCP server(s)")
   })
 })

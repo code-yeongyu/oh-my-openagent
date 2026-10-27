@@ -133,10 +133,29 @@ function resolveLspCommand(options: LspMcpConfigOptions = {}): AncestorCliCandid
   return createBootstrapCandidate(findBootstrapRoot(candidates, pathExists), pathExists, resolveExecutable)
 }
 
+export type LspConfigPaths = {
+  readonly cwd: string
+  readonly projectConfigPaths: readonly string[]
+  readonly userConfigPath: string
+  readonly installDecisionsPath: string
+}
+
+/** The config locations the LSP tools bridge is started with; doctor reuses them so both resolve servers alike. */
+export function resolveLspConfigPaths(cwd: string = process.cwd()): LspConfigPaths {
+  const resolvedCwd = resolve(cwd)
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  return {
+    cwd: resolvedCwd,
+    projectConfigPaths: PROJECT_LSP_CONFIGS.map((configPath) => resolve(resolvedCwd, configPath)),
+    userConfigPath: resolve(configDir, "lsp.json"),
+    installDecisionsPath: resolve(configDir, "lsp-install-decisions.json"),
+  }
+}
+
 export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpConfig {
   const resolvedCommand = resolveLspCommand(options)
-  const cwd = resolve(options.cwd ?? process.cwd())
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const paths = resolveLspConfigPaths(options.cwd)
+  const cwd = paths.cwd
   const sourceVersion = hasCliSuffix(resolvedCommand.path, SOURCE_CLI_REL) ? readDaemonPackageVersion(resolvedCommand.root) : null
 
   return {
@@ -146,9 +165,9 @@ export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpC
     cwd,
     environment: {
       LSP_TOOLS_MCP_CWD: cwd,
-      LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIGS.map((configPath) => resolve(cwd, configPath)).join(delimiter),
-      LSP_TOOLS_MCP_USER_CONFIG: resolve(configDir, "lsp.json"),
-      LSP_TOOLS_MCP_INSTALL_DECISIONS: resolve(configDir, "lsp-install-decisions.json"),
+      LSP_TOOLS_MCP_PROJECT_CONFIG: paths.projectConfigPaths.join(delimiter),
+      LSP_TOOLS_MCP_USER_CONFIG: paths.userConfigPath,
+      LSP_TOOLS_MCP_INSTALL_DECISIONS: paths.installDecisionsPath,
       ...(sourceVersion
         ? {
             [OMO_LSP_DAEMON_CLI]: resolvedCommand.path,

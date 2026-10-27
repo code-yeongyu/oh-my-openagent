@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { install } from "./install"
 import * as astGrepInstall from "./install-ast-grep-sg"
+import * as componentCheck from "./install-component-check"
 import * as configManager from "./config-manager"
 import type { InstallArgs } from "./types"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
@@ -37,6 +38,7 @@ describe("install CLI - binary check behavior", () => {
     mockConsoleLog.mockClear()
 
     spyOn(astGrepInstall, "installAstGrepForOpenCode").mockResolvedValue(undefined)
+    spyOn(componentCheck, "reportComponentHealth").mockResolvedValue(undefined)
   })
 
   afterEach(() => {
