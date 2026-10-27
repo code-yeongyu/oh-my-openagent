@@ -6,6 +6,7 @@ import {
   writeBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState, BoulderWorkResumeOption } from "../../features/boulder-state"
+import { log } from "../../shared/logger"
 import { createWorktreeActiveBlock } from "./worktree-block"
 import { ensureNotepadScaffold } from "./notepad-scaffold"
 
@@ -111,12 +112,13 @@ Looking for new plans...`
   const shouldRewriteState = existingState.agent !== activeAgent || worktreePath !== undefined
 
   if (shouldRewriteState) {
-    writeBoulderState(directory, {
+    const written = writeBoulderState(directory, {
       ...existingState,
       agent: activeAgent,
       ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
       session_ids: updatedSessions,
     })
+    if (!written.ok) log("[ulw-execute] boulder state write failed", { error: written.error.message, code: written.error.code })
   } else if (!sessionAlreadyTracked) {
     appendSessionId(directory, sessionId)
   }

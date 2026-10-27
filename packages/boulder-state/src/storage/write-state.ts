@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
+import { randomUUID } from "node:crypto"
+import { existsSync, mkdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
 import type { BoulderState, BoulderWorkState } from "../types"
@@ -7,7 +8,39 @@ import { getPlanName } from "./plan-progress"
 import { getBoulderWorks, readBoulderState } from "./read-state"
 import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror, restoreDemotedWork } from "./shared"
 
-export function writeBoulderState(directory: string, state: BoulderState): boolean {
+const DISK_FULL_CODES = new Set(["ENOSPC", "EDQUOT"])
+
+/** boulder.json could not be saved; the previous file is unchanged. `code` is the system error code when there is one. */
+export class BoulderStateWriteError extends Error {
+  readonly code: string | undefined
+  readonly path: string
+
+  constructor(path: string, cause: unknown) {
+    const code = cause instanceof Error && "code" in cause && typeof cause.code === "string" ? cause.code : undefined
+    const reason = cause instanceof Error ? cause.message : String(cause)
+    const advice = code !== undefined && DISK_FULL_CODES.has(code) ? " Free disk space, then retry." : ""
+    super(`Could not save the boulder state to ${path}: ${reason}. The previous state is unchanged.${advice}`, { cause })
+    this.name = "BoulderStateWriteError"
+    this.code = code
+    this.path = path
+  }
+}
+
+export type BoulderWriteResult = { readonly ok: true } | { readonly ok: false; readonly error: BoulderStateWriteError }
+
+/** Writes through a temp file and a rename, so a failed write (a full disk) never leaves a truncated boulder.json. */
+function replaceFile(filePath: string, content: string): void {
+  const temporary = `${filePath}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`
+  try {
+    writeFileSync(temporary, content, "utf-8")
+    renameSync(temporary, filePath)
+  } catch (error) {
+    rmSync(temporary, { force: true })
+    throw error
+  }
+}
+
+export function writeBoulderState(directory: string, state: BoulderState): BoulderWriteResult {
   const filePath = getBoulderFilePath(directory)
   try {
     const dir = dirname(filePath)
@@ -42,10 +75,10 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
       }
     }
 
-    writeFileSync(filePath, JSON.stringify(stateToWrite, null, 2), "utf-8")
-    return true
-  } catch {
-    return false
+    replaceFile(filePath, JSON.stringify(stateToWrite, null, 2))
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: new BoulderStateWriteError(filePath, error) }
   }
 }
 
@@ -122,7 +155,7 @@ export function selectActiveWork(directory: string, workId: string): BoulderStat
     works: { ...Object.fromEntries(works.map((work) => [work.work_id, work])), [workId]: nextWork },
   }
   projectWorkToMirror(nextState, nextWork)
-  return writeBoulderState(directory, nextState) ? nextState : null
+  return writeBoulderState(directory, nextState).ok ? nextState : null
 }
 
 export function addBoulderWork(
@@ -158,7 +191,7 @@ export function addBoulderWork(
     active_work_id: workId,
   }
   projectWorkToMirror(nextState, nextWork)
-  return writeBoulderState(directory, nextState) ? nextState : null
+  return writeBoulderState(directory, nextState).ok ? nextState : null
 }
 
 export function completeBoulder(directory: string, workId?: string, endedAt?: string): BoulderState | null {
@@ -191,5 +224,5 @@ export function completeBoulder(directory: string, workId?: string, endedAt?: st
     projectWorkToMirror(state, work)
   }
 
-  return writeBoulderState(directory, state) ? state : null
+  return writeBoulderState(directory, state).ok ? state : null
 }

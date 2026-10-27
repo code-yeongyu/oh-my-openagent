@@ -208,4 +208,10 @@ export declare function upsertTaskSessionStateForWork(
   workId: string,
   input: TaskSessionInput,
 ): BoulderState | null
-export declare function writeBoulderState(directory: string, state: BoulderState): boolean
+export declare class BoulderStateWriteError extends Error {
+  readonly code: string | undefined
+  readonly path: string
+  constructor(path: string, cause: unknown)
+}
+export type BoulderWriteResult = { readonly ok: true } | { readonly ok: false; readonly error: BoulderStateWriteError }
+export declare function writeBoulderState(directory: string, state: BoulderState): BoulderWriteResult

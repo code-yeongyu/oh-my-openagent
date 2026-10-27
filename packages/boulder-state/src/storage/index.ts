@@ -20,4 +20,14 @@ export {
   STALE_WORK_THRESHOLD_ENV_KEY,
 } from "./stale-work"
 export { endTaskTimer, startTaskTimer, upsertTaskSessionState, upsertTaskSessionStateForWork } from "./task"
-export { addBoulderWork, clearBoulderState, completeBoulder, createBoulderState, generateWorkId, selectActiveWork, writeBoulderState } from "./write-state"
+export {
+  addBoulderWork,
+  BoulderStateWriteError,
+  type BoulderWriteResult,
+  clearBoulderState,
+  completeBoulder,
+  createBoulderState,
+  generateWorkId,
+  selectActiveWork,
+  writeBoulderState,
+} from "./write-state"

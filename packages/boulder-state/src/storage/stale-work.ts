@@ -116,7 +116,7 @@ export function reconcileStaleWorks(
       projectWorkToMirror(nextState, mirrorWork)
     }
 
-    return writeBoulderState(directory, nextState) ? { demoted, written: true } : NO_CHANGES
+    return writeBoulderState(directory, nextState).ok ? { demoted, written: true } : NO_CHANGES
   } catch {
     return NO_CHANGES
   }

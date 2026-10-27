@@ -70,7 +70,7 @@ describe("boulder-state", () => {
       const roundTripState = readBoulderState(TEST_DIR)
 
       // then
-      expect(writeSucceeded).toBe(true)
+      expect(writeSucceeded).toEqual({ ok: true })
       expect(roundTripState?.active_plan).toBe(legacyRawState.active_plan)
       expect(roundTripState?.started_at).toBe(legacyRawState.started_at)
       expect(roundTripState?.session_ids).toEqual(["opencode:legacy-session"])
@@ -243,7 +243,7 @@ describe("boulder-state", () => {
       const readBack = readBoulderState(TEST_DIR)
 
       // then
-      expect(success).toBe(true)
+      expect(success).toEqual({ ok: true })
       expect(readBack).not.toBeNull()
       expect(readBack?.active_plan).toBe("/test/plan.md")
     })
@@ -262,7 +262,7 @@ describe("boulder-state", () => {
         const success = writeBoulderState(freshDir, state)
 
         // then
-        expect(success).toBe(true)
+        expect(success).toEqual({ ok: true })
         const gitignorePath = join(freshDir, '.omo', '.gitignore')
         expect(existsSync(gitignorePath)).toBe(true)
         const content = readFileSync(gitignorePath, 'utf-8')
