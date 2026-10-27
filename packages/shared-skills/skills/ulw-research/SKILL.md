@@ -119,6 +119,8 @@ A worker with nothing to expand writes `## EXPAND` followed by `none — <one-li
 
 Read [research-collection.md](references/research-collection.md) before scoping or collecting sources, then [research-delivery.md](references/research-delivery.md) before verification, synthesis, and delivery. These references continue this skill in phase order; their requirements remain binding.
 
+`source snapshot --html` and `--url` probe their own conversion and print the numbers it altered (a footnote digit glued onto a value, a merged table cell); `fact add` then refuses those numbers with `conversion_altered_number`, so write a verified text of that source and replace the snapshot with `source snapshot --id S<n> --text <verified.txt> --replace` (refused while an active row cites the id: retract those rows first or use a new id), then add the fact from it. When you convert a document yourself, run `node "$SKILL_DIR/scripts/report-tools.mjs" source probe-conversion <raw-file> <converted-file>` and snapshot a verified `--text` instead before adding any number it lists as `altered`; `lost` is a warning only.
+
 ## Phase 5 — Final materials
 
 The promised formats recorded in `brief.md` and `outcome.json` are binding; `pdf` + `docx` is the default pair only when a document was asked for with no format word and no destination:

@@ -154,6 +154,8 @@ A member with nothing to expand sends `## EXPAND` followed by `none — <one-lin
 
 ## Phase 2 — Saturation wave
 
+`source snapshot --html` and `--url` probe their own conversion and print the numbers it altered (a footnote digit glued onto a value, a merged table cell); `fact add` then refuses those numbers with `conversion_altered_number`, so write a verified text of that source and replace the snapshot with `source snapshot --id S<n> --text <verified.txt> --replace` (refused while an active row cites the id: retract those rows first or use a new id), then add the fact from it. When you convert a document yourself, run `node "$SKILL_DIR/scripts/report-tools.mjs" source probe-conversion <raw-file> <converted-file>` and snapshot a verified `--text` instead before adding any number it lists as `altered`; `lost` is a warning only.
+
 Launch the entire first wave in one turn — every member briefed at `team_create` time starts immediately; add bounded `task` lanes in the same turn for the territories members cannot reach (read-only curated-agent sweeps). Sequential launches and "start with one and see" defeat the mode.
 
 Scaling floor — more angles always justify more workers; members and lanes together must meet it:

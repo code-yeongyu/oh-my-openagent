@@ -130,8 +130,16 @@ export const FIDELITY_RECORDS = Object.freeze([
 	}),
 ])
 
+// Collection warnings use the same envelope, but are not delivery-gate records.
+const SOURCE_RECORDS = Object.freeze([
+	Object.freeze({
+		kind: "source_conversion",
+		payload: Object.freeze(["conversion_altered_numbers", "lost", "raw_count", "converted_count"]),
+	}),
+])
+
 const entryOf = (kind) => {
-	const entry = FIDELITY_RECORDS.find((row) => row.kind === kind)
+	const entry = [...FIDELITY_RECORDS, ...SOURCE_RECORDS].find((row) => row.kind === kind)
 	if (entry === undefined) throw new CliError(`unknown fidelity record kind ${kind}`)
 	return entry
 }

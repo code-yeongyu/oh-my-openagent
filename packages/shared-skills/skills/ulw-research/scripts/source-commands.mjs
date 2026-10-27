@@ -1,7 +1,9 @@
 // source-commands.mjs - the `source snapshot`, `source refresh` and `claims index` subcommands of
 // report-tools. A source dir is immutable: the same id with identical bytes is a no-op, different
 // bytes fail (exit 1, snapshot_exists), because ledger rows pin the old hash; `source refresh`
-// (source-refresh.mjs) is the one explicit repin. `--url` fetches with plain fetch (30 s timeout,
+// (source-refresh.mjs) is the one explicit repin. `--replace` swaps in a corrected capture under the
+// same id (the conversion_altered_number recovery) only while no active ledger row cites the id
+// (exit 1, snapshot_pinned, listing them). `--url` fetches with plain fetch (30 s timeout,
 // no browser) and records extractor tool:source-snapshot@1; `--html` imports a browser-lane page
 // capture and `--raw` alone a saved file's bytes (extractor model). `--text` alone registers a converted-only source (no raw bytes:
 // quotes only); `--raw <bytes> --text <extraction> --extractor NAME@VERSION` keeps the original
@@ -15,6 +17,8 @@ import { join, resolve } from "node:path"
 
 import { indexClaims } from "./claims-index.mjs"
 import { CliError, parseArgs, sha256Of, writeJsonAtomic } from "./cli-support.mjs"
+import { runConversionProbe } from "./conversion-probe.mjs"
+import { readLedger } from "./fact-ledger.mjs"
 import { parseFidelityBlock } from "./fidelity-brief.mjs"
 import { parseSourceFloor } from "./fidelity-policy.mjs"
 import { encodingOf, headerCharset } from "./raw-decode.mjs"
@@ -24,7 +28,7 @@ import { readSnapshot } from "./source-view.mjs"
 const FETCH_TIMEOUT_MS = 30_000
 const TOOL_EXTRACTOR = "tool:source-snapshot@1"
 export const SNAPSHOT_USAGE =
-	"usage: source snapshot --id S<n> (--url <u> | --html <file> | --raw <file> [--text <file> --extractor NAME@VERSION] | --text <file> (converted-only) | --command '<argv json>' --cwd DIR) [--charset NAME] [--kind page|command|document|converted-only] [--provenance primary|secondary] [--revision R] --session-dir D"
+	"usage: source probe-conversion <raw-file> <converted-file> | source snapshot --id S<n> (--url <u> | --html <file> | --raw <file> [--text <file> --extractor NAME@VERSION] | --text <file> (converted-only) | --command '<argv json>' --cwd DIR) [--charset NAME] [--kind page|command|document|converted-only] [--provenance primary|secondary] [--revision R] [--replace] --session-dir D"
 
 function readInput(path) {
 	try {
@@ -133,17 +137,25 @@ export async function acquire(flags) {
 export async function runSource(argv) {
 	const [sub, ...rest] = argv
 	if (sub === "refresh") return (await import("./source-refresh.mjs")).runRefresh(rest)
+	if (sub === "probe-conversion") return runConversionProbe(rest)
 	if (sub !== "snapshot") throw new CliError(SNAPSHOT_USAGE)
-	const args = parseArgs(rest)
+	const args = parseArgs(rest, { booleans: ["replace"] })
 	const id = args.required("id")
-	const sourcesDir = join(sessionDirOf(args.flags), "sources")
+	const sessionDir = sessionDirOf(args.flags)
+	const sourcesDir = join(sessionDir, "sources")
+	const replace = args.flags.replace === true
+	const pinned = replace ? readLedger(sessionDir).rows.filter((row) => row.source_id === id && (row.status ?? "active") === "active").map((row) => row.fact_id) : []
+	if (pinned.length > 0) {
+		const message = `${id} is cited by active row(s) ${pinned.join(", ")}; retract them first, or snapshot the corrected text under a new id`
+		return { json: { command: "source snapshot", status: "fail", exitCode: 1, error: "snapshot_pinned", message, rows: pinned }, summary: `source snapshot: ${message}`, exitCode: 1 }
+	}
 	const { receipt, ...input } = await acquire(args.flags)
 	if (args.flags.kind !== undefined) input.kind = args.flags.kind
 	if (args.flags.provenance !== undefined) input.provenance = args.flags.provenance
 	if (args.flags.revision !== undefined) input.revision = args.flags.revision
 	let written
 	try {
-		written = writeSnapshot(sourcesDir, id, input)
+		written = writeSnapshot(sourcesDir, id, input, { replace })
 	} catch (error) {
 		if (String(error.message).startsWith("snapshot_exists")) {
 			return { json: { command: "source snapshot", status: "fail", exitCode: 1, error: "snapshot_exists", message: error.message }, summary: `source snapshot: ${error.message}`, exitCode: 1 }
@@ -153,8 +165,9 @@ export async function runSource(argv) {
 	}
 	if (receipt) writeFileSync(join(written.dir, "command.json"), `${JSON.stringify(receipt, null, 2)}\n`)
 	const meta = JSON.parse(readFileSync(join(written.dir, "meta.json"), "utf8"))
-	const data = { source_id: id, directory: written.dir, snapshot_sha256: written.sha256, extractor: meta.extractor, kind: meta.kind, provenance: meta.provenance, text_source: meta.text_source }
-	return { json: { command: "source snapshot", status: "pass", exitCode: 0, data }, summary: `source snapshot: ${id} ${written.sha256.slice(0, 12)} (${meta.extractor}, ${meta.text_source})`, exitCode: 0 }
+	const data = { source_id: id, directory: written.dir, snapshot_sha256: written.sha256, extractor: meta.extractor, kind: meta.kind, provenance: meta.provenance, text_source: meta.text_source, ...(written.altered ? { conversion_altered_numbers: written.altered } : {}) }
+	const probe = written.altered ? `; conversion ${written.altered.length} altered${written.altered.length ? ` (${written.altered.join(", ")}): fact add refuses those numbers` : ""}` : ""
+	return { json: { command: "source snapshot", status: "pass", exitCode: 0, data }, summary: `source snapshot: ${id} ${written.sha256.slice(0, 12)} (${meta.extractor}, ${meta.text_source})${probe}`, exitCode: 0 }
 }
 
 export function runClaims(argv) {

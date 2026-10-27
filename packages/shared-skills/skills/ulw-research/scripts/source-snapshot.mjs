@@ -4,13 +4,16 @@
 // only for converted-only sources), meta.json (sha256 of the pinned body, text_source, charset),
 // text.txt (the locator text of source-view.mjs: the visible text nodes of a page, the decoded
 // bytes of a document, or a declared/converted extraction), source.html for pages (decoded, a
-// reading aid), sentences.jsonl (sid S<n>:s<k>, indexed over text.txt) and acronyms.json.
+// reading aid), sentences.jsonl (sid S<n>:s<k>, indexed over text.txt) and acronyms.json; a page
+// also gets conversion.json, the conversion probe's record of the numbers its text.txt altered.
 // Plain Node ESM, node: builtins and sibling imports only.
 
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { sha256Of } from "./cli-support.mjs"
+import { probeConversion } from "./conversion-probe.mjs"
+import { writeFidelityRecord } from "./fidelity-records.mjs"
 import { extractHtml } from "./html-text-map.mjs"
 import { splitSentences } from "./sentence-split.mjs"
 import { buildView } from "./source-view.mjs"
@@ -111,6 +114,7 @@ function checkInput(sourceId, input) {
 	if (typeof (input.url ?? input.path) !== "string") throw new TypeError("writeSnapshot needs a url or a path")
 	if (input.kind !== undefined && !KINDS.has(input.kind)) throw new TypeError(`kind must be page, command, document, or converted-only, got ${input.kind}`)
 	if (input.provenance !== undefined && !PROVENANCE.has(input.provenance)) throw new TypeError(`provenance must be primary, secondary, or unknown, got ${input.provenance}`)
+	if (input.observed_at !== undefined && (typeof input.observed_at !== "string" || Number.isNaN(new Date(input.observed_at).getTime()))) throw new TypeError(`observed_at must be an ISO timestamp, got ${input.observed_at}`)
 }
 
 function pinnedHash(dir) {
@@ -119,11 +123,13 @@ function pinnedHash(dir) {
 }
 
 /**
- * Write <sourcesDir>/<sourceId>/ for one source; returns { dir, sha256 } over the pinned body.
+ * Write <sourcesDir>/<sourceId>/ for one source; returns { dir, sha256, altered } over the pinned body,
+ * where altered lists the numbers the page conversion altered (null when no page conversion ran).
  * input: { url | path, raw?, markup?, html?, text? | pages?, charset?, extractor, observed_at?, revision?,
  * kind?, provenance? } (see bodiesOf). Re-writing the same bytes is a no-op; different bytes over
  * an existing snapshot throw snapshot_exists, because ledger rows pin the old hash, unless
- * options.replace (`source refresh`, which re-anchors those rows) is set.
+ * options.replace (`source refresh`, which re-anchors those rows, or `source snapshot --replace`, which
+ * has checked that no active row pins it) is set; a replacement drops the old capture's command.json.
  */
 export function writeSnapshot(sourcesDir, sourceId, input, options = {}) {
 	checkInput(sourceId, input)
@@ -132,7 +138,10 @@ export function writeSnapshot(sourcesDir, sourceId, input, options = {}) {
 	const sha256 = sha256Of(raw ?? textBody)
 	const dir = join(sourcesDir, sourceId)
 	const pinned = pinnedHash(dir)
-	if (pinned !== null && pinned !== sha256 && options.replace !== true) throw new Error(`snapshot_exists: ${sourceId} already holds different snapshot bytes`)
+	if (pinned !== null && pinned !== sha256) {
+		if (options.replace !== true) throw new Error(`snapshot_exists: ${sourceId} already holds different snapshot bytes`)
+		rmSync(join(dir, "command.json"), { force: true })
+	}
 	mkdirSync(dir, { recursive: true })
 	if (raw) writeFileSync(join(dir, "raw.bin"), raw)
 	else rmSync(join(dir, "raw.bin"), { force: true })
@@ -153,9 +162,18 @@ export function writeSnapshot(sourcesDir, sourceId, input, options = {}) {
 		...(mode === "declared" ? { text_sha256: sha256Of(textBody) } : {}),
 	}
 	writeFileSync(join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}\n`)
+	let altered = null
+	if (mode === "html") {
+		const { altered: changed, ...counts } = probeConversion(view.html, view.text, { attributes: false })
+		altered = changed
+		writeFidelityRecord(join(dir, "conversion.json"), "source_conversion", {
+			artifact_sha256: sha256Of(view.html), report: join(dir, "source.html"), defects: [],
+			conversion_altered_numbers: changed, ...counts,
+		}, new Date(meta.observed_at))
+	} else rmSync(join(dir, "conversion.json"), { force: true })
 	const sentences = indexSentences(view.text, sourceId)
 	writeFileSync(join(dir, "sentences.jsonl"), sentences.map((row) => `${JSON.stringify(row)}\n`).join(""))
 	const acronyms = { schemaVersion: 1, source_id: sourceId, snapshot_sha256: sha256, entries: findAcronyms(view.text, sentences) }
 	writeFileSync(join(dir, "acronyms.json"), `${JSON.stringify(acronyms, null, 2)}\n`)
-	return { dir, sha256 }
+	return { dir, sha256, altered }
 }

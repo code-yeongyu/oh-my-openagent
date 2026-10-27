@@ -46,6 +46,8 @@ ulw-research/
     ├── source-commands.mjs          # `source snapshot`, `claims index`, snapshot readers; `source refresh` is source-refresh.mjs
     ├── source-view.mjs / raw-decode.mjs / html-text-map.mjs   # the one snapshot reading: locator text, charset decode, byte map, visible-text extraction
     ├── css-hiding.mjs               # whether inline styles and the page's <style> rules hide an element from every reader (cascade, conditional at-rules)
+    ├── conversion-probe.mjs / number-grammar.mjs   # `source probe-conversion` (numeric diff of a conversion); the one grouped-number grammar (shared with numerals.mjs)
+    ├── markdown-closers.mjs         # CommonMark closer runs (titled/parenthesised link and image targets, references, escapes) for the probe's sign reading and link spans
     ├── *.test.ts                    # co-located bun tests, one per module (unshipped)
     └── tests/fixtures/              # good/bad reports, boxes.json, reference docs (unshipped)
 ```
