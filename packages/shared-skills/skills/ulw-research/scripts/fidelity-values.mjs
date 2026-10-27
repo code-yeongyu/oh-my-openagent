@@ -14,6 +14,7 @@ import { claimChecks } from "./fidelity-claims.mjs"
 import { convertedHalfFits, followsOriginal, isDerivedRow, originalProblem, renderLocator, staleRender, textAfter } from "./fidelity-originals.mjs"
 import { snapshotCause, unreadableSnapshots } from "./fidelity-snapshot-readability.mjs"
 import { STRUCTURAL, clip, traceChecks } from "./fidelity-trace.mjs"
+import { fillEntriesByNode, valueUnitProblem } from "./fidelity-value-unit.mjs"
 import { parseHtml, proseText } from "./html-lite.mjs"
 import { parseNumeral } from "./numerals.mjs"
 import { div, fromDecimal, sub } from "./rational.mjs"
@@ -175,6 +176,14 @@ export function valueChecks(ctx, ledger, fillMap, sourcesDir, options = {}) {
 		})
 	}
 	rowChecks(ctx, ledger, rows, cited, options, flag)
+	// options.fillEntries: the edition's fill-map entries whose element is in the checked HTML (value mode, fill's unit_bound).
+	const facts = ctx.all.filter((cur) => cur.attrs["data-fact"] !== undefined)
+	const entries = fillEntriesByNode(facts, options.fillEntries)
+	for (const node of facts) {
+		const row = rows.get(node.attrs["data-fact"])
+		const problem = row && row.kind !== "quote" && !factProblem(row, proseText(node), node.attrs) && valueUnitProblem(node, row, entries.get(node))
+		if (problem) flag(problem[0], node, problem[1])
+	}
 	for (const tr of ctx.all.filter((node) => node.tag === "tr" && node.attrs["data-row-kind"] !== "comparison")) {
 		const groups = new Set(ctx.util.descendants(tr).map((node) => rows.get(node.attrs["data-fact"])?.observation_id).filter(Boolean))
 		if (groups.size > 1) flag("join_integrity_fail", tr, `one table row joins observations ${[...groups].join(", ")}`)

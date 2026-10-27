@@ -63,7 +63,9 @@ const RANGE_SEP = /^(?:\s?[-\u2013~]\s?|\sto\s)/
 const SIGN = "-\u2212"
 /** Bounding qualifiers: before the value (Korean and English) and right after it (Korean). */
 const QUALIFIERS_BEFORE = ["up to", "at least", "at most", "more than", "less than", "about", "approximately", "nearly", "over", "under", "\uCD5C\uB300", "\uCD5C\uC18C", "\uC57D"]
-const QUALIFIER_AFTER = /^\s?(\uC774\uC0C1|\uC774\uD558|\uBBF8\uB9CC|\uCD08\uACFC|\uB0B4\uC678|\uAE4C\uC9C0)/
+/** Korean bounding qualifiers written right after a value (isang, iha, miman, chogwa, naeoe, kkaji). */
+export const QUALIFIERS_AFTER = Object.freeze(["\uC774\uC0C1", "\uC774\uD558", "\uBBF8\uB9CC", "\uCD08\uACFC", "\uB0B4\uC678", "\uAE4C\uC9C0"])
+const QUALIFIER_AFTER = new RegExp(`^\\s?(${QUALIFIERS_AFTER.join("|")})`)
 
 /** Comma grouping from the one grouped-number grammar (number-grammar.mjs). */
 const COMMA_GROUPED = new RegExp(`^${groupedNumberSource([","])}$`)

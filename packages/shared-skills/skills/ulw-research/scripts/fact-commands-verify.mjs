@@ -174,11 +174,15 @@ export function runFactVerify(args) {
 	const briefPath = flags.brief ?? join(sessionDir, "brief.md")
 	const ledger = readLedger(sessionDir)
 	const projected = edition.format === "md" ? markdownAsHtml(edition.text, edition.entries, ledger) : null
+	// The entries whose element is in the checked HTML: an HTML edition's own map, or the projection's intact entries.
+	const ownMap = flags["fill-map"] ?? `${report}.fill-map.json`
+	const fillEntries = projected ? edition.entries.filter((entry) => !projected.stale.includes(entry)) : existsSync(ownMap) ? readJsonFile(ownMap).entries : null
 	const result = checkFidelity(projected?.html ?? edition.text, {
 		ledger,
 		sourcesDir: resolve(flags.sources ?? join(sessionDir, "sources")),
 		claims: flags.claims !== undefined || existsSync(claimsPath) ? readJsonFile(claimsPath) : null,
 		fillMap: projected?.stale ?? edition.entries,
+		fillEntries,
 		brief: existsSync(briefPath) ? readText(briefPath) : "",
 		baseDir: dirname(resolve(report)),
 		recompute,
