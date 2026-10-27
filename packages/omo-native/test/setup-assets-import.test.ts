@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { loadMcpConfig } from "../../../node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/mcp/config.js"
+import { resolveConfigValue } from "../../../node_modules/@code-yeongyu/senpi/dist/core/resolve-config-value.js"
 import { teardownRoots } from "./teardown.test-support"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
@@ -65,6 +66,12 @@ function mcp(item: Fixture): Record<string, unknown> {
   return JSON.parse(readFileSync(join(item.agentDir, "mcp.json"), "utf8"))
 }
 
+// The value the engine will use, or a failure that names what was missing.
+function required<T>(value: T | undefined | null, what: string): T {
+  if (value === undefined || value === null) throw new Error(`${what} is missing`)
+  return value
+}
+
 describe("omo setup opencode asset import", () => {
   describe("#given global opencode mcp servers and skills", () => {
     describe("#when setup is accepted", () => {
@@ -95,7 +102,7 @@ describe("omo setup opencode asset import", () => {
 
   describe("#given opencode servers whose values the engine's interpolation would reject", () => {
     describe("#when setup imports the rest", () => {
-      test("#then the pinned engine still loads the written mcp.json and every imported server", () => {
+      test("#then the pinned engine still loads the written mcp.json and every imported server", async () => {
         const item = fixture()
         write(join(item.agentDir, "mcp.json"), JSON.stringify({ mcpServers: { mine: { type: "stdio", command: "mine" } } }))
         opencode(item, {
@@ -119,8 +126,18 @@ describe("omo setup opencode asset import", () => {
         expect(Object.keys(loaded.servers).sort()).toEqual(["client", "mine", "off", "remote", "rooted", "token"])
         expect(loaded.servers.client?.config?.oauth).toEqual({ clientId: "cid", scopes: ["read", "write"], callbackPort: 19876 })
         expect(loaded.servers.rooted?.config?.cwd).toBe("/srv/tools")
-        expect(loaded.servers.token?.config?.env).toEqual({ TOKEN: "t0k" })
-        expect(loaded.servers.remote?.config?.headers).toEqual({ A: "t0k" })
+        // The engine interpolates a plain string when it loads an mcp.json and resolves a
+        // reference object when it connects. Either way the value the server gets is the one
+        // opencode would have sent, with the environment this test supplies.
+        expect(Object.keys(loaded.servers.token?.config?.env ?? {})).toEqual(["TOKEN"])
+        expect(await resolveConfigValue(required(loaded.servers.token?.config?.env?.TOKEN, "the token server's TOKEN"), { QA_TOKEN: "t0k" })).toBe("t0k")
+        expect(Object.keys(loaded.servers.remote?.config?.headers ?? {})).toEqual(["A"])
+        expect(await resolveConfigValue(required(loaded.servers.remote?.config?.headers?.A, "the remote server's A header"), { QA_TOKEN: "t0k" })).toBe("t0k")
+        // Setup must never inline the secret's bytes: the written config names where the
+        // value lives, and the engine resolves it. The plain-string shape writes a
+        // template the engine expands at load, so the loaded config holds the value and
+        // only the file on disk can say what setup wrote.
+        expect(JSON.stringify(mcp(item))).not.toContain("t0k")
         expect(loaded.servers.off.state).toBe("disabled")
       })
     })
