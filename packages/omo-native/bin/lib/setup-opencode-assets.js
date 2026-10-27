@@ -308,7 +308,7 @@ function disabled(entry) {
 // that is what keeps `convertLocal` and `convertRemote` readable. `noticeFor` names the field and
 // the server in a refusal, because the environment notice and the header notice name them
 // differently, and that difference is what omo has always printed.
-function convertArgsPlain(parts) {
+function convertArgsPlain(name, parts) {
   const record = []
   for (const part of parts) {
     const converted = convertPlainField(part)
@@ -317,7 +317,7 @@ function convertArgsPlain(parts) {
         result: undefined,
         refusal: {
           reason: "uses {file:...} in args",
-          notice: `NOTICE opencode: mcp server args uses ${converted.reason} which omo does not write in the args field; not imported - inline the value or move the path to a header or env entry`,
+          notice: `NOTICE opencode: mcp server ${name} args uses ${converted.reason} which omo does not write in the args field; not imported - inline the value or move the path to a header or env entry`,
         },
       }
     }
@@ -326,14 +326,17 @@ function convertArgsPlain(parts) {
   return { result: record.length > 0 ? record : undefined, refusal: undefined }
 }
 
-function convertArgsObjects(parts, baseDir) {
+function convertArgsObjects(name, parts, baseDir) {
   const record = []
   for (const part of parts) {
     const converted = convertToObjectField(part, baseDir, false)
     if (converted.refused) {
       return {
         result: undefined,
-        refusal: { reason: converted.reason, notice: `NOTICE opencode: mcp server args has ${converted.reason}` },
+        refusal: {
+          reason: converted.reason,
+          notice: `NOTICE opencode: mcp server ${name} args has ${converted.reason}; not imported - inline the value, or move the path to a header or env entry`,
+        },
       }
     }
     record.push(converted.value)
@@ -411,13 +414,13 @@ function convertLocal(name, entry, baseDir, legacy) {
       config: undefined,
       refusal: {
         reason: "uses {file:...} in command",
-        notice: `NOTICE opencode: mcp server command uses ${executable.reason} which omo does not write in the command field; not imported - inline the value or move the path to a header, env, or args entry`,
+        notice: `NOTICE opencode: mcp server ${name} command uses ${executable.reason} which omo does not write in the command field; not imported - inline the value or move the path to a header, env, or args entry`,
       },
     }
   }
   // args[] takes reference objects in the new mode; in the legacy mode it takes plain strings
   // and a reference there has no spelling, so it is refused.
-  const args = legacy ? convertArgsPlain(command.slice(1)) : convertArgsObjects(command.slice(1), baseDir)
+  const args = legacy ? convertArgsPlain(name, command.slice(1)) : convertArgsObjects(name, command.slice(1), baseDir)
   if (args.refusal) return { config: undefined, refusal: args.refusal }
   const cwd = convertPlainField(entry.cwd)
   if (cwd.refused) {
@@ -425,7 +428,7 @@ function convertLocal(name, entry, baseDir, legacy) {
       config: undefined,
       refusal: {
         reason: "uses {file:...} in cwd",
-        notice: `NOTICE opencode: mcp server cwd uses ${cwd.reason} which omo does not write in the cwd field; not imported - inline the value or move the path to a header or env entry`,
+        notice: `NOTICE opencode: mcp server ${name} cwd uses ${cwd.reason} which omo does not write in the cwd field; not imported - inline the value or move the path to a header or env entry`,
       },
     }
   }
@@ -519,13 +522,13 @@ function convertRemote(name, entry, baseDir, legacy, notices) {
         },
         (key) => ({
           reason: "header value has a placeholder omo cannot express in the plain-string form",
-          notice: `NOTICE opencode: mcp server ${name} headers.${key} has a placeholder omo cannot express in the plain-string form; not imported`,
+          notice: `NOTICE opencode: mcp server ${name} headers.${key} has a placeholder omo cannot express in the plain-string form; not imported - inline the header value, or reference it as {env:NAME}`,
         }),
       )
     : convertRecordObjects(
         entry.headers,
         baseDir,
-        (key, reason) => ({ reason, notice: `NOTICE opencode: mcp server ${name} headers.${key} has ${reason}` }),
+        (key, reason) => ({ reason, notice: `NOTICE opencode: mcp server ${name} headers.${key} has ${reason}; not imported - inline the header value, or reference it as {env:NAME}` }),
       )
   if (headers.refusal) return { config: undefined, refusal: headers.refusal }
   const env = convertEnv(name, entry, baseDir, legacy)
