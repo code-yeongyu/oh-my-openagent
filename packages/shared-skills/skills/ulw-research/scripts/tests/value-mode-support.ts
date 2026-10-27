@@ -26,10 +26,10 @@ export const LEDGER = {
 }
 
 /** Fill `body` in a fresh session; verify re-checks the edition, write replaces its text (the fill map stays). */
-export async function filled(body: string, format = "html") {
+export async function filled(body: string, format = "html", ledger: { rows: Row[] } = LEDGER) {
 	const dir = mkdtempSync(join(tmpdir(), "value-mode-unit-"))
 	onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
-	writeFileSync(join(dir, "fact-ledger.json"), JSON.stringify(LEDGER))
+	writeFileSync(join(dir, "fact-ledger.json"), JSON.stringify(ledger))
 	copyFileSync(join(FIX, "fidelity-brief-locked.md"), join(dir, "brief.md"))
 	cpSync(join(FIX, "fidelity", "sources"), join(dir, "sources"), { recursive: true })
 	const source = join(dir, `report.src.${format}`)
