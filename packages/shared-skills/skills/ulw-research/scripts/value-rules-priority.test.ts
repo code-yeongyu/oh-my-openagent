@@ -14,7 +14,8 @@ import { parseFidelityBlock } from "./fidelity-brief.mjs"
 
 const FIX = join(import.meta.dir, "tests", "fixtures")
 const ledger = () => JSON.parse(readFileSync(join(FIX, "fidelity", "ledger-verify.json"), "utf8"))
-const check = (html: string, book: ReturnType<typeof ledger>, options = {}) => valueChecks(buildContext(parseHtml(html), {}), book, null, null, options)
+// Source-backed rows are checked against their pinned snapshots; a missing sources dir blocks them.
+const check = (html: string, book: ReturnType<typeof ledger>, options = {}) => valueChecks(buildContext(parseHtml(html), {}), book, null, join(FIX, "fidelity", "sources"), options)
 const codes = (defects: { code: string }[]) => defects.map((d) => d.code)
 
 test("revision v1 does not match the brief's v12", () => {
