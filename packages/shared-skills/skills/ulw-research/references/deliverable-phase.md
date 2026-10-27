@@ -50,7 +50,7 @@ The request and its destination usually answer the format question already. Deri
 | A prior report of the same kind in this workspace, not pointed at | that report's format, offered as the Q1 default | `template-vibe` | full |
 | A complete existing deliverable for this question (section 2) | its existing format | `edit-existing` | the original's tier |
 
-QA tiers: **light** runs the static gates and one render check of the answer, and records the fidelity gate as `not_run --reason "<why>"` (the reason is required) until Markdown deliverable support ships for it. **Full** runs the static gates, the fidelity gate, the layout gates, visual QA of every page, and the proofread gate (section 7).
+QA tiers: **light** runs the static gates and one render check of the answer, and records the fidelity gate as `not_run --reason "<why>"` (the reason is required); the light tier does not run `fact verify`. **Full** runs the static gates, the fidelity gate, the layout gates, visual QA of every page, and the proofread gate (section 7).
 
 ## 4. The empty-info interview
 
@@ -169,7 +169,7 @@ Nothing reaches the requester until the gates for its QA tier pass, in this orde
    ```bash
    node "$SKILL_DIR/scripts/report-tools.mjs" fact verify "$SESSION_DIR/report.html" --session-dir "$SESSION_DIR"   # writes fidelity-defects.json
    ```
-   Exit `1` on any blocker or major defect: record `outcome gate fidelity fail`; minors alone exit `0` and are listed. The grammar, the fill step, and the derivations are in section 11; this stage verifies HTML only.
+   Exit `1` on any blocker or major defect: record `outcome gate fidelity fail`; minors alone exit `0` and are listed. This stage verifies HTML and Markdown with its fill map; verify LaTeX through its Markdown source (section 11).
 3. **Layout gates.** Print the probe, evaluate it in the rendered page through the browser skill's owned headless engine, save the returned object as `$SESSION_DIR/boxes.json`, and re-run `check` with `--layout "$SESSION_DIR/boxes.json"`. It adds overflow past the container, clipped text, scroll containers, distorted images, and overlapping siblings.
    ```bash
    node "$SKILL_DIR/scripts/report-tools.mjs" layout-probe --json   # .source is one async expression
@@ -184,7 +184,7 @@ Nothing reaches the requester until the gates for its QA tier pass, in this orde
 
 **Every reader-facing edition is verified.** The main report, the inline edition (section 9), LaTeX per-section sources, and slide sources are filled by `fact fill` from one placeholder source and each is verified by `fact verify` into its own record; PDF and DOCX are renders of a verified source. A delivered row is recorded with `outcome set <format> delivered --path <file> --verified-by <record>`, where the record's `artifact_sha256` equals the sha256 of the delivered source; a PDF or DOCX adds `--rendered-from <source>` and is matched against that source. Each delivered edition also carries its own meaning record: run `fact pairs` on that edition's source and `fact meaning-check --edition <format>`, which writes `fidelity-meaning-defects.<format>.json` bound to those bytes (section 7). The barrier binds each edition to a record for its current bytes: every record whose `artifact_sha256` equals those bytes is a candidate (its own record, another edition's record for a byte-identical copy or the html edition a PDF renders, and the legacy single file `fidelity-meaning-defects.json`), and the one with the newest `written_at` wins; on equal times the more severe verdict wins (`meaning_drift_confirmed`, then `meaning_unverified`, then clean). In a session with a fact ledger, `outcome verify` refuses a delivered row without a matching record (`edition_unverified`, blocker, integrity). Markdown and LaTeX verification arrive with the Markdown stage; until then `fact verify --format md|tex` exits `2`, and such an edition is recorded `blocked_capability` with that reason rather than delivered unverified.
 
-The light tier runs gate 1 and one render (recorded as `visual`) and records `fidelity`, `layout`, and `proofread` as `not_run` (`fidelity not_run` needs `--reason "<why>"`); `fidelity` stays `not_run` in the light tier until Markdown deliverable support ships for the fidelity verifier. The full tier runs all five.
+The light tier runs gate 1 and one render (recorded as `visual`) and records `fidelity`, `layout`, and `proofread` as `not_run` (`fidelity not_run` needs `--reason "<why>"`); the light tier never runs the fidelity verifier, although `fact verify` checks HTML and Markdown editions. The full tier runs all five.
 
 ## 8. Bounded repair loop
 

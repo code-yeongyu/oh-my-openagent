@@ -63,7 +63,7 @@ export const DEFECT_CODES = deepFreeze({
 	derived_not_allowed: { severity: "blocker", integrity: true, hint: "The brief allows no derived or assumed numbers; cite a source row directly or change the brief with the requester." },
 	source_outside_floor: { severity: "blocker", integrity: true, hint: "The row's source is outside the source floor the brief records; use a source the brief allows or remove the fact." },
 	brief_changed: { severity: "blocker", integrity: true, hint: "The edition's fill map was not written under the current ## Fidelity block (it changed after fill, or the map predates the binding); re-run fact fill, then fact verify." },
-	snapshot_hash_mismatch: { severity: "blocker", integrity: true, hint: "The source snapshot changed after it was pinned; re-snapshot the source and re-register its rows." },
+	snapshot_hash_mismatch: { severity: "blocker", integrity: true, hint: "The source snapshot is unreadable or changed after it was pinned; restore or re-snapshot the source and re-register its rows." },
 	chart_value_untraceable: { severity: "blocker", integrity: true, hint: "A chart value, tick, or data file does not match its ledger-backed data source; re-render the chart from the exported data." },
 	quote_unbound: { severity: "blocker", integrity: true, hint: "A direct quotation has no ledger quote row; register it with fact quote and insert it through its placeholder." },
 	edition_unverified: { severity: "blocker", integrity: true, hint: "The delivered file has no matching fact verify record; run fact verify on that edition and record it with --verified-by." },
