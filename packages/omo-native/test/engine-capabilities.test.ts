@@ -23,9 +23,11 @@ describe("the reference-object capability gate", () => {
   describe("#given an engine that declares no capabilities", () => {
     describe("#when the gate is read", () => {
       test("#then it is closed, and a missing field means the engine does not support the shapes", () => {
-        expect(engineSupportsReferenceObjects({ capabilities: undefined })).toBe(false)
-        expect(engineSupportsReferenceObjects({ capabilities: {} })).toBe(false)
-        expect(engineSupportsReferenceObjects({ capabilities: { configReferenceObjects: 0 } })).toBe(false)
+        const root = engineRoot({ name: "@code-yeongyu/senpi" })
+
+        expect(engineSupportsReferenceObjects({ capabilities: undefined, senpiPackageRoot: root })).toBe(false)
+        expect(engineSupportsReferenceObjects({ capabilities: {}, senpiPackageRoot: root })).toBe(false)
+        expect(engineSupportsReferenceObjects({ capabilities: { configReferenceObjects: 0 }, senpiPackageRoot: root })).toBe(false)
       })
     })
   })

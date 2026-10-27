@@ -55,7 +55,7 @@ export function readEngineCapabilities(source = {}) {
 /**
  * Whether the engine resolves the reference objects.
  *
- * @param {{ capabilities?: Record<string, unknown> }} [source]
+ * @param {{ capabilities?: Record<string, unknown>, senpiPackageRoot?: string }} [source]
  * @returns {boolean}
  */
 export function engineSupportsReferenceObjects(source = {}) {

@@ -94,8 +94,8 @@ function convertKey(id, entry, opencodeAuth, baseDir, legacy, notices) {
     if (key !== undefined) return { key, source: "opencode config apiKey" }
     notices.push(
       legacy
-        ? `NOTICE opencode: ${kind} ${id} apiKey has a {file:...} or malformed {env:NAME} placeholder that omo cannot express in the plain-string form; the key was not imported - start omo and run /login ${id}, or fix the apiKey value.`
-        : `NOTICE opencode: ${kind} ${id} apiKey has a malformed {env:NAME} placeholder (NAME outside the identifier shape) that omo refuses to ship; the {file:...} form is supported (the engine resolves it at load time). Start omo and run /login ${id}, or fix the apiKey value.`,
+        ? `NOTICE opencode: ${kind} ${id} apiKey has a {file:...} or malformed {env:NAME} placeholder; the key was not imported - inline the apiKey value or use {env:NAME} for an environment variable, then run omo setup again, or start omo and run /login ${id}.`
+        : `NOTICE opencode: ${kind} ${id} apiKey has a malformed {env:NAME} placeholder (the name must be letters, numbers and underscores, starting with a letter or underscore); the key was not imported - inline the apiKey value or fix the name, then run omo setup again, or start omo and run /login ${id}.`,
     )
     return undefined
   }
@@ -126,14 +126,12 @@ function convertModelName(source, providerId, id, notices) {
   return converted.value
 }
 
-// The engine's model entry carries no apiKey and no headers, so a per-model key or header has
-// nowhere to land. It is reported rather than dropped in silence.
-function reportModelFieldsWithoutHome(source, providerId, id, notices) {
+// The engine's model entry carries no apiKey, so a per-model key has nowhere to land. It is
+// reported rather than dropped in silence. The model entry DOES carry headers, and the engine
+// resolves a reference object in them, so headers are carried over rather than reported.
+function reportModelApiKeyWithoutHome(source, providerId, id, notices) {
   if (text(source.options?.apiKey) !== undefined) {
     notices.push(`NOTICE opencode: model ${providerId}/${id} apiKey is not carried over; the engine's model entry has no apiKey field - set it on the provider, or add the model to models.json by hand`)
-  }
-  if (isPlainObject(source.options?.headers) && Object.keys(source.options.headers).length > 0) {
-    notices.push(`NOTICE opencode: model ${providerId}/${id} headers are not carried over; the engine's model entry has no headers field - set them on the provider, or add the model to models.json by hand`)
   }
 }
 
@@ -160,6 +158,28 @@ function resolveModelEndpoint(provider, source, id, api, notices) {
   return baseUrl
 }
 
+// The model entry, in the shape the engine's model-config-schema.js ModelDefinitionSchema
+// validates. Every optional field is left out rather than written as undefined, and the
+// fields the engine resolves a reference object in are the ones the engine's own
+// model-reference-origins.js registers as trusted slots.
+function modelEntry(id, source, provider, resolved) {
+  const { api, baseUrl, name, headers, input } = resolved
+  return {
+    id,
+    // OpenCode's model `id` is the id sent to the API when the key is an alias; the engine's
+    // `upstreamModelId` replaces the request model id the same way (model-runtime.js).
+    ...(text(source.id) !== undefined && source.id !== id ? { upstreamModelId: source.id } : {}),
+    ...(name !== undefined ? { name } : {}),
+    ...(api !== provider.api ? { api } : {}),
+    ...(baseUrl !== provider.baseUrl ? { baseUrl } : {}),
+    ...(Object.keys(headers).length > 0 ? { headers } : {}),
+    ...(typeof source.reasoning === "boolean" ? { reasoning: source.reasoning } : {}),
+    ...(input.length > 0 ? { input } : {}),
+    ...(positive(source.limit?.context) !== undefined ? { contextWindow: source.limit.context } : {}),
+    ...(positive(source.limit?.output) !== undefined ? { maxTokens: source.limit.output } : {}),
+  }
+}
+
 function convertModel(provider, id, entry, notices) {
   const source = isPlainObject(entry) ? entry : {}
   const npm = text(source.provider?.npm)
@@ -175,21 +195,18 @@ function convertModel(provider, id, entry, notices) {
   if (baseUrl === undefined) return undefined
   const name = convertModelName(source, provider.id, id, notices)
   if (name === null) return undefined
-  reportModelFieldsWithoutHome(source, provider.id, id, notices)
-  const input = Array.isArray(source.modalities?.input) ? source.modalities.input.filter((kind) => MODEL_INPUTS.has(kind)) : []
-  return {
-    id,
-    // OpenCode's model `id` is the id sent to the API when the key is an alias; the engine's
-    // `upstreamModelId` replaces the request model id the same way (model-runtime.js).
-    ...(text(source.id) !== undefined && source.id !== id ? { upstreamModelId: source.id } : {}),
-    ...(name !== undefined ? { name } : {}),
-    ...(api !== provider.api ? { api } : {}),
-    ...(baseUrl !== provider.baseUrl ? { baseUrl } : {}),
-    ...(typeof source.reasoning === "boolean" ? { reasoning: source.reasoning } : {}),
-    ...(input.length > 0 ? { input } : {}),
-    ...(positive(source.limit?.context) !== undefined ? { contextWindow: source.limit.context } : {}),
-    ...(positive(source.limit?.output) !== undefined ? { maxTokens: source.limit.output } : {}),
+  reportModelApiKeyWithoutHome(source, provider.id, id, notices)
+  const headers = convertHeaders(source.options?.headers, provider.baseDir, provider.legacy)
+  if (headers === undefined) {
+    notices.push(
+      provider.legacy
+        ? `NOTICE opencode: model ${provider.id}/${id} has a header with a {file:...} or malformed {env:NAME} placeholder; not imported - inline the header value or use {env:NAME} for an environment variable, then run omo setup again`
+        : `NOTICE opencode: model ${provider.id}/${id} has a header with a malformed {env:NAME} placeholder (the name must be letters, numbers and underscores, starting with a letter or underscore); not imported - inline the header value or fix the name, then run omo setup again`,
+    )
+    return undefined
   }
+  const input = Array.isArray(source.modalities?.input) ? source.modalities.input.filter((kind) => MODEL_INPUTS.has(kind)) : []
+  return modelEntry(id, source, provider, { api, baseUrl, name, headers, input })
 }
 
 function convertHeaders(headers, baseDir, legacy) {
@@ -232,13 +249,20 @@ function convertProvider(id, entry, context) {
   if (headers === undefined) {
     notices.push(
       context.legacy
-        ? `NOTICE opencode: ${kind} ${id} has a header with a {file:...} or malformed {env:NAME} placeholder omo cannot express in the plain-string form; not imported`
-        : `NOTICE opencode: ${kind} ${id} has a header with a malformed {env:NAME} placeholder omo cannot express; not imported`,
+        ? `NOTICE opencode: ${kind} ${id} has a header with a {file:...} or malformed {env:NAME} placeholder; not imported - inline the header value or use {env:NAME} for an environment variable, then run omo setup again`
+        : `NOTICE opencode: ${kind} ${id} has a header with a malformed {env:NAME} placeholder (the name must be letters, numbers and underscores, starting with a letter or underscore); not imported - inline the header value or fix the name, then run omo setup again`,
     )
     return undefined
   }
   const models = Object.entries(isPlainObject(entry.models) ? entry.models : {})
-    .map(([modelId, model]) => convertModel({ id, api, baseURL, baseUrl, optionsBaseURL: text(entry.options?.baseURL) }, modelId, model, notices))
+    .map(([modelId, model]) =>
+      convertModel(
+        { id, api, baseURL, baseUrl, optionsBaseURL: text(entry.options?.baseURL), baseDir: context.baseDir, legacy: context.legacy },
+        modelId,
+        model,
+        notices,
+      ),
+    )
     .filter((model) => model !== undefined)
   if (models.length === 0) {
     notices.push(`NOTICE opencode: ${kind} ${id} declares no models omo can use; not imported`)

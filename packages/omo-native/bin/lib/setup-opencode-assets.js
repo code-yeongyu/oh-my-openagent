@@ -11,7 +11,6 @@ import { shouldEmitReferenceObjects } from "./engine-capabilities.js"
 export { shouldEmitReferenceObjects }
 import { literalConfigValue } from "./engine-config-value.js"
 import { parseJsonc } from "./jsonc.js"
-import { senpiPackageRoot } from "./package-paths.js"
 
 // `interpolateString` in the engine's mcp config rejects any string value that looks like command
 // substitution - one containing `$(` or starting (after leading whitespace) with `!` - and one bad
@@ -100,12 +99,19 @@ export function readOpencodeConfig(files, label, notices) {
 
 // OpenCode substitutes `{env:NAME}`; the engine substitutes `${NAME}`. Same intent, same value.
 // `{file:...}` and `{env:...}` placeholders in fields that accept a plain string today
-// (`mcp.json`: `headers.*`, `env.*`, `args[]`; `models.json`: provider and model `apiKey` and
-// `headers.*`; `auth.json`: the API key `key`, and pool `accounts[].key`) become a structured
+// (`mcp.json`: `headers.*`, `env.*`, `args[]`; `models.json`: the provider `apiKey` and the
+// provider and model `headers.*`; `auth.json`: the API key `key`) become a structured
 // reference object — `{$file: "/abs/path"}` or `{$env: "NAME"}` — and any surrounding text plus
 // the reference goes into a `{$concat: ["text", {ref}, ...]}` array. The engine reads these
 // references at load time, so setup never inlines secret bytes into `mcp.json`, `models.json`,
 // or `auth.json`; rotation of the source file is picked up on the next engine load.
+//
+// The slots above are the engine's own: `mcp/config-references.js` names `headers.*`, `env.*`
+// and `args[]`; `model-reference-origins.js` names the provider `apiKey`, the provider and
+// model `headers.*`, the model override `headers.*` and the credential slot `value`;
+// `auth-credential-values.js` names `<provider>.key` and `<provider>.accounts[].key`. A field
+// the engine reads as a plain string has no room for a reference and refuses the value by
+// name instead.
 //
 // The maintainer ships the engine half themselves. The engine says it resolves the `$file` /
 // `$env` / `$concat` shapes with a field in its own package.json, and until that field is
@@ -374,7 +380,7 @@ function convertEnv(name, entry, baseDir, legacy) {
       },
       (key, reason) => ({
         reason: "environment value has a placeholder omo cannot express in the plain-string form",
-        notice: `NOTICE opencode: mcp server ${name} environment.${key} has ${reason}; not imported - inline the value or reference it as \${NAME}`,
+        notice: `NOTICE opencode: mcp server ${name} environment.${key} has ${reason}; not imported - inline the value or reference it as {env:NAME}`,
       }),
     )
   }
@@ -383,7 +389,7 @@ function convertEnv(name, entry, baseDir, legacy) {
     baseDir,
     (key, reason) => ({
       reason,
-      notice: `NOTICE opencode: mcp server ${name} environment.${key} has ${reason}; not imported - inline the value or reference it as \${NAME}`,
+      notice: `NOTICE opencode: mcp server ${name} environment.${key} has ${reason}; not imported - inline the value or reference it as {env:NAME}`,
     }),
   )
 }

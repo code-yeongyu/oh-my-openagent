@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 
 import { ModelConfig } from "../../../node_modules/@code-yeongyu/senpi/dist/core/model-config.js"
 import { composeModelProvider } from "../../../node_modules/@code-yeongyu/senpi/dist/core/provider-composer.js"
-import { resolveConfigValue } from "../../../node_modules/@code-yeongyu/senpi/dist/core/resolve-config-value.js"
+import { resolveStoredCredential } from "../../../node_modules/@code-yeongyu/senpi/dist/core/auth-credential-values.js"
 import { readAuthStore, writeAuthStore } from "../bin/lib/auth-store.js"
 import { planOpencodeProviders } from "../bin/lib/setup-opencode-providers.js"
 import { teardownRoots } from "./teardown.test-support"
@@ -129,6 +129,22 @@ async function run(item: Fixture, args: string[], envOverrides: Record<string, s
 
 function readJson(path: string): Record<string, any> {
   return JSON.parse(readFileSync(path, "utf8"))
+}
+
+// Set environment variables for the duration of a check, and put the old ones back after.
+// The engine's auth storage resolves an env-named key against the process environment.
+function withEnv(values: Record<string, string>): () => void {
+  const previous = new Map<string, string | undefined>()
+  for (const [name, value] of Object.entries(values)) {
+    previous.set(name, process.env[name])
+    process.env[name] = value
+  }
+  return () => {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  }
 }
 
 const ACME = {
@@ -293,15 +309,24 @@ describe("omo setup opencode custom provider import", () => {
         const result = await run(item, ["setup", "--yes"])
         const path = join(item.agentDir, "auth.json")
         const auth = readJson(path)
-        const env = { ACME_API_KEY: "acme-from-env", ENVONLY_KEY: "env-only", HOME: "/nope", X: "nope" }
 
         expect(result.status).toBe(0)
         expect(Object.keys(auth).sort()).toEqual(["acme", "envonly", "inline", "stored"])
         expect(Object.values(auth).every((entry: any) => entry.type === "api_key")).toBe(true)
-        expect(await resolveConfigValue(auth.acme.key, env)).toBe("acme-from-env")
-        expect(await resolveConfigValue(auth.inline.key, env)).toBe(literal)
-        expect(await resolveConfigValue(auth.stored.key, env)).toBe(`stored-${literal}`)
-        expect(await resolveConfigValue(auth.envonly.key, env)).toBe("env-only")
+        // The engine resolves a key held in auth.json through its own auth storage, which
+        // registers auth.json as the reference's trusted origin. A bare resolveConfigValue
+        // refuses a reference object: with no origin the engine treats it as forbidden.
+        const resolved = async (provider: string) =>
+          (await resolveStoredCredential(auth[provider], provider, path)).key
+        const restore = withEnv({ ACME_API_KEY: "acme-from-env", ENVONLY_KEY: "env-only", X: "nope" })
+        try {
+          expect(await resolved("acme")).toBe("acme-from-env")
+          expect(await resolved("inline")).toBe(literal)
+          expect(await resolved("stored")).toBe(`stored-${literal}`)
+          expect(await resolved("envonly")).toBe("env-only")
+        } finally {
+          restore()
+        }
         if (process.platform !== "win32") expect(statSync(path).mode & 0o777).toBe(0o600)
         expect(result.stdout).not.toContain("skipped-unmapped: acme")
       })
