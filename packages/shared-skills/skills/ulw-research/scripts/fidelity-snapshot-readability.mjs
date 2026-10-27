@@ -26,7 +26,7 @@ export function snapshotCause(sourcesDir, row) {
 			throw error instanceof SyntaxError ? new Error("meta.json is not valid JSON") : error
 		}
 		if (!meta || typeof meta.sha256 !== "string") return "has invalid snapshot metadata (meta.json has no sha256)"
-		const needsRaw = row.locator?.unit === "utf8-bytes" && meta.kind !== "converted-only"
+		const needsRaw = ["bytes", "utf8-bytes"].includes(row.locator?.unit) && meta.kind !== "converted-only"
 		const file = existsSync(join(dir, "raw.bin")) || needsRaw ? "raw.bin" : "text.txt"
 		return sha256Of(read(dir, file)) === meta.sha256 ? null : `hash mismatch: ${file} changed after its snapshot was pinned`
 	} catch (error) {

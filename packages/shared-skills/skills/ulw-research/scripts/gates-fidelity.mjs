@@ -25,6 +25,7 @@ export const FIDELITY_GATE_CODES = Object.freeze([
 	"unsupported_verification", "conflicting_readings", "hedge_dropped", "direction_flipped", "causality_added",
 	"qualifier_dropped", "unbound_sentence", "snapshot_mismatch", "operand_timestamp_missing", "operand_missing", "join_integrity_fail", "quote_stale_version",
 	"quote_fuzzy_match", "name_outside_quote", "scope_widened_warn", "claim_kind_mismatch", "verification_claim_unmarked",
+	"snapshot_not_raw", "relocated", "quote_converted_only",
 ])
 const RANK = { blocker: 0, major: 1, minor: 2 }
 

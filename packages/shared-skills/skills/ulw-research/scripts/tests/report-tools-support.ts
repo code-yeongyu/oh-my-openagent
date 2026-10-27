@@ -172,7 +172,7 @@ function fillTemplate(dir: string, body: string, extra: string[] = []) {
 function textSource(dir: string, id: string, provenance?: string) {
 	writeFileSync(join(dir, `${id}.txt`), "Commentary: the span length is 320 m according to this review.\n")
 	const prov = provenance === undefined ? [] : ["--provenance", provenance]
-	const snap = nodeJson(["source", "snapshot", "--id", id, "--text", join(dir, `${id}.txt`), "--kind", "document", ...prov, "--session-dir", dir])
+	const snap = nodeJson(["source", "snapshot", "--id", id, "--raw", join(dir, `${id}.txt`), "--kind", "document", ...prov, "--session-dir", dir])
 	const add = nodeJson(["fact", "add", "--source", id, "--find", "span length", "--label", `span_${id.toLowerCase()}`, "--json", "--session-dir", dir])
 	return { snap, row: add.json.data?.row }
 }
