@@ -10,6 +10,8 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { CliError, parseArgs, sha256Of } from "./cli-support.mjs"
+import { DEFECT_CODES } from "./contracts.mjs"
+import { alteredIn } from "./conversion-probe.mjs"
 import { derive } from "./fact-derive.mjs"
 import { addRow, readLedger, retractRow, supersedeRow, writeLedger } from "./fact-ledger.mjs"
 import { locateFind, locateMatch, locatePageLine, locateTable } from "./fact-locate.mjs"
@@ -80,6 +82,8 @@ function runAdd(args, quote) {
 	const found = locate(flags, snapshot, id, quote)
 	if (found.error === "unit_expected_mismatch") return failure(command, "unit_mismatch", { message: `expected ${found.expected}, found ${found.found}`, candidates: found.candidates })
 	if (found.error) return failure(command, found.error, { message: `no single match in ${id}`, candidates: found.candidates })
+	const altered = alteredIn(join(sessionDir, "sources", id), [found.raw, found.quote])
+	if (altered.length > 0) return failure(command, "conversion_altered_number", { message: `${id}'s conversion altered ${[...new Set(altered)].join(", ")} (sources/${id}/conversion.json); the converted text cannot back this number, even where the source also shows it unaltered: write a verified text of the source and run \`source snapshot --id ${id} --text <verified.txt> --replace\`, then add the fact again`, tokens: altered, hint: DEFECT_CODES.conversion_altered_number.hint })
 	const { meta } = snapshot
 	const host = URL.canParse(meta.url) ? new URL(meta.url).hostname : null
 	const labelSource = flags.find ?? flags.match ?? (flags.table !== undefined ? `${flags.row}_${flags.col}` : `p${flags.page}_l${flags.line}`)

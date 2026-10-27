@@ -23,7 +23,7 @@ const PROSE_SKIP = new Set(["code", "pre", "kbd", "samp", "script", "style", "sv
 const SAFE_ID = /^[A-Za-z_][\w-]*$/
 
 export const PROSE_TAGS = new Set(["p", "li", ...HEADINGS, "td", "th", "figcaption", "blockquote", "dd", "dt"])
-const PROSE_BREAKS = new Set([...P_CLOSERS, ...PROSE_TAGS, "br", "tr"])
+export const PROSE_BREAKS = new Set([...P_CLOSERS, ...PROSE_TAGS, "br", "tr"])
 
 function makeNode(tag, attrs, parent, line) {
 	return { tag, attrs, children: [], parent, line, text: "", raw: null }

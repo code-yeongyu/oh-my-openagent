@@ -44,6 +44,8 @@ ulw-research/
     ├── fact-commands-verify.mjs     # `fact verify` and the Markdown projection it checks
     ├── fidelity-records.mjs         # FIDELITY_RECORDS table + the delivery barrier of outcome verify/finish (fidelity_unresolved, edition_unverified)
     ├── source-commands.mjs          # `source snapshot`, `claims index`, snapshot readers
+    ├── conversion-probe.mjs / number-grammar.mjs   # `source probe-conversion` (numeric diff of a conversion); the one grouped-number grammar (shared with numerals.mjs)
+    ├── markdown-closers.mjs         # CommonMark closer runs (titled/parenthesised link and image targets, references, escapes) for the probe's sign reading and link spans
     ├── *.test.ts                    # co-located bun tests, one per module (unshipped)
     └── tests/fixtures/              # good/bad reports, boxes.json, reference docs (unshipped)
 ```
