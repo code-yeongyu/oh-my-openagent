@@ -1,6 +1,7 @@
 import type { ModelFallbackControllerAccessor } from "../hooks/model-fallback"
 import { createInternalAgentTextPart } from "./internal-initiator-marker"
 import type { FallbackEntry } from "./model-requirements"
+import { setSessionFallbackSnapshot, clearAllSessionFallbackSnapshots } from "./session-fallback-snapshot"
 import { SessionCategoryRegistry } from "./session-category-registry"
 
 export type DelegatedChildSessionRetryPart = {
@@ -42,6 +43,9 @@ export function registerDelegatedChildSessionBootstrap(_args: {
   tools?: Record<string, boolean>
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
 }): void {
+  if (Object.hasOwn(_args, "fallbackChain")) {
+    setSessionFallbackSnapshot(_args.sessionID, _args.fallbackChain)
+  }
   const retryParts = [createInternalAgentTextPart(_args.promptText)]
   const fallbackChain = cloneFallbackChain(_args.fallbackChain)
   const tools = cloneTools(_args.tools)
@@ -82,4 +86,5 @@ export function clearDelegatedChildSessionBootstrap(_sessionID: string): void {
 
 export function clearAllDelegatedChildSessionBootstrap(): void {
   delegatedChildSessionBootstraps.clear()
+  clearAllSessionFallbackSnapshots()
 }
