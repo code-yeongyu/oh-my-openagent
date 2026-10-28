@@ -1,5 +1,6 @@
 import * as p from "@clack/prompts"
 import { copyEditorProfile, createEditorProfile, deleteEditorProfile, listEditorProfiles, type EditorSession } from "./backend"
+import { importBuiltinPreset } from "./preset-editor"
 import { choose, displayText, input, safeName } from "./prompt"
 
 export async function editProfiles(session: EditorSession, view: string[]): Promise<string[]> {
@@ -7,6 +8,7 @@ export async function editProfiles(session: EditorSession, view: string[]): Prom
   while (true) {
     const names = listEditorProfiles(session)
     const action = await choose(`Profiles in this file (${names.length})`, [
+      { value: "import", label: "Import built-in preset", hint: "Preview performance, balanced or budget from local cache" },
       { value: "create", label: "Create empty profile", hint: "Inherit shared and harness settings" },
       ...(names.length > 0 ? [
         { value: "edit", label: "List / edit profile declarations" },
@@ -16,6 +18,11 @@ export async function editProfiles(session: EditorSession, view: string[]): Prom
       { value: "back", label: "Back" },
     ])
     if (action === "back") return view
+    if (action === "import") {
+      const imported = await importBuiltinPreset(session)
+      if (imported !== undefined) return imported
+      continue
+    }
     if (action === "create" || action === "copy") {
       const source = action === "copy" ? await selectProfile(session, "Copy which profile declaration?") : undefined
       if (action === "copy" && source === undefined) continue
