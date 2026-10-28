@@ -101,3 +101,14 @@ The daemon exits about ten minutes after the last browser disconnects and is not
 service, so a reboot also stops it. Both heal on the next call — `connectBrowserSkill()` starts it
 unless `BSK_AUTO_START=0` (sandboxes that reap background processes keep the daemon on the host
 and share `BSK_HOME`; see upstream's sandboxed-agents guide).
+
+On Windows, an agent host whose Job Object forbids breakaway makes every detached start fail with
+"cannot start an independent Windows daemon". The doctor reports that as `daemon.startBlocked`.
+Retrying `bsk status` or `bsk daemon start` cannot help: run `bsk daemon start --foreground` in a
+persistent background session of the host (one that outlives the command) and check it with
+`bsk status` from a separate call. While the daemon is down, nothing can see the extension, so
+never ask the user to enable it on the strength of `no-daemon`.
+
+The doctor also lists the daemon's open `sessions`. Each keeps an Agent Window open; one your task
+did not start was left by an earlier or cancelled task. Stop it with `bsk session stop <id>` (the
+daemon stops sessions idle for five minutes on its own).
