@@ -232,7 +232,7 @@ omo-agent-toolkit run --profile quality --port 4097 "Review this change"
 
 `--profile` selects an existing `profiles.<name>` overlay from `omo.json[c]` for both the CLI and the OpenCode server it starts. For this run, it takes precedence over profile selection through `OMO_PROFILE`, `OCX_PROFILE`, and `OPENCODE_CONFIG_DIR`. A blank or unknown profile name is an error. See the [profile definitions and example](./omo-json.md#profiles).
 
-The selection is temporary: it does not persist configuration or reconfigure an existing server or session. `--profile` rejects `--attach` and an occupied `--port` so the run cannot silently reuse a server with a different configuration; an available `--port` is supported. Adding `--model <provider/model>` overrides the primary prompt's model, while the profile still governs other agent and task category settings. This flag selects a whole configuration profile; the Native harness's [`model_profile`](./omo-json.md#model-profiles-native-harness) selects the main session model within its loaded configuration.
+The selection is temporary: it does not save a profile preference or change a server already running. `--profile` rejects `--attach` and an occupied `--port` so the run cannot silently reuse a server with a different configuration; an available `--port` is supported. Adding `--model <provider/model>` overrides the primary prompt's model, while the profile still governs other agent and task category settings. This flag selects a whole configuration profile; the Native harness's [`model_profile`](./omo-json.md#model-profiles-native-harness) selects the main session model within its loaded configuration.
 
 ### Agent Resolution Order
 

@@ -58,7 +58,7 @@ The active profile name comes from (`resolveOmoProfileName`), highest priority f
 
 No default profiles ship. A profile exists only when you write one under `profiles.<name>` or the migration derives one from a legacy OpenCode profile directory.
 
-For the OpenCode runner, `omo-agent-toolkit run --profile <name> <message>` takes precedence over all three environment-based selectors for that run and applies the named profile to both the CLI and its newly started server. The name must exist; a blank or unknown name is an error. The selection does not persist configuration or reconfigure existing servers or sessions. `--attach` and an occupied `--port` are rejected with `--profile`; an available `--port` is supported. See the [run command](./cli.md#named-configuration-profiles).
+For the OpenCode runner, `omo-agent-toolkit run --profile <name> <message>` takes precedence over all three environment-based selectors for that run and applies the named profile to both the CLI and its newly started server. The name must exist; a blank or unknown name is an error. The selection does not save a profile preference or change a server already running. `--attach` and an occupied `--port` are rejected with `--profile`; an available `--port` is supported. See the [run command](./cli.md#named-configuration-profiles).
 
 ### Example
 
