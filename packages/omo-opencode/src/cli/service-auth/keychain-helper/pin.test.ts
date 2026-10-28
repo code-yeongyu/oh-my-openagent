@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { resolveHelperAccess } from "./access"
@@ -35,6 +35,45 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     expect(third.kind === "pinned" && first.kind === "pinned" && third.path !== first.path).toBe(true)
   })
 
+  test("#given a pin directory that cannot be written #when pinning #then the copy failure is a typed unavailable", async () => {
+    const root = tempRoot()
+    const source = join(root, "omo-keychain")
+    const pins = join(root, "pins")
+    mkdirSync(pins, { mode: 0o500 })
+    writeFileSync(source, "signed helper")
+    const result = await pinVerifiedCopy(source, alwaysValid, pins)
+    chmodSync(pins, 0o700)
+    expect(result.kind).toBe("unavailable")
+  })
+
+  test("#given a reused pin that no longer verifies #when pinning again #then a fresh copy replaces it", async () => {
+    const root = tempRoot()
+    const source = join(root, "omo-keychain")
+    const pins = join(root, "pins")
+    mkdirSync(pins, { mode: 0o700 })
+    writeFileSync(source, "signed helper")
+    const first = await pinVerifiedCopy(source, alwaysValid, pins)
+    if (first.kind !== "pinned") throw new Error(`expected pinned, got ${first.kind}`)
+    const second = await pinVerifiedCopy(source, async path => (path === first.path ? "invalid" : "valid"), pins)
+    expect(second.kind === "pinned" && second.path !== first.path).toBe(true)
+  })
+
+  test("#given TMPDIR does not exist #when pinning into the process directory #then unavailable, and a later attempt succeeds", async () => {
+    const root = tempRoot()
+    const source = join(root, "omo-keychain")
+    writeFileSync(source, "signed helper, tmpdir case")
+    const previous = process.env.TMPDIR
+    process.env.TMPDIR = join(root, "missing")
+    try {
+      expect((await pinVerifiedCopy(source, alwaysValid)).kind).toBe("unavailable")
+      mkdirSync(join(root, "missing"))
+      expect((await pinVerifiedCopy(source, alwaysValid)).kind).toBe("pinned")
+    } finally {
+      if (previous === undefined) delete process.env.TMPDIR
+      else process.env.TMPDIR = previous
+    }
+  })
+
   test("#given a source that vanishes before the copy #when resolving #then a typed unavailable result, never a rejection", async () => {
     const root = tempRoot()
     const source = join(root, "omo-keychain")
@@ -66,12 +105,4 @@ describe.skipIf(process.platform !== "darwin")("the per-process signature checke
     expect(processSignatureChecker()).toBe(processSignatureChecker())
   })
 
-  test("#given no injected verify #when the store resolves a helper #then the shared checker holds the verdict", async () => {
-    const root = tempRoot()
-    const candidate = join(root, "omo-keychain")
-    copyFileSync("/usr/bin/true", candidate)
-    expect(await processSignatureChecker().knows(candidate)).toBe(false)
-    expect((await resolveHelperAccess([candidate])).kind).toBe("invalid")
-    expect(await processSignatureChecker().knows(candidate)).toBe(true)
-  })
 })

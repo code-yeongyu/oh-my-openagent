@@ -1,3 +1,5 @@
+import { keychainProcessState } from "./process-state"
+
 export type ItemAttributes = { readonly cdat: number; readonly mdat: number }
 export type ApprovalEntry = ItemAttributes & { readonly value: string; readonly readStartedAt: number }
 export type ApprovalAnswer = { readonly kind: "approved"; readonly value: string; readonly attributes: ItemAttributes } | { readonly kind: "denied" } | { readonly kind: "missing" }
@@ -42,6 +44,9 @@ export function createApprovalCache(clock: ApprovalClock = systemClock) {
      * Runs `approve` at most once at a time per process: later callers attach to the pending answer instead of opening a
      * second dialog, and a late answer still fills the cache after a caller's bounded wait expired (3.2 step 4).
      */
+    /** The `approve` already running in this process, which a new caller attaches to before taking any lock. */
+    inFlight: (): Promise<ApprovalAnswer> | null => pending,
+
     approve(run: () => Promise<ApprovalAnswer>): Promise<ApprovalAnswer> {
       if (pending !== null) return pending
       const readStartedAt = clock.nowSeconds()
@@ -86,5 +91,8 @@ export function createApprovalCache(clock: ApprovalClock = systemClock) {
   }
 }
 
-let processCache: ApprovalCache | undefined
-export const processApprovalCache = (): ApprovalCache => (processCache ??= createApprovalCache())
+export const processApprovalCache = (): ApprovalCache => {
+  const state = keychainProcessState()
+  state.approvalCache ??= createApprovalCache()
+  return state.approvalCache
+}

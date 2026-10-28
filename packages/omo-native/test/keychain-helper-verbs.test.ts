@@ -46,7 +46,7 @@ describe.skipIf(!isDarwin)("omo-keychain helper verbs on a throwaway keychain (#
     expect((await harness.run(request("stage", { value: "dummy-staged-2" }))).reply).toEqual({ ok: true })
     expect((await harness.run(request("read"))).reply).toMatchObject({ present: { staging: true, old: false } })
 
-    expect((await harness.run(request("retire"))).reply).toEqual({ ok: true })
+    expect((await harness.run(request("retire"))).reply).toEqual({ ok: true, slot: 0 })
     const midway = await harness.run(request("read"))
     expect(midway.reply).toMatchObject({ owned: true, value: "dummy-staged-2", recover: true, present: { staging: true, old: true } })
 
@@ -63,22 +63,34 @@ describe.skipIf(!isDarwin)("omo-keychain helper verbs on a throwaway keychain (#
     expect((await harness.run({ v: 1, verb: "remove", account: OLD })).reply).toEqual({ ok: true, missing: true })
   })
 
-  test("retire onto an existing .old is skipped and loses nothing; promote onto an existing original refuses", async () => {
-    expect((await harness.run(request("retire"))).reply).toEqual({ ok: true })
+  test("retire onto an existing .old takes the next slot and loses nothing; promote onto an existing original refuses (RULING-73)", async () => {
+    expect((await harness.run(request("retire"))).reply).toEqual({ ok: true, slot: 0 })
     expect((await harness.run(request("write", { value: "dummy-newer" }))).reply).toEqual({ ok: true, created: true })
-    expect((await harness.run(request("retire"))).reply).toEqual({ ok: true, skipped: true })
-    expect((await harness.run(request("read"))).reply).toMatchObject({ owned: true, value: "dummy-newer" })
+    expect((await harness.run(request("retire"))).reply).toEqual({ ok: true, slot: 1 })
+    expect((await harness.run(request("read"))).reply).toMatchObject({ missing: true, present: { old: true, oldSlots: [0, 1] } })
+    expect((await harness.run({ v: 1, verb: "remove", account: `${OLD}.1` })).reply).toEqual({ ok: true })
+    expect((await harness.run(request("write", { value: "dummy-newer" }))).reply).toEqual({ ok: true, created: true })
 
     expect((await harness.run(request("stage", { value: "dummy-stage" }))).reply).toEqual({ ok: true, created: true })
     expect((await harness.run(request("promote"))).reply).toMatchObject({ error: "exists", status: -25299 })
-    expect((await harness.run(request("read"))).reply).toMatchObject({ value: "dummy-newer", present: { staging: true, old: true } })
+    expect((await harness.run(request("read"))).reply).toMatchObject({ value: "dummy-newer", present: { staging: true, old: true, oldSlots: [0] } })
 
     for (const account of [STAGING, OLD, ACCOUNT])
       expect((await harness.run({ v: 1, verb: "remove", account })).reply).toEqual({ ok: true })
-    expect((await harness.run(request("read"))).reply).toEqual({ missing: true, present: { staging: false, old: false } })
+    expect((await harness.run(request("read"))).reply).toEqual({ missing: true, present: { staging: false, old: false, oldSlots: [] } })
     expect((await harness.run(request("retire"))).reply).toMatchObject({ error: "missing" })
     expect((await harness.run(request("promote"))).reply).toMatchObject({ error: "missing" })
   })
+  test("retire with every slot taken by copies another identity owns answers old-slots-full and renames nothing (RULING-73)", async () => {
+    const slots = [OLD, ...[1, 2, 3, 4, 5, 6, 7].map(slot => `${OLD}.${slot}`)]
+    for (const name of slots) expect(await harness.fixture("add", name, "dummy-foreign")).toContain("status 0")
+    expect((await harness.run(request("write", { value: "dummy-current" }))).reply).toEqual({ ok: true, created: true })
+    expect((await harness.run(request("retire"))).reply).toMatchObject({ error: "exists", reason: "old-slots-full" })
+    expect((await harness.run(request("read"))).reply).toMatchObject({ owned: true, value: "dummy-current", present: { oldSlots: [0, 1, 2, 3, 4, 5, 6, 7] } })
+    for (const name of slots) expect(await harness.fixture("delete", name)).toContain("status 0")
+    expect((await harness.run({ v: 1, verb: "remove", account: ACCOUNT })).reply).toEqual({ ok: true })
+  })
+
 
   test("an item another identity created is never read, written, staged over or deleted", async () => {
     expect(await harness.fixture("add", ACCOUNT, "dummy-foreign")).toContain("status 0")

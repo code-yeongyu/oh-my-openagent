@@ -34,17 +34,17 @@ export function sweepDeadPinDirs(root: string = tmpdir()): readonly string[] {
   return removed
 }
 
-let processDir: Promise<string> | undefined
+let processDir: string | undefined
 
-// One private directory per process (mode 0700 by mkdtemp), named after its owner pid and removed when it exits.
-function processPinDir(): Promise<string> {
-  processDir ??= Promise.resolve().then(async () => {
-    sweepDeadPinDirs()
-    const dir = await mkdtemp(join(tmpdir(), `${DIR_PREFIX}${process.pid}-`))
-    process.once("exit", () => rmSync(dir, { recursive: true, force: true }))
-    return dir
-  })
-  return processDir
+// One private directory per process (mode 0700 by mkdtemp), named after its owner pid and removed when it exits. A
+// failure is not remembered: the next resolve tries again.
+async function processPinDir(): Promise<string> {
+  if (processDir !== undefined) return processDir
+  sweepDeadPinDirs()
+  const dir = await mkdtemp(join(tmpdir(), `${DIR_PREFIX}${process.pid}-`))
+  process.once("exit", () => rmSync(dir, { recursive: true, force: true }))
+  processDir = dir
+  return dir
 }
 
 export type PinResult = { readonly kind: "pinned"; readonly path: string } | { readonly kind: "invalid" } | { readonly kind: "unavailable"; readonly reason: string }
@@ -93,9 +93,12 @@ export async function pinVerifiedCopy(
     const result = await known
     if (result.kind !== "pinned" || (await verify(result.path)) === "valid") return result
   }
-  const created = Promise.resolve(dir ?? processPinDir()).then(target => copyAndVerify(source, verify, target))
+  const created = Promise.resolve(dir ?? processPinDir()).then(
+    target => copyAndVerify(source, verify, target),
+    (error: unknown): PinResult => ({ kind: "unavailable", reason: error instanceof Error ? error.message : String(error) }),
+  )
   pinned.set(identity, created)
   const result = await created
-  if (result.kind === "unavailable") pinned.delete(identity)
+  if (result.kind !== "pinned") pinned.delete(identity)
   return result
 }

@@ -10,8 +10,8 @@ import { bundleCandidates, machineCandidates } from "./location"
 // The gate for unsigned development copies (#11580 builds one for its parity leg and the dev omob builder): every such
 // copy, wherever it sits, fails the real designated-requirement check and is never spawned.
 describe.skipIf(process.platform !== "darwin")("unsigned and ad-hoc helper copies are never run (#11262 design 1, addendum row 10)", () => {
-  // A backstop only: full-directory runs under load have failed intermittently with an unnamed hook timeout whose
-  // cause is not yet identified (#11607). Remove this budget once #11607 finds and fixes the cause.
+  // beforeAll compiles the helper and signs two copies; Bun gives hooks its 5 s default, not the --timeout flag,
+  // and on a busy machine the native build alone runs past that.
   const NATIVE_BUILD_BUDGET_MS = 120_000
   let dir: string
   let flavors: Record<"linker-adhoc" | "adhoc-with-identifier" | "unsigned", string>

@@ -3,7 +3,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import { withLock } from "@oh-my-opencode/team-core/team-state-store/locks"
 import { signInHint } from "./accounts-gate"
-import { credentialId, type CredentialStore, CredentialStoreError } from "./keystore"
+import { credentialId, type CredentialStore, CredentialStoreError, type LockedStore } from "./keystore"
 import {
   ApiRefusal,
   type ChooseDevice,
@@ -43,14 +43,27 @@ export function createSession(options: { readonly api: string; readonly store: C
   const directory = join(options.home ?? homedir(), ".omo", "session-locks")
   const lockPath = join(directory, `${credentialId(api)}.lock`)
   const markerPath = signedOutMarkerPath(options.home ?? homedir(), credentialId(api))
-  async function locked<T>(action: () => Promise<T>): Promise<T> {
+  type View = LockedStore<Credentials>
+  const plainView: View = {
+    read: () => store.read(),
+    write: value => store.write(value),
+    clear: () => store.clear(),
+    recover: async () => {},
+    settle: async () => {},
+  }
+  // Any approval dialog happens in prepare(), before the lock: no access dialog is ever open while it is held. Inside,
+  // every section first converges an interrupted migration (#11262 design 3.2, 3.4).
+  async function locked<T>(action: (view: View) => Promise<T>): Promise<T> {
     await mkdir(directory, { recursive: true, mode: 0o700 })
     signal?.throwIfAborted()
+    await store.prepare?.()
     return withLock(
       lockPath,
-      async () => {
+      async lease => {
         signal?.throwIfAborted()
-        return action()
+        const view = (await store.underLock?.(lease)) ?? plainView
+        await view.recover()
+        return action(view)
       },
       { ownerTag: "cli-session", staleAfterMs: Number.POSITIVE_INFINITY },
     )
@@ -61,19 +74,19 @@ export function createSession(options: { readonly api: string; readonly store: C
       `The refresh outcome is unknown. Saved credentials and keys were retained, but this refresh token will not be sent again. ${signInHint("again")}`,
       true,
     )
-  async function refreshedAccess(current: Credentials): Promise<string> {
+  async function refreshedAccess(current: Credentials, view: View): Promise<string> {
     if (current.refreshState === "uncertain") throw uncertain()
     if (Date.parse(current.accessTokenExpiresAt) > Date.now() + 30_000) return current.accessToken
     // Journal before sending: a lost response or process crash must never replay a single-use token.
-    await store.write({ ...current, refreshState: "uncertain" })
+    await view.write({ ...current, refreshState: "uncertain" })
     try {
       const tokens = parseReply(tokenSchema, await request("/v1/session/refresh", jsonRequest({ refreshToken: current.refreshToken })))
-      await store.write({ ...current, ...tokens })
+      await view.write({ ...current, ...tokens })
       return tokens.accessToken
     } catch (error) {
       if (error instanceof CredentialStoreError) throw error
       if (error instanceof ApiRefusal && error.status < 500 && ["unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked"].includes(error.code)) {
-        await store.clear()
+        await view.clear()
         throw new SessionEnded(
           error.code === "reauth_required"
             ? `This session was ended because its refresh token was reused. ${signInHint("again")}`
@@ -83,7 +96,7 @@ export function createSession(options: { readonly api: string; readonly store: C
         )
       }
       if ((error instanceof RequestFailure && error.notSent) || (error instanceof ApiRefusal && error.status === 429 && error.code === "rate_limited")) {
-        await store.write(current)
+        await view.write(current)
         throw error
       }
       throw uncertain()
@@ -96,25 +109,25 @@ export function createSession(options: { readonly api: string; readonly store: C
       await store.read()
     },
     async save(value: Credentials) {
-      await locked(async () => {
-        await store.write(value)
+      await locked(async view => {
+        await view.write(value, "fresh-sign-in")
         await clearSignedOutMarker(markerPath)
       })
     },
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),
     clearSignedOutMarker: () => clearSignedOutMarker(markerPath),
-    async update<T>(action: (current: Credentials | null) => Promise<T>): Promise<T> {
-      return locked(async () => action(await store.read()))
+    async update<T>(action: (current: Credentials | null, view: View) => Promise<T>): Promise<T> {
+      return locked(async view => action(await view.read(), view))
     },
     async logout(): Promise<boolean> {
-      return locked(async () => {
+      return locked(async view => {
         let current: Credentials | null = null
         try {
-          current = await store.read()
+          current = await view.read()
           if (current !== null) {
             if (current.refreshState === "uncertain") return false
-            const access = Date.parse(current.accessTokenExpiresAt) <= Date.now() ? await refreshedAccess(current) : current.accessToken
+            const access = Date.parse(current.accessTokenExpiresAt) <= Date.now() ? await refreshedAccess(current, view) : current.accessToken
             await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
               method: "DELETE",
               headers: { authorization: `Bearer ${access}` },
@@ -129,15 +142,16 @@ export function createSession(options: { readonly api: string; readonly store: C
           // Marker first: it only counts once the store is empty, so an unlocked reader never sees an empty store
           // without it, and a failed marker write leaves the credentials in place instead of half-signing-out.
           await writeSignedOutMarker(markerPath, current?.device.id ?? null)
-          await store.clear()
+          await view.clear()
         }
       })
     },
     async accessToken(): Promise<string> {
-      return locked(async () => {
-        const current = await store.read()
+      return locked(async view => {
+        const current = await view.read()
         if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
-        return refreshedAccess(current)
+        await view.settle()
+        return refreshedAccess(current, view)
       })
     },
     async removeForLimit(error: unknown, choose: ChooseDevice): Promise<boolean> {

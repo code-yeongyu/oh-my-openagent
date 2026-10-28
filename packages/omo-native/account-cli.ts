@@ -10,6 +10,7 @@ import {
   SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
 import { type Credentials, credentialSchema, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
+import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import { createSession, type Session, SessionEnded } from "../omo-opencode/src/cli/service-auth/session"
 
 // `omo account` lets the desktop share this machine's one OS-keychain credential with `omo login`
@@ -76,7 +77,7 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
     return ACCOUNT_EXIT.invalid
   }
   const session = sessionOf(dependencies)
-  return session.update(async current => {
+  return session.update(async (current, view) => {
     if (current !== null && current.device.id !== incoming.device.id && !replace) {
       return reply(dependencies, { conflict: { device: deviceOf(current) } }, ACCOUNT_EXIT.conflict)
     }
@@ -85,7 +86,7 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
       current.device.id === incoming.device.id &&
       current.refreshState !== "uncertain" &&
       Date.parse(current.accessTokenExpiresAt) > Date.parse(incoming.accessTokenExpiresAt)
-    if (!keepCurrent) await dependencies.store.write(incoming)
+    if (!keepCurrent) await view.write(incoming)
     await session.clearSignedOutMarker()
     return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
   })
@@ -151,7 +152,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
     }
     case "forget": {
       const session = sessionOf(dependencies)
-      await session.update(async () => dependencies.store.clear())
+      await session.update(async (_current, view) => view.clear())
       return reply(dependencies, { forgotten: true })
     }
     default:
@@ -181,7 +182,8 @@ export async function runAccountVerb(dependencies: AccountCommandDependencies, a
   }
 }
 
-export async function runAccountCommand(args: readonly string[]): Promise<void> {
+export async function runAccountCommand(args: readonly string[], options: { readonly helperCandidates?: readonly string[] } = {}): Promise<void> {
+  registerHelperCandidates(options.helperCandidates ?? [])
   const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
   // One store per command: its keyring check and fallback notice are per store (#10658 review).
   let store: CredentialStore | undefined

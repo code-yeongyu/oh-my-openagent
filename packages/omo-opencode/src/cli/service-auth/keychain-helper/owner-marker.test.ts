@@ -9,8 +9,8 @@ describe.skipIf(!isDarwin)("owner-marker probe without the helper (#11262 addend
   let harness: Harness
   let searchListBefore = ""
 
-  // A backstop only: full-directory runs under load have failed intermittently with an unnamed hook timeout whose
-  // cause is not yet identified (#11607). Remove this budget once #11607 finds and fixes the cause.
+  // The harness compiles the helper and the keychain fixture with clang; Bun gives hooks its 5 s default, not the
+  // --timeout flag, and on a busy machine the native build alone runs past that.
   const NATIVE_BUILD_BUDGET_MS = 120_000
 
   beforeAll(async () => {

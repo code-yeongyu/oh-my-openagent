@@ -3,6 +3,10 @@ import { basename } from "node:path"
 import type { z } from "zod"
 import { signInRoute } from "./accounts-gate"
 import { credentialSchema, type Credentials, serviceOrigin, SignInError } from "./protocol"
+import type { HelperLease } from "./keychain-helper/client"
+import { asKeystoreError, HelperMissingForOwnedItem, type KeychainHelperOptions } from "./keychain-helper/darwin-backend"
+import { HelperOldSlotsFull } from "./keychain-helper/darwin-store"
+import { bindKeychainHelper, type LockedStore, lockedStoreView } from "./keychain-helper/store-binding"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
 
 type SecretKey = { readonly service: string; readonly name: string }
@@ -11,10 +15,15 @@ export type SecretApi = {
   readonly set: (key: SecretKey & { readonly value: string }) => Promise<void>
   readonly delete: (key: SecretKey) => Promise<boolean>
 }
+export type { LockedStore }
 export type SealedStore<T> = {
   readonly read: () => Promise<T | null>
   readonly write: (value: T) => Promise<void>
   readonly clear: () => Promise<void>
+  /** Before the session lock: settles any approval, so no access dialog is ever open while the lock is held. */
+  readonly prepare?: () => Promise<void>
+  /** Null when this store has no helper: the session then uses its own view over the store object it was given. */
+  readonly underLock?: (lease: HelperLease) => Promise<LockedStore<T> | null>
 }
 export type CredentialStore = SealedStore<Credentials>
 
@@ -76,9 +85,10 @@ export function createCredentialStore(
     readonly lockProbe?: SecretServiceLockProbe
     readonly notice?: (message: string) => void
     readonly wait?: CredentialReadWait
+    readonly keychainHelper?: KeychainHelperOptions
   } = {},
 ): CredentialStore {
-  return createSealedStore(api, "omo-cli", credentialSchema, options.secrets, options.platform, options.lockProbe, options.notice, options.wait)
+  return createSealedStore(api, "omo-cli", credentialSchema, options.secrets, options.platform, options.lockProbe, options.notice, options.wait, options.keychainHelper)
 }
 
 export function createSealedStore<T>(
@@ -90,6 +100,7 @@ export function createSealedStore<T>(
   lockProbe: SecretServiceLockProbe = probeSecretServiceLock,
   notice: (message: string) => void = stderrNoticeOncePerProcess,
   wait: CredentialReadWait = SESSION_READ_WAIT,
+  keychainHelper?: KeychainHelperOptions,
 ): SealedStore<T> {
   if (!secrets) throw new SignInError("OmO sign-in needs Bun 1.4 or newer with OS credential storage. No file fallback is available.")
   const platformName =
@@ -103,6 +114,17 @@ export function createSealedStore<T>(
   if (platformName === null) throw new SignInError("This platform has no supported OS credential store.")
   const key = { service: namespace, name: credentialId(api) }
   const slot = `${key.service}\n${key.name}`
+  const helper = bindKeychainHelper({
+    platform,
+    namespace,
+    secrets,
+    key,
+    background: wait.kind === "bounded",
+    notice,
+    pending: message => new KeychainApprovalPendingError(message),
+    ...(keychainHelper === undefined ? {} : { options: keychainHelper }),
+  })
+  secrets = helper.secrets
   const readsOf = (api: SecretApi): Map<string, Promise<string | null>> => {
     const known = processReads.get(api)
     if (known !== undefined) return known
@@ -129,17 +151,19 @@ export function createSealedStore<T>(
     platform === "darwin"
       ? `macOS Keychain is waiting for your approval: answer the "${basename(process.execPath)} wants to access key ${namespace}" dialog ("Always Allow" stops it asking again)`
       : `${platformName} has not answered; it may be waiting for your approval or an unlock in a system dialog`
+  const helperWaiting = `macOS Keychain is waiting for your approval: answer the "OmO's keychain helper wants to access key ${namespace}" dialog`
   const answered = async (api: SecretApi): Promise<string | null> => {
+    const waitingFor = helper.isHelperReader(api) ? helperWaiting : waiting
     const read = sharedRead(api)
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       if (wait.kind === "interactive") {
-        timer = setTimeout(() => wait.notice(`omo: ${waiting}.`), wait.noticeAfterMs)
+        timer = setTimeout(() => wait.notice(`omo: ${waitingFor}.`), wait.noticeAfterMs)
         return await read
       }
       const expired = new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new KeychainApprovalPendingError(`${waiting}, then try again. Credentials are never saved to a file.`)),
+          () => reject(new KeychainApprovalPendingError(`${waitingFor}, then try again. Credentials are never saved to a file.`)),
           wait.deadlineMs,
         )
       })
@@ -176,28 +200,52 @@ export function createSealedStore<T>(
       notice("omo: could not check whether the keyring is locked (gdbus or the Secret Service did not answer); using libsecret directly.")
     }
   }
-  return {
+  const parseStored = (value: string): T => {
+    try {
+      return schema.parse(JSON.parse(value))
+    } catch {
+      throw new InvalidCredentialState(signInRoute() === "cli"
+        ? "Stored sign-in data is invalid. Run omo logout, then omo login."
+        : "The OmO sign-in saved on this computer can't be read, and it can't be reset from the terminal yet.")
+    }
+  }
+  const readText = async (): Promise<string | null> => {
+    await assertUsable()
+    const backend = await helper.backend()
+    try {
+      if (backend === null) await helper.guardHelperless()
+      return await answered(backend === null ? secrets : helper.reader(backend))
+    } catch (error) {
+      if (error instanceof KeychainApprovalPendingError) throw error
+      if (error instanceof HelperMissingForOwnedItem) throw new CredentialStoreError(error.message)
+      throw unavailable(error)
+    }
+  }
+  const lockedFailure = (error: unknown): unknown => {
+    const mapped = asKeystoreError(error, message => new KeychainApprovalPendingError(message))
+    if (error instanceof HelperOldSlotsFull) return new CredentialStoreError(error.message)
+    if (mapped instanceof KeychainApprovalPendingError || mapped instanceof SignInError) return mapped
+    if (mapped instanceof Error && mapped.name === "LockLeaseLostError") return mapped
+    return unavailable(mapped)
+  }
+  const store: SealedStore<T> = {
+    async prepare() {
+      if ((await helper.backend()) !== null) await readText()
+    },
+    async underLock(lease) {
+      const backend = await helper.backend()
+      if (backend === null) return null
+      const codec = { parse: parseStored, serialize: (value: T) => JSON.stringify(schema.parse(value)) }
+      return lockedStoreView(backend, lease, codec, lockedFailure, () => forget(helper.reader(backend)))
+    },
     async read() {
-      await assertUsable()
-      let value: string | null
-      try {
-        value = await answered(secrets)
-      } catch (error) {
-        if (error instanceof KeychainApprovalPendingError) throw error
-        throw unavailable(error)
-      }
-      if (value === null) return null
-      try {
-        return schema.parse(JSON.parse(value))
-      } catch {
-        throw new InvalidCredentialState(signInRoute() === "cli"
-          ? "Stored sign-in data is invalid. Run omo logout, then omo login."
-          : "The OmO sign-in saved on this computer can't be read, and it can't be reset from the terminal yet.")
-      }
+      const value = await readText()
+      return value === null ? null : parseStored(value)
     },
     async write(value) {
       // One OS-store replacement commits the rotating token and its access token together.
       await assertUsable()
+      if ((await helper.backend()) !== null) throw new Error("OmO's keychain helper writes only under the session lock.")
       try {
         await secrets.set({ ...key, value: JSON.stringify(schema.parse(value)) })
       } catch (error) {
@@ -207,6 +255,7 @@ export function createSealedStore<T>(
     },
     async clear() {
       await assertUsable()
+      if ((await helper.backend()) !== null) throw new Error("OmO's keychain helper deletes only under the session lock.")
       try {
         await secrets.delete(key)
       } catch (error) {
@@ -215,4 +264,5 @@ export function createSealedStore<T>(
       forget(secrets)
     },
   }
+  return store
 }

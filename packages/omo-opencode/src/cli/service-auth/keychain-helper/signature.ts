@@ -94,10 +94,7 @@ async function fileIdentity(path: string): Promise<string | null> {
  * back with utimes. The file is stat'ed before AND after the check, and a verdict is stored only when both agree, so it
  * is never recorded under the identity of a file that changed while it was being checked (that answers "invalid").
  */
-export type SignatureChecker = ((path: string) => Promise<SignatureVerdict>) & {
-  /** Whether a verdict for the file as it is now is already cached. */
-  readonly knows: (path: string) => Promise<boolean>
-}
+export type SignatureChecker = (path: string) => Promise<SignatureVerdict>
 
 export function createSignatureChecker(check: RequirementCheck = verifyWithSecurityFramework, requirement = KEYCHAIN_HELPER_REQUIREMENT): SignatureChecker {
   const verdicts = new Map<string, SignatureVerdict>()
@@ -112,12 +109,7 @@ export function createSignatureChecker(check: RequirementCheck = verifyWithSecur
     verdicts.set(before, verdict)
     return verdict
   }
-  return Object.assign(checker, {
-    knows: async (path: string) => {
-      const identity = await fileIdentity(path)
-      return identity !== null && verdicts.has(identity)
-    },
-  })
+  return checker
 }
 
 let processChecker: SignatureChecker | undefined

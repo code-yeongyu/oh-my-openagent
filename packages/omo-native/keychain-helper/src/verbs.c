@@ -10,6 +10,18 @@ static void derived_name(char *out, const char *base, const char *suffix) {
   snprintf(out, ACCOUNT_NAME_BYTES, "%s%s", base, suffix);
 }
 
+// Retired copies rotate through <A>.old, <A>.old.1 ... <A>.old.7 (RULING-73): a leftover copy nobody can delete takes
+// one slot instead of blocking every later retire.
+static void old_slot_name(char *out, const char *base, int slot) {
+  if (slot == 0) {
+    derived_name(out, base, ".old");
+    return;
+  }
+  char suffix[8];
+  snprintf(suffix, sizeof suffix, ".old.%d", slot);
+  derived_name(out, base, suffix);
+}
+
 // A locked keychain answers -25308 or, for some calls with interaction disabled, -25293: both are today's locked class.
 // The lock state is the one of the keychain holding <account> (or receiving it, for an add).
 static const char *failure_code_for(const char *account, OSStatus status) {
@@ -32,15 +44,22 @@ static void put_attributes(buffer *reply, const item_state *state) {
 static void put_presence(buffer *reply, const char *base) {
   char staging[ACCOUNT_NAME_BYTES], old[ACCOUNT_NAME_BYTES];
   derived_name(staging, base, ".staging");
-  derived_name(old, base, ".old");
-  item_state s = {0}, o = {0};
+  item_state s = {0};
   bool has_staging = lookup_attributes(staging, &s) == errSecSuccess;
-  bool has_old = lookup_attributes(old, &o) == errSecSuccess;
   item_state_release(&s);
-  item_state_release(&o);
+  char slots[3 * OLD_SLOTS + 1] = "";
+  size_t used = 0;
+  for (int slot = 0; slot < OLD_SLOTS; slot++) {
+    old_slot_name(old, base, slot);
+    item_state o = {0};
+    if (lookup_attributes(old, &o) == errSecSuccess) used += (size_t)snprintf(slots + used, sizeof slots - used, used == 0 ? "%d" : ",%d", slot);
+    item_state_release(&o);
+  }
   if (reply->length > 1) buffer_text(reply, ",");
   buffer_text(reply, has_staging ? "\"present\":{\"staging\":true" : "\"present\":{\"staging\":false");
-  buffer_text(reply, has_old ? ",\"old\":true}" : ",\"old\":false}");
+  buffer_text(reply, used > 0 ? ",\"old\":true,\"oldSlots\":[" : ",\"old\":false,\"oldSlots\":[");
+  buffer_text(reply, slots);
+  buffer_text(reply, "]}");
 }
 
 static bool unlock_or_reply(SecKeychainItemRef item) {
@@ -193,8 +212,24 @@ static void rename_verb(const char *from, const char *to, bool skip_on_existing)
 
 void verb_retire(const char *base) {
   char old[ACCOUNT_NAME_BYTES];
-  derived_name(old, base, ".old");
-  rename_verb(base, old, true);
+  for (int slot = 0; slot < OLD_SLOTS; slot++) {
+    old_slot_name(old, base, slot);
+    OSStatus status = rename_item(base, old);
+    if (status == errSecDuplicateItem) continue;
+    if (status == errSecItemNotFound) reply_error("missing", NULL, status);
+    else if (status != errSecSuccess) reply_error(failure_code_for(base, status), NULL, status);
+    else {
+      buffer reply = {0};
+      buffer_open_object(&reply);
+      buffer_field_bool(&reply, "ok", true);
+      buffer_field_number(&reply, "slot", (double)slot, "%.0f");
+      send_reply(&reply);
+      free(reply.bytes);
+    }
+    return;
+  }
+  // Every slot holds a copy this helper could not clear: the one state that needs the user (RULING-73).
+  reply_error("exists", "old-slots-full", errSecDuplicateItem);
 }
 
 void verb_promote(const char *base) {

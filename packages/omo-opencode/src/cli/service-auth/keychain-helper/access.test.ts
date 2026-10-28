@@ -11,7 +11,7 @@ describe("helper access: verified fall-through (#11262 addendum row 10, ruling 2
     const spawned: string[] = []
     const spawn: HelperSpawner = path => {
       spawned.push(path)
-      return { pid: 4242, send: () => {}, reply: Promise.resolve('{"missing":true,"present":{"staging":false,"old":false}}'), close: () => {} }
+      return { pid: 4242, send: () => {}, reply: Promise.resolve('{"missing":true,"present":{"staging":false,"old":false,"oldSlots":[]}}'), close: () => {} }
     }
 
     const pinnedFrom: string[] = []

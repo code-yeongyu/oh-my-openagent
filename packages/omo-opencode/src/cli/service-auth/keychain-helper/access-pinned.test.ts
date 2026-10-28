@@ -26,7 +26,7 @@ function fixture() {
   const spawned: string[] = []
   const spawn: HelperSpawner = path => {
     spawned.push(path)
-    return { pid: 4242, send: () => {}, reply: Promise.resolve('{"missing":true,"present":{"staging":false,"old":false}}'), close: () => {} }
+    return { pid: 4242, send: () => {}, reply: Promise.resolve('{"missing":true,"present":{"staging":false,"old":false,"oldSlots":[]}}'), close: () => {} }
   }
   return { root, source, pins, spawned, spawn }
 }

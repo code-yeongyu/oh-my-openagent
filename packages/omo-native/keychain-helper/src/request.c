@@ -170,11 +170,13 @@ bool valid_base_account(const char *account, size_t length) {
   return true;
 }
 
-// Suffixed names are accepted only by `remove`; every other verb derives `<A>.staging` and `<A>.old` itself.
+// Suffixed names are accepted only by `remove`; every other verb derives `<A>.staging` and the `<A>.old` slots itself.
 bool valid_remove_target(const char *account, size_t length) {
   if (length == 64) return valid_base_account(account, length);
   if (length == 64 + 8 && strcmp(account + 64, ".staging") == 0) return valid_base_account(account, 64);
   if (length == 64 + 4 && strcmp(account + 64, ".old") == 0) return valid_base_account(account, 64);
+  if (length == 64 + 6 && strncmp(account + 64, ".old.", 5) == 0 && account[69] >= '1' && account[69] <= '0' + OLD_SLOTS - 1)
+    return valid_base_account(account, 64);
   return false;
 }
 

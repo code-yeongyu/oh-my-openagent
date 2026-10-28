@@ -40,8 +40,8 @@ describe("keychain helper client (#11262 design 2 and 3.6 R2)", () => {
   })
 
   test("#given a read #when it runs #then no lease is needed and none is touched", async () => {
-    const { events, spawn } = fake('{"missing":true,"present":{"staging":false,"old":false}}')
-    expect(await callHelper("/helper", { verb: "read", account: A }, { spawn })).toEqual({ missing: true, present: { staging: false, old: false } })
+    const { events, spawn } = fake('{"missing":true,"present":{"staging":false,"old":false,"oldSlots":[]}}')
+    expect(await callHelper("/helper", { verb: "read", account: A }, { spawn })).toEqual({ missing: true, present: { staging: false, old: false, oldSlots: [] } })
     expect(events).toEqual([`send {"v":1,"verb":"read","account":"${A}"}`, "reply", "close"])
   })
 

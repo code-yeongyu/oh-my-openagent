@@ -35,6 +35,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
+import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
@@ -132,7 +133,13 @@ export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersi
 /** Test seam: the thread SDK `omo daemon adopt` locates and releases through (the plugin's by default). */
 type CompiledLauncherSeams = { readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }> }
 
+/** Design v9 shape B: the compiled binary's keychain helper sits beside it; every command's store uses it first. */
+export function compiledKeychainHelper(execDir: string): string {
+  return join(execDir, "bin", "darwin", "omo-keychain")
+}
+
 export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string, migration: CompiledLauncherOptions = {}, seams: CompiledLauncherSeams = {}): Promise<boolean> {
+  registerHelperCandidates([compiledKeychainHelper(execDir)])
   if (args[0] === "loro-smoke") {
     process.exitCode = await runLoroSmoke()
     return true
