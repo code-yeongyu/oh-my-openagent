@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { CredentialStoreError } from "../keystore"
 import { A, credentials, fakeKeychain, helperSession } from "./fake-keychain.test-support"
 
@@ -95,8 +98,12 @@ describe("#11589 review folds", () => {
     const approveStarted = new Promise<void>(resolve => (started = resolve))
     const keychain = fakeKeychain({ approveGate: new Promise<void>(resolve => (open = resolve)), onApprove: () => started() })
     keychain.put(A, stored, "runtime", "ours")
-    const interactive = await helperSession(keychain)
-    const bounded = await helperSession(keychain, true)
+    // One home shared by both backends: one dialog in total. (The attach inside approveOnce is pinned directly in
+    // darwin-read-attach.test.ts; here the second read is already deduplicated before it reaches approveOnce.)
+    const home = await mkdtemp(join(tmpdir(), "omo-shared-home-"))
+    onTestFinished(() => rm(home, { recursive: true, force: true }))
+    const interactive = await helperSession(keychain, false, { home })
+    const bounded = await helperSession(keychain, true, { home })
     const first = interactive.store.read()
     await approveStarted
     const second = bounded.store.read()
@@ -114,5 +121,16 @@ describe("#11589 review folds", () => {
     await session.update(async (_current, view) => view.clear())
     expect(keychain.events.filter(event => event.startsWith("remove .old"))).toEqual(["remove .old", "remove .old.2"])
     expect([...keychain.items.keys()]).toEqual([])
+  })
+
+  test("#given the presence read fails during sign-out #when signing out #then every slot is attempted, so no retired copy is left", async () => {
+    const keychain = fakeKeychain({ failReadWhenMissing: true })
+    keychain.put(A, stored, "helper", "none")
+    keychain.put(`${A}.old.5`, stored, "helper", "none")
+    const { session } = await helperSession(keychain)
+    await session.update(async (_current, view) => view.clear())
+    // Recovery may already remove the reported slot; what matters is that clear() attempted every one of the 8 names.
+    expect(new Set(keychain.events.filter(event => event.startsWith("remove .old"))).size).toBe(8)
+    expect(keychain.items.has(`${A}.old.5`)).toBe(false)
   })
 })

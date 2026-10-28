@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { ACCOUNT, createHarness, NATIVE_BUILD_BUDGET_MS, type Harness, isDarwin, userSearchList } from "./keychain-helper.test-support"
+import { ACCOUNT, createHarness, type Harness, isDarwin, userSearchList } from "./keychain-helper.test-support"
 
 const STAGING = `${ACCOUNT}.staging`
 const OLD = `${ACCOUNT}.old`
@@ -13,14 +13,14 @@ describe.skipIf(!isDarwin)("omo-keychain helper verbs on a throwaway keychain (#
   beforeAll(async () => {
     searchListBefore = await userSearchList()
     harness = await createHarness()
-  }, NATIVE_BUILD_BUDGET_MS)
+  })
 
   afterAll(async () => {
     const keychain = harness.keychain
     await harness.dispose()
     expect(existsSync(keychain)).toBe(false)
     expect(await userSearchList()).toBe(searchListBefore)
-  }, NATIVE_BUILD_BUDGET_MS)
+  })
 
   test("write creates an item only the helper may decrypt, with the omo-owner/1 marker", async () => {
     const value = JSON.stringify({ refreshToken: "dummy-token", note: "quote\" newline\n é 😀" })

@@ -15,6 +15,7 @@ export type KeychainProcessState = {
   readonly entryCandidates: string[]
   helperAccess: Promise<HelperAccess> | undefined
   readonly heldPromptLocks: Set<string>
+  handOff: Promise<boolean> | undefined
 }
 
 const KEY = Symbol.for("omo.keychain-helper.process.v1")
@@ -28,6 +29,7 @@ export function keychainProcessState(): KeychainProcessState {
     entryCandidates: [],
     helperAccess: undefined,
     heldPromptLocks: new Set(),
+    handOff: undefined,
   }
   return holder[KEY]
 }

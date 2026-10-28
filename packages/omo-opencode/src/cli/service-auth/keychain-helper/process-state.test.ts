@@ -40,13 +40,26 @@ describe("one keychain state per process across bundled copies (#11262 design 3.
     await again?.()
   })
 
-  test("#given two copies racing for the prompt lock #when both take it at once #then exactly one gets it", async () => {
+  test("#given one copy held between its reservation and its publish #when the other copy takes the lock #then the other is refused, deterministically", async () => {
     const path = join(root, "race", "account.keychain-prompt")
-    const [a, b] = await Promise.all([first.promptLockAt(path)(), second.promptLockAt(path)()])
-    expect([a, b].filter(release => release !== null)).toHaveLength(1)
-    await a?.()
-    await b?.()
+    let resume = () => {}
+    let reserved = () => {}
+    const atPublish = new Promise<void>(resolve => (reserved = resolve))
+    const held = first.promptLockAt(path, {
+      beforePublish: () =>
+        new Promise<void>(resolve => {
+          resume = resolve
+          reserved()
+        }),
+    })()
+    await atPublish
+    expect(await second.promptLockAt(path)()).toBeNull()
+    resume()
+    const release = await held
+    expect(release).not.toBeNull()
+    await release?.()
   })
+
 
   test("#given a secrets call running in one copy #when the other copy queues one #then it starts only after the first ends", async () => {
     const order: string[] = []

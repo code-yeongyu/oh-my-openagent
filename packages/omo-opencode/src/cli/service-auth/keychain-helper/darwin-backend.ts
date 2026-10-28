@@ -71,6 +71,8 @@ export type KeychainHelperOptions = {
   readonly row8b?: Row8bChoice
   readonly row9b?: Row9bChoice
   readonly cache?: ApprovalCache
+  readonly handOff?: () => Promise<boolean>
+  readonly noDialog?: boolean
 }
 
 export type DarwinBackend = {
@@ -90,6 +92,8 @@ export function createDarwinBackend(options: {
   readonly row8b?: Row8bChoice
   readonly silently?: <T>(run: () => Promise<T>) => Promise<T>
   readonly cache?: ApprovalCache
+  readonly handOff?: () => Promise<boolean>
+  readonly noDialog?: boolean
 }): DarwinBackend {
   const silently = options.silently ?? silentSecrets
   const key = { service: options.service, name: options.account }
@@ -107,6 +111,8 @@ export function createDarwinBackend(options: {
         : silently(() => options.secrets.delete({ ...key, name })),
     notice: options.notice,
     ...(options.row8b === undefined ? {} : { row8b: options.row8b }),
+    ...(options.handOff === undefined ? {} : { handOff: options.handOff }),
+    noDialog: options.noDialog === true,
   }
   return {
     read: async () => {

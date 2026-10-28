@@ -35,6 +35,7 @@ export type DarwinReadDeps = {
   readonly takePromptLock: () => Promise<(() => Promise<void>) | null>
   /** Asks the side that created the item to migrate it before any prompt; true when that ran. */
   readonly handOff?: () => Promise<boolean>
+  readonly noDialog?: boolean
   readonly background: boolean
   readonly row8b?: Row8bChoice
 }
@@ -88,11 +89,14 @@ export async function readThroughHelper(deps: DarwinReadDeps, allowPrompt: boole
   }
   if (deps.background && deps.cache.deniedForBackground())
     throw new HelperReadError("pending", "Keychain access was denied; run an omo command in a terminal to approve it.")
+  if (reloginInstead) return { kind: "missing", reply }
+  // A hand-off child exists only to move the item silently; it never shows a dialog of its own (one dialog in total).
+  if (deps.noDialog === true) throw new HelperReadError("pending", "The keychain hand-off cannot show a dialog.")
+  // Only here, where this process would otherwise show its one dialog, ask the item's creator to move it first.
   if (deps.handOff !== undefined && (await deps.handOff())) {
     const after = await deps.access.call({ verb: "read", account: deps.account })
     if (after.owned === true && after.value !== undefined) return { kind: "value", value: after.value, source: "owned", reply: after }
   }
-  if (reloginInstead) return { kind: "missing", reply }
   const answer = await approveOnce(deps)
   if (answer.kind === "approved") return { kind: "value", value: answer.value, source: "approved", reply }
   if (answer.kind === "missing") return { kind: "missing", reply }

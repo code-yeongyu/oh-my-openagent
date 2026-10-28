@@ -133,9 +133,9 @@ export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersi
 /** Test seam: the thread SDK `omo daemon adopt` locates and releases through (the plugin's by default). */
 type CompiledLauncherSeams = { readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }> }
 
-/** Design v9 shape B: the compiled binary's keychain helper sits beside it; every command's store uses it first. */
+/** RULING-74: the runtime's keychain helper sits directly beside the binary (the desktop layout); every command uses it first. */
 export function compiledKeychainHelper(execDir: string): string {
-  return join(execDir, "bin", "darwin", "omo-keychain")
+  return join(execDir, "omo-keychain")
 }
 
 export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string, migration: CompiledLauncherOptions = {}, seams: CompiledLauncherSeams = {}): Promise<boolean> {

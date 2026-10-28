@@ -198,7 +198,8 @@ void verb_write(const char *account, const buffer *value, const char *not_owned_
   OSStatus status = add_owned(account, value);
   if (status == errSecSuccess) reply_ok("created");
   else if (status == errSecDuplicateItem) update_owned(account, value, not_owned_reason);
-  else reply_error(failure_code_for(account, status), NULL, status);
+  // An add targets the default keychain (or --keychain), not one holding a same-named item elsewhere on the list.
+  else reply_error(status == errSecInteractionNotAllowed || (status == errSecAuthFailed && target_keychain_locked()) ? "locked" : "store", NULL, status);
 }
 
 static void rename_verb(const char *from, const char *to, bool skip_on_existing) {

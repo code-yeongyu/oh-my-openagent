@@ -34,6 +34,7 @@ describe("a failed helper resolution is retried, never kept for the process (#11
         secrets: Bun.secrets,
         key: { service: "omo-cli", name: "f".repeat(64) },
         background: false,
+        origin: "https://api.example.test",
         notice: () => {},
         pending: message => new Error(message),
       })

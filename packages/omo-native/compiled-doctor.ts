@@ -4,6 +4,7 @@ import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { doctorCoverageLines } from "./bin/lib/category-coverage.js"
 import { doctorComputerUseLines } from "./bin/lib/computer-use-doctor.js"
 import { daemonReportLines } from "./bin/lib/daemon.js"
+import { keychainHelperDoctorLines } from "./bin/lib/keychain-helper-doctor.js"
 import { reapStaleEngines, staleEngineReport, transientMemoryReport, warningsForSettings } from "./bin/lib/doctor.js"
 import { migrationReport } from "./bin/lib/doctor-migration.js"
 import { runDoctorModels } from "./bin/lib/model-chains.js"
@@ -22,6 +23,7 @@ export type CompiledDoctorOptions = {
   readonly platform?: NodeJS.Platform
   readonly coverageLines?: () => Promise<string[]>
   readonly computerUseLines?: () => Promise<string[]>
+  readonly keychainHelperLines?: () => string[]
   readonly list?: () => { pid: number; ppid: number; elapsed: string; tty: string; command: string }[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
 }
@@ -95,6 +97,7 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   const launchSpec = launchSpecDoctorLines(join(input.execDir, "plugin"))
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)
+  lines.push(...(input.options?.keychainHelperLines?.() ?? keychainHelperDoctorLines({ packageRoot: input.execDir, helperRelPath: "omo-keychain" })))
   if (input.engine !== undefined) {
     lines.push(...daemonReportLines({ engine: input.engine, pluginRoot: join(input.execDir, "plugin"), agentDir: canonicalAgentDir(), env: process.env, platform: process.platform }))
   }

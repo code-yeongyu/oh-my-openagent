@@ -36,7 +36,12 @@ import {
   releaseEngineBuildStamp,
 } from "./engine-build-defines"
 import { desktopEngineTarget, stageCompiledDesktopEngine } from "./release-desktop-engine-target"
+import { keychainHelperPayload, stageKeychainHelper } from "./release-keychain-helper-target"
 import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
+import {
+  RUNTIME_CAPABILITIES_FILE,
+  runtimeCapabilitiesText,
+} from "../packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities"
 import { reportEmbeddedPayload } from "./embedded-payload-probe"
 
 export { compileDefinesForOmoBinary, reportEmbeddedPayload }
@@ -417,6 +422,8 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
   }
   const desktopEngine = desktopEngineTarget(target.target).payload
   if (desktopEngine !== null) relPaths.add(desktopEngine)
+  const keychainHelper = keychainHelperPayload(target.target)
+  if (keychainHelper !== null) relPaths.add(keychainHelper)
   return [...relPaths].sort()
 }
 
@@ -547,6 +554,8 @@ export function stageSidecarPayload(
   // build (a full build-omo-native run with submodule fetches) so a missing payload fails closed at once (#9857).
   const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
   if (desktopEngine !== null) staged.add(desktopEngine)
+  const keychainHelper = stageKeychainHelper(target.target, stageDir, desktopEngineSourceRoot)
+  if (keychainHelper !== null) staged.add(keychainHelper)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
   writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")
@@ -611,6 +620,9 @@ export async function buildReleaseBinary(
     writeFileSync(join(stageDir, RUNTIME_MANIFEST_REL_PATH), runtimeManifestFileContent(manifest, target.target), "utf8")
 
     mkdirSync(outDir, { recursive: true })
+    // RULING-74: every runtime ships its declared capabilities beside it; the desktop bundles this file with the
+    // runtime and its keychain helper, and the CLI hands off only to a runtime that declares the contract.
+    writeFileSync(join(outDir, RUNTIME_CAPABILITIES_FILE), runtimeCapabilitiesText(), "utf8")
     const binaryPath = join(outDir, target.binaryName)
 
     // Probe BEFORE the expensive target compile: a bun that predates the

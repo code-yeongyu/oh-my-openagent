@@ -1,3 +1,4 @@
+import { homedir } from "node:os"
 import type { SecretApi } from "../keystore"
 import type { HelperLease } from "./client"
 import {
@@ -9,6 +10,8 @@ import {
   type KeychainHelperOptions,
 } from "./darwin-backend"
 import type { LockedDarwinStore, WriteIntent } from "./darwin-store"
+import { createCreatorHandOff, desktopRuntimeCandidates, HANDOFF_ENV } from "./creator-handoff"
+import { keychainProcessState } from "./process-state"
 import { gatedSecrets } from "./secrets-gate"
 
 /** The session-lock view of a store (#11262 design 3.3, 3.4, 3.6): every keychain change inside one locked section. */
@@ -34,6 +37,16 @@ export type HelperBinding = {
 const readers = new Map<DarwinBackend, SecretApi>()
 const backends = new Map<string, Promise<DarwinBackend | null>>()
 
+// Addendum change 1: at most one hand-off attempt per process (shared by every bundled copy), to the installed and
+// verified desktop app, for the origin this store serves.
+function processHandOff(origin: string): () => Promise<boolean> {
+  return () => {
+    const state = keychainProcessState()
+    state.handOff ??= createCreatorHandOff({ candidates: desktopRuntimeCandidates(homedir()), origin })()
+    return state.handOff
+  }
+}
+
 /**
  * Only the real macOS store of the sign-in item gets the signed helper (or a store a test hands helper options to);
  * Windows, Linux, the other namespaces and injected stores keep exactly today's path.
@@ -44,6 +57,7 @@ export function bindKeychainHelper(input: {
   readonly secrets: SecretApi
   readonly key: { readonly service: string; readonly name: string }
   readonly background: boolean
+  readonly origin: string
   readonly notice: (message: string) => void
   readonly pending: (message: string) => Error
   readonly options?: KeychainHelperOptions
@@ -73,11 +87,13 @@ export function bindKeychainHelper(input: {
             service: key.service,
             account: key.name,
             background: input.background,
+            noDialog: options?.noDialog ?? process.env[HANDOFF_ENV] === "1",
             notice: input.notice,
             ...(options?.home === undefined ? {} : { home: options.home }),
             ...(options?.row8b === undefined ? {} : { row8b: options.row8b }),
             ...(options?.silently === undefined ? {} : { silently: options.silently }),
             ...(options?.cache === undefined ? {} : { cache: options.cache }),
+            handOff: options === undefined ? processHandOff(input.origin) : (options.handOff ?? (async () => false)),
           }),
     )
     if (options === undefined) {
@@ -116,7 +132,10 @@ export function bindKeychainHelper(input: {
     reader,
     isHelperReader: api => [...readers.values()].includes(api),
     guardHelperless: async () => {
-      if (eligible) await guardHelperlessRead(key.service, key.name, options?.row9b, options?.ownerMarker)
+      if (!eligible) return
+      // A hand-off child never shows a dialog, not even on today's helper-less read (#11613 review).
+      if ((options?.noDialog ?? process.env[HANDOFF_ENV] === "1") === true) throw input.pending("The keychain hand-off cannot show a dialog.")
+      await guardHelperlessRead(key.service, key.name, options?.row9b, options?.ownerMarker)
     },
   }
 }

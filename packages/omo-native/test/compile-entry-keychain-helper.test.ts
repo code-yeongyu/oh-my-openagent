@@ -9,7 +9,7 @@ const execDir = mkdtempSync(join(tmpdir(), "compiled-exec-"))
 afterAll(() => rmSync(execDir, { recursive: true, force: true }))
 
 describe("compiled binary: the keychain helper beside it serves every command (#11262 v9 shape B)", () => {
-  test("#given any command #when the compiled launcher starts #then execDir/bin/darwin/omo-keychain is the first helper candidate", async () => {
+  test("#given any command #when the compiled launcher starts #then execDir/omo-keychain is the first helper candidate", async () => {
     writeFileSync(join(execDir, "package.json"), JSON.stringify({ version: "0.0.0-test" }))
     const exitCode = process.exitCode
     try {
@@ -18,6 +18,7 @@ describe("compiled binary: the keychain helper beside it serves every command (#
       process.exitCode = exitCode ?? 0
     }
     expect(keychainProcessState().entryCandidates[0]).toBe(compiledKeychainHelper(execDir))
-    expect(compiledKeychainHelper("/opt/omo")).toBe("/opt/omo/bin/darwin/omo-keychain")
+    // RULING-74, desktop#5057: omo-keychain directly beside the runtime binary.
+    expect(compiledKeychainHelper("/opt/omo")).toBe("/opt/omo/omo-keychain")
   })
 })

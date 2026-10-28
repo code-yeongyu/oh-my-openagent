@@ -120,6 +120,7 @@ export function createSealedStore<T>(
     secrets,
     key,
     background: wait.kind === "bounded",
+    origin: api,
     notice,
     pending: message => new KeychainApprovalPendingError(message),
     ...(keychainHelper === undefined ? {} : { options: keychainHelper }),

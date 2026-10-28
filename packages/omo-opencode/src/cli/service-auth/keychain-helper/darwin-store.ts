@@ -1,7 +1,7 @@
 import type { HelperCall, HelperLease, HelperReply } from "./client"
 import { type DarwinReadDeps, HelperReadError, readThroughHelper, type ReadResult } from "./darwin-read"
 import { migrate } from "./migration"
-import { deleteOldSlots, namesFromRead, runRecovery } from "./recovery"
+import { deleteOldSlots, namesFromRead, OLD_SLOT_COUNT, runRecovery } from "./recovery"
 
 export type WriteIntent = "fresh-sign-in" | "update"
 
@@ -24,6 +24,8 @@ export type LockedDarwinStore = {
 
 /** RULING-73: every retired slot holds a copy nothing here can remove; the user must delete them once. */
 export class HelperOldSlotsFull extends Error {}
+
+const ALL_OLD_SLOTS = Array.from({ length: OLD_SLOT_COUNT }, (_, slot) => slot)
 
 const OLD_SLOTS_FULL_MESSAGE =
   'The macOS keychain holds 8 earlier OmO sign-ins that cannot be removed automatically. Open Keychain Access, delete the items whose account name ends in ".old" or ".old.1" to ".old.7" for OmO, then sign in again.'
@@ -91,8 +93,11 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
       if (removed.error === "not-owned") await deps.ownDelete(deps.account)
       else if (removed.ok !== true) throw failed(removed, "remove")
       await helper({ verb: "remove", account: `${deps.account}.staging` })
+      // The slots a read reports; when that read fails (a staging item another identity owns, a locked keychain), every
+      // slot is attempted, so a failed read never leaves retired copies behind silently.
       const present = await helper({ verb: "read", account: deps.account })
-      await deleteOldSlots(deps.account, present.present?.oldSlots ?? [], helper, deleteOwnOld)
+      const slots = present.error === undefined ? (present.present?.oldSlots ?? []) : ALL_OLD_SLOTS
+      await deleteOldSlots(deps.account, slots, helper, deleteOwnOld)
       lastRead = null
     },
   }
