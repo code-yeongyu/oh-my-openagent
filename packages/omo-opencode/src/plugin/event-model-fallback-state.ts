@@ -16,6 +16,7 @@ import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-c
 import { getSessionFallbackSnapshot } from "../shared/session-fallback-snapshot";
 import { getSessionModel } from "../shared/session-model-state";
 import { log } from "../shared/logger";
+import { captureSyncChildPromptHold } from "../shared/sync-child-prompt-hold";
 import type { PluginEventContext } from "./event-types";
 
 export type FallbackContinuationContext = {
@@ -64,9 +65,11 @@ export function createModelFallbackContinuationController(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
   resolveSelectedProfileFallback?: (sessionID: string) => ReturnType<ModelFallbackHook["getNextFallback"]> | undefined;
+  resolveSyncChildFallback?: (sessionID: string) => ReturnType<ModelFallbackHook["getNextFallback"]>;
   lastKnownModelBySession: Map<string, { providerID: string; modelID: string }>;
   continuationsInFlight: Set<string>;
   lastDispatchedContinuationKeys: Map<string, FallbackContinuationDedupeState>;
+  isSessionStopped?: (sessionID: string) => boolean;
 }) {
   const { pluginConfig, pluginContext, lastKnownModelBySession, continuationsInFlight } = args;
   const lastDispatchedContinuationKeys = args.lastDispatchedContinuationKeys;
@@ -171,10 +174,21 @@ export function createModelFallbackContinuationController(args: {
     if (shouldSkipFallbackContinuation(sessionID, source, fallbackContext)) return;
 
     continuationsInFlight.add(sessionID);
+    const syncHold = captureSyncChildPromptHold(sessionID);
     let dispatched = false;
     try {
+      if (syncHold) {
+        let messages: unknown;
+        try {
+          messages = await pluginContext.client.session.messages({ path: { id: sessionID } });
+        } catch {
+          return; // Without current terminal evidence, retain the original hold.
+        }
+        if (!syncHold.isTerminalFailure(messages) || args.isSessionStopped?.(sessionID)) return;
+      }
       try {
-        await pluginContext.client.session.abort({ path: { id: sessionID } });
+        const abortResult = await pluginContext.client.session.abort({ path: { id: sessionID } });
+        if (abortResult && typeof abortResult === "object" && "error" in abortResult && abortResult.error) return;
       } catch (error) {
         log("[event] model-fallback abort failed", {
           sessionID,
@@ -183,19 +197,26 @@ export function createModelFallbackContinuationController(args: {
         });
         return;
       }
-      releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
+      if (args.isSessionStopped?.(sessionID)) return;
+      if (syncHold) {
+        const outcome = syncHold.release(`model-fallback-abort:${source}`);
+        if (outcome === "superseded" || outcome === "unsettled") return;
+      } else releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
         reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
         reservedByPrefix: "model-fallback:",
       });
 
       // OpenCode validates launch models before synthetic continuations reach chat.message.
-      const selectedFallback = args.resolveSelectedProfileFallback?.(sessionID);
+      const selectedFallback = syncHold
+        ? args.resolveSyncChildFallback?.(sessionID) ?? null
+        : args.resolveSelectedProfileFallback?.(sessionID);
       if (selectedFallback === null) return;
       const launchAgent = fallbackContext?.agentName
         ? resolveRegisteredAgentName(fallbackContext.agentName)
         : undefined;
       const launchModel = selectedFallback
         ? { providerID: selectedFallback.providerID, modelID: selectedFallback.modelID }
+        : syncHold ? syncHold.model
         : fallbackContext?.providerID && fallbackContext?.modelID
         ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
         : undefined;
@@ -218,15 +239,25 @@ export function createModelFallbackContinuationController(args: {
       };
 
       const mode = typeof pluginContext.client.session.promptAsync === "function" ? "async" : "sync";
+      let confirmRecoveryHold: (() => void) | undefined;
+      const recoverySource = mode === "async" ? `model-fallback:${source}` : `model-fallback:${source}:sync`;
       const promptResult = await dispatchInternalPrompt({
         mode,
         client: pluginContext.client,
         sessionID,
-        source: mode === "async" ? `model-fallback:${source}` : `model-fallback:${source}:sync`,
+        source: recoverySource,
         queueBehavior: "defer",
+        ...(syncHold ? { shouldDispatch: () => {
+          if (!syncHold.isCurrent() || args.isSessionStopped?.(sessionID)) return false;
+          confirmRecoveryHold = syncHold.captureRecoveryHold(recoverySource, promptBody);
+          return true;
+        } } : {}),
         input: promptBody,
       });
       if (isInternalPromptDispatchAccepted(promptResult)) {
+        if (promptResult.status === "dispatched") {
+          confirmRecoveryHold?.();
+        }
         dispatched = true;
       } else if (promptResult.status === "failed") {
         if (isAmbiguousPostDispatchPromptFailure(promptResult)) dispatched = true;

@@ -64,6 +64,8 @@ export function createModelFallbackEventHandler(args: {
     lastKnownModelBySession,
     continuationsInFlight,
     lastDispatchedContinuationKeys,
+    isSessionStopped: args.isSessionStopped,
+    resolveSyncChildFallback: (sessionID) => args.modelFallback?.getNextFallback(sessionID) ?? null,
   });
 
   const clearSession = (sessionID: string): void => {
