@@ -86,6 +86,8 @@ impl Engine {
             Method::HoldMouse => op(Op::HoldMouse(parse(params)?)),
             Method::RaiseWindow => op(Op::RaiseWindow(parse(params)?)),
             Method::RaiseToSpace => op(Op::BringToCurrentSpace(parse(params)?)),
+            Method::AppsList => op(Op::AppsList(parse(params)?)),
+            Method::AppsOpen => op(Op::AppsOpen(parse(params)?)),
             Method::AxSnapshot => op(Op::AxSnapshot(parse(params)?)),
             Method::AxQuery => op(Op::AxQuery(parse(params)?)),
             Method::AxElementAt => op(Op::AxElementAt(parse(params)?)),

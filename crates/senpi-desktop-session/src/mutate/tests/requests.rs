@@ -1,5 +1,5 @@
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, BringToCurrentSpaceParams, ClipboardText,
+    AppsOpenParams, AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, BringToCurrentSpaceParams, ClipboardText,
     DragParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuSelectParams,
     PointParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
@@ -53,6 +53,10 @@ pub(super) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
         MutatingAction::BringToCurrentSpace => {
             Op::BringToCurrentSpace(BringToCurrentSpaceParams { window_id: target })
         }
+        // The fixture's window 101 belongs to Notes, which the fake lists as a running app.
+        MutatingAction::OpenApp { foreground } => Op::AppsOpen(AppsOpenParams {
+            id: "Notes".to_owned(), activate: Some(foreground), reveal: None, app: None,
+        }),
         MutatingAction::AxPerform => Op::AxPerform(AxPerformParams {
             ref_: reference, action: "focus".to_owned(),
         }),

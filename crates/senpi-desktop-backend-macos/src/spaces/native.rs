@@ -26,7 +26,6 @@ pub(crate) fn bring_to_current_space(id: &str, check_stop: &dyn Fn() -> CoreResu
 /// Whether `pid` has a normal window on a Space no display shows now, which
 /// on-screen window lists leave out. `None` when the window list or a
 /// window's Space membership cannot be read.
-#[cfg_attr(not(test), expect(dead_code, reason = "apps.open (#11463, plan todo 11) reports windows on another Space through this"))]
 pub(crate) fn window_on_another_space(pid: libc::pid_t) -> Option<bool> {
     let spaces = NativeSpaces::connect(skylight::spaces_if_available()?).ok()?;
     let pid = u32::try_from(pid).ok()?;
@@ -81,7 +80,6 @@ impl NativeSpaces {
 
     /// `wid`'s memberships, empty for none; `None` when WindowServer does not
     /// say.
-    #[cfg_attr(not(test), expect(dead_code, reason = "only window_on_another_space reads it until apps.open lands"))]
     fn window_spaces(&self, wid: u32) -> Option<Vec<SpaceId>> {
         self.copy_window_spaces(wid)
             .ok()?

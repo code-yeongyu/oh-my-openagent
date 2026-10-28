@@ -158,7 +158,6 @@ pub(super) fn verified_move(current: SpaceId, observed: &[SpaceId]) -> bool {
 /// only to Spaces no display shows (`shown`). A window WindowServer keeps
 /// ordered out belongs to none, and one on every Space belongs to a shown one
 /// too. `None` once a membership is unknown and none seen so far is elsewhere.
-#[cfg_attr(not(test), expect(dead_code, reason = "only window_on_another_space reads it until apps.open lands"))]
 pub(super) fn on_another_space(
     shown: &[SpaceId],
     memberships: impl IntoIterator<Item = Option<Vec<SpaceId>>>,

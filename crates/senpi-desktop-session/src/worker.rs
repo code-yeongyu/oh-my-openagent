@@ -156,6 +156,8 @@ impl Worker {
             Op::HoldMouse(params) => served(self.hold_mouse(&params, cancelled)),
             Op::RaiseWindow(params) => served(self.raise_window(&params.window_id, cancelled)),
             Op::BringToCurrentSpace(params) => served(self.bring_to_current_space(&params.window_id, cancelled)),
+            Op::AppsList(params) => Ok(Response::Applications(self.backend()?.apps_list(&params)?)),
+            Op::AppsOpen(params) => served(self.apps_open(&params, cancelled)),
             Op::AxSnapshot(params) => self.ax_snapshot(&params),
             Op::AxQuery(params) => self.ax_query(&params),
             Op::AxElementAt(params) => self.ax_element_at(&params),

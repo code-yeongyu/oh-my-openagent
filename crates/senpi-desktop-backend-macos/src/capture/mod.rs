@@ -11,7 +11,7 @@ mod minimized;
 mod route;
 mod sck;
 pub(crate) mod screencapture;
-mod windows;
+pub(crate) mod windows;
 
 use image::RgbaImage;
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};

@@ -5,11 +5,13 @@ use std::path::PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+mod apps;
 mod ax;
 mod capture;
 mod display;
 mod window;
 
+pub use apps::{Application, OpenedApplication};
 pub use ax::{AxNode, AxQuery, AxSnapshot, AxSnapshotOptions};
 pub use capture::{CaptureCaps, CaptureMode, CaptureRegion, CaptureResult, DesktopCapture, ObserveResult, DEFAULT_CAPTURE_MAX_BYTES};
 pub use display::{DesktopCapabilities, DesktopDisplay, DisplaySelector};

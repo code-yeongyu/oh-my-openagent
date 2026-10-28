@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::menus::MenuItem;
 use crate::protocol_params::{
-    AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
+    AdvanceClockParams, AppsListParams, AppsOpenParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
     AxSetValueParams, AxSnapshotParams, BringToCurrentSpaceParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
     EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuPathParams, MenuSelectParams, ObserveParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams, TypeTextParams,
@@ -20,7 +20,8 @@ use crate::protocol_results::{
     AuditEvent, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
 };
 use crate::types::{
-    AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
+    Application, AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
+    OpenedApplication,
 };
 
 /// What a method may do to the desktop or to the engine's input gate.
@@ -107,6 +108,8 @@ method_table! {
     HoldMouse = "holdMouse", Exec, Public, HoldMouseParams => ();
     RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => ();
     RaiseToSpace = "window.bringToCurrentSpace", Exec, Public, BringToCurrentSpaceParams => ();
+    AppsList = "apps.list", Read, Public, AppsListParams => Vec<Application>;
+    AppsOpen = "apps.open", Exec, Public, AppsOpenParams => OpenedApplication;
     MenusItems = "menus.items", Read, Public, MenuPathParams => Vec<MenuItem>;
     MenusSelect = "menus.select", Exec, Public, MenuSelectParams => ();
     ClipboardRead = "clipboard.read", Read, Public, EmptyParams => ClipboardText;

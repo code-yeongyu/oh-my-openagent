@@ -19,6 +19,13 @@ pub enum MutatingAction {
     /// Moves a window into the user's current Space. Background-only: it never
     /// activates or switches Spaces, so it needs no control grant.
     BringToCurrentSpace,
+    /// Opens an application, document or URL. Without `foreground` nothing
+    /// is activated, so no control grant is needed; `activate`/`reveal` bring
+    /// the application (or Finder) in front and need the grant like
+    /// `RaiseWindow`.
+    OpenApp {
+        foreground: bool,
+    },
     AxPerform,
     AxSetValue,
     AxFocus,
@@ -28,7 +35,7 @@ pub enum MutatingAction {
 }
 
 impl MutatingAction {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 18] = [
         Self::Click,
         Self::MoveMouse,
         Self::Drag,
@@ -39,6 +46,8 @@ impl MutatingAction {
         Self::HoldMouse,
         Self::RaiseWindow,
         Self::BringToCurrentSpace,
+        Self::OpenApp { foreground: false },
+        Self::OpenApp { foreground: true },
         Self::AxPerform,
         Self::AxSetValue,
         Self::AxFocus,
@@ -61,6 +70,7 @@ impl MutatingAction {
             Self::HoldMouse => Method::HoldMouse,
             Self::RaiseWindow => Method::RaiseWindow,
             Self::BringToCurrentSpace => Method::RaiseToSpace,
+            Self::OpenApp { .. } => Method::AppsOpen,
             Self::AxPerform => Method::AxPerform,
             Self::AxSetValue => Method::AxSetValue,
             Self::AxFocus => Method::AxFocus,
@@ -81,6 +91,7 @@ impl MutatingAction {
             | Self::HoldKeys
             | Self::RaiseWindow
             | Self::BringToCurrentSpace
+            | Self::OpenApp { .. }
             | Self::AxPerform
             | Self::AxSetValue
             | Self::AxFocus

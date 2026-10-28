@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use crate::ax_tree::AxTree;
 use crate::faults::Faults;
 use crate::method::FakeMethod;
-use crate::scenario::{DelayMs, FakeMenuNode, FakeScenario, ResizeWindow};
+use crate::scenario::{DelayMs, FakeApplication, FakeMenuNode, FakeScenario, ResizeWindow};
 use crate::sink::{RecordingSink, SinkOp};
 
 /// Scripted headless `Backend` + `AxBackend`: serves a [`FakeScenario`],
@@ -32,6 +32,7 @@ pub struct FakeBackend {
     pub(crate) ax_tree: AxTree,
     pub(crate) ax_owner_unknown: bool,
     pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    pub(crate) apps: Vec<FakeApplication>,
     pub(crate) sink: RecordingSink,
     faults: Faults,
 }
@@ -51,6 +52,7 @@ impl FakeBackend {
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
             menus: scenario.menus,
+            apps: scenario.apps,
             displays: scenario.displays,
             windows: scenario.windows,
             capabilities: scenario.capabilities,

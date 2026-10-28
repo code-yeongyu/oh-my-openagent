@@ -12,8 +12,10 @@ use senpi_desktop_core::error::{CoreResult, DesktopError, PermissionDeniedData, 
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::menus::MenuItem;
+use senpi_desktop_core::protocol_params::{AppsListParams, AppsOpenParams};
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
+    Application, CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow,
+    OpenedApplication, Target,
 };
 
 /// Makes the next call of one method panic; clones share the slot.
@@ -94,6 +96,14 @@ impl Backend for PanickyFake {
     }
     fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
         self.inner.bring_to_current_space(id, check_stop)
+    }
+    fn apps_list(&mut self, params: &AppsListParams) -> CoreResult<Vec<Application>> {
+        self.inner.apps_list(params)
+    }
+    fn apps_open(
+        &mut self, params: &AppsOpenParams, check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<OpenedApplication> {
+        self.inner.apps_open(params, check_stop)
     }
     fn hold_keys(
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,

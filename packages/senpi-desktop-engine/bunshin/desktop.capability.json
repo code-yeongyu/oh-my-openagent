@@ -22,6 +22,8 @@
 		"desktop.holdMouse",
 		"desktop.raiseWindow",
 		"desktop.window.bringToCurrentSpace",
+		"desktop.apps.list",
+		"desktop.apps.open",
 		"desktop.menus.items",
 		"desktop.menus.select",
 		"desktop.clipboard.read",
@@ -60,6 +62,8 @@
 		"desktop.holdMouse": "mutate",
 		"desktop.raiseWindow": "mutate",
 		"desktop.window.bringToCurrentSpace": "mutate",
+		"desktop.apps.list": "read",
+		"desktop.apps.open": "mutate",
 		"desktop.menus.items": "read",
 		"desktop.menus.select": "mutate",
 		"desktop.clipboard.read": "read",
@@ -1061,6 +1065,58 @@
 				"windowId"
 			],
 			"description": "`window.bringToCurrentSpace`: the native id of the window to move into the\nuser's current Space. The window is usually on another Space, so it may be\nabsent from `windows`.",
+			"additionalProperties": false
+		},
+		"desktop.apps.list": {
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": [
+						"string",
+						"null"
+					],
+					"default": null
+				},
+				"runningOnly": {
+					"type": [
+						"boolean",
+						"null"
+					],
+					"default": null
+				}
+			},
+			"description": "`apps.list`: `query` is a case-insensitive substring of an application's\nname, id or path; `runningOnly` keeps only applications with a process.",
+			"additionalProperties": false
+		},
+		"desktop.apps.open": {
+			"type": "object",
+			"properties": {
+				"id": {
+					"type": "string"
+				},
+				"activate": {
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"reveal": {
+					"type": [
+						"boolean",
+						"null"
+					]
+				},
+				"app": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"id"
+			],
+			"description": "`apps.open`: `id` is an application id, name or native path, or a file,\nfolder or URL. `activate` brings the application forward and `reveal`\nshows the item selected in Finder; both take the user's foreground and\nneed the control grant. `app` names the application to open a document\nwith; `reveal` and `app` together are refused.",
 			"additionalProperties": false
 		},
 		"desktop.menus.items": {

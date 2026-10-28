@@ -4,6 +4,7 @@
 //! background delivery and the focus guard, the AXUIElement accessibility
 //! backend, and the `CGEventTap` kill switch (the `Global` stop path).
 
+mod applications;
 mod ax;
 mod backend;
 mod capture;

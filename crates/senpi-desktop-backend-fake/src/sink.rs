@@ -116,6 +116,12 @@ pub enum SinkOp {
     BringToCurrentSpace {
         id: String,
     },
+    /// An application opened; focus moves only with `activate`.
+    OpenApp {
+        id: String,
+        activate: bool,
+        reveal: bool,
+    },
     ReleaseAll,
     WarpCursor(DesktopPoint),
     QueryFrontWindow,

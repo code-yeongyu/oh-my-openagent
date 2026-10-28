@@ -2,14 +2,15 @@
 
 use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
+    AppsListParams, AppsOpenParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
     BringToCurrentSpaceParams,
     CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
     HoldKeysParams, HoldMouseParams, ObserveParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
 use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_core::types::{
-    AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow, ObserveResult,
+    Application, AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow, ObserveResult,
+    OpenedApplication,
 };
 use serde::Serialize;
 
@@ -32,6 +33,8 @@ pub enum Op {
     HoldMouse(HoldMouseParams),
     RaiseWindow(RaiseWindowParams),
     BringToCurrentSpace(BringToCurrentSpaceParams),
+    AppsList(AppsListParams),
+    AppsOpen(AppsOpenParams),
     AxSnapshot(AxSnapshotParams),
     AxQuery(AxQueryParams),
     AxElementAt(AxElementAtParams),
@@ -72,4 +75,6 @@ pub enum Response {
     Clipboard(ClipboardText),
     ControlState(ControlStateResult),
     MenuItems(Vec<MenuItem>),
+    Applications(Vec<Application>),
+    OpenedApplication(OpenedApplication),
 }

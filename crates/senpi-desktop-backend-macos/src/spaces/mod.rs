@@ -7,7 +7,7 @@ mod guard;
 mod mover;
 mod native;
 
-pub(crate) use self::native::bring_to_current_space;
+pub(crate) use self::native::{bring_to_current_space, window_on_another_space};
 
 #[cfg(test)]
 mod tests;

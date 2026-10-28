@@ -23,6 +23,7 @@ export const INPUT_CALLS: ReadonlyArray<readonly [string, Message]> = [
 	["keyChord", { target: WINDOW, keys: ["ctrl", "a"] }],
 	["raiseWindow", { windowId: WINDOW }],
 	["window.bringToCurrentSpace", { windowId: WINDOW }],
+	["apps.open", { id: "Notes" }],
 	["ax.perform", { ref: "e1", action: "press" }],
 	["ax.setValue", { ref: "e1", value: "hi" }],
 	["ax.focus", { ref: "e1" }],

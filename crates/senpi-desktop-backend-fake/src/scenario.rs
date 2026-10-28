@@ -10,6 +10,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::method::FakeMethod;
+pub use crate::scenario_nodes::{FakeApplication, FakeAxNode, FakeBounds, FakeMenuNode};
 
 const DEFAULT_CAPTURE_COLOR: [u8; 4] = [32, 96, 160, 255];
 
@@ -27,6 +28,8 @@ pub struct FakeScenario {
     pub ax: BTreeMap<String, FakeAxNode>,
     /// Menu-bar children per window id; absent means the backend has no menus.
     pub menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    /// Installed applications besides the windows' running owners.
+    pub apps: Vec<FakeApplication>,
     /// Reports every AX element's owner as unknown, like a backend that
     /// cannot map an element to its native window.
     pub ax_owner_unknown: bool,
@@ -51,6 +54,7 @@ impl Default for FakeScenario {
             capabilities: fake_capabilities(0),
             ax: BTreeMap::new(),
             menus: BTreeMap::new(),
+            apps: Vec::new(),
             ax_owner_unknown: false,
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
@@ -140,57 +144,6 @@ pub struct ScriptedFailure {
     pub reason: Option<String>,
 }
 
-/// One scripted accessibility element and its subtree.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeAxNode {
-    pub role: String,
-    /// Platform role; defaults to `role`.
-    #[serde(default)]
-    pub native_role: Option<String>,
-    #[serde(default)]
-    pub title: Option<String>,
-    #[serde(default)]
-    pub value: Option<String>,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default = "enabled_by_default")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub focused: bool,
-    /// Global logical bounds.
-    #[serde(default)]
-    pub bounds: Option<FakeBounds>,
-    #[serde(default)]
-    pub actions: Vec<String>,
-    #[serde(default)]
-    pub children: Vec<FakeAxNode>,
-}
-
-/// One scripted menu item and its submenu.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeMenuNode {
-    pub title: String,
-    #[serde(default = "enabled_by_default")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub checked: bool,
-    #[serde(default)]
-    pub shortcut: Option<String>,
-    #[serde(default)]
-    pub children: Vec<FakeMenuNode>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeBounds {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
     #[error("cannot read fake scenario {path}: {source}")]
@@ -217,6 +170,8 @@ struct RawScenario {
     #[serde(default)]
     menus: BTreeMap<String, Vec<FakeMenuNode>>,
     #[serde(default)]
+    apps: Vec<FakeApplication>,
+    #[serde(default)]
     ax_owner_unknown: bool,
     #[serde(default = "default_cursor")]
     cursor: Option<DesktopPoint>,
@@ -241,6 +196,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             .ax
             .keys()
             .chain(raw.menus.keys())
+            .chain(raw.apps.iter().filter_map(|app| app.window.as_ref()))
             .chain(raw.resize_window.iter().map(|resize| &resize.id));
         if let Some(unknown) = referenced.find(|id| !known(id)) {
             return Err(ScenarioError::UnknownWindow(unknown.clone()));
@@ -253,6 +209,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             capabilities,
             ax: raw.ax,
             menus: raw.menus,
+            apps: raw.apps,
             ax_owner_unknown: raw.ax_owner_unknown,
             cursor: raw.cursor,
             capture_color: raw.capture_color,
@@ -284,8 +241,4 @@ const fn default_cursor() -> Option<DesktopPoint> {
 
 const fn default_capture_color() -> [u8; 4] {
     DEFAULT_CAPTURE_COLOR
-}
-
-const fn enabled_by_default() -> bool {
-    true
 }

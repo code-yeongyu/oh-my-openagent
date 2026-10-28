@@ -31,6 +31,8 @@ export const ENGINE_METHODS = [
 	"holdMouse",
 	"raiseWindow",
 	"window.bringToCurrentSpace",
+	"apps.list",
+	"apps.open",
 	"menus.items",
 	"menus.select",
 	"clipboard.read",

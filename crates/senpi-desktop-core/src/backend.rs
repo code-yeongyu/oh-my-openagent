@@ -10,8 +10,10 @@ use crate::ax::{AxHandle, AxProps};
 use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
+use crate::protocol_params::{AppsListParams, AppsOpenParams};
 use crate::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
+    Application, CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow,
+    OpenedApplication, Target,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -178,6 +180,30 @@ pub trait Backend: Send {
     fn bring_to_current_space(&mut self, _id: &str, _check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
         Err(DesktopError::space_unsupported(
             "moving a window to the current Space is not available on this backend",
+        ))
+    }
+
+    /// The installed and running applications `params` selects. Backends
+    /// without an application inventory refuse with `AxUnsupported`.
+    fn apps_list(&mut self, _params: &AppsListParams) -> CoreResult<Vec<Application>> {
+        Err(DesktopError::new(
+            crate::error::ErrorCode::AxUnsupported,
+            "listing applications is not available on this backend",
+        ))
+    }
+
+    /// Opens the application, document or URL `params` names without
+    /// activating it unless asked (the session admits `activate`/`reveal`
+    /// only under the control grant), and returns it with the window it
+    /// shows. Backends call `check_stop` while they wait for that window.
+    fn apps_open(
+        &mut self,
+        _params: &AppsOpenParams,
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<OpenedApplication> {
+        Err(DesktopError::new(
+            crate::error::ErrorCode::AxUnsupported,
+            "opening applications is not available on this backend",
         ))
     }
 

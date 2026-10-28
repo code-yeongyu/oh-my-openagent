@@ -19,6 +19,7 @@ mod session;
 mod test_support;
 mod timeouts;
 mod worker;
+mod worker_apps;
 mod worker_ax;
 mod worker_capture;
 mod worker_observe;

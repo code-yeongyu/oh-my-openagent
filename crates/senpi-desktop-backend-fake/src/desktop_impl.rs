@@ -1,10 +1,12 @@
 use image::RgbaImage;
 use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, PointerEvent};
-use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
+use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::protocol_params::{AppsListParams, AppsOpenParams};
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
+    Application, CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow,
+    OpenedApplication, Target,
 };
 
 use crate::fake::FakeBackend;
@@ -33,31 +35,7 @@ impl Backend for FakeBackend {
         _caps: &CaptureCaps,
         _exclude_window_titles: &[String],
     ) -> CoreResult<(RgbaImage, FrameGeometry)> {
-        self.begin(FakeMethod::Capture)?;
-        if !self.capabilities.capture {
-            return Err(DesktopError::capture_failed(
-                "capture is unavailable in this fake scenario",
-            ));
-        }
-        let (frame, width, height) = self.frame(target)?;
-        let frame = if self.legacy_capture {
-            frame.into_legacy_capture()
-        } else {
-            frame
-        };
-        if width == 0 || height == 0 {
-            return Err(DesktopError::capture_failed(
-                "fake scenario has nothing to capture",
-            ));
-        }
-        if u64::from(width) * u64::from(height) > MAX_COMPOSITE_PIXELS {
-            return Err(DesktopError::capture_failed(format!(
-                "composite {width}x{height} exceeds the native safety limit"
-            )));
-        }
-        let image = RgbaImage::from_pixel(width, height, self.capture_color);
-        self.apply_scripted_resize(target);
-        Ok((image, frame))
+        self.capture_impl(target)
     }
 
     fn pointer(
@@ -167,6 +145,16 @@ impl Backend for FakeBackend {
         check_stop()?;
         self.record(SinkOp::BringToCurrentSpace { id: id.to_string() });
         Ok(())
+    }
+
+    fn apps_list(&mut self, params: &AppsListParams) -> CoreResult<Vec<Application>> {
+        self.apps_list_impl(params)
+    }
+
+    fn apps_open(
+        &mut self, params: &AppsOpenParams, check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<OpenedApplication> {
+        self.apps_open_impl(params, check_stop)
     }
 
     fn hold_keys(

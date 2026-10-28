@@ -3,6 +3,7 @@
 //! into a [`RecordingSink`], injects per-method failures and delays, and ships
 //! a [`FakeClock`] for heartbeat tests. Touches no OS API.
 
+mod apps_impl;
 mod ax_impl;
 mod ax_tree;
 mod clock;
@@ -14,6 +15,7 @@ mod holds_impl;
 mod menus_impl;
 mod method;
 mod scenario;
+mod scenario_nodes;
 mod sink;
 
 pub use clock::FakeClock;
@@ -21,7 +23,7 @@ pub use fake::FakeBackend;
 pub use faults::Faults;
 pub use method::FakeMethod;
 pub use scenario::{
-    fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeMenuNode, FakeScenario, ResizeWindow,
+    fake_capabilities, DelayMs, FakeApplication, FakeAxNode, FakeBounds, FakeMenuNode, FakeScenario, ResizeWindow,
     ScenarioError, ScriptedFailure,
 };
 pub use sink::{RecordedPointer, RecordingSink, SinkOp};

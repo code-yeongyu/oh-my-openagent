@@ -112,6 +112,32 @@ pub struct BringToCurrentSpaceParams {
     pub window_id: String,
 }
 
+/// `apps.list`: `query` is a case-insensitive substring of an application's
+/// name, id or path; `runningOnly` keeps only applications with a process.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AppsListParams {
+    pub query: Option<String>,
+    pub running_only: Option<bool>,
+}
+
+/// `apps.open`: `id` is an application id, name or native path, or a file,
+/// folder or URL. `activate` brings the application forward and `reveal`
+/// shows the item selected in Finder; both take the user's foreground and
+/// need the control grant. `app` names the application to open a document
+/// with; `reveal` and `app` together are refused.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AppsOpenParams {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activate: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reveal: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
+}
+
 /// `control.grant`: `confirmationId` is the host's receipt of the human
 /// confirmation it showed; the engine never sees the confirm itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

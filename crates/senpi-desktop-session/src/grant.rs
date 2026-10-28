@@ -16,7 +16,10 @@
 //! deliberately stricter than upstream, which gates only `takeover` input.
 //! `window.bringToCurrentSpace` needs no grant, as upstream: it moves a window
 //! into the user's Space without activating it or switching Spaces, and it is
-//! audited like every other mutation.
+//! audited like every other mutation. `apps.open` needs the grant only with
+//! `activate` or `reveal`: a background open launches, unhides or reopens
+//! without activating anything; bringing the application (or Finder) in front
+//! takes the user's foreground like `raiseWindow` (plan D5).
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -141,6 +144,13 @@ impl Worker {
             return Err(DesktopError::control_required(
                 "raising a window takes your foreground: approve the grant to allow it \
                  (computer.control.acquire asks the human first)",
+            ));
+        }
+        if mutation.action == (MutatingAction::OpenApp { foreground: true }) {
+            return Err(DesktopError::control_required(
+                "opening an application in front (activate) or revealing an item in Finder takes your \
+                 foreground: open it in the background instead, or approve the grant \
+                 (computer.control.acquire asks the human first); nothing was launched",
             ));
         }
         Err(DesktopError::control_required(

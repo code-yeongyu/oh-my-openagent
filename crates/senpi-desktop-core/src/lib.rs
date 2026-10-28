@@ -1,6 +1,7 @@
 //! Shared desktop wire types, errors, capture frames, keys, AX registry, and
 //! the `Backend`/`AxBackend` traits every platform backend implements.
 
+pub mod apps;
 pub mod ax;
 pub mod backend;
 #[cfg(feature = "system-clipboard")]

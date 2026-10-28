@@ -2,16 +2,16 @@
 //! runtime capabilities that report the SkyLight/canary truth.
 
 use image::RgbaImage;
-use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
 use senpi_desktop_core::ax::AxBackend;
 use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::menus::MenuItem;
+use senpi_desktop_core::protocol_params::{AppsListParams, AppsOpenParams};
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
-    FrontWindow, Target,
+    Application, CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
+    FrontWindow, OpenedApplication, Target,
 };
 
 use crate::ax::{is_trusted, MacAx};
@@ -19,6 +19,7 @@ use crate::capture::{MacCapture, Screencapture};
 use crate::input::{CanaryMode, CanaryResult, MacInput};
 
 mod capabilities;
+mod raise;
 
 #[path = "permissions.rs"]
 pub(crate) mod permissions;
@@ -227,36 +228,22 @@ impl Backend for MacosBackend {
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         Self::require_input_permission()?;
-        let window = self
-            .capture
-            .windows()?
-            .into_iter()
-            .find(|window| window.id == id)
-            .ok_or_else(|| {
-                DesktopError::window_not_found(format!(
-                    "window '{id}' was not found; it may be closed or minimized"
-                ))
-            })?;
-        self.ax.raise(&window)?;
-        let pid = window
-            .pid
-            .ok_or_else(|| DesktopError::input_failed(format!("window {id} has no owning process id")))?;
-        let pid = i32::try_from(pid)
-            .map_err(|_| DesktopError::input_failed(format!("window {id} has an invalid process id")))?;
-        let app = NSRunningApplication::runningApplicationWithProcessIdentifier(pid).ok_or_else(|| {
-            DesktopError::window_not_found(format!("application for window '{id}' is no longer running"))
-        })?;
-        if !app.activateWithOptions(NSApplicationActivationOptions::empty()) {
-            return Err(DesktopError::input_failed(format!(
-                "activation request for window '{id}' was rejected"
-            )));
-        }
-        Ok(())
+        self.raise(id)
     }
 
     fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
         Self::require_input_permission()?;
         crate::spaces::bring_to_current_space(id, check_stop)
+    }
+
+    fn apps_list(&mut self, params: &AppsListParams) -> CoreResult<Vec<Application>> {
+        crate::applications::list(params)
+    }
+
+    fn apps_open(
+        &mut self, params: &AppsOpenParams, check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<OpenedApplication> {
+        crate::applications::open(params, check_stop)
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
