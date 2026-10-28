@@ -1659,7 +1659,26 @@ retain the last accepted snapshot until a valid configuration is saved.
 
 A running request and an existing child's `task_id` / `session_id` continuation
 keep their resolved model. The command itself makes a normal OpenCode request to
-confirm the selected state. Primary agent prompts, tools, hooks, provider/auth
-configuration and tool registrations still come from startup configuration; this
-command changes model routing. Tuning beyond model and variant retains each
-existing tool resolver's support.
+confirm the selected state. Primary agent registrations, prompts, tools, hooks, provider/auth configuration
+and tool registrations still come from startup configuration. New delegations
+also use the existing dispatch resolver's category fields, including category
+`prompt_append`, `disable`, `is_unstable_agent` and `max_prompt_tokens`; these
+fields follow the selected profile along with model settings. Tuning beyond
+model and variant retains each existing tool resolver's support.
+
+
+The same operation is available without a TUI through OpenCode's existing API:
+`POST /session/<id>/command?directory=<project>` with JSON
+`{"command":"omo-profile","arguments":"budget","agent":"Sisyphus - ultraworker"}`.
+The SDK equivalent is `client.session.command` with the same command/arguments.
+This native command also produces a normal confirmation request. An application
+needing a selection-only response can reuse the exported `createSessionModelProfiles`
+controller within the same plugin instance. It exposes typed `inspect(sessionID)`
+and `select(sessionID, name | undefined)` methods; `undefined` restores startup
+selection. Its state is process-local; creating a new controller does not address
+another server.
+
+The selected state reports an accepted configuration snapshot. Saving a profile
+alone does not activate it in another running session; schema validation does not
+guarantee that a provider accepts a model or that credentials are available.
+Named OMO `profiles` are separate from Native `model_profile` tiers.
