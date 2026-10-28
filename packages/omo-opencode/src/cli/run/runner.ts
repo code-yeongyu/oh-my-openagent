@@ -17,6 +17,7 @@ import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { resolveRunnableRunAgent } from "./runnable-agent-resolver"
+import { withRunProfile } from "./profile-selection"
 
 export { resolveRunAgent }
 
@@ -35,6 +36,15 @@ export async function waitForEventProcessorShutdown(
 }
 
 export async function run(options: RunOptions): Promise<number> {
+  try {
+    return await withRunProfile(options, () => runWithOptions(options))
+  } catch (err) {
+    console.error(pc.red(`Error: ${serializeError(err)}`))
+    return 1
+  }
+}
+
+async function runWithOptions(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
   process.env.OPENCODE_CLIENT = "run"
 
@@ -71,6 +81,7 @@ export async function run(options: RunOptions): Promise<number> {
     const { client, cleanup: serverCleanup } = await createServerConnection({
       port: options.port,
       attach: options.attach,
+      requireNewServer: options.profile !== undefined,
       signal: abortController.signal,
     })
 

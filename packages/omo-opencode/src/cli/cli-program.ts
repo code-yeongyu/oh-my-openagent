@@ -108,6 +108,7 @@ program
   .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-m, --model <provider/model>", "Model override (e.g., anthropic/claude-sonnet-4)")
+  .option("--profile <name>", "Named OMO configuration profile (requires a new server)")
   .option("-d, --directory <path>", "Working directory")
   .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
   .option("--attach <url>", "Attach to existing opencode server URL")
@@ -150,6 +151,7 @@ Unlike 'opencode run', this command waits until:
       message,
       agent: options.agent,
       model: options.model,
+      profile: options.profile,
       directory: options.directory,
       port: options.port,
       attach: options.attach,
