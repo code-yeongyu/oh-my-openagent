@@ -6,14 +6,6 @@
 import { chmodSync, constants, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 
-// opencode keeps a pasted key verbatim and never interprets it, but the engine resolves every stored
-// key as a config value: a leading `!` runs a shell command and `$NAME` / `${NAME}` interpolate the
-// environment. `$$` and `$!` are the engine's literal escapes, so the engine reads back the exact
-// bytes opencode held.
-export function literalConfigValue(value) {
-  return value.replace(/[$!]/g, "$$$&")
-}
-
 export function readAuthStore(path) {
   if (!existsSync(path)) return { entries: {}, bytes: undefined }
   const bytes = readFileSync(path, "utf8")

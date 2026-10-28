@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 
 import { ModelConfig } from "../../../node_modules/@code-yeongyu/senpi/dist/core/model-config.js"
 import { composeModelProvider } from "../../../node_modules/@code-yeongyu/senpi/dist/core/provider-composer.js"
-import { resolveConfigValue } from "../../../node_modules/@code-yeongyu/senpi/dist/core/resolve-config-value.js"
+import { resolveStoredCredential } from "../../../node_modules/@code-yeongyu/senpi/dist/core/auth-credential-values.js"
 import { readAuthStore, writeAuthStore } from "../bin/lib/auth-store.js"
 import { planOpencodeProviders } from "../bin/lib/setup-opencode-providers.js"
 import { teardownRoots } from "./teardown.test-support"
@@ -96,10 +96,10 @@ function childEnv(item: Fixture): NodeJS.ProcessEnv {
 
 type RunResult = { status: number | null, signal: NodeJS.Signals | null, stdout: string, stderr: string }
 
-async function run(item: Fixture, args: string[]): Promise<RunResult> {
+async function run(item: Fixture, args: string[], envOverrides: Record<string, string> = {}): Promise<RunResult> {
   // --no-install: a module the copied app cannot resolve fails the run instead of Bun fetching it from the
   // registry into the fixture home, a cold network install on every run that timed out on Windows (#10210).
-  const child = spawn(process.execPath, ["--no-install", item.launcher, ...args], { env: childEnv(item), stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
+  const child = spawn(process.execPath, ["--no-install", item.launcher, ...args], { env: { ...childEnv(item), ...envOverrides }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
   let stdout = ""
   let stderr = ""
   child.stdout.setEncoding("utf8")
@@ -131,6 +131,22 @@ function readJson(path: string): Record<string, any> {
   return JSON.parse(readFileSync(path, "utf8"))
 }
 
+// Set environment variables for the duration of a check, and put the old ones back after.
+// The engine's auth storage resolves an env-named key against the process environment.
+function withEnv(values: Record<string, string>): () => void {
+  const previous = new Map<string, string | undefined>()
+  for (const [name, value] of Object.entries(values)) {
+    previous.set(name, process.env[name])
+    process.env[name] = value
+  }
+  return () => {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  }
+}
+
 const ACME = {
   npm: "@ai-sdk/openai-compatible",
   name: "Acme Inference",
@@ -139,6 +155,19 @@ const ACME = {
     "acme-large": { name: "Acme Large", limit: { context: 200000, output: 32000 } },
     "acme-alias": { id: "acme-upstream-7b" },
   },
+}
+
+// A custom provider whose apiKey points at a file, in the shape OpenCode reads.
+function providerReferencingAFile(item: Fixture, secretPath: string): void {
+  opencode(item, {
+    provider: {
+      acme: {
+        npm: "@ai-sdk/openai-compatible",
+        options: { baseURL: "https://api.example/v1", apiKey: `{file:${secretPath}}` },
+        models: { "acme-default": { name: "Acme Default", limit: { context: 1024, output: 256 } } },
+      },
+    },
+  })
 }
 
 describe("omo setup opencode custom provider import", () => {
@@ -174,6 +203,44 @@ describe("omo setup opencode custom provider import", () => {
           ["claude-relay", "anthropic-messages", "https://relay.example/anthropic", true, ["text", "image"]],
         ])
         expect(result.stdout).toContain("providers-imported: acme, relay")
+      })
+    })
+  })
+
+  describe("#given a custom provider whose apiKey references a path via {file:...}", () => {
+    describe("#when the engine supports reference objects", () => {
+      test("#then the apiKey lands in auth.json as a $file reference object, not the file's bytes", async () => {
+        const item = fixture()
+        const secretPath = join(item.tmp, "api-key")
+
+        providerReferencingAFile(item, secretPath)
+
+        const result = await run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "1" })
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect(auth.malformed).toBeUndefined()
+        // The reference ships as an object; the engine resolves it at load time.
+        expect((auth.entries as Record<string, { type: string, key: unknown }>).acme).toEqual({
+          type: "api_key",
+          key: { $file: secretPath },
+        })
+      })
+    })
+
+    describe("#when the engine does not support reference objects", () => {
+      test("#then the provider is not imported, because a {file:...} has no plain-string spelling", async () => {
+        const item = fixture()
+        const secretPath = join(item.tmp, "api-key")
+
+        providerReferencingAFile(item, secretPath)
+
+        const result = await run(item, ["setup", "--yes"], { OMO_REFERENCE_OBJECTS: "0" })
+        const auth = readAuthStore(join(item.agentDir, "auth.json"))
+
+        expect(result.status).toBe(0)
+        expect((auth.entries as Record<string, unknown>).acme).toBeUndefined()
+        expect(result.stdout).toContain("acme")
       })
     })
   })
@@ -239,15 +306,24 @@ describe("omo setup opencode custom provider import", () => {
         const result = await run(item, ["setup", "--yes"])
         const path = join(item.agentDir, "auth.json")
         const auth = readJson(path)
-        const env = { ACME_API_KEY: "acme-from-env", ENVONLY_KEY: "env-only", HOME: "/nope", X: "nope" }
 
         expect(result.status).toBe(0)
         expect(Object.keys(auth).sort()).toEqual(["acme", "envonly", "inline", "stored"])
         expect(Object.values(auth).every((entry: any) => entry.type === "api_key")).toBe(true)
-        expect(await resolveConfigValue(auth.acme.key, env)).toBe("acme-from-env")
-        expect(await resolveConfigValue(auth.inline.key, env)).toBe(literal)
-        expect(await resolveConfigValue(auth.stored.key, env)).toBe(`stored-${literal}`)
-        expect(await resolveConfigValue(auth.envonly.key, env)).toBe("env-only")
+        // The engine resolves a key held in auth.json through its own auth storage, which
+        // registers auth.json as the reference's trusted origin. A bare resolveConfigValue
+        // refuses a reference object: with no origin the engine treats it as forbidden.
+        const resolved = async (provider: string) =>
+          (await resolveStoredCredential(auth[provider], provider, path)).key
+        const restore = withEnv({ ACME_API_KEY: "acme-from-env", ENVONLY_KEY: "env-only", X: "nope" })
+        try {
+          expect(await resolved("acme")).toBe("acme-from-env")
+          expect(await resolved("inline")).toBe(literal)
+          expect(await resolved("stored")).toBe(`stored-${literal}`)
+          expect(await resolved("envonly")).toBe("env-only")
+        } finally {
+          restore()
+        }
         if (process.platform !== "win32") expect(statSync(path).mode & 0o777).toBe(0o600)
         expect(result.stdout).not.toContain("skipped-unmapped: acme")
       })

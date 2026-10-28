@@ -93,6 +93,10 @@ export function updateTarget(
   }
 }
 
+export function senpiPackageRoot(options = {}) {
+  return resolveSenpi(options).packageRoot
+}
+
 export function resolveSenpi(options = {}) {
   const {
     resolveIndex = () => fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")),
