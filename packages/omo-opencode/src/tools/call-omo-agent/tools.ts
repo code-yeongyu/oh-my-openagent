@@ -118,7 +118,7 @@ export function createCallOmoAgent(
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor,
-  loadCurrentModelConfig?: () => Pick<OhMyOpenCodeConfig, "agents" | "categories">,
+  loadCurrentModelConfig?: (sessionID: string) => Pick<OhMyOpenCodeConfig, "agents" | "categories"> | Promise<Pick<OhMyOpenCodeConfig, "agents" | "categories">>,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`,
@@ -200,7 +200,7 @@ export function createCallOmoAgent(
       }
 
       const currentModelConfig = loadCurrentModelConfig
-        ? loadCurrentModelConfig()
+        ? await loadCurrentModelConfig(toolCtx.sessionID)
         : { agents: agentOverrides, categories: userCategories }
       const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({
         subagentType: args.subagent_type,

@@ -112,7 +112,7 @@ export interface DelegateTaskToolOptions {
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
   /** Reload model-bearing config at task invocation time so edits are honored without rebuilding tools. */
-  loadCurrentModelConfig?: () => Pick<OhMyOpenCodeConfig, "agents" | "categories">
+  loadCurrentModelConfig?: (sessionID: string) => Pick<OhMyOpenCodeConfig, "agents" | "categories"> | Promise<Pick<OhMyOpenCodeConfig, "agents" | "categories">>
   sisyphusAgentConfig?: SisyphusAgentConfig
   /** Mirrors `claude_code.agents`; when false, `.claude/agents` definitions are not read during subagent matching. */
   claudeCodeAgentsEnabled?: boolean
