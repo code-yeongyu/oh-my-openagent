@@ -12,7 +12,7 @@ import { acquireSessionAdmissionLease } from "./admission-lease"
 import { createTaskLifecycle } from "./create"
 import type { ProcessSignaller, RespawnResult } from "./port"
 import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
-import { NO_HOST_ENDPOINT } from "./host-session"
+import { DEFAULT_HOST_SESSION_RETRY_POLICY, NO_HOST_ENDPOINT, type HostSessionRetryPolicy } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -60,6 +60,9 @@ function injectedHarness(options: {
   readonly store?: TaskRecordStore
   readonly config?: Record<string, unknown>
   readonly alive?: Set<number>
+  /** Runs before every liveness answer: the seam a test uses to act inside the ownership probe. */
+  readonly onIsAlive?: (pid: number) => void
+  readonly hostRetry?: HostSessionRetryPolicy
   readonly onRespawn?: (record: TaskRecord, sessionPath: string | undefined) => Promise<RespawnResult>
 } = {}) {
   const store = options.store ?? tempStore()
@@ -68,7 +71,10 @@ function injectedHarness(options: {
   const signals: Array<{ readonly pid: number; readonly signal: string }> = []
   const alive = options.alive ?? new Set<number>()
   const signaller: ProcessSignaller = {
-    isAlive: (pid) => alive.has(pid),
+    isAlive: (pid) => {
+      options.onIsAlive?.(pid)
+      return alive.has(pid)
+    },
     signal: (pid, signal) => {
       signals.push({ pid, signal })
       alive.delete(pid)
@@ -83,6 +89,7 @@ function injectedHarness(options: {
     now,
     signaller,
     orphanKillDelayMs: 0,
+    ...(options.hostRetry === undefined ? {} : { hostRetry: options.hostRetry }),
     respawn: async (record, sessionPath) => {
       launches.push({ taskId: record.task_id, sessionPath })
       return options.onRespawn?.(record, sessionPath) ?? success(record.task_id)
@@ -623,13 +630,84 @@ describe("reconcileOnSessionStart scoped revival", () => {
     const exits = await Promise.all(children.map((child) => child.exited))
     const stderr = await Promise.all(errors)
 
-    // then
+    // then: whichever window the loser lost in, it reports the one loser outcome (#11665).
     const launches = readFileSync(launchLog, "utf8").trim().split("\n").filter(Boolean)
     expect(launches).toHaveLength(1)
     expect(results.flatMap((result) => result.outcomes).map((outcome) => `${outcome.kind}:${outcome.reason}`).sort())
       .toEqual(["deferred:foreign_live_owner", "resumed:respawned and reattached"])
     exits.forEach((code, index) => expect(code, stderr[index]).toBe(0))
   }, 20_000)
+
+  describe("#given a dead-owner resident that a second owner claims (#11665)", () => {
+    const deadPid = 2_147_483_647
+    const winnerPid = 3_333
+    const taskId = "st_10000016"
+    const windows = ["before the scan", "during the ownership probe", "at the reclaim CAS"] as const
+
+    function claimForWinner(store: TaskRecordStore): void {
+      store.mutate(taskId, (fresh) => ({
+        ...fresh, host_pid: winnerPid, residency_claim: "winner-claim", updated_at: new Date(2_000_000).toISOString(),
+      }))
+    }
+
+    test.each(windows)("#when the claim lands %s #then this pass defers it as foreign_live_owner and schedules the scoped retry", async (window) => {
+      // given: each window is entered on purpose, never by timing.
+      const backing = tempStore()
+      let loserMutations = 0
+      const store: TaskRecordStore = {
+        ...backing,
+        mutate: (id, mutation) => {
+          if (id === taskId) {
+            loserMutations += 1
+            // The loser's first write to this record is its reclaim CAS.
+            if (window === "at the reclaim CAS" && loserMutations === 1) claimForWinner(backing)
+          }
+          return backing.mutate(id, mutation)
+        },
+      }
+      let probed = false
+      const waits: number[] = []
+      const harness = injectedHarness({
+        store,
+        alive: new Set([winnerPid]),
+        // The first liveness question about the dead owner is the ownership probe of the scan.
+        onIsAlive: (pid) => {
+          if (window !== "during the ownership probe" || pid !== deadPid || probed) return
+          probed = true
+          claimForWinner(backing)
+        },
+        hostRetry: {
+          ...DEFAULT_HOST_SESSION_RETRY_POLICY,
+          wait: (ms) => {
+            waits.push(ms)
+            return new Promise<void>(() => undefined)
+          },
+        },
+      })
+      const orphan = withV1(backing, seedRecord(backing, {
+        task_id: taskId, parent_session_id: parentSessionId, status: "running",
+        residency_state: "resident", execution_mode: "in-process", host_pid: deadPid,
+        updated_at: new Date(1_000_000).toISOString(),
+      }))
+      persistSession(backing, orphan.task_id)
+      if (window === "before the scan") claimForWinner(backing)
+
+      // when
+      const result = await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+      // then
+      expect(result.outcomes.filter((outcome) => outcome.task_id === taskId))
+        .toEqual([{ task_id: taskId, kind: "deferred", reason: "foreign_live_owner" }])
+      expect(harness.launches).toHaveLength(0)
+      expect(backing.load(taskId)).toMatchObject({ host_pid: winnerPid, residency_claim: "winner-claim" })
+      // Only the CAS window reaches a reclaim attempt; the other two never write the winner's record.
+      if (window === "at the reclaim CAS") expect(loserMutations).toBeGreaterThan(0)
+      else expect(loserMutations).toBe(0)
+      if (window === "during the ownership probe") expect(probed).toBe(true)
+      // The loser keeps watching the winner: one scoped retry is armed at its first backoff.
+      expect(waits).toEqual([DEFAULT_HOST_SESSION_RETRY_POLICY.deferredRetryBackoffMs[0]])
+    })
+  })
 
   test("#given reattach and child resume are disabled #when suspended records exist #then they remain suspended with deferred outcomes", async () => {
     // given

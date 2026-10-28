@@ -64,20 +64,14 @@ async function reconcileRecords(
       || fresh.notification.run_epoch !== record.notification.run_epoch || fresh.updated_at !== record.updated_at
       || fresh.residency_state !== record.residency_state || fresh.status !== record.status) {
       excludedFromRevival.add(record.task_id)
-      outcomes.push({ task_id: record.task_id, kind: "foreign_live_owner", reason: "ownership changed during probe" })
+      outcomes.push(lostOwnership(record, parentSessionId, "ownership changed during probe"))
       continue
     }
     if (foreign) {
       // Scoped admission re-reads the store rather than this candidate array. Carry the
       // ownership exclusion into that selector too, or a suspended live-owner child is claimed.
       excludedFromRevival.add(record.task_id)
-      outcomes.push(parentSessionId === undefined
-        ? {
-            task_id: record.task_id,
-            kind: "foreign_live_owner",
-            reason: `child owned by live process pid=${record.host_pid}`,
-          }
-        : { task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
+      outcomes.push(lostOwnership(record, parentSessionId, `child owned by live process pid=${record.host_pid}`))
       continue
     }
     if (hasLiveResidentHandle(context, record.task_id)) {
@@ -142,6 +136,18 @@ async function reconcileRecords(
     (taskId) => newestSessionPath(context, taskId),
   ))
   return { outcomes }
+}
+
+/**
+ * One loser contract for every window in which another owner takes the record (omo#11665): seen live
+ * at the scan, changed while its owner was probed, or claimed first at the reclaim CAS. A scoped pass
+ * reports `deferred`/`foreign_live_owner`, which is what schedules the scoped retry that revives the
+ * child if that owner dies; the legacy global sweep keeps its `foreign_live_owner` kind and detail.
+ */
+function lostOwnership(record: TaskRecord, parentSessionId: string | undefined, detail: string): ReconcileOutcome {
+  return parentSessionId === undefined
+    ? { task_id: record.task_id, kind: "foreign_live_owner", reason: detail }
+    : { task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" }
 }
 
 export async function reconcileLegacyRecord(context: LifecycleContext, observed: TaskRecord): Promise<ReconcileOutcome> {
