@@ -72,18 +72,21 @@ export function createPluginInterface(args: {
       hooks,
       mcpManager: managers.skillMcpManager,
       notify: (message) => showSkillSecurityNotice(ctx, message),
+      notifyProfile: (message, variant) => {
+        void ctx.client.tui?.showToast?.({ body: { title: "Session model profile", message, variant, duration: 8000 } })?.catch(() => {})
+      },
     }),
 
     "chat.message": async (input, output) => {
       const selected = !isSyntheticOrInternalOnlyTextParts(output.parts)
-        ? await args.sessionModelProfiles?.applyPrimary(input.sessionID, input.agent, output.message)
+        ? await args.sessionModelProfiles?.applyPrimary(input.sessionID, input.agent ?? (typeof output.message.agent === "string" ? output.message.agent : undefined), output.message)
         : args.sessionModelProfiles?.primaryConfig(input.sessionID, output.message.id)
       await createChatMessageHandler({
         ctx,
         pluginConfig: selected ? { ...pluginConfig, ...selected } : pluginConfig,
         firstMessageVariantGate,
         hooks,
-      })(input, output)
+      })(selected && output.message.model ? { ...input, model: output.message.model as { providerID: string; modelID: string } } : input, output)
     },
 
     "experimental.chat.messages.transform": createMessagesTransformHandler({

@@ -56,6 +56,7 @@ export function createCommandExecuteBeforeHandler(args: {
   sessionModelProfiles?: SessionModelProfiles
   hooks: CreatedHooks
   mcpManager?: SkillMcpManager
+  notifyProfile?: (message: string, variant: "success" | "error") => void
   notify?: (message: string) => void
 }): (
   input: CommandExecuteBeforeInput,
@@ -65,7 +66,14 @@ export function createCommandExecuteBeforeHandler(args: {
 
   return async (input, output): Promise<void> => {
     if (input.command.toLowerCase() === "omo-profile" && args.sessionModelProfiles) {
-      const message = await args.sessionModelProfiles.command(input.sessionID, input.arguments)
+      let message: string
+      try {
+        message = await args.sessionModelProfiles.command(input.sessionID, input.arguments)
+      } catch (error) {
+        args.notifyProfile?.(error instanceof Error ? error.message : String(error), "error")
+        throw error
+      }
+      args.notifyProfile?.(message, "success")
       output.parts.push({ type: "text", text: message, synthetic: true })
       return
     }
