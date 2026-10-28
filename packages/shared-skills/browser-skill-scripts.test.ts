@@ -147,7 +147,7 @@ describe("browser-doctor.mjs", () => {
     }
   })
 
-  test("#given open sessions, one without a valid created_at_ms #when the doctor runs #then it lists them all and does not crash", () => {
+  test("#given open sessions, some without a valid or in-range created_at_ms #when the doctor runs #then it lists them all and does not crash", () => {
     const createdAtMs = Date.UTC(2026, 9, 28, 12, 0, 0)
     const daemon = {
       running: true,
@@ -158,6 +158,7 @@ describe("browser-doctor.mjs", () => {
         { session_id: "s-valid", browser_instance_id: "b1", agent_window_id: 7, created_at_ms: createdAtMs },
         { session_id: "s-missing", browser_instance_id: "b1" },
         { session_id: "s-invalid", browser_instance_id: "b1", agent_window_id: 8, created_at_ms: "not a time" },
+        { session_id: "s-out-of-range", browser_instance_id: "b1", created_at_ms: 1e20 },
       ],
     }
 
@@ -166,13 +167,14 @@ describe("browser-doctor.mjs", () => {
     expect(text.status).toBe(0)
     const listed = text.stdout.split("\n").find((line) => line.startsWith("sessions open: "))
     expect(listed).toContain(new Date(createdAtMs).toISOString())
-    for (const id of ["s-valid", "s-missing", "s-invalid"]) expect(listed).toContain(id)
+    for (const id of ["s-valid", "s-missing", "s-invalid", "s-out-of-range"]) expect(listed).toContain(id)
 
     const summary = runJson("browser-doctor.mjs", doctorReport(daemon))
     expect(summary.sessions).toEqual([
       { sessionId: "s-valid", browserInstanceId: "b1", agentWindowId: 7, createdAtMs },
       { sessionId: "s-missing", browserInstanceId: "b1", agentWindowId: null, createdAtMs: null },
       { sessionId: "s-invalid", browserInstanceId: "b1", agentWindowId: 8, createdAtMs: null },
+      { sessionId: "s-out-of-range", browserInstanceId: "b1", agentWindowId: null, createdAtMs: null },
     ])
   })
 })
