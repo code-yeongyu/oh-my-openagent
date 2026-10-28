@@ -18,7 +18,7 @@ const state = report.ready
           : "no-extension"
 
 const startBlocked = report.daemon.startBlocked ?? /Job Object|breakaway/i.test(report.daemon.error ?? "")
-const sessions = (report.daemon.sessions ?? []).map((s) => ({ sessionId: s.session_id, browserInstanceId: s.browser_instance_id, agentWindowId: s.agent_window_id ?? null, createdAtMs: s.created_at_ms }))
+const sessions = (report.daemon.sessions ?? []).map((s) => ({ sessionId: s.session_id, browserInstanceId: s.browser_instance_id, agentWindowId: s.agent_window_id ?? null, createdAtMs: Number.isFinite(s.created_at_ms) ? s.created_at_ms : null }))
 const SESSIONS_NOTE = sessions.length > 0
   ? `\n${sessions.length} BrowserSkill session(s) are open, each with an Agent Window. Any you did not start in this task was left by an earlier or cancelled task: stop it with \`bsk session stop <id>\` (the daemon also stops sessions idle for 5 minutes).`
   : ""
@@ -62,6 +62,6 @@ if (process.argv.includes("--json")) {
   if (summary.registeredElsewhere.length > 0) console.log(`extension entries left in other browsers: ${summary.registeredElsewhere.join(", ")} (not removed automatically)`)
   console.log(`browsers detected: ${summary.browsersDetected.map((b) => `${b.id}${b.extensionRegistered ? " (extension registered)" : ""}`).join(", ") || "none"}`)
   console.log(`browsers connected: ${summary.browsersConnected.map((b) => `${b.name} ${b.version} [${b.instanceId}]`).join(", ") || "none"}`)
-  console.log(`sessions open: ${sessions.map((s) => `${s.sessionId} (browser ${s.browserInstanceId}, window ${s.agentWindowId ?? "-"}, since ${new Date(s.createdAtMs).toISOString()})`).join(", ") || "none"}`)
+  console.log(`sessions open: ${sessions.map((s) => `${s.sessionId} (browser ${s.browserInstanceId}, window ${s.agentWindowId ?? "-"}${s.createdAtMs === null ? "" : `, since ${new Date(s.createdAtMs).toISOString()}`})`).join(", ") || "none"}`)
   console.log(`\n${summary.remedy}`)
 }
