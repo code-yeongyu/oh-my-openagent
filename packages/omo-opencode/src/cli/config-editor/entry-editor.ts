@@ -8,7 +8,7 @@ import { DEFAULT_CATEGORIES } from "../../tools/delegate-task/builtin-categories
 import { choose, input, record, safeName, displayText } from "./prompt"
 import { editModelChain, readModelChain, modelId, changePrimary, writeModelChain } from "./model-chain"
 import { selectEditorModel } from "./model-picker"
-import { readEditorValue, setEditorValue, withEditorTransaction, type EditorSession } from "./session"
+import { readEditorValue, setEditorValue, withEditorTransaction, validateEditorValue, type EditorSession } from "./backend"
 
 export function isOpenCodeView(path: readonly string[]): boolean {
   return path.at(-1) === "[opencode]"
@@ -43,9 +43,8 @@ export async function editJsonField(session: EditorSession, parent: string[], su
   }
   const text = await input(`JSON value for ${field}`, JSON.stringify(current), (value) => {
     try {
-      const candidate: EditorSession = { ...session, config: structuredClone(session.config), edits: [...session.edits] }
-      setEditorValue(candidate, path, JSON.parse(value))
-      return undefined
+      const result = validateEditorValue(session, path, JSON.parse(value))
+      return result.valid ? undefined : result.issues.map((issue) => displayText(issue.message)).join("; ")
     } catch (error) { return displayText(error instanceof Error ? error.message : "Enter a valid JSON value.") }
   })
   setEditorValue(session, path, JSON.parse(text))

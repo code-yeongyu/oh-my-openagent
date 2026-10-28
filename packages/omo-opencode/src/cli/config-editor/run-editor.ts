@@ -2,7 +2,7 @@ import * as p from "@clack/prompts"
 import { resolve } from "node:path"
 import { choose, record, EditorCancelled, displayText } from "./prompt"
 import { bulkSetModels, editEntries, editJsonField, editRootDefault, isOpenCodeView } from "./entry-editor"
-import { discoverEditorTargets, openEditorSession, isEditorModified, saveEditorSession, type EditorSession } from "./session"
+import { discoverEditorTargets, openEditorSession, isEditorModified, saveEditorSession, type EditorSession } from "./backend"
 
 export type ConfigEditorOptions = {
   readonly directory?: string

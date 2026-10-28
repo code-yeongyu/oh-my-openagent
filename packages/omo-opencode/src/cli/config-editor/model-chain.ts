@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts"
 import { choose, record, displayText } from "./prompt"
 import { selectEditorModel } from "./model-picker"
-import { readEditorValue, setEditorValue, withEditorTransaction, type EditorSession } from "./session"
+import { readEditorValue, setEditorValue, withEditorTransaction, type EditorSession } from "./backend"
 
 export type ModelEntry = string | Record<string, unknown>
 
