@@ -98,37 +98,55 @@ describe("task start failure cause", () => {
     expect(eventLog).not.toContain("sk-live-secret")
   })
 
+  // manager.start reports within START_REPORT_WINDOW_MS: a launch that settles inside the window returns
+  // start_failed, one still spawning when it closes returns started+starting and fails afterwards (#11732;
+  // a Windows process spawn alone can outlast the window). Both orders are forced here, never left to timing.
   test.each([
     ["no error code (an engine that predates typed refusals)", { error: "No API key found for openai." }, "the prompt was refused (host_refused)", {}],
     ["a non-credential error code", { error: "busy", errorCode: "host_memory_pressure" }, "the prompt was refused (host_refused: host_memory_pressure)", { cause_code: "host_memory_pressure" }],
-  ])("#given a real process child refuses its first prompt with %s #when the task starts #then it fails on its own model with that refusal named and no chain walk", async (_label, refusal, cause, code) => {
+  ])("#given a real process child refuses its first prompt with %s #when the task starts #then it fails on its own model with that refusal named and no chain walk, whether the refusal or the start report window comes first", async (_label, refusal, cause, code) => {
     // given: protocol contract - the wire's typed errorCode reaches the start-failure record unchanged
     const primary = { provider: "openai", model_id: "gpt-5.6-sol", display: "openai/gpt-5.6-sol", source: "category" } as const
     const next = { provider: "kimi-coding", model_id: "kimi-k3", display: "kimi-coding/kimi-k3", source: "category" } as const
     const planner: ChildPlanner = () => ({ kind: "resolved", plan: { model: primary.display, resolved_model: primary, category: "quick", fallback_models: [next] } })
     const { runner, launched } = refusingProcessRunner({ [primary.display]: refusal }, spawned)
-    const { manager, store } = makeManager({ planner, process: createRpcManagedRunner(runner) })
-
-    // when
-    const result = await manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "quick", execution_mode: "process" })
-
-    // then
-    expect(result.kind).toBe("start_failed")
-    if (result.kind !== "start_failed") return
-    expect(await launchSettled(manager, result)).toBe("start_failed")
+    const real = createRpcManagedRunner(runner)
     const message = `Child prompt failed to start: ${cause}.`
-    expect(result.error_message).toBe(message)
+
+    // when: window first - the real launch is held until start has reported, as a slow spawn does
+    let realRefusal: unknown
+    let reported!: () => void
+    const startReported = new Promise<void>((resolve) => { reported = resolve })
+    const late = makeManager({ planner, process: {
+      start: async (spec) => {
+        await startReported
+        return real.start(spec).catch((error: unknown) => { realRefusal = error; throw error })
+      },
+    } })
+    const windowFirst = await late.manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "quick", execution_mode: "process" })
+    reported()
+
+    // when: refusal first - the same real refusal settles the launch before the window can close
+    const early = makeManager({ planner, process: { start: async () => { throw realRefusal } } })
+    expect(windowFirst).toMatchObject({ kind: "started", starting: true })
+    expect(await launchSettled(late.manager, windowFirst)).toBe("start_failed")
+    const refusalFirst = await early.manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "quick", execution_mode: "process" })
+
+    // then: both orders end in the same named failure on the child's own model
+    expect(refusalFirst).toMatchObject({ kind: "start_failed", error_message: message })
     expect(launched).toEqual([primary.display])
-    const log = taskEvents(store.stateDir, result.task_id)
-    expect(log.filter((event) => event.type === "task_model_fallback")).toEqual([])
-    expect(log.find((event) => event.type === "task_start_failed")?.payload).toEqual({
-      error_message: message,
-      failure_kind: "child-prompt-failed",
-      rejected_while: "alive",
-      cause_class: "host_refused",
-      ...code,
-    })
-    expect(store.load(result.task_id)).toMatchObject({ model: primary.display, status: "error" })
+    for (const { store, taskId } of [{ store: late.store, taskId: windowFirst.task_id }, { store: early.store, taskId: refusalFirst.task_id }]) {
+      const log = taskEvents(store.stateDir, taskId)
+      expect(log.filter((event) => event.type === "task_model_fallback")).toEqual([])
+      expect(log.find((event) => event.type === "task_start_failed")?.payload).toEqual({
+        error_message: message,
+        failure_kind: "child-prompt-failed",
+        rejected_while: "alive",
+        cause_class: "host_refused",
+        ...code,
+      })
+      expect(store.load(taskId)).toMatchObject({ model: primary.display, status: "error", error_message: message })
+    }
     await runner.settleTeardowns()
   })
 
