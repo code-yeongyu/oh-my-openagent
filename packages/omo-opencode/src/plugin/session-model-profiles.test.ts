@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { getFallbackModelsForSession } from "../hooks/runtime-fallback/fallback-models"
 import { getSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
+import { applyAgentVariant } from "../shared/agent-variant"
 import { createSessionModelProfiles } from "./session-model-profiles"
 
 function fixture(run: (args: { profiles: ReturnType<typeof createSessionModelProfiles>; path: string; config: Record<string, unknown>; reads: string[] }) => Promise<void>): Promise<void> {
@@ -106,6 +107,60 @@ describe("session model profiles", () => {
       await profiles.applyPrimary("parent", "sisyphus", retry)
       expect(retry.model.modelID).toBe("budget-fallback")
       expect(retry.variant).toBe("minimal")
+    })
+  })
+
+  test.each([
+    ["new model and variant", "deliberate-new-choice", "medium", "deliberate-new-choice", "medium"],
+    ["new variant only", "budget", "medium", "original", "medium"],
+    ["new model only", "deliberate-new-choice", "low", "deliberate-new-choice", "high"],
+    ["stale profile values", "budget", "low", "original", "high"],
+  ])("selection-only clear preserves %s independently of stale fields", async (_, incomingModel, incomingVariant, expectedModel, expectedVariant) => {
+    await fixture(async ({ profiles, path }) => {
+      writeFileSync(path, JSON.stringify({ profiles: { quality: {}, budget: { "[opencode]": { agents: { sisyphus: { model: "fixture/budget", variant: "low" } } } } } }))
+      await profiles.select("parent", "budget")
+      await profiles.applyPrimary("parent", "sisyphus", { id: "selected", model: { providerID: "fixture", modelID: "original" }, variant: "high" })
+      await profiles.select("parent", undefined)
+      const next = { id: "first-after-clear", model: { providerID: "fixture", modelID: incomingModel }, variant: incomingVariant }
+      await profiles.applyPrimary("parent", "sisyphus", next)
+      expect(next.model).toEqual({ providerID: "fixture", modelID: expectedModel })
+      expect(next.variant).toBe(expectedVariant)
+      const later = { id: "later-after-clear", model: { providerID: "fixture", modelID: "budget" }, variant: "low" }
+      await profiles.applyPrimary("parent", "sisyphus", later)
+      expect(later.model.modelID).toBe("budget")
+      expect(later.variant).toBe("low")
+    })
+  })
+
+  test.each(["model", "reasoning"])("clearing %s variant suppression preserves a new host variant", async (field) => {
+    await fixture(async ({ profiles, path }) => {
+      const override = field === "model" ? { model: "fixture/budget" } : { reasoning: "low" }
+      writeFileSync(path, JSON.stringify({ profiles: { quality: {}, budget: { "[opencode]": { agents: { sisyphus: override } } } } }))
+      await profiles.select("parent", "budget")
+      const first: Record<string, unknown> = { id: "suppressed", model: { providerID: "fixture", modelID: "original" }, variant: "high" }
+      await profiles.applyPrimary("parent", "sisyphus", first)
+      expect(first.variant).toBeUndefined()
+      await profiles.select("parent", undefined)
+      const next = { id: "explicit-after-suppression", model: { providerID: "fixture", modelID: "chosen" }, variant: "medium" }
+      await profiles.applyPrimary("parent", "sisyphus", next)
+      expect(next.model.modelID).toBe("chosen")
+      expect(next.variant).toBe("medium")
+    })
+  })
+
+  test.each(["low", "medium"])("clearing lowered reasoning handles incoming %s variant", async (incomingVariant) => {
+    await fixture(async ({ profiles, path }) => {
+      writeFileSync(path, JSON.stringify({ profiles: { quality: {}, budget: { "[opencode]": { agents: { sisyphus: { reasoning: "low" } } } } } }))
+      await profiles.select("parent", "budget")
+      const first = { id: "reasoning-first", model: { providerID: "openai", modelID: "gpt-6.1-sol" }, variant: "high" }
+      const selected = await profiles.applyPrimary("parent", "sisyphus", first)
+      if (!selected) throw new Error("Expected a selected primary config")
+      applyAgentVariant(selected, "sisyphus", first, first.model)
+      expect(first.variant).toBe("low")
+      await profiles.select("parent", undefined)
+      const next = { id: "after-reasoning-clear", model: { ...first.model }, variant: incomingVariant }
+      await profiles.applyPrimary("parent", "sisyphus", next)
+      expect(next.variant).toBe(incomingVariant === "low" ? "high" : "medium")
     })
   })
 

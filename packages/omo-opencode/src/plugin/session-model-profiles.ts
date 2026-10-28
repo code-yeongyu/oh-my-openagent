@@ -6,13 +6,25 @@ import { parseModelString } from "../shared/model-string-parser"
 import { log } from "../shared/logger"
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models"
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements"
+import { lowerReasoningForModel } from "../shared/agent-variant"
 import { setSessionFallbackSnapshot, clearSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
 import { createRuntimeModelConfigLoader } from "./runtime-model-config"
 
 type ModelConfig = Pick<OhMyOpenCodeConfig, "agents" | "categories">
 type Selection = { name?: string; config: ModelConfig }
-type PrimaryBaseline = { model?: unknown; variant?: unknown }
+type ModelChoice = { providerID: string; modelID: string }
+type PrimaryBaseline = {
+  model?: { value: unknown; applied: ModelChoice }
+  variant?: { value: unknown; applied: unknown }
+}
 type SessionReader = (id: string) => Promise<{ parentID?: string }>
+
+function modelChoice(value: unknown): ModelChoice | undefined {
+  if (typeof value !== "object" || value === null
+    || !("providerID" in value) || typeof value.providerID !== "string"
+    || !("modelID" in value) || typeof value.modelID !== "string") return undefined
+  return { providerID: value.providerID, modelID: value.modelID }
+}
 
 export type SessionModelProfiles = ReturnType<typeof createSessionModelProfiles>
 
@@ -120,21 +132,30 @@ export function createSessionModelProfiles(args: {
     const baselines = baselineModels.get(sessionID) ?? new Map<string, PrimaryBaseline>()
     const baseline = baselines.get(agentKey ?? "") ?? {}
     if (model) {
-      if (!("model" in baseline)) baseline.model = message.model
-      message.model = { providerID: model.providerID, modelID: model.modelID }
-    } else if ("model" in baseline) {
-      message.model = baseline.model
+      const applied = { providerID: model.providerID, modelID: model.modelID }
+      baseline.model ??= { value: message.model, applied }
+      baseline.model.applied = applied
+      message.model = applied
+    } else if (baseline.model) {
+      const incoming = modelChoice(message.model)
+      if (incoming?.providerID === baseline.model.applied.providerID && incoming?.modelID === baseline.model.applied.modelID) message.model = baseline.model.value
       delete baseline.model
     }
     const variant = override?.variant ?? category?.variant ?? model?.variant
     const reasoning = override?.reasoning ?? category?.reasoning
     if (model || variant !== undefined || reasoning !== undefined) {
-      if (!("variant" in baseline)) baseline.variant = message.variant
+      baseline.variant ??= { value: message.variant, applied: variant }
+      const currentModel = modelChoice(message.model)
+      // chat.params lowers reasoning after this hook; remember the variant it actually writes.
+      baseline.variant.applied = variant ?? (reasoning !== undefined && currentModel
+        ? lowerReasoningForModel(reasoning, currentModel).variant : undefined)
       if (variant !== undefined) message.variant = variant
       else delete message.variant
-    } else if ("variant" in baseline) {
-      if (baseline.variant !== undefined) message.variant = baseline.variant
-      else delete message.variant
+    } else if (baseline.variant) {
+      if (message.variant === baseline.variant.applied) {
+        if (baseline.variant.value !== undefined) message.variant = baseline.variant.value
+        else delete message.variant
+      }
       delete baseline.variant
     }
     if (Object.keys(baseline).length > 0) {
