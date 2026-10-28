@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 import { displayText } from "./prompt"
 
 import { readEditorModels, validateEditorModel, type EditorModels } from "./models"
@@ -71,7 +72,7 @@ export async function selectEditorModel(current?: string, options: ModelPickerOp
     }
     const model = await prompts.text({
       message: "Enter a model (provider/model)",
-      placeholder: "openai/gpt-6.1-sol",
+      placeholder: `openai/${LATEST_MODEL_BY_FAMILY.gptSol}`,
       ...(current === undefined ? {} : { initialValue: displayText(current) }),
       validate: validateEditorModel,
     })

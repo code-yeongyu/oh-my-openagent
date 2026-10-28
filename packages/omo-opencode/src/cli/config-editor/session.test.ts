@@ -43,7 +43,8 @@ describe("config editor sessions", () => {
     expect(content).toContain("// provider-specific fallback details")
     expect(content).toContain('"future_setting": { "enabled": true }')
     expect(content).toContain('"temperature": 0.4')
-    expect(readFileSync(saved.backupPath!, "utf-8")).toBe(original)
+    if (saved.backupPath === undefined) throw new Error("Expected a backup after saving edits.")
+    expect(readFileSync(saved.backupPath, "utf-8")).toBe(original)
     expect(readEditorValue(session, ["agents", "oracle", "models"])).toEqual(["openai/new", { model: "anthropic/backup", reasoning: "high" }])
     expect(isEditorModified(session)).toBe(false)
   })
@@ -285,7 +286,8 @@ describe("config editor sessions", () => {
     setEditorValue(session, ["agents", "oracle", "model"], "openai/a")
     const result = saveEditorSession(session)
     expect(lstatSync(path).mode & 0o777).toBe(0o600)
-    expect(lstatSync(result.backupPath!).mode & 0o777).toBe(0o600)
+    if (result.backupPath === undefined) throw new Error("Expected a backup after saving edits.")
+    expect(lstatSync(result.backupPath).mode & 0o777).toBe(0o600)
   })
 
   test("new files are created only on save with private permissions", () => {

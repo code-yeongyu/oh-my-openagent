@@ -39,12 +39,13 @@ test("headless backend validates without mutation, snapshots edits and safely sa
   value.edit = "deny"
   expect(readEditorValue(session, field)).toEqual({ edit: "allow" })
   const saved = saveEditorSession(session)
-  expect(readFileSync(saved.backupPath!, "utf8")).toBe(original)
+  if (saved.backupPath === undefined) throw new Error("Expected a backup after saving edits.")
+  expect(readFileSync(saved.backupPath, "utf8")).toBe(original)
   expect(readFileSync(path, "utf8")).toContain("// keep this note")
   expect(readFileSync(path, "utf8")).toContain('"future":{"keep":true}')
   expect(readEditorValue(openEditorSession(path, "project"), field)).toEqual({ edit: "allow" })
   expect(statSync(path).mode & 0o777).toBe(0o600)
-  expect(statSync(saved.backupPath!).mode & 0o777).toBe(0o600)
+  expect(statSync(saved.backupPath).mode & 0o777).toBe(0o600)
 
   setEditorValue(session, field, { edit: "deny" })
   const external = readFileSync(path, "utf8") + "// another writer\n"
