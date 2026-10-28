@@ -1,3 +1,4 @@
+import type { OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 import type { OhMyOpenCodeConfig } from "../config"
 import { validatePluginConfig } from "../config/validate"
 import { log } from "../shared/logger"
@@ -6,12 +7,13 @@ import { log } from "../shared/logger"
 export function createRuntimeModelConfigLoader(
   directory: string,
   initialConfig: OhMyOpenCodeConfig,
+  environment: OmoConfigEnv = process.env,
 ): () => Pick<OhMyOpenCodeConfig, "agents" | "categories"> {
   let current = { agents: initialConfig.agents, categories: initialConfig.categories }
 
   return () => {
     try {
-      const validation = validatePluginConfig(directory)
+      const validation = validatePluginConfig(directory, environment)
       // Invalid leaves can be pruned with only a warning. Never accept that partial edit.
       if (!validation.valid || validation.messages.length > 0 || validation.warnings.length > 0) {
         log("[runtime-model-config] Reload rejected; keeping the last valid model config", {
