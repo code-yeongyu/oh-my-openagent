@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { getFallbackModelsForSession } from "../hooks/runtime-fallback/fallback-models"
 import { getSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
 import { createSessionModelProfiles } from "./session-model-profiles"
@@ -28,6 +28,59 @@ function fixture(run: (args: { profiles: ReturnType<typeof createSessionModelPro
 }
 
 describe("session model profiles", () => {
+  test("headless control returns safe errors and saved inspection preserves each accepted session", async () => {
+    await fixture(async ({ profiles, path, config }) => {
+      expect(await profiles.control("parent", "budget")).toEqual({ ok: true })
+      const initial = await profiles.inspectRuntime("parent")
+      expect(initial).toMatchObject({ ok: true, sessionID: "parent", source: "session", acceptedRevision: 1, saved: { valid: true, matchesAccepted: true } })
+      expect(await profiles.inspectRuntime("child-one")).toEqual(initial)
+      expect(await profiles.control("child-one", "quality")).toEqual({ ok: false, error: { code: "selection-rejected" } })
+      for (const value of ["", " padded", "bad\nname", 2, {}, undefined]) {
+        expect(await profiles.control("parent", value)).toEqual({ ok: false, error: { code: "invalid-profile" } })
+      }
+      expect(await profiles.control("parent", "PRIVATE_MISSING_PROFILE")).toEqual({ ok: false, error: { code: "selection-rejected" } })
+      expect(await profiles.inspectRuntime("parent")).toEqual(initial)
+      writeFileSync(path, JSON.stringify(config).replaceAll("fixture/budget", "fixture/pending"))
+      expect(await profiles.inspectRuntime("parent")).toMatchObject({ acceptedRevision: 1, saved: { valid: true, matchesAccepted: false } })
+      expect(profiles.primaryConfig("parent")?.agents?.explore?.model).toBe("fixture/budget")
+      await profiles.load("parent")
+      expect(await profiles.inspectRuntime("parent")).toMatchObject({ acceptedRevision: 2, lastReload: { outcome: "accepted" }, saved: { matchesAccepted: true } })
+      writeFileSync(path, '{"PRIVATE_PARSE_SENTINEL":')
+      expect(await profiles.inspectRuntime("parent")).toMatchObject({ acceptedRevision: 2, lastReload: { outcome: "accepted" }, saved: { valid: false, matchesAccepted: null } })
+      await profiles.load("child-one")
+      expect(await profiles.inspectRuntime("parent")).toMatchObject({ lastReload: { outcome: "rejected" } })
+      expect(profiles.primaryConfig("parent")?.agents?.explore?.model).toBe("fixture/pending")
+      const state = JSON.stringify(await profiles.inspectRuntime("parent"))
+      expect(state).not.toContain("PRIVATE")
+      expect(state).not.toContain(path)
+      writeFileSync(path, JSON.stringify(config))
+      expect(await profiles.control("parent", null)).toEqual({ ok: true })
+      expect((await profiles.load("parent")).agents?.explore?.model).toBe("fixture/quality")
+      expect(await profiles.inspectRuntime("other")).toMatchObject({ source: "startup", acceptedRevision: 1, lastReload: { outcome: "startup" } })
+    })
+  })
+
+  test("safe inspection redacts session reader failures and instances do not share selectors", async () => {
+    await fixture(async ({ profiles, path }) => {
+      const other = createSessionModelProfiles({ directory: path, initialConfig: {}, environment: {}, readSession: async () => { throw new Error("PRIVATE_SESSION_TOKEN") } })
+      expect(await other.inspectRuntime("unavailable")).toEqual({ ok: false, error: { code: "session-unavailable" } })
+      expect(await other.control("unavailable", "budget")).toEqual({ ok: false, error: { code: "selection-rejected" } })
+      expect(await profiles.control("parent", "budget")).toEqual({ ok: true })
+      expect(await profiles.inspectRuntime("parent")).toMatchObject({ source: "session" })
+      const isolated = createSessionModelProfiles({ directory: dirname(dirname(path)), initialConfig: {}, environment: { HOME: dirname(dirname(dirname(path))), OMO_PROFILE: "quality" }, readSession: async () => ({}) })
+      expect((await isolated.inspect("parent")).profile).toBe("quality")
+      expect(await isolated.inspectRuntime("parent")).toMatchObject({ source: "startup", acceptedRevision: 1 })
+      expect((await isolated.load("parent")).agents?.explore?.model).toBe("fixture/quality")
+      expect(profiles.primaryConfig("parent")?.agents?.explore?.model).toBe("fixture/budget")
+      let rejectChange = false
+      const failedCallback = createSessionModelProfiles({ directory: dirname(dirname(path)), initialConfig: {}, environment: { HOME: dirname(dirname(dirname(path))) }, readSession: async () => ({}), onSelectionChanged: () => { if (rejectChange) throw new Error("PRIVATE_CALLBACK") } })
+      expect(await failedCallback.control("parent", "budget")).toEqual({ ok: true })
+      rejectChange = true
+      expect(await failedCallback.control("parent", "quality")).toEqual({ ok: false, error: { code: "selection-rejected" } })
+      expect(failedCallback.primaryConfig("parent")?.agents?.explore?.model).toBe("fixture/budget")
+    })
+  })
+
   test("native selection overrides startup selector for one parent and descendant dispatches without persisting", async () => {
     await fixture(async ({ profiles, path, reads }) => {
       const before = readFileSync(path, "utf8")

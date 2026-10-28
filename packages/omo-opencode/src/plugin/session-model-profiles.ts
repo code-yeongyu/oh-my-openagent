@@ -3,14 +3,13 @@ import type { OhMyOpenCodeConfig } from "../config"
 import { validatePluginConfig } from "../config/validate"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { parseModelString } from "../shared/model-string-parser"
-import { log } from "../shared/logger"
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models"
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements"
 import { setSessionFallbackSnapshot, clearSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
 import { createRuntimeModelConfigLoader } from "./runtime-model-config"
 
 type ModelConfig = Pick<OhMyOpenCodeConfig, "agents" | "categories">
-type Selection = { name?: string; config: ModelConfig }
+type Selection = { name?: string; config: ModelConfig; runtime: ReturnType<typeof createRuntimeModelConfigLoader> }
 type SessionReader = (id: string) => Promise<{ parentID?: string }>
 
 export type SessionModelProfiles = ReturnType<typeof createSessionModelProfiles>
@@ -52,11 +51,7 @@ export function createSessionModelProfiles(args: {
   }
 
   function reload(selection: Selection): ModelConfig {
-    try {
-      selection.config = readConfig(selection.name)
-    } catch (error) {
-      log("[session-model-profiles] Reload rejected; retaining the accepted session snapshot", { error: String(error) })
-    }
+    selection.config = selection.runtime()
     return selection.config
   }
 
@@ -84,8 +79,46 @@ export function createSessionModelProfiles(args: {
     }
     if (name !== undefined && !name.trim()) throw new Error("A nonblank profile name is required")
     const config = readConfig(name)
-    selections.set(sessionID, { name, config })
-    args.onSelectionChanged?.(sessionID)
+    const selectedEnvironment = name === undefined ? environment : { ...environment, OMO_PROFILE: name }
+    const runtime = createRuntimeModelConfigLoader(args.directory, config, selectedEnvironment)
+    const previous = selections.get(sessionID)
+    selections.set(sessionID, { name, config, runtime })
+    try {
+      args.onSelectionChanged?.(sessionID)
+    } catch (error) {
+      if (previous) selections.set(sessionID, previous)
+      else selections.delete(sessionID)
+      throw error
+    }
+  }
+
+  /** Instance-local capability: observes saved files without accepting a runtime reload. */
+  async function inspectRuntime(sessionID: string) {
+    try {
+      const root = await rootSession(sessionID)
+      const selection = selections.get(root)
+      return {
+        ok: true as const,
+        sessionID: root,
+        source: selection?.name === undefined ? "startup" as const : "session" as const,
+        ...((selection?.runtime ?? loadDefault).inspect()),
+      }
+    } catch {
+      return { ok: false as const, error: { code: "session-unavailable" as const } }
+    }
+  }
+
+  /** Safe error DTO for a trusted adapter; null restores the startup selector. */
+  async function control(sessionID: string, profile: unknown) {
+    if (profile !== null && (typeof profile !== "string" || profile.trim() !== profile || !profile || /[\u0000-\u001f\u007f]/.test(profile))) {
+      return { ok: false as const, error: { code: "invalid-profile" as const } }
+    }
+    try {
+      await select(sessionID, profile === null ? undefined : profile)
+      return { ok: true as const }
+    } catch {
+      return { ok: false as const, error: { code: "selection-rejected" as const } }
+    }
   }
 
   async function command(sessionID: string, value: string): Promise<string> {
@@ -142,7 +175,7 @@ export function createSessionModelProfiles(args: {
     clearSessionFallbackSnapshot(sessionID)
   }
 
-  return { load, inspect, select, command, applyPrimary, clearSession, primaryConfig: (id: string, messageID?: unknown) => {
+  return { load, inspect, inspectRuntime, control, select, command, applyPrimary, clearSession, primaryConfig: (id: string, messageID?: unknown) => {
     const request = typeof messageID === "string" ? requests.get(id)?.get(messageID) : undefined
     return request ?? selections.get(id)?.config
   } }
