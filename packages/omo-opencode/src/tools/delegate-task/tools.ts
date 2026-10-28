@@ -147,7 +147,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const currentModelConfig = options.loadCurrentModelConfig?.()
       const modelOptions = currentModelConfig === undefined
         ? options
-        : { ...options, userCategories: currentModelConfig.categories, agentOverrides: currentModelConfig.agents }
+        : {
+          ...options,
+          userCategories: currentModelConfig.categories,
+          agentOverrides: currentModelConfig.agents,
+          sisyphusJuniorModel: currentModelConfig.agents?.["sisyphus-junior"]?.model,
+        }
 
       let agentToUse: string
       let categoryModel: DelegatedModelConfig | undefined
