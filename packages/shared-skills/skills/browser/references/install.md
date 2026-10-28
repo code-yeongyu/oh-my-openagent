@@ -103,7 +103,9 @@ unless `BSK_AUTO_START=0` (sandboxes that reap background processes keep the dae
 and share `BSK_HOME`; see upstream's sandboxed-agents guide).
 
 On Windows, an agent host whose Job Object forbids breakaway makes every detached start fail with
-"cannot start an independent Windows daemon". The doctor reports that as `daemon.startBlocked`.
+"cannot start an independent Windows daemon". `browser-install.mjs`, which starts the daemon, reports
+that as `daemon.startBlocked`; the doctor does not start the daemon, so it reports it only when the
+error it sees names the refusal.
 Retrying `bsk status` or `bsk daemon start` cannot help: run `bsk daemon start --foreground` in a
 persistent background session of the host (one that outlives the command) and check it with
 `bsk status` from a separate call. While the daemon is down, nothing can see the extension, so

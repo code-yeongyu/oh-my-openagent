@@ -17,7 +17,9 @@ const state = report.ready
           ? "choose-browser"
           : "no-extension"
 
-const startBlocked = report.daemon.startBlocked ?? /Job Object|breakaway/i.test(report.daemon.error ?? "")
+// An omowright with its PR #70 sets daemon.startBlocked. Older omowright doctors never start the daemon
+// (auto-start is off), so a refusal only shows when the error text names it; browser-install.mjs does start it.
+const startBlocked = !report.daemon.running && (report.daemon.startBlocked ?? /Job Object|breakaway|registering the bsk daemon task/i.test(report.daemon.error ?? ""))
 const sessions = (report.daemon.sessions ?? []).map((s) => ({ sessionId: s.session_id, browserInstanceId: s.browser_instance_id, agentWindowId: s.agent_window_id ?? null, createdAtMs: Number.isFinite(s.created_at_ms) ? s.created_at_ms : null }))
 const SESSIONS_NOTE = sessions.length > 0
   ? `\n${sessions.length} BrowserSkill session(s) are open, each with an Agent Window. Any you did not start in this task was left by an earlier or cancelled task: stop it with \`bsk session stop <id>\` (the daemon also stops sessions idle for 5 minutes).`
