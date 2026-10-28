@@ -3853,18 +3853,22 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "bin/senpi-patch.mjs",
+        // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
+        "keychain-helper/gui-session-runner.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "test/account-linux-no-gdbus.fixture.ts",
         "test/bun-bin-shim.fixture.ts",
         "test/bun-bin-shim.test-support.ts",
         "test/daemon-test-support.ts",
+        "test/keychain-helper.test-support.ts",
         "test/fixtures/compiled-setup/entry.ts",
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
         "test/fixtures/senpi-hooks-state-consumer.mjs",
         "test/packed-consumer.mjs",
         "test/teardown.test-support.ts",
+        "test/trust-certificate-fixtures.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

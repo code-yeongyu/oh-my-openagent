@@ -61,15 +61,17 @@ function extractLockedVersion(packageReference: string): string {
 }
 
 async function findFirstPartyEffectImports(): Promise<string[]> {
+  // POSIX ERE, not PCRE: `git grep -P` needs a git built with USE_LIBPCRE and
+  // exits 128 without it (#10735). Every git supports -E.
   const importPattern =
-    String.raw`(?:from\s+["']effect(?:/[^"']*)?["']|import\(\s*["']effect(?:/[^"']*)?["']|require\(\s*["']effect(?:/[^"']*)?["'])`
+    String.raw`(from[[:space:]]+|import\([[:space:]]*|require\([[:space:]]*)["']effect(/[^"']*)?["']`
   const result = Bun.spawnSync(
     [
       "git",
       "grep",
       "-l",
       "-I",
-      "-P",
+      "-E",
       importPattern,
       "--",
       ...FIRST_PARTY_SOURCE_PATHS,
@@ -78,7 +80,7 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
       ":(exclude)**/node_modules/**",
       ":(exclude)**/dist/**",
     ],
-    // Bound the spawn so a slow `git grep -P` on a loaded Windows runner fails
+    // Bound the spawn so a slow `git grep -E` on a loaded Windows runner fails
     // deterministically instead of hanging past the test timeout (the observed flake).
     { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe", timeout: 60_000 },
   )
@@ -126,7 +128,7 @@ describe("dependency security", () => {
     expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.83")
   })
 
-  // The scan spawns `git grep -P` over every first-party source and already bounds that spawn at
+  // The scan spawns `git grep -E` over every first-party source and already bounds that spawn at
   // 60s so a stalled grep fails deterministically. The case therefore has to outlive its own
   // guard: on the 5s default the test died before the spawn budget could ever apply, which is the
   // Windows failure. The assertion is unchanged - only the ceiling now exceeds what it wraps.

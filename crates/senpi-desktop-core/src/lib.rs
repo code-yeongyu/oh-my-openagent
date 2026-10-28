@@ -16,6 +16,7 @@ mod protocol_holds;
 pub mod protocol_params;
 pub mod protocol_results;
 pub mod protocol_schema;
+pub mod text_range;
 pub mod types;
 pub mod user_input;
 

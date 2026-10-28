@@ -1963,6 +1963,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "omo-engine-trust-helper"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

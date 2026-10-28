@@ -11,6 +11,7 @@ members = [
     "crates/senpi-desktop-backend-win32",
     "crates/senpi-desktop-engine",
     "crates/senpi-desktop-xpc",
+    "crates/omo-engine-trust-helper",
 ]
 resolver = "2"
 

@@ -14,7 +14,7 @@ import {
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
-import { runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
+import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture } from "./build-extension.test-support.mjs"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
 import { removeTestRootBestEffort } from "../../../../test-support/held-test-root.mjs"
@@ -469,7 +469,8 @@ describe("checkExtensionCurrent", () => {
       await cp(join(pluginRoot, "package.json"), join(pkg, "package.json"))
       await cp(memorySyncOutputPath, join(pkg, "extensions", "omo-memory-sync.js"))
       for (const asset of MEMORY_SYNC_ASSET_NAMES) await cp(join(dirname(memorySyncOutputPath), asset), join(pkg, "extensions", asset))
-      const packed = await runBoundedStage("npm pack", "npm", ["pack", "--silent", "--pack-destination", work], { cwd: pkg, shell: process.platform === "win32" }, PACKED_STAGE_CAPS.pack)
+      const pack = npmPackStage(pkg, work)
+      const packed = await runBoundedStage("npm pack", pack.command, pack.args, pack.options, PACKED_STAGE_CAPS.pack)
       expect(packed.status, packed.stderr).toBe(0)
       const tarball = join(work, packed.stdout.trim().split("\n").at(-1))
       const installed = join(work, "installed")
