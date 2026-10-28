@@ -1,5 +1,7 @@
 import { setEditorValue, type EditorSession } from "./session"
 
+export { listEditorProfiles, createEditorProfile, copyEditorProfile, deleteEditorProfile } from "./profiles"
+
 export {
   discoverEditorTargets,
   isEditorModified,
