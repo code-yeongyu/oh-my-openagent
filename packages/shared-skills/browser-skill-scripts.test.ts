@@ -42,6 +42,8 @@ function runJson(script: string, report: Report) {
 const ENABLE_STEP = "In Google Chrome, open chrome://extensions and enable BrowserSkill."
 // The error the pinned omowright's doctor returns for a down daemon: it never starts one (auto-start is off).
 const DOCTOR_NO_DAEMON = "no BrowserSkill daemon published at /home/u/.bsk/daemon.json and automatic start is disabled (BSK_AUTO_START=0); run `bsk daemon start` in the environment that owns it"
+// What older omowright reports when it registered its scheduled-task fallback and that failed for an unrelated reason.
+const SCHEDULED_TASK_DENIED = "registering the bsk daemon task exited with 1: Access is denied."
 const JOB_OBJECT_REFUSAL = "bsk status exited with 1: cannot start an independent Windows daemon; the host may prohibit Job Object breakaway"
 
 function identification() {
@@ -90,16 +92,23 @@ describe("browser-install.mjs with the daemon down", () => {
     expect(summary.nextStep).not.toBe(ENABLE_STEP)
   })
 
-  for (const error of [JOB_OBJECT_REFUSAL, "registering the bsk daemon task exited with 1: Access is denied."]) {
-    test(`#given the host refuses the detached start (${error.slice(0, 32)}...) #when --json runs #then startBlocked is set and the step differs from a plain start`, () => {
-      const blocked = runJson("browser-install.mjs", onboardReport({ running: false, error }))
-      const plain = runJson("browser-install.mjs", onboardReport({ running: false, error: "daemon start was requested but /home/u/.bsk/daemon.json never appeared" }))
+  test("#given the host refuses the detached start with the Job Object message #when --json runs #then startBlocked is set and the step differs from a plain start", () => {
+    const blocked = runJson("browser-install.mjs", onboardReport({ running: false, error: JOB_OBJECT_REFUSAL }))
+    const plain = runJson("browser-install.mjs", onboardReport({ running: false, error: "daemon start was requested but /home/u/.bsk/daemon.json never appeared" }))
 
-      expect(blocked.daemon.startBlocked).toBe(true)
-      expect(blocked.humanStep).toBeNull()
-      expect(blocked.nextStep).not.toBe(plain.nextStep)
-    })
-  }
+    expect(blocked.daemon.startBlocked).toBe(true)
+    expect(blocked.humanStep).toBeNull()
+    expect(blocked.nextStep).not.toBe(plain.nextStep)
+  })
+
+  test("#given a scheduled-task registration that failed for another reason #when --json runs #then it is not classified as start-blocked", () => {
+    const summary = runJson("browser-install.mjs", onboardReport({ running: false, error: SCHEDULED_TASK_DENIED }))
+    const plain = runJson("browser-install.mjs", onboardReport({ running: false, error: "daemon start was requested but /home/u/.bsk/daemon.json never appeared" }))
+
+    expect(summary.daemonDown).toBe(true)
+    expect(summary.daemon.startBlocked).toBe(false)
+    expect(summary.nextStep).toBe(plain.nextStep)
+  })
 
   test("#given an omowright that reports startBlocked itself #when --json runs #then that value is used", () => {
     const summary = runJson("browser-install.mjs", onboardReport({ running: false, error: "anything", startBlocked: true }))
@@ -136,6 +145,13 @@ describe("browser-doctor.mjs", () => {
     expect(summary.state).toBe("no-daemon")
     expect(summary.daemon.startBlocked).toBe(false)
     expect(summary.sessions).toEqual([])
+  })
+
+  test("#given a scheduled-task registration that failed with Access is denied #when --json runs #then startBlocked is false", () => {
+    const summary = runJson("browser-doctor.mjs", doctorReport({ running: false, error: SCHEDULED_TASK_DENIED, browsers: [], sessions: [] }))
+
+    expect(summary.state).toBe("no-daemon")
+    expect(summary.daemon.startBlocked).toBe(false)
   })
 
   test("#given a Job Object refusal in the error or from omowright #when --json runs #then startBlocked is true", () => {

@@ -19,9 +19,10 @@ const result = await omowright.bskOnboard({
 // A down daemon cannot see the extension, so it is no reason to ask the user to enable it.
 // That includes a failed CLI install: no CLI, no daemon.
 const daemonDown = !result.ready && !result.needsChoice && !result.daemon.running
-// An omowright with its PR #70 sets daemon.startBlocked. Older omowright only reports the refusal in the error text:
-// bsk's own "Job Object" message, or its Windows fallback when registering the daemon's scheduled task fails.
-const startBlocked = daemonDown && (result.daemon.startBlocked ?? /Job Object|breakaway|registering the bsk daemon task/i.test(result.daemon.error ?? ""))
+// An omowright with its PR #70 sets daemon.startBlocked. Older omowright only reports the refusal in the error text,
+// as bsk's own "Job Object" breakaway message. A failed scheduled-task registration (e.g. "Access is denied") is not
+// classified as blocked; the plain daemon step still names the foreground start.
+const startBlocked = daemonDown && (result.daemon.startBlocked ?? /Job Object|breakaway/i.test(result.daemon.error ?? ""))
 const FOREGROUND_STEP = "run `bsk daemon start --foreground` in a persistent background session that outlives the command, then check `bsk status` from a separate call."
 const DAEMON_STEP = !result.cli.installed
   ? "Install the bsk CLI first: the official installer did not leave a working `bsk`; re-run this script, and if it fails again follow references/install.md to install it by hand."
