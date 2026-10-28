@@ -4,6 +4,9 @@ import { validatePluginConfig } from "../config/validate"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { parseModelString } from "../shared/model-string-parser"
 import { log } from "../shared/logger"
+import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models"
+import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements"
+import { setSessionFallbackSnapshot, clearSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
 import { createRuntimeModelConfigLoader } from "./runtime-model-config"
 
 type ModelConfig = Pick<OhMyOpenCodeConfig, "agents" | "categories">
@@ -18,12 +21,13 @@ export function createSessionModelProfiles(args: {
   initialConfig: OhMyOpenCodeConfig
   readSession: SessionReader
   environment?: OmoConfigEnv
+  onSelectionChanged?: (sessionID: string) => void
 }) {
   const environment = { ...(args.environment ?? process.env) }
   const selections = new Map<string, Selection>()
   const parents = new Map<string, string | undefined>()
-  const baselineModels = new Map<string, unknown>()
-  const requests = new Map<string, { id: unknown; config: ModelConfig }>()
+  const baselineModels = new Map<string, Map<string, unknown>>()
+  const requests = new Map<string, Map<string, ModelConfig>>()
   const loadDefault = createRuntimeModelConfigLoader(args.directory, args.initialConfig, environment)
 
   async function rootSession(id: string): Promise<string> {
@@ -61,34 +65,70 @@ export function createSessionModelProfiles(args: {
     return selection ? reload(selection) : loadDefault()
   }
 
-  async function command(sessionID: string, value: string): Promise<string> {
+  async function inspect(sessionID: string) {
     const root = await rootSession(sessionID)
-    if (root !== sessionID) throw new Error("Switch profiles in the parent session; existing child continuations keep their resolved model.")
-    const argument = value.trim()
-    if (argument === "" || argument === "list" || argument === "current") {
-      const loaded = loadOmoConfig({ cwd: args.directory, env: environment })
-      const names = [...new Set(loaded.layers.flatMap((layer) => Object.keys(layer.config.profiles ?? {})))].sort()
-      const selection = selections.get(sessionID)
-      return `Session model profile: ${selection?.name ?? loaded.profile ?? "base"}. Available: ${names.join(", ") || "(none)"}. Use /omo-profile <name> or /omo-profile clear.`
+    const loaded = loadOmoConfig({ cwd: args.directory, env: environment })
+    const availableProfiles = [...new Set(loaded.layers.flatMap((layer) => Object.keys(layer.config.profiles ?? {})))].sort()
+    const selection = selections.get(root)
+    return {
+      sessionID: root,
+      profile: selection?.name ?? loaded.profile ?? null,
+      source: selection?.name === undefined ? "startup" as const : "session" as const,
+      availableProfiles,
     }
-    const name = argument === "clear" ? undefined : argument.startsWith("use ") ? argument.slice(4).trim() : argument
+  }
+
+  async function select(sessionID: string, name: string | undefined): Promise<void> {
+    if (await rootSession(sessionID) !== sessionID) {
+      throw new Error("Switch profiles in the parent session; existing child continuations keep their resolved model.")
+    }
     if (name !== undefined && !name.trim()) throw new Error("A nonblank profile name is required")
-    // Validate before committing the selector; a missing profile is a config diagnostic.
     const config = readConfig(name)
     selections.set(sessionID, { name, config })
-    return `Session model profile: ${name ?? "startup selection"}. Applies to subsequent primary requests and new delegations. Existing children keep their resolved models; prompts, tools, hooks and providers retain startup settings.`
+    args.onSelectionChanged?.(sessionID)
+  }
+
+  async function command(sessionID: string, value: string): Promise<string> {
+    const argument = value.trim()
+    if (argument === "" || argument === "list" || argument === "current") {
+      const state = await inspect(sessionID)
+      return `Session model profile: ${state.profile ?? "base"}. Available: ${state.availableProfiles.join(", ") || "(none)"}. Use /omo-profile <name> or /omo-profile clear.`
+    }
+    const name = argument === "clear" ? undefined : /^use(?:\s|$)/.test(argument) ? argument.slice(3).trim() : argument
+    await select(sessionID, name)
+    return `Session model profile: ${name ?? "startup selection"}. Applies to subsequent primary requests and new delegations. Existing children keep their resolved models; agent registrations, hooks and providers retain startup settings.`
   }
 
   async function applyPrimary(sessionID: string, agent: string | undefined, message: Record<string, unknown>): Promise<ModelConfig | undefined> {
+    const requestID = typeof message.id === "string" ? message.id : undefined
+    const request = requestID ? requests.get(sessionID)?.get(requestID) : undefined
+    if (request) return request
     const selection = selections.get(sessionID)
     if (!selection) return // Children and unselected sessions retain explicit host/dispatch models.
-    if (!baselineModels.has(sessionID)) baselineModels.set(sessionID, message.model)
+    const effectiveAgent = agent ?? (typeof message.agent === "string" ? message.agent : undefined)
+    const agentKey = effectiveAgent ? getAgentConfigKey(effectiveAgent) : undefined
+    const baselines = baselineModels.get(sessionID) ?? new Map<string, unknown>()
+    if (!baselines.has(agentKey ?? "")) baselines.set(agentKey ?? "", message.model)
+    baselineModels.set(sessionID, baselines)
     const config = reload(selection)
-    requests.set(sessionID, { id: message.id, config })
-    const override = agent ? config.agents?.[getAgentConfigKey(agent)] : undefined
+    if (requestID) {
+      const sessionRequests = requests.get(sessionID) ?? new Map<string, ModelConfig>()
+      sessionRequests.set(requestID, config)
+      requests.set(sessionID, sessionRequests)
+    }
+    const override = agentKey ? config.agents?.[agentKey] : undefined
     const category = override?.category ? config.categories?.[override.category] : undefined
     const model = parseModelString(override?.model ?? category?.model ?? "")
-    message.model = model ? { providerID: model.providerID, modelID: model.modelID } : baselineModels.get(sessionID)
+    const effectiveModel = model ?? baselines.get(agentKey ?? "")
+    const providerID = typeof effectiveModel === "object" && effectiveModel !== null && "providerID" in effectiveModel && typeof effectiveModel.providerID === "string"
+      ? effectiveModel.providerID
+      : undefined
+    const fallbacks = override?.fallback_models ?? category?.fallback_models
+    const chain = fallbacks === undefined
+      ? (agentKey ? AGENT_MODEL_REQUIREMENTS[agentKey]?.fallbackChain : undefined)
+      : buildFallbackChainFromModels(fallbacks, providerID)
+    setSessionFallbackSnapshot(sessionID, chain)
+    message.model = model ? { providerID: model.providerID, modelID: model.modelID } : baselines.get(agentKey ?? "")
     if (override?.variant ?? category?.variant ?? model?.variant) message.variant = override?.variant ?? category?.variant ?? model?.variant
     else delete message.variant
     return config
@@ -99,10 +139,11 @@ export function createSessionModelProfiles(args: {
     parents.delete(sessionID)
     baselineModels.delete(sessionID)
     requests.delete(sessionID)
+    clearSessionFallbackSnapshot(sessionID)
   }
 
-  return { load, command, applyPrimary, clearSession, primaryConfig: (id: string, messageID?: unknown) => {
-    const request = requests.get(id)
-    return request && messageID !== undefined && request.id === messageID ? request.config : selections.get(id)?.config
+  return { load, inspect, select, command, applyPrimary, clearSession, primaryConfig: (id: string, messageID?: unknown) => {
+    const request = typeof messageID === "string" ? requests.get(id)?.get(messageID) : undefined
+    return request ?? selections.get(id)?.config
   } }
 }

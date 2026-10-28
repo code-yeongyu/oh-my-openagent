@@ -303,6 +303,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     const sessionModelProfiles = createSessionModelProfiles({
       directory: input.directory,
       initialConfig: pluginConfig,
+      onSelectionChanged: (sessionID) => hooks.modelFallback?.clearPendingModelFallback(sessionID),
       readSession: async (id) => {
         const response = await input.client.session.get({ path: { id }, query: { directory: input.directory } })
         if (!response.data) throw new Error("Cannot read session for model profile selection")
