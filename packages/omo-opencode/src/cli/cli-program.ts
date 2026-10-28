@@ -10,6 +10,7 @@ import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
 import { configureRuntimeCommands } from "./runtime-commands"
 import { runConfigMigrate } from "./config-migrate"
+import { runConfigEditor, type ConfigEditorOptions } from "./config-editor"
 import { availableInstallPlatforms } from "./native-dev-platform-flag"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -216,9 +217,11 @@ Examples:
     process.exit(exitCode)
   })
 
-program
+const configCommand = program
   .command("config")
   .description("Manage unified OMO configuration")
+
+configCommand
   .command("migrate")
   .description("Migrate legacy OMO configuration into ~/.omo/omo.jsonc")
   .option("--dry-run", "Print the transform, backup move plan, and conflicts without new migration writes")
@@ -226,6 +229,15 @@ program
   .action((options: ConfigMigrateCommandOptions) => {
     const exitCode = runConfigMigrate({ dryRun: options.dryRun ?? false, json: options.json ?? false })
     process.exit(exitCode)
+  })
+
+configCommand
+  .command("edit")
+  .description("Interactively edit unified OMO configuration with backups and validation")
+  .option("-d, --directory <path>", "Project directory for configuration discovery")
+  .option("-f, --file <path>", "Edit an explicit omo.json or omo.jsonc file")
+  .action(async (options: ConfigEditorOptions) => {
+    process.exit(await runConfigEditor(options))
   })
 
 configureRuntimeCommands(program)
