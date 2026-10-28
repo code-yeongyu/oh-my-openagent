@@ -11,6 +11,7 @@ import { createRuntimeModelConfigLoader } from "./runtime-model-config"
 
 type ModelConfig = Pick<OhMyOpenCodeConfig, "agents" | "categories">
 type Selection = { name?: string; config: ModelConfig }
+type PrimaryBaseline = { model?: unknown; variant?: unknown }
 type SessionReader = (id: string) => Promise<{ parentID?: string }>
 
 export type SessionModelProfiles = ReturnType<typeof createSessionModelProfiles>
@@ -26,7 +27,7 @@ export function createSessionModelProfiles(args: {
   const environment = { ...(args.environment ?? process.env) }
   const selections = new Map<string, Selection>()
   const parents = new Map<string, string | undefined>()
-  const baselineModels = new Map<string, Map<string, unknown>>()
+  const baselineModels = new Map<string, Map<string, PrimaryBaseline>>()
   const requests = new Map<string, Map<string, ModelConfig>>()
   const loadDefault = createRuntimeModelConfigLoader(args.directory, args.initialConfig, environment)
 
@@ -107,9 +108,6 @@ export function createSessionModelProfiles(args: {
     if (!selection) return // Children and unselected sessions retain explicit host/dispatch models.
     const effectiveAgent = agent ?? (typeof message.agent === "string" ? message.agent : undefined)
     const agentKey = effectiveAgent ? getAgentConfigKey(effectiveAgent) : undefined
-    const baselines = baselineModels.get(sessionID) ?? new Map<string, unknown>()
-    if (!baselines.has(agentKey ?? "")) baselines.set(agentKey ?? "", message.model)
-    baselineModels.set(sessionID, baselines)
     const config = reload(selection)
     if (requestID) {
       const sessionRequests = requests.get(sessionID) ?? new Map<string, ModelConfig>()
@@ -119,7 +117,34 @@ export function createSessionModelProfiles(args: {
     const override = agentKey ? config.agents?.[agentKey] : undefined
     const category = override?.category ? config.categories?.[override.category] : undefined
     const model = parseModelString(override?.model ?? category?.model ?? "")
-    const effectiveModel = model ?? baselines.get(agentKey ?? "")
+    const baselines = baselineModels.get(sessionID) ?? new Map<string, PrimaryBaseline>()
+    const baseline = baselines.get(agentKey ?? "") ?? {}
+    if (model) {
+      if (!("model" in baseline)) baseline.model = message.model
+      message.model = { providerID: model.providerID, modelID: model.modelID }
+    } else if ("model" in baseline) {
+      message.model = baseline.model
+      delete baseline.model
+    }
+    const variant = override?.variant ?? category?.variant ?? model?.variant
+    const reasoning = override?.reasoning ?? category?.reasoning
+    if (model || variant !== undefined || reasoning !== undefined) {
+      if (!("variant" in baseline)) baseline.variant = message.variant
+      if (variant !== undefined) message.variant = variant
+      else delete message.variant
+    } else if ("variant" in baseline) {
+      if (baseline.variant !== undefined) message.variant = baseline.variant
+      else delete message.variant
+      delete baseline.variant
+    }
+    if (Object.keys(baseline).length > 0) {
+      baselines.set(agentKey ?? "", baseline)
+      baselineModels.set(sessionID, baselines)
+    } else {
+      baselines.delete(agentKey ?? "")
+      if (baselines.size === 0) baselineModels.delete(sessionID)
+    }
+    const effectiveModel = message.model
     const providerID = typeof effectiveModel === "object" && effectiveModel !== null && "providerID" in effectiveModel && typeof effectiveModel.providerID === "string"
       ? effectiveModel.providerID
       : undefined
@@ -128,9 +153,6 @@ export function createSessionModelProfiles(args: {
       ? (agentKey ? AGENT_MODEL_REQUIREMENTS[agentKey]?.fallbackChain : undefined)
       : buildFallbackChainFromModels(fallbacks, providerID)
     setSessionFallbackSnapshot(sessionID, chain)
-    message.model = model ? { providerID: model.providerID, modelID: model.modelID } : baselines.get(agentKey ?? "")
-    if (override?.variant ?? category?.variant ?? model?.variant) message.variant = override?.variant ?? category?.variant ?? model?.variant
-    else delete message.variant
     return config
   }
 

@@ -74,6 +74,41 @@ describe("session model profiles", () => {
     })
   })
 
+  test("uncovered agents preserve each new host model and variant", async () => {
+    await fixture(async ({ profiles }) => {
+      await profiles.select("parent", "budget")
+      for (const [id, modelID, variant] of [["host-first", "host-one", "high"], ["host-second", "host-two", "low"]]) {
+        const message = { id, model: { providerID: "host", modelID }, variant }
+        await profiles.applyPrimary("parent", "bare-agent", message)
+        expect(message).toEqual({ id, model: { providerID: "host", modelID }, variant })
+      }
+    })
+  })
+
+  test("removed overrides restore their baseline once and then accept later host choices", async () => {
+    await fixture(async ({ profiles, path }) => {
+      writeFileSync(path, JSON.stringify({ profiles: { quality: {}, budget: { "[opencode]": { agents: { sisyphus: { model: "fixture/budget", variant: "low" } } } } } }))
+      await profiles.select("parent", "budget")
+      const first = { id: "before-clear", model: { providerID: "host", modelID: "original" }, variant: "high" }
+      await profiles.applyPrimary("parent", "sisyphus", first)
+      expect(first.model.modelID).toBe("budget")
+      expect(first.variant).toBe("low")
+      await profiles.select("parent", undefined)
+      const restored = { id: "after-clear", model: { providerID: "fixture", modelID: "budget" }, variant: "low" }
+      await profiles.applyPrimary("parent", "sisyphus", restored)
+      expect(restored.model).toEqual({ providerID: "host", modelID: "original" })
+      expect(restored.variant).toBe("high")
+      const later = { id: "host-later", model: { providerID: "host", modelID: "new-choice" }, variant: "medium" }
+      await profiles.applyPrimary("parent", "sisyphus", later)
+      expect(later.model.modelID).toBe("new-choice")
+      expect(later.variant).toBe("medium")
+      const retry = { id: "before-clear", model: { providerID: "fixture", modelID: "budget-fallback" }, variant: "minimal" }
+      await profiles.applyPrimary("parent", "sisyphus", retry)
+      expect(retry.model.modelID).toBe("budget-fallback")
+      expect(retry.variant).toBe("minimal")
+    })
+  })
+
   test("updates selected primary only, clears previous variant and restores startup model on clear", async () => {
     await fixture(async ({ profiles }) => {
       await profiles.command("parent", "budget")
