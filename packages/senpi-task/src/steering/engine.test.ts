@@ -452,6 +452,26 @@ describe("durable prelaunch steering", () => {
     expect(restarted.store.load(record.task_id)?.pending_steering ?? []).toEqual([])
   })
 
+  test("#given queued sends #when a restarted engine drains them #then each goes to the child under its own queue entry id (#2838)", async () => {
+    // given
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "first", deliverAs: "steer" })
+    await harness.engine.sendToTask({ idOrName: record.task_id, message: "second" })
+    const entryIds = harness.store.load(record.task_id)?.pending_steering?.map((entry) => entry.id) ?? []
+
+    // when
+    const restarted = restartHarness(harness.store.stateDir)
+    const fake = makeFakeHandle(record.task_id, "rpc")
+    restarted.live.set(record.task_id, fake.handle)
+    await restarted.engine.notifyStarted(record.task_id)
+
+    // then: the child holds each input under the id it was queued with, so a repeated drain replays it
+    expect(entryIds).toHaveLength(2)
+    expect(fake.inputIds).toEqual(entryIds)
+    expect(new Set(fake.inputIds).size).toBe(2)
+  })
+
   test("#given a pending child with queued sends #when cancelled #then the persisted queue is cleared and a post-restart start delivers nothing", async () => {
     // given
     const harness = makeHarness()

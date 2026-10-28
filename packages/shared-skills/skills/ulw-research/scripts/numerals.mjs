@@ -6,6 +6,7 @@
 // English number words one to twelve, an adjacent currency symbol or unit, and an adjacent bounding
 // qualifier. No numeral is ever passed through Number(). Plain Node ESM, sibling imports only.
 
+import { groupedNumberSource } from "./number-grammar.mjs"
 import { add, fromDecimal, mul, toDecimal } from "./rational.mjs"
 import { normalizeUnit } from "./units.mjs"
 
@@ -62,11 +63,16 @@ const RANGE_SEP = /^(?:\s?[-\u2013~]\s?|\sto\s)/
 const SIGN = "-\u2212"
 /** Bounding qualifiers: before the value (Korean and English) and right after it (Korean). */
 const QUALIFIERS_BEFORE = ["up to", "at least", "at most", "more than", "less than", "about", "approximately", "nearly", "over", "under", "\uCD5C\uB300", "\uCD5C\uC18C", "\uC57D"]
-const QUALIFIER_AFTER = /^\s?(\uC774\uC0C1|\uC774\uD558|\uBBF8\uB9CC|\uCD08\uACFC|\uB0B4\uC678|\uAE4C\uC9C0)/
+/** Korean bounding qualifiers written right after a value (isang, iha, miman, chogwa, naeoe, kkaji). */
+export const QUALIFIERS_AFTER = Object.freeze(["\uC774\uC0C1", "\uC774\uD558", "\uBBF8\uB9CC", "\uCD08\uACFC", "\uB0B4\uC678", "\uAE4C\uC9C0"])
+const QUALIFIER_AFTER = new RegExp(`^\\s?(${QUALIFIERS_AFTER.join("|")})`)
 
-/** "1,237" -> "1237"; a malformed group ("1,23") keeps only the leading plain number. */
+/** Comma grouping from the one grouped-number grammar (number-grammar.mjs). */
+const COMMA_GROUPED = new RegExp(`^${groupedNumberSource([","])}$`)
+
+/** "1,237" -> "1237"; a malformed group ("1,23", "12,3451") keeps only the leading plain number. */
 function cleanDigits(raw) {
-	if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(raw)) return { digits: raw.replace(/,/g, ""), length: raw.length }
+	if (COMMA_GROUPED.test(raw)) return { digits: raw.replace(/,/g, ""), length: raw.length }
 	const plain = /^\d+(?:\.\d+)?/.exec(raw)[0]
 	return { digits: plain, length: plain.length }
 }

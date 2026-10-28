@@ -33,7 +33,7 @@ import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { registerDagTool } from "./register-workflow-tool"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { registerEvalHandleHost } from "./eval-handle-host"
-import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
+import { TASK_USAGE_HINT_FLAG, wireEventBridge, type EventBridge } from "./event-bridge"
 import { wireHostPrewarm } from "./host-prewarm"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
@@ -175,7 +175,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       // Ahead of the recovery chain's session_start, so a revived child's host boots during the reconcile.
       wireHostPrewarm(pi, engine)
 
-      wireDagLifecycle(pi, dagRuntime, () => {
+      wireDagLifecycle(pi, dagRuntime, () =>
         wireEventBridge(pi, ctx, engine, statusUi, transitions, {
           reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
           leadPollers: teamTools.leadPollers,
@@ -184,8 +184,9 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
             manager: dagRuntime.manager,
             sessionId: () => engine.runtime.sessionId(),
           }),
-        })
-      })
+        }),
+        (error) => ctx.logger.warn("omo-senpi DAG attach after reconcile failed", { error: String(error) }),
+      )
     },
   }
 }
@@ -257,15 +258,25 @@ function registerTaskTools(
 export function wireDagLifecycle(
   pi: SenpiExtensionAPI,
   runtime: Pick<DagRuntime, "attach" | "detach" | "pauseForShutdown" | "dispose">,
-  wireTaskLifecycle: () => void,
-): void {
+  wireTaskLifecycle: () => Pick<EventBridge, "afterSessionStartReconcile">,
+  onAttachError: (error: unknown) => void = () => {},
+): { readonly lastAttach: () => Promise<void> } {
   pi.on("session_shutdown", async () => {
     await runtime.pauseForShutdown()
     runtime.detach()
   })
-  wireTaskLifecycle()
-  pi.on("session_start", (event) => runtime.attach(event))
+  const bridge = wireTaskLifecycle()
+  // DAG recovery assumes the session-start task reconcile finished (a revivable child already carries
+  // a handle). Admission does not wait for that reconcile, so the attach waits for it instead (#11335).
+  let latest: Promise<void> = Promise.resolve()
+  pi.on("session_start", (event) => {
+    latest = bridge
+      .afterSessionStartReconcile()
+      .then((current) => (current ? runtime.attach(event) : undefined))
+      .catch(onAttachError)
+  })
   pi.on("session_shutdown", () => runtime.dispose())
+  return { lastAttach: () => latest }
 }
 
 function createTeamToolContext(

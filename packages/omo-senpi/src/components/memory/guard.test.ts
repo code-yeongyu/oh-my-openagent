@@ -148,6 +148,22 @@ describe("memory cross-identity guard", () => {
     })
   })
 
+  test("#given dot-dot after a link in own memory #when an external read opens the raw relative path #then foreign memory is blocked", async () => {
+    const setup = fixture()
+    const foreignRepo = dirname(dirname(setup.foreignFile))
+    mkdirSync(join(foreignRepo, "subdir"))
+    symlinkSync(join(foreignRepo, "subdir"), join(setup.own.identityPaths.repo, "jump"), process.platform === "win32" ? "junction" : "dir")
+    const raw = relative(setup.workspace, setup.own.identityPaths.repo) + "/jump/../system/persona.md"
+
+    const result = await dispatch(setup, "vendor_read", { path: raw })
+
+    if (process.platform === "win32") expect(result).toBeUndefined()
+    else expect(result).toEqual({
+      block: true,
+      reason: `cross-identity memory access denied: vendor_read to ${raw} belongs to another memory identity`,
+    })
+  })
+
   test("#given the identities root and one of its ancestors #when enumeration tools target them #then cross-identity enumeration is blocked", async () => {
     const setup = fixture()
     const memoryRoot = dirname(setup.agentsRoot)

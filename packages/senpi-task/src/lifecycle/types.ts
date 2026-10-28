@@ -87,7 +87,7 @@ export type TaskLifecycle = {
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.
   dispose?(): void
   admitResident(parentSessionId: string): Promise<AdmissionResult>
-  reconcileOnSessionStart(parentSessionId?: string): Promise<ReconcileResult>
+  reconcileOnSessionStart(parentSessionId?: string, signal?: AbortSignal): Promise<ReconcileResult>
   // The daemon hosting this child went away: park the record and retry the reconcile on a bounded
   // backoff. Giving up leaves it suspended (rpc_detached) - never lost, never signalled.
   parkHostSessionOnDaemonLoss(taskId: string, options?: HostSessionParkOptions): Promise<HostSessionParkOutcome>

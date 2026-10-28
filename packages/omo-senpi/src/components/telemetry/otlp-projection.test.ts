@@ -1,5 +1,42 @@
 import { expect, test } from "bun:test"
+import { ALL_KNOWN_MODEL_IDS } from "./model-vocabulary"
 import { isOtlpEvent, projectOtlpEvent, OTLP_SPANS } from "./otlp-projection"
+import { PINNED_MODEL_ID_LIST } from "./pinned-model-ids"
+import { OMO_NATIVE_EVENT_SCHEMAS, type OmoNativePropertySchema } from "./event-schemas"
+import { addTurn, openWindow, summaryProperties } from "./session-summary-window"
+
+// Feed the client schema's actual property names and vocabulary, not relay aliases.
+function clientBag(schema: Readonly<Record<string, OmoNativePropertySchema>>): Record<string, string | number | boolean> {
+  return Object.fromEntries(Object.entries(schema).map(([key, value]) => [
+    key, value.type === "number" ? 1 : value.type === "boolean" ? false : value.values?.[0] ?? "a".repeat(64),
+  ]))
+}
+
+for (const [event, property, wire] of [
+  ["daily_active", "reason", "omo.start_trigger"],
+  ["session_started", "reason", "omo.start_trigger"],
+  ["prompt_submitted", "suppression_reason", "omo.suppression_cause"],
+  ["delegation_completed", "start_reason", "omo.start_trigger"],
+] as const) {
+  test(`OTLP maps real ${event} client vocabulary from ${property}`, () => {
+    const schema: Readonly<Record<string, OmoNativePropertySchema>> = OMO_NATIVE_EVENT_SCHEMAS[event]
+    for (const value of schema[property]?.values ?? []) {
+      const bag = { ...clientBag(schema), [property]: value }
+      expect(projectOtlpEvent(event, bag)[wire]).toBe(value)
+    }
+    for (const value of ["unrecognized", 1, true]) {
+      expect(projectOtlpEvent(event, { ...clientBag(schema), [property]: value })[wire]).toBeUndefined()
+    }
+  })
+}
+
+test("OTLP maps real category_config user_category_count within pinned bounds", () => {
+  const bag = clientBag(OMO_NATIVE_EVENT_SCHEMAS.category_config)
+  expect(projectOtlpEvent("category_config", bag)["omo.custom_category_count"]).toBe(bag["user_category_count"])
+  for (const value of [-1, 1e9 + 1, Infinity, "1", true]) {
+    expect(projectOtlpEvent("category_config", { ...bag, user_category_count: value })["omo.custom_category_count"]).toBeUndefined()
+  }
+})
 
 // Independent examples from omo-telemetry's pinned omo-senpi v4 artifact.
 for (const [event, property, wire] of [
@@ -56,8 +93,27 @@ test("OTLP turn projection includes cache tokens in input and maps cost and prov
   })
 })
 
-test("OTLP summary cost uses the pinned integer cost field and excludes non-finite attributes", () => {
-  expect(projectOtlpEvent("session_summary", { cost_1e4: 50, turns: NaN })).toEqual({ "omo.cost.usd_1e4": 50 })
+test("OTLP summary cost derives pinned integer units from the real summary USD property", () => {
+  const window = openWindow(0, 1)
+  addTurn(window, {
+    turnIndex: 1, provider: "google", modelId: "gemini-3.1-pro",
+    inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0,
+    reasoningTokens: 0, totalTokens: 2, cost1e4: 57, usageValid: true,
+    stopReason: "stop", toolResultCount: 0, toolErrorCount: 0,
+  }, 1)
+  const properties = summaryProperties("a".repeat(64), window, {
+    endedBy: "shutdown", epoch: "a".repeat(16), seq: 1, sampleRate: 1,
+    sampled: true, sessionRole: "main", droppedEvents: 0,
+  })
+  expect(properties["cost_usd"]).toBe(0.0057)
+  expect(projectOtlpEvent("session_summary", properties)["omo.cost.usd_1e4"]).toBe(57)
+  // Older client summaries and recovered bags need only the published USD property.
+  const { cost_1e4: _internalCost, ...usdSummary } = properties
+  expect(projectOtlpEvent("session_summary", usdSummary)["omo.cost.usd_1e4"]).toBe(57)
+  expect(projectOtlpEvent("session_summary", { ...usdSummary, cost_usd: 0.00015 })["omo.cost.usd_1e4"]).toBe(1)
+  for (const cost_usd of [-1, Infinity, NaN, 1e6 + 1, "1", true]) {
+    expect(projectOtlpEvent("session_summary", { ...usdSummary, cost_usd })["omo.cost.usd_1e4"]).toBeUndefined()
+  }
 })
 
 test("OTLP spans allow only the pinned turn attributes", () => {
@@ -67,4 +123,38 @@ test("OTLP spans allow only the pinned turn attributes", () => {
       "omo.model_id", "omo.provider", "omo.session.role", "omo.turn.index", "session.id",
     ],
   })
+})
+
+// Collector pin 13c6e61b (omo-senpi.json): omo.model_id on omo.turn_completed is a REQUIRED enum of the
+// pinned model vocabulary, which lists custom. The client vocabulary can run ahead of the pin, and the
+// collector rejects the whole record for an unlisted value (invalid_enum), so such a value must leave as custom.
+const PIN_MODEL_IDS = new Set(PINNED_MODEL_ID_LIST)
+
+test("#given a client model id the collector pin does not list #when turn_completed is projected #then every model key carries a pinned value", () => {
+  const models = [...ALL_KNOWN_MODEL_IDS, "claude-fable-5-5", "custom"]
+  for (const model of models) {
+    const projected = projectOtlpEvent("turn_completed", {
+      provider: "anthropic", model_id: model, request_model_id: model, response_model_id: model,
+      input_tokens: 100, output_tokens: 20, cost_1e4: 1, session_role: "root",
+    })
+    for (const key of ["omo.model_id", "gen_ai.request.model", "gen_ai.response.model"]) {
+      const value = projected[key]
+      expect(typeof value === "string" && PIN_MODEL_IDS.has(value), `${key}=${String(value)} for ${model}`).toBe(true)
+    }
+  }
+  expect(projectOtlpEvent("turn_completed", { model_id: "claude-fable-5-5" })["omo.model_id"]).toBe("custom")
+  expect(projectOtlpEvent("turn_completed", { model_id: "claude-opus-5-5" })["omo.model_id"]).toBe("claude-opus-5-5")
+})
+
+test("#given an unpinned model id on another event #when it is projected #then it leaves as custom", () => {
+  expect(projectOtlpEvent("session_started", { default_model: "claude-fable-5-5" })["omo.default_model"]).toBe("custom")
+  expect(projectOtlpEvent("category_config", { cat_quick: "claude-fable-5-5" })["omo.cat_quick"]).toBe("custom")
+  expect(projectOtlpEvent("kibitzer_summary", { model_top: "claude-fable-5-5" })["omo.model_top"]).toBe("custom")
+})
+
+test("#given session_summary top-model ranks #when they are projected #then unpinned ids leave as custom and none stays none", () => {
+  const projected = projectOtlpEvent("session_summary", { m1_model: "claude-fable-5-5", m2_model: "claude-opus-5-5", m3_model: "none" })
+  expect(projected["omo.m1_model"]).toBe("custom")
+  expect(projected["omo.m2_model"]).toBe("claude-opus-5-5")
+  expect(projected["omo.m3_model"]).toBe("none")
 })

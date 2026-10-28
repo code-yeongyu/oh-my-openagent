@@ -78,7 +78,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
 
         const osProvider = options.osProvider ?? getDefaultTelemetryOsProvider()
         const sessionId = extractSessionId(eventCtx) ?? "unknown"
-        const attribution = getOmoNativeAttribution({ env, now: options.now, osProvider })
+        const attribution = getOmoNativeAttribution({ env })
         client = createEventTelemetryClient({
           diagnostics: options.diagnostics,
           distinctId: attribution.install_hash,
@@ -304,7 +304,11 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
       return false
     }
   }
-  const target = resolve(path)
+  // The install id is written under path.join(home, ...), which resolves `..` lexically, so every check below
+  // judges that lexically resolved path (the helper's contract for lexical openers), not the raw HOME. A lexical
+  // HOME that does not exist yet cannot hold a stable id either: it counts as ephemeral (telemetry OFF).
+  const lexical = paths.resolve(path)
+  const target = resolve(lexical)
   if (target === undefined) return true
   const usersDirs = windows ? [win32.join(`${env["SystemDrive"]?.trim() || "C:"}\\`, "Users")] : POSIX_USERS_DIRS
   const rootHomes = windows ? [] : POSIX_ROOT_HOMES
@@ -314,7 +318,7 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
     const root = resolve(candidate)
     if (root === undefined || paths.dirname(root) === root) return false
     try {
-      return isPathInside(path, candidate, options)
+      return isPathInside(lexical, candidate, options)
     } catch {
       return false
     }

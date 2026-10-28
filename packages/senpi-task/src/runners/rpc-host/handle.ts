@@ -25,6 +25,7 @@ import { createHandleWaiters } from "./handle-waiters"
 import type { HostSessionParked, HostSessionReplaced } from "./session-client"
 import { extractTerminalAssistantMessage } from "./terminal-message"
 import { createInputEffects } from "../input-effects"
+import { readHostAdmissions } from "../input-admission-read"
 import { toHostInput } from "./input-command"
 import { createInputDelivery } from "../input-delivery"
 import { createRpcRunPause } from "../rpc/native-run-pause"
@@ -260,6 +261,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const inputEffects = createInputEffects({
     taskId, store: options.inputStore,
     send: command => recovery.issue(toHostInput(command)),
+    read: ids => readHostAdmissions(client, ids),
   })
 
   const beginTurn = (): void => {
@@ -317,13 +319,13 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     },
     getEntries: async (since) => (await recovery.currentPort()).getEntries(since),
     switchSession: async (sessionPath) => (await recovery.currentPort()).switchSession(sessionPath),
-    steer: (text) => {
+    steer: (text, identity) => {
       if (heartbeat.status().state !== "running") return Promise.reject(new HostSessionUnresponsiveError())
-      return delivery.steer(text)
+      return delivery.steer(text, identity?.clientMessageId)
     },
-    followUp: (text) => {
+    followUp: (text, identity) => {
       if (heartbeat.status().state !== "running") return Promise.reject(new HostSessionUnresponsiveError())
-      return delivery.runPrompt(text, "followUp")
+      return delivery.runPrompt(text, "followUp", identity?.clientMessageId)
     },
     liveness: heartbeat.status,
     onLiveness: heartbeat.subscribe,

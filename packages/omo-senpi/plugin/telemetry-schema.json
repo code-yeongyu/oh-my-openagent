@@ -664,13 +664,6 @@
         "required": false,
         "posthog_name": "custom_category_count"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.source": {
         "type": "string",
         "values": [
@@ -726,13 +719,6 @@
         ],
         "required": false,
         "posthog_name": "host_platform"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.source": {
         "type": "string",
@@ -819,13 +805,6 @@
         "required": false,
         "posthog_name": "host_platform"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "session.id": {
         "type": "string",
         "pattern": "^[0-9a-f]{64}$",
@@ -864,13 +843,6 @@
         ],
         "required": false,
         "posthog_name": "host_platform"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.permission": {
         "type": "string",
@@ -912,13 +884,6 @@
         "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
         "required": false,
         "posthog_name": "day_utc"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.start_trigger": {
         "type": "string",
@@ -1063,13 +1028,6 @@
         "max": 1000000000000,
         "required": false,
         "posthog_name": "input_tokens"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.model_id": {
         "type": "string",
@@ -1339,13 +1297,6 @@
         "required": false,
         "posthog_name": "kind"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.name": {
         "type": "string",
         "values": [
@@ -1392,13 +1343,6 @@
         "required": false,
         "posthog_name": "feature"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "session.id": {
         "type": "string",
         "pattern": "^[0-9a-f]{64}$",
@@ -1436,13 +1380,6 @@
         "max": 1000000000,
         "required": false,
         "posthog_name": "fresh_usd"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.model_id": {
         "type": "string",
@@ -1619,13 +1556,6 @@
         "max": 1000000000000,
         "required": false,
         "posthog_name": "input_tokens"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.model_top": {
         "type": "string",
@@ -1901,13 +1831,6 @@
         "required": false,
         "posthog_name": "incomplete_calls"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.measured_eval_execution_duration_ms_sum": {
         "type": "number",
         "min": 0,
@@ -2036,13 +1959,6 @@
         ],
         "required": false,
         "posthog_name": "detection"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.process_kind": {
         "type": "string",
@@ -2193,13 +2109,6 @@
         ],
         "required": false,
         "posthog_name": "keyword_variant"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.prompt.is_real_user": {
         "type": "boolean",
@@ -2370,13 +2279,6 @@
         ],
         "required": false,
         "posthog_name": "default_provider"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.memory_bucket": {
         "type": "string",
@@ -2914,13 +2816,6 @@
         "required": false,
         "posthog_name": "m3_turns"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.model_count": {
         "type": "number",
         "min": 0,
@@ -3067,13 +2962,6 @@
         "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
         "required": true,
         "posthog_name": "event_id"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.skill_name": {
         "type": "string",
@@ -3301,13 +3189,6 @@
         "min": 0,
         "max": 10000000000,
         "required": true
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.model_id": {
         "type": "string",
@@ -3876,5 +3757,5 @@
       }
     }
   },
-  "sha256": "f5662a46f83ddbf556ec73255a529fddee6ff983cfb85705f83218047965792f"
+  "sha256": "5523d0cc507d5746d524418210c7213adb3fe0f6d67dba06033003b2e0214c49"
 }

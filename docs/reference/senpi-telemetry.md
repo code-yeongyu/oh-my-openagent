@@ -273,7 +273,6 @@ Every event above also carries these properties.
 | `ci` | `boolean` | - |
 | `event_id` | `string` | - |
 | `install_hash` | `string` | - |
-| `machine_hash` | `string` | - |
 | `package_version` | `string` | - |
 | `platform` | `string` | `omo-senpi` |
 | `product_name` | `string` | `omo-native` |
@@ -375,7 +374,8 @@ A process that dies natively cannot report its own death, so `process_crashed` i
 Identity is installation-level, not person-level:
 
 - As of schema version 4, every OmO Native event's `distinct_id` is `install_hash` = `sha256(install id)`, where the install id is the random file described below. The same value is sent as the `install_hash` property; the raw install id never leaves the machine.
-- Schema versions 1 to 3 used the machine id `sha256("omo-senpi:" + hostname)` as `distinct_id`. Until `2026-12-15` (UTC, exclusive) every event also carries that value as `machine_hash`, so rows from before and after the switch can be joined per installation; after that date the property is no longer sent. The raw hostname never leaves the machine; it's only hashed locally. The legacy `omo_senpi_daily_active` event keeps the machine id as its `distinct_id`.
+- The legacy `omo_senpi_daily_active` event's `distinct_id` is `sha256` of its own random install id, a 64-hex value created on first send in its state directory (`<agent home>/omo-senpi/posthog/install-id`, mode 0600).
+- No telemetry identifier is derived from the hostname, the user name, a home path, or any other machine or user attribute.
 - The `$session_id` value is a keyed hash: a per-machine random salt combined with the raw session id, then hashed. The raw session id is never sent, and sessions from different machines can't be correlated by session id.
 - Person profiles are disabled on every event (`$process_person_profile: false`), so PostHog builds no person records.
 - GeoIP enrichment is enabled as of schema version 2: native events are sent without the `$geoip_disable` transport flag, so PostHog may derive an approximate country (`$geoip_country_code`) from the sending IP server side. The application never authors `$ip` or any location property itself, and stores no IP locally. Earlier schema versions disabled GeoIP; a prior revision of this document wrongly claimed it was already on.

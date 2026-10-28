@@ -15,3 +15,8 @@ export const localeNames: Readonly<Record<(typeof locales)[number], string>> = {
 export type Locale = (typeof locales)[number]
 
 export const defaultLocale: Locale = "en"
+
+/** BCP 47 tag for `<html lang>`: the route segment, except zh, which is Simplified Chinese. */
+export function languageTag(locale: Locale): string {
+  return locale === "zh" ? "zh-CN" : locale
+}

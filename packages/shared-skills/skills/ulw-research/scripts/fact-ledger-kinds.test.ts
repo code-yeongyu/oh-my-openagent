@@ -62,6 +62,7 @@ const GENERATORS: Record<string, Gen> = {
 	rational_or_null: { valid: (r) => pick(r, [null, rational(r)]), invalid: (r) => pick(r, [{ num: "1", den: "0" }, { num: 1, den: "2" }, "1/2"]) },
 	by_derive: { valid: rational, invalid: (r) => pick(r, [null, { num: "1", den: "0" }, { num: "x", den: "2" }, "1/2"]) },
 	context_by_derive: { valid: (_r, row) => row.kind === "converted" ? { target: "km" } : null, invalid: (r) => pick(r, ["km", 3, ["km"], false]) },
+	source_context: { valid: (r) => pick(r, [null, { prefix: "source ", suffix: " text" }]), invalid: (r) => pick(r, [{ target: "km" }, { prefix: "x".repeat(33), suffix: "" }, { prefix: "", suffix: 3 }]) },
 	derived_operation: { valid: () => "expr", invalid: (r) => pick(r, [null, "convert", "mean"]) },
 	convert_operation: { valid: () => "convert", invalid: (r) => pick(r, [null, "sum", "mean"]) },
 	precision: { valid: () => ({ places: 2, sigfigs: 3 }), invalid: (r) => pick(r, [null, { places: -1, sigfigs: 3 }, { places: 2, sigfigs: 0 }]) },
@@ -122,7 +123,7 @@ describe("rows generated from KIND_RULES", () => {
 		expect(validateLedger(ledgerOf({ ...row, exact: { num: "-1", den: "2" } }))).toEqual([])
 	})
 
-	test("review r6 LOW 3: context is a derived or converted column; a measured, quote, or assumed row carrying one is rejected", () => {
+	test("source context rejects derivation fields, and assumed rows still require null context", () => {
 		for (const kind of ["measured", "quote", "assumed"]) {
 			const row = { ...validRow(kind, prng(3)), context: { target: "km" } }
 			expect({ kind, named: validateLedger(ledgerOf(row)).some((error: string) => error.startsWith("rows[0].context")) }).toEqual({ kind, named: true })

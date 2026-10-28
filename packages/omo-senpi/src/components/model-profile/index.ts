@@ -7,7 +7,14 @@ import { credentialRotationPolicy } from "./credential-policy"
 import { customModelProviders } from "./custom-providers"
 import { newProbeState, resolveDefaultModelProfile, type ProbeState } from "./default-profile"
 import { authFailedDetails, noticeContent } from "./notice"
-import { type AuthFailure, type ProbeRegistry, probeRequestAuth, probeRuntime, sanitizedAuthErrorDetail } from "./request-auth"
+import {
+  type AuthFailure,
+  type ProbeRegistry,
+  probeRequestAuth,
+  probeRuntime,
+  type RefreshUnavailableKeep,
+  sanitizedAuthErrorDetail,
+} from "./request-auth"
 import { resolveModelProfile, type ModelProfileResolution } from "./resolve"
 
 /**
@@ -97,6 +104,28 @@ function extractAgentDir(eventCtx: unknown): string | undefined {
   return isRecord(eventCtx) && typeof eventCtx["agentDir"] === "string" ? eventCtx["agentDir"] : undefined
 }
 
+// senpi's ExtensionContext.ui, whose notify the desktop shows as a timeline row; a host without one
+// keeps the log line only.
+function extractNotify(eventCtx: unknown): ((message: string, level: "info" | "warning") => void) | undefined {
+  if (!isRecord(eventCtx)) return undefined
+  const ui = eventCtx["ui"]
+  if (!isRecord(ui)) return undefined
+  const notify: unknown = ui["notify"]
+  if (typeof notify !== "function") return undefined
+  return (message, level) => {
+    Reflect.apply(notify, ui, [message, level])
+  }
+}
+
+// A profile outcome is for the person running the session, never for the model: senpi hands every
+// custom message to the model as user text in the next request, and one sent while the first prompt
+// streams is delivered as a steer that costs a request of its own. The outcome is kept as a session
+// entry, which no request carries; as startup bookkeeping it leaves no file behind for a session that
+// never gets a conversation.
+function recordOutcome(pi: SenpiExtensionAPI, customType: string, content: string, details?: Record<string, unknown>): void {
+  pi.appendEntry?.(customType, details === undefined ? { content } : { content, details }, { startupBookkeeping: true })
+}
+
 // Only a fresh session may receive the profile: a resume/fork carries its own model history, a
 // reload keeps the running session, and a `--model` flag or scoped model is explicit user state.
 // A session_start without any provenance is treated as explicit too: senpi omits the field on a
@@ -151,6 +180,15 @@ function logSkippedCandidate(ctx: ComponentContext, failure: AuthFailure): void 
   }
 }
 
+// A kept candidate whose login refresh failed transiently may still fail on the first turn; this
+// line (class/code fingerprints only) is what makes that failure diagnosable afterwards.
+function logKeptOnTransientRefresh(ctx: ComponentContext, keep: RefreshUnavailableKeep): void {
+  ctx.logger.warn(
+    `omo-senpi: model profile kept ${keep.provider}/${keep.model}: its login refresh failed transiently at session start (${keep.errorKind}, ${keep.causeKind}); the first turn retries it`,
+    { provider: keep.provider, model: keep.model, errorKind: keep.errorKind, causeKind: keep.causeKind },
+  )
+}
+
 type ProbedResolution = { readonly resolution: ModelProfileResolution; readonly model: unknown; readonly failures: AuthFailure[] }
 
 // Each failed probe removes at least one selector (the whole provider for a credential failure,
@@ -186,7 +224,9 @@ async function resolveWithRequestAuth(
   while (resolution.kind === "resolved") {
     model = registry.find(resolution.provider, resolution.modelId)
     if (model === undefined || resolution.profile.source === "pin" || runtime === undefined) break
-    const failure = await probeRequestAuth(registry, runtime, mayRotate, resolution.provider, resolution.modelId, model)
+    const failure = await probeRequestAuth(registry, runtime, mayRotate, resolution.provider, resolution.modelId, model, (keep) =>
+      logKeptOnTransientRefresh(ctx, keep),
+    )
     if (failure === undefined) break
     failures.push(failure)
     logSkippedCandidate(ctx, failure)
@@ -257,16 +297,21 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
           const customType = resolution.kind === "unknown" ? MODEL_PROFILE_UNKNOWN_TYPE : MODEL_PROFILE_UNAVAILABLE_TYPE
           const details =
             resolution.kind === "unavailable" && failures.length > 0
-              ? { details: { profile: resolution.profile.id, ...authFailedDetails(failures) } }
-              : {}
-          pi.sendMessage({ customType, content, display: true, ...details })
+              ? { profile: resolution.profile.id, ...authFailedDetails(failures) }
+              : undefined
+          recordOutcome(pi, customType, content, details)
+          // The notice names the step the user can take. The unset default falling back to the session's
+          // own model is quiet detail; a profile the user chose, or a stored login that failed, warns.
+          extractNotify(eventCtx)?.(content, explicit === undefined && failures.length === 0 ? "info" : "warning")
           ctx.logger.warn(content)
           return
         }
 
         if (model === undefined) {
-          const message = `OmO Native: model profile "${resolution.profile.id}" resolved ${resolution.provider}/${resolution.modelId} but the registry no longer lists it`
-          pi.sendMessage({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE, content: message, display: true })
+          const message = `OmO Native: model profile "${resolution.profile.id}" resolved ${resolution.provider}/${resolution.modelId} but the registry no longer lists it; the session keeps its current model. Choose another model for this profile in Settings`
+          recordOutcome(pi, MODEL_PROFILE_UNAVAILABLE_TYPE, message)
+          // The user can act on it (pick another model), so it reaches them, not only the log (#11365 review).
+          extractNotify(eventCtx)?.(message, "warning")
           ctx.logger.warn(message)
           return
         }
@@ -274,18 +319,15 @@ export function createModelProfileComponent(options: ModelProfileComponentOption
         const thinkingLevel = asSenpiThinkingLevel(resolution.reasoning)
         if (thinkingLevel !== undefined) api.setSessionThinkingLevel?.(thinkingLevel)
         const selectedModel = `${resolution.provider}/${resolution.modelId}`
-        pi.sendMessage({
-          customType: MODEL_PROFILE_APPLIED_TYPE,
-          content,
-          display: true,
-          details: {
-            profile: resolution.profile.id,
-            model: selectedModel,
-            skipped: [...resolution.skipped],
-            ...(resolution.reasoning !== undefined ? { reasoning: resolution.reasoning } : {}),
-            ...authFailedDetails(failures),
-          },
+        recordOutcome(pi, MODEL_PROFILE_APPLIED_TYPE, content, {
+          profile: resolution.profile.id,
+          model: selectedModel,
+          skipped: [...resolution.skipped],
+          ...(resolution.reasoning !== undefined ? { reasoning: resolution.reasoning } : {}),
+          ...authFailedDetails(failures),
         })
+        // A stored login that failed is the one step the user can take: it reaches them (#11365 review).
+        if (failures.length > 0) extractNotify(eventCtx)?.(content, "warning")
         ctx.logger.info(content, { profile: resolution.profile.id, model: selectedModel })
       })
     },

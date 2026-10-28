@@ -16,6 +16,7 @@ impl MacInput {
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
         capture: &MacCapture, control: &HoldControl<'_>,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         self.hold_target(target, mode, capture, None, |this, route, _| {
             this.keys_held(keys, route, control, |_| (control.wait)())
         })
@@ -25,6 +26,7 @@ impl MacInput {
         &mut self, target: &Target, hold: &MouseHold<'_>, mode: DeliveryMode,
         capture: &MacCapture, control: &HoldControl<'_>,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         self.hold_target(target, mode, capture, Some(hold), |this, key_route, window| {
             let route = match (window, mode) {
                 (Some(window), DeliveryMode::Background) => {

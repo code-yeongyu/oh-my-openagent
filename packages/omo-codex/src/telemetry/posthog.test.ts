@@ -100,7 +100,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
@@ -117,7 +117,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
@@ -134,7 +134,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
@@ -151,7 +151,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
@@ -168,7 +168,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(1)
@@ -184,7 +184,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages[0]?.event).toBe("omo_codex_daily_active")
@@ -201,7 +201,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: false }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
@@ -217,7 +217,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createInstallPostHog().trackActive("distinct", "install_started")
+    posthog.createInstallPostHog().trackActive("install_started")
 
     // then
     expect(capturedMessages[0]?.properties?.source).toBe("install")
@@ -233,7 +233,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages[0]?.properties?.source).toBe("cli")
@@ -249,7 +249,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)

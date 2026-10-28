@@ -13,6 +13,7 @@ mod keys;
 mod menu_key;
 mod post;
 mod release;
+mod user_monitor;
 
 #[cfg(test)]
 mod tests;
@@ -32,8 +33,10 @@ use held::{Held, KeyRoute};
 
 pub(crate) use self::canary::CANARY_STOP_REASON;
 pub use self::canary::{CanaryMode, CanaryResult};
-pub(crate) use self::cgevent::modifier_flags;
+pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
 pub(crate) use self::keys::{key_code, update_modifier};
+pub(crate) use self::user_monitor::UserInputWatch;
+pub(crate) use self::release::post_helper_release;
 
 pub(crate) struct MacInput {
     source: CGEventSource,
@@ -115,6 +118,7 @@ impl MacInput {
         mode: DeliveryMode,
         capture: &MacCapture,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         match target {
             Target::Desktop | Target::Display(_) => global::pointer(&self.source, &mut self.held, event, &self.overlay),
             Target::Window(id) => {
@@ -163,6 +167,7 @@ impl MacInput {
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         match target {
             Target::Desktop | Target::Display(_) => keys::type_text_interruptible(
                 &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
@@ -198,6 +203,7 @@ impl MacInput {
         mode: DeliveryMode,
         capture: &MacCapture,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         match target {
             Target::Desktop | Target::Display(_) => keys::chord(&self.source, &mut self.held, chord, KeyRoute::Global),
             Target::Window(id) => {

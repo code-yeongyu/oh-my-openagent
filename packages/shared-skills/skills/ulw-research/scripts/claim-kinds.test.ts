@@ -127,7 +127,7 @@ describe("design-check regressions", () => {
 	test("#given the assumed row F9 unmarked or marked fact #then both refuse it, and the unmarked message names the A mark", () => {
 		expect(codes(prose(value(F9)))).toEqual(["claim_kind_mismatch"])
 		expect(codes(prose(value(F9, "fact")))).toEqual(["claim_kind_mismatch"])
-		expect(JSON.stringify(claims(prose(value(F9))))).toContain("{{A:F9}}")
+		expect(JSON.stringify(claims(prose(value(F9))))).toContain("{{A:F9:growth_rate}}")
 	})
 
 	test("#given the assumed row F9 marked {{A:F9}} (data-claim-kind=assumed) #then no claim defect", () => {

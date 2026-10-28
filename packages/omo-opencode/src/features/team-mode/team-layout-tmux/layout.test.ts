@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { createPaneAuthDirectory } from "@oh-my-opencode/tmux-core"
 
 import * as sharedModule from "../../../shared"
 import * as sharedTmuxModule from "../../../shared/tmux"
@@ -221,7 +222,7 @@ describe("team-layout-tmux", () => {
     expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%2", "@omo_attach_session_id", "s-m2"])
   })
 
-  test("#given env auth set #when createTeamLayout runs #then send-keys attach commands omit secrets while split-window forwards pane env", async () => {
+  test("#given env auth set #when createTeamLayout runs #then send-keys and split-window argv omit the password and use a private file", async () => {
     // given — fixtures assembled at runtime (never literals) so static secret
     // scanners don't flag a username/password pair (GitGuardian false-positive,
     // #4466). The embedded single quote still exercises the shell-escape path.
@@ -231,6 +232,7 @@ describe("team-layout-tmux", () => {
     const originalUser = process.env.OPENCODE_SERVER_USERNAME
     process.env.OPENCODE_SERVER_PASSWORD = fixturePassword
     process.env.OPENCODE_SERVER_USERNAME = fixtureUsername
+    const cleanupAuthDirectory = createPaneAuthDirectory()
     try {
       const { createTeamLayout } = await loadLayoutModule()
       const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
@@ -244,17 +246,27 @@ describe("team-layout-tmux", () => {
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
       if (attach === undefined) throw new Error("expected attach command")
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
+      expect(attach.match(/\$OPENCODE_SERVER_PASSWORD\w*/g)).toEqual([
+        "$OPENCODE_SERVER_PASSWORD_FILE",
+        "$OPENCODE_SERVER_PASSWORD_FILE",
+      ])
       expect(attach).not.toContain("OPENCODE_SERVER_USERNAME")
-      expect(attach).not.toContain(fixturePassword)
       expect(attach).not.toContain(fixtureUsername)
 
+      const paneCommands = commands.filter((args) => args[0] === "send-keys" || args[0] === "split-window")
+      for (const args of paneCommands) {
+        for (const arg of args) {
+          expect(arg).not.toContain(fixturePassword)
+          expect(arg).not.toContain("OPENCODE_SERVER_PASSWORD=")
+        }
+      }
       const splitWindow = commands.find((args) => args[0] === "split-window")
       expect(splitWindow).toBeDefined()
       expect(splitWindow).toContain("-e")
-      expect(splitWindow).toContain(`OPENCODE_SERVER_PASSWORD=${fixturePassword}`)
+      expect(splitWindow?.some((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))).toBe(true)
       expect(splitWindow).toContain(`OPENCODE_SERVER_USERNAME=${fixtureUsername}`)
     } finally {
+      cleanupAuthDirectory()
       if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
       if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = originalUser
     }
@@ -275,7 +287,7 @@ describe("team-layout-tmux", () => {
       const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
       const attach = sendKeys.find((s) => s.includes("opencode attach"))
       expect(attach).toBeDefined()
-      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
+      expect(attach).not.toMatch(/\bOPENCODE_SERVER_PASSWORD(?:_FILE)?\b/)
     } finally {
       if (originalPwd !== undefined) process.env.OPENCODE_SERVER_PASSWORD = originalPwd
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:7d55db8453217bd673590c89027b6fc9eb3be24b45db25d1d049030d6dcf901b:91cf086bf03581fe3159525e7823a4543d29ce184608dbc51cf1aa285c271bb1
+// omo-codex-install:2d0c1659412332e67b4b2e1662a73437c4b77f7217d62af30e1939f0285042b7:bbeadf337f1e764673db2b0767bd717135d6961cb1d14095b4cc12f695b21755
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -453,13 +453,9 @@ var init_event_id = __esm(() => {
 });
 
 // packages/telemetry-core/src/machine-id.ts
-import { createHash as createHash5 } from "node:crypto";
 import os2 from "node:os";
 function getDefaultTelemetryOsProvider() {
   return os2;
-}
-function getTelemetryDistinctId(machineIdPrefix, osProvider = getDefaultTelemetryOsProvider()) {
-  return createHash5("sha256").update(`${machineIdPrefix}${osProvider.hostname()}`).digest("hex");
 }
 var init_machine_id = () => {};
 
@@ -10086,6 +10082,55 @@ var init_posthog_transport = __esm(() => {
 // packages/telemetry-core/src/events.ts
 var init_events = () => {};
 
+// packages/telemetry-core/src/install-id.ts
+import { createHash as createHash5, randomBytes } from "node:crypto";
+import { mkdirSync as mkdirSync5, readFileSync as readFileSync5, writeFileSync as writeFileSync2 } from "node:fs";
+import { dirname as dirname12, join as join38 } from "node:path";
+function getTelemetryInstallDistinctId(stateDir) {
+  return createHash5("sha256").update(readOrCreateInstallId(join38(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).digest("hex");
+}
+function readOrCreateInstallId(path) {
+  const persisted = readInstallId(path);
+  if (persisted !== undefined)
+    return persisted;
+  const installId = randomBytes(32).toString("hex");
+  try {
+    mkdirSync5(dirname12(path), { recursive: true });
+    writeFileSync2(path, `${installId}
+`, { flag: "wx", mode: 384 });
+    fallbackInstallIds.delete(path);
+    return installId;
+  } catch {
+    const concurrentlyCreated = readInstallId(path);
+    if (concurrentlyCreated !== undefined)
+      return concurrentlyCreated;
+    try {
+      writeFileSync2(path, `${installId}
+`, { flag: "w", mode: 384 });
+      fallbackInstallIds.delete(path);
+      return installId;
+    } catch {}
+    const fallback = fallbackInstallIds.get(path);
+    if (fallback !== undefined)
+      return fallback;
+    fallbackInstallIds.set(path, installId);
+    return installId;
+  }
+}
+function readInstallId(path) {
+  try {
+    const value = readFileSync5(path, "utf8").trim();
+    return INSTALL_ID_PATTERN.test(value) ? value : undefined;
+  } catch {
+    return;
+  }
+}
+var TELEMETRY_INSTALL_ID_FILE_NAME = "install-id", INSTALL_ID_PATTERN, fallbackInstallIds;
+var init_install_id = __esm(() => {
+  INSTALL_ID_PATTERN = /^[0-9a-f]{64}$/;
+  fallbackInstallIds = new Map;
+});
+
 // packages/telemetry-core/src/posthog-client.ts
 function createTelemetryClient2(input) {
   return createTelemetryClient({ ...input, transportFactory: input.transportFactory ?? createDefaultPostHogTransport });
@@ -10112,6 +10157,7 @@ var init_src = __esm(() => {
   init_env();
   init_event_id();
   init_events();
+  init_install_id();
   init_machine_id();
   init_posthog_client();
   init_record_daily_active();
@@ -10123,7 +10169,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.48",
+    version: "5.1.49",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -10174,7 +10220,6 @@ function createCodexTelemetryProductConfig(packageVersion = getProductVersion(),
     defaultApiKey: DEFAULT_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: EVENT_NAME,
-    machineIdPrefix: MACHINE_ID_PREFIX,
     packageName: PACKAGE_NAME,
     packageVersion,
     platform: "omo-codex",
@@ -10189,7 +10234,7 @@ function createCodexTelemetryProductConfig(packageVersion = getProductVersion(),
     additionalProperties
   };
 }
-var PRODUCT_NAME = "omo-codex", PACKAGE_NAME = "@oh-my-opencode/omo-codex", CACHE_DIR_NAME = "omo-codex", EVENT_NAME = "omo_codex_daily_active", PRODUCT_ENV_PREFIX = "OMO_CODEX", MACHINE_ID_PREFIX = "omo-codex:";
+var PRODUCT_NAME = "omo-codex", PACKAGE_NAME = "@oh-my-opencode/omo-codex", CACHE_DIR_NAME = "omo-codex", EVENT_NAME = "omo_codex_daily_active", PRODUCT_ENV_PREFIX = "OMO_CODEX";
 var init_product_identity = __esm(() => {
   init_src();
   init_package();
@@ -10267,7 +10312,7 @@ function createPostHogClient(source, options = {}) {
   }
   const activityStateProvider = resolveActivityStateProvider(options);
   return {
-    trackActive: (distinctId, reason) => {
+    trackActive: (reason) => {
       const activityState = options.stateDir === undefined ? activityStateProvider() : getDailyActiveCaptureState({
         diagnostics: writeTelemetryDiagnostic2,
         now: options.now,
@@ -10278,7 +10323,7 @@ function createPostHogClient(source, options = {}) {
       }
       client.trackActive({
         dayUTC: activityState.dayUTC,
-        distinctId,
+        distinctId: getTelemetryInstallDistinctId(options.stateDir ?? getActivityStateDir()),
         reason
       });
     },
@@ -10287,15 +10332,13 @@ function createPostHogClient(source, options = {}) {
     }
   };
 }
-function getPostHogDistinctId() {
-  return getTelemetryDistinctId(MACHINE_ID_PREFIX, resolveOsProvider());
-}
 function createInstallPostHog() {
   return createPostHogClient("install");
 }
 var osProviderOverride2 = null, activityStateProviderOverride = null, transportFactoryOverride = null, NO_OP_POSTHOG;
 var init_posthog = __esm(() => {
   init_src();
+  init_data_path();
   init_diagnostics2();
   init_posthog_activity_state();
   init_product_identity();
@@ -10316,7 +10359,7 @@ var init_telemetry = __esm(() => {
 
 // packages/omo-codex/src/install/install-local-cli.ts
 import { readFile as readFile26 } from "node:fs/promises";
-import { dirname as dirname13, join as join42, resolve as resolve11 } from "node:path";
+import { dirname as dirname14, join as join43, resolve as resolve11 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // packages/utils/src/runtime/spawn.ts
@@ -10587,7 +10630,7 @@ var defaultRunCommand = async (command, args, options) => {
 };
 
 // packages/omo-codex/src/install/install-codex.ts
-import { join as join38, resolve as resolve10 } from "node:path";
+import { join as join39, resolve as resolve10 } from "node:path";
 import { existsSync as existsSync7 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 
@@ -23735,7 +23778,7 @@ async function trackCodexInstallTelemetry() {
   try {
     await Promise.resolve().then(() => init_telemetry());
     const posthog = createInstallPostHog();
-    posthog.trackActive(getPostHogDistinctId(), "install_completed");
+    posthog.trackActive("install_completed");
     await posthog.shutdown();
   } catch (error) {
     if (error instanceof Error)
@@ -23750,7 +23793,7 @@ async function runCodexInstaller(options = {}) {
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const repoRoot = resolve10(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env }));
-  const codexHome = resolve10(options.codexHome ?? env.CODEX_HOME ?? join38(homedir2(), ".codex"));
+  const codexHome = resolve10(options.codexHome ?? env.CODEX_HOME ?? join39(homedir2(), ".codex"));
   const projectDirectory = resolve10(options.projectDirectory ?? env.OMO_CODEX_PROJECT ?? process.cwd());
   const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env });
   const runCommand = options.runCommand ?? defaultRunCommand;
@@ -23767,9 +23810,9 @@ async function runCodexInstaller(options = {}) {
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint);
   }
-  const codexPackageRoot = join38(repoRoot, "packages", "omo-codex");
+  const codexPackageRoot = join39(repoRoot, "packages", "omo-codex");
   const marketplace = await readMarketplace(repoRoot, {
-    marketplacePath: join38(codexPackageRoot, "marketplace.json")
+    marketplacePath: join39(codexPackageRoot, "marketplace.json")
   });
   const distributionManifest = await readDistributionManifest(repoRoot);
   const installed = [];
@@ -23814,7 +23857,7 @@ async function runCodexInstaller(options = {}) {
       if (runtimeLink !== null)
         log(`Linked ${runtimeLink.name} -> ${runtimeLink.target}`);
       else
-        log(`Warning: skipped the omo-agent-toolkit runtime wrapper because ${join38(repoRoot, "dist", "cli", "index.js")} is missing; omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
+        log(`Warning: skipped the omo-agent-toolkit runtime wrapper because ${join39(repoRoot, "dist", "cli", "index.js")} is missing; omo-agent-toolkit ulw-loop commands will be unavailable until a package shipping dist/cli is installed`);
     }
     pluginSources.push({ name: entry.name, sourcePath });
     installed.push(plugin);
@@ -23864,13 +23907,13 @@ async function runCodexInstaller(options = {}) {
       continue;
     log(`Warning: deferred legacy Codex LSP daemon cleanup for v${cleanup.version}: ${cleanup.reason}`);
   }
-  const marketplaceRoot = join38(codexHome, "plugins", "cache", marketplace.name);
+  const marketplaceRoot = join39(codexHome, "plugins", "cache", marketplace.name);
   await writeCachedMarketplaceManifest({
     marketplaceName: marketplace.name,
     marketplaceRoot,
     plugins: installed
   });
-  const configPath = join38(codexHome, "config.toml");
+  const configPath = join39(codexHome, "config.toml");
   await updateCodexConfig({
     configPath,
     repoRoot: codexPackageRoot,
@@ -23915,7 +23958,7 @@ function findRepoRootFromImporter(importerDir) {
   for (let depth = 0;depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current))
       return current;
-    for (const wrapperPackageRoot of [join38(current, "node_modules", "oh-my-openagent"), join38(current, "oh-my-openagent")]) {
+    for (const wrapperPackageRoot of [join39(current, "node_modules", "oh-my-openagent"), join39(current, "oh-my-openagent")]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot))
         return wrapperPackageRoot;
     }
@@ -23933,7 +23976,7 @@ function findRepoRoot(input) {
   return findRepoRootFromImporter(input.importerDir);
 }
 function isRepoRootWithCodexPlugin(repoRoot) {
-  return existsSync7(join38(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
+  return existsSync7(join39(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"));
 }
 function codexMarketplaceSource(marketplaceRoot) {
   return { sourceType: "local", source: marketplaceRoot };
@@ -24245,13 +24288,13 @@ function shellQuote(value) {
 
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
 import { spawn as spawn3, spawnSync as spawnSync2 } from "node:child_process";
-import { readFileSync as readFileSync5 } from "node:fs";
-import { dirname as dirname12, join as join40 } from "node:path";
+import { readFileSync as readFileSync6 } from "node:fs";
+import { dirname as dirname13, join as join41 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 // packages/omo-codex/src/install/lazycodex-bun-global-paths.ts
-import { join as join39 } from "node:path";
+import { join as join40 } from "node:path";
 function isBunGlobalEntrypointPath(invokedPath, env) {
   if (typeof invokedPath !== "string" || invokedPath.trim().length === 0)
     return false;
@@ -24262,8 +24305,8 @@ function resolveBunGlobalRoots(env) {
   const bunInstallRoot = env.BUN_INSTALL?.trim();
   const homeRoot = env.HOME?.trim();
   return [
-    ...bunInstallRoot ? [join39(bunInstallRoot, "bin"), join39(bunInstallRoot, "install", "global", "node_modules")] : [],
-    ...homeRoot ? [join39(homeRoot, ".bun", "bin"), join39(homeRoot, ".bun", "install", "global", "node_modules")] : []
+    ...bunInstallRoot ? [join40(bunInstallRoot, "bin"), join40(bunInstallRoot, "install", "global", "node_modules")] : [],
+    ...homeRoot ? [join40(homeRoot, ".bun", "bin"), join40(homeRoot, ".bun", "install", "global", "node_modules")] : []
   ].map(normalizePathForPrefix);
 }
 function normalizePathForPrefix(path) {
@@ -24355,8 +24398,8 @@ function resolveArgs(env) {
 function resolveCurrentVersion(env) {
   if (env.LAZYCODEX_CURRENT_VERSION?.trim())
     return env.LAZYCODEX_CURRENT_VERSION.trim();
-  const pluginRoot = dirname12(dirname12(fileURLToPath(import.meta.url)));
-  return readVersionManifest(resolveInstalledVersionPath(env, pluginRoot)) ?? readVersionManifest(join40(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join40(pluginRoot, ".codex-plugin", "plugin.json"));
+  const pluginRoot = dirname13(dirname13(fileURLToPath(import.meta.url)));
+  return readVersionManifest(resolveInstalledVersionPath(env, pluginRoot)) ?? readVersionManifest(join41(pluginRoot, "..", "..", "..", "package.json")) ?? readVersionManifest(join41(pluginRoot, ".codex-plugin", "plugin.json"));
 }
 function resolveLatestVersion(env) {
   if (env.LAZYCODEX_LATEST_VERSION?.trim())
@@ -24472,11 +24515,11 @@ function compareVersions(left, right) {
 function resolveInstalledVersionPath(env, pluginRoot) {
   if (env.LAZYCODEX_INSTALLED_VERSION_FILE?.trim())
     return env.LAZYCODEX_INSTALLED_VERSION_FILE.trim();
-  return join40(pluginRoot, INSTALLED_VERSION_FILE);
+  return join41(pluginRoot, INSTALLED_VERSION_FILE);
 }
 function readVersionManifest(path) {
   try {
-    const parsed = JSON.parse(readFileSync5(path, "utf8"));
+    const parsed = JSON.parse(readFileSync6(path, "utf8"));
     if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string") {
       return parsed.version;
     }
@@ -24489,10 +24532,10 @@ function readVersionManifest(path) {
 }
 // packages/omo-codex/src/install/codex-git-bash-mcp-env.ts
 import { readFile as readFile25, writeFile as writeFile14 } from "node:fs/promises";
-import { join as join41 } from "node:path";
+import { join as join42 } from "node:path";
 var GIT_BASH_ENV_KEY2 = "OMO_CODEX_GIT_BASH_PATH";
 async function stampGitBashMcpEnv(input) {
-  const manifestPath = join41(input.pluginRoot, ".mcp.json");
+  const manifestPath = join42(input.pluginRoot, ".mcp.json");
   if (!await fileExistsStrict(manifestPath))
     return false;
   const parsed = JSON.parse(await readFile25(manifestPath, "utf8"));
@@ -24523,7 +24566,7 @@ async function installMarketplaceLocally(options = {}) {
   return runCodexInstaller(options);
 }
 function resolveDefaultRepoRootForEntrypoint(entrypointPath) {
-  return resolve11(dirname13(entrypointPath), "..", "..", "..");
+  return resolve11(dirname14(entrypointPath), "..", "..", "..");
 }
 function resolveDefaultRepoRoot() {
   return resolveDefaultRepoRootForEntrypoint(fileURLToPath2(import.meta.url));
@@ -24539,7 +24582,7 @@ async function runLazyCodexInstallLocalCli(input) {
     return 0;
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile26(join42(input.defaultRepoRoot, "package.json"), "utf8"));
+    const packageJson = JSON.parse(await readFile26(join43(input.defaultRepoRoot, "package.json"), "utf8"));
     const version = typeof packageJson.version === "string" ? packageJson.version : "unknown";
     input.log(`lazycodex-ai ${version}`);
     return 0;

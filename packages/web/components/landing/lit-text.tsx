@@ -83,7 +83,7 @@ export function LitWords({ text, parts, className }: LitWordsProps): JSX.Element
           href={part.href}
           target="_blank"
           rel="noopener noreferrer"
-          className="lit-link focus-visible:outline-accent-32 focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="lit-link focus-ring"
         >
           {words}
         </a>

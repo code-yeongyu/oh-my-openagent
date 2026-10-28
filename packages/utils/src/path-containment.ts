@@ -10,13 +10,11 @@ export interface PathContainmentOptions {
 /**
  * Includes the parent itself. Both paths must exist: native realpath errors propagate,
  * so callers must map an unresolvable path to their denied/not-inside outcome.
- * Mirrors Senpi canonicalizePathStrict (#1463, 5d78ba39d).
- * Guarantee: each path is first resolved lexically (`path.resolve`, which collapses `..`
- * textually), then canonicalized with the native realpath, and the verdict is about that
- * resolved path. A caller must OPEN the same `path.resolve`d path it checked (Senpi's
- * built-in tools do). Opening the raw string instead can reach a different file on POSIX,
- * where the kernel follows a symlink before applying a later `..`.
- * Windows compares normalized long names case-insensitively; POSIX preserves case.
+ * Native realpath receives the original component sequence before lexical normalization:
+ * on POSIX a symlink must be followed before a later `..`. Callers that open a lexically
+ * resolved path must pass that same resolved path; raw-string openers must pass the raw path.
+ * Windows compares normalized long names case-insensitively; POSIX compares native spelling
+ * (so a case alias of the same directory on a case-insensitive volume is accepted).
  * Import from @oh-my-opencode/utils/path-containment.
  */
 export function isPathInside(child: string, parent: string, options: PathContainmentOptions = {}): boolean {
@@ -27,8 +25,8 @@ export function isPathInside(child: string, parent: string, options: PathContain
 export function containedRelativePath(child: string, parent: string, options: PathContainmentOptions = {}): string | undefined {
   const paths = (options.platform ?? process.platform) === "win32" ? win32 : posix
   const realpath = options.realpath ?? realpathSync.native
-  const canonicalChild = paths.normalize(realpath(paths.resolve(child)))
-  const canonicalParent = paths.normalize(realpath(paths.resolve(parent)))
+  const canonicalChild = paths.normalize(realpath(child))
+  const canonicalParent = paths.normalize(realpath(parent))
   const relative = paths.relative(canonicalParent, canonicalChild)
   const escapes = relative === ".." || relative.startsWith(`..${paths.sep}`) || paths.isAbsolute(relative)
   return escapes ? undefined : relative

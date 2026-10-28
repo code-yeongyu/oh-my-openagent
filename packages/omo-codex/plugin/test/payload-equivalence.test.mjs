@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,9 +60,11 @@ test("payload-equivalence: #given telemetry-core and component shim #when sessio
 			stateDir,
 			transportFactory: componentRecorder.factory,
 		});
-		const expectedDistinctId = componentPostHog.getPostHogDistinctIdForTesting(createOsProvider());
-		componentClient.trackActive(expectedDistinctId, "session_start");
+		componentClient.trackActive("session_start");
 		await componentClient.shutdown();
+		const installId = readFileSync(join(stateDir, "install-id"), "utf8").trim();
+		assert.match(installId, /^[0-9a-f]{64}$/);
+		const expectedDistinctId = createHash("sha256").update(installId).digest("hex");
 
 		assert.deepEqual(componentMessages, [
 			{
@@ -104,6 +107,5 @@ test("payload-equivalence: #given built telemetry CLI #when inspected #then tele
 	assert.doesNotMatch(bundle, new RegExp(`from ["']${TELEMETRY_CORE_PACKAGE}`));
 	assert.doesNotMatch(bundle, new RegExp(`import\\(["']${TELEMETRY_CORE_PACKAGE}`));
 	assert.match(bundle, /omo_codex_daily_active/);
-	assert.match(bundle, /omo-codex:/);
 	assert.match(bundle, /posthog-activity\.json/);
 });

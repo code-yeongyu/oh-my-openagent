@@ -40,7 +40,7 @@ function resolveQuote(row, parsed, format) {
 
 function resolve(found, rows, format) {
 	const { parsed } = found
-	if (parsed.error) return { code: "unresolved_placeholder", message: parsed.error }
+	if (parsed.error) return { code: "unresolved_placeholder", message: `${parsed.error}; for literal opening braces, write &#123;&#123; instead of {{ (including in code spans)` }
 	const row = rows.get(parsed.id)
 	if (row === undefined) return { code: "unresolved_placeholder", message: `${parsed.id} is not in the fact ledger` }
 	if (row.status !== "active") return { code: "unresolved_placeholder", message: `${parsed.id} is ${row.status}; cite its replacement` }

@@ -538,6 +538,7 @@ function startSpec(record: DagRunRecordV1, nodeId: DagNodeId, sessionDepth: numb
     ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
     parent_session_id: record.parentSessionId,
     root_session_id: record.rootSessionId,
+    ...(record.parentModel === undefined ? {} : { parent_model: record.parentModel }),
     depth: sessionDepth + 1,
     ...(node.route.kind === "category"
       ? { category: node.route.category }

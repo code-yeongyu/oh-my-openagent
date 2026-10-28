@@ -1,7 +1,7 @@
 // fact-commands-meaning.mjs - `fact pairs` and `fact meaning-check`, the script half of the
 // separate-session meaning verifier. fact pairs writes the (source, report sentence) pairs a
-// reader lane gets and nothing else (with --changed-since, only the pairs whose sentence polish
-// rewrote); it honours the brief's `meaning check` field and writes
+// reader lane gets and nothing else (with --changed-since, only the pairs whose sentence changed
+// since the pre-polish fill map's artifact, or all when those bytes are gone); it honours the brief's `meaning check` field and writes
 // `{ skipped: true }` when it is off. fact meaning-check ingests the readers' verdict files
 // (meaning-check.mjs), writes the meaning record of one edition (fidelity-meaning-defects.<format>.json
 // with --edition, else the legacy fidelity-meaning-defects.json; a fidelity record bound to the pairs'
@@ -58,10 +58,12 @@ function runPairs(args) {
 	const ledger = ledgerFrom(flags, session)
 	const html = edition.format === "md" ? markdownAsHtml(edition.text, edition.entries, ledger).html : edition.text
 	const all = extractPairs(html, ledger, claims)
-	const pairs = flags["changed-since"] === undefined ? all : pairsChangedSince(all, flags["changed-since"], ledger, claims)
+	const since = flags["changed-since"] === undefined ? null : pairsChangedSince(all, flags["changed-since"], ledger, claims)
+	const pairs = since?.pairs ?? all
 	const counts = { total: pairs.length, force_strong: pairs.filter((pair) => pair.force_strong).length }
 	for (const kind of PAIR_KINDS) counts[kind] = pairs.filter((pair) => pair.kind === kind).length
-	const record = { schemaVersion: 1, skipped: false, report: resolve(report), format: edition.format, artifact_sha256: sha256Of(edition.text), pairs_sha256: sha256Of(JSON.stringify(pairs)), counts, verdict_schema: VERDICT_SCHEMA, pairs }
+	const changed = since === null ? {} : { changed_since: { fill_map: since.fill_map, narrowed: since.narrowed } }
+	const record = { schemaVersion: 1, skipped: false, report: resolve(report), format: edition.format, artifact_sha256: sha256Of(edition.text), pairs_sha256: sha256Of(JSON.stringify(pairs)), counts, ...changed, verdict_schema: VERDICT_SCHEMA, pairs }
 	writeJsonAtomic(out, record)
 	const summary = `fact pairs: ${counts.total} pair(s), ${counts.force_strong} routed to the strong reader`
 	return { json: { command: "fact pairs", status: "pass", exitCode: 0, data: { out, ...record, pairs: undefined } }, summary, exitCode: 0 }

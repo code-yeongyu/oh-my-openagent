@@ -127,6 +127,20 @@ describe("isServerRunning", () => {
     expect(result).toBe(false)
   })
 
+  test("counts a password-protected server (401/403) as running (omo#11367)", async () => {
+    for (const status of [401, 403]) {
+      // given: omo run gives its server a per-run password the probing process does not hold
+      const state = createServerHealthStateForTesting()
+      const fetchMock = createFetchRecorder(async () => new Response(null, { status }))
+
+      // when
+      const result = await isServerRunning("http://localhost:4096", { fetchImplementation: fetchMock, state })
+
+      // then: alive, so the stale-pane sweep keeps its panes
+      expect(result).toBe(true)
+    }
+  })
+
   test("caches successful result", async () => {
     // given
     const state = createServerHealthStateForTesting()

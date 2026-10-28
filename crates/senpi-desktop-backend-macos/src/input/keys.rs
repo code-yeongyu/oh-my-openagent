@@ -4,13 +4,13 @@
 use std::thread;
 use std::time::Duration;
 
-use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation};
+use core_graphics::event::{CGEventFlags, CGEventTapLocation};
 use core_graphics::event_source::CGEventSource;
 use senpi_desktop_core::backend::Modifiers;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
 
-use super::cgevent::modifier_flags;
+use super::cgevent::{keyboard_event, modifier_flags};
 use super::held::{Held, HeldKey, KeyRoute};
 
 /// The key code for a chord key, as the fixed macOS virtual-key table gives it.
@@ -155,8 +155,7 @@ pub(super) fn post_key(
             text: text.map(str::to_string),
         });
     }
-    let event = CGEvent::new_keyboard_event(source.clone(), code, down)
-        .map_err(|()| DesktopError::input_failed("failed to create a Quartz keyboard event"))?;
+    let event = keyboard_event(source, code, down)?;
     match text {
         Some(text) => {
             event.set_string(text);

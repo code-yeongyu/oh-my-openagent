@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve, win32 } from "node:path"
-import { isPathInside } from "./path-containment"
+import { join, win32 } from "node:path"
+import { containedRelativePath, isPathInside } from "./path-containment"
 
 const shortHome = String.raw`C:\Users\RUNNER~1`
 const longHome = String.raw`C:\Users\runneradmin`
@@ -64,7 +64,7 @@ function symlinkFixture() {
   return { inside, child: join(inside, "entry", "workspace") }
 }
 
-const opensInside = (path: string) => fs.readFileSync(join(path, "note.md"), "utf8") === "inside"
+const opensInside = (path: string) => fs.readFileSync(`${path}/note.md`, "utf8") === "inside"
 
 test("#given a link whose target contains dot-dot #when native containment runs #then the verdict matches the directory the OS opens", () => {
   const { inside, child } = symlinkFixture()
@@ -91,15 +91,41 @@ test("#given a Node-style lexical realpath fake #when default containment runs #
   }
 })
 
-test("#given dot-dot after a link in the input #when containment runs #then it judges the path.resolve()d path a caller opens", () => {
+test("#given dot-dot after a link in the input #when containment runs #then it judges the path the OS opens", () => {
   const { inside } = symlinkFixture()
   const child = `${inside}/jump/../workspace`
 
   const result = isPathInside(child, inside)
 
-  // The contract: callers open path.resolve(child), as Senpi's built-in tools do.
-  expect(result).toBe(opensInside(resolve(child)))
-  expect(result).toBe(true)
+  expect(result).toBe(opensInside(child))
+  if (process.platform !== "win32") expect(result).toBe(false)
+})
+
+test("#given existing paths #when containment runs #then inside and different directories stay distinct", () => {
+  const { inside } = symlinkFixture()
+
+  expect(containedRelativePath(join(inside, "workspace", "note.md"), inside)).toBe(join("workspace", "note.md"))
+  expect(containedRelativePath(join(inside, "..", "outside"), inside)).toBeUndefined()
+  expect(containedRelativePath(inside, inside)).toBe("")
+})
+
+test("#given dot-dot after a link in the parent #when containment runs #then the parent is also resolved natively", () => {
+  const { inside } = symlinkFixture()
+  const parent = `${inside}/jump/..`
+
+  expect(isPathInside(join(inside, "workspace"), parent)).toBe(process.platform === "win32")
+})
+
+test.if(process.platform === "darwin")("#given a case alias of the same directory #when native containment runs #then it is accepted", () => {
+  const { inside } = symlinkFixture()
+  const alias = inside.replace(/inside$/, "INSIDE")
+  // Case-sensitive macOS volumes have distinct directory names, not an alias.
+  if (!fs.existsSync(alias)) {
+    expect(() => containedRelativePath(alias, inside)).toThrow()
+    return
+  }
+
+  expect(containedRelativePath(alias, inside)).toBe("")
 })
 
 test("#given an absent target #when strict containment runs #then it throws instead of granting an ancestor", () => {

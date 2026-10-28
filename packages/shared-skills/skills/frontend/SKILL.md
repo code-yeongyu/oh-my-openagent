@@ -5,7 +5,7 @@ description: "Builds, styles, and polishes anything drawn with HTML, CSS, or SVG
 
 # Frontend
 
-This file is a router over `references/`; the rules live there. The flow is brief -> build -> subtract -> verify. The bar is restraint with a visible hierarchy: one primary action, the important thing first, nothing on the screen without a job. A quiet, correct screen that holds its hierarchy at 390 and 1440 in both themes is a finish. Atmosphere, motion, and award-grade surface work are opt-in: build them when the brief asks (a named brand, "premium", "make it stunning", a marketing page), never by default for an internal tool, dashboard, admin screen, report, or figure.
+This file is a router over `references/`; the rules live there. The flow is ground -> brief -> build -> subtract -> verify. The bar is restraint with a visible hierarchy: one primary action, the important thing first, nothing on the screen without a job. A quiet, correct screen that holds its hierarchy at 390 and 1440 in both themes is a finish. Atmosphere, motion, and award-grade surface work are opt-in: build them when the brief asks (a named brand, "premium", "make it stunning", a marketing page), never by default for an internal tool, dashboard, admin screen, report, or figure.
 
 ## Route: name the references, read exactly those
 
@@ -15,6 +15,7 @@ Before the first edit, name the references the request routes to and one reason 
 |---|---|
 | Small change on an existing surface: a fix, a new control, a restyled component, a copy or spacing change | The project's `DESIGN.md` (or the nearest styled sibling when there is none) plus at most ONE design reference: the Layer A style skill the project follows, or `references/design/redesign-skill.md` when the ask is "this looks bad" / "improve this". No `DESIGN.md` and no styled sibling either: README Phase 0 (it asks). |
 | A new screen or flow in an existing project | ALSO `references/design/README.md` Phase 0 (the `DESIGN.md` gate and its branches) and the Layer A skill in use. |
+| A new screen or flow, a redesign ("this looks bad", "make it better"), or design-system creation or rework | ALSO `references/design/grounding.md` (step 0 below). |
 | Greenfield with no concrete reference | `references/design/README.md` in full: the gate, the greenfield research lanes (`_INDEX.md` shortlist, `lazyweb.md`, `stylegallery.md`, imagen drafts), and the style routing. One Layer A + one Layer B, read in full. |
 | A concrete visual reference: screenshot, mockup, Figma export, Stitch or imagen output | `references/design/image-to-code-skill.md`; a live site or URL to clone: `references/design/clone-from-url.md`. The reference is the contract and `/visual-qa` runs in reference-fidelity mode. |
 | Any layout or structure change: a new or reshaped region, shell, panel, split, list or grid, sticky bar, or scroll container; "what goes where"; "this layout breaks at X" | `references/design/layout-skill.md` for the mechanics, then `references/design/stylegallery.md` for the pattern contract. Write the `Layout:` line (Brief, below) before the code; `/visual-qa` A12 checks the build against it. |
@@ -28,6 +29,10 @@ Before the first edit, name the references the request routes to and one reason 
 | Any code change in a React project | `references/design/README.md` Phase 0.5: the react-grab / react-scan / react-doctor check (a grep), the install when one is missing, and the dev-only gate; `react-dev-tooling-skill.md` for per-framework snippets. |
 | "What do shipped apps in this space look like?"; design-direction research for an existing product | `references/design/lazyweb.md` (run its recipe verbatim) + the `references/design/_INDEX.md` shortlist. |
 | Image only, no code: a mockup, app-screen concepts, a brand board | `references/design/imagegen-frontend-web.md` / `imagegen-frontend-mobile.md` / `imagegen-brandkit.md` (+ a Layer B brand if named). These never write code. |
+
+## 0. Ground: know the product and the bar before designing
+
+For a new screen or flow, a redesign, or design-system work, run `references/design/grounding.md` first. It reads the guideline source in full, defines the ideal state for the product's personas and journeys, and writes every gap into a ledger. The brief and the build close rows of that ledger. A small change reads the ledger when `DESIGN.md` has one.
 
 ## 1. Brief: decide what the screen is for before drawing it
 
@@ -43,12 +48,12 @@ Write this for every screen you build or change, into `DESIGN.md` section 5 besi
 
 ## 2. Build
 
-Take the branch in `references/design/README.md` Phase 0 first (a small change on a surface with no `DESIGN.md` follows its small-change rule), and on a React project its Phase 0.5 tooling check: `DESIGN.md` (or, under the small-change rule, the styled sibling) exists before components do, and every colour, size, and spacing value traces to a token in it. Then build to these rules; `/visual-qa` verifies them afterwards and should find nothing new.
+Take the branch in `references/design/README.md` Phase 0 first (a small change on a surface with no `DESIGN.md` follows its small-change rule), and on a React project its Phase 0.5 tooling check: `DESIGN.md` (or, under the small-change rule, the styled sibling) exists before components do, and every colour, size, and spacing value traces to a token in it. A new system is built in this order: colour roles in both themes, then type and spacing, then components, which start from shadcn/ui anatomy (or the project's own kit) restyled with the tokens, never invented shapes. Then build to these rules; `/visual-qa` verifies them afterwards and should find nothing new.
 
-- **Hit targets.** Touch layouts: at least 44x44 pt (44 CSS px) per interactive element, 8-12 pt between neighbours. Pointer-only: about 10 px beyond the glyph. Grow the hit area with padding or a pseudo-element, never the glyph; adjacent bar buttons share continuous hit areas.
+- **Hit targets.** Touch layouts: at least 44x44 pt (44 CSS px) per interactive element, 8-12 pt between neighbours. Pointer-only: at least 24x24 CSS px (WCAG 2.5.8), about 10 px beyond the glyph. Grow the hit area with padding or a pseudo-element, never the glyph; adjacent bar buttons share continuous hit areas.
 - **Hierarchy.** The brief's primary action is the one prominent control; the most important content sits top-leading in reading order; each screen's title says what it is; neither a destructive action nor Cancel is the Enter default.
-- **States.** A control ships with hover, pressed, focus-visible, and disabled states beside its default. A data view ships empty (offering the next action), loading (a placeholder at once, a spinner only past about a second), error (cause beside the object), and offline.
-- **Keyboard.** Every action reachable in reading order with a visible focus ring; Escape closes the topmost overlay; Enter triggers the non-destructive default; standard shortcuts keep their meaning; icon-only controls carry an accessible name and a tooltip.
+- **States.** A control ships with hover, pressed, focus-visible, and disabled states beside its default. It keeps one box in every state: the label, icon, and spinner swap inside slots that exist in all states (a min-width sized to the longest label, a spinner overlaying the hidden label), so width, height, and padding never change when the state does, and an arrow or spinner never adds padding when it appears. A data view ships empty (offering the next action), loading (a placeholder at once, a spinner only past about a second), error (cause beside the object), and offline.
+- **Keyboard.** Every action reachable in reading order with a visible focus ring that no sticky bar or overlay covers; Escape closes the topmost overlay; Enter triggers the non-destructive default; standard shortcuts keep their meaning; icon-only controls carry an accessible name and a tooltip.
 - **Motion.** Only for a cause (an interaction, a state change, an arrival), on `transform`, `opacity`, `filter`; interruptible, never gating input; movement becomes a cross-fade under `prefers-reduced-motion`. A hover that changes nothing or motion on a non-interactive element is slop: leave it out.
 - **Icons.** One SVG set (Lucide, Heroicons, Radix, Phosphor); never an emoji.
 - **Concrete reference = contract.** Match its pixels, copy, component structure, and responsive intent unless the user accepts a deviation.
@@ -67,19 +72,33 @@ Some tells regenerate by default, so they are kept out of the first draft rather
 - **No repeated formula.** A treatment that carries one heading (a serif line with an italic accent phrase, a gradient word, an eyebrow-headline-subtitle stack) becomes a template when every section repeats it; so does one image reused across sections. Use each once, where it means something.
 - **No subtitle under every heading.** A heading explains itself; a one-line description under each one is the generated rhythm. Keep a subtitle only where the heading alone would be misread.
 - **One fact, one place.** A conclusion banner and a callout that restates it, a summary card and a table row with the same figure, a label repeated as its placeholder: keep one.
+- **No dated or borrowed surface.** Glass and blur panels (they read as a clone of a popular open-source chat app), neumorphism, mesh-gradient heroes, heavy drop shadows, and 2019-era SaaS illustration date a draft on sight. Surfaces come from `DESIGN.md` section 7; a material ships only when the brief or a concrete reference supplies it.
 - **No promotional copy.** Interface copy states what a thing is or does. "Seamlessly", "effortlessly", "smart", "powerful", "at a glance", "supercharge", and their Korean counterparts ("한눈에", "손쉽게", "스마트한", "효율적으로", "간편하게") are marketing, not interface: rewrite as the plain fact or delete.
 
 ## 3. Subtract
 
-After the draft renders and the lint exits 0, walk every element on the screen and ask what the user could not do or know without it. No answer: delete it, whatever the reference or the previous version showed. Then open the brief's required-content list and confirm every item is still on the screen by name, with its own control or field. Subtraction that merges two required inputs into one, drops a datum, or shortens required copy is a regression, not a cleanup. Record what you removed under "Left out on purpose".
+After the draft renders and the lint exits 0, walk every element on the screen and ask what the user could not do or know without it. No answer: delete it, whatever the reference or the previous version showed. Then open the brief's required-content list and confirm every item is still on the screen by name, with its own control or field. Subtraction that merges two required inputs into one, drops a datum, or shortens required copy is a regression, not a cleanup. Record what you removed under "Left out on purpose". Then count the controls: a secondary action most visits do not need moves into a menu or to the object it acts on, and groups separate by whitespace, not by boxes and borders. Fewer controls with room around them is the target.
 
 ## 4. Verify
 
 Done is the `/visual-qa` gate, not your own glance. It owns the visual checks; this skill keeps build rules. Hand it the brief (B7 checks the primary action and priorities), the `Layout:` line (A12), the required-content list (Pass A), and, for a changed surface, the `before` set so it runs Before/after mode and the pair shows what improved. Its review loop is bounded (its Step 4 sets the budget): defects earn another round, and taste findings are recorded and stop it. A concrete reference runs reference-fidelity mode. Fix passes are scoped: after the first build, each fix names one change and the regions it owns (a token fix may own every region) and leaves everything else untouched, because a whole-page "make it better" pass breaks what was already right. Pass design-system decisions, evidence, and unresolved debt into `/review-work` for significant work.
 
+Every UI or design-system deliverable states its WCAG 2.2 AA result. Probe the built surface in the real browser and put a table in the deliverable (PR body, change description, or reply): one row per item below, PASS / FAIL / N/A, with its evidence. A FAIL is fixed, or recorded as accepted debt in `DESIGN.md` section 8 with the user's sign-off.
+
+- **Contrast** (1.4.3, 1.4.11): text 4.5:1 (large 3:1), icons and control edges 3:1, both themes, placeholder text included.
+- **Focus** (2.4.7, 2.4.11): Tab through every control and screenshot each ring; none missing, none entirely hidden by a sticky bar or overlay (the AA line; the target is none covered at all).
+- **Target size** (2.5.8): every pointer target at least 24x24 CSS px, or an undersized one whose 24 px circle, centred on it, intersects no other target and no other undersized target's circle. Exempt: inline links in a sentence, targets the browser draws unstyled, a target with a same-function equivalent that passes, and a size the information requires.
+- **Keyboard** (2.1.1, 2.1.2): every action works from the keyboard, and focus never gets trapped.
+- **Reflow and text spacing** (1.4.10, 1.4.12): at 320 CSS px no content scrolls sideways, except content that needs two dimensions (a data table, a map, a diagram); with line-height 1.5, paragraph spacing 2em, letter spacing 0.12em, and word spacing 0.16em applied, nothing clips or overlaps.
+- **Dragging, authentication, help, entry** (2.5.7, 3.3.8, 3.2.6, 3.3.7): a single-pointer alternative for every drag, no cognitive test to sign in unless an alternative exists, paste and password managers work, or the test is object or personal-content recognition, help in the same place on every page, nothing asked twice in one flow. N/A only when the surface has none of these.
+- **State-stable controls** (build rule above): read each control's `getBoundingClientRect()` in every state (idle, hover, loading, success, disabled); width and height match across states.
+- **System and surfaces** (build rules above): colour roles exist in `DESIGN.md` before any component; each component names its shadcn/ui or project-kit source; a grep of the shipped styles finds no `backdrop-filter`, neumorphic double shadows, or mesh-gradient backgrounds unless the brief or a concrete reference supplies them.
+
+On the grounded path, close the gap ledger row by row: each fixed gap has its before/after pair and the check that proves it.
+
 ## The reference library (`references/`)
 
-`design/` holds one architecture file (`design-system-architecture.md`: the `DESIGN.md` structure, 8 sections plus a greenfield-only Research Log), 12 taste skills (Layer A: how to execute), 70 brand design systems (Layer B: what it looks like), and the project-original routers in the table above. `_INDEX.md` catalogs all 83 with mood-to-brand mappings; read it when routing is not obvious. Most non-trivial work loads one Layer A + one Layer B. `README.md` carries the `DESIGN.md` gate, the style routing flow, stacking rules, and Phase Final.
+`design/` holds one architecture file (`design-system-architecture.md`: the `DESIGN.md` structure, 8 sections plus a greenfield-only Research Log and the grounding gap ledger), 12 taste skills (Layer A: how to execute), 70 brand design systems (Layer B: what it looks like), and the project-original routers in the table above. `_INDEX.md` catalogs all 83 with mood-to-brand mappings; read it when routing is not obvious. Most non-trivial work loads one Layer A + one Layer B. `README.md` carries the `DESIGN.md` gate, the style routing flow, stacking rules, and Phase Final.
 
 Layer A (pick AT MOST ONE style skill; they encode opposing philosophies):
 

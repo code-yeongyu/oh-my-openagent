@@ -16,9 +16,14 @@ import {
   RETRY_DELAY_MS,
 } from "./idle-constants"
 import { canContinueTrackedBoulderSession } from "./idle-session-eligibility"
-import type { AtlasHookOptions, SessionState } from "./types"
+import type { AtlasHookOptions, AtlasRetryScheduler, SessionState } from "./types"
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
+
+export const scheduleRetryWithTimer: AtlasRetryScheduler = (callback, delayMs) => {
+  const timer = setTimeout(callback, delayMs)
+  return { cancel: () => clearTimeout(timer) }
+}
 
 export function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
   const backgroundManager = options?.backgroundManager
@@ -104,7 +109,7 @@ export async function injectContinuation(input: {
 
     if (result === "injected") {
       if (input.sessionState.pendingRetryTimer) {
-        clearTimeout(input.sessionState.pendingRetryTimer)
+        input.sessionState.pendingRetryTimer.cancel()
         input.sessionState.pendingRetryTimer = undefined
       }
       input.sessionState.lastContinuationInjectedAt = Date.now()
@@ -167,7 +172,8 @@ export function scheduleRetry(input: {
     return
   }
 
-  sessionState.pendingRetryTimer = setTimeout(async () => {
+  const schedule = options?.retryScheduler ?? scheduleRetryWithTimer
+  sessionState.pendingRetryTimer = schedule(async () => {
     try {
       sessionState.pendingRetryTimer = undefined
 

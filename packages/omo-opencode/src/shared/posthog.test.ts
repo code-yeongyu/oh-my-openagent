@@ -86,10 +86,10 @@ describe("posthog client creation", () => {
     const pluginPostHog = posthogModule.createPluginPostHog()
 
     // then
-    expect(() => cliPostHog.trackActive("cli", "run_started")).not.toThrow()
+    expect(() => cliPostHog.trackActive("run_started")).not.toThrow()
     expect(await cliPostHog.shutdown()).toBeUndefined()
 
-    expect(() => pluginPostHog.trackActive("plugin", "run_started")).not.toThrow()
+    expect(() => pluginPostHog.trackActive("run_started")).not.toThrow()
     expect(await pluginPostHog.shutdown()).toBeUndefined()
   })
 
@@ -117,7 +117,7 @@ describe("posthog client creation", () => {
     const pluginPostHog = posthogModule.createPluginPostHog()
 
     // then
-    expect(() => pluginPostHog.trackActive("plugin", "run_started")).not.toThrow()
+    expect(() => pluginPostHog.trackActive("run_started")).not.toThrow()
     expect(await pluginPostHog.shutdown()).toBeUndefined()
   })
 
@@ -198,7 +198,7 @@ describe("posthog disable env var parsing", () => {
       const client = posthogModule.createCliPostHog()
 
       // when
-      client.trackActive("distinct-cli", "run_started")
+      client.trackActive("run_started")
 
       // then
       expect(captured).toHaveLength(0)
@@ -222,7 +222,7 @@ describe("posthog disable env var parsing", () => {
       const client = posthogModule.createCliPostHog()
 
       // when
-      client.trackActive("distinct-cli", "run_started")
+      client.trackActive("run_started")
 
       // then
       expect(captured).toHaveLength(0)
@@ -243,7 +243,7 @@ describe("posthog disable env var parsing", () => {
     const client = posthogModule.createCliPostHog()
 
     // when
-    client.trackActive("distinct-cli", "run_started")
+    client.trackActive("run_started")
 
     // then
     expect(captured).toHaveLength(1)
@@ -262,7 +262,7 @@ describe("posthog disable env var parsing", () => {
     const client = posthogModule.createCliPostHog({ configEnabled: false })
 
     // when
-    client.trackActive("distinct-cli", "run_started")
+    client.trackActive("run_started")
 
     // then
     expect(captured).toHaveLength(0)
@@ -303,7 +303,7 @@ describe("posthog trackActive emission contract", () => {
     const client = posthogModule.createCliPostHog()
 
     // when
-    client.trackActive("distinct-cli", "run_started")
+    client.trackActive("run_started")
 
     // then
     expect(captured).toHaveLength(1)
@@ -314,7 +314,7 @@ describe("posthog trackActive emission contract", () => {
       throw new Error("Expected daily event")
     }
     expect(dailyEvent?.event).toBe("omo_daily_active")
-    expect(dailyEvent?.distinctId).toBe("distinct-cli")
+    expect(dailyEvent?.distinctId).toMatch(/^[0-9a-f]{64}$/)
     const properties = dailyEvent.properties ?? {}
     const expectedPropertyKeys = ["$os", "$os_version", "$process_person_profile", "ci", "cpu_count", "cpu_model", "day_utc", "locale", "os_arch", "os_type", "package_name", "package_version", "platform", "plugin_name", "product_name", "reason", "runtime", "runtime_version", "shell", "source", "terminal", "timezone", "total_memory_gb"]
     expect(Object.keys(properties).sort()).toEqual(expectedPropertyKeys.sort())
@@ -350,7 +350,7 @@ describe("posthog trackActive emission contract", () => {
     const client = posthogModule.createPluginPostHog()
 
     // when
-    client.trackActive("distinct-plugin", "run_started")
+    client.trackActive("run_started")
 
     // then
     expect(captured).toHaveLength(0)

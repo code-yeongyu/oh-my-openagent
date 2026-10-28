@@ -13,6 +13,7 @@ import {
   createSenpiRpcClient,
   probeWithEngine,
   type HostProtocolProbe,
+  type HostPendingInputs,
   type HostRpcClient,
   type HostRpcClientFactory,
   type HostSessionOpenInput,
@@ -133,6 +134,11 @@ export class HostSessionClient {
 
   getEntries(since?: string): Promise<RpcEntriesResult> {
     return this.connected("get_entries").getEntries(since)
+  }
+
+  async getPendingInputs(knownClientMessageIds: readonly string[]): Promise<HostPendingInputs | undefined> {
+    const client = this.connected("get_pending_inputs")
+    return client.getPendingInputs === undefined ? undefined : client.getPendingInputs(knownClientMessageIds)
   }
 
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult> {

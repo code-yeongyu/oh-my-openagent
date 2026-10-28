@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import type { TelemetryCaptureMessage, TelemetryTransport, TelemetryTransportOptions } from "@oh-my-opencode/telemetry-core"
 import { createLazyPostHogTransportFactory } from "./lazy-posthog"
 
@@ -21,17 +21,16 @@ function recorder(calls: unknown[]): TelemetryTransport {
 test("dual-send lazily fans out buffered captures and awaits both lifecycle operations", async () => {
   const posthog: unknown[] = []
   const otlp: unknown[] = []
-  let resolve!: (value: TelemetryTransport) => void
-  const ready = new Promise<TelemetryTransport>(done => { resolve = done })
+  const ready = Promise.withResolvers<TelemetryTransport>()
   let loads = 0
   const transport = createLazyPostHogTransportFactory({
     load: async () => ({ createDefaultPostHogTransport: () => recorder(posthog) }),
-    loadOtlp: () => { loads++; return ready },
+    loadOtlp: () => { loads++; return ready.promise },
   })("key", options)
   expect(loads).toBe(0)
   transport.capture(message)
   const flushed = transport.flush?.()
-  resolve(recorder(otlp))
+  ready.resolve(recorder(otlp))
   await flushed
   expect(posthog).toEqual([message, "flush"])
   expect(otlp).toEqual([message, "flush"])
@@ -85,17 +84,16 @@ test("dual-send forwards immediate events to OTLP even when the PostHog acknowle
 test("dual-send drops buffered OTLP events when consent is withdrawn before creation finishes", async () => {
   const otlp: unknown[] = []
   let consent = true
-  let resolve!: (value: TelemetryTransport) => void
-  const ready = new Promise<TelemetryTransport>(done => { resolve = done })
+  const ready = Promise.withResolvers<TelemetryTransport>()
   const transport = createLazyPostHogTransportFactory({
     load: async () => ({ createDefaultPostHogTransport: () => recorder([]) }),
-    loadOtlp: () => ready,
+    loadOtlp: () => ready.promise,
     consent: () => consent,
   })("key", options)
   transport.capture(message)
   consent = false
   const shutdown = transport.shutdown()
-  resolve(recorder(otlp))
+  ready.resolve(recorder(otlp))
   await shutdown
   expect(otlp).toEqual(["shutdown"])
 })
@@ -140,3 +138,112 @@ test("dual-send does not initialize either unused transport on exit", async () =
   await transport.shutdown()
   expect(loads).toBe(0)
 })
+
+for (const failure of ["reject", "timeout"] as const) {
+  test(`dual-send retries OTLP ${failure} after a 60 second backoff`, async () => {
+    let now = 0
+    let loads = 0
+    const otlp: unknown[] = []
+    const late = Promise.withResolvers<TelemetryTransport>()
+    const transport = createLazyPostHogTransportFactory({
+      load: async () => ({ createDefaultPostHogTransport: () => recorder([]) }),
+      loadOtlp: async () => {
+        loads++
+        if (loads > 1) return recorder(otlp)
+        if (failure === "reject") throw new Error("transient startup failure")
+        return late.promise
+      },
+      now: () => now,
+      timeoutMs: 10,
+    })("key", options)
+    try {
+      transport.capture(message)
+      await transport.flush?.()
+      expect(loads).toBe(1)
+      now = 59_999
+      transport.capture(message)
+      await transport.flush?.()
+      expect(loads).toBe(1)
+      now = 60_000
+      transport.capture(message)
+      await transport.flush?.()
+      expect(loads).toBe(2)
+      expect(otlp).toEqual([message, "flush"])
+      // A timed-out attempt must not replace the successful retry or leak a late sender.
+      const disposed = Promise.withResolvers<undefined>()
+      const stale: unknown[] = []
+      late.resolve({ capture: value => { stale.push(value) }, shutdown: async () => { disposed.resolve(undefined) } })
+      if (failure === "timeout") await disposed.promise
+      expect(stale).toEqual([])
+    } finally {
+      await transport.shutdown()
+    }
+  })
+}
+
+test("dual-send refuses OTLP once after a null load and never loads for unmapped events", async () => {
+  let now = 0
+  let loads = 0
+  const transport = createLazyPostHogTransportFactory({
+    load: async () => ({ createDefaultPostHogTransport: () => recorder([]) }),
+    loadOtlp: async () => { loads++; return null },
+    isOtlpEvent: event => event === message.event,
+    now: () => now,
+  })("key", options)
+  transport.capture({ ...message, event: "omo_senpi_daily_active" })
+  await transport.flush?.()
+  expect(loads).toBe(0)
+  transport.capture(message)
+  await transport.flush?.()
+  expect(loads).toBe(1)
+  now = 3_600_000
+  transport.capture(message)
+  await transport.flush?.()
+  expect(loads).toBe(1)
+  await transport.shutdown()
+})
+
+for (const method of ["flush", "captureImmediate"] as const) {
+  test(`dual-send preserves a slow PostHog ${method} acknowledgement past OTLP bounds`, async () => {
+    const started = Promise.withResolvers<undefined>()
+    const acknowledged = Promise.withResolvers<undefined>()
+    let slow = false
+    const operation = async (): Promise<void> => {
+      if (!slow) return
+      started.resolve(undefined)
+      await acknowledged.promise
+    }
+    const transport = createLazyPostHogTransportFactory({
+      load: async () => ({ createDefaultPostHogTransport: () => ({
+        capture: () => undefined, flush: operation, captureImmediate: operation, shutdown: async () => undefined,
+      }) }),
+      loadOtlp: async () => recorder([]),
+    })("key", options)
+    transport.capture(message)
+    await transport.flush?.()
+    // Drive deadlines directly, so the acknowledgement contract does not depend on wall-clock luck.
+    const deadlines: (() => void)[] = []
+    const schedule = globalThis.setTimeout
+    const timers = spyOn(globalThis, "setTimeout").mockImplementation(Object.assign(
+      <Args extends unknown[]>(callback: (...args: Args) => void, _ms?: number, ...args: Args) => {
+        deadlines.push(() => callback(...args))
+        return schedule(() => undefined, 60_000)
+      },
+      { __promisify__: schedule.__promisify__ },
+    ))
+    try {
+      slow = true
+      const pending = method === "flush" ? transport.flush?.() : transport.captureImmediate?.(message)
+      // Attach a rejection handler before firing the deadlines.
+      const result = Promise.resolve(pending).then(() => "acknowledged", error => String(error))
+      await started.promise
+      for (const deadline of deadlines) deadline()
+      acknowledged.resolve(undefined)
+      expect(await result).toBe("acknowledged")
+    } finally {
+      timers.mockRestore()
+      acknowledged.resolve(undefined)
+      await transport.shutdown()
+    }
+  })
+}

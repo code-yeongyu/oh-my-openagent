@@ -18,7 +18,6 @@ import { createLazyValue } from "../../extension/startup-deferral"
 import type { ComponentLogger } from "../../extension/types"
 
 export const SENPI_TELEMETRY_EVENT_NAME = "omo_senpi_daily_active"
-export const SENPI_MACHINE_ID_PREFIX = "omo-senpi:"
 
 const SENPI_TELEMETRY_SOURCE = "senpi-extension"
 const SESSION_START_REASON = "session_start"
@@ -44,7 +43,6 @@ export function createSenpiTelemetryProductConfig(): TelemetryProductConfig {
     defaultApiKey: DEFAULT_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: SENPI_TELEMETRY_EVENT_NAME,
-    machineIdPrefix: SENPI_MACHINE_ID_PREFIX,
     packageName: "@oh-my-opencode/omo-senpi",
     packageVersion: packageVersion.get(),
     platform: "omo-senpi",

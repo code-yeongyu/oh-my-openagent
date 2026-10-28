@@ -1,11 +1,15 @@
 import type { OtlpWireProjection, SpanAllowlist, WireAttributes } from "@oh-my-opencode/telemetry-core/otlp"
+import { isOtlpEvent, type OtlpEvent } from "./otlp-events"
+export { isOtlpEvent } from "./otlp-events"
+
+import { pinnedModelId } from "./pinned-model-ids"
 
 // Derived from omo-telemetry origin/main 13c6e61b40c49141868e7430e02a7b4b949d0c5d:
 // packages/schema-registry/artifacts/omo-senpi.json (schema v4, proto v1.7.0)
 // and packages/schema-registry/semconv-map.json. No unlisted event or attribute has a fallback.
 // For registered semconv keys, use the map's input name: omo.prompt.is_real_user comes from
 // is_real_user_prompt, although the pinned artifact still names its relay alias is_real_user.
-const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+const EVENT_FIELDS: Readonly<Record<OtlpEvent, Readonly<Record<string, string>>>> = {
   "category_config": {
     "builtin_overridden_count": "omo.builtin_overridden_count",
     "cat_architect": "omo.cat_architect",
@@ -20,8 +24,7 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "cat_writing": "omo.cat_writing",
     "combo_fingerprint": "omo.combo_fingerprint",
     "config_generation": "omo.config_generation",
-    "custom_category_count": "omo.custom_category_count",
-    "machine_hash": "omo.machine_hash",
+    "user_category_count": "omo.custom_category_count",
     "source": "omo.source",
     "$session_id": "session.id"
   },
@@ -29,7 +32,6 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "active": "omo.active",
     "backend": "omo.backend",
     "host_platform": "omo.host_platform",
-    "machine_hash": "omo.machine_hash",
     "source": "omo.source",
     "$session_id": "session.id"
   },
@@ -37,21 +39,18 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "backend": "omo.backend",
     "code": "omo.code",
     "host_platform": "omo.host_platform",
-    "machine_hash": "omo.machine_hash",
     "$session_id": "session.id"
   },
   "computer_use_permission_denied": {
     "backend": "omo.backend",
     "host_platform": "omo.host_platform",
-    "machine_hash": "omo.machine_hash",
     "permission": "omo.permission",
     "scope": "omo.scope",
     "$session_id": "session.id"
   },
   "daily_active": {
     "day_utc": "omo.day_utc",
-    "machine_hash": "omo.machine_hash",
-    "start_trigger": "omo.start_trigger",
+    "reason": "omo.start_trigger",
     "$session_id": "session.id"
   },
   "delegation_completed": {
@@ -68,7 +67,6 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "execution_mode": "omo.execution_mode",
     "fallback_attempts": "omo.fallback_attempts",
     "input_tokens": "omo.input_tokens",
-    "machine_hash": "omo.machine_hash",
     "model_id": "omo.model_id",
     "model_source": "omo.model_source",
     "output_tokens": "omo.output_tokens",
@@ -76,7 +74,7 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "provider": "omo.provider",
     "reasoning_effort": "omo.reasoning_effort",
     "run_epoch": "omo.run_epoch",
-    "start_trigger": "omo.start_trigger",
+    "start_reason": "omo.start_trigger",
     "stats_status": "omo.stats_status",
     "status": "omo.status",
     "task_send_queued_count": "omo.task_send_queued_count",
@@ -92,20 +90,17 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "background": "omo.background",
     "batch_size_bucket": "omo.batch_size_bucket",
     "kind": "omo.kind",
-    "machine_hash": "omo.machine_hash",
     "name": "omo.name",
     "$session_id": "session.id"
   },
   "feature_used": {
     "feature": "omo.feature",
-    "machine_hash": "omo.machine_hash",
     "$session_id": "session.id"
   },
   "handoff_hint": {
     "action": "omo.action",
     "context_tokens": "omo.context_tokens",
     "fresh_usd": "omo.fresh_usd",
-    "machine_hash": "omo.machine_hash",
     "model_id": "omo.model_id",
     "next_reply_usd": "omo.next_reply_usd",
     "provider": "omo.provider",
@@ -122,7 +117,6 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "first_nudge_wake": "omo.first_nudge_wake",
     "generations": "omo.generations",
     "input_tokens": "omo.input_tokens",
-    "machine_hash": "omo.machine_hash",
     "model_top": "omo.model_top",
     "nudge_gap_ms_median": "omo.nudge_gap_ms_median",
     "nudge_gap_ms_p90": "omo.nudge_gap_ms_p90",
@@ -157,7 +151,6 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "eval_outer_joined_calls": "omo.eval_outer_joined_calls",
     "eval_tool_aggregate_truncated_execution_count": "omo.eval_tool_aggregate_truncated_execution_count",
     "incomplete_calls": "omo.incomplete_calls",
-    "machine_hash": "omo.machine_hash",
     "measured_eval_execution_duration_ms_sum": "omo.measured_eval_execution_duration_ms_sum",
     "measured_eval_nested_tool_duration_ms_sum": "omo.measured_eval_nested_tool_duration_ms_sum",
     "measured_turn_duration_ms_total": "omo.measured_turn_duration_ms_total",
@@ -177,7 +170,6 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "crashed_engine_version": "omo.crashed_engine_version",
     "crashed_omo_version": "omo.crashed_omo_version",
     "detection": "omo.detection",
-    "machine_hash": "omo.machine_hash",
     "process_kind": "omo.process_kind",
     "shard_kind": "omo.shard_kind",
     "signal": "omo.signal",
@@ -195,12 +187,11 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "keyword_ultrawork_full": "omo.keyword_ultrawork_full",
     "keyword_ulw_abbrev": "omo.keyword_ulw_abbrev",
     "keyword_variant": "omo.keyword_variant",
-    "machine_hash": "omo.machine_hash",
     "is_real_user_prompt": "omo.prompt.is_real_user",
     "prompt_length_bucket": "omo.prompt_length_bucket",
     "queue_mode": "omo.queue_mode",
     "real_prompt_ordinal_bucket": "omo.real_prompt_ordinal_bucket",
-    "suppression_cause": "omo.suppression_cause",
+    "suppression_reason": "omo.suppression_cause",
     "$session_id": "session.id"
   },
   "session_started": {
@@ -208,13 +199,12 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "cpu_count": "omo.cpu_count",
     "default_model": "omo.default_model",
     "default_provider": "omo.default_provider",
-    "machine_hash": "omo.machine_hash",
     "memory_bucket": "omo.memory_bucket",
     "model_count": "omo.model_count",
     "provider_count": "omo.provider_count",
     "session_role": "omo.session.role",
     "signed_in_provider_count": "omo.signed_in_provider_count",
-    "start_trigger": "omo.start_trigger",
+    "reason": "omo.start_trigger",
     "$session_id": "session.id"
   },
   "session_summary": {
@@ -251,7 +241,6 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "m3_provider": "omo.m3_provider",
     "m3_total_tokens": "omo.m3_total_tokens",
     "m3_turns": "omo.m3_turns",
-    "machine_hash": "omo.machine_hash",
     "model_count": "omo.model_count",
     "other_cost_usd": "omo.other_cost_usd",
     "other_total_tokens": "omo.other_total_tokens",
@@ -271,11 +260,9 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "total_tokens_p95": "omo.total_tokens_p95",
     "turns": "omo.turns",
     "window_ms": "omo.window_ms",
-    "$session_id": "session.id",
-    "cost_1e4": "omo.cost.usd_1e4"
+    "$session_id": "session.id"
   },
   "skill_loaded": {
-    "machine_hash": "omo.machine_hash",
     "skill_name": "omo.skill_name",
     "$session_id": "session.id"
   },
@@ -287,7 +274,6 @@ const EVENT_FIELDS: Readonly<Record<string, Readonly<Record<string, string>>>> =
     "input_tokens": "gen_ai.usage.input_tokens",
     "output_tokens": "gen_ai.usage.output_tokens",
     "reasoning_tokens": "gen_ai.usage.reasoning.output_tokens",
-    "machine_hash": "omo.machine_hash",
     "model_id": "omo.model_id",
     "provider": "omo.provider",
     "sample_rate": "omo.sample_rate",
@@ -312,6 +298,8 @@ export const OTLP_SPANS: SpanAllowlist = {
     "session.id"
   ]
 }
+
+const MODEL_WIRE_KEY_LIST = ["gen_ai.request.model", "gen_ai.response.model", "omo.cat_architect", "omo.cat_artistry", "omo.cat_deep_high", "omo.cat_deep_low", "omo.cat_quick", "omo.cat_ultrabrain", "omo.cat_unspecified_high", "omo.cat_unspecified_low", "omo.cat_visual_engineering", "omo.cat_writing", "omo.default_model", "omo.model_id", "omo.model_top"]
 
 const PROVIDER_VALUES: Readonly<Record<string, string>> = {
   "alibaba-token-plan": "alibaba-token-plan",
@@ -344,17 +332,45 @@ const PROVIDER_VALUES: Readonly<Record<string, string>> = {
   "custom": "custom"
 }
 
-export function isOtlpEvent(event: string): boolean {
-  return Object.hasOwn(EVENT_FIELDS, event)
+// Wire keys whose pinned enum is the model vocabulary (see pinned-model-ids.ts).
+const MODEL_WIRE_KEYS: ReadonlySet<string> = new Set(MODEL_WIRE_KEY_LIST)
+// session_summary's top-model keys use the same vocabulary plus "none" (no model in that rank).
+const RANKED_MODEL_WIRE_KEYS: ReadonlySet<string> = new Set(["omo.m1_model", "omo.m2_model", "omo.m3_model"])
+
+// Optional aliases use the collector pin's closed vocabulary, not future client additions.
+const START_TRIGGERS: Readonly<Record<string, readonly string[]>> = {
+  daily_active: ["session_start"],
+  session_started: ["startup", "reload", "new", "resume", "fork"],
+  delegation_completed: [
+    "initial_spawn", "runtime_fallback", "session_resume", "dag_retry", "revive_after_completed",
+    "revive_after_error", "revive_after_cancelled", "revive_after_interrupted", "revive_after_lost", "unknown",
+  ],
 }
+const SUPPRESSION_CAUSES = [
+  "none", "no_keyword", "identifier_reference", "negated_mention", "extension_source",
+  "child_session", "embedded_directive", "skill_expansion", "skill_name_only",
+]
 
 export const projectOtlpEvent: OtlpWireProjection = (event, properties) => {
   if (!isOtlpEvent(event)) return {}
   const attributes: WireAttributes = {}
   for (const [property, wire] of Object.entries(EVENT_FIELDS[event] ?? {})) {
     const value = properties[property]
-    if (typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
+    if (wire === "omo.start_trigger" && (typeof value !== "string" || !START_TRIGGERS[event]?.includes(value))) continue
+    if (wire === "omo.suppression_cause" && (typeof value !== "string" || !SUPPRESSION_CAUSES.includes(value))) continue
+    if (wire === "omo.custom_category_count" && (typeof value !== "number" || value < 0 || value > 1e9)) continue
+    if (typeof value === "string" && MODEL_WIRE_KEYS.has(wire)) {
+      attributes[wire] = pinnedModelId(value)
+    } else if (typeof value === "string" && RANKED_MODEL_WIRE_KEYS.has(wire)) {
+      attributes[wire] = value === "none" ? value : pinnedModelId(value)
+    } else if (typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
       attributes[wire] = value
+    }
+  }
+  if (event === "session_summary") {
+    const usd = properties["cost_usd"]
+    if (typeof usd === "number" && Number.isFinite(usd) && usd >= 0 && usd <= 1e6) {
+      attributes["omo.cost.usd_1e4"] = Math.round(usd * 10_000)
     }
   }
   if (event === "turn_completed") {

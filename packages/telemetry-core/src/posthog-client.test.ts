@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto"
 import { describe, expect, test } from "bun:test"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -11,7 +10,6 @@ import {
   createDefaultPostHogTransport,
   createTelemetryClient,
   getTelemetryActivityStateFilePath,
-  getTelemetryDistinctId,
   isTelemetryClientEnabled,
   recordDailyActive,
 } from "./index"
@@ -28,7 +26,6 @@ const PRODUCT = {
   defaultApiKey: DEFAULT_POSTHOG_API_KEY,
   defaultHost: DEFAULT_POSTHOG_HOST,
   eventName: "omo_codex_daily_active",
-  machineIdPrefix: "omo-codex:",
   packageName: "@oh-my-opencode/omo-codex",
   packageVersion: "4.9.2",
   platform: "omo-codex",
@@ -126,7 +123,7 @@ describe("posthog telemetry client", () => {
     // when
     client.trackActive({
       dayUTC: "2026-05-25",
-      distinctId: getTelemetryDistinctId(PRODUCT.machineIdPrefix, OS_PROVIDER),
+      distinctId: "a".repeat(64),
       reason: "cli_run",
     })
     await client.flush()
@@ -135,7 +132,7 @@ describe("posthog telemetry client", () => {
     // then
     expect(capturedMessages).toHaveLength(1)
     expect(capturedMessages[0]).toEqual({
-      distinctId: createHash("sha256").update("omo-codex:test-host").digest("hex"),
+      distinctId: "a".repeat(64),
       event: "omo_codex_daily_active",
       properties: {
         platform: "omo-codex",

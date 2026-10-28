@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
-import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { nowIso, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { isFallbackHandoff } from "./fallback-handoff"
 import { isHostSessionRecord } from "./host-session"
@@ -17,6 +17,8 @@ import { reconcileLegacyTerminal, terminateClaimedPid } from "./reconcile-termin
 import type { ReconcileOutcome, ReconcileResult } from "./types"
 import { reconcileProvisionalExit, settleProvisionalExitLoss } from "./provisional-exit"
 import { hasForeignLiveOwner } from "./reconcile-owner"
+import { holdsClaim, rollbackOrDeferred } from "./revive-rollback"
+import { suspendHandle } from "./shutdown"
 
 const HEARTBEAT_FRESH_MS = 30_000
 
@@ -25,17 +27,47 @@ export async function reconcileOnSessionStart(
   context: LifecycleContext,
   parentSessionId?: string,
 ): Promise<ReconcileResult> {
+  if (!reconciliationActive(context)) return { outcomes: [] }
+  context.hostSessionProbe.refresh()
+  const groups = new Map<string, TaskRecord[]>()
+  for (const record of context.store.list().records) {
+    const key = isHostSessionRecord(record) ? record.host_session.socket : ""
+    const group = groups.get(key) ?? []
+    group.push(record)
+    groups.set(key, group)
+  }
+  // Admission leases cover only local claims. A host's probe/respawn never holds up another host.
+  const results = await Promise.all([...groups.values()].map(records => reconcileRecords(context, parentSessionId, records)))
+  if (!reconciliationActive(context)) return { outcomes: [] }
+  await reclaimIsolations(context)
+  return { outcomes: results.flatMap(result => result.outcomes) }
+}
+
+async function reconcileRecords(
+  context: LifecycleContext,
+  parentSessionId: string | undefined,
+  records: readonly TaskRecord[],
+): Promise<ReconcileResult> {
   const outcomes: ReconcileOutcome[] = []
   const candidates: TaskRecord[] = []
   const excludedFromRevival = new Set(context.reconcileAdmission.excludeTaskIds)
-  // ONE daemon snapshot per pass: every host-session record below is matched against it by session
-  // path, so a hundred children still cost one probeHost and one list_sessions.
-  context.hostSessionProbe.refresh()
 
   // Ownership is checked before terminality, residency, or mode. A live sibling owns the record in
   // every status and this process must not mutate it.
-  for (const record of context.store.list().records) {
-    if (await hasForeignLiveOwner(context, record, parentSessionId)) {
+  for (const record of records) {
+    if (!reconciliationActive(context)) return { outcomes }
+    const foreign = await hasForeignLiveOwner(context, record, parentSessionId)
+    if (!reconciliationActive(context)) return { outcomes }
+    // The probe says nothing about a claim installed while it was in flight, even at the same pid.
+    const fresh = context.store.load(record.task_id)
+    if (fresh === null || fresh.host_pid !== record.host_pid || fresh.residency_claim !== record.residency_claim
+      || fresh.notification.run_epoch !== record.notification.run_epoch || fresh.updated_at !== record.updated_at
+      || fresh.residency_state !== record.residency_state || fresh.status !== record.status) {
+      excludedFromRevival.add(record.task_id)
+      outcomes.push({ task_id: record.task_id, kind: "foreign_live_owner", reason: "ownership changed during probe" })
+      continue
+    }
+    if (foreign) {
       // Scoped admission re-reads the store rather than this candidate array. Carry the
       // ownership exclusion into that selector too, or a suspended live-owner child is claimed.
       excludedFromRevival.add(record.task_id)
@@ -60,6 +92,7 @@ export async function reconcileOnSessionStart(
     if (record.provisional_exit !== undefined && !TERMINAL_STATUSES.has(record.status)
       && !(parentSessionId !== undefined && record.parent_session_id !== parentSessionId && isSameProcessSibling(context, record))) {
       outcomes.push(await reconcileProvisionalExit(context, record))
+      if (!reconciliationActive(context)) return { outcomes }
       excludedFromRevival.add(record.task_id)
       continue
     }
@@ -70,8 +103,8 @@ export async function reconcileOnSessionStart(
     for (const record of candidates) {
       if (isSuspended(record)) continue
       outcomes.push(await reconcileLegacyRecord(context, record))
+      if (!reconciliationActive(context)) return { outcomes }
     }
-    await reclaimIsolations(context)
     return { outcomes }
   }
 
@@ -90,23 +123,29 @@ export async function reconcileOnSessionStart(
       continue
     }
     outcomes.push(await reconcileLegacyRecord(context, record))
+    if (!reconciliationActive(context)) return { outcomes }
   }
 
+  const approved = new Set(candidates.map(record => record.task_id))
   outcomes.push(...await reconcileScopedRevival(
     {
       ...context,
       deferUnresumable: context.registry.ownsRecord?.({ parent_session_id: parentSessionId }) === true || context.deferUnresumable,
-      reconcileAdmission: { ...context.reconcileAdmission, excludeTaskIds: excludedFromRevival },
+      reconcileAdmission: {
+        ...context.reconcileAdmission,
+        excludeTaskIds: excludedFromRevival,
+        canClaim: (fresh) => approved.has(fresh.task_id) && context.reconcileAdmission.canClaim?.(fresh) !== false,
+      },
     },
     parentSessionId,
     candidates.filter((record) => record.parent_session_id === parentSessionId),
     (taskId) => newestSessionPath(context, taskId),
   ))
-  await reclaimIsolations(context)
   return { outcomes }
 }
 
 export async function reconcileLegacyRecord(context: LifecycleContext, observed: TaskRecord): Promise<ReconcileOutcome> {
+  if (!reconciliationActive(context)) return { task_id: observed.task_id, kind: "deferred", reason: "session_unavailable" }
   if (observed.residency_state !== "resident") return reconcileLegacyRecordExclusive(context, observed)
   // Same-process sweeps cannot distinguish "our claim is in flight" from a switched-session orphan
   // using host_pid alone. This marker never waits or spans records: a loser defers immediately while
@@ -189,7 +228,11 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
   }
 
   const heartbeat = heartbeatState(context, record)
-  if (!await terminateClaimedPid(context, record)) {
+  const terminated = await terminateClaimedPid(context, record)
+  if (!reconciliationActive(context)) return rollbackOrDeferred(context, record.task_id, "rpc_detached", "session_unavailable", record)
+  const fresh = context.store.load(record.task_id)
+  if (fresh === null || !holdsClaim(context, fresh, record)) return { task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" }
+  if (!terminated) {
     await markLost(context, record.task_id, `rpc orphan pid=${pid} could not be terminated`)
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
   }
@@ -230,6 +273,21 @@ async function reattachLegacyRecord(
     reservation.release()
     throw error
   }
+  const owns = () => {
+    const fresh = context.store.load(record.task_id)
+    return fresh !== null && fresh.host_pid === context.hostPid && fresh.residency_claim === record.residency_claim
+  }
+  if (!reconciliationActive(context) || !owns()) {
+    reservation.release()
+    if (respawned.ok) {
+      const handle = respawned.handle
+      await suspendHandle(context, {
+        ...handle, kind: handle.kind ?? "rpc",
+        terminate: () => handle.terminate?.() ?? Promise.resolve(),
+      }, "revived_after_shutdown", owns)
+    }
+    return rollbackOrDeferred(context, record.task_id, "rpc_detached", "session_unavailable", record)
+  }
   if (!respawned.ok) {
     reservation.release()
     // A stopped run keeps its child: nothing launched, and the run's Resume restores it.
@@ -243,6 +301,17 @@ async function reattachLegacyRecord(
   } catch (error) {
     reservation.release()
     throw error
+  }
+  if (!reconciliationActive(context) || !owns()) {
+    reservation.release()
+    if (reattached.ok) {
+      const handle = respawned.handle
+      await suspendHandle(context, {
+        ...handle, kind: handle.kind ?? "rpc",
+        terminate: () => handle.terminate?.() ?? Promise.resolve(),
+      }, "revived_after_shutdown", owns)
+    }
+    return rollbackOrDeferred(context, record.task_id, "rpc_detached", "session_unavailable", record)
   }
   if (!reattached.ok) {
     reservation.release()

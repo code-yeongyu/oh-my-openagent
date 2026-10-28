@@ -971,9 +971,8 @@ Postinstall validates both platform binary resolution and OpenCode version compa
 Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). For both products:
 
 - A single event is sent **at most once per UTC day per machine**
-- Uses a SHA256-hashed installation identifier — never the raw hostname
+- Uses a SHA256 hash of a random install id created on your computer, never anything derived from the hostname or user name
 - PostHog person profiles are **not** created
-- The raw hostname is never transmitted
 
 Per product:
 

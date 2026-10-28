@@ -11,7 +11,6 @@ import type { PostHogActivityReason, PostHogClient } from "../src/posthog.js";
 const CLI_PATH = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 
 type CapturedCall = {
-	distinctId: string;
 	reason: PostHogActivityReason;
 };
 
@@ -53,8 +52,8 @@ function makeRecordingClient(): { client: PostHogClient; calls: CapturedCall[]; 
 	const calls: CapturedCall[] = [];
 	let shutdownCalls = 0;
 	const client: PostHogClient = {
-		trackActive: (distinctId, reason) => {
-			calls.push({ distinctId, reason });
+		trackActive: (reason) => {
+			calls.push({ reason });
 		},
 		shutdown: async () => {
 			shutdownCalls += 1;
@@ -104,10 +103,9 @@ describe("runSessionStartHook", () => {
 
 			const output = await runSessionStartHook(makeSessionStartInput(), {
 				createClient: () => recorder.client,
-				getDistinctId: () => "distinct-id-abc",
 			});
 
-			expect(recorder.calls).toEqual([{ distinctId: "distinct-id-abc", reason: "session_start" }]);
+			expect(recorder.calls).toEqual([{ reason: "session_start" }]);
 			expect(output).toBe("");
 		});
 
@@ -116,7 +114,6 @@ describe("runSessionStartHook", () => {
 
 			await runSessionStartHook(makeSessionStartInput(), {
 				createClient: () => recorder.client,
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(recorder.shutdownCalls).toBe(1);
@@ -129,7 +126,6 @@ describe("runSessionStartHook", () => {
 				createClient: () => {
 					throw new Error("posthog unavailable");
 				},
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(output).toBe("");
@@ -140,7 +136,6 @@ describe("runSessionStartHook", () => {
 				createClient: async () => {
 					throw new Error("posthog unavailable");
 				},
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(output).toBe("");
