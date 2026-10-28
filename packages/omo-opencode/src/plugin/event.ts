@@ -1,3 +1,4 @@
+import type { SessionModelProfiles } from "./session-model-profiles";
 import type { PluginInput } from "@opencode-ai/plugin";
 import type { OhMyOpenCodeConfig } from "../config";
 import type { CreatedHooks } from "../create-hooks";
@@ -27,6 +28,7 @@ import type { EventInput, FirstMessageVariantGate, PluginEventContext } from "./
 export { extractErrorMessage } from "./event-error-utils";
 
 export function createEventHandler(args: {
+  sessionModelProfiles?: SessionModelProfiles;
   ctx: PluginContext;
   pluginConfig: OhMyOpenCodeConfig;
   firstMessageVariantGate: FirstMessageVariantGate;
@@ -152,6 +154,8 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.deleted") {
+      const info = props?.info as { id?: string } | undefined;
+      if (info?.id) args.sessionModelProfiles?.clearSession(info.id);
       await handleSessionDeletedEvent({
         props,
         tmuxIntegrationEnabled,

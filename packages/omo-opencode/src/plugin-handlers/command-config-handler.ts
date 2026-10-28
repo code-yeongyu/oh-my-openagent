@@ -111,6 +111,10 @@ export async function applyCommandConfig(params: {
   ]);
 
   params.config.command = {
+    "omo-profile": {
+      description: "Select a model profile for this running session: <name>, list, current, clear",
+      template: "Report the session model profile command result below briefly. $ARGUMENTS",
+    },
     "omo-mcp-env-grant": {
       description: "Grant and save permanently the displayed environment names for one MCP declaration",
       template: "$ARGUMENTS",

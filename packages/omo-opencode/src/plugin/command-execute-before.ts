@@ -1,3 +1,4 @@
+import type { SessionModelProfiles } from "./session-model-profiles"
 import type { CreatedHooks } from "../create-hooks"
 import { parseGoalCommand } from "../hooks/goal/command-arguments"
 import { log } from "../shared/logger"
@@ -52,6 +53,7 @@ function hasPartsOutput(value: unknown): value is CommandExecuteBeforeOutput {
 
 export function createCommandExecuteBeforeHandler(args: {
   directory: string
+  sessionModelProfiles?: SessionModelProfiles
   hooks: CreatedHooks
   mcpManager?: SkillMcpManager
   notify?: (message: string) => void
@@ -62,6 +64,11 @@ export function createCommandExecuteBeforeHandler(args: {
   const { directory, hooks } = args
 
   return async (input, output): Promise<void> => {
+    if (input.command.toLowerCase() === "omo-profile" && args.sessionModelProfiles) {
+      const message = await args.sessionModelProfiles.command(input.sessionID, input.arguments)
+      output.parts.push({ type: "text", text: message, synthetic: true })
+      return
+    }
     if (input.command.toLowerCase() === "omo-mcp-env-grant") {
       const [id, ...names] = input.arguments.trim().split(/\s+/)
       if (!id || !args.mcpManager) throw new Error("Usage: /omo-mcp-env-grant <id> [NAME...]")
