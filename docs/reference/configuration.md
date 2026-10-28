@@ -1634,3 +1634,32 @@ See [Ollama Troubleshooting](../troubleshooting/ollama.md) for `JSON Parse error
 #### OpenGateway
 
 The `omo-opencode` plugin exposes the OpenAI-compatible `opengateway` provider at `https://apis.opengateway.ai/v1` when `OPENGATEWAY_API_KEY` is set or an `opengateway` auth entry exists. No provider is injected if neither credential is present.
+
+### Change model profiles in a running OpenCode session
+
+Use `/omo-profile budget` to apply an existing `profiles.budget` overlay to the
+current session's model routing. `/omo-profile quality` changes it again without
+restarting OpenCode or editing configuration. `/omo-profile` (or `list` / `current`)
+shows the current selector and available profiles; `/omo-profile clear` returns
+to the selector inherited when this plugin instance started. Use
+`/omo-profile use <name>` for a profile named `list`, `current` or `clear`.
+
+The session selector overrides `OMO_PROFILE`, `OCX_PROFILE` and the profile inferred
+from `OPENCODE_CONFIG_DIR` for this session. It does not write a global preference
+and expires when the server/plugin instance restarts. Another parent session in
+the same server keeps its own selection. New delegations from descendants resolve
+their parent's selection; change profiles from the parent session.
+
+After a successful switch, subsequent primary requests use the selected agent's
+model and variant. New `task` and `call_omo_agent` dispatches use its agent/category
+settings through the existing tool resolvers. A profile with no model override
+falls through to the shared base settings. Invalid JSON, ignored invalid values,
+unknown keys and missing profile names reject a switch; later invalid file edits
+retain the last accepted snapshot until a valid configuration is saved.
+
+A running request and an existing child's `task_id` / `session_id` continuation
+keep their resolved model. The command itself makes a normal OpenCode request to
+confirm the selected state. Primary agent prompts, tools, hooks, provider/auth
+configuration and tool registrations still come from startup configuration; this
+command changes model routing. Tuning beyond model and variant retains each
+existing tool resolver's support.
