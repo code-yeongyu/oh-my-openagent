@@ -16,24 +16,33 @@ const result = await omowright.bskOnboard({
   waitTotalMs,
 })
 
+// A down daemon cannot see the extension, so it is no reason to ask the user to enable it.
+const daemonDown = !result.ready && !result.needsChoice && !result.daemon.running && result.cli.installed
+// An omowright with its PR #70 sets daemon.startBlocked. Older omowright only reports the refusal in the error text:
+// bsk's own "Job Object" message, or its Windows fallback when registering the daemon's scheduled task fails.
+const startBlocked = daemonDown && (result.daemon.startBlocked ?? /Job Object|breakaway|registering the bsk daemon task/i.test(result.daemon.error ?? ""))
+const FOREGROUND_STEP = "run `bsk daemon start --foreground` in a persistent background session that outlives the command, then check `bsk status` from a separate call."
+const DAEMON_STEP = startBlocked
+  ? `Start the daemon in the foreground: this host does not let a command detach it, so retrying \`bsk status\` or \`bsk daemon start\` fails the same way; ${FOREGROUND_STEP}`
+  : `Start the daemon first: run \`bsk status\` once; if the host forbids Job Object breakaway (Windows) or reaps background processes, ${FOREGROUND_STEP}`
+// An omowright with its PR #69 returns nextStep; older omowright has none, so derive it from the result.
+const nextStep = result.ready ? null : daemonDown ? DAEMON_STEP : result.nextStep ?? result.humanStep ?? null
+
 const summary = {
   ready: result.ready,
   cli: result.cli,
   installerRan: result.install !== null,
-  daemon: { running: result.daemon.running, version: result.daemon.version ?? null, error: result.daemon.error ?? null },
+  daemon: { running: result.daemon.running, version: result.daemon.version ?? null, error: result.daemon.error ?? null, startBlocked },
   browser: result.primary ? { id: result.primary.id, label: result.primary.label, confidence: result.identification.confidence, reason: result.identification.reason } : null,
   needsChoice: result.needsChoice,
   candidates: result.identification.candidates.map((c) => ({ id: c.id, label: c.label, signals: c.signals })),
   registeredElsewhere: result.identification.registeredElsewhere,
-  registrations: result.registrations.map((r) => ({ browser: r.browser, registered: r.registered, alreadyPresent: r.alreadyPresent ?? false, reason: r.reason ?? null, needsRestart: r.needsRestart ?? null, humanStep: r.humanStep ?? null })),
+  registrations: result.registrations.map((r) => ({ browser: r.browser, registered: r.registered, alreadyPresent: r.alreadyPresent ?? false, reason: r.reason ?? null, needsRestart: r.needsRestart ?? null, humanStep: daemonDown ? null : r.humanStep ?? null })),
   browsersConnected: result.browsersConnected.map((b) => ({ instanceId: b.instance_id, name: b.browser_name, version: b.browser_version })),
-  humanStep: result.humanStep,
-  nextStep: result.nextStep ?? null,
+  daemonDown,
+  humanStep: daemonDown ? null : result.humanStep,
+  nextStep,
 }
-
-// A down daemon cannot see the extension, so it is no reason to ask the user to enable it.
-const daemonDown = !result.ready && !result.needsChoice && !result.daemon.running && result.cli.installed
-const DAEMON_STEP = "Start the daemon first: if the host forbids Job Object breakaway (Windows) or reaps background processes, run `bsk daemon start --foreground` in a persistent background session that outlives the command, then check `bsk status` from a separate call."
 
 if (json) {
   console.log(JSON.stringify(summary, null, 2))
@@ -47,7 +56,7 @@ if (json) {
     console.log(`extension for ${r.browser}: ${r.registered ? (r.alreadyPresent ? "already registered" : "registered") : `not registered (${r.reason})`}`)
   }
   if (daemonDown) {
-    console.log(`\nThe BrowserSkill daemon is not running, so nothing can tell whether the extension is enabled. Do not ask the user to enable it.\n  ${result.nextStep ?? DAEMON_STEP}\nThen re-run browser-doctor.mjs.`)
+    console.log(`\nThe BrowserSkill daemon is not running, so nothing can tell whether the extension is enabled. Do not ask the user to enable it.\n  ${nextStep}\nThen re-run browser-doctor.mjs.`)
   } else if (result.needsChoice) {
     console.log(`\nNothing was registered. ${result.humanStep}\nRe-run: node "<skill-root>/scripts/browser-install.mjs" --browser=<id>`)
   } else {
