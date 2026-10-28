@@ -13,6 +13,7 @@ import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
+import { getSessionFallbackSnapshot } from "../shared/session-fallback-snapshot";
 import { getSessionModel } from "../shared/session-model-state";
 import { log } from "../shared/logger";
 import type { PluginEventContext } from "./event-types";
@@ -42,6 +43,12 @@ export function applyUserConfiguredFallbackChain(
   currentProviderID: string,
   pluginConfig: OhMyOpenCodeConfig,
 ): void {
+  const snapshot = getSessionFallbackSnapshot(sessionID);
+  if (snapshot !== undefined) {
+    modelFallback?.setSessionFallbackChain(sessionID, snapshot);
+    return;
+  }
+
   const agentKey = getAgentConfigKey(agentName);
   const rawFallbackModels = getRawFallbackModels(sessionID, agentKey, pluginConfig);
   if (!rawFallbackModels || rawFallbackModels.length === 0) return;
