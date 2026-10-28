@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as pluginConfig from "../../plugin-config"
 import * as connection from "./server-connection"
-import { run } from "./runner"
+import type * as runnerModule from "./runner"
 
 const envKeys = ["HOME", "USERPROFILE", "OMO_PROFILE", "OPENCODE_CLIENT", "OPENCODE_CLI_RUN_MODE"] as const
 let savedEnv: Record<string, string | undefined>
@@ -16,8 +16,10 @@ let loadSpy: ReturnType<typeof spyOn<typeof pluginConfig, "loadPluginConfig">>
 let serverSpy: ReturnType<typeof spyOn<typeof connection, "createServerConnection">>
 let loadedModel: string | undefined
 let spawnedProfile: string | undefined
+let run: typeof runnerModule.run
+let runnerImportId = 0
 
-beforeEach(() => {
+beforeEach(async () => {
   savedEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]))
   root = mkdtempSync(join(tmpdir(), "omo-run-profile-boundary-"))
   directory = join(root, "project")
@@ -43,6 +45,10 @@ beforeEach(() => {
     spawnedProfile = process.env.OMO_PROFILE
     throw new Error("server startup failed")
   })
+  // Earlier telemetry tests can leave the canonical runner bound to their restored module mocks.
+  const runnerPath = `./runner?profile-boundary=${++runnerImportId}`
+  const runner: typeof runnerModule = await import(runnerPath)
+  run = runner.run
 })
 
 afterEach(() => {

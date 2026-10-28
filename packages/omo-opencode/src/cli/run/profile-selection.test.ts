@@ -150,7 +150,9 @@ describe("run profile selection", () => {
     const previousRunMode = process.env.OPENCODE_CLI_RUN_MODE
     process.env.OMO_PROFILE = "deep"
     try {
-      const { run } = await import("./runner")
+      // Load after prior suites restore their runner dependency mocks.
+      const runnerPath = "./runner?profile-selection-model-validation"
+      const { run }: typeof import("./runner") = await import(runnerPath)
 
       // when / then
       expect(await run({ message: "test", profile: "missing", directory, model: "invalid", timestamp: false })).toBe(1)
