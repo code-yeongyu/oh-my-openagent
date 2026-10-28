@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [5.1.50] - 2026-10-27
+## [5.1.51] - 2026-10-28
+
+5.1.50 was not published; its changes ship here.
 
 **A process child whose provider has no usable sign-in now moves on to the next provider instead of failing.** When the engine refuses a child's first prompt with `provider_credentials_missing` or `provider_credentials_expired`, the task skips the remaining models on that provider and starts on the next provider in its fallback chain, ending on the parent session's model when nothing else is left. Each hop is recorded as a `task_model_fallback` event naming the provider. An engine that does not send these codes behaves exactly as before. Every other refused first prompt in process mode now also carries the engine's validated error code as `cause_code` in its `task_start_failed` event and in the start-failure message (for example `host_refused: host_memory_pressure`); this is diagnostic only and does not change what the task does. ([#11440](https://github.com/code-yeongyu/oh-my-openagent/pull/11440), part of [#10806](https://github.com/code-yeongyu/oh-my-openagent/issues/10806)) ([#11525](https://github.com/code-yeongyu/oh-my-openagent/pull/11525))
 
