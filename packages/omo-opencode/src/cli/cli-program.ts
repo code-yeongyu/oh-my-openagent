@@ -10,6 +10,7 @@ import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
 import { configureRuntimeCommands } from "./runtime-commands"
 import { runConfigMigrate } from "./config-migrate"
+import { runConfigModels, type ConfigModelsOptions } from "./config-models"
 import { availableInstallPlatforms } from "./native-dev-platform-flag"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -216,9 +217,20 @@ Examples:
     process.exit(exitCode)
   })
 
-program
+const configCommand = program
   .command("config")
   .description("Manage unified OMO configuration")
+
+configCommand
+  .command("models")
+  .description("Map declared OpenCode agent/category models by config source and section (read-only)")
+  .option("-d, --directory <path>", "Working directory to load configuration from")
+  .option("--json", "Print machine-readable model declarations and diagnostics")
+  .action((options: ConfigModelsOptions) => {
+    process.exit(runConfigModels(options))
+  })
+
+configCommand
   .command("migrate")
   .description("Migrate legacy OMO configuration into ~/.omo/omo.jsonc")
   .option("--dry-run", "Print the transform, backup move plan, and conflicts without new migration writes")
