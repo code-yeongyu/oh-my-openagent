@@ -7,7 +7,7 @@ import type { PluginContext, ToolsRecord } from "./types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
-import { loadPluginConfig } from "../plugin-config"
+import { createRuntimeModelConfigLoader } from "./runtime-model-config"
 import { createGoalController, type GoalController } from "../hooks/goal/controller"
 import { createGoalTools } from "../hooks/goal/tools"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
@@ -26,6 +26,7 @@ export function createCoreTools(args: {
   readonly factories: ToolRegistryFactories
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
+  const loadCurrentModelConfig = createRuntimeModelConfigLoader(ctx.directory, pluginConfig)
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
@@ -34,6 +35,7 @@ export function createCoreTools(args: {
     pluginConfig.agents,
     pluginConfig.categories,
     managers.modelFallbackControllerAccessor,
+    loadCurrentModelConfig,
   )
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -55,10 +57,7 @@ export function createCoreTools(args: {
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
     agentOverrides: pluginConfig.agents,
-    loadCurrentModelConfig: () => {
-      const current = loadPluginConfig(ctx.directory, process.env)
-      return { agents: current.agents, categories: current.categories }
-    },
+    loadCurrentModelConfig,
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: getSisyphusJuniorModelOverride(pluginConfig.agents?.["sisyphus-junior"]),
     browserProvider: skillContext.browserProvider,
