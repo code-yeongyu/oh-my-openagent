@@ -1,4 +1,5 @@
 import { readEditorValue, setEditorValue, withEditorTransaction, type EditorSession } from "./session"
+import { getNodeValue, parseTree } from "jsonc-parser/lib/esm/main.js"
 
 /** Names declared in this file, including staged edits; not the merged effective profiles. */
 export function listEditorProfiles(session: EditorSession): readonly string[] {
@@ -31,7 +32,12 @@ export function createEditorProfile(session: EditorSession, name: string): void 
 export function copyEditorProfile(session: EditorSession, source: string, name: string): void {
   assertExisting(session, source)
   assertNewName(session, name)
-  withEditorTransaction(session, (staged) => setEditorValue(staged, ["profiles", name], readEditorValue(staged, ["profiles", source])))
+  // AST values use null-prototype objects: reserved keys survive until setEditorValue
+  // rejects them, instead of parse() / structuredClone silently dropping __proto__.
+  const tree = parseTree(session.content, [], { allowTrailingComma: true })
+  if (tree === undefined) throw new Error("Cannot read the profile declaration.")
+  const declaration: unknown = getNodeValue(tree)["profiles"][source]
+  withEditorTransaction(session, (staged) => setEditorValue(staged, ["profiles", name], declaration))
 }
 
 /** Stage removal from this file; another configuration layer may still declare this name. */

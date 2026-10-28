@@ -93,6 +93,23 @@ test("malformed profiles are refused and external changes retain staged profile 
   expect(readdirSync(root)).toHaveLength(1)
 })
 
+test("copy rejects literal reserved keys before JSONC parsing can silently drop them", () => {
+  for (const value of ['{"polluted":true}', "null", "true", '"literal"']) {
+    const { session, path } = fixture(`{"profiles":{"work":{"[opencode]":{"agents":{"oracle":{"__proto__":${value},"model":"provider/a"}}}}}}`)
+    const before = structuredClone(session)
+    const bytes = readFileSync(path, "utf8")
+    expect(() => copyEditorProfile(session, "work", "copy")).toThrow("Reserved configuration key: __proto__")
+    expect(session).toEqual(before)
+    expect(readFileSync(path, "utf8")).toBe(bytes)
+  }
+})
+
+test("copy uses the same last declaration semantics as the editor for duplicate JSONC properties", () => {
+  const { session } = fixture('{"profiles":{"work":{"model_profile":"first"},"work":{"model_profile":"last"}}}')
+  copyEditorProfile(session, "work", "copy")
+  expect(readEditorValue(session, ["profiles", "copy"])).toEqual({ model_profile: "last" })
+})
+
 test("profile lifecycle backend imports and runs without a terminal or prompt dependencies", () => {
   const { path } = fixture()
   const backend = new URL("./backend.ts", import.meta.url).href
