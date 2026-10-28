@@ -610,8 +610,8 @@
       "packages/omo-opencode/src/config/schema.ts": ["AnyMcpNameSchema", "McpNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AgentDefinitionPathSchema
       "packages/omo-opencode/src/config/schema/agent-definitions.ts": ["AgentDefinitionPathSchema"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BuiltinAgentNameSchema, OverridableAgentNameSchema, AgentNameSchema
-      "packages/omo-opencode/src/config/schema/agent-names.ts": ["BuiltinAgentNameSchema", "OverridableAgentNameSchema", "AgentNameSchema"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) BuiltinAgentNameSchema, AgentNameSchema
+      "packages/omo-opencode/src/config/schema/agent-names.ts": ["BuiltinAgentNameSchema", "AgentNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FallbackModelStringArraySchema, FallbackModelObjectArraySchema, FallbackModelMixedArraySchema
       "packages/omo-opencode/src/config/schema/fallback-models.ts": ["FallbackModelStringArraySchema", "FallbackModelObjectArraySchema", "FallbackModelMixedArraySchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PermissionValueSchema
