@@ -160,6 +160,11 @@ The next new `call_omo_agent` call for `explore` and the next new `task` call fo
 
 If an edit is half-written, invalid JSONC, fails schema validation, or produces validation warnings about ignored values, the plugin rejects the reload and logs the reason. New dispatches keep the last accepted agent/category snapshot instead of silently dropping an invalid override and selecting a different model. After you save a valid configuration, the next new dispatch accepts it automatically.
 
+Trusted in-process consumers can inspect saved candidates separately from accepted
+runtime state through the [runtime configuration status helpers](runtime-config-status.md).
+Diagnostics use redacted codes and counts; observation does not accept a pending
+edit. These helpers are instance-local capabilities and do not expose an endpoint.
+
 ### Quick Start Example
 
 Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live inside the `[opencode]` block:
