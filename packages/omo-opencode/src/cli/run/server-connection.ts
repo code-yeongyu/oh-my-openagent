@@ -12,6 +12,7 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]", "0.0.0
 export type ServerConnectionOptions = {
   port?: number
   attach?: string
+  requireNewServer?: boolean
   signal: AbortSignal
 }
 
@@ -149,8 +150,14 @@ export async function createServerConnectionWithDeps<TClient>(
   deps: ServerConnectionDeps<TClient>,
 ): Promise<{ client: TClient, cleanup: () => void }> {
   const { port, attach, signal } = options
+  const assertCanAttach = (): void => {
+    if (options.requireNewServer) {
+      throw new Error("--profile requires a new server; cannot attach to an existing server. Choose an available --port or omit --port")
+    }
+  }
 
   if (attach !== undefined) {
+    assertCanAttach()
     console.log(pc.dim("Attaching to existing server at"), pc.cyan(attach))
     const client = deps.createOpencodeClient({ baseUrl: attach })
     if (isLoopbackAttachUrl(attach)) {
@@ -180,6 +187,7 @@ export async function createServerConnectionWithDeps<TClient>(
           throw error
         }
 
+        assertCanAttach()
         console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("became occupied, attaching to existing server"))
         const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
         deps.injectServerAuthIntoClient(client)
@@ -187,6 +195,7 @@ export async function createServerConnectionWithDeps<TClient>(
       }
     }
 
+    assertCanAttach()
     console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("is occupied, attaching to existing server"))
     const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
     deps.injectServerAuthIntoClient(client)
@@ -209,6 +218,7 @@ export async function createServerConnectionWithDeps<TClient>(
       throw error
     }
 
+    assertCanAttach()
     console.log(pc.dim("Port range exhausted, attaching to existing server on"), pc.cyan(DEFAULT_SERVER_PORT.toString()))
     const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${DEFAULT_SERVER_PORT}` })
     deps.injectServerAuthIntoClient(client)
