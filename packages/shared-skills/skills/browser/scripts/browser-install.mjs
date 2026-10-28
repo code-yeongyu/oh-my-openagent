@@ -17,12 +17,15 @@ const result = await omowright.bskOnboard({
 })
 
 // A down daemon cannot see the extension, so it is no reason to ask the user to enable it.
-const daemonDown = !result.ready && !result.needsChoice && !result.daemon.running && result.cli.installed
+// That includes a failed CLI install: no CLI, no daemon.
+const daemonDown = !result.ready && !result.needsChoice && !result.daemon.running
 // An omowright with its PR #70 sets daemon.startBlocked. Older omowright only reports the refusal in the error text:
 // bsk's own "Job Object" message, or its Windows fallback when registering the daemon's scheduled task fails.
 const startBlocked = daemonDown && (result.daemon.startBlocked ?? /Job Object|breakaway|registering the bsk daemon task/i.test(result.daemon.error ?? ""))
 const FOREGROUND_STEP = "run `bsk daemon start --foreground` in a persistent background session that outlives the command, then check `bsk status` from a separate call."
-const DAEMON_STEP = startBlocked
+const DAEMON_STEP = !result.cli.installed
+  ? "Install the bsk CLI first: the official installer did not leave a working `bsk`; re-run this script, and if it fails again follow references/install.md to install it by hand."
+  : startBlocked
   ? `Start the daemon in the foreground: this host does not let a command detach it, so retrying \`bsk status\` or \`bsk daemon start\` fails the same way; ${FOREGROUND_STEP}`
   : `Start the daemon first: run \`bsk status\` once; if the host forbids Job Object breakaway (Windows) or reaps background processes, ${FOREGROUND_STEP}`
 // An omowright with its PR #69 returns nextStep; older omowright has none, so derive it from the result.

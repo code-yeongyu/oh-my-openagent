@@ -107,6 +107,18 @@ describe("browser-install.mjs with the daemon down", () => {
     expect(summary.daemon.startBlocked).toBe(true)
   })
 
+  test("#given the CLI install failed #when --json runs #then the next step is the CLI, not the extension", () => {
+    const failedInstall = { ...onboardReport({ running: false, error: "bsk status exited with 1: bsk: not found" }), cli: { installed: false, bskBin: null, version: null } }
+    const summary = runJson("browser-install.mjs", failedInstall)
+    const daemonDownOnly = runJson("browser-install.mjs", onboardReport({ running: false, error: "bsk status exited with 1: bsk: not found" }))
+
+    expect(summary.daemonDown).toBe(true)
+    expect(summary.humanStep).toBeNull()
+    expect(typeof summary.nextStep).toBe("string")
+    expect(summary.nextStep).not.toBe(ENABLE_STEP)
+    expect(summary.nextStep).not.toBe(daemonDownOnly.nextStep)
+  })
+
   test("#given the daemon is running and the extension is not enabled #when --json runs #then the extension step is the next step", () => {
     const summary = runJson("browser-install.mjs", onboardReport({ running: true, version: "0.3.3" }))
 
