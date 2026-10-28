@@ -1,5 +1,8 @@
 import { setEditorValue, type EditorSession } from "./session"
 
+export { EDITOR_PRESET_IDS, type EditorPresetId } from "./preset-policy"
+export { previewEditorPreset, readEditorPresetCache, stageEditorPreset, type EditorPresetPreview, type EditorPresetRole } from "./presets"
+
 export { listEditorProfiles, createEditorProfile, copyEditorProfile, deleteEditorProfile } from "./profiles"
 
 export {
