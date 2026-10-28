@@ -70,6 +70,7 @@ bunx oh-my-opencode
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
+| `config models` | Read-only OpenCode model declarations by source file and section; `-d/--directory <path>` selects the project, `--json` emits the report |
 | `config migrate` | Migrate legacy OMO configuration into the unified config at `~/.omo/omo.jsonc` (`--dry-run` prints the transform/backup plan without writing, `--json` emits a machine-readable report) |
 | `worktree-sweep` | Report (and optionally remove) stale linked git worktrees: SWEEP when merged into the default branch and clean, KEEP when locked/external/unmerged/dirty or when it is the worktree the sweep was started from, PRUNE when the path is gone. Dry-run by default; `--apply` removes with `git worktree remove` (never forced) and prunes; `--older-than <days>` adds an age fallback, `--repo <path>` is repeatable, `--json` emits machine-readable output |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
@@ -77,6 +78,54 @@ bunx oh-my-opencode
 | `boulder` | Inspect boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
+
+---
+
+## config models
+
+Inspect model declarations in the unified OMO configuration chain without changing files:
+
+```bash
+omo-agent-toolkit config models
+omo-agent-toolkit config models --directory /path/to/project
+omo-agent-toolkit config models --directory /path/to/project --json
+```
+
+The map includes user and walked project sources, their loading status, the active profile,
+and each applicable root, `[opencode]`, profile, or profile `[opencode]` section in the
+canonical precedence order. Later sections can override earlier fields. Named agents and
+categories include custom names as well as explicitly configured builtins. Each declaration
+shows its full section key, category link, model, ordered `models` and `fallback_models`
+entries, reasoning/variant settings, and `disable` when declared. Shared model fields use
+canonical normalization; OpenCode block fields retain their declared spelling. The projection
+covers direct agent/category fields; nested `ultrawork`/`compaction` settings, model catalog
+definitions, and `model_profiles` are outside this report.
+
+This is a declaration map: catalog names stay as declared, category arrows show links,
+and no runtime model selection or provider availability check is performed. Builtin model
+defaults that are absent from configuration are not listed. Use `doctor --verbose` for
+installation health, cached provider information, and builtin model resolution diagnostics.
+The map is a read-only companion to the visual configuration work tracked in
+[#1529](https://github.com/code-yeongyu/oh-my-openagent/pull/1529); it covers the source
+attribution and chain-inspection part of
+[#2963](https://github.com/code-yeongyu/oh-my-openagent/issues/2963).
+
+The JSON report contains `directory`, `profile` (or `null`), `valid`, `sources`, `views`,
+and `diagnostics`. A view identifies its `path`, `scope`, and `keyPrefix`, and contains
+only projected model declarations. Source status is `loaded`, `partial` (invalid values
+were ignored), `rejected` (the file could not load), or `missing`. Diagnostics expose
+kind, severity, `scope` (`source` or `merged`), a nullable source `path`, `issuePaths`, and a
+generic explanation, without copying invalid values. Merged errors such as catalog cycles
+have `scope: "merged"`, `path: null`, and their configuration keys in `issuePaths`. A source
+status describes loading and file-local validation; a merged error can fail the report even
+when every source loaded successfully.
+Prompts, tools, environment settings, and provider options are excluded from both formats.
+
+Exit status is **0** for a valid or empty map and **1** for invalid values, rejected sources,
+missing requested profiles, or other configuration errors. Ignored unknown keys and accepted
+deprecated keys are visible warnings and do not fail the command. Invalid leaves are omitted
+while valid declarations from the same source remain visible; their source is marked `partial`.
+The command does not migrate configuration, create backups, contact providers, or update caches.
 
 ---
 
@@ -335,4 +384,4 @@ bunx oh-my-openagent mcp oauth status [server-name]
 - `2` when the boulder state file exists but can't be read
 - `130` when `run` is aborted
 
-`run`, `install`, `uninstall`/`cleanup`, `doctor`, `get-local-version`, `refresh-model-capabilities`, `config migrate`, `boulder`, `ulw-loop`, and `mcp oauth` subcommands return explicit numeric exit codes.
+`run`, `install`, `uninstall`/`cleanup`, `doctor`, `get-local-version`, `refresh-model-capabilities`, `config migrate`, `config models`, `boulder`, `ulw-loop`, and `mcp oauth` subcommands return explicit numeric exit codes.
