@@ -848,8 +848,8 @@
       "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
       // pre-existing at origin dev 4686e425b5: unused export(s) hasCompactionPart
       "packages/omo-opencode/src/shared/compaction-marker.ts": ["hasCompactionPart"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
-      "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) findProviderModelMetadata
+      "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["findProviderModelMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
       "packages/omo-opencode/src/shared/contains-path.ts": ["containsPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getCacheDir
