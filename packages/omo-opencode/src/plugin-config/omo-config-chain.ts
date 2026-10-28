@@ -6,6 +6,7 @@ import {
   pruneInvalidConfigPaths,
   type OmoConfigDiagnostic,
   type OmoConfigEnv,
+  type OmoConfigSource,
   type OmoModelReferenceDiagnostic,
   resolveModelReferences,
   resolveOmoConfigView,
@@ -21,6 +22,8 @@ export type OmoOpenCodeConfigView = {
 
 export type OmoOpenCodeConfigChain = {
   readonly diagnostics: readonly (OmoConfigDiagnostic | OmoModelReferenceDiagnostic)[]
+  readonly profile?: string
+  readonly sources: readonly OmoConfigSource[]
   readonly protectedUserView: Record<string, unknown>
   readonly views: readonly OmoOpenCodeConfigView[]
 }
@@ -164,6 +167,8 @@ export function loadOmoOpenCodeConfigChain(
       ...loaded.diagnostics,
       ...resolvedModels.diagnostics,
     ],
+    ...(loaded.profile === undefined ? {} : { profile: loaded.profile }),
+    sources: loaded.sources,
     protectedUserView,
     views,
   }
