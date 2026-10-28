@@ -76,7 +76,8 @@ export function openEditorSession(path: string, scope: "project" | "user"): Edit
 }
 
 export function readEditorValue(session: EditorSession, path: readonly string[]): unknown {
-  return path.reduce<unknown>((value, key) => isRecord(value) && Object.hasOwn(value, key) ? value[key] : undefined, session.config)
+  const value = path.reduce<unknown>((entry, key) => isRecord(entry) && Object.hasOwn(entry, key) ? entry[key] : undefined, session.config)
+  return structuredClone(value)
 }
 
 function intersects(left: readonly PropertyKey[], right: readonly PropertyKey[]): boolean {
@@ -132,7 +133,7 @@ export function setEditorValue(session: EditorSession, path: readonly string[], 
   validateEdit(config, path)
   session.content = content
   session.config = config
-  session.edits.push({ path: [...path], value })
+  session.edits.push({ path: [...path], value: structuredClone(value) })
 }
 
 export function withEditorTransaction(session: EditorSession, operation: (staged: EditorSession) => void): void {
