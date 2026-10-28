@@ -70,4 +70,26 @@ describe("bundled model capabilities snapshot", () => {
     // then
     expect(results).toEqual([1_050_000, 1_050_000])
   })
+
+  test("resolves MiniMax M3.1 Flash from the bundled snapshot", () => {
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
+
+    const result = getModelCapabilities({
+      providerID: "minimax-coding-plan",
+      modelID: "MiniMax-M3.1-Flash",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      canonicalModelID: "minimax-m3.1-flash",
+      family: "minimax",
+      reasoning: true,
+      supportsThinking: true,
+      modalities: { input: ["text", "image", "video"], output: ["text"] },
+      diagnostics: {
+        resolutionMode: "snapshot-backed",
+        snapshot: { source: "bundled-snapshot" },
+      },
+    })
+  })
 })
