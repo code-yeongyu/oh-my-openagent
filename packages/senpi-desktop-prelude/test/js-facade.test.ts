@@ -39,6 +39,28 @@ describe("JavaScript computer facade", () => {
 		]);
 	});
 
+	it("opens an application as one apps.open call and wraps the returned window as a handle", async () => {
+		// Given
+		const opened = { id: "com.apple.Notes", name: "Notes", path: "/System/Applications/Notes.app", running: true, pid: 7, window: WINDOW_SNAPSHOT };
+		const kernel = loadJsFacade((args) => {
+			const chain = Array.isArray(args.chain) ? args.chain : [];
+			return chain[0]?.method === "apps.open" ? { text: "", details: { value: opened } } : { text: "" };
+		});
+
+		// When
+		const result = await kernel.run(
+			`const app = await computer.apps.open("Notes"); await app.window.click(3, 4); await computer.apps.list({ query: "no" }); return JSON.stringify(app);`,
+		);
+
+		// Then: the open carries no empty options object, the window is a live handle, the list forwards its options
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "apps.open", args: ["Notes"] }] },
+			{ action: "call", chain: [{ method: "window", args: ["w1"] }, { method: "click", args: [3, 4] }] },
+			{ action: "call", chain: [{ method: "apps.list", args: [{ query: "no" }] }] },
+		]);
+		expect(JSON.parse(String(result))).toEqual(opened);
+	});
+
 	it("exposes the resolved window's identity fields on the handle", async () => {
 		// Given
 		const kernel = loadJsFacade(windowResponder);

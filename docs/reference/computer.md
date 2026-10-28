@@ -52,7 +52,7 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `StopPathUnavailable` | The global stop chord could not be armed, or cannot hear keys (`secure-input-active`: macOS Secure Event Input is on), so input is refused; an in-flight `typeText` stops at the next character, and a menu walk at the next menu level, with this code; no stop latches | Use a host where the chord arms, or `allow_host_relay_only_stop`; for `secure-input-active`, wait for the user to leave the password field |
 | `ScreenLocked` | The screen is locked | Unlock the session |
 | `BackgroundUnavailable` | The target refuses background delivery | Use accessibility actions or `delivery: "foreground"` |
-| `ControlRequired` | Foreground delivery, `raiseWindow`, or input on the desktop or a display without this session's live control grant | A consent-capable host confirms with the human, then calls `control.grant`; a bridge client (`--oneshot`, MCP) cannot grant, so target a window for background delivery |
+| `ControlRequired` | Foreground delivery, `raiseWindow`, `apps.open` with `activate` or `reveal`, or input on the desktop or a display without this session's live control grant | A consent-capable host confirms with the human, then calls `control.grant`; a bridge client (`--oneshot`, MCP) cannot grant, so target a window for background delivery |
 | `InputBusy` | Another session holds the foreground control grant | Retry after that session revokes or closes |
 | `InvalidCoordinateFrame` | The coordinates do not belong to the latest screenshot of that target, or the target moved or resized | Take a new screenshot of the same target |
 | `StaleRef` | An accessibility ref from an older snapshot | Take a new `ax()` snapshot |

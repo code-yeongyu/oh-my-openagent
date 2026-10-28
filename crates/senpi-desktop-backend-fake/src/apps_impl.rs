@@ -44,13 +44,11 @@ impl FakeBackend {
         check_stop()?;
         let activate = params.activate.unwrap_or(false);
         let opened = self.launch(application);
-        let window = self.shown_window(&opened);
-        if activate {
-            if let Some(window) = &window {
-                let id = window.id.clone();
-                self.focus_window(&id);
-            }
+        let shown = self.shown_window(&opened).map(|window| window.id);
+        if let (true, Some(id)) = (activate, &shown) {
+            self.focus_window(id);
         }
+        let window = shown.and_then(|id| self.window(&id).ok().cloned());
         self.record(SinkOp::OpenApp { id: opened.id.clone(), activate, reveal: params.reveal.unwrap_or(false) });
         Ok(OpenedApplication::new(opened, window))
     }

@@ -40,6 +40,12 @@ describe("isReadOnlyComputerCall", () => {
 		expect(isReadOnlyComputerCall([{ method: "window" }, { method }])).toBe(false);
 	});
 
+	it("classifies apps.list as read and apps.open as exec on the desktop root only", () => {
+		expect(isReadOnlyComputerCall([{ method: "apps.list", args: [{ query: "notes" }] }])).toBe(true);
+		expect(isReadOnlyComputerCall([{ method: "apps.open", args: ["Notes"] }])).toBe(false);
+		expect(rejectionReason([{ method: "window" }, { method: "apps.open" }])).toBe("unknownMethod");
+	});
+
 	it("classifies window bringToCurrentSpace as exec and refuses it on a display handle", () => {
 		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "bringToCurrentSpace" }])).toBe(false);
 		expect(rejectionReason([{ method: "display" }, { method: "bringToCurrentSpace" }])).toBe("unknownMethod");

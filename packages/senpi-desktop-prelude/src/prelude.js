@@ -112,6 +112,13 @@
 	computer.elementAt = (x, y) => resolveElement([step("elementAt", [x, y])]);
 	computer.focusedElement = () => resolveElement([step("focusedElement", [])]);
 	computer.ref = ref => resolveElement([step("ref", [ref])]);
+	computer.apps = Object.freeze({
+		list: options => callValue([step("apps.list", options === undefined ? [] : [options])]),
+		open: async (id, options) => {
+			const opened = await callValue([step("apps.open", options === undefined ? [id] : [id, options])]);
+			return Object.freeze({ ...opened, window: opened.window ? makeWindow(opened.window) : null });
+		},
+	});
 	computer.clipboard = Object.freeze({
 		read: () => callValue([step("clipboard.read", [])]),
 		write: text => callValue([step("clipboard.write", [text])]),

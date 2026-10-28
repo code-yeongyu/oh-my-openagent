@@ -6,6 +6,8 @@ import { preludeAssets } from "./assets";
  */
 const METHOD_ALLOWLIST: readonly string[] = [
 	"actions",
+	"apps.list",
+	"apps.open",
 	"attributes",
 	"ax",
 	"bounds",

@@ -4,6 +4,8 @@ import { DESKTOP_METHODS, DISPLAY_METHODS, ELEMENT_METHODS, WINDOW_METHODS } fro
 /** Every helper a model-facing computer call chain may name; a new one is a deliberate edit here. */
 const CHAIN_METHOD_SNAPSHOT = [
 	"actions",
+	"apps.list",
+	"apps.open",
 	"attributes",
 	"ax",
 	"bounds",

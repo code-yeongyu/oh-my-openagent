@@ -56,6 +56,18 @@ describe("Python computer facade", () => {
 		});
 	});
 
+	it("sends apps.open keyword options as one trailing object and wraps the returned window", () => {
+		// Given
+		const opened = { id: "com.apple.Notes", name: "Notes", path: "/System/Applications/Notes.app", running: true, pid: 7, window: WINDOW_SNAPSHOT };
+		const responders = { "apps.open": JSON.stringify({ text: "", details: { value: opened } }) };
+		// When
+		const run = runPythonFacade("app = computer.apps.open('Notes', activate=False)\nout = [app['window'].id, app['window'].app, app['id']]", responders);
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.calls).toEqual([{ action: "call", chain: [{ method: "apps.open", args: ["Notes", { activate: false }] }] }]);
+		expect(run.out).toEqual([WINDOW_SNAPSHOT.id, WINDOW_SNAPSHOT.app, "com.apple.Notes"]);
+	});
+
 	it("sends bringToCurrentSpace() as a window-hopped chain", () => {
 		// When
 		const run = runPythonFacade("computer.window(app='Code').bringToCurrentSpace()");

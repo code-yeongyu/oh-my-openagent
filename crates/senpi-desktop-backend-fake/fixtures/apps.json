@@ -1,0 +1,70 @@
+{
+  "displays": [
+    {
+      "id": "1",
+      "name": "Built-in Display",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "pixelX": 0,
+      "pixelY": 0,
+      "pixelWidth": 1920,
+      "pixelHeight": 1080,
+      "isPrimary": true
+    },
+    {
+      "id": "2",
+      "name": "External Display",
+      "x": 1920,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "scale": 2,
+      "pixelX": 1920,
+      "pixelY": 0,
+      "pixelWidth": 2880,
+      "pixelHeight": 1800,
+      "isPrimary": false
+    }
+  ],
+  "windows": [
+    {
+      "id": "101",
+      "title": "user.txt",
+      "app": "TextEdit",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": true,
+      "elevated": null
+    },
+    {
+      "id": "202",
+      "title": "Untitled - Notes",
+      "app": "Notes",
+      "pid": 4343,
+      "x": 900,
+      "y": 120,
+      "width": 600,
+      "height": 500,
+      "focused": false,
+      "elevated": null
+    }
+  ],
+  "apps": [
+    {
+      "id": "com.apple.calculator",
+      "name": "Calculator",
+      "path": "/System/Applications/Calculator.app"
+    }
+  ],
+  "ax": {},
+  "cursor": {
+    "x": 960,
+    "y": 540
+  }
+}

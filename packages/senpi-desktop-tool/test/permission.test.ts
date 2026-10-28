@@ -31,6 +31,16 @@ describe("computerPermissionParser tiers", () => {
 		expect(patterns).toEqual(["exec"]);
 	});
 
+	it("classifies apps.open as exec and apps.list as read", () => {
+		// Given
+		const open = { action: "call", chain: [{ method: "apps.open", args: ["Notes"] }] };
+		const list = { action: "call", chain: [{ method: "apps.list", args: [] }] };
+
+		// When / Then
+		expect(patternsOf(open)).toEqual(["exec"]);
+		expect(patternsOf(list)).toEqual(["read"]);
+	});
+
 	it("classifies window->bringToCurrentSpace as exec", () => {
 		// Given
 		const input = { action: "call", chain: [windowStep, { method: "bringToCurrentSpace" }] };

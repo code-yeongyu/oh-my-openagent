@@ -22,7 +22,7 @@ const SEARCH_KEYWORDS = [
 ] as const;
 
 const DESCRIPTION = [
-	"Drive the user's real desktop (experimental): windows, screenshots, native mouse and keyboard input, the OS accessibility (AX) tree, and the clipboard. Not a browser.",
+	"Drive the user's real desktop (experimental): windows, applications (list, open without activating), screenshots, native mouse and keyboard input, the OS accessibility (AX) tree, and the clipboard. Not a browser.",
 	'- `{action:"call", chain}` runs one desktop helper, optionally followed by one call on the window/element it returns, e.g. `[{method:"window",args:[{app:"Code"}]},{method:"screenshot"}]`.',
 	'- `{action:"run", code, read_only?, timeout?}` runs a JavaScript async function body with `desktop`, `wait`, `assert`, and `tool` in scope; `read_only: true` blocks input.',
 	'- `{action:"capabilities"}` reports backend, permissions, `stopPath`, and `focusGuard`; availability is unknown until `computer.capabilities()` returns in this session, so make no availability claim before it and repeat the host and reason on `native-unavailable`. `{action:"close"}` ends the desktop session.',
@@ -46,7 +46,7 @@ export const computerToolDefinition = {
 	description: DESCRIPTION,
 	exposure: "search" as const,
 	searchText:
-		"Operate the real desktop (experimental): screenshots, clicks, typing, key chords, window list, accessibility tree, clipboard; macOS/Linux/Windows",
+		"Operate the real desktop (experimental): screenshots, clicks, typing, key chords, window list, open applications in the background, accessibility tree, clipboard; macOS/Linux/Windows",
 	searchKeywords: SEARCH_KEYWORDS,
 	searchGroup: "desktop",
 	promptSnippet: "Operate the real desktop (experimental): screenshots, native input, accessibility tree, clipboard",

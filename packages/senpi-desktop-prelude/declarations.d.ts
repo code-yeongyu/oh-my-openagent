@@ -254,6 +254,36 @@ interface ComputerWindow extends ComputerInputTarget {
 	ref(ref: string): Promise<ComputerElement | null>;
 }
 
+/** One installed or running application. */
+interface ComputerApplication {
+	/** Bundle id, or the native path when the bundle has none. */
+	readonly id: string;
+	readonly name: string;
+	readonly path: string;
+	readonly running: boolean;
+	readonly pid?: number | null;
+}
+
+/** An opened application and the window it shows (null if none appeared within 3 s). */
+interface ComputerOpenedApplication extends ComputerApplication {
+	readonly window: ComputerWindow | null;
+}
+
+interface ComputerAppsListOptions {
+	/** Case-insensitive substring of the name, id or path. */
+	readonly query?: string;
+	readonly runningOnly?: boolean;
+}
+
+interface ComputerAppsOpenOptions {
+	/** Bring the application to the front; takes the user's foreground, so it needs the control grant. */
+	readonly activate?: boolean;
+	/** Show the file or folder selected in Finder, which comes to the front (macOS; needs the grant). */
+	readonly reveal?: boolean;
+	/** The application (id, name or path) to open a document with. */
+	readonly app?: string;
+}
+
 /** Desktop helpers shared by the direct `computer` facade and the `desktop` object inside `computer.run`. */
 interface ComputerDesktop extends ComputerInputTarget {
 	displays(): Promise<ComputerDisplay[]>;
@@ -270,6 +300,16 @@ interface ComputerDesktop extends ComputerInputTarget {
 	readonly clipboard: {
 		read(): Promise<string>;
 		write(text: string): Promise<void>;
+	};
+	readonly apps: {
+		/** Installed and running applications, filtered and sorted by name. */
+		list(options?: ComputerAppsListOptions): Promise<ComputerApplication[]>;
+		/**
+		 * Open an application (id, name or path), a file, a folder or a URL WITHOUT bringing it forward, and return
+		 * it with the window it shows. A relative path names an item in the session's folder. `activate` and
+		 * `reveal` take the user's foreground and need the human-confirmed grant (`computer.control.acquire`).
+		 */
+		open(id: string, options?: ComputerAppsOpenOptions): Promise<ComputerOpenedApplication>;
 	};
 	readonly control: {
 		/** Ask the human for the foreground-control grant; returns `{ active }` (false when headless or refused). */

@@ -56,9 +56,10 @@ let control = { active: false };
 const GLOBAL_INPUT = new Set(["click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse"]);
 const refusesGlobalInput = (method, params) =>
 	process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1" &&
-	GLOBAL_INPUT.has(method) &&
-	(params?.target === "desktop" || String(params?.target).startsWith("display:")) &&
-	!control.active;
+	!control.active &&
+	((GLOBAL_INPUT.has(method) && (params?.target === "desktop" || String(params?.target).startsWith("display:"))) ||
+		// apps.open with activate/reveal takes the foreground: the engine refuses it before launching anything (plan D5).
+		(method === "apps.open" && (params?.activate === true || params?.reveal === true)));
 const CONTROL_GRANTED_AT = "2026-10-11T00:00:00.000Z";
 const status = () => ({
 	suspended,

@@ -31,6 +31,15 @@ const WINDOWS = [
 	{ id: "202", title: "Inbox", app: "Mail", pid: 43, x: 100, y: 100, width: 900, height: 700, focused: false },
 ];
 
+// apps.list inventory: the two window owners run; Notes is installed only. apps.open("Notes") returns Mail's window as
+// the one it shows (id 202) so a run can drive the returned handle; an unknown id is InvalidTarget. The grant rule for
+// activate/reveal lives in fake-engine.mjs (FAKE_ENGINE_GLOBAL_INPUT_GATE=1), where the control grant state is.
+const APPS = [
+	{ id: "com.apple.Notes", name: "Notes", path: "/Applications/Notes.app", running: false },
+	{ id: "Code", name: "Code", path: "/Applications/Code.app", running: true, pid: 42 },
+	{ id: "Mail", name: "Mail", path: "/Applications/Mail.app", running: true, pid: 43 },
+];
+
 const BUTTON = {
 	ref: "e1",
 	role: "button",
@@ -177,6 +186,20 @@ export function createDesktop() {
 				const result = { ...capture(target, frameId), ax: "button Run [ref=e1]", nodeCount: 1, truncated: false };
 				if (process.env.FAKE_ENGINE_BAD_OBSERVE === "1") delete result.ax;
 				return { result };
+			}
+			case "apps.list": {
+				const query = (params?.query ?? "").toLowerCase();
+				const apps = APPS.filter((app) => (!params?.runningOnly || app.running) &&
+					(query === "" || app.name.toLowerCase().includes(query) || app.id.toLowerCase().includes(query)));
+				return { result: apps.map(({ running, pid, ...app }) => (running ? { ...app, running, pid } : { ...app, running })) };
+			}
+			case "apps.open": {
+				const app = APPS.find((candidate) => candidate.id === params?.id || candidate.name === params?.id || candidate.path === params?.id);
+				if (app === undefined) return error(-32005, "InvalidTarget", `application ${JSON.stringify(params?.id)} was not found`);
+				const foreground = params?.activate === true || params?.reveal === true;
+				const window = WINDOWS.find((candidate) => candidate.id === "202");
+				const opened = { id: app.id, name: app.name, path: app.path, running: true, pid: app.pid ?? 9000, window };
+				return { result: opened, notifications: [{ method: "audit", params: { action: "apps.open", target: app.id, delivery: foreground ? "foreground" : "background", frameId: null, code: null, durationMs: 1 } }] };
 			}
 			case "clipboard.read":
 				return { result: { text: clipboard } };

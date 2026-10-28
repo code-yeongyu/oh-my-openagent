@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DESKTOP_METHODS, DISPLAY_METHODS, type DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol";
 import { isDesktopCapabilities, isRecord } from "../service/parse";
+import { createAppsFacade } from "./apps";
 import { ComputerRunError, facadeMethod, type RunScope } from "./context";
 import {
 	type DesktopDisplay,
@@ -14,6 +15,7 @@ import {
 	optional,
 } from "./engine-results";
 import { ElementHandle, InputTarget, resolveElement, WindowHandle } from "./handles";
+import { describeWindowMiss } from "./window-miss";
 
 export interface WindowFilter {
 	/** Case-insensitive substring of the owning app name. */
@@ -66,12 +68,19 @@ export function createDesktopFacade(scope: RunScope) {
 		/** Exactly one window by opaque id or filter; an ambiguous filter throws listing the candidates. */
 		window: (selector: string | WindowFilter): Promise<WindowHandle> =>
 			method("window", async (run) => {
-				const found = (await listWindows(run)).filter((window) =>
+				const windows = await listWindows(run);
+				const found = windows.filter((window) =>
 					typeof selector === "string" ? window.id === selector : matchesFilter(window, selector),
 				);
 				const [only, ...others] = found;
-				if (only === undefined)
-					throw new ComputerRunError("window", `no window matches ${JSON.stringify(selector)}`);
+				if (only === undefined) {
+					const app = typeof selector === "object" ? selector.app : undefined;
+					const route = process.platform === "darwin" ? "shows-window" : "launches";
+					throw new ComputerRunError(
+						"window",
+						`no window matches ${JSON.stringify(selector)}\n${describeWindowMiss(windows, app, route)}`,
+					);
+				}
 				if (others.length > 0) {
 					const candidates = found.map((window) => `${window.id} ${window.app} ${JSON.stringify(window.title)}`);
 					throw new ComputerRunError(
@@ -113,6 +122,7 @@ export function createDesktopFacade(scope: RunScope) {
 					await call("clipboard.write", { text });
 				}),
 		},
+		apps: createAppsFacade(scope, method),
 		control: createControlFacade(scope, method),
 	};
 }

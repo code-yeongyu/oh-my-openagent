@@ -33,6 +33,8 @@ export const DESKTOP_METHODS: MethodPolicies = {
 	ref: "read",
 	"clipboard.read": "read",
 	"clipboard.write": "exec",
+	"apps.list": "read",
+	"apps.open": "exec",
 	"control.acquire": "exec",
 	"control.release": "exec",
 	"control.state": "read",

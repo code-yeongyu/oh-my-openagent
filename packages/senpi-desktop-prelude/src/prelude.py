@@ -128,6 +128,20 @@ def _make_computer():
             args = (path,) if delivery is None else (path, {"delivery": delivery})
             return self._call("menu.select", args, {})
 
+    class _Apps:
+        __slots__ = ()
+
+        def __repr__(self):
+            return "<computer.apps>"
+
+        def list(self, **kwargs):
+            return _call([_step("apps.list", (), kwargs)])
+
+        def open(self, id, **kwargs):
+            opened = _call([_step("apps.open", (id,), kwargs)])
+            window = opened.get("window")
+            return {**opened, "window": _Window(window) if window else None}
+
     class _Clipboard:
         __slots__ = ()
 
@@ -159,9 +173,10 @@ def _make_computer():
             return _call([_step("control.state", (), {})])
 
     class _Computer:
-        __slots__ = ("clipboard", "control")
+        __slots__ = ("apps", "clipboard", "control")
 
         def __init__(self):
+            self.apps = _Apps()
             self.clipboard = _Clipboard()
             self.control = _Control()
 
