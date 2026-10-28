@@ -212,15 +212,27 @@ bunx oh-my-openagent run <message>
 | Option | Description |
 | --- | --- |
 | `-a, --agent <name>` | Agent to use (default resolution chain applies) |
-| `-m, --model <provider/model>` | Model override (example: `anthropic/claude-sonnet-4`) |
+| `-m, --model <provider/model>` | Primary prompt model override (example: `anthropic/claude-sonnet-4`); takes precedence over the selected profile for that prompt |
+| `--profile <name>` | Use an existing named OMO configuration profile for this run |
 | `-d, --directory <path>` | Working directory |
-| `-p, --port <port>` | Server port (attaches if already in use) |
-| `--attach <url>` | Attach to an existing OpenCode server URL |
+| `-p, --port <port>` | Server port (attaches if already in use, except with `--profile`) |
+| `--attach <url>` | Attach to an existing OpenCode server URL; incompatible with `--profile` |
 | `--on-complete <command>` | Run shell command after completion |
 | `--json` | Output structured JSON result |
 | `--no-timestamp` | Disable timestamp prefix in output |
 | `--verbose` | Show full event stream (default: messages/tools only) |
 | `--session-id <id>` | Resume an existing session |
+
+### Named configuration profiles
+
+```bash
+omo-agent-toolkit run --profile budget "Review this change"
+omo-agent-toolkit run --profile quality --port 4097 "Review this change"
+```
+
+`--profile` selects an existing `profiles.<name>` overlay from `omo.json[c]` for both the CLI and the OpenCode server it starts. For this run, it takes precedence over profile selection through `OMO_PROFILE`, `OCX_PROFILE`, and `OPENCODE_CONFIG_DIR`. A blank or unknown profile name is an error. See the [profile definitions and example](./omo-json.md#profiles).
+
+The selection is temporary: it does not persist configuration or reconfigure an existing server or session. `--profile` rejects `--attach` and an occupied `--port` so the run cannot silently reuse a server with a different configuration; an available `--port` is supported. Adding `--model <provider/model>` overrides the primary prompt's model, while the profile still governs other agent and task category settings. This flag selects a whole configuration profile; the Native harness's [`model_profile`](./omo-json.md#model-profiles-native-harness) selects the main session model within its loaded configuration.
 
 ### Agent Resolution Order
 

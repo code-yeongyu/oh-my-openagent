@@ -58,6 +58,8 @@ The active profile name comes from (`resolveOmoProfileName`), highest priority f
 
 No default profiles ship. A profile exists only when you write one under `profiles.<name>` or the migration derives one from a legacy OpenCode profile directory.
 
+For the OpenCode runner, `omo-agent-toolkit run --profile <name> <message>` takes precedence over all three environment-based selectors for that run and applies the named profile to both the CLI and its newly started server. The name must exist; a blank or unknown name is an error. The selection does not persist configuration or reconfigure existing servers or sessions. `--attach` and an occupied `--port` are rejected with `--profile`; an available `--port` is supported. See the [run command](./cli.md#named-configuration-profiles).
+
 ### Example
 
 ```json
@@ -555,24 +557,43 @@ Each member shares a base (`name` matching `^[a-z0-9-]+$`, optional `cwd`, `work
 
 ### `profiles`
 
-A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfileSchema`). Each profile accepts the shared base keys (`categories`, `agents`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`) plus `[opencode]`, `[native]`, and `[codex]` blocks of its own:
+A record of profile name to a partial view (`schema/config.ts` `OmoConfigProfileSchema`). Each profile accepts the shared base keys (`categories`, `agents`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`) plus `[opencode]`, `[native]`, and `[codex]` blocks of its own.
+
+For example, define two OpenCode-specific overlays in `.omo/omo.jsonc` (the names and models are user-chosen):
 
 ```jsonc
 {
   "profiles": {
-    "kimi": {
-      "categories": {
-        "deep-low": { "model": "kimi-for-coding/kimi-k3" }
-      },
-      "[native]": {
+    "budget": {
+      "[opencode]": {
         "agents": {
-          "plan-reviewer": { "model": "kimi-for-coding/kimi-k3" }
+          "sisyphus": { "model": "anthropic/claude-sonnet-4-5" }
+        },
+        "categories": {
+          "quick": { "model": "anthropic/claude-sonnet-4-5" }
+        }
+      }
+    },
+    "quality": {
+      "[opencode]": {
+        "agents": {
+          "sisyphus": { "model": "anthropic/claude-opus-5-5" }
+        },
+        "categories": {
+          "quick": { "model": "anthropic/claude-opus-5-5" }
         }
       }
     }
   }
 }
 ```
+
+```bash
+omo-agent-toolkit run --profile budget "Review this change"
+omo-agent-toolkit run --profile quality "Review this change"
+```
+
+Each run selects the corresponding `sisyphus` agent and `quick` task category model settings. An explicit `--model <provider/model>` overrides the primary prompt's model while the selected profile still governs other agents and categories.
 
 Profiles are inert until activated (see [Profile activation](#profile-activation)). When active, the profile's base keys fold over the shared base, and the profile's harness block folds over the top-level harness block. A config profile is a different thing from a model profile: see [Model profiles](#model-profiles-native-harness).
 
