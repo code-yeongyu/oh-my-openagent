@@ -7,6 +7,7 @@ import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
+import { getSessionFallbackSnapshot, setSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
 type EventInput = { event: { type: string; properties?: unknown } }
@@ -1348,7 +1349,7 @@ describe("createEventHandler - event forwarding", () => {
 		})
 	})
 
-	it("clears stored prompt params on session.deleted", async () => {
+	it("clears stored prompt params and fallback snapshot on session.deleted", async () => {
 		const eventHandler = createEventHandler({
 			ctx: {} as never,
 			pluginConfig: {} as never,
@@ -1368,6 +1369,7 @@ describe("createEventHandler - event forwarding", () => {
 			hooks: {} as never,
 		})
 		const sessionID = "ses_prompt_params_deleted"
+		setSessionFallbackSnapshot(sessionID, [{ providers: ["budget"], model: "backup" }])
 		setSessionPromptParams(sessionID, {
 			temperature: 0.4,
 			topP: 0.7,
@@ -1380,6 +1382,7 @@ describe("createEventHandler - event forwarding", () => {
 			},
 		}))
 		expect(getSessionPromptParams(sessionID)).toBeUndefined()
+		expect(getSessionFallbackSnapshot(sessionID)).toBeUndefined()
 	})
 })
 
