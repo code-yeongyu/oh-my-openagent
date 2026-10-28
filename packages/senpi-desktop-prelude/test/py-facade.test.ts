@@ -187,6 +187,20 @@ describe("Python computer facade", () => {
 		]);
 	});
 
+	it("sends el.press(chord) and el.doubleClick as ref-hopped chains with their arguments", () => {
+		// When
+		const run = runPythonFacade("el = computer.ref('e1')\nel.press('cmd+a')\nel.press()\nel.doubleClick(delivery='foreground')");
+
+		// Then
+		expect(run.error).toBeNull();
+		const hops = run.calls.slice(1).map((call) => (call.chain as { method: string; args: unknown[] }[])[1]);
+		expect(hops).toEqual([
+			{ method: "press", args: ["cmd+a"] },
+			{ method: "press", args: [] },
+			{ method: "doubleClick", args: [{ delivery: "foreground" }] },
+		]);
+	});
+
 	it("sends el.selectText as a ref-hopped chain and returns the selection", () => {
 		// When
 		const run = runPythonFacade("el = computer.ref('e1')\nout = el.selectText('beta', prefix='alpha ')", {

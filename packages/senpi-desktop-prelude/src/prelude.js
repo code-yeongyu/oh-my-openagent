@@ -53,7 +53,7 @@
 	const windowFields = ["id", "app", "title", "pid", "bounds", "focused"];
 	const windowValueMethods = ["screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "raise", "ax"];
 	const elementFields = ["ref", "role", "nativeRole", "title", "description", "enabled", "focused", "childCount"];
-	const elementValueMethods = ["value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "type", "selectText", "focus"];
+	const elementValueMethods = ["value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "doubleClick", "type", "selectText", "focus"];
 	const desktopValueMethods = ["displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse"];
 	const displayValueMethods = ["screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse"];
 

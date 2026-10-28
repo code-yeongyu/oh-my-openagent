@@ -192,6 +192,19 @@ impl Backend for MacosBackend {
         self.input.ax_type_text(element, text, mode, &self.capture, check_stop, delivered)
     }
 
+    fn ax_key_chord(
+        &mut self,
+        h: &AxHandle,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        Self::require_input_permission()?;
+        self.ax.show_target(h);
+        let element = crate::ax::element::element(h)?;
+        self.input.ax_key_chord(element, keys, mode, &self.capture, check_stop)
+    }
+
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.key_chord_interruptible(target, keys, mode, &|| Ok(()))
     }

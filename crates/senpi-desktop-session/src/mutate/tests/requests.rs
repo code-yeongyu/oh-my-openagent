@@ -1,5 +1,5 @@
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams, ClipboardText,
+    AxClickParams, AxKeyChordParams, AxPerformParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams, ClipboardText,
     DragParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuSelectParams,
     PointParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
@@ -75,6 +75,9 @@ pub(super) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
                 ref_: reference, text: "hello".to_owned(), prefix: None, suffix: None, select: None,
             })
         }
+        MutatingAction::AxKeyChord => Op::AxKeyChord(AxKeyChordParams {
+            ref_: reference, keys: vec!["enter".to_owned()], opts: None,
+        }),
         MutatingAction::ClipboardWrite => Op::ClipboardWrite(ClipboardText { text: "hello".to_owned() }),
         MutatingAction::MenuSelect => Op::MenusSelect(MenuSelectParams {
             window_id: target, path: vec!["File".to_owned(), "Save".to_owned()], delivery_mode: None,

@@ -17,7 +17,8 @@ enum Fault {
     Pass,
     Fail(DesktopError),
     CannotComplete,
-    /// The element never takes focus (`ax.typeText` keys path): nothing typed.
+    /// The element never takes focus (`ax.typeText` / `ax.keyChord` keys
+    /// path): nothing sent.
     RefuseFocus,
     Panic,
     Hook(Box<dyn FnOnce() + Send>),
@@ -54,10 +55,11 @@ impl Faults {
         self.queues.lock().entry(write.method()).or_default().push_back(Fault::CannotComplete);
     }
 
-    /// Makes the next `ax.typeText` keys path find an element that never
-    /// takes focus, so nothing is typed and the call reports where focus is.
-    pub fn refuse_focus_next(&self) {
-        self.queues.lock().entry(FakeMethod::AxTypeText).or_default().push_back(Fault::RefuseFocus);
+    /// Makes the next keys path of `method` (`ax.typeText` or `ax.keyChord`)
+    /// find an element that never takes focus, so nothing is sent and the
+    /// call reports where focus is.
+    pub fn refuse_focus_next(&self, method: FakeMethod) {
+        self.queues.lock().entry(method).or_default().push_back(Fault::RefuseFocus);
     }
 
     /// Panic after `calls` preceding calls have returned normally.
@@ -77,10 +79,10 @@ impl Faults {
         self.next(method).err()
     }
 
-    /// Whether a `RefuseFocus` fault is queued for `ax.typeText`, consuming it.
-    pub(crate) fn take_refused_focus(&self) -> bool {
+    /// Whether a `RefuseFocus` fault is queued for `method`, consuming it.
+    pub(crate) fn take_refused_focus(&self, method: FakeMethod) -> bool {
         let mut queues = self.queues.lock();
-        let Some(queue) = queues.get_mut(&FakeMethod::AxTypeText) else {
+        let Some(queue) = queues.get_mut(&method) else {
             return false;
         };
         if matches!(queue.front(), Some(Fault::RefuseFocus)) {

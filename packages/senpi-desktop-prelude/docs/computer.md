@@ -40,9 +40,11 @@ win.ref("e5") / computer.ref("e5") → ComputerElement | null
 computer.elementAt(x, y) / computer.focusedElement() → ComputerElement | null
     `elementAt` takes GLOBAL desktop coordinates, not screenshot pixels.
 el.value() / el.bounds() / el.attributes() / el.actions() / el.parent() / el.children() → reads
-el.setValue(text) / el.perform(action) / el.press() / el.click({ delivery? }?) / el.focus() → mutations
+el.setValue(text) / el.perform(action) / el.press() / el.click({ button?, modifiers?, delivery? }?) / el.doubleClick(opts?) / el.focus() → mutations
 el.selectText(text, { prefix?, suffix?, select? }?) → { start, length, text, focused }
     Selects `text` inside THAT element's value (macOS) by writing its selected range: no key sent, no focus moved, value unchanged. The match must be unique; `prefix` / `suffix` disambiguate (an ambiguous match is refused with its offsets, nothing selected); `select: "start" | "end"` places a caret instead; empty `text` with context places a caret. Offsets are UTF-16 units. Then `el.type(...)` replaces the selection.
+el.press("cmd+a" | keys[], { delivery? }?) → None
+    Presses that chord in THAT element without taking the user's focus (macOS): the element is given app-local focus and the keys go out only once the app confirms it has focus; an element that never takes focus throws `BackgroundUnavailable` naming where the focus is, nothing sent. `el.press()` with no chord is the element's native press action.
 el.type(text, { delivery? }?) → { method: "inserted" | "keys" }
     Types into THAT element without taking the user's focus (macOS). A native text field takes the text through its own selection and the value is read back exactly (`inserted`: no key sent, no focus moved, works in a multi-window app); any other element is given app-local focus and takes keys only once the app confirms it has focus (`keys`). An element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) naming where the focus is, with a ref; nothing was typed. A secure field's text never appears in an error. Foreground delivery raises the window first and needs the grant.
     Element fields: ref, role, nativeRole, title, description, enabled, focused, childCount. AX actions need no screenshot.

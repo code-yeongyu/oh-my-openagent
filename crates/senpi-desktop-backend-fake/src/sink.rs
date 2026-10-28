@@ -140,6 +140,11 @@ pub enum SinkOp {
         start: u32,
         length: u32,
     },
+    AxKeyChord {
+        node: u64,
+        keys: Vec<KeyName>,
+        mode: DeliveryMode,
+    },
     MenuSelect {
         window: String,
         path: Vec<String>,

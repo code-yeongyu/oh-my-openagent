@@ -176,6 +176,7 @@ impl Worker {
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
             Op::AxTypeText(params) => served(self.ax_type_text(&params, cancelled)),
             Op::AxSelectText(params) => served(self.ax_select_text(&params, cancelled)),
+            Op::AxKeyChord(params) => served(self.ax_key_chord(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
             Op::ControlGrant(params) => self.control_grant(&params),

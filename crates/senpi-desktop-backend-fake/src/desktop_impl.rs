@@ -153,6 +153,16 @@ impl Backend for FakeBackend {
         crate::element_input_impl::ax_type_text(self, h, text, mode, check_stop, delivered)
     }
 
+    fn ax_key_chord(
+        &mut self,
+        h: &AxHandle,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        crate::element_input_impl::ax_key_chord(self, h, keys, mode, check_stop)
+    }
+
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::KeyChord)?;
         self.input_gate(target, mode)?;

@@ -28,4 +28,5 @@ export const INPUT_CALLS: ReadonlyArray<readonly [string, Message]> = [
 	["ax.click", { ref: "e1" }],
 	["ax.typeText", { ref: "e1", text: "hi" }],
 	["ax.selectText", { ref: "e1", text: "hi" }],
+	["ax.keyChord", { ref: "e1", keys: ["enter"] }],
 ];

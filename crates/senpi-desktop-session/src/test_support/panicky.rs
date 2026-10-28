@@ -108,6 +108,15 @@ impl Backend for PanickyFake {
     ) -> CoreResult<ElementDelivery> {
         self.inner.ax_type_text(h, text, mode, check_stop, delivered)
     }
+    fn ax_key_chord(
+        &mut self,
+        h: &AxHandle,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        self.inner.ax_key_chord(h, keys, mode, check_stop)
+    }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.inner.key_chord(target, keys, mode)
     }

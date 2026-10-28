@@ -209,6 +209,19 @@ pub struct AxSelectTextParams {
     pub select: Option<String>,
 }
 
+/// `ax.keyChord`: presses the chord `keys` in the element `ref` names, as
+/// keys once the element holds its application's keyboard focus (never
+/// unconfirmed). Only `opts.deliveryMode` is read: an omitted delivery is
+/// background (no focus change for the user); `foreground` raises the
+/// element's window under the control grant, like `ax.typeText`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AxKeyChordParams {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub keys: Vec<String>,
+    pub opts: Option<PointerOptions>,
+}
+
 /// `ax.typeText`: types `text` into the element `ref` names. Only
 /// `opts.deliveryMode` is read: an omitted delivery is background (no focus
 /// change for the user); `foreground` raises the element's window under the

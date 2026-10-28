@@ -16,7 +16,7 @@ import {
 	listOf,
 	optional,
 } from "./engine-results";
-import { type DeliveryOptions, InputTarget, pointerOptions, send } from "./input-target";
+import { chordKeys, type ClickOptions, type DeliveryOptions, InputTarget, pointerOptions, send } from "./input-target";
 import { observeWindow, type ObserveOptions, type ObservationResult } from "./observe";
 export { type ClickOptions, type DeliveryOptions, InputTarget, type ScrollOptions } from "./input-target";
 
@@ -183,12 +183,23 @@ export class ElementHandle {
 		return this.#send("perform", "ax.perform", { action });
 	}
 
-	press(): Promise<void> {
-		return this.#send("press", "ax.perform", { action: "press" });
+	/**
+	 * Without a chord, the element's native press action. With one (`"cmd+a"` or `["cmd", "a"]`), that chord pressed in
+	 * this element without taking the user's focus: keys go out only once the element holds its app's keyboard focus and
+	 * are never sent to an element that did not take it. Foreground delivery raises the window first and needs the grant.
+	 */
+	press(chord?: string | readonly string[], options?: DeliveryOptions): Promise<void> {
+		if (chord === undefined) return this.#send("press", "ax.perform", { action: "press" });
+		return this.#send("press", "ax.keyChord", { keys: chordKeys(chord), opts: pointerOptions(options) });
 	}
 
-	click(options?: DeliveryOptions): Promise<void> {
+	click(options?: ClickOptions): Promise<void> {
 		return this.#send("click", "ax.click", { opts: pointerOptions(options) });
+	}
+
+	/** Two clicks at the element's center with native input (`ax.click` with `count: 2`). */
+	doubleClick(options?: Omit<ClickOptions, "count">): Promise<void> {
+		return this.#send("doubleClick", "ax.click", { opts: pointerOptions({ ...options, count: 2 }) });
 	}
 
 	/**

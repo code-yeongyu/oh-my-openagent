@@ -48,6 +48,7 @@ export const ENGINE_METHODS = [
 	"ax.click",
 	"ax.typeText",
 	"ax.selectText",
+	"ax.keyChord",
 	"stopPath.start",
 	"stopPath.status",
 	"stopPath.heartbeat",

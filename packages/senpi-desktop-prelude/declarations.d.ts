@@ -192,10 +192,16 @@ interface ComputerElement {
 	attributes(): Promise<Record<string, string>>;
 	actions(): Promise<string[]>;
 	perform(action: string): Promise<void>;
-	/** Perform the element's native press action; needs no screenshot. */
-	press(): Promise<void>;
+	/**
+	 * Without a chord: the element's native press action; needs no screenshot. With a chord ("cmd+a" or ["cmd", "a"]):
+	 * that chord pressed in this element without taking the user's focus (macOS); keys go out only once the element holds
+	 * its app's keyboard focus, else `BackgroundUnavailable` (`InputFailed` in the foreground) with nothing sent.
+	 */
+	press(chord?: string | string[], options?: ComputerDeliveryOptions): Promise<void>;
 	/** Click the element's center with native input. */
-	click(options?: ComputerDeliveryOptions): Promise<void>;
+	click(options?: ComputerClickOptions): Promise<void>;
+	/** Two clicks at the element's center with native input. */
+	doubleClick(options?: Omit<ComputerClickOptions, "count">): Promise<void>;
 	/**
 	 * Type into this element without taking the user's focus (macOS): a native text field takes the text through its
 	 * own selection (`inserted`), any other element takes keys once it holds its app's keyboard focus (`keys`); an

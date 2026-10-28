@@ -1,7 +1,7 @@
 //! `ax.typeText` over the fake: insertion into a native text field, keys into
 //! an element the backend focused, the grant rule, and an unanswered write.
 
-use senpi_desktop_backend_fake::{AxWrite, SinkOp};
+use senpi_desktop_backend_fake::{AxWrite, FakeMethod, SinkOp};
 use senpi_desktop_core::backend::{AxInputMethod, DeliveryMode};
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::methods::Method;
@@ -144,11 +144,11 @@ fn an_element_that_never_takes_focus_gets_no_keys_and_the_refusal_names_the_focu
     // Given: the Save button never takes focus; the text area holds it.
     let mut harness = harness(&json!({}));
     let reference = element_ref(&mut harness, "button");
-    harness.faults.refuse_focus_next();
+    harness.faults.refuse_focus_next(FakeMethod::AxTypeText);
     // When: background, then foreground under the grant.
     let refused = harness.process(type_into(&reference, "ok", None)).expect_err("refused");
     harness.grant("retry in front");
-    harness.faults.refuse_focus_next();
+    harness.faults.refuse_focus_next(FakeMethod::AxTypeText);
     let front = harness
         .process(type_into(&reference, "ok", delivery("foreground")))
         .expect_err("refused");

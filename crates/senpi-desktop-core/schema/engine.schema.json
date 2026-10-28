@@ -482,6 +482,17 @@
         "$ref": "#/definitions/AxTextSelection"
       }
     },
+    "ax.keyChord": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxKeyChordParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
     "stopPath.start": {
       "effect": "exec",
       "hostOnly": true,
@@ -2347,6 +2358,36 @@
       "description": "`ax.selectText` reply: the selection that was applied, in UTF-16 code\nunits of the element's value, with the text it covers and whether the\nelement holds its application's focus.",
       "additionalProperties": false
     },
+    "AxKeyChordParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "keys"
+      ],
+      "description": "`ax.keyChord`: presses the chord `keys` in the element `ref` names, as\nkeys once the element holds its application's keyboard focus (never\nunconfirmed). Only `opts.deliveryMode` is read: an omitted delivery is\nbackground (no focus change for the user); `foreground` raises the\nelement's window under the control grant, like `ax.typeText`.",
+      "additionalProperties": false
+    },
     "StopPathStartParams": {
       "type": "object",
       "properties": {
@@ -2604,6 +2645,7 @@
         "ax.click",
         "ax.typeText",
         "ax.selectText",
+        "ax.keyChord",
         "stopPath.start",
         "stopPath.status",
         "stopPath.heartbeat",

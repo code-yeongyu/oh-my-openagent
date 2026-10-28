@@ -49,6 +49,7 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("ax.click", "exec", "public"),
     ("ax.typeText", "exec", "public"),
     ("ax.selectText", "exec", "public"),
+    ("ax.keyChord", "exec", "public"),
     ("stopPath.start", "exec", "hostOnly"),
     ("stopPath.status", "read", "public"),
     ("stopPath.heartbeat", "read", "hostOnly"),

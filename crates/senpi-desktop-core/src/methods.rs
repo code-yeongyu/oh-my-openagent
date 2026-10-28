@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::menus::MenuItem;
 use crate::protocol_params::{
-    AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
+    AdvanceClockParams, AxClickParams, AxElementAtParams, AxKeyChordParams, AxPerformParams, AxQueryParams, AxRefParams,
     AxSelectTextParams, AxSetValueParams, AxSnapshotParams, AxTypeTextParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
     EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuPathParams, MenuSelectParams, ObserveParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams, TypeTextParams,
@@ -124,6 +124,7 @@ method_table! {
     AxClick = "ax.click", Exec, Public, AxClickParams => ();
     AxTypeText = "ax.typeText", Exec, Public, AxTypeTextParams => AxInputResult;
     AxSelectText = "ax.selectText", Exec, Public, AxSelectTextParams => AxTextSelection;
+    AxKeyChord = "ax.keyChord", Exec, Public, AxKeyChordParams => ();
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();

@@ -184,6 +184,19 @@ pub trait Backend: Send {
     ) -> CoreResult<ElementDelivery> {
         Err(DesktopError::ax_unsupported())
     }
+    /// Presses the chord `keys` in the element `h` names (`ax.keyChord`):
+    /// as keys once the element holds its application's keyboard focus,
+    /// never unconfirmed; `check_stop` runs before every key press. Backends
+    /// without element input keep this default and refuse.
+    fn ax_key_chord(
+        &mut self,
+        _h: &AxHandle,
+        _keys: &[KeyName],
+        _mode: DeliveryMode,
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        Err(DesktopError::ax_unsupported())
+    }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
     /// [`Self::key_chord`] with `check_stop` before every key press, so a stop
     /// or a cancellation lands between presses. The default checks once,

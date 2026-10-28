@@ -40,6 +40,7 @@ pub enum FakeMethod {
     AxFocus,
     AxTypeText,
     AxSelectText,
+    AxKeyChord,
     AxElementAt,
     AxFocusedElement,
     AxAttributes,
