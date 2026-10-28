@@ -70,6 +70,7 @@ bunx oh-my-opencode
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
+| `config edit` | Interactive unified configuration editor; select a file and shared/harness/profile view, edit models and settings, then save with a backup |
 | `config migrate` | Migrate legacy OMO configuration into the unified config at `~/.omo/omo.jsonc` (`--dry-run` prints the transform/backup plan without writing, `--json` emits a machine-readable report) |
 | `worktree-sweep` | Report (and optionally remove) stale linked git worktrees: SWEEP when merged into the default branch and clean, KEEP when locked/external/unmerged/dirty or when it is the worktree the sweep was started from, PRUNE when the path is gone. Dry-run by default; `--apply` removes with `git worktree remove` (never forced) and prunes; `--older-than <days>` adds an age fallback, `--repo <path>` is repeatable, `--json` emits machine-readable output |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
@@ -79,6 +80,21 @@ bunx oh-my-opencode
 | `mcp oauth` | OAuth token management for MCP servers |
 
 ---
+
+## Interactive configuration editor
+
+Run `omo-agent-toolkit config edit` in an interactive terminal. Use `--directory /path/to/project` to discover that project's user and ancestor configuration layers, or `--file /path/to/omo.jsonc` to select a file explicitly. New files are created only when you save changes. `config migrate` remains a separate command; opening the editor does not migrate legacy files.
+
+Choose a shared, OpenCode, OmO Native, or Codex view, or a view inside an existing named profile. The editor changes only that file and view; values from other layers or an active profile can still take precedence. The menus show declared overrides, rather than claiming a cached model is available or showing the final runtime resolution. Navigate with the arrow keys and Enter; each nested menu has an explicit Back option. New entries are added only after their first field is accepted. Selecting Keep or appending an existing model leaves the configuration unchanged.
+
+- **Agents:** edit the ordered model chain, permissions, descriptions and schema fields. In the OpenCode view, assign a category or set the default run agent.
+- **Categories:** edit models, fallbacks, descriptions and schema fields, including custom categories.
+- **Model picker:** enter `provider/model` directly or search cached models by provider. Model chains keep per-model metadata when reordered; removing one model retains the rest. Bulk assignment changes selected entries' primary models and keeps their secondary fallbacks.
+- **Other configuration fields:** select a field and enter a JSON value (`"text"`, `true`, an array, or an object), or remove the override to inherit defaults. Nested settings such as detailed command permissions can be edited as JSON objects. New field values are checked against the current schema.
+
+Changes stay in memory until **Save changes and exit**. Cancelling prompts with unsaved changes offers **Keep editing** or **Discard changes and exit**. Saving preserves unrelated JSONC comments and data, creates a backup, keeps the original file permissions, and refuses to overwrite a file changed by another process. A save error keeps the staged edits available for retry or discard.
+
+The interactive workflow continues WietRob's original [TUI configuration editor proposal (#1529)](https://github.com/code-yeongyu/oh-my-openagent/pull/1529), adapted to the current unified `omo.jsonc` configuration and CLI.
 
 ## install
 
@@ -335,4 +351,4 @@ bunx oh-my-openagent mcp oauth status [server-name]
 - `2` when the boulder state file exists but can't be read
 - `130` when `run` is aborted
 
-`run`, `install`, `uninstall`/`cleanup`, `doctor`, `get-local-version`, `refresh-model-capabilities`, `config migrate`, `boulder`, `ulw-loop`, and `mcp oauth` subcommands return explicit numeric exit codes.
+`run`, `install`, `uninstall`/`cleanup`, `doctor`, `get-local-version`, `refresh-model-capabilities`, `config migrate`, `config edit`, `boulder`, `ulw-loop`, and `mcp oauth` subcommands return explicit numeric exit codes.
