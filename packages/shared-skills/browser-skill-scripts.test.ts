@@ -33,10 +33,23 @@ function runScript(script: string, report: Report, args: string[] = []) {
   return { status: run.status, stdout: run.stdout, stderr: run.stderr }
 }
 
+type Registration = { humanStep: string | null }
+
+// The fields of the scripts' --json output that these tests read.
+interface ScriptSummary {
+  daemonDown?: boolean
+  daemon: { startBlocked: boolean }
+  humanStep?: string | null
+  nextStep?: string | null
+  registrations: [Registration, ...Registration[]]
+  state?: string
+  sessions?: unknown[]
+}
+
 function runJson(script: string, report: Report) {
   const run = runScript(script, report, ["--json"])
   expect(run.stderr).toBe("")
-  return JSON.parse(run.stdout) as Record<string, any>
+  return JSON.parse(run.stdout) as ScriptSummary
 }
 
 const ENABLE_STEP = "In Google Chrome, open chrome://extensions and enable BrowserSkill."
