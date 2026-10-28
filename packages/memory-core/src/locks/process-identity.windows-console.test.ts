@@ -1,9 +1,13 @@
-import { describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, test } from "bun:test"
 
 // Namespace spies hide unused exports from Knip. Module mocks survive mock.restore(). Run the
 // fallback probe in its own test process so neither source coverage nor later native probes change.
 const CHILD_PROBE_ENV = "OMO_PROCESS_IDENTITY_CONSOLE_PROBE"
 const POWERSHELL_INSTANT = "2026-09-19T15:04:05.0000000Z"
+
+afterEach(() => {
+  mock.restore()
+})
 
 interface CapturedExecFile {
   readonly command: string
