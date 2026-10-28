@@ -71,6 +71,12 @@ No default profiles ship: a profile exists only when you write one under `profil
 
 Activating a profile that does not exist produces a diagnostic and falls back to the base configuration.
 
+The terminal configuration editor’s **Profiles → Import built-in preset** previews `performance`, `balanced`, or `budget` against the existing local `provider-models.json` cache. Performance follows the current per-role requirement chains. Balanced curates Kimi, GLM and Sonnet-class candidates, with GPT-5.6 Sol for GPT lanes; budget keeps Kimi / GLM for orchestration and reasoning and smaller Haiku / DeepSeek flash / Luna candidates for simple work. Hephaestus keeps GPT candidates and the multimodal looker keeps candidates from its vision requirements. Exact listed provider/model ids are required, including intentional OpenRouter routed aliases; no fuzzy matching or provider network request occurs.
+
+The preview shows the cache timestamp, every agent/category primary model, fallback/skipped counts and missing roles. **Inspect full model chain** opens a role picker with paged retained and skipped candidates. Import is unavailable unless all current roles have a nonempty chain. This is a **cache-only listing check**, not proof of current availability, authentication, pricing or savings. Cache contents can be stale. These are cost-oriented declarations, not a spend cap: normal layered overrides, inherited reasoning/variant settings and runtime fallback policies can affect actual routing and cost. Imports omit variant tuning rather than copying unsupported presets from another model.
+
+Import creates ordinary `profiles.<new name>."[opencode]"` declarations in the selected file and opens them for editing. Existing names are never overwritten. Nothing is written until **Save**, and leaving without saving discards the import. Saved declarations do not automatically update when built-in policies change. Importing or saving does not activate the profile or change running sessions; select it through the normal profile activation mechanism above.
+
 #### Model Catalog
 
 A top-level `models` record maps a short name to the canonical shape `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs are accepted for compatibility and normalized to `reasoning`. When an agent or category `model` string matches a catalog key, it resolves to the entry's model id and fills any unset `reasoning` from the entry; tuning written at the use site always wins. `[harness]` blocks can override individual catalog entries for one harness.
