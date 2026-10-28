@@ -1,3 +1,4 @@
+import type { SessionModelProfiles } from "./session-model-profiles"
 import type { ToolDefinition } from "@opencode-ai/plugin"
 import type { AvailableCategory } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
@@ -20,13 +21,14 @@ import { createRuntimeSkillsResolver, readRuntimeHostSkills } from "./runtime-sk
 export function createCoreTools(args: {
   readonly ctx: PluginContext
   readonly pluginConfig: OhMyOpenCodeConfig
+  readonly sessionModelProfiles?: SessionModelProfiles
   readonly managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor">
   readonly skillContext: SkillContext
   readonly availableCategories: AvailableCategory[]
   readonly factories: ToolRegistryFactories
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
-  const loadCurrentModelConfig = createRuntimeModelConfigLoader(ctx.directory, pluginConfig)
+  const loadCurrentModelConfig = args.sessionModelProfiles?.load ?? createRuntimeModelConfigLoader(ctx.directory, pluginConfig)
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,

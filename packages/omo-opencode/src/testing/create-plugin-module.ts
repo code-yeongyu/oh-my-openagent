@@ -1,3 +1,4 @@
+import { createSessionModelProfiles } from "../plugin/session-model-profiles"
 import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 import type { HookName } from "../config"
 import { validatePluginConfig } from "../config/validate"
@@ -299,7 +300,18 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       runtimeSkillSourceUrl: runtimeSkillSource?.url,
     })
 
+    const sessionModelProfiles = createSessionModelProfiles({
+      directory: input.directory,
+      initialConfig: pluginConfig,
+      readSession: async (id) => {
+        const response = await input.client.session.get({ path: { id }, query: { directory: input.directory } })
+        if (!response.data) throw new Error("Cannot read session for model profile selection")
+        return response.data
+      },
+    })
+
     const toolsResult = await deps.createTools({
+      sessionModelProfiles,
       ctx: input,
       pluginConfig,
       managers,
@@ -319,6 +331,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     })
 
     const pluginInterface = deps.createPluginInterface({
+      sessionModelProfiles,
       ctx: input,
       pluginConfig,
       firstMessageVariantGate,
