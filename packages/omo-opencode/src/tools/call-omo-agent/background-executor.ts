@@ -10,6 +10,7 @@ import { getMessageDir } from "./message-dir"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { sanitizeSubagentType } from "../delegate-task/subagent-discovery"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { setCallOmoAgentSessionConfig } from "../../shared/call-omo-agent-session-config"
 
 export async function executeBackground(
   args: CallOmoAgentArgs,
@@ -56,6 +57,9 @@ export async function executeBackground(
       parentTools: getSessionTools(toolContext.sessionID),
       model,
       fallbackChain,
+      onSessionCreated: async (sessionID) => {
+        setCallOmoAgentSessionConfig(sessionID, { model, fallbackChain })
+      },
     })
 
     const WAIT_FOR_SESSION_INTERVAL_MS = 50
