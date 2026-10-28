@@ -8,6 +8,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
 
 - [Getting Started](#getting-started)
   - [File Locations](#file-locations)
+  - [OpenCode Dispatch-Time Reload](#opencode-dispatch-time-reload)
   - [Quick Start Example](#quick-start-example)
 - [Core Concepts](#core-concepts)
   - [Agents](#agents)
@@ -115,6 +116,49 @@ The first time a current harness starts (and again on install or via the CLI), a
 - Backups: sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`). An interrupted run resumes from its journal on the next start.
 - Manual run: `oh-my-openagent config migrate`. `--dry-run` prints the transform, backup move plan, and conflicts without writing; `--json` prints machine-readable output.
 - Diagnostics surface once per startup: an OpenCode toast, a Senpi `session_start` notification, or Codex loader warnings.
+
+### OpenCode Dispatch-Time Reload
+
+Save model-routing changes to the unified `.omo/omo.jsonc` files while OpenCode is running. Before each new child dispatch through `task` or `call_omo_agent`, the plugin re-reads the effective config chain and accepts a valid snapshot for that dispatch. No reload command, file watcher, or opt-in flag is needed.
+
+Reload uses the same user, project, harness, and active-profile precedence described in [File Locations](#file-locations). For example, a nearer project's category model still overrides the same category model in `~/.omo/omo.jsonc`; changing the user file will not override that project value. Legacy config migration runs at startup, not on dispatch, so edit the unified files rather than a legacy `oh-my-*` file.
+
+| Change | When it takes effect |
+| --- | --- |
+| Agent or category `model`, model identities and fallback ordering in `models` / `fallback_models`, and compatible `variant` inputs where supported | The next new child dispatched through `task` or `call_omo_agent`, following each tool's existing model-resolution behavior. This includes the `sisyphus-junior` default used by category tasks. |
+| Primary-agent startup configuration, registered agent prompts/tools, hooks, MCPs, provider/auth configuration, and team-tool registrations | Restart OpenCode to rebuild the startup configuration and registrations. |
+| A child already running, a `task` continuation using `task_id`, or a `call_omo_agent` continuation using `session_id` | Saving config does not reconfigure a running child. Continuing a child keeps OpenCode's last selected model and its stored prompt parameters. During the same plugin process, `call_omo_agent` also reuses that child's original fallback chain. |
+
+Existing sessions from before a plugin restart retain their host model but have no restored `call_omo_agent` fallback snapshot. `task` continuations keep their existing behavior and do not trigger a config reload.
+
+For example, if `explore` and the `quick` category currently use `anthropic/claude-opus-5-5`, save this lower-cost routing in your project's `.omo/omo.jsonc`:
+
+```jsonc
+{
+  "[opencode]": {
+    "agents": {
+      "explore": {
+        "models": [
+          "openai/gpt-6-luna-fast",
+          "opencode/gpt-5-nano"
+        ]
+      }
+    },
+    "categories": {
+      "quick": {
+        "models": [
+          "openai/gpt-6-luna-fast",
+          "opencode/gpt-5-nano"
+        ]
+      }
+    }
+  }
+}
+```
+
+The next new `call_omo_agent` call for `explore` and the next new `task` call for `quick` resolve the saved cheaper chain in the same OpenCode session. Choose models from providers you have already configured and authenticated; the first chain entry is the primary and later entries are fallbacks. Reload changes the config supplied to each tool's existing resolver; support for model tuning remains specific to that tool. Changing a fallback chain does not enable a fallback hook that was disabled at startup.
+
+If an edit is half-written, invalid JSONC, fails schema validation, or produces validation warnings about ignored values, the plugin rejects the reload and logs the reason. New dispatches keep the last accepted agent/category snapshot instead of silently dropping an invalid override and selecting a different model. After you save a valid configuration, the next new dispatch accepts it automatically.
 
 ### Quick Start Example
 
