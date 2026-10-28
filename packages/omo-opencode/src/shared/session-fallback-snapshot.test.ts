@@ -10,11 +10,14 @@ test("fallback snapshots distinguish unregistered from empty and clone nested se
   setSessionFallbackSnapshot("child", chain)
   chain[0].providers[0] = "changed"
   chain[0].thinking.budgetTokens = 200
-  const snapshot = getSessionFallbackSnapshot("child")!
+  const snapshot = getSessionFallbackSnapshot("child")
+  if (!snapshot) throw new Error("Missing dispatch snapshot")
   expect(snapshot[0]).toEqual({ providers: ["budget"], model: "backup", thinking: { type: "enabled", budgetTokens: 100 } })
   snapshot[0].providers.push("changed")
-  snapshot[0].thinking!.budgetTokens = 300
-  expect(getSessionFallbackSnapshot("child")![0]).toEqual({ providers: ["budget"], model: "backup", thinking: { type: "enabled", budgetTokens: 100 } })
+  const thinking = snapshot[0].thinking
+  if (!thinking) throw new Error("Missing captured thinking settings")
+  thinking.budgetTokens = 300
+  expect(getSessionFallbackSnapshot("child")?.[0]).toEqual({ providers: ["budget"], model: "backup", thinking: { type: "enabled", budgetTokens: 100 } })
   setSessionFallbackSnapshot("child", undefined)
   expect(getSessionFallbackSnapshot("child")).toEqual([])
   clearSessionFallbackSnapshot("child")
