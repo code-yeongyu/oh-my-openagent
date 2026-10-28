@@ -1,3 +1,4 @@
+import type { SessionModelProfiles } from "./session-model-profiles"
 import type { AvailableCategory } from "../agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { Managers } from "../create-managers"
@@ -29,6 +30,7 @@ export type ToolRegistryResult = {
 export function createToolRegistry(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
+  sessionModelProfiles?: SessionModelProfiles
   managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor" | "monitorManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
@@ -53,6 +55,7 @@ export function createToolRegistry(args: {
     ...createCoreTools({
       ctx,
       pluginConfig,
+      sessionModelProfiles: args.sessionModelProfiles,
       managers,
       skillContext,
       availableCategories,

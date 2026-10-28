@@ -8,6 +8,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
 
 - [Getting Started](#getting-started)
   - [File Locations](#file-locations)
+  - [OpenCode Dispatch-Time Reload](#opencode-dispatch-time-reload)
   - [Quick Start Example](#quick-start-example)
 - [Core Concepts](#core-concepts)
   - [Agents](#agents)
@@ -71,6 +72,12 @@ No default profiles ship: a profile exists only when you write one under `profil
 
 Activating a profile that does not exist produces a diagnostic and falls back to the base configuration.
 
+The terminal configuration editor’s **Profiles → Import built-in preset** previews `performance`, `balanced`, or `budget` against the existing local `provider-models.json` cache. Performance follows the current per-role requirement chains. Balanced curates Kimi, GLM and Sonnet-class candidates, with GPT-5.6 Sol for GPT lanes; budget keeps Kimi / GLM for orchestration and reasoning and smaller Haiku / DeepSeek flash / Luna candidates for simple work. Hephaestus keeps GPT candidates and the multimodal looker keeps candidates from its vision requirements. Exact listed provider/model ids are required, including intentional OpenRouter routed aliases; no fuzzy matching or provider network request occurs.
+
+The preview shows the cache timestamp, every agent/category primary model, fallback/skipped counts and missing roles. **Inspect full model chain** opens a role picker with paged retained and skipped candidates. Import is unavailable unless all current roles have a nonempty chain. This is a **cache-only listing check**, not proof of current availability, authentication, pricing or savings. Cache contents can be stale. These are cost-oriented declarations, not a spend cap: normal layered overrides, inherited reasoning/variant settings and runtime fallback policies can affect actual routing and cost. Imports omit variant tuning rather than copying unsupported presets from another model.
+
+Import creates ordinary `profiles.<new name>."[opencode]"` declarations in the selected file and opens them for editing. Existing names are never overwritten. Nothing is written until **Save**, and leaving without saving discards the import. Saved declarations do not automatically update when built-in policies change. Importing or saving does not activate the profile or change running sessions; select it through the normal profile activation mechanism above.
+
 #### Model Catalog
 
 A top-level `models` record maps a short name to the canonical shape `{ model, reasoning? }`. Deprecated `variant` and `reasoningEffort` inputs are accepted for compatibility and normalized to `reasoning`. When an agent or category `model` string matches a catalog key, it resolves to the entry's model id and fills any unset `reasoning` from the entry; tuning written at the use site always wins. `[harness]` blocks can override individual catalog entries for one harness.
@@ -115,6 +122,54 @@ The first time a current harness starts (and again on install or via the CLI), a
 - Backups: sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`). An interrupted run resumes from its journal on the next start.
 - Manual run: `oh-my-openagent config migrate`. `--dry-run` prints the transform, backup move plan, and conflicts without writing; `--json` prints machine-readable output.
 - Diagnostics surface once per startup: an OpenCode toast, a Senpi `session_start` notification, or Codex loader warnings.
+
+### OpenCode Dispatch-Time Reload
+
+Save model-routing changes to the unified `.omo/omo.jsonc` files while OpenCode is running. Before each new child dispatch through `task` or `call_omo_agent`, the plugin re-reads the effective config chain and accepts a valid snapshot for that dispatch. No reload command, file watcher, or opt-in flag is needed.
+
+Reload uses the same user, project, harness, and active-profile precedence described in [File Locations](#file-locations). For example, a nearer project's category model still overrides the same category model in `~/.omo/omo.jsonc`; changing the user file will not override that project value. Legacy config migration runs at startup, not on dispatch, so edit the unified files rather than a legacy `oh-my-*` file.
+
+| Change | When it takes effect |
+| --- | --- |
+| Agent or category `model`, model identities and fallback ordering in `models` / `fallback_models`, and compatible `variant` inputs where supported | The next new child dispatched through `task` or `call_omo_agent`, following each tool's existing model-resolution behavior. This includes the `sisyphus-junior` default used by category tasks. |
+| Primary-agent startup configuration, registered agent prompts/tools, hooks, MCPs, provider/auth configuration, and team-tool registrations | Restart OpenCode to rebuild the startup configuration and registrations. |
+| A child already running, a `task` continuation using `task_id`, or a `call_omo_agent` continuation using `session_id` | Saving config does not reconfigure a running child. Continuing a child keeps OpenCode's last selected model and its stored prompt parameters. During the same plugin process, `call_omo_agent` also reuses that child's original fallback chain. |
+
+Existing sessions from before a plugin restart retain their host model but have no restored `call_omo_agent` fallback snapshot. `task` continuations keep their existing behavior and do not trigger a config reload.
+
+For example, if `explore` and the `quick` category currently use `anthropic/claude-opus-5-5`, save this lower-cost routing in your project's `.omo/omo.jsonc`:
+
+```jsonc
+{
+  "[opencode]": {
+    "agents": {
+      "explore": {
+        "models": [
+          "openai/gpt-6-luna-fast",
+          "opencode/gpt-5-nano"
+        ]
+      }
+    },
+    "categories": {
+      "quick": {
+        "models": [
+          "openai/gpt-6-luna-fast",
+          "opencode/gpt-5-nano"
+        ]
+      }
+    }
+  }
+}
+```
+
+The next new `call_omo_agent` call for `explore` and the next new `task` call for `quick` resolve the saved cheaper chain in the same OpenCode session. Choose models from providers you have already configured and authenticated; the first chain entry is the primary and later entries are fallbacks. Reload changes the config supplied to each tool's existing resolver; support for model tuning remains specific to that tool. Changing a fallback chain does not enable a fallback hook that was disabled at startup.
+
+If an edit is half-written, invalid JSONC, fails schema validation, or produces validation warnings about ignored values, the plugin rejects the reload and logs the reason. New dispatches keep the last accepted agent/category snapshot instead of silently dropping an invalid override and selecting a different model. After you save a valid configuration, the next new dispatch accepts it automatically.
+
+Trusted in-process consumers can inspect saved candidates separately from accepted
+runtime state through the [runtime configuration status helpers](runtime-config-status.md).
+Diagnostics use redacted codes and counts; observation does not accept a pending
+edit. These helpers are instance-local capabilities and do not expose an endpoint.
 
 ### Quick Start Example
 
@@ -1590,3 +1645,51 @@ See [Ollama Troubleshooting](../troubleshooting/ollama.md) for `JSON Parse error
 #### OpenGateway
 
 The `omo-opencode` plugin exposes the OpenAI-compatible `opengateway` provider at `https://apis.opengateway.ai/v1` when `OPENGATEWAY_API_KEY` is set or an `opengateway` auth entry exists. No provider is injected if neither credential is present.
+
+### Change model profiles in a running OpenCode session
+
+Use `/omo-profile budget` to apply an existing `profiles.budget` overlay to the
+current session's model routing. `/omo-profile quality` changes it again without
+restarting OpenCode or editing configuration. `/omo-profile` (or `list` / `current`)
+shows the current selector and available profiles; `/omo-profile clear` returns
+to the selector inherited when this plugin instance started. Use
+`/omo-profile use <name>` for a profile named `list`, `current` or `clear`.
+
+The session selector overrides `OMO_PROFILE`, `OCX_PROFILE` and the profile inferred
+from `OPENCODE_CONFIG_DIR` for this session. It does not write a global preference
+and expires when the server/plugin instance restarts. Another parent session in
+the same server keeps its own selection. New delegations from descendants resolve
+their parent's selection; change profiles from the parent session.
+
+After a successful switch, subsequent primary requests use the selected agent's
+model and variant. New `task` and `call_omo_agent` dispatches use its agent/category
+settings through the existing tool resolvers. A profile with no model override
+falls through to the shared base settings. Invalid JSON, ignored invalid values,
+unknown keys and missing profile names reject a switch; later invalid file edits
+retain the last accepted snapshot until a valid configuration is saved.
+
+A running request and an existing child's `task_id` / `session_id` continuation
+keep their resolved model. The command itself makes a normal OpenCode request to
+confirm the selected state. Primary agent registrations, prompts, tools, hooks, provider/auth configuration
+and tool registrations still come from startup configuration. New delegations
+also use the existing dispatch resolver's category fields, including category
+`prompt_append`, `disable`, `is_unstable_agent` and `max_prompt_tokens`; these
+fields follow the selected profile along with model settings. Tuning beyond
+model and variant retains each existing tool resolver's support.
+
+
+The same operation is available without a TUI through OpenCode's existing API:
+`POST /session/<id>/command?directory=<project>` with JSON
+`{"command":"omo-profile","arguments":"budget","agent":"Sisyphus - ultraworker"}`.
+The SDK equivalent is `client.session.command` with the same command/arguments.
+This native command also produces a normal confirmation request. An application
+needing a selection-only response can reuse the exported `createSessionModelProfiles`
+controller within the same plugin instance. It exposes typed `inspect(sessionID)`
+and `select(sessionID, name | undefined)` methods; `undefined` restores startup
+selection. Its state is process-local; creating a new controller does not address
+another server.
+
+The selected state reports an accepted configuration snapshot. Saving a profile
+alone does not activate it in another running session; schema validation does not
+guarantee that a provider accepts a model or that credentials are available.
+Named OMO `profiles` are separate from Native `model_profile` tiers.

@@ -164,3 +164,27 @@ describe("#given core skill tools are registered", () => {
     expect(createDelegateTask.mock.calls[0]?.[0].taskCleanupDelayMs).toBe(120000)
   })
 })
+
+describe("runtime model config wiring", () => {
+  test("task and call_omo_agent share one dispatch-time snapshot loader without changing startup registration", () => {
+    const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
+    const createCallOmoAgent = mock((...args: Parameters<ToolRegistryFactories["createCallOmoAgent"]>) => fakeTool)
+    const agents = { explore: { model: "fixture/startup" } }
+    const categories = { runtime: { model: "fixture/startup" } }
+    createCoreTools({
+      ctx: unsafeTestValue({ directory: "/tmp/project", client: {} }),
+      pluginConfig: { disabled_agents: ["multimodal-looker"], agents, categories },
+      managers: unsafeTestValue({ backgroundManager: {}, tmuxSessionManager: {}, skillMcpManager: {}, modelFallbackControllerAccessor: {} }),
+      skillContext: { mergedSkills: [], availableSkills: [], browserProvider: "playwright", disabledSkills: new Set() },
+      availableCategories: [],
+      factories: { ...createFactories(() => fakeTool), createDelegateTask, createCallOmoAgent },
+    })
+    const loader = createDelegateTask.mock.calls[0]?.[0].loadCurrentModelConfig
+    expect(typeof loader).toBe("function")
+    expect(createCallOmoAgent.mock.calls[0]?.[6]).toBe(loader)
+    expect(createCallOmoAgent.mock.calls[0]?.[3]).toBe(agents)
+    expect(createCallOmoAgent.mock.calls[0]?.[4]).toBe(categories)
+    expect(createDelegateTask.mock.calls[0]?.[0].agentOverrides).toBe(agents)
+    expect(createDelegateTask.mock.calls[0]?.[0].userCategories).toBe(categories)
+  })
+})

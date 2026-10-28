@@ -13,6 +13,7 @@ Commander.js CLI with 12 commands (`sparkshell` removed 2026-07). Entry: `index.
 | `install` | Interactive/non-interactive setup | Provider selection → config gen → plugin registration |
 | `run <message>` | Non-interactive session launcher | Agent resolution (flag → env → config → Sisyphus) |
 | `doctor` | 4-category health checks | System, Config, Tools, Models |
+| `config models` | Read-only OpenCode declaration map with source/section attribution, category links, ordered chains and safe diagnostics | `config-models/`: canonical source views + plugin pruning; `-d/--directory`, `--json`; never runtime resolution or migration |
 | `config migrate` | Migrate legacy OMO config into `~/.omo/omo.jsonc` | `config-migrate.ts` over `runOpenCodeStartupMigration`; `--dry-run` prints transform + backup move plan, `--json` machine-readable |
 | `get-local-version` | Version detection | Installed vs npm latest |
 | `version` | Print plugin version | Trivial 2-line subcommand |
@@ -37,6 +38,7 @@ cli/
 ├── model-fallback.ts            # Model config gen by provider availability
 ├── provider-availability.ts     # Provider detection
 ├── fallback-chain-resolution.ts # Fallback chain logic
+├── config-models/               # Read-only declaration report: types, projection, diagnostics, report, text formatter, public run
 ├── config-manager/              # 27 config utilities
 │   ├── plugin registration, provider config
 │   ├── JSONC operations, auth plugins

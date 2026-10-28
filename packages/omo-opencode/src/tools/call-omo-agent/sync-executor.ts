@@ -11,6 +11,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { deleteSessionTools, setSessionTools } from "../../shared/session-tools-store"
+import { setCallOmoAgentSessionConfig } from "../../shared/call-omo-agent-session-config"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
@@ -100,6 +101,7 @@ export async function executeSync(
 
     if (session.isNew) {
       spawnReservation?.commit()
+      setCallOmoAgentSessionConfig(sessionID, { model, fallbackChain })
     }
 
     if (fallbackChain && fallbackChain.length > 0) {
@@ -107,7 +109,9 @@ export async function executeSync(
       appliedFallbackChain = true
     }
 
-    applySessionPromptParams(sessionID, model)
+    if (!args.session_id) {
+      applySessionPromptParams(sessionID, model)
+    }
 
     await Promise.resolve(
       toolContext.metadata?.({

@@ -3,7 +3,7 @@ import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs, ToolContextWithMetadata } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
-import type { CategoriesConfig, AgentOverrides } from "../../config/schema"
+import type { CategoriesConfig, AgentOverrides, OhMyOpenCodeConfig } from "../../config/schema"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -19,6 +19,8 @@ import { createOrGetSession } from "./session-creator"
 import { processMessages } from "./message-processor"
 import { waitForCompletion } from "./completion-poller"
 import { getFirstFallbackModel } from "../../agents/builtin-agents/model-resolution"
+import { getCallOmoAgentSessionConfig } from "../../shared/call-omo-agent-session-config"
+import { resolveContinuationModel } from "./session-model-resolver"
 
 function createSyncExecutorDeps(modelFallbackControllerAccessor?: ModelFallbackControllerAccessor) {
   return {
@@ -116,6 +118,7 @@ export function createCallOmoAgent(
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor,
+  loadCurrentModelConfig?: (sessionID: string) => Pick<OhMyOpenCodeConfig, "agents" | "categories"> | Promise<Pick<OhMyOpenCodeConfig, "agents" | "categories">>,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`,
@@ -179,47 +182,52 @@ export function createCallOmoAgent(
         return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your .omo/omo.jsonc to use it.`
       }
 
+      if (args.session_id) {
+        if (args.run_in_background) {
+          return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`;
+        }
+        const sessionConfig = getCallOmoAgentSessionConfig(args.session_id)
+        const continuationModel = await resolveContinuationModel(ctx.client, args.session_id, sessionConfig?.model)
+        return await executeSync(
+          args,
+          toolCtx,
+          ctx,
+          createSyncExecutorDeps(modelFallbackControllerAccessor),
+          sessionConfig?.fallbackChain,
+          undefined,
+          continuationModel,
+        )
+      }
+
+      const currentModelConfig = loadCurrentModelConfig
+        ? await loadCurrentModelConfig(toolCtx.sessionID)
+        : { agents: agentOverrides, categories: userCategories }
       const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({
         subagentType: args.subagent_type,
-        agentOverrides,
-        userCategories,
+        agentOverrides: currentModelConfig.agents,
+        userCategories: currentModelConfig.categories,
       })
 
       if (args.run_in_background) {
-        if (args.session_id) {
-          return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`;
-        }
         return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain, resolvedModel)
       }
 
-      if (!args.session_id) {
-        let spawnReservation: Awaited<ReturnType<BackgroundManager["reserveSubagentSpawn"]>> | undefined
-        try {
-          spawnReservation = await backgroundManager.reserveSubagentSpawn(toolCtx.sessionID)
-          return await executeSync(
-            args,
-            toolCtx,
-            ctx,
-            createSyncExecutorDeps(modelFallbackControllerAccessor),
-            fallbackChain,
-            spawnReservation,
-            resolvedModel,
-          )
-        } catch (error) {
-          spawnReservation?.rollback()
-          return `Error: ${error instanceof Error ? error.message : String(error)}`
-        }
+      let spawnReservation: Awaited<ReturnType<BackgroundManager["reserveSubagentSpawn"]>> | undefined
+      try {
+        spawnReservation = await backgroundManager.reserveSubagentSpawn(toolCtx.sessionID)
+        return await executeSync(
+          args,
+          toolCtx,
+          ctx,
+          createSyncExecutorDeps(modelFallbackControllerAccessor),
+          fallbackChain,
+          spawnReservation,
+          resolvedModel,
+        )
+      } catch (error) {
+        spawnReservation?.rollback()
+        return `Error: ${error instanceof Error ? error.message : String(error)}`
       }
-
-      return await executeSync(
-        args,
-        toolCtx,
-        ctx,
-        createSyncExecutorDeps(modelFallbackControllerAccessor),
-        fallbackChain,
-        undefined,
-        resolvedModel,
-      )
     },
   });
 }

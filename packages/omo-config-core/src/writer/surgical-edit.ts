@@ -1,4 +1,4 @@
-import { applyEdits, findNodeAtLocation, modify, parseTree, type Node } from "jsonc-parser/lib/esm/main.js"
+import { applyEdits, createScanner, findNodeAtLocation, modify, parseTree, SyntaxKind, type Node } from "jsonc-parser/lib/esm/main.js"
 
 import { parseJsoncSafe } from "../internal/jsonc-parse"
 import type { OmoConfigEdit } from "./types"
@@ -156,10 +156,11 @@ function insertMember(content: string, root: Node, edit: OmoConfigEdit): string 
 function removeMember(content: string, valueNode: Node): string | undefined {
   const property = valueNode.parent
   if (property?.type !== "property" || property.parent?.type !== "object") return undefined
-  if (!onlyWhitespaceBefore(content, property.offset)) return undefined
   const end = property.offset + property.length
-  if (!lineRestIsTrivia(content, end)) return undefined
   const members = memberNodes(property.parent)
+  if (!onlyWhitespaceBefore(content, property.offset) || !lineRestIsTrivia(content, end)) {
+    return members.length === 1 ? removeSoleMember(content, property) : undefined
+  }
   const index = members.indexOf(property)
   const isLast = index === members.length - 1
   const removeFrom = lineStart(content, property.offset)
@@ -172,4 +173,15 @@ function removeMember(content: string, valueNode: Node): string | undefined {
   const previousComma = commaAfter(content, previous.offset + previous.length)
   if (previousComma === undefined) return removed
   return `${removed.slice(0, previousComma)}${removed.slice(previousComma + 1)}`
+}
+
+function removeSoleMember(content: string, property: Node): string {
+  const end = property.offset + property.length
+  const scanner = createScanner(content, true)
+  scanner.setPosition(end)
+  if (scanner.scan() !== SyntaxKind.CommaToken) {
+    return `${content.slice(0, property.offset)}${content.slice(end)}`
+  }
+  const commaOffset = scanner.getTokenOffset()
+  return `${content.slice(0, property.offset)}${content.slice(end, commaOffset)}${content.slice(commaOffset + 1)}`
 }

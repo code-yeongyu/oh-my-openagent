@@ -1,3 +1,4 @@
+import type { SessionModelProfiles } from "./session-model-profiles";
 import type { PluginInput } from "@opencode-ai/plugin";
 import type { OhMyOpenCodeConfig } from "../config";
 import type { CreatedHooks } from "../create-hooks";
@@ -27,6 +28,7 @@ import type { EventInput, FirstMessageVariantGate, PluginEventContext } from "./
 export { extractErrorMessage } from "./event-error-utils";
 
 export function createEventHandler(args: {
+  sessionModelProfiles?: SessionModelProfiles;
   ctx: PluginContext;
   pluginConfig: OhMyOpenCodeConfig;
   firstMessageVariantGate: FirstMessageVariantGate;
@@ -52,6 +54,7 @@ export function createEventHandler(args: {
   const teamHandlers = createEventTeamHandlers({ pluginConfig, pluginContext, managers });
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
+    if (args.sessionModelProfiles?.primaryConfig(sessionID)) return true;
     if (syncSubagentSessions.has(sessionID)) return true;
     const mainSessionID = getMainSessionID();
     if (mainSessionID) return sessionID === mainSessionID;
@@ -64,6 +67,7 @@ export function createEventHandler(args: {
     modelFallback: hooks.modelFallback,
     isModelFallbackEnabled,
     isRuntimeFallbackEnabled,
+    isSessionProfileSelected: (sessionID) => args.sessionModelProfiles?.primaryConfig(sessionID) !== undefined,
     shouldAutoRetrySession,
     isSessionStopped: (sessionID) => hooks.stopContinuationGuard?.isStopped(sessionID) ?? false,
   });
@@ -152,6 +156,8 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.deleted") {
+      const info = props?.info as { id?: string } | undefined;
+      if (info?.id) args.sessionModelProfiles?.clearSession(info.id);
       await handleSessionDeletedEvent({
         props,
         tmuxIntegrationEnabled,

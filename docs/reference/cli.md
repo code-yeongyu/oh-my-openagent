@@ -70,6 +70,8 @@ bunx oh-my-opencode
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
+| `config edit` | Interactive unified configuration editor; select a file and shared/harness/profile view, edit models and settings, then save with a backup |
+| `config models` | Read-only OpenCode model declarations by source file and section; `-d/--directory <path>` selects the project, `--json` emits the report |
 | `config migrate` | Migrate legacy OMO configuration into the unified config at `~/.omo/omo.jsonc` (`--dry-run` prints the transform/backup plan without writing, `--json` emits a machine-readable report) |
 | `worktree-sweep` | Report (and optionally remove) stale linked git worktrees: SWEEP when merged into the default branch and clean, KEEP when locked/external/unmerged/dirty or when it is the worktree the sweep was started from, PRUNE when the path is gone. Dry-run by default; `--apply` removes with `git worktree remove` (never forced) and prunes; `--older-than <days>` adds an age fallback, `--repo <path>` is repeatable, `--json` emits machine-readable output |
 | `ulw-loop [args...]` | Pass arguments through to the Codex LazyCodex ulw-loop CLI |
@@ -77,6 +79,80 @@ bunx oh-my-opencode
 | `boulder` | Inspect boulder work-state (active plan, current-task timing, session count); supports `-d/--directory`, `-w/--work-id`, and `--json` |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
+
+---
+
+## Interactive configuration editor
+
+Run `omo-agent-toolkit config edit` in an interactive terminal. Use `--directory /path/to/project` to discover that project's user and ancestor configuration layers, or `--file /path/to/omo.jsonc` to select a file explicitly. New files are created only when you save changes. `config migrate` remains a separate command; opening the editor does not migrate legacy files.
+
+Choose a shared, OpenCode, OmO Native, or Codex view, or a view inside an existing named profile. The editor changes only that file and view; values from other layers or an active profile can still take precedence. The menus show declared overrides, rather than claiming a cached model is available or showing the final runtime resolution. Navigate with the arrow keys and Enter; each nested menu has an explicit Back option. New entries are added only after their first field is accepted. Selecting Keep or appending an existing model leaves the configuration unchanged.
+
+- **Agents:** edit the ordered model chain, permissions, descriptions and schema fields. In the OpenCode view, assign a category or set the default run agent.
+- **Categories:** edit models, fallbacks, descriptions and schema fields, including custom categories.
+- **Model picker:** enter `provider/model` directly or search cached models by provider. Model chains keep per-model metadata when reordered; removing one model retains the rest. Bulk assignment changes selected entries' primary models and keeps their secondary fallbacks.
+- **Profiles in this file:** list, create an empty profile, copy a declaration, edit it, or stage deletion after confirmation. Creation and copying open the new profile's shared view; **Change configuration view** also offers its harness views. Empty profiles inherit shared/harness settings. Copying retains only the selected file's declared values, including model metadata, without flattening defaults or other files. Deleting the current profile returns to Shared. Other layers may still declare a deleted name.
+- **Other configuration fields:** select a field and enter a JSON value (`"text"`, `true`, an array, or an object), or remove the override to inherit defaults. Nested settings such as detailed command permissions can be edited as JSON objects. New field values are checked against the current schema.
+
+Changes stay in memory until **Save changes and exit**. Cancelling prompts with unsaved changes offers **Keep editing** or **Discard changes and exit**. Saving preserves unrelated JSONC comments and data, creates a backup, keeps the original file permissions, and refuses to overwrite a file changed by another process. A save error keeps the staged edits available for retry or discard.
+
+The editor's internal Node/TypeScript backend is available separately at `packages/omo-opencode/src/cli/config-editor/backend.ts`. It exposes file discovery, session reads, nonmutating structured value validation, staged edits/transactions, named-profile listing/creation/copy/deletion, cache-only preset preview/import, dirty-state inspection, and safe save without importing terminal prompts. The CLI uses that same validation and persistence API, allowing a future server-side WebUI adapter to reuse it; this change adds no HTTP API or WebUI. A server adapter must authenticate requests and restrict clients to server-owned source identifiers mapped to an allowed set of discovered files, rather than accepting arbitrary filesystem paths such as the trusted local CLI's `--file` option. Sessions must remain server-owned; never deserialize a client-supplied mutable `EditorSession` as trusted state. A future HTTP adapter must also redact sensitive configuration values and error details before sending them to clients or logs. File revision checks remain optimistic and do not provide a cross-process lock. A successful safe save and selected-field schema check do not prove that a runtime consumes the selected scope, accepts the resulting configuration, can access the chosen model, or has reloaded it.
+
+**Model presets:** choose **Profiles in this file → Import built-in preset** to preview `performance`, `balanced` or `budget` against the existing local provider-models cache. The preview includes every agent/category, retained and skipped candidates, missing roles and the cache timestamp. Import requires a nonempty chain for every role and stages a new named declaration for the ordinary Save workflow. The cache may be stale; listing a model does not prove authentication, current availability, pricing or savings, and these presets do not impose a spend cap. Imported declarations remain editable and do not automatically track later built-in changes. You can also create an empty profile, assign models and copy it under another name. See [preset policy and limitations](./configuration.md#profiles).
+
+Selecting an editor view edits declarations. To select a saved profile for a new server, use `omo-agent-toolkit run --profile budget "Review this change"` or `OMO_PROFILE=budget opencode`. In a running OpenCode parent session, use `/omo-profile budget` for subsequent model-routing requests. Shared settings and declarations in other files still apply, and the provider, registered agents, prompts, hooks and tools retain their documented startup boundary. Named OMO profiles are distinct from OmO Native's `model_profiles` / `model_profile` feature.
+
+The terminal editor does not provide a graphical configuration/source visualization or merged runtime resolution. Profile lists are scoped to the selected file and include staged changes. Copying a malformed or unknown-field profile may fail schema validation; the original declaration and staged state remain intact. Creating, copying and deleting all use the existing staged save/discard workflow and backup/concurrent-change checks.
+
+The interactive workflow continues WietRob's original [TUI configuration editor proposal (#1529)](https://github.com/code-yeongyu/oh-my-openagent/pull/1529), adapted to the current unified `omo.jsonc` configuration and CLI.
+
+---
+
+## config models
+
+Inspect model declarations in the unified OMO configuration chain without changing files:
+
+```bash
+omo-agent-toolkit config models
+omo-agent-toolkit config models --directory /path/to/project
+omo-agent-toolkit config models --directory /path/to/project --json
+```
+
+The map includes user and walked project sources, their loading status, the active profile,
+and each applicable root, `[opencode]`, profile, or profile `[opencode]` section in the
+canonical precedence order. Later sections can override earlier fields. Named agents and
+categories include custom names as well as explicitly configured builtins. Each declaration
+shows its full section key, category link, model, ordered `models` and `fallback_models`
+entries, reasoning/variant settings, and `disable` when declared. Shared model fields use
+canonical normalization; OpenCode block fields retain their declared spelling. The projection
+covers direct agent/category fields; nested `ultrawork`/`compaction` settings, model catalog
+definitions, and `model_profiles` are outside this report.
+
+This is a declaration map: catalog names stay as declared, category arrows show links,
+and no runtime model selection or provider availability check is performed. Builtin model
+defaults that are absent from configuration are not listed. Use `doctor --verbose` for
+installation health, cached provider information, and builtin model resolution diagnostics.
+The map is a read-only companion to the visual configuration work tracked in
+[#1529](https://github.com/code-yeongyu/oh-my-openagent/pull/1529); it covers the source
+attribution and chain-inspection part of
+[#2963](https://github.com/code-yeongyu/oh-my-openagent/issues/2963).
+
+The JSON report contains `directory`, `profile` (or `null`), `valid`, `sources`, `views`,
+and `diagnostics`. A view identifies its `path`, `scope`, and `keyPrefix`, and contains
+only projected model declarations. Source status is `loaded`, `partial` (invalid values
+were ignored), `rejected` (the file could not load), or `missing`. Diagnostics expose
+kind, severity, `scope` (`source` or `merged`), a nullable source `path`, `issuePaths`, and a
+generic explanation, without copying invalid values. Merged errors such as catalog cycles
+have `scope: "merged"`, `path: null`, and their configuration keys in `issuePaths`. A source
+status describes loading and file-local validation; a merged error can fail the report even
+when every source loaded successfully.
+Prompts, tools, environment settings, and provider options are excluded from both formats.
+
+Exit status is **0** for a valid or empty map and **1** for invalid values, rejected sources,
+missing requested profiles, or other configuration errors. Ignored unknown keys and accepted
+deprecated keys are visible warnings and do not fail the command. Invalid leaves are omitted
+while valid declarations from the same source remain visible; their source is marked `partial`.
+The command does not migrate configuration, create backups, contact providers, or update caches.
 
 ---
 
@@ -212,15 +288,27 @@ bunx oh-my-openagent run <message>
 | Option | Description |
 | --- | --- |
 | `-a, --agent <name>` | Agent to use (default resolution chain applies) |
-| `-m, --model <provider/model>` | Model override (example: `anthropic/claude-sonnet-4`) |
+| `-m, --model <provider/model>` | Primary prompt model override (example: `anthropic/claude-sonnet-4`); takes precedence over the selected profile for that prompt |
+| `--profile <name>` | Use an existing named OMO configuration profile for this run |
 | `-d, --directory <path>` | Working directory |
-| `-p, --port <port>` | Server port (attaches if already in use) |
-| `--attach <url>` | Attach to an existing OpenCode server URL |
+| `-p, --port <port>` | Server port (attaches if already in use, except with `--profile`) |
+| `--attach <url>` | Attach to an existing OpenCode server URL; incompatible with `--profile` |
 | `--on-complete <command>` | Run shell command after completion |
 | `--json` | Output structured JSON result |
 | `--no-timestamp` | Disable timestamp prefix in output |
 | `--verbose` | Show full event stream (default: messages/tools only) |
 | `--session-id <id>` | Resume an existing session |
+
+### Named configuration profiles
+
+```bash
+omo-agent-toolkit run --profile budget "Review this change"
+omo-agent-toolkit run --profile quality --port 4097 "Review this change"
+```
+
+`--profile` selects an existing `profiles.<name>` overlay from `omo.json[c]` for both the CLI and the OpenCode server it starts. For this run, it takes precedence over profile selection through `OMO_PROFILE`, `OCX_PROFILE`, and `OPENCODE_CONFIG_DIR`. A blank or unknown profile name is an error. See the [profile definitions and example](./omo-json.md#profiles).
+
+The selection is temporary: it does not save a profile preference or change a server already running. `--profile` rejects `--attach` and an occupied `--port` so the run cannot silently reuse a server with a different configuration; an available `--port` is supported. Adding `--model <provider/model>` overrides the primary prompt's model, while the profile still governs other agent and task category settings. This flag selects a whole configuration profile; the Native harness's [`model_profile`](./omo-json.md#model-profiles-native-harness) selects the main session model within its loaded configuration.
 
 ### Agent Resolution Order
 
@@ -335,4 +423,4 @@ bunx oh-my-openagent mcp oauth status [server-name]
 - `2` when the boulder state file exists but can't be read
 - `130` when `run` is aborted
 
-`run`, `install`, `uninstall`/`cleanup`, `doctor`, `get-local-version`, `refresh-model-capabilities`, `config migrate`, `boulder`, `ulw-loop`, and `mcp oauth` subcommands return explicit numeric exit codes.
+`run`, `install`, `uninstall`/`cleanup`, `doctor`, `get-local-version`, `refresh-model-capabilities`, `config migrate`, `config edit`, `config models`, `boulder`, `ulw-loop`, and `mcp oauth` subcommands return explicit numeric exit codes.

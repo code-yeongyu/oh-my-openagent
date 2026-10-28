@@ -5,8 +5,9 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createEventHandler, extractErrorMessage } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
-import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
+import { _resetForTesting, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
+import { getSessionFallbackSnapshot, setSessionFallbackSnapshot, clearSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
 
 type EventInput = { event: { type: string; properties?: unknown } }
@@ -1348,7 +1349,7 @@ describe("createEventHandler - event forwarding", () => {
 		})
 	})
 
-	it("clears stored prompt params on session.deleted", async () => {
+	it("clears stored prompt params and fallback snapshot on session.deleted", async () => {
 		const eventHandler = createEventHandler({
 			ctx: {} as never,
 			pluginConfig: {} as never,
@@ -1368,6 +1369,7 @@ describe("createEventHandler - event forwarding", () => {
 			hooks: {} as never,
 		})
 		const sessionID = "ses_prompt_params_deleted"
+		setSessionFallbackSnapshot(sessionID, [{ providers: ["budget"], model: "backup" }])
 		setSessionPromptParams(sessionID, {
 			temperature: 0.4,
 			topP: 0.7,
@@ -1380,6 +1382,7 @@ describe("createEventHandler - event forwarding", () => {
 			},
 		}))
 		expect(getSessionPromptParams(sessionID)).toBeUndefined()
+		expect(getSessionFallbackSnapshot(sessionID)).toBeUndefined()
 	})
 })
 
@@ -1655,4 +1658,28 @@ describe("createEventHandler - event hook isolation", () => {
 			"writeExistingFileGuard",
 		])
 	})
+})
+
+
+describe("selected primary profile fallback", () => {
+  afterEach(() => clearSessionFallbackSnapshot("ses_profile_root"))
+  it("resolves a selected root fallback before native validation without changing unrelated roots", async () => {
+    setMainSession("ses_other_main")
+    updateSessionAgent("ses_profile_root", "sisyphus")
+    const modelFallback = createModelFallbackHook()
+    setSessionFallbackSnapshot("ses_profile_root", [{ providers: ["fixture"], model: "budget-fallback", variant: "low" }])
+    const prompt = mock(async (_input: unknown) => ({}))
+    const handler = createEventHandler({
+      ctx: asEventHandlerContext({ directory: "/tmp", client: { session: { abort: async () => ({}), prompt, messages: async () => ({ data: [] }), status: async () => ({ data: {} }) } } }),
+      sessionModelProfiles: cast<EventHandlerArgs["sessionModelProfiles"]>({ primaryConfig: (id: string) => id === "ses_profile_root" ? {} : undefined }),
+      pluginConfig: asPluginConfig({ model_fallback: true }),
+      firstMessageVariantGate: { markSessionCreated: () => {}, clear: () => {} },
+      managers: createEventHandlerManagers(),
+      hooks: createEventHandlerHooks({ modelFallback, stopContinuationGuard: { isStopped: () => false } }),
+    })
+    await handler(asEventHandlerInput({ event: { type: "session.error", properties: { sessionID: "ses_profile_root", error: { name: "APIError", data: { message: "Model fixture/budget not found" } } } } }))
+    await handler(asEventHandlerInput({ event: { type: "session.error", properties: { sessionID: "ses_unselected_root", error: { name: "APIError", data: { message: "Model fixture/budget not found" } } } } }))
+    expect(prompt).toHaveBeenCalledTimes(1)
+    expect(prompt.mock.calls[0]?.[0]).toMatchObject({ path: { id: "ses_profile_root" }, body: { model: { providerID: "fixture", modelID: "budget-fallback" }, variant: "low" } })
+  })
 })
