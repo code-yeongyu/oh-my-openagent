@@ -210,7 +210,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         options,
       )
       const hashSession = (rawId: string): string =>
-        currentConsent(false) ? (options.hashSessionId ?? hashSessionId)(rawId) : OPTED_OUT_SESSION_HASH
+        !currentConsent(false) ? OPTED_OUT_SESSION_HASH : options.hashSessionId === undefined ? hashSessionId(rawId, env) : options.hashSessionId(rawId)
       // The span carries the same closed root/child/unknown role as the events: the collector pin refuses any other value.
       // A host whose session context cannot be read must not stop registration (no inherited traceparent then).
       const turnSpans = createOmoNativeTurnSpans({
