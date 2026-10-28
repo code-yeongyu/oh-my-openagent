@@ -3,6 +3,7 @@ import { resolve } from "node:path"
 import { choose, record, EditorCancelled, displayText } from "./prompt"
 import { bulkSetModels, editEntries, editJsonField, editRootDefault, isOpenCodeView } from "./entry-editor"
 import { discoverEditorTargets, openEditorSession, isEditorModified, saveEditorSession, type EditorSession } from "./backend"
+import { editProfiles } from "./profile-editor"
 
 export type ConfigEditorOptions = {
   readonly directory?: string
@@ -45,6 +46,7 @@ async function menuLoop(session: EditorSession, initialView: string[]): Promise<
         ...(isOpenCodeView(view) ? [{ value: "default", label: "Default run agent" }] : []),
         { value: "bulk", label: "Bulk primary model assignment" },
         { value: "field", label: "Other configuration fields", hint: "Schema-validated JSON values" },
+        { value: "profiles", label: "Profiles in this file", hint: "Create, copy, edit or delete declarations" },
         { value: "view", label: "Change configuration view" },
         { value: "save", label: "Save changes and exit" },
         { value: "discard", label: "Exit without saving" },
@@ -53,6 +55,7 @@ async function menuLoop(session: EditorSession, initialView: string[]): Promise<
       else if (action === "default") await editRootDefault(session, view)
       else if (action === "bulk") await bulkSetModels(session, view)
       else if (action === "field") await editJsonField(session, view)
+      else if (action === "profiles") view = await editProfiles(session, view)
       else if (action === "view") view = await chooseView(session)
       else if (action === "discard") {
         if (await discard(session)) { p.outro("Exited without saving."); return 0 }
