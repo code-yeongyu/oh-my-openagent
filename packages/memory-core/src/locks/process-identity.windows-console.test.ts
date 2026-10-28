@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as childProcess from "node:child_process"
+import * as processStartTime from "./process-start-time"
 
 // The lock protocol re-probes process start identity on every memory write and on every recorded
 // run pid it revalidates. On win32 the in-process kernel32 reader answers first, but it reaches
@@ -16,26 +18,24 @@ const POWERSHELL_INSTANT = "2026-09-19T15:04:05.0000000Z"
 
 function captureExecFile(): CapturedExecFile[] {
   const captured: CapturedExecFile[] = []
-  mock.module("node:child_process", () => ({
-    execFile: (
-      command: string,
-      args: readonly string[],
-      options: Record<string, unknown>,
-      callback: (error: Error | null, stdout: string, stderr: string) => void,
-    ) => {
-      captured.push({ command, args, options })
-      queueMicrotask(() => callback(null, `${POWERSHELL_INSTANT}\n`, ""))
-      return {}
-    },
-  }))
+  // Module mocks survive mock.restore() and force later Darwin probes onto ps-lstart.
+  // Namespace spies restore both the child-process API and the native identity readers.
+  spyOn(childProcess, "execFile").mockImplementation(((
+    command: string,
+    args: readonly string[],
+    options: Record<string, unknown>,
+    callback: (error: Error | null, stdout: string, stderr: string) => void,
+  ) => {
+    captured.push({ command, args, options })
+    queueMicrotask(() => callback(null, `${POWERSHELL_INSTANT}\n`, ""))
+    return {}
+  }) as typeof childProcess.execFile)
   return captured
 }
 
 function forceStartTimeFastPathUnavailable(): void {
-  mock.module("./process-start-time", () => ({
-    readDarwinProcessStartSeconds: async () => null,
-    readWin32ProcessCreationFiletime: async () => null,
-  }))
+  spyOn(processStartTime, "readDarwinProcessStartSeconds").mockResolvedValue(null)
+  spyOn(processStartTime, "readWin32ProcessCreationFiletime").mockResolvedValue(null)
 }
 
 describe("process start identity win32 console suppression", () => {
