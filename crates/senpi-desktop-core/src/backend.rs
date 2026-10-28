@@ -13,6 +13,7 @@ use crate::keys::KeyName;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
+use crate::user_input::UserPresses;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeliveryMode {
@@ -229,6 +230,16 @@ pub trait Backend: Send {
     /// Whether the interactive session is behind the lock screen.
     fn screen_locked(&mut self) -> CoreResult<bool> {
         Ok(false)
+    }
+
+    /// Starts watching the user's own key presses and clicks; idempotent.
+    /// Backends without a watch keep this no-op and report no
+    /// `interventionWatch`.
+    fn watch_user_input(&mut self) {}
+
+    /// The user's presses the watch recorded since the last call.
+    fn take_user_presses(&mut self) -> UserPresses {
+        UserPresses::default()
     }
 }
 

@@ -17,5 +17,6 @@ pub mod protocol_params;
 pub mod protocol_results;
 pub mod protocol_schema;
 pub mod types;
+pub mod user_input;
 
 pub use protocol_schema::engine_schema;

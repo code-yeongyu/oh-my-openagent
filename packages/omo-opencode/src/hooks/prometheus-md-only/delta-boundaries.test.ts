@@ -188,7 +188,7 @@ describe("planner delta serialization and physical boundaries", () => {
         const child = Bun.spawn([
           process.execPath, "run", join(import.meta.dir, "fixtures/denial-log.ts"),
           denial.tool, JSON.stringify(denial.args), ...(denial.frozen ? ["frozen"] : []),
-        ], { cwd: root, stdout: "pipe", stderr: "pipe", env: { ...process.env, TMPDIR: logDir } })
+        ], { cwd: root, stdout: "pipe", stderr: "pipe", env: { ...process.env, TMPDIR: logDir, TEMP: logDir, TMP: logDir } })
         const [stdout, stderr, code] = await Promise.all([
           new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
         ])
@@ -249,10 +249,11 @@ describe("planner delta serialization and physical boundaries", () => {
 
   test("host retained-reference handoff permits canonical frozen patch spacing and CRLF", async () => {
     mkdirSync(join(root, ".omo"))
-    const text = `\r\n*** Begin Patch\r\n*** Add File:  ${root}/.omo/new.md\r\n+ORIGINAL\r\n*** End Patch\r\n`
+    const canonical = join(root, ".omo/new.md")
+    const text = `\r\n*** Begin Patch\r\n*** Add File:  ${canonical}\r\n+ORIGINAL\r\n*** End Patch\r\n`
     const args = Object.freeze({ patchText: text })
     await expect(invoke("apply_patch", args)).resolves.toBeUndefined()
-    expect(parsePatch(args.patchText).hunks).toEqual([{ type: "add", path: `${root}/.omo/new.md`, contents: "ORIGINAL\r" }])
+    expect(parsePatch(args.patchText).hunks).toEqual([{ type: "add", path: canonical, contents: "ORIGINAL\r" }])
   })
 
   for (const text of [
