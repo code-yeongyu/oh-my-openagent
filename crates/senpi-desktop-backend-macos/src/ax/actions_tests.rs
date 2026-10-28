@@ -4,7 +4,17 @@ use objc2_application_services::AXError;
 use objc2_core_foundation::{CFString, CFType};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 
-use super::{focus, perform_requested, request_result, write_value, AxRequests};
+use super::{focus, perform_requested, request_result, set_date_value, set_string_value, AxRequests};
+
+/// Writes `AXValue` as the control publishes it: a `CFDate` for date and time
+/// controls, else a `CFString` (the dispatch `set_value` makes after the
+/// text-target checks).
+fn write_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
+    match element.read_date("AXValue") {
+        Some(current) => set_date_value(element, value, current),
+        None => set_string_value(element, value),
+    }
+}
 use crate::skylight::reporting_partial;
 
 /// An element that answers every request with `reply` and records what it

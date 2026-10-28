@@ -10,8 +10,10 @@ use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::intervention::check_press;
 
 use super::date;
-use super::element::{self, ax_result, copy_date};
+use super::element::{self, ax_result, copy_date, element_pid};
 use super::popup;
+use super::replace_value::{may_borrow_focus, replace_native_text};
+use super::text_input::{ensure_native_text_target, is_secure, text_readback};
 use crate::skylight::{mark_sent, reporting_partial};
 
 pub(crate) fn perform(element: &AXUIElement, action: &str) -> CoreResult<()> {
@@ -86,25 +88,43 @@ pub(super) fn perform_requested(element: &(impl AxRequests + ?Sized), action: &s
     })
 }
 
+/// `ax.setValue`: a popup's value is chosen from its menu; otherwise the
+/// element must be a verifiable native text target with a settable `AXValue`.
+/// A date control takes a `CFDate`. A native text field is replaced through
+/// `AXSelectedText` over its whole value ([`replace_native_text`]: several
+/// apps echo an `AXValue` write without ever taking it); anything else takes
+/// the `AXValue` write, read back exactly ([`text_readback`]).
 pub(super) fn set_value(element: &AXUIElement, value: &str) -> CoreResult<()> {
     reporting_partial(|| {
         if element::copy_string(element, "AXRole").as_deref() == Some("AXPopUpButton") {
             return popup::choose(element, value);
         }
-        write_value(element, value)
+        ensure_native_text_target(element)?;
+        if !element::attribute_settable(element, "AXValue") {
+            return Err(DesktopError::ax_failed("AXValue is not settable; no typing fallback was attempted"));
+        }
+        if let Some(current) = element.read_date("AXValue") {
+            return set_date_value(element, value, current);
+        }
+        let pid = element_pid(element)?;
+        // Focus is borrowed only from an app already in the background as the
+        // call starts: in the front app it would move the user's caret.
+        let started_in_background = may_borrow_focus(crate::front_app::current_front_pid(), pid);
+        if replace_native_text(element, pid, started_in_background, value)? {
+            return Ok(());
+        }
+        // A control whose value is not text (a slider, stepper or checkbox)
+        // cannot be read back as the string that was written.
+        let textual = element::copy_string(element, "AXValue").is_some();
+        set_string_value(element, value)?;
+        if !textual {
+            return Ok(());
+        }
+        text_readback(value, value, element::copy_string(element, "AXValue").as_deref(), is_secure(element))
     })
 }
 
-/// Writes `AXValue` as the control publishes it: a `CFDate` for date and time
-/// controls, else a `CFString`.
-pub(super) fn write_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
-    match element.read_date("AXValue") {
-        Some(current) => set_date_value(element, value, current),
-        None => set_string_value(element, value),
-    }
-}
-
-fn set_string_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
+pub(super) fn set_string_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {
     check_press()?;
     let value = CFString::from_str(value);
     let error = sent(element.write_attribute(&CFString::from_str("AXValue"), &value));
@@ -118,7 +138,7 @@ fn set_string_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreRe
 /// Date and time controls publish `AXValue` as a `CFDate` and refuse the same
 /// date written as a `CFString`, so an ISO-8601 value is written as a `CFDate`
 /// in the system time zone the control displays, then read back as one.
-fn set_date_value(element: &(impl AxRequests + ?Sized), text: &str, current: f64) -> CoreResult<()> {
+pub(super) fn set_date_value(element: &(impl AxRequests + ?Sized), text: &str, current: f64) -> CoreResult<()> {
     // CF caches the system zone per process; the target app follows changes to it.
     CFTimeZone::reset_system();
     let zone = CFTimeZone::system().ok_or_else(|| DesktopError::ax_failed("the system time zone is unavailable"))?;

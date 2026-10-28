@@ -10,6 +10,7 @@ mod point_owner;
 mod popup;
 pub(crate) mod element;
 mod props;
+mod replace_value;
 mod selection;
 mod text_input;
 mod tree;
@@ -195,6 +196,9 @@ mod tests;
 
 #[cfg(test)]
 mod selection_tests;
+
+#[cfg(test)]
+mod replace_value_tests;
 
 #[cfg(test)]
 mod text_input_tests;

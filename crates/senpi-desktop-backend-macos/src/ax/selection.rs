@@ -15,8 +15,11 @@ use senpi_desktop_core::intervention::check_press;
 use senpi_desktop_core::protocol_results::AxTextSelection;
 use senpi_desktop_core::text_range::{utf16_slice, TextSelectRequest, Utf16Range};
 
-use super::element::{attribute_settable, copy_bool, copy_held_attribute, copy_range, copy_string, element_gone};
+use super::element::{
+    attribute_settable, copy_bool, copy_held_attribute, copy_range, copy_string, element_gone, element_pid,
+};
 use super::popup::poll;
+use super::replace_value::may_borrow_focus;
 use crate::skylight::{mark_sent, reporting_partial};
 
 const SELECTED_RANGE: &str = "AXSelectedTextRange";
@@ -171,23 +174,5 @@ pub(super) fn write_result(error: AXError) -> CoreResult<()> {
         error => Err(DesktopError::ax_failed(format!(
             "setting {SELECTED_RANGE} failed ({error:?}); nothing was selected"
         ))),
-    }
-}
-
-/// Focus moves only inside a background app: in the front app it would move
-/// the user's caret, and an unknown front process counts as the target's.
-fn may_borrow_focus(front: Option<libc::pid_t>, target: libc::pid_t) -> bool {
-    front.is_some_and(|front| front != target)
-}
-
-/// The process owning `element`.
-fn element_pid(element: &AXUIElement) -> CoreResult<libc::pid_t> {
-    let mut pid: libc::pid_t = 0;
-    // SAFETY: `pid` is a live out parameter for the synchronous query.
-    let error = unsafe { element.pid(NonNull::from(&mut pid)) };
-    match error {
-        AXError::Success => Ok(pid),
-        AXError::InvalidUIElement => Err(element_gone()),
-        error => Err(DesktopError::ax_failed(format!("reading the element's process failed ({error:?})"))),
     }
 }

@@ -3427,6 +3427,7 @@
         "test/refusal-child.ts",
         "test/support/engine.ts",
         "test/support/error-code-cases.ts",
+        "test/support/input-calls.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

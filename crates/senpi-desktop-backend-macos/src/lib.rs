@@ -13,6 +13,7 @@ mod front_app;
 mod launch_gate;
 mod launch_services;
 mod overlay;
+mod process;
 mod release_helper;
 mod responsible;
 mod input;

@@ -13,7 +13,7 @@ use senpi_desktop_core::text_range::{replace_utf16_selection, Utf16Range};
 
 use super::element::{
     attribute_settable, copy_attribute_result, copy_element, copy_held_attribute, copy_range, copy_string,
-    element_gone,
+    element_gone, element_pid,
 };
 use super::props::truncate_chars;
 use crate::skylight::{mark_sent, reporting_partial};
@@ -47,6 +47,25 @@ fn text_surface(element: &AXUIElement) -> TextSurface {
         current = parent;
     }
     TextSurface::Unknown
+}
+
+/// Refuses an element whose AX text cannot be verified after a write: a
+/// terminal's text area is its rendered grid, web content can echo a write
+/// its renderer never accepted, and an incomplete ancestry proves neither
+/// (ported from oh-my-pi `ensure_native_text_target`).
+pub(super) fn ensure_native_text_target(element: &AXUIElement) -> CoreResult<()> {
+    if crate::process::is_terminal(element_pid(element)?) {
+        return Err(DesktopError::ax_failed(
+            "terminal AX text represents its rendered grid, not terminal input; use win.type instead",
+        ));
+    }
+    if text_surface(element) != TextSurface::Native {
+        return Err(DesktopError::ax_failed(
+            "AX text writes cannot be verified in web content or an incomplete AX ancestry; use a \
+             pixel click followed by win.type instead",
+        ));
+    }
+    Ok(())
 }
 
 /// Whether text goes in by writing `AXSelectedText`: a native text field,
@@ -188,16 +207,21 @@ fn insert_selected_text(element: &AXUIElement, text: &str) -> CoreResult<bool> {
     };
     let secure = is_secure(element);
     check_press()?;
+    set_selected_text(element, text)?;
+    text_readback(text, &expected, copy_string(element, "AXValue").as_deref(), secure)?;
+    Ok(true)
+}
+
+/// Writes `text` to `AXSelectedText`, replacing the element's selection; an
+/// accepted or unanswered write marks the call sent, since the text may be in
+/// the field either way.
+pub(super) fn set_selected_text(element: &AXUIElement, text: &str) -> CoreResult<()> {
     let attribute = CFString::from_str("AXSelectedText");
     let value = CFString::from_str(text);
     // SAFETY: The element, attribute and string stay retained for the setter.
     let error = unsafe { element.set_attribute_value(&attribute, &value) };
     if error == AXError::Success || error == AXError::CannotComplete {
-        // The app accepted the write or never answered it: either way the
-        // text may be in the field now.
         mark_sent();
     }
-    insertion_result(error)?;
-    text_readback(text, &expected, copy_string(element, "AXValue").as_deref(), secure)?;
-    Ok(true)
+    insertion_result(error)
 }

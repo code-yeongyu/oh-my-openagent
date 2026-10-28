@@ -247,6 +247,18 @@ pub(super) fn retained_element(pointer: *const AXUIElement) -> CoreResult<CFReta
     Ok(unsafe { CFRetained::from_raw(pointer) })
 }
 
+/// The process owning `element`; a destroyed element is a stale ref.
+pub(crate) fn element_pid(element: &AXUIElement) -> CoreResult<libc::pid_t> {
+    let mut pid: libc::pid_t = 0;
+    // SAFETY: `pid` is a live out parameter for the synchronous query.
+    let error = unsafe { element.pid(NonNull::from(&mut pid)) };
+    match error {
+        AXError::Success => Ok(pid),
+        AXError::InvalidUIElement => Err(element_gone()),
+        error => Err(DesktopError::ax_failed(format!("reading the element's process failed ({error:?})"))),
+    }
+}
+
 pub(super) fn ax_result(error: AXError, context: impl Into<String>) -> CoreResult<()> {
     if error == AXError::Success {
         Ok(())
