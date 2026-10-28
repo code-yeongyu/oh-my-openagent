@@ -54,6 +54,7 @@ export function createEventHandler(args: {
   const teamHandlers = createEventTeamHandlers({ pluginConfig, pluginContext, managers });
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
+    if (args.sessionModelProfiles?.primaryConfig(sessionID)) return true;
     if (syncSubagentSessions.has(sessionID)) return true;
     const mainSessionID = getMainSessionID();
     if (mainSessionID) return sessionID === mainSessionID;
@@ -66,6 +67,7 @@ export function createEventHandler(args: {
     modelFallback: hooks.modelFallback,
     isModelFallbackEnabled,
     isRuntimeFallbackEnabled,
+    isSessionProfileSelected: (sessionID) => args.sessionModelProfiles?.primaryConfig(sessionID) !== undefined,
     shouldAutoRetrySession,
     isSessionStopped: (sessionID) => hooks.stopContinuationGuard?.isStopped(sessionID) ?? false,
   });

@@ -63,6 +63,7 @@ export function applyUserConfiguredFallbackChain(
 export function createModelFallbackContinuationController(args: {
   pluginConfig: OhMyOpenCodeConfig;
   pluginContext: PluginEventContext;
+  resolveSelectedProfileFallback?: (sessionID: string) => ReturnType<ModelFallbackHook["getNextFallback"]> | undefined;
   lastKnownModelBySession: Map<string, { providerID: string; modelID: string }>;
   continuationsInFlight: Set<string>;
   lastDispatchedContinuationKeys: Map<string, FallbackContinuationDedupeState>;
@@ -187,17 +188,24 @@ export function createModelFallbackContinuationController(args: {
         reservedByPrefix: "model-fallback:",
       });
 
+      // OpenCode validates launch models before synthetic continuations reach chat.message.
+      const selectedFallback = args.resolveSelectedProfileFallback?.(sessionID);
+      if (selectedFallback === null) return;
       const launchAgent = fallbackContext?.agentName
         ? resolveRegisteredAgentName(fallbackContext.agentName)
         : undefined;
-      const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
+      const launchModel = selectedFallback
+        ? { providerID: selectedFallback.providerID, modelID: selectedFallback.modelID }
+        : fallbackContext?.providerID && fallbackContext?.modelID
         ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
         : undefined;
       const agentConfigKey = fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : undefined;
       const agentSettings = agentConfigKey
         ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
         : undefined;
-      const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
+      const launchVariant = selectedFallback
+        ? selectedFallback.variant
+        : (agentSettings as { variant?: string } | undefined)?.variant;
       const promptBody = {
         path: { id: sessionID },
         body: {
