@@ -29,6 +29,32 @@ function fixture(run: (args: { profiles: ReturnType<typeof createSessionModelPro
 }
 
 describe("session model profiles", () => {
+  test("one selected session cannot make another session's failed lookup break default delegation", async () => {
+    await fixture(async ({ path, config }) => {
+      let failLookup = false
+      let lookups = 0
+      const profiles = createSessionModelProfiles({
+        directory: dirname(dirname(path)), initialConfig: {},
+        environment: { HOME: dirname(dirname(dirname(path))), OMO_PROFILE: "quality" },
+        readSession: async (id) => {
+          lookups++
+          if (failLookup) throw new Error("lookup unavailable")
+          return id.startsWith("child") ? { parentID: "parent" } : {}
+        },
+      })
+      await profiles.select("parent", "budget")
+      failLookup = true
+      const before = lookups
+      expect((await profiles.load("parent")).agents?.explore?.model).toBe("fixture/budget")
+      expect(lookups).toBe(before)
+      writeFileSync(path, JSON.stringify({ ...config, "[opencode]": { unknown_runtime_key: true } }).replaceAll("fixture/quality", "fixture/updated"))
+      expect((await profiles.load("unrelated")).agents?.explore?.model).toBe("fixture/updated")
+      failLookup = false
+      expect((await profiles.load("child-new")).agents?.explore?.model).toBe("fixture/budget")
+      profiles.clearSession("parent")
+    })
+  })
+
   test("default delegation reload never looks up session ancestry before any selection", async () => {
     await fixture(async ({ path, config }) => {
       let reads = 0

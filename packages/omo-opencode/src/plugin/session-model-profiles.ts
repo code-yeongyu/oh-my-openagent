@@ -73,7 +73,15 @@ export function createSessionModelProfiles(args: {
 
   async function load(sessionID: string): Promise<ModelConfig> {
     if (selections.size === 0) return loadDefault()
-    const selection = selections.get(await rootSession(sessionID))
+    const direct = selections.get(sessionID)
+    if (direct) return reload(direct)
+    let root: string
+    try {
+      root = await rootSession(sessionID)
+    } catch {
+      return loadDefault()
+    }
+    const selection = selections.get(root)
     return selection ? reload(selection) : loadDefault()
   }
 
