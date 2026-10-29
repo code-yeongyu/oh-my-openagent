@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { isAbsolute, join } from "node:path"
 
 import type { ManagerStartSpec, StartResult } from "../../manager"
 import type { PlanArtifactReference, SkillInvocationState } from "../../agents"
@@ -13,7 +13,8 @@ const PLAN_A = ".omo/plans/alpha-plan.md"
 const PLAN_B = ".omo/plans/beta-plan.md"
 
 function canonical(path: string): string {
-  return `Review the work plan at ${path} for contradictions and blocking issues.`
+  const physicalPath = isAbsolute(path) ? realpathSync.native(path) : path
+  return `Review the work plan at ${physicalPath} for contradictions and blocking issues.`
 }
 
 function refs(entries: readonly (readonly [string, number, number])[]): readonly PlanArtifactReference[] {
@@ -67,14 +68,25 @@ afterEach(() => {
 // A real project directory with the given plan files under .omo/plans, so explicit-path resolution
 // runs against the filesystem instead of the session's touched-plan bookkeeping.
 function projectWithPlans(names: readonly string[]): string {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "plan-review-contract-")))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "plan-review-contract-")))
   tempRoots.push(root)
   mkdirSync(join(root, ".omo", "plans"), { recursive: true })
   for (const name of names) writeFileSync(join(root, ".omo", "plans", name), `# ${name}\n`)
   return root
 }
 
-describe("buildTaskExecute plan-review contract explicit path (#10837)", () => {
+describe("buildTaskExecute plan-review contract explicit path (#10837, #11728)", () => {
+  test("#given a directory alias to a plan #when canonicalizing the expected prompt #then it uses the physical plan path", () => {
+    const project = projectWithPlans(["alias-plan.md"])
+    const aliasRoot = projectWithPlans([])
+    const alias = join(aliasRoot, "PROJEC~1")
+    symlinkSync(project, alias, "junction")
+
+    expect(canonical(join(alias, ".omo", "plans", "alias-plan.md"))).toBe(
+      `Review the work plan at ${realpathSync.native(join(project, ".omo", "plans", "alias-plan.md"))} for contradictions and blocking issues.`,
+    )
+  })
+
   test("#given an explicit plan that exists in the project but was never touched and another plan that was touched #when spawning plan-reviewer #then the explicit plan is reviewed, not the touched one", async () => {
     // given
     const project = projectWithPlans(["untouched-plan.md"])
@@ -131,7 +143,23 @@ describe("buildTaskExecute plan-review contract explicit path (#10837)", () => {
     // then
     expect(specs).toHaveLength(0)
     expect(result.details.status).toBe("denied")
-    expect(resultText(result)).toContain(foreign)
+    expect(resultText(result)).toContain(foreign.replace(/\\/g, "/"))
+  })
+
+  test("#given an outside plan referenced through a directory alias inside the project #when spawning plan-reviewer #then the spawn is refused", async () => {
+    const project = projectWithPlans([])
+    const elsewhere = projectWithPlans(["foreign-plan.md"])
+    const alias = join(project, "FOREIG~1")
+    symlinkSync(elsewhere, alias, "junction")
+    const foreign = join(alias, ".omo", "plans", "foreign-plan.md")
+    const { specs, manager } = specCapture()
+    const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
+
+    const result = await execute("c", { prompt: `review ${foreign}`, subagent_type: "plan-reviewer" }, undefined, undefined, { ...CTX, cwd: project })
+
+    expect(specs).toHaveLength(0)
+    expect(result.details.status).toBe("denied")
+    expect(resultText(result)).toContain(foreign.replace(/\\/g, "/"))
   })
 
   test("#given an explicit path to a plan touched in another worktree #when spawning plan-reviewer #then the recorded plan is reviewed", async () => {
