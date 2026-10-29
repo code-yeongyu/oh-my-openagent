@@ -443,6 +443,10 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
         expect(models.map((model: any) => [model.id, model.api, model.baseUrl, model.contextWindow, model.maxTokens, model.reasoning])).toEqual([
           ["kimi-k2.5", "openai-completions", "https://api.neuralwatt.com/v1", 262144, 32768, true],
         ])
+        expect(readJson(join(item.agentDir, "settings.json"))).toMatchObject({
+          defaultProvider: "neuralwatt",
+          defaultModel: "kimi-k2.5",
+        })
         expect(readAuthStore(join(item.agentDir, "auth.json")).entries.neuralwatt).toMatchObject({ type: "api_key" })
         expect(result.stdout).toContain("providers-imported: neuralwatt")
         expect(result.stdout).not.toContain("could not read the engine's model list")
