@@ -92,8 +92,46 @@ const EMPTY_TASKS_MESSAGE = "tasks must contain at least one item."
 const RUN_IN_BACKGROUND_CONFLICT_MESSAGE =
   "run_in_background is batch-wide: every value in one task call must agree. Set it once at the top level (true returns every task id immediately; false waits for every result) and drop the disagreeing item-level values."
 
+// The merge strategy an isolated child gets when neither the call nor task.isolation names one.
+// Exported so buildStartSpec and the no-op rule below cannot drift to different defaults.
+export const DEFAULT_ISOLATION_MERGE = "patch"
+
 function present(value: string | undefined): value is string {
   return value !== undefined && value.trim().length > 0
+}
+
+export type IsolationFieldsInput = {
+  readonly isolated?: boolean
+  readonly apply?: boolean
+  readonly merge?: "patch" | "branch"
+}
+
+export type IsolationDefaults = {
+  readonly enabled?: boolean
+  readonly merge?: "patch" | "branch"
+}
+
+function isolationFieldMessage(field: "apply" | "merge", value: string): string {
+  return `${field}: ${value} needs isolation enabled: set isolated: true on this call (or task.isolation.enabled), or drop ${field}. Without isolation apply: false and the default merge are accepted and ignored.`
+}
+
+// apply/merge only ever reach an ISOLATED child, so without isolation a value that asks for nothing
+// new - apply: false, or the merge strategy isolation would have used anyway - is a NO-OP: accepted
+// and ignored, so a model that fills every optional field still gets its spawn. Only a value that
+// would change behaviour (apply: true, a different merge) is refused, naming the field and its value.
+// One rule for single calls and batch items alike, including values inherited from the top level.
+export function isolationFieldsViolation(
+  fields: IsolationFieldsInput,
+  defaults: IsolationDefaults | undefined,
+): string | undefined {
+  const isolated = fields.isolated ?? defaults?.enabled ?? false
+  if (isolated) return undefined
+  if (fields.apply === true) return isolationFieldMessage("apply", "true")
+  const defaultMerge = defaults?.merge ?? DEFAULT_ISOLATION_MERGE
+  if (fields.merge !== undefined && fields.merge !== defaultMerge) {
+    return isolationFieldMessage("merge", `"${fields.merge}"`)
+  }
+  return undefined
 }
 
 // category XOR subagent_type: both or neither is a typed tool error. Wording ports the omo

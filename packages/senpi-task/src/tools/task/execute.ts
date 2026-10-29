@@ -16,7 +16,13 @@ import type {
   TaskToolDeps,
   TaskToolDetails,
 } from "./types"
-import { resolveRunInBackground, resolveSpawnItems, validateBatchShape, validateTaskTarget } from "./validation"
+import {
+  isolationFieldsViolation,
+  resolveRunInBackground,
+  resolveSpawnItems,
+  validateBatchShape,
+  validateTaskTarget,
+} from "./validation"
 
 type TaskExecute = (
   toolCallId: string,
@@ -74,11 +80,12 @@ export function buildTaskExecute(deps: TaskToolDeps, options: ForegroundWaitOpti
     const first = resolved.items[0]
     if (first === undefined) return invalidArguments("Provide at least one task item.")
 
-    for (const item of resolved.items) {
-      const isolated = item.isolated ?? deps.omoConfig.task?.isolation?.enabled ?? false
-      if (!isolated && (item.apply !== undefined || item.merge !== undefined)) {
-        return invalidArguments("apply and merge require isolated: true or task.isolation.enabled.")
-      }
+    for (const [index, item] of resolved.items.entries()) {
+      const violation = isolationFieldsViolation(item, deps.omoConfig.task?.isolation)
+      if (violation === undefined) continue
+      if (shape.kind !== "batch") return invalidArguments(violation)
+      const label = item.name === undefined ? `Task item ${index}` : `Task item ${index} (${item.name})`
+      return invalidArguments(`${label}: ${violation}`)
     }
 
     // The parent session's one daemon check, settled BEFORE any spec is built so every child of

@@ -7,10 +7,10 @@ const isolationParams = {
     description: "Run the child in a copy-on-write clone of the checkout and merge its changes back on completion; defaults to task.isolation.enabled.",
   })),
   apply: Type.Optional(Type.Boolean({
-    description: "Merge the child's changes into this checkout when it completes; false keeps the patch/branch artifacts only.",
+    description: "Merge the child's changes into this checkout when it completes; false keeps the patch/branch artifacts only. Only matters with isolation: without it apply: false is accepted and ignored, and apply: true is refused.",
   })),
   merge: Type.Optional(Type.Union([Type.Literal("patch"), Type.Literal("branch")], {
-    description: "Merge strategy for an isolated child; defaults to task.isolation.merge.",
+    description: "Merge strategy for an isolated child; defaults to task.isolation.merge. Only matters with isolation: without it the default strategy is accepted and ignored, and a different one is refused.",
   })),
 }
 

@@ -9,6 +9,14 @@ import { TaskToolParams } from "./params"
 import { resolveSpawnItems } from "./validation"
 import { CTX, createFakeManager, makeDeps } from "./__fixtures__/task-tool-fakes"
 
+import type { StartResult } from "../../manager"
+
+function startedManager() {
+  return createFakeManager({
+    start: async (): Promise<StartResult> => ({ kind: "started", task_id: "st_00000099", status: "running", name: "isolation-task" }),
+  })
+}
+
 describe("isolation task parameters", () => {
   test("rejects string booleans through normalization and schema validation", () => {
     expect(Value.Check(TaskToolParams, { prompt: "Inspect", category: "quick", isolated: "yes" })).toBe(false)
@@ -30,23 +38,58 @@ describe("isolation task parameters", () => {
     expect(singleSpawnParams(second, true)).toMatchObject({ isolated: false, apply: true, merge: "patch" })
   })
 
-  test.each([{ merge: "branch" as const }, { apply: false }])("refuses merge options without isolation before starting", async (options) => {
-    const manager = createFakeManager({})
-    const result = await buildTaskExecute(makeDeps(manager))("call", {
+  // apply/merge are inert without isolation, so a value that asks for nothing new is accepted and
+  // ignored; only a behaviour-changing value is refused, and the refusal names field and value.
+  test.each([{ apply: false }, { merge: "patch" as const }, { apply: false, merge: "patch" as const }])(
+    "accepts no-op isolation fields without isolation (%o)",
+    async (options) => {
+      const result = await buildTaskExecute(makeDeps(startedManager()))("call", {
+        prompt: "Inspect", category: "quick", isolated: false, run_in_background: true, ...options,
+      }, undefined, undefined, CTX)
+      expect(result.details.status).toBe("running")
+    },
+  )
+
+  test.each([
+    { options: { apply: true }, named: "apply: true" },
+    { options: { merge: "branch" as const }, named: 'merge: "branch"' },
+  ])("refuses behaviour-changing isolation fields without isolation", async ({ options, named }) => {
+    const result = await buildTaskExecute(makeDeps(startedManager()))("call", {
       prompt: "Inspect", category: "quick", ...options,
     }, undefined, undefined, CTX)
     expect(result.details.status).toBe("invalid_arguments")
+    expect(result.details.reason).toContain(named)
+    expect(result.details.reason).toContain("isolated: true")
+  })
+
+  test("refuses a batch item inheriting apply: true from the top level, naming the item", async () => {
+    const result = await buildTaskExecute(makeDeps(startedManager()))("call", {
+      category: "quick", apply: true,
+      tasks: [{ prompt: "First", isolated: true }, { prompt: "Second", name: "second" }],
+    }, undefined, undefined, CTX)
+    expect(result.details.status).toBe("invalid_arguments")
+    expect(result.details.reason).toContain("Task item 1 (second)")
+    expect(result.details.reason).toContain("apply: true")
+  })
+
+  test("accepts a batch whose items inherit only no-op isolation fields", async () => {
+    const result = await buildTaskExecute(makeDeps(startedManager()))("call", {
+      category: "quick", apply: false, merge: "patch", run_in_background: true,
+      tasks: [{ prompt: "First" }, { prompt: "Second" }],
+    }, undefined, undefined, CTX)
+    expect(result.details.status).not.toBe("invalid_arguments")
   })
 
   test("explicit false overrides an enabled setting for batch validation", async () => {
-    const deps = makeDeps(createFakeManager({}), {
+    const deps = makeDeps(startedManager(), {
       omoConfig: { task: OmoTaskSettingsSchema.parse({ isolation: { enabled: true } }) },
     })
     const result = await buildTaskExecute(deps)("call", {
-      category: "quick", isolated: true, merge: "patch",
+      category: "quick", isolated: true, merge: "branch",
       tasks: [{ prompt: "First" }, { prompt: "Second", isolated: false }],
     }, undefined, undefined, CTX)
     expect(result.details.status).toBe("invalid_arguments")
+    expect(result.details.reason).toContain('merge: "branch"')
   })
 
   test("enabled settings reach the manager spec and call overrides win", () => {
