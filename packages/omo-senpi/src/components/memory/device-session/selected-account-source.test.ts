@@ -1,73 +1,58 @@
 import { describe, expect, test } from "bun:test"
-import { PassThrough } from "node:stream"
+import { join } from "node:path"
 import type { DesktopSyncEngineWire } from "../desktop-sync/desktopSyncAccount"
 import { DesktopSyncRefused } from "../desktop-sync/desktopSyncProtocol"
+import type { MemorySyncSelection } from "../desktop-sync/hostSelection"
 import type { DesktopSyncAccount, DeviceAccountSource } from "./account-source"
 import { createDeviceSessionResolver } from "./resolver"
-import { selectDeviceAccountSource, type DesktopSyncAttachment } from "./selected-account-source"
+import { accountSourceFromSelection } from "./selected-account-source"
 
-// Security contract (account-transport-api v8 section 7): a launch that declares the private memory-sync channel never
-// constructs the CLI credential source; only an undeclared launch does.
+// Security contract (account-transport-api v9 section 7): a desktop host never constructs the CLI credential source,
+// in the main thread or in any session Worker; only a CLI selection does, and only the main thread selects.
 
 const cliCanary = (): DeviceAccountSource => { throw new Error("the CLI credential source was constructed on a desktop host") }
-const declared = (stream: PassThrough | undefined) => ({
-  declared: (name: string) => name === "memory-sync",
-  take: (name: string) => (name === "memory-sync" ? stream : undefined),
-})
 const wire = (): DesktopSyncEngineWire & { readonly lifetime: AbortController } => {
   const lifetime = new AbortController()
   return { lifetime, signal: lifetime.signal, close: () => lifetime.abort(), onEvent: () => () => {}, request: async () => { throw new Error("unused") } }
 }
 const desktopAccount = (generation: string, current: () => boolean) => ({ kind: "desktop", descriptor: { generation }, isCurrent: async () => current() }) as unknown as DesktopSyncAccount
+const desktop = (channel: DesktopSyncEngineWire) => async (): Promise<MemorySyncSelection> => ({ kind: "desktop", channel })
 
-describe("selecting the one account source at registration", () => {
-  test("an undeclared launch is a standalone CLI and gets the CLI source", async () => {
+describe("the account source built from the engine's one selection", () => {
+  test("a CLI selection builds the CLI source once", async () => {
     let built = 0
-    const source = selectDeviceAccountSource({
-      inherited: { declared: () => false, take: () => { throw new Error("an undeclared channel was claimed") } },
-      attach: async () => { throw new Error("an undeclared launch attached a channel") },
-      cli: () => { built += 1; return async () => null },
-    })
+    const source = accountSourceFromSelection({ selection: async () => ({ kind: "cli" }), cli: () => { built += 1; return async () => null } })
+    expect(await source()).toBeNull()
     expect(await source()).toBeNull()
     expect(built).toBe(1)
   })
 
-  test("a declaration without a descriptor selects the unavailable desktop source, never the CLI", async () => {
-    let attached: unknown = "not called"
-    const source = selectDeviceAccountSource({
-      inherited: declared(undefined),
-      attach: async stream => { attached = stream; return { kind: "unavailable", reason: "private_channel_unavailable" } },
-      cli: cliCanary,
-    })
-    expect(await source()).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
-    expect(attached).toBeUndefined()
+  test("an unavailable selection passes its reason through and never builds the CLI source", async () => {
+    for (const reason of ["private_channel_unavailable", "platform_not_supported"] as const) {
+      const source = accountSourceFromSelection({ selection: async () => ({ kind: "unavailable", reason }), cli: cliCanary })
+      expect(await source()).toEqual({ kind: "unavailable", reason })
+    }
   })
 
-  test("a connected channel selects the desktop account and reopens it only when it stops being current", async () => {
+  test("a desktop selection opens the account and reopens it only when it stops being current", async () => {
     const channel = wire()
     let opened = 0
     let current = true
-    const source = selectDeviceAccountSource({
-      inherited: declared(new PassThrough()),
-      attach: async (): Promise<DesktopSyncAttachment> => ({ kind: "connected", channel }),
-      cli: cliCanary,
+    const source = accountSourceFromSelection({
+      selection: desktop(channel), cli: cliCanary,
       openAccount: async () => { opened += 1; return desktopAccount(`generation-${opened}`, () => current) },
     })
     const first = await source()
     expect(await source()).toBe(first)
     current = false
-    const second = await source()
+    expect(await source()).not.toBe(first)
     expect(opened).toBe(2)
-    expect(second).not.toBe(first)
   })
 
   test("main with no account to describe is signed out, then the next resolve opens the account", async () => {
-    const channel = wire()
     let signedIn = false
-    const source = selectDeviceAccountSource({
-      inherited: declared(new PassThrough()),
-      attach: async (): Promise<DesktopSyncAttachment> => ({ kind: "connected", channel }),
-      cli: cliCanary,
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
       openAccount: async () => { if (!signedIn) throw new DesktopSyncRefused(); return desktopAccount("generation-1", () => true) },
     })
     expect(await source()).toBeNull()
@@ -75,12 +60,10 @@ describe("selecting the one account source at registration", () => {
     expect((await source())?.kind).toBe("desktop")
   })
 
-  test("a closed channel stays unavailable for the rest of the launch and sync reports why", async () => {
+  test("a closed channel stays unavailable and the resolver reports why without loading the sync runtime", async () => {
     const channel = wire()
-    const source = selectDeviceAccountSource({
-      inherited: declared(new PassThrough()),
-      attach: async (): Promise<DesktopSyncAttachment> => ({ kind: "connected", channel }),
-      cli: cliCanary,
+    const source = accountSourceFromSelection({
+      selection: desktop(channel), cli: cliCanary,
       openAccount: async () => desktopAccount("generation-1", () => !channel.signal.aborted),
     })
     expect((await source())?.kind).toBe("desktop")
@@ -89,4 +72,42 @@ describe("selecting the one account source at registration", () => {
     const resolve = createDeviceSessionResolver({ source, pinDir: "/unused", loadRuntime: async () => { throw new Error("an unavailable source loaded the sync runtime") } })
     expect(await resolve({ paths: { repo: "/unused" }, space: { profile: "default", projectDir: "/unused" } } as never)).toEqual({ idle: "private_channel_unavailable" })
   })
+})
+
+async function engine(scenario: string): Promise<{ readonly claims: number; readonly reports: readonly { readonly source: string; readonly cliBuilt: boolean; readonly echo?: unknown; readonly event?: unknown }[] }> {
+  const child = Bun.spawn([process.execPath, join(import.meta.dirname, "../desktop-sync/hostSelection.fixture.ts"), scenario], { stdout: "pipe", stderr: "pipe" })
+  const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`the ${scenario} engine fixture did not exit within 20s`)), 20_000))
+  const code = await Promise.race([child.exited, deadline])
+  const out = await new Response(child.stdout).text()
+  if (code !== 0) throw new Error(`engine fixture ${scenario} exited ${code}: ${await new Response(child.stderr).text()}`)
+  return JSON.parse(out)
+}
+
+describe("session Workers in a shared-worker engine", () => {
+  test("a desktop launch: both Workers reach the one claimed channel and neither builds the CLI source", async () => {
+    const result = await engine("desktop")
+    expect(result.claims).toBe(1)
+    for (const report of result.reports) {
+      expect(report).toEqual({ source: "desktop", cliBuilt: false, echo: { answered: "descriptor", claims: 1 }, event: { event: "connected", child: "child-1", handle: "h-1", connected: true } })
+    }
+  }, 30_000)
+
+  for (const scenario of ["declared-null", "unparseable"] as const) {
+    test(`a ${scenario} launch: every Worker gets the unavailable desktop source, never the CLI`, async () => {
+      const result = await engine(scenario)
+      expect(result.claims).toBe(1)
+      for (const report of result.reports) expect(report).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: false })
+    }, 30_000)
+  }
+
+  test("an undeclared launch: Workers get the CLI selection and nothing is claimed", async () => {
+    const result = await engine("cli")
+    expect(result.claims).toBe(0)
+    for (const report of result.reports) expect(report).toEqual({ source: "null", cliBuilt: true })
+  }, 30_000)
+
+  test("no host selection answers: Workers are unavailable, never the CLI", async () => {
+    const result = await engine("no-host")
+    for (const report of result.reports) expect(report).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: false })
+  }, 30_000)
 })
