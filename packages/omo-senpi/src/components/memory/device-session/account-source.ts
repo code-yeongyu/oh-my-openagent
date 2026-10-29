@@ -45,7 +45,13 @@ export interface CliDeviceAccount {
 
 export type { DesktopSyncDescriptor, SyncDevice, SyncOperationAuthority, DesktopSyncOperation, DesktopSyncAccount } from "@oh-my-opencode/memory-core/sync-engine"
 
-export type DeviceAccount = CliDeviceAccount | DesktopSyncAccount
+/** A desktop host whose private sync channel is missing or refused: sync stays idle and diagnosable, never the CLI. */
+export interface DesktopSyncUnavailable {
+  readonly kind: "unavailable"
+  readonly reason: "private_channel_unavailable" | "platform_not_supported"
+}
+
+export type DeviceAccount = CliDeviceAccount | DesktopSyncAccount | DesktopSyncUnavailable
 export type DeviceAccountSource = () => Promise<DeviceAccount | null>
 
 export const DEFAULT_SERVICE_API = "https://api.omo.dev"

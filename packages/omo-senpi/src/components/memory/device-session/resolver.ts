@@ -28,6 +28,7 @@ export function createDeviceSessionResolver(options: {
   return async ({ paths, space }) => {
     const account = await options.source()
     if (account === null) return null
+    if (account.kind === "unavailable") return { idle: account.reason }
     const runtime = await options.loadRuntime()
     if (account.kind === "desktop" && (account.signal.aborted || !await account.isCurrent())) return null
     const resolved = runtime.resolveSpace(new runtime.GitSpaceConfig(paths.repo), { profile: space.profile, remotes: runtime.listRemotes(space.projectDir) })
