@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { Socket } from "bun"
 
 import { dagNodeRetriedEvent } from "./events"
 import type { DagDefinition } from "./graph"
@@ -63,20 +64,15 @@ function runFiles(store: ReturnType<typeof createDagFileStore>): readonly string
     : []
 }
 
-function raceWorkerSource(projectDir: string, prompt: string, barrierDir: string): string {
+function raceWorkerSource(projectDir: string, prompt: string, releasePort: number): string {
   return [
     `const { createDagManager } = await import(${JSON.stringify(managerPath)})`,
     `const { createDagFileStore } = await import(${JSON.stringify(join(import.meta.dir, "store.ts"))})`,
-    `const { existsSync, watch } = await import("node:fs")`,
     `const store = createDagFileStore({ project_dir: ${JSON.stringify(projectDir)} })`,
     `const dag = createDagManager({ store })`,
-    `const releasePath = ${JSON.stringify(join(barrierDir, "release"))}`,
-    `const waitForRelease = () => new Promise((resolve, reject) => {`,
-    `  const watcher = watch(${JSON.stringify(barrierDir)}, () => { if (existsSync(releasePath)) finish() })`,
-    `  const timeout = setTimeout(() => finish(new Error("timed out waiting for DAG race release")), 30_000)`,
-    `  const finish = (error) => { clearTimeout(timeout); watcher.close(); error === undefined ? resolve() : reject(error) }`,
-    `  if (existsSync(releasePath)) finish()`,
-    `})`,
+    `let release`,
+    `const released = new Promise((resolve) => { release = resolve })`,
+    `await Bun.connect({ hostname: "127.0.0.1", port: ${releasePort}, socket: { data: (socket) => { socket.end(); release() } } })`,
     `const definition = {`,
     `  key: "release-plan",`,
     `  name: "release plan",`,
@@ -86,7 +82,7 @@ function raceWorkerSource(projectDir: string, prompt: string, barrierDir: string
     `  ],`,
     `}`,
     `process.stdout.write("ready\\n")`,
-    `await waitForRelease()`,
+    `await released`,
     `try {`,
     `  const started = await dag.start({ definition, parentSessionId: ${JSON.stringify(parentSessionId)}, rootSessionId: ${JSON.stringify(rootSessionId)} })`,
     `  process.stdout.write(JSON.stringify({ ok: true, reused: started.reused, runId: started.snapshot.runId }) + "\\n")`,
@@ -126,23 +122,37 @@ type RaceOutcome = {
 }
 
 async function raceStarts(projectDir: string, prompts: readonly string[]): Promise<readonly RaceOutcome[]> {
-  const barrierDir = join(projectDir, "race-barrier")
-  fs.mkdirSync(barrierDir)
+  // The release is a byte on a socket each child connected before publishing ready. A directory
+  // watcher can miss the release file when it lands while the watcher is still arming (seen on
+  // macOS), which left a child waiting out the whole test; a connected socket cannot miss it.
+  const connections: Socket[] = []
+  let allConnected: () => void = () => undefined
+  const connected = new Promise<void>((resolve) => { allConnected = resolve })
+  const server = Bun.listen({
+    hostname: "127.0.0.1",
+    port: 0,
+    socket: {
+      open: (socket) => {
+        connections.push(socket)
+        if (connections.length === prompts.length) allConnected()
+      },
+      data: () => undefined,
+    },
+  })
   const children = prompts.map((prompt) => Bun.spawn(
-    [process.execPath, "-e", raceWorkerSource(projectDir, prompt, barrierDir)],
+    [process.execPath, "-e", raceWorkerSource(projectDir, prompt, server.port)],
     { stdout: "pipe", stderr: "pipe", env: { ...process.env } },
   ))
   const readers = children.map((child) => lineReader(child.stdout))
   const errors = children.map((child) => new Response(child.stderr).text())
-  // Each child installs its filesystem watcher before publishing ready. The single release file is
-  // written only after both readiness signals, so the two starts cannot be serialized by the
-  // parent's sequential stdin writes on Windows.
   const ready = await Promise.all(readers.map((read) => read()))
   expect(ready).toEqual(prompts.map(() => "ready"))
-  fs.writeFileSync(join(barrierDir, "release"), "go")
+  await connected
+  for (const connection of connections) connection.write("go")
   const outcomes = await Promise.all(readers.map(async (read) => JSON.parse(await read()) as RaceOutcome))
   const exits = await Promise.all(children.map((child) => child.exited))
   const stderr = await Promise.all(errors)
+  server.stop(true)
   exits.forEach((code, index) => expect(code, stderr[index]).toBe(0))
   return outcomes
 }

@@ -12,6 +12,11 @@ import { decodePausedNodes, decodePausedTransition, encodePausedNodes, encodePau
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
 const LOCK_WAIT_TIMEOUT_MS = 1_000
+// A lock body with no owner record is either a publisher between its exclusive create and its write
+// (the Windows no-hard-link path) or one that crashed there. It counts as held for this long after
+// its last write, so a live publisher is never robbed; it equals the wait budget so a waiter still
+// reclaims a crashed one before it would time out behind it.
+const INCOMPLETE_LOCK_GRACE_MS = LOCK_WAIT_TIMEOUT_MS
 const WINDOWS_CLEANUP_RETRIES = 8
 const WINDOWS_CLEANUP_RETRY_MS = 5
 const READ_BUFFER_BYTES = 64 * 1024
@@ -622,7 +627,7 @@ function withLock<T>(
       stalledBehind = observedHolder
       stalledSince = now()
     }
-    if (observedHolder.pid === undefined || !isProcessAlive(observedHolder.pid)) {
+    if (isReclaimable(observedHolder, isProcessAlive, now)) {
       const outcome = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
       if (outcome.kind === "acquired") {
         acquiredHolder = outcome.holder
@@ -642,9 +647,13 @@ function withLock<T>(
   }
 }
 
-type LockHolder = {
-  readonly pid: number | undefined
-  readonly content: string
+type LockHolder =
+  | { readonly pid: number; readonly content: string }
+  | { readonly pid: undefined; readonly content: string; readonly writtenAtMs: number }
+
+function isReclaimable(holder: LockHolder, isProcessAlive: (pid: number) => boolean, now: () => number): boolean {
+  if (holder.pid !== undefined) return !isProcessAlive(holder.pid)
+  return now() - holder.writtenAtMs >= INCOMPLETE_LOCK_GRACE_MS
 }
 
 function readLockHolder(path: string): LockHolder | undefined {
@@ -658,7 +667,8 @@ function readLockHolder(path: string): LockHolder | undefined {
     }
     const firstLine = content.split("\n", 1)[0]
     const pid = Number(firstLine)
-    return { pid: Number.isInteger(pid) && pid > 0 ? pid : undefined, content }
+    if (Number.isInteger(pid) && pid > 0) return { pid, content }
+    return { pid: undefined, content, writtenAtMs: fs.statSync(path).mtimeMs }
   } catch (error) {
     if (hasCode(error, "ENOENT")) return undefined
     throw error
@@ -667,19 +677,27 @@ function readLockHolder(path: string): LockHolder | undefined {
 
 function sameLockHolder(left: LockHolder | undefined, right: LockHolder | undefined): boolean {
   if (left === undefined || right === undefined) return left === right
+  if (left.pid === undefined && right.pid === undefined) {
+    return left.content === right.content && left.writtenAtMs === right.writtenAtMs
+  }
   return left.pid === right.pid && left.content === right.content
 }
 
 // Windows can refuse hard links outright (EPERM/EACCES on NTFS ACLs, ReFS, and network shares)
 // even though the target is vacant. Publishing the lock exclusively with "wx" is equally atomic:
 // the OS rejects the second creator with EEXIST, which is the contention answer callers expect.
+// Unlike the link, this create makes the path visible before the owner record is in it. A waiter
+// leaves that ownerless body alone for INCOMPLETE_LOCK_GRACE_MS, and only a publisher stalled past it
+// can be reclaimed, so the publisher confirms the path still holds its own record before it owns it.
 function publishLockExclusively(path: string, content: string, fsyncWrites: boolean): boolean {
   let fd: number | undefined
   try {
     fd = fs.openSync(path, "wx")
     fs.writeSync(fd, content)
     if (fsyncWrites) fs.fsyncSync(fd)
-    return true
+    fs.closeSync(fd)
+    fd = undefined
+    return readLockHolder(path)?.content === content
   } catch (error) {
     if (hasCode(error, "EEXIST")) return false
     throw error
@@ -758,7 +776,7 @@ function reclaimObservedLock(
     fd = undefined
     const currentHolder = readLockHolder(path)
     if (currentHolder === undefined || !sameLockHolder(observedHolder, currentHolder) ||
-      (currentHolder.pid !== undefined && isProcessAlive(currentHolder.pid))) {
+      !isReclaimable(currentHolder, isProcessAlive, now)) {
       return { kind: "holder_changed" }
     }
     fs.renameSync(successorPath, path)
@@ -790,14 +808,13 @@ function tryAcquireReclaimMutex(
     return { holder: { pid: process.pid, content }, clearedStaleMutex: false }
   }
   const observedHolder = readLockHolder(path)
-  if (observedHolder === undefined ||
-    (observedHolder.pid !== undefined && isProcessAlive(observedHolder.pid))) {
+  if (observedHolder === undefined || !isReclaimable(observedHolder, isProcessAlive, now)) {
     return { holder: undefined, clearedStaleMutex: false }
   }
   const clearedStaleMutex = removeObservedLock(
     path,
     observedHolder,
-    (movedHolder) => movedHolder === undefined || movedHolder.pid === undefined || !isProcessAlive(movedHolder.pid),
+    (movedHolder) => movedHolder === undefined || isReclaimable(movedHolder, isProcessAlive, now),
   )
   if (!clearedStaleMutex) return { holder: undefined, clearedStaleMutex: false }
   // The crashed reclaimer's sentinel is gone: that is a state transition, not contention, so retry
