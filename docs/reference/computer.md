@@ -56,7 +56,7 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `InputBusy` | Another session holds the foreground control grant | Retry after that session revokes or closes |
 | `InvalidCoordinateFrame` | The coordinates do not belong to the latest screenshot of that target, or the target moved or resized | Take a new screenshot of the same target |
 | `StaleRef` | An accessibility ref from an older snapshot | Take a new `ax()` snapshot |
-| `WindowNotFound`, `InvalidTarget` | The window closed, or the filter matched nothing or several windows | List windows again and pick one |
+| `WindowNotFound`, `InvalidTarget` | The window closed, or the filter matched nothing or several windows. On macOS, `InvalidTarget` also refuses background keys for a window that sits behind its own focused sheet or panel; the message names that sheet and nothing was sent | List windows again and pick one; for a sheet, send the keys to the sheet the message names |
 | `AxUnsupported`, `AxFailed` | The element or platform does not support that accessibility operation | Fall back to pointer input |
 | `FocusRestoreFailed`, `CursorRestoreFailed` | Foreground delivery could not put the previous window or cursor back | Tell the user; nothing is hidden |
 | `UserIntervened` | The user was using the target app, or brought another window forward, so the action stopped; the message says whether any input was sent | Read the window again once the user pauses; never repeat the action as it was |
