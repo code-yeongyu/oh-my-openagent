@@ -37,6 +37,18 @@ function writeConfig(path: string, config: unknown): void {
 const initial: OhMyOpenCodeConfig = { agents: { explore: { model: "fixture/expensive" } } }
 
 describe("runtime model config snapshots", () => {
+  test("default compatibility reload accepts sanitized config despite unrelated diagnostics", () => {
+    withConfig((project, path) => {
+      const load = createRuntimeModelConfigLoader(project, initial, process.env, { acceptPartialConfig: true })
+      for (const extra of [{ unknown_runtime_key: true }, { telemetry: "invalid" }]) {
+        writeConfig(path, { agents: { explore: { model: "fixture/updated" } }, ...extra })
+        expect(load().agents?.explore?.model).toBe("fixture/updated")
+        expect(load.status().lastReload.outcome).toBe("accepted")
+        expect(load.inspect().saved).toMatchObject({ valid: true, matchesAccepted: true })
+      }
+    })
+  })
+
   test("replaces snapshots on valid edits, materializes chains, and removes deleted overrides", () => {
     withConfig((project, path) => {
       const load = createRuntimeModelConfigLoader(project, initial)

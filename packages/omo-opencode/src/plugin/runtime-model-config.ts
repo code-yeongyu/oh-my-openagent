@@ -30,6 +30,7 @@ export function createRuntimeModelConfigLoader(
   directory: string,
   initialConfig: Pick<OhMyOpenCodeConfig, "agents" | "categories">,
   environment: OmoConfigEnv = process.env,
+  options: { acceptPartialConfig?: boolean } = {},
 ) {
   let current = { agents: initialConfig.agents, categories: initialConfig.categories }
   let acceptedRevision = 1
@@ -54,21 +55,22 @@ export function createRuntimeModelConfigLoader(
   // Observing a saved candidate must not accept it or alter the last dispatch result.
   function inspect(): SavedRuntimeModelConfigStatus {
     const candidate = readCandidate()
-    const valid = candidate.diagnostics.length === 0
+    const valid = candidate.config !== undefined && (options.acceptPartialConfig === true || candidate.diagnostics.length === 0)
     return { ...status(), saved: { valid, matchesAccepted: valid ? isDeepStrictEqual(candidate.config, current) : null, diagnostics: candidate.diagnostics } }
   }
 
   function load() {
     const candidate = readCandidate()
-    // Invalid leaves can be pruned with only a warning. Never accept that partial edit.
-    if (candidate.config === undefined || candidate.diagnostics.length > 0) {
+    // Explicit selections reject pruned edits atomically. Default delegation can
+    // opt into the startup validator's existing best-effort behavior.
+    if (candidate.config === undefined || (!options.acceptPartialConfig && candidate.diagnostics.length > 0)) {
       lastReload = { outcome: "rejected", diagnostics: candidate.diagnostics }
       log("[runtime-model-config] Reload rejected; keeping the last valid model config", { diagnostics: candidate.diagnostics })
       return current
     }
     if (!isDeepStrictEqual(current, candidate.config)) acceptedRevision += 1
     current = candidate.config
-    lastReload = { outcome: "accepted", diagnostics: [] }
+    lastReload = { outcome: "accepted", diagnostics: candidate.diagnostics }
     return current
   }
 
