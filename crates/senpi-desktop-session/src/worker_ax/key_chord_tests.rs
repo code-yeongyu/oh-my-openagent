@@ -164,7 +164,7 @@ fn an_invalid_chord_is_refused_before_anything_is_sent() {
     // Given
     let mut harness = harness(&json!({}));
     let reference = element_ref(&mut harness, "button");
-    // When: "cmd+" parses to an empty key name.
+    // When: an empty component ("cmd+" split by hand; the facade drops empty parts itself).
     let reply = harness.process(press(&reference, &["cmd", ""], None));
     // Then
     assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::InvalidKey));
@@ -229,4 +229,18 @@ fn the_fakes_set_value_moves_the_caret_to_the_end_of_the_new_value() {
         .expect("typed");
     // Then
     assert_eq!(value_of(&mut harness, &reference).as_deref(), Some("12"));
+}
+
+#[test]
+fn an_empty_chord_is_refused_before_anything_is_sent() {
+    // Given
+    let mut harness = harness(&json!({}));
+    let reference = element_ref(&mut harness, "button");
+    // When: el.press("") / el.press([]) reach the engine as no keys at all.
+    let reply = harness.process(press(&reference, &[], None));
+    // Then: refused before the element was focused or anything pressed.
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::InvalidKey));
+    assert!(chords(&harness).is_empty());
+    assert!(!harness.sink.ops().iter().any(|op| matches!(op, SinkOp::AxFocus { .. })));
+    assert_eq!(harness.audits()[0].code, Some(ErrorCode::InvalidKey));
 }

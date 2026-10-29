@@ -92,12 +92,31 @@ pub(crate) fn window_id(element: &AXUIElement) -> Option<u32> {
 }
 
 /// The CGWindowID of the window owning `element`: the element itself when
-/// it is a window, else its `AXWindow`.
+/// it is a window, else its `AXWindow`, else the element when it is one of
+/// its application's `AXWindows` without being an `AXWindow`
+/// ([`listed_window_id`]).
 pub(crate) fn owner_window_id(element: &AXUIElement) -> Option<u32> {
     if copy_string(element, "AXRole").as_deref() == Some("AXWindow") {
         return window_id(element);
     }
-    window_id(&*copy_element(element, "AXWindow")?)
+    match copy_element(element, "AXWindow") {
+        Some(window) => window_id(&window),
+        None => listed_window_id(element),
+    }
+}
+
+/// The window id of `element` when it is itself one of its application's
+/// `AXWindows` though not an `AXWindow`, as Finder's inline rename field
+/// is: such an element has no window above it and stands for its own
+/// (ported from oh-my-pi 0838d2ab44 `listed_window_id`).
+fn listed_window_id(element: &AXUIElement) -> Option<u32> {
+    let app = create_application(element_pid(element).ok()?).ok()?;
+    let _ = set_timeout(&app);
+    copy_elements(&app, "AXWindows")?
+        .iter()
+        .any(|window| **window == *element)
+        .then(|| window_id(element))
+        .flatten()
 }
 
 pub(super) fn copy_attribute_result(
@@ -213,6 +232,13 @@ pub(super) fn copy_name_array(
         .iter()
         .filter_map(|value| value.downcast::<CFString>().ok().map(|name| name.to_string()))
         .collect())
+}
+
+/// The actions `element` lists (`AXActionNames`); none when it cannot answer.
+pub(crate) fn action_names(element: &AXUIElement) -> Vec<String> {
+    // SAFETY: The retained element and the writable out slot stay valid for
+    // the synchronous copy.
+    copy_name_array(|slot| unsafe { element.copy_action_names(slot) }).unwrap_or_default()
 }
 
 pub(crate) fn bounds(element: &AXUIElement) -> Option<AxBounds> {

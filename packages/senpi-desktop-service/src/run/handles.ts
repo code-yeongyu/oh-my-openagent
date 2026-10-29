@@ -188,8 +188,12 @@ export class ElementHandle {
 	 * this element without taking the user's focus: keys go out only once the element holds its app's keyboard focus and
 	 * are never sent to an element that did not take it. Foreground delivery raises the window first and needs the grant.
 	 */
-	press(chord?: string | readonly string[], options?: DeliveryOptions): Promise<void> {
-		if (chord === undefined) return this.#send("press", "ax.perform", { action: "press" });
+	press(chord?: string | readonly string[] | null, options?: DeliveryOptions): Promise<void> {
+		// The native press takes no delivery option: a chord-less call with one is a mistake, not a background press.
+		if (chord === undefined || chord === null) {
+			if (options !== undefined) throw new TypeError("press() without a chord takes no options; pass a chord to press keys");
+			return this.#send("press", "ax.perform", { action: "press" });
+		}
 		return this.#send("press", "ax.keyChord", { keys: chordKeys(chord), opts: pointerOptions(options) });
 	}
 

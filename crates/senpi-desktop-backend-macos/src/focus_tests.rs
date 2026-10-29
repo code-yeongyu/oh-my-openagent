@@ -1,4 +1,6 @@
-use super::{first_front_window, hand_back, HandBack, WindowInfo};
+use senpi_desktop_core::types::FrontWindow;
+
+use super::{first_front_window, hand_back, mark_key_window, HandBack, WindowInfo};
 use crate::front_app::{restore_step, user_front_pid, RestoreStep};
 
 #[test]
@@ -176,4 +178,20 @@ fn window_list_keeps_off_screen_windows_whose_onscreen_key_is_absent() {
     // Then: they are listed as off-screen instead of dropped; a dropped helper window was
     // reported as "cannot identify a cursor-helper window" and broke every capture.
     assert!(windows.iter().any(|window| !window.on_screen), "{} windows, none off-screen", windows.len());
+}
+
+/// A front app that shows no window (Finder after a click on the desktop, an
+/// app that closed its last window) is handed back as a process: the
+/// snapshot carries no window id and the AX half of the restore is a no-op
+/// (oh-my-pi c7b45a8375's refusal class does not exist here).
+#[test]
+fn a_windowless_front_app_is_handed_back_without_a_key_window() {
+    let front = FrontWindow {
+        pid: 12,
+        window_id: None,
+        app: "Finder".to_owned(),
+        key_window_ax_title: None,
+    };
+    assert!(mark_key_window(&front).is_ok());
+    assert_eq!(hand_back(12, Some(7), Some(7)), HandBack::Reactivate);
 }

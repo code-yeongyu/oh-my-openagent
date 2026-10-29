@@ -154,7 +154,10 @@ impl AxBackend for MacAx {
 
     fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()> {
         self.show_target(h);
-        actions::perform_requested(element(h)?, action)
+        let element = element(h)?;
+        actions::perform_requested(element, action, || {
+            element::element_pid(element).is_ok_and(crate::process::is_uikit)
+        })
     }
 
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()> {

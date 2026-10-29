@@ -1,9 +1,21 @@
 //! Processes whose accessibility text is not their input: a terminal's AX
 //! text area represents its rendered grid, not the pty, so even a successful
 //! `AXSelectedText` or `AXValue` write is no proof that the shell received
-//! it (ported from oh-my-pi 0838d2ab44 `process::is_terminal`).
+//! it; and `UIKit` apps, which answer `AXPress` by tapping where the element
+//! is drawn (ported from oh-my-pi 0838d2ab44 `process::is_terminal`,
+//! `is_uikit`).
 
 use objc2_app_kit::NSRunningApplication;
+use objc2_foundation::{ns_string, NSBundle};
+
+/// Whether `pid` is a `UIKit` app (Mac Catalyst, or an iPhone or iPad app):
+/// its bundle declares `UIDeviceFamily`, which `AppKit` apps' do not.
+pub(crate) fn is_uikit(pid: libc::pid_t) -> bool {
+    NSRunningApplication::runningApplicationWithProcessIdentifier(pid)
+        .and_then(|app| app.bundleURL())
+        .and_then(|url| NSBundle::bundleWithURL(&url))
+        .is_some_and(|bundle| bundle.objectForInfoDictionaryKey(ns_string!("UIDeviceFamily")).is_some())
+}
 
 /// Whether `pid` is a known terminal emulator, by bundle identifier.
 pub(crate) fn is_terminal(pid: libc::pid_t) -> bool {

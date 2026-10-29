@@ -136,6 +136,10 @@ describe("runComputerCode", HANG_GUARD, () => {
 		const sent = log.requests
 			.filter((request) => ["ax.keyChord", "ax.perform", "ax.click"].includes(request.method))
 			.map((request) => [request.method, request.params]);
+		const refused = await rejectionOf(run(service, `const el = await desktop.ref("e1"); await el.press(undefined, { delivery: "foreground" });`));
+		expect(String((refused as Error).message)).toContain("takes no options");
+		await run(service, `const el = await desktop.ref("e1"); await el.press(null);`);
+		expect(log.requests.filter((request) => request.method === "ax.perform").length).toBe(2);
 		expect(sent).toEqual([
 			["ax.keyChord", { ref: "e1", keys: ["cmd", "a"], opts: {} }],
 			["ax.keyChord", { ref: "e1", keys: ["shift", "tab"], opts: { deliveryMode: "foreground" } }],

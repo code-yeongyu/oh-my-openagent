@@ -137,8 +137,10 @@ pub(super) fn replace_whole_value<F: TextField>(field: &F, text: &str) -> CoreRe
         return Ok(false);
     }
     if let Err(error) = field.insert(text) {
-        // A refused insertion wrote nothing: a borrowed focus goes back,
-        // unless the user has since moved it off the field.
+        // Whether the insertion was refused, unanswered or read back wrong,
+        // the field is the user's again: a borrowed focus goes back unless
+        // the user has since moved it off the field; a hand-back the app
+        // refuses changes nothing more and the insertion's own verdict stands.
         if let Some(previous) = previous {
             if field.focused() == Some(true) {
                 let _ = field.hand_focus_to(&previous);

@@ -4,7 +4,10 @@ use objc2_application_services::AXError;
 use objc2_core_foundation::{CFString, CFType};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 
-use super::{focus, perform_requested, request_result, set_date_value, set_string_value, AxRequests};
+use super::{
+    focus, perform_requested, request_result, scrolls_before_press, set_date_value, set_string_value, unsupported_action,
+    AxRequests,
+};
 
 /// Writes `AXValue` as the control publishes it: a `CFDate` for date and time
 /// controls, else a `CFString` (the dispatch `set_value` makes after the
@@ -49,6 +52,10 @@ impl ScriptedElement {
 }
 
 impl AxRequests for ScriptedElement {
+    fn action_names(&self) -> Vec<String> {
+        ["AXPress", "AXShowMenu", "AXScrollToVisible"].map(str::to_owned).to_vec()
+    }
+
     fn send_action(&self, action: &CFString) -> AXError {
         self.requests.borrow_mut().push(format!("perform {action}"));
         self.reply
@@ -101,7 +108,7 @@ fn a_perform_without_a_reply_is_unconfirmed() {
     // Given
     let element = ScriptedElement::replying(AXError::CannotComplete);
     // When
-    let error = perform_requested(&element, "press").unwrap_err();
+    let error = perform_requested(&element, "press", || false).unwrap_err();
     // Then
     assert_unconfirmed(&error, "AX action 'AXPress'");
     assert_eq!(element.requests(), ["perform AXPress"]);
@@ -112,11 +119,11 @@ fn a_refused_perform_stays_failed() {
     // Given
     let element = ScriptedElement::replying(AXError::IllegalArgument);
     // When
-    let error = perform_requested(&element, "AXShowMenu").unwrap_err();
+    let error = perform_requested(&element, "AXShowMenu", || false).unwrap_err();
     // Then
     assert_eq!(error.code, ErrorCode::AxFailed, "{error}");
     assert!(error.message.contains("AX action 'AXShowMenu' failed"), "{}", error.message);
-    assert!(perform_requested(&ScriptedElement::replying(AXError::Success), "press").is_ok());
+    assert!(perform_requested(&ScriptedElement::replying(AXError::Success), "press", || false).is_ok());
 }
 
 #[test]
@@ -193,8 +200,8 @@ fn an_action_or_value_write_that_may_have_landed_marks_the_call_sent() {
     let element = ScriptedElement::replying;
     // When
     let refusals = [
-        refusal_after(|| assert!(perform_requested(&element(AXError::Success), "press").is_ok())),
-        refusal_after(|| assert!(perform_requested(&element(AXError::CannotComplete), "press").is_err())),
+        refusal_after(|| assert!(perform_requested(&element(AXError::Success), "press", || false).is_ok())),
+        refusal_after(|| assert!(perform_requested(&element(AXError::CannotComplete), "press", || false).is_err())),
         refusal_after(|| assert!(write_value(&element(AXError::Success), "hello").is_ok())),
         refusal_after(|| assert!(write_value(&element(AXError::CannotComplete), "hello").is_err())),
     ];
@@ -208,7 +215,7 @@ fn a_refused_request_or_a_focus_write_leaves_the_call_unsent() {
     let element = ScriptedElement::replying;
     // When
     let refusals = [
-        refusal_after(|| assert!(perform_requested(&element(AXError::IllegalArgument), "press").is_err())),
+        refusal_after(|| assert!(perform_requested(&element(AXError::IllegalArgument), "press", || false).is_err())),
         refusal_after(|| assert!(write_value(&element(AXError::AttributeUnsupported), "hello").is_err())),
         refusal_after(|| assert!(focus(&element(AXError::Success)).is_ok())),
     ];
@@ -226,4 +233,47 @@ fn a_refused_focus_write_stays_failed() {
     assert_eq!(error.code, ErrorCode::AxFailed, "{error}");
     assert!(error.message.contains("setting AXFocused=true failed"), "{}", error.message);
     assert!(focus(&ScriptedElement::replying(AXError::Success)).is_ok());
+}
+
+#[test]
+fn an_element_without_a_press_action_is_pointed_at_click() {
+    let actions = ["AXShowMenu".to_owned(), "AXScrollToVisible".to_owned()];
+    let press = unsupported_action("AXPress", &actions);
+    assert_eq!(press.code, ErrorCode::AxFailed);
+    assert!(press.message.contains("AXShowMenu, AXScrollToVisible"), "{}", press.message);
+    assert!(press.message.contains("click()"), "{}", press.message);
+    assert!(press.message.contains("nothing was sent"), "{}", press.message);
+    let other = unsupported_action("AXIncrement", &actions);
+    assert!(!other.message.contains("click()"), "{}", other.message);
+}
+
+#[test]
+fn an_unlisted_action_is_refused_before_anything_is_sent() {
+    let element = ScriptedElement::replying(AXError::Success);
+    let error = perform_requested(&element, "AXIncrement", || unreachable!("no press, no classification")).unwrap_err();
+    assert_eq!(error.code, ErrorCode::AxFailed);
+    assert!(element.requests().is_empty(), "{:?}", element.requests());
+}
+
+#[test]
+fn only_a_uikit_press_scrolls_its_element_into_view_first() {
+    let actions = |names: &[&str]| names.iter().map(|name| (*name).to_owned()).collect::<Vec<_>>();
+    let row = actions(&["AXPress", "AXScrollToVisible", "AXShowMenu"]);
+    assert!(scrolls_before_press("AXPress", &row, || true));
+    // An AppKit app, another action, or an element that cannot scroll: press as is.
+    assert!(!scrolls_before_press("AXPress", &row, || false));
+    assert!(!scrolls_before_press("AXShowMenu", &row, || true));
+    assert!(!scrolls_before_press("AXPress", &actions(&["AXPress"]), || true));
+    // The app is only classified when the press could scroll.
+    assert!(!scrolls_before_press("AXShowMenu", &row, || unreachable!()));
+}
+
+#[test]
+fn a_uikit_press_sends_the_scroll_then_the_press() {
+    let element = ScriptedElement::replying(AXError::Success);
+    assert!(perform_requested(&element, "press", || true).is_ok());
+    assert_eq!(element.requests(), ["perform AXScrollToVisible", "perform AXPress"]);
+    let appkit = ScriptedElement::replying(AXError::Success);
+    assert!(perform_requested(&appkit, "press", || false).is_ok());
+    assert_eq!(appkit.requests(), ["perform AXPress"]);
 }

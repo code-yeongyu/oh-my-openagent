@@ -11,6 +11,7 @@ use senpi_desktop_core::intervention::check_press;
 
 use super::date;
 use super::element::{self, ax_result, copy_date, element_pid};
+use super::element::action_names;
 use super::popup;
 use super::replace_value::{may_borrow_focus, replace_native_text};
 use super::text_input::{ensure_native_text_target, is_secure, text_readback};
@@ -37,12 +38,18 @@ fn sent(error: AXError) -> AXError {
 /// The AX requests an element write sends, each answered by the app's
 /// `AXError` reply: the seam tests script replies through.
 pub(super) trait AxRequests {
+    /// The actions the element lists (`AXActionNames`).
+    fn action_names(&self) -> Vec<String>;
     fn send_action(&self, action: &CFString) -> AXError;
     fn write_attribute(&self, attribute: &CFString, value: &CFType) -> AXError;
     fn read_date(&self, attribute: &str) -> Option<f64>;
 }
 
 impl AxRequests for AXUIElement {
+    fn action_names(&self) -> Vec<String> {
+        action_names(self)
+    }
+
     fn send_action(&self, action: &CFString) -> AXError {
         // SAFETY: The retained element and action CFString stay valid for the
         // synchronous AX request.
@@ -77,15 +84,58 @@ pub(super) fn request_result(error: AXError, request: &str, failed: impl Into<St
     ax_result(error, failed)
 }
 
-/// Performs a model-requested action (`ax.perform`, presses): a request the
-/// app got but did not answer is `AxUnconfirmed`.
-pub(super) fn perform_requested(element: &(impl AxRequests + ?Sized), action: &str) -> CoreResult<()> {
+/// The action that scrolls an element into its view.
+const SCROLL_TO_VISIBLE: &str = "AXScrollToVisible";
+
+/// Performs a model-requested action (`ax.perform`, presses): an action the
+/// element does not list is refused with nothing sent (a press points at
+/// `click()`); a `UIKit` press scrolls the element into view first
+/// ([`scrolls_before_press`]); a request the app got but did not answer is
+/// `AxUnconfirmed`. `uikit` classifies the element's app, read only when a
+/// press could scroll.
+pub(super) fn perform_requested(
+    element: &(impl AxRequests + ?Sized),
+    action: &str,
+    uikit: impl FnOnce() -> bool,
+) -> CoreResult<()> {
     reporting_partial(|| {
         check_press()?;
         let native = action_name(action);
+        let actions = element.action_names();
+        if !actions.contains(&native) {
+            return Err(unsupported_action(&native, &actions));
+        }
+        if scrolls_before_press(&native, &actions, uikit) {
+            // A failed scroll leaves the press to report its own outcome.
+            let _ = element.send_action(&CFString::from_str(SCROLL_TO_VISIBLE));
+        }
         let error = sent(element.send_action(&CFString::from_str(&native)));
         request_result(error, &format!("AX action '{native}'"), format!("AX action '{native}' failed"))
     })
+}
+
+/// The refusal of `native`, an action the element does not list among
+/// `actions`; nothing was sent. A control without a press action still takes
+/// a click (ported from oh-my-pi 0838d2ab44 `unsupported_action`).
+pub(super) fn unsupported_action(native: &str, actions: &[String]) -> DesktopError {
+    let instead = if native == "AXPress" {
+        "; nothing was sent: if this is the control you meant, click() it instead"
+    } else {
+        ""
+    };
+    DesktopError::ax_failed(format!(
+        "AX action '{native}' is not supported by this element; available actions: {}{instead}",
+        actions.join(", "),
+    ))
+}
+
+/// `UIKit` (Mac Catalyst, iPhone and iPad apps) answers `AXPress` by tapping
+/// the element where it is drawn, so pressing a row scrolled out of its view
+/// reports success and does nothing. Scrolling it into view first lets the
+/// tap land; for an element already in view the scroll changes nothing
+/// (ported from oh-my-pi 0838d2ab44 `scrolls_before_press`).
+pub(super) fn scrolls_before_press(native: &str, actions: &[String], uikit: impl FnOnce() -> bool) -> bool {
+    native == "AXPress" && actions.iter().any(|action| action == SCROLL_TO_VISIBLE) && uikit()
 }
 
 /// `ax.setValue`: a popup's value is chosen from its menu; otherwise the
@@ -117,10 +167,11 @@ pub(super) fn set_value(element: &AXUIElement, value: &str) -> CoreResult<()> {
         // cannot be read back as the string that was written.
         let textual = element::copy_string(element, "AXValue").is_some();
         set_string_value(element, value)?;
-        if !textual {
+        let after = element::copy_string(element, "AXValue");
+        if !textual && after.is_none() {
             return Ok(());
         }
-        text_readback(value, value, element::copy_string(element, "AXValue").as_deref(), is_secure(element))
+        text_readback(value, value, after.as_deref(), is_secure(element))
     })
 }
 
