@@ -2048,6 +2048,7 @@
     "packages/team-core/src/team-state-store/lock-publish.ts",
     "packages/team-core/src/team-state-store/lock-reclaim.ts",
     "packages/team-core/src/team-state-store/lock-record.ts",
+    "packages/team-core/src/team-state-store/lock-worker-lifetime.ts",
     "packages/team-core/src/team-state-store/locks.ts",
     "packages/team-core/src/team-state-store/store.ts",
     "packages/team-core/src/team-tasklist/claim.ts",
