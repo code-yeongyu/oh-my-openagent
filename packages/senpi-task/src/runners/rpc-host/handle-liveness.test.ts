@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
+import { _flushForTesting, log as sharedLog } from "../../../../omo-opencode/src/shared/logger"
 import { adaptRpcHandle } from "../../manager/child-handle"
 import { baseSpec, cleanupProjects, makeManager } from "../../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../../manager/manager"
@@ -11,9 +12,24 @@ import type { HostSessionLiveness } from "./handle-port"
 
 let clock: ReturnType<typeof fakeClock>
 afterEach(() => {
+  // Never let a fake flush timer outlive the clock: the shared logger would keep that dead id and
+  // stop scheduling flushes for every later test in the process.
+  _flushForTesting()
   clock?.restore()
   cleanupProjects()
 })
+
+/**
+ * The process-wide shared logger arms its own flush timer on any log() call, whether from this test's
+ * code or from work another test file left running in the same bun process. Under the fake clock that
+ * timer is counted by clock.pending() although no code under test owns it, so a loaded full-suite run
+ * failed with one pending timer (#11448). Flush it synchronously first, so the count is only the
+ * timers the handle and the manager left behind.
+ */
+function timersLeftByCodeUnderTest(): number {
+  _flushForTesting()
+  return clock.pending()
+}
 
 function stalledSession() {
   const delivered = Promise.withResolvers<undefined>()
@@ -58,7 +74,7 @@ test("missed state probes keep the original child nonterminal and recover steeri
     .toEqual(["queued", "continue"])
   manager.forget(started.task_id, { path: "park" })
   await h.handle.dispose()
-  expect(clock.pending()).toBe(0)
+  expect(timersLeftByCodeUnderTest()).toBe(0)
 })
 
 test("an overdue session is aborted and closed before reporting terminal", async () => {
@@ -75,7 +91,7 @@ test("an overdue session is aborted and closed before reporting terminal", async
   expect(h.handle.hasExited()).toBe(true)
   expect(await h.handle.waitForOutcome()).toMatchObject({ status: "error", failure: { kind: "child-unresponsive" } })
   await h.handle.dispose()
-  expect(clock.pending()).toBe(0)
+  expect(timersLeftByCodeUnderTest()).toBe(0)
 })
 
 test("an unreachable host never produces a false crashed completion", async () => {
@@ -87,7 +103,7 @@ test("an unreachable host never produces a false crashed completion", async () =
   expect(h.closes()).toBeGreaterThan(1)
   expect(h.port.detaches).toBe(0)
   await h.handle.dispose()
-  expect(clock.pending()).toBe(0)
+  expect(timersLeftByCodeUnderTest()).toBe(0)
 })
 
 test("termination releases outcome waiters created before terminal-pending", async () => {
@@ -119,7 +135,7 @@ test("a live host's definitive missing-session reply ends the handle immediately
   expect(h.handle.hasExited()).toBe(true)
   expect(h.closes()).toBe(0)
   await h.handle.dispose()
-  expect(clock.pending()).toBe(0)
+  expect(timersLeftByCodeUnderTest()).toBe(0)
 })
 
 test("the parent observes unresponsive then running without a terminal completion", async () => {
@@ -151,4 +167,27 @@ test("the parent observes unresponsive then running without a terminal completio
     manager.forget(started.task_id, { path: "park" })
     await h.handle.dispose()
   }
+})
+
+test("#given a log from elsewhere in the process after the last clock step #when the leftover timers are counted #then the shared logger's flush timer is not one of them (#11448)", async () => {
+  // Given a handle that has been disposed cleanly.
+  clock = fakeClock()
+  const h = stalledSession()
+  await clock.advance(10_000)
+  await h.handle.dispose()
+  // When unrelated work in the same process logs before the assertion, as a loaded full suite does.
+  sharedLog("unrelated work in the same bun process")
+  // Then only timers the code under test left behind are counted.
+  expect(timersLeftByCodeUnderTest()).toBe(0)
+})
+
+test("#given a handle that is not disposed #when the leftover timers are counted #then its heartbeat timer is still caught (#11448)", async () => {
+  // Given a live handle whose heartbeat keeps a timer armed.
+  clock = fakeClock()
+  const h = stalledSession()
+  await clock.advance(10_000)
+  // Then the count still sees it: flushing the logger never hides a timer the handle owns.
+  expect(timersLeftByCodeUnderTest()).toBeGreaterThan(0)
+  await h.handle.dispose()
+  expect(timersLeftByCodeUnderTest()).toBe(0)
 })
