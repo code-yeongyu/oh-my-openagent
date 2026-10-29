@@ -69,6 +69,27 @@ export async function removeLockRecordIfUnchanged(
   staleAfterMs: number,
   deps: LockReclaimDeps = {},
 ): Promise<LockReclaimOutcome> {
+  return withRecordGuard(lockPath, expectedRecord, staleAfterMs, deps, async () => {
+    const current = await readLockRecord(lockPath)
+    if (current === null) return "absent"
+    if (current.content !== expectedRecord || !isLockRecordStale(current, staleAfterMs)) return "changed"
+    const unlinked = await unlinkWithRetry(lockPath, deps)
+    return unlinked === "absent" ? "absent" : unlinked
+  })
+}
+
+/**
+ * Runs `act` while holding the guard named after `expectedRecord`, the same guard every reclaimer of that record takes.
+ * Under it, nobody else can remove or replace the record, so a re-read followed by an unlink or a rename sees one file.
+ * Returns "busy" when another holder has the guard (a stale guard left by a crash is reclaimed first).
+ */
+export async function withRecordGuard<T>(
+  lockPath: string,
+  expectedRecord: string,
+  staleAfterMs: number,
+  deps: LockReclaimDeps,
+  act: () => Promise<T>,
+): Promise<T | "busy"> {
   const guardPath = reclaimGuardPath(lockPath, expectedRecord)
   const guardRecord = buildLockRecord("lock-reclaim")
   if (!(await publishLockRecord(guardPath, guardRecord))) {
@@ -80,11 +101,7 @@ export async function removeLockRecordIfUnchanged(
   }
 
   try {
-    const current = await readLockRecord(lockPath)
-    if (current === null) return "absent"
-    if (current.content !== expectedRecord || !isLockRecordStale(current, staleAfterMs)) return "changed"
-    const unlinked = await unlinkWithRetry(lockPath, deps)
-    return unlinked === "absent" ? "absent" : unlinked
+    return await act()
   } finally {
     markLockRecordReleased(guardRecord)
     await unlinkWithRetry(guardPath, deps)

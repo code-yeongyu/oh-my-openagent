@@ -2063,6 +2063,7 @@
     "packages/team-core/src/team-registry/paths.ts",
     "packages/team-core/src/team-registry/team-spec-input-normalizer.ts",
     "packages/team-core/src/team-state-store/index.ts",
+    "packages/team-core/src/team-state-store/lock-lease.ts",
     "packages/team-core/src/team-state-store/lock-publish.ts",
     "packages/team-core/src/team-state-store/lock-reclaim.ts",
     "packages/team-core/src/team-state-store/lock-record.ts",
