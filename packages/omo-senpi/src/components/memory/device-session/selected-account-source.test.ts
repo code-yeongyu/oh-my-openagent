@@ -121,6 +121,7 @@ describe("session Workers in a shared-worker engine", () => {
     ["no-port", "unavailable:port_absent"],
     ["throwing", "unavailable:selection_failed"],
     ["malformed", "unavailable:selection_failed"],
+    ["hang", "unavailable:private_channel_unavailable"],
   ]
   for (const [scenario, expected] of failClosed) {
     test(`a ${scenario} launch: Workers are unavailable (${expected}), never the CLI`, async () => {

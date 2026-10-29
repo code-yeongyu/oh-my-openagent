@@ -10,7 +10,7 @@ import {
 
 // An engine process in miniature, wired the way senpi provideSessionWorkerData hands each session Worker its value:
 // the main thread selects once; each Worker gets workerData.extensionData[name] plus its transfers; dispose on exit.
-// Usage: bun hostSelection.fixture.ts <desktop|declared-null|unparseable|cli|no-port|throwing|malformed|late>
+// Usage: bun hostSelection.fixture.ts <desktop|declared-null|unparseable|cli|no-port|throwing|malformed|late|hang>
 
 type Report = {
   readonly source: string
@@ -70,12 +70,14 @@ async function inMain(scenario: string): Promise<void> {
   const attachGate = new Promise<void>(resolve => { releaseAttach = resolve })
   const host = scenario === "no-port" || scenario === "malformed" ? undefined : selectHostMemorySyncSource({
     inherited: {
-      declared: name => { if (scenario === "throwing") throw new Error("stub failure"); return name === "memory-sync" && ["desktop", "declared-null", "late"].includes(scenario) },
+      declared: name => { if (scenario === "throwing") throw new Error("stub failure"); return name === "memory-sync" && ["desktop", "declared-null", "late", "hang"].includes(scenario) },
       tablePresent: () => scenario !== "cli",
-      take: name => { claims += 1; return ["desktop", "late"].includes(scenario) && name === "memory-sync" ? new PassThrough() : undefined },
+      take: name => { claims += 1; return ["desktop", "late", "hang"].includes(scenario) && name === "memory-sync" ? new PassThrough() : undefined },
     },
+    ...(scenario === "hang" ? { attachDeadlineMs: 500 } : {}),
     attach: async (stream): Promise<DesktopSyncAttachment> => {
       if (scenario === "late") await attachGate
+      if (scenario === "hang") await new Promise(() => {})
       return stream === undefined ? { kind: "unavailable", reason: "private_channel_unavailable" } : { kind: "connected", channel }
     },
   })

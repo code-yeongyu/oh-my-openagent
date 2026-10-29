@@ -57,6 +57,8 @@ type HostGlobal = typeof globalThis & { [HOST_KEY]?: HostMemorySync }
 export function selectHostMemorySyncSource(options: {
   readonly inherited: InheritedPrivateChannels
   readonly attach: (stream: Duplex | undefined) => Promise<DesktopSyncAttachment>
+  /** The bootstrap exchange bound; every present port is answered within it (v11 section 7.3). */
+  readonly attachDeadlineMs?: number
 }): HostMemorySync {
   if (!isMainThread) throw new Error("memory sync selection runs only in the engine's main thread")
   const host = globalThis as HostGlobal
@@ -71,7 +73,15 @@ async function select(options: Parameters<typeof selectHostMemorySyncSource>[0])
   try {
     const declared = options.inherited.declared(MEMORY_SYNC_CHANNEL) || options.inherited.tablePresent()
     if (!declared) return { kind: "cli" }
-    const attached = await options.attach(options.inherited.take(MEMORY_SYNC_CHANNEL))
+    const pending = options.attach(options.inherited.take(MEMORY_SYNC_CHANNEL))
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const expired = new Promise<"expired">(resolve => { timer = setTimeout(() => resolve("expired"), options.attachDeadlineMs ?? 10_000) })
+    const attached = await Promise.race([pending, expired]).finally(() => clearTimeout(timer))
+    if (attached === "expired") {
+      // A late attachment is discarded: close it so the claimed channel cannot outlive the unavailable answer.
+      void pending.then(late => { if (late.kind === "connected") late.channel.close() }, () => undefined)
+      return { kind: "unavailable", reason: "private_channel_unavailable" }
+    }
     return attached.kind === "connected" ? { kind: "desktop", channel: attached.channel } : attached
   } catch {
     return { kind: "unavailable", reason: "selection_failed" }
