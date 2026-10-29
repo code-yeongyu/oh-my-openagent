@@ -8,6 +8,7 @@ import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements"
 import { lowerReasoningForModel } from "../shared/agent-variant"
 import { setSessionFallbackSnapshot, clearSessionFallbackSnapshot } from "../shared/session-fallback-snapshot"
 import { createRuntimeModelConfigLoader } from "./runtime-model-config"
+import { createRequestSnapshotStore } from "./request-snapshots"
 
 type ModelConfig = Pick<OhMyOpenCodeConfig, "agents" | "categories">
 type Selection = { name?: string; config: ModelConfig; runtime: ReturnType<typeof createRuntimeModelConfigLoader> }
@@ -39,8 +40,10 @@ export function createSessionModelProfiles(args: {
   const selections = new Map<string, Selection>()
   const parents = new Map<string, string | undefined>()
   const baselineModels = new Map<string, Map<string, PrimaryBaseline>>()
-  const requests = new Map<string, Map<string, ModelConfig>>()
-  const loadDefault = createRuntimeModelConfigLoader(args.directory, args.initialConfig, environment)
+  const requests = createRequestSnapshotStore<ModelConfig>()
+  // Match pre-profile delegation: the validated, sanitized config still reloads when
+  // unrelated settings are ignored. Explicit profile selections stay atomic/strict.
+  const loadDefault = createRuntimeModelConfigLoader(args.directory, args.initialConfig, environment, { acceptPartialConfig: true })
 
   async function rootSession(id: string): Promise<string> {
     const visited = new Set<string>()
@@ -69,6 +72,7 @@ export function createSessionModelProfiles(args: {
   }
 
   async function load(sessionID: string): Promise<ModelConfig> {
+    if (selections.size === 0) return loadDefault()
     const selection = selections.get(await rootSession(sessionID))
     return selection ? reload(selection) : loadDefault()
   }
@@ -147,17 +151,15 @@ export function createSessionModelProfiles(args: {
 
   async function applyPrimary(sessionID: string, agent: string | undefined, message: Record<string, unknown>): Promise<ModelConfig | undefined> {
     const requestID = typeof message.id === "string" ? message.id : undefined
-    const request = requestID ? requests.get(sessionID)?.get(requestID) : undefined
-    if (request) return request
+    const request = requests.get(sessionID, requestID)
+    if (request) return resumeRequest(sessionID, requestID)
     const selection = selections.get(sessionID)
     if (!selection) return // Children and unselected sessions retain explicit host/dispatch models.
     const effectiveAgent = agent ?? (typeof message.agent === "string" ? message.agent : undefined)
     const agentKey = effectiveAgent ? getAgentConfigKey(effectiveAgent) : undefined
     const config = reload(selection)
     if (requestID) {
-      const sessionRequests = requests.get(sessionID) ?? new Map<string, ModelConfig>()
-      sessionRequests.set(requestID, config)
-      requests.set(sessionID, sessionRequests)
+      requests.set(sessionID, requestID, config)
     }
     const override = agentKey ? config.agents?.[agentKey] : undefined
     const category = override?.category ? config.categories?.[override.category] : undefined
@@ -210,16 +212,35 @@ export function createSessionModelProfiles(args: {
     return config
   }
 
+  function releaseRequest(sessionID: string, messageID: unknown): void {
+    requests.remove(sessionID, messageID)
+  }
+
+  function primaryConfig(sessionID: string, messageID?: unknown): ModelConfig | undefined {
+    const request = requests.get(sessionID, messageID)
+    return request ?? selections.get(sessionID)?.config
+  }
+
+  function resumeRequest(sessionID: string, messageID: unknown): ModelConfig | undefined {
+    return requests.resume(sessionID, messageID) ?? selections.get(sessionID)?.config
+  }
+
+  function completeRequest(sessionID: string, info: Record<string, unknown>): void {
+    const lease = requests.capture(sessionID)
+    lease.complete(info)
+    lease.release()
+  }
+
   function clearSession(sessionID: string): void {
     selections.delete(sessionID)
     parents.delete(sessionID)
     baselineModels.delete(sessionID)
-    requests.delete(sessionID)
+    requests.clear(sessionID)
     clearSessionFallbackSnapshot(sessionID)
   }
 
-  return { load, inspect, inspectRuntime, control, select, command, applyPrimary, clearSession, primaryConfig: (id: string, messageID?: unknown) => {
-    const request = typeof messageID === "string" ? requests.get(id)?.get(messageID) : undefined
-    return request ?? selections.get(id)?.config
-  } }
+  return { load, inspect, inspectRuntime, control, select, command, applyPrimary, releaseRequest, resumeRequest, completeRequest, clearSession, primaryConfig,
+    captureRequestEvent: (id: string, info?: Record<string, unknown>) => requests.capture(id, undefined, info),
+    beginRequestRecovery: (id: string) => requests.capture(id, "runtime-fallback"),
+  }
 }

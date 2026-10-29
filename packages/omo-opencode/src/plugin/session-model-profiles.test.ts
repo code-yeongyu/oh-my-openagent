@@ -29,6 +29,87 @@ function fixture(run: (args: { profiles: ReturnType<typeof createSessionModelPro
 }
 
 describe("session model profiles", () => {
+  test("default delegation reload never looks up session ancestry before any selection", async () => {
+    await fixture(async ({ path, config }) => {
+      let reads = 0
+      const profiles = createSessionModelProfiles({
+        directory: dirname(dirname(path)), initialConfig: {},
+        environment: { HOME: dirname(dirname(dirname(path))) },
+        readSession: async () => { reads++; throw new Error("session lookup unavailable") },
+      })
+      for (const extra of [{ unknown_key: true }, { telemetry: "invalid" }]) {
+        writeFileSync(path, JSON.stringify({ ...config, "[opencode]": { agents: { explore: { model: "fixture/updated" } }, ...extra } }))
+        expect((await profiles.load("default-parent")).agents?.explore?.model).toBe("fixture/updated")
+      }
+      expect(reads).toBe(0)
+    })
+  })
+
+  test("terminal completion releases only its request snapshot and retains retry and tool steps", async () => {
+    await fixture(async ({ profiles }) => {
+      await profiles.select("parent", "budget")
+      for (const id of ["active", "finished"]) await profiles.applyPrimary("parent", "sisyphus", { id })
+      const recovery = profiles.beginRequestRecovery("parent")
+      recovery.bind("active")
+      recovery.commit()
+      await profiles.select("parent", "quality")
+      for (const info of [
+        { parentID: "active", finish: "tool-calls", time: { completed: 1 } },
+        { parentID: "active", finish: "stop", time: {} },
+        { parentID: "active", finish: "stop", time: { completed: 1 }, error: { name: "APIError" } },
+      ]) profiles.completeRequest("parent", info)
+      expect(profiles.primaryConfig("parent", "active")?.agents?.sisyphus?.model).toBe("fixture/budget")
+      profiles.completeRequest("parent", { parentID: "finished", finish: "stop", time: { completed: 1 } })
+      profiles.completeRequest("parent", { parentID: "finished", finish: "stop", time: { completed: 1 } })
+      expect(profiles.primaryConfig("parent", "finished")?.agents?.sisyphus?.model).toBe("fixture/quality")
+      expect(profiles.primaryConfig("parent", "active")?.agents?.sisyphus?.model).toBe("fixture/budget")
+      profiles.releaseRequest("parent", "active")
+      expect(profiles.primaryConfig("parent", "active")?.agents?.sisyphus?.model).toBe("fixture/quality")
+    })
+  })
+
+  test("a long successful session releases every completed primary snapshot", async () => {
+    await fixture(async ({ profiles }) => {
+      await profiles.select("parent", "budget")
+      for (let n = 0; n < 150; n++) {
+        await profiles.applyPrimary("parent", "sisyphus", { id: `turn-${n}` })
+        profiles.completeRequest("parent", { parentID: `turn-${n}`, finish: "stop", time: { completed: n + 1 } })
+      }
+      await profiles.select("parent", "quality")
+      for (let n = 0; n < 150; n++) expect(profiles.primaryConfig("parent", `turn-${n}`)?.agents?.sisyphus?.model).toBe("fixture/quality")
+    })
+  })
+
+  test("a new primary turn retires terminal failed history", async () => {
+    await fixture(async ({ profiles }) => {
+      await profiles.select("parent", "budget")
+      await profiles.applyPrimary("parent", "sisyphus", { id: "failed" })
+      profiles.completeRequest("parent", { parentID: "failed", error: { name: "APIError" }, time: { completed: 1 } })
+      await profiles.select("parent", "quality")
+      await profiles.applyPrimary("parent", "sisyphus", { id: "new-user-turn" })
+      expect(profiles.primaryConfig("parent", "failed")?.agents?.sisyphus?.model).toBe("fixture/quality")
+    })
+  })
+
+  test.each(["primary", "synthetic"])("an active %s retry retains its snapshot across a newer user turn", async (kind) => {
+    await fixture(async ({ profiles }) => {
+      await profiles.select("parent", "budget")
+      await profiles.applyPrimary("parent", "sisyphus", { id: "retrying" })
+      const recovery = profiles.beginRequestRecovery("parent")
+      recovery.bind("retrying")
+      recovery.commit()
+      profiles.completeRequest("parent", { parentID: "retrying", error: { name: "APIError" }, time: { completed: 1 } })
+      await profiles.select("parent", "quality")
+      if (kind === "primary") {
+        const retry = { id: "retrying", model: { providerID: "fixture", modelID: "backup" } }
+        expect((await profiles.applyPrimary("parent", "sisyphus", retry))?.agents?.sisyphus?.model).toBe("fixture/budget")
+        expect(retry.model.modelID).toBe("backup")
+      } else expect(profiles.resumeRequest("parent", "retrying")?.agents?.sisyphus?.model).toBe("fixture/budget")
+      await profiles.applyPrimary("parent", "sisyphus", { id: "new-user-turn" })
+      expect(profiles.primaryConfig("parent", "retrying")?.agents?.sisyphus?.model).toBe("fixture/budget")
+    })
+  })
+
   test("headless control returns safe errors and saved inspection preserves each accepted session", async () => {
     await fixture(async ({ profiles, path, config }) => {
       expect(await profiles.control("parent", "budget")).toEqual({ ok: true })

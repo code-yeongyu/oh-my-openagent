@@ -80,7 +80,7 @@ export function createPluginInterface(args: {
     "chat.message": async (input, output) => {
       const selected = !isSyntheticOrInternalOnlyTextParts(output.parts)
         ? await args.sessionModelProfiles?.applyPrimary(input.sessionID, input.agent ?? (typeof output.message.agent === "string" ? output.message.agent : undefined), output.message)
-        : args.sessionModelProfiles?.primaryConfig(input.sessionID, output.message.id)
+        : args.sessionModelProfiles?.resumeRequest(input.sessionID, output.message.id)
       await createChatMessageHandler({
         ctx,
         pluginConfig: selected ? { ...pluginConfig, ...selected } : pluginConfig,
