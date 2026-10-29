@@ -74,7 +74,8 @@ describe("the account source built from the engine's one selection", () => {
   })
 })
 
-async function engine(scenario: string): Promise<{ readonly claims: number; readonly reports: readonly { readonly source: string; readonly cliBuilt: boolean; readonly echo?: unknown; readonly event?: unknown }[] }> {
+type EngineReport = { readonly source: string; readonly cliBuilt: boolean; readonly handle?: string; readonly foreignEnd?: string; readonly events?: readonly string[] }
+async function engine(scenario: string): Promise<{ readonly claims: number; readonly ends: number; readonly reports: readonly EngineReport[] }> {
   const child = Bun.spawn([process.execPath, join(import.meta.dirname, "../desktop-sync/hostSelection.fixture.ts"), scenario], { stdout: "pipe", stderr: "pipe" })
   const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`the ${scenario} engine fixture did not exit within 20s`)), 20_000))
   const code = await Promise.race([child.exited, deadline])
@@ -84,13 +85,23 @@ async function engine(scenario: string): Promise<{ readonly claims: number; read
 }
 
 describe("session Workers in a shared-worker engine", () => {
-  test("a desktop launch: both Workers reach the one claimed channel and neither builds the CLI source", async () => {
-    const result = await engine("desktop")
-    expect(result.claims).toBe(1)
-    for (const report of result.reports) {
-      expect(report).toEqual({ source: "desktop", cliBuilt: false, echo: { answered: "descriptor", claims: 1 }, event: { event: "connected", child: "child-1", handle: "h-1", connected: true } })
-    }
-  }, 30_000)
+  for (const scenario of ["desktop", "late"] as const) {
+    test(`a ${scenario} desktop launch: each Worker owns only its handles and events on its own port, with one claim`, async () => {
+      const result = await engine(scenario)
+      expect(result.claims).toBe(1)
+      expect(result.ends).toBe(2)
+      const [a, b] = result.reports
+      if (a === undefined || b === undefined) throw new Error("missing Worker report")
+      expect(new Set([a.handle, b.handle]).size).toBe(2)
+      for (const report of result.reports) {
+        expect(report.source).toBe("desktop")
+        expect(report.cliBuilt).toBe(false)
+        expect(report.foreignEnd).toBe("refused")
+        expect(report.events?.length).toBeGreaterThan(0)
+        expect(new Set(report.events)).toEqual(new Set([report.handle ?? ""]))
+      }
+    }, 30_000)
+  }
 
   for (const scenario of ["declared-null", "unparseable"] as const) {
     test(`a ${scenario} launch: every Worker gets the unavailable desktop source, never the CLI`, async () => {
@@ -106,8 +117,15 @@ describe("session Workers in a shared-worker engine", () => {
     for (const report of result.reports) expect(report).toEqual({ source: "null", cliBuilt: true })
   }, 30_000)
 
-  test("no host selection answers: Workers are unavailable, never the CLI", async () => {
-    const result = await engine("no-host")
-    for (const report of result.reports) expect(report).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: false })
-  }, 30_000)
+  const failClosed: readonly [string, string][] = [
+    ["no-port", "unavailable:port_absent"],
+    ["throwing", "unavailable:selection_failed"],
+    ["malformed", "unavailable:selection_failed"],
+  ]
+  for (const [scenario, expected] of failClosed) {
+    test(`a ${scenario} launch: Workers are unavailable (${expected}), never the CLI`, async () => {
+      const result = await engine(scenario)
+      for (const report of result.reports) expect(report).toEqual({ source: expected, cliBuilt: false })
+    }, 30_000)
+  }
 })
