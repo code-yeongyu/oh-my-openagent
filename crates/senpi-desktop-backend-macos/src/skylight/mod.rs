@@ -7,6 +7,7 @@
 //! AppKit) only.
 
 mod authentication;
+pub(crate) mod background;
 mod partial;
 mod psn;
 mod spi;

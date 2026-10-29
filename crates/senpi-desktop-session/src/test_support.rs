@@ -2,6 +2,7 @@
 //! failure and panic injection, its clock, and every audit event it emitted.
 
 mod panicky;
+mod background;
 
 use std::sync::Arc;
 

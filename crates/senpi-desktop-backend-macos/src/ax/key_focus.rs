@@ -11,6 +11,9 @@ use super::element::{copy_attribute_result, copy_bool, copy_element, copy_elemen
 /// How many `AXParent` hops the window ascent follows before giving up.
 const MAX_ANCESTRY_DEPTH: usize = 40;
 
+mod window_kind;
+pub(crate) use window_kind::ElementWindowKind;
+
 /// One of an application's `AXWindows`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct AxWindowRecord {
@@ -47,6 +50,9 @@ pub(crate) struct KeyFocus {
     /// fields of an Open panel's Go to Folder sheet map to no window: another
     /// process draws them.
     pub(crate) element_mapped: bool,
+    /// AX role/subrole of the focused element's window, when it differs from
+    /// the reported window. A missing probe is not a known ordinary child.
+    pub(crate) element_kind: ElementWindowKind,
 }
 
 /// Where keystrokes posted for window `wid` would go now.
@@ -65,7 +71,10 @@ pub(crate) enum KeyDestination {
 impl KeyFocus {
     /// Where keystrokes for window `wid` of process `pid` would go.
     ///
-    /// The focused window decides when the application reports one; a sheet
+    /// A known focused sheet takes only its own keys. Unknown classification
+    /// refuses a reported parent whose attached child holds the element;
+    /// known popovers retain the existing parent-window routing.
+    /// Otherwise the focused window decides when reported; a sheet
     /// or panel it reports is another window, even when attached to `wid`.
     /// When it reports `wid`'s parent while the focused element is in `wid`,
     /// as Reminders does for a field in its details popover, keys reach `wid`.
@@ -73,6 +82,15 @@ impl KeyFocus {
     /// overlay window of its own) has focus, the focused element's window
     /// decides: `wid` itself, or a window `parent_of` says is attached to it.
     pub(crate) fn destination(&self, pid: libc::pid_t, wid: u32, parent_of: impl Fn(u32) -> Option<u32>) -> KeyDestination {
+        if let Some(child) = self.element_window.filter(|&child| child != wid) {
+            let sheet_candidate = self.window == FocusedWindow::Id(wid)
+                && parent_of(child) == Some(wid);
+            if self.element_kind == ElementWindowKind::Sheet
+                || (self.element_kind == ElementWindowKind::Unknown && sheet_candidate)
+            {
+                return KeyDestination::Other(Some(child));
+            }
+        }
         match self.window {
             FocusedWindow::Id(id) if id == wid => KeyDestination::Target(pid),
             FocusedWindow::Id(_) if self.holds_overlay_focus(wid, &parent_of) => KeyDestination::Target(pid),
@@ -120,10 +138,17 @@ pub(crate) fn key_focus(pid: libc::pid_t) -> KeyFocus {
         .as_deref()
         .and_then(innermost_window_id)
         .map_or((None, false), |(id, own)| (Some(id), own));
+    let element_kind = element_window
+        .filter(|&id| window == FocusedWindow::Unreported
+            || matches!(window, FocusedWindow::Id(reported) if reported != id))
+        .and_then(|id| find_window(&app, id))
+        .as_deref()
+        .map_or(ElementWindowKind::Unknown, window_kind::read);
     KeyFocus {
         window,
         element_window,
         element_mapped,
+        element_kind,
     }
 }
 
@@ -304,3 +329,6 @@ mod tests;
 #[cfg(test)]
 #[path = "key_window_lookup_tests.rs"]
 mod lookup_tests;
+
+#[cfg(test)]
+mod sheet_tests;

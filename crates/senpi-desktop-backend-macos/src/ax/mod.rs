@@ -24,9 +24,9 @@ use senpi_desktop_core::types::DesktopWindow;
 
 pub use self::element::is_trusted;
 pub(crate) use self::foreground::{make_frontmost, prepare_foreground_input};
-pub(crate) use self::point_owner::ensure_points_owned;
+pub(crate) use self::point_owner::{ensure_points_owned, point_owner};
 pub(crate) use self::key_focus::{
-    focused_window_id, key_focus, window_content, window_records, AxWindowRecord, FocusedWindow, KeyDestination, KeyFocus,
+    focused_window_id, key_focus, window_content, window_records, AxWindowRecord, ElementWindowKind, FocusedWindow, KeyDestination, KeyFocus,
     WindowContent,
 };
 pub(crate) use self::text_input::insert_into_element;

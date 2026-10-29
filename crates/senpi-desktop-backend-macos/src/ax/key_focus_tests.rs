@@ -14,6 +14,7 @@ fn a_focused_sheet_is_not_the_window_it_is_attached_to() {
         window: FocusedWindow::Id(41740),
         element_window: Some(41740),
         element_mapped: true,
+        element_kind: super::ElementWindowKind::Sheet,
     };
     let attached = |id| (id == 41740).then_some(41732);
     assert_eq!(focus.destination(7, 41732, attached), KeyDestination::Other(Some(41740)));
@@ -47,6 +48,7 @@ fn an_editor_overlay_attached_to_the_target_holds_its_focus() {
         window: FocusedWindow::Unreported,
         element_window: Some(41743),
         element_mapped: true,
+        element_kind: super::ElementWindowKind::Ordinary,
     };
     let attached = |id| (id == 41743).then_some(41732);
     assert_eq!(focus.destination(7, 41732, attached), KeyDestination::Target(7));
@@ -64,6 +66,7 @@ fn a_popover_holding_focus_takes_its_own_keys() {
         window: FocusedWindow::Id(79),
         element_window: Some(90),
         element_mapped: true,
+        element_kind: super::ElementWindowKind::Popover,
     };
     let attached = |id| (id == 90).then_some(79);
     assert_eq!(focus.destination(7, 90, attached), KeyDestination::Target(7));

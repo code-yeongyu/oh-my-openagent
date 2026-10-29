@@ -33,12 +33,15 @@ impl Panics {
 }
 
 /// Counts `watch_user_input` calls across every backend a factory built.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct Watches(Arc<AtomicUsize>);
+#[derive(Clone, Default)]
+pub(crate) struct Watches {
+    count: Arc<AtomicUsize>,
+    pub(crate) background: super::background::BackgroundFixture,
+}
 
 impl Watches {
     pub(crate) fn count(&self) -> usize {
-        self.0.load(Ordering::SeqCst)
+        self.count.load(Ordering::SeqCst)
     }
 }
 
@@ -49,6 +52,14 @@ pub(crate) struct PanickyFake {
 }
 
 impl Backend for PanickyFake {
+    fn begin_background_action(
+        &mut self,
+        _target: &Target,
+    ) -> CoreResult<Option<Box<dyn senpi_desktop_core::background_action::BackgroundActionWatch>>>
+    {
+        Ok(self.watches.background.begin())
+    }
+
     fn permission_denied(&mut self, permission: TccPermission) -> DesktopError {
         DesktopError::permission_denied_with(PermissionDeniedData {
             permission,
@@ -176,7 +187,7 @@ impl Backend for PanickyFake {
         self.inner.screen_locked()
     }
     fn watch_user_input(&mut self) {
-        self.watches.0.fetch_add(1, Ordering::SeqCst);
+        self.watches.count.fetch_add(1, Ordering::SeqCst);
         self.inner.watch_user_input();
     }
     fn user_input_feed(&mut self) -> Option<Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {

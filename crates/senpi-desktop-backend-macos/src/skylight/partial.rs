@@ -27,6 +27,7 @@ const RERUN_SUFFIXES: [&str; 5] = [
 /// Records that the current background call posted input to its target, or
 /// made an AX request that may have taken effect there.
 pub(crate) fn mark_sent() {
+    senpi_desktop_core::background_action::note_send();
     SENT.set(true);
 }
 

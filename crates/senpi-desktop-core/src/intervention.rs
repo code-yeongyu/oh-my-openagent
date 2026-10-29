@@ -46,6 +46,7 @@ impl Drop for PressWatch {
 /// # Errors
 /// The installed check's refusal: nothing more of the call may be sent.
 pub fn check_press() -> CoreResult<()> {
+    crate::background_action::check_press()?;
     PRESS_CHECK.get().map_or(Ok(()), |check| check())
 }
 

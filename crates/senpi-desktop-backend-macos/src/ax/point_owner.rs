@@ -56,7 +56,7 @@ pub(crate) fn event_points(event: &PointerEvent) -> Vec<(f64, f64)> {
 }
 
 /// Hit-tests `(x, y)` the way the pointer would.
-fn point_owner(x: f64, y: f64) -> CoreResult<Option<PointOwner>> {
+pub(crate) fn point_owner(x: f64, y: f64) -> CoreResult<Option<PointOwner>> {
     let Some(hit) = tree::element_at(x, y)? else {
         return Ok(None);
     };

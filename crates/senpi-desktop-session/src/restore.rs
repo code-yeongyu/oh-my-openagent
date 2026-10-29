@@ -64,6 +64,24 @@ impl From<TransactionError> for DesktopError {
 }
 
 impl Guard {
+    /// Post-action cleanup follows the newer user choice, never its old snapshot.
+    pub(crate) fn follow_background_lease(
+        &mut self,
+        lease: &senpi_desktop_core::background_focus::BackgroundFocusLease,
+    ) {
+        if let Self::KeyFocus { front } = self {
+            if lease.disarmed {
+                *self = Self::Untouched;
+            } else if let Some(front) = front {
+                if front.pid == lease.previous {
+                    front.window_id = lease.key.map(|key| key.to_string());
+                } else {
+                    *self = Self::Untouched;
+                }
+            }
+        }
+    }
+
     /// Captures what `action` delivered this way may disturb. A capture
     /// failure posts no input.
     pub(crate) fn begin(

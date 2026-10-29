@@ -107,6 +107,14 @@ pub enum ElementDelivery {
 }
 
 pub trait Backend: Send {
+    /// Watches a background window action through settle; also the Spaces hook.
+    fn begin_background_action(
+        &mut self,
+        _target: &Target,
+    ) -> CoreResult<Option<Box<dyn crate::background_action::BackgroundActionWatch>>> {
+        Ok(None)
+    }
+
     /// Independent release ownership, usable without borrowing a busy backend.
     /// Owners register this before admitting input into bounded fatal-stop mode.
     fn emergency_release(&self) -> Option<std::sync::Arc<dyn EmergencyRelease>> {

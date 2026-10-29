@@ -14,10 +14,12 @@ use senpi_desktop_core::error::CoreResult;
 
 use super::key_route::{
     attached_under, decide, key_process, key_refusal, keyboard_conflict, keys_still_reach, owner_still_focused,
-    unmapped_keyboard_refusal, KeyDecision, KeyboardConflict,
+    KeyDecision, KeyboardConflict,
 };
-use crate::ax::{self, KeyDestination, KeyFocus};
+use crate::ax::{self, KeyFocus};
 use crate::skylight;
+
+mod activation;
 
 /// How long the application has to report the target as its key window
 /// after the focus-without-raise record, read every [`KEY_WINDOW_POLL`].
@@ -65,19 +67,10 @@ impl PreparedKeys {
 /// a target behind its own sheet): nothing was sent.
 pub(super) fn prepare(pid: libc::pid_t, wid: u32) -> CoreResult<PreparedKeys> {
     let conflict = keyboard_conflict_now(pid, wid);
-    if conflict == Some(KeyboardConflict::Unmapped) {
-        return Err(unmapped_keyboard_refusal(wid));
-    }
-    let focus = ax::key_focus(pid);
-    // The target cannot become key while a window attached to it has focus,
-    // so waiting for that would only delay the same refusal.
-    let destination = focus.destination(pid, wid, skylight::window_parent);
-    if let KeyDestination::Other(Some(other)) = destination {
-        if attached_under(other, skylight::window_parent, |parent| parent == wid) {
-            return Err(key_refusal(wid, destination, conflict, skylight::window_parent));
-        }
-    }
-    skylight::activate_without_raise(pid, wid)?;
+    activation::activate_target(
+        pid, wid, conflict, || ax::key_focus(pid), skylight::window_parent,
+        || skylight::activate_without_raise(pid, wid),
+    )?;
     let (to, proven) = await_key_destination(pid, wid, conflict)?;
     let owner = key_process(to, wid, &proven, || ax::window_content(pid, wid), ax::focused_window_id)?;
     if owner.0 != pid {

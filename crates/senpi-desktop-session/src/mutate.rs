@@ -17,13 +17,13 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, TccPermission};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_safety::{
-    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate, StopPathReason,
-    StopPolicy, Supervisor,
+    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction,
+    PermissionGate, StopPathReason, StopPolicy, Supervisor,
 };
 
 use crate::audit::audit_event;
 use crate::grant::ControlSlot;
-use crate::restore::{Guard, TransactionError};
+use crate::restore::TransactionError;
 use crate::session::guarded;
 use crate::worker::Worker;
 
@@ -33,6 +33,8 @@ static INPUT_TRANSACTION: Mutex<()> = parking_lot::const_mutex(());
 
 /// How long admission waits on a held transaction lock between cancellation
 /// checks.
+mod transaction;
+
 const ADMISSION_POLL: Duration = Duration::from_millis(1);
 
 /// What the session thread needs to gate input and report it.
@@ -77,7 +79,11 @@ pub(crate) struct Mutation<'a> {
 }
 
 impl Mutation<'_> {
-    pub(crate) const fn new(action: MutatingAction, target: String, delivery: DeliveryMode) -> Self {
+    pub(crate) const fn new(
+        action: MutatingAction,
+        target: String,
+        delivery: DeliveryMode,
+    ) -> Self {
         Self {
             action,
             target,
@@ -131,9 +137,27 @@ impl Worker {
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> CoreResult<(T, AuditEvent)> {
         let started = Instant::now();
-        let (result, focus_restored) = match self.admit(cancelled) {
-            Ok(_transaction) => self.transaction(mutation, cancelled, act),
-            Err(stopped) => (Err(TransactionError::Primary(stopped)), None),
+        // The user's quiet-period wait owns no process-wide input lock.
+        // Gate/grant checks are repeated under the lock before capture.
+        let cancelled_before_wait = cancelled();
+        let admission = if self.safety.supervisor.is_suspended() {
+            Err(DesktopError::from(GateError::Suspended))
+        } else if cancelled_before_wait {
+            Err(DesktopError::new(
+                ErrorCode::Cancelled,
+                "the request was cancelled before any input was sent",
+            ))
+        } else {
+            self.gate(mutation)
+                .and_then(|()| self.admit_control(mutation))
+                .and_then(|()| self.admit_intervention(mutation, cancelled))
+        };
+        let (result, focus_restored) = match admission {
+            Ok(_watch) => match self.admit(cancelled) {
+                Ok(_transaction) => self.transaction(mutation, cancelled, act),
+                Err(stopped) => (Err(TransactionError::Primary(stopped)), None),
+            },
+            Err(refused) => (Err(TransactionError::Primary(refused)), None),
         };
         let result = result.map_err(DesktopError::from);
         let code = result.as_ref().err().map(|error| error.code);
@@ -143,45 +167,7 @@ impl Worker {
         result.map(|value| (value, event))
     }
 
-    /// The gate and the transaction proper; `focus_restored` is `None` when
-    /// nothing was captured to restore.
-    pub(crate) fn transaction<T>(
-        &mut self,
-        mutation: &Mutation<'_>,
-        cancelled: &dyn Fn() -> bool,
-        act: impl FnOnce(&mut Self) -> CoreResult<T>,
-    ) -> (Result<T, TransactionError>, Option<bool>) {
-        // The fail-closed gate (stop path, lock, permissions) answers first:
-        // asking the human for a grant is pointless while input cannot run.
-        if let Err(refused) = self.gate(mutation) {
-            return (Err(TransactionError::Primary(refused)), None);
-        }
-        if let Err(refused) = self.admit_control(mutation) {
-            return (Err(TransactionError::Primary(refused)), None);
-        }
-        let _watch = match self.admit_intervention(mutation, cancelled) {
-            Ok(watch) => watch,
-            Err(refused) => return (Err(TransactionError::Primary(refused)), None),
-        };
-        let guard = match Guard::begin(self, mutation.action, mutation.delivery) {
-            Ok(guard) => guard,
-            Err(error) => return (Err(TransactionError::Primary(error)), None),
-        };
-        let mut result = match self.stop_observed(cancelled) {
-            Some(stopped) => Err(stopped),
-            None => guarded(|| act(self)),
-        };
-        if result.is_ok() {
-            result = self.after_action(mutation, result);
-        }
-        if let Err(primary) = &mut result {
-            // Recorded on the primary error, never in place of it.
-            if let Err(release) = guarded(|| self.backend()?.release_all()) {
-                primary.message = format!("{}; releasing held input also failed: {release}", primary.message);
-            }
-        }
-        guard.restore(self, result)
-    }
+
 
     /// Waits for the transaction lock, giving up when a stop or a
     /// cancellation is observed first.
@@ -210,11 +196,14 @@ impl Worker {
     /// stop may race it.
     fn stop_observed(&self, cancelled: &dyn Fn() -> bool) -> Option<DesktopError> {
         let cancelled = cancelled();
-        interruption(&self.safety.supervisor, &self.stop_policy())
-            .or_else(|| cancelled.then(|| DesktopError::new(
-                ErrorCode::Cancelled,
-                "the request was cancelled before any input was sent",
-            )))
+        interruption(&self.safety.supervisor, &self.stop_policy()).or_else(|| {
+            cancelled.then(|| {
+                DesktopError::new(
+                    ErrorCode::Cancelled,
+                    "the request was cancelled before any input was sent",
+                )
+            })
+        })
     }
 
     pub(crate) fn stop_policy(&self) -> StopPolicy {
@@ -265,7 +254,9 @@ impl Worker {
             mutation.frame_id.map(FrameId::new),
         );
         match result {
-            Err(GateError::PermissionDenied { permission }) => Err(self.backend()?.permission_denied(permission)),
+            Err(GateError::PermissionDenied { permission }) => {
+                Err(self.backend()?.permission_denied(permission))
+            }
             other => other.map_err(DesktopError::from),
         }
     }
@@ -309,3 +300,6 @@ mod stop_tests;
 pub(crate) mod tests;
 #[cfg(test)]
 mod typing_tests;
+
+#[cfg(test)]
+mod background_tests;

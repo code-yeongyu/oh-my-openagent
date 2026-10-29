@@ -12,6 +12,8 @@ use super::background_keys::PreparedKeys;
 use super::{global, guard, keys, post, resolve_window, window_identity, MacInput};
 use crate::{capture::MacCapture, skylight};
 
+mod keyboard;
+
 impl MacInput {
     pub(crate) fn hold_keys(
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
@@ -90,22 +92,14 @@ impl MacInput {
         prepared: Option<&PreparedKeys>,
         operation: impl FnOnce(&mut Self) -> CoreResult<()>,
     ) -> CoreResult<()> {
-        let codes = held_keys.iter().map(|&key| keys::key_code(key).map(|code| (key, code)))
-            .collect::<CoreResult<Vec<_>>>()?;
-        // Before every held key press: the stop check, and for background keys the
-        // proof that they still reach the window.
-        let check = move || {
-            (control.check)()?;
-            prepared.map_or(Ok(()), super::background_keys::PreparedKeys::recheck)
-        };
-        with_held(
-            &mut (self, Modifiers::default()), &codes, &check,
-            |(this, modifiers), (key, code), down| {
-                keys::update_modifier(modifiers, key, down);
+        keyboard::keys_held(
+            self, held_keys, control.check,
+            || prepared.map_or(Ok(()), PreparedKeys::recheck),
+            |this, code, down, modifiers| {
                 keys::post_key(&this.source, &mut this.held, code, None, down,
-                    modifier_flags(*modifiers), route)
+                    modifier_flags(modifiers), route)
             },
-            |(this, _)| operation(this),
+            operation,
         )
     }
 

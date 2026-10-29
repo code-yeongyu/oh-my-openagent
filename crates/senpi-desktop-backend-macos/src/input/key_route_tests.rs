@@ -101,6 +101,7 @@ fn keys_for_a_system_panel_go_to_the_process_that_draws_it() {
         window: FocusedWindow::Id(window),
         element_window: Some(element),
         element_mapped: mapped,
+        element_kind: crate::ax::ElementWindowKind::Ordinary,
     };
     let unread = || -> WindowContent { panic!("focus in the window itself proves the host") };
     let unasked = |_| -> Option<u32> { panic!("no other process is involved") };
@@ -127,6 +128,7 @@ fn keys_for_a_system_panel_go_to_the_process_that_draws_it() {
         window: FocusedWindow::Unreported,
         element_window: Some(41743),
         element_mapped: true,
+        element_kind: crate::ax::ElementWindowKind::Ordinary,
     };
     assert_eq!(key_process(7, 41732, &rename, unread, unasked).unwrap(), (7, 41732));
     assert_eq!(input_owner(7581, 554, WindowContent::Own, unasked).unwrap(), (7581, 554));
@@ -140,6 +142,7 @@ fn background_keys_stop_once_another_window_becomes_key() {
         window: FocusedWindow::Id(42),
         element_window: Some(42),
         element_mapped: true,
+        element_kind: crate::ax::ElementWindowKind::Ordinary,
     };
     let unread = || -> Option<KeyboardConflict> { panic!("a reported destination needs no window set") };
     assert!(keys_still_reach(7, 42, unread, proven, || proven, |_| None).is_ok());
@@ -147,6 +150,7 @@ fn background_keys_stop_once_another_window_becomes_key() {
         window: FocusedWindow::Id(43),
         element_window: Some(43),
         element_mapped: true,
+        element_kind: crate::ax::ElementWindowKind::Ordinary,
     };
     let error = keys_still_reach(7, 42, unread, proven, || moved, |_| None).unwrap_err();
     assert_eq!(error.code, ErrorCode::InputFailed);
@@ -163,6 +167,7 @@ fn background_keys_stop_once_the_overlay_holding_focus_closes() {
         window: FocusedWindow::Unreported,
         element_window: Some(41743),
         element_mapped: true,
+        element_kind: crate::ax::ElementWindowKind::Ordinary,
     };
     assert!(keys_still_reach(7, 41732, || None, proven, || proven, attached).is_ok());
     let closed = KeyFocus {
