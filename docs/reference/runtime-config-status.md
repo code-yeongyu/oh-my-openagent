@@ -31,12 +31,27 @@ loader. An observation never changes `lastReload` or `acceptedRevision`.
 
 `saved.valid` is false for malformed input, invalid values that the normal
 startup loader would prune, unknown fields and read failures.
+This strict acceptance policy applies to explicit profile selections. Default
+delegation keeps the startup validator's best-effort behavior: sanitized
+agents/categories still reload when other settings are ignored or unknown.
+For that loader, `saved.valid` means a sanitized candidate can be accepted;
+diagnostics remain visible even on acceptance. Unexpected validation exceptions
+still retain the previous snapshot.
 `saved.matchesAccepted` is `null` for a rejected candidate, otherwise a boolean
 comparison of the effective agents/categories snapshot. It does not compare raw
 file bytes, comments, or unrelated hook/provider settings. An edit may remain
 pending until a subsequent dispatch reads it. Acceptance covers model routing
 only: startup agent registrations, hooks and providers retain their startup
 settings, and requests/child continuations already resolved keep their snapshots.
+
+Primary request snapshots retain active work rather than completed turn history.
+Terminal assistant success or failure releases the snapshot after its event
+handlers finish. A queued or accepted runtime fallback owns the exact original
+user-message snapshot until that request resumes, is removed, or is superseded
+by an accepted recovery. Abort and timeout work also retain ownership across
+asynchronous operations. Record identity and retry generations prevent late
+completion, deletion, or acknowledgement from releasing a newer request.
+Intermediate tool steps and nonterminal updates do not release active snapshots.
 
 Diagnostics expose only `{ code, count }`:
 
