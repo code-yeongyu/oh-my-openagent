@@ -3,14 +3,14 @@
 import { z } from "zod"
 
 export const SyncInteger = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
-export const SyncPrincipal = z.object({
+const SyncPrincipal = z.object({
   kind: z.literal("device"),
   id: z.string(),
   signing_public_key: z.string(),
   sealing_public_key: z.string(),
 })
 const author = z.union([SyncPrincipal, z.object({ kind: z.literal("recovery"), credential_id: z.string() })])
-export const SyncWrap = z.object({ epoch: SyncInteger, id: z.string(), wrap: z.string() })
+const SyncWrap = z.object({ epoch: SyncInteger, id: z.string(), wrap: z.string() })
 const chainRowFields = {
   seq: SyncInteger,
   base_seq: SyncInteger,
@@ -23,7 +23,7 @@ const chainRowFields = {
   keyring_link: z.string().nullable(),
   record_sig: z.string(),
 }
-export const SyncChainRow = z.object(chainRowFields)
+const SyncChainRow = z.object(chainRowFields)
 const keyringRow = z.object({
   ...chainRowFields,
   kind: z.literal("keyring"),

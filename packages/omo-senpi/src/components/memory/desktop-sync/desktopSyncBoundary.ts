@@ -17,7 +17,7 @@ const DesktopGenerationRecord = z.strictObject({
 })
 
 /** Re-read main's durable record; only an active record naming the captured identity, generation and incarnation passes. */
-export async function desktopRecordIsCurrent(descriptor: DesktopSyncDescriptor, home = homedir()): Promise<boolean> {
+async function desktopRecordIsCurrent(descriptor: DesktopSyncDescriptor, home = homedir()): Promise<boolean> {
   let raw: string
   try {
     raw = await readFile(credentialLockPaths(descriptor.serviceOrigin, home).desktopRecord, "utf8")

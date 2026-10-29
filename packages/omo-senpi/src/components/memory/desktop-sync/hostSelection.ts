@@ -9,7 +9,7 @@ import { z } from "zod"
 import type { DesktopSyncEngineWire } from "./desktopSyncAccount"
 import { DesktopSyncEvent, DesktopSyncRefused, DesktopSyncRequest, decodeSyncHandle } from "./desktopSyncProtocol"
 
-export const MEMORY_SYNC_CHANNEL = "memory-sync"
+const MEMORY_SYNC_CHANNEL = "memory-sync"
 export type UnavailableReason = "private_channel_unavailable" | "platform_not_supported" | "port_absent" | "selection_failed"
 
 export interface InheritedPrivateChannels {
