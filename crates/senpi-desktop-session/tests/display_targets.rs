@@ -79,6 +79,7 @@ async fn per_call_display_frames_survive_other_target_captures_without_reopening
     // Desktop and display input needs the human-confirmed control grant (#10788).
     session
         .submit(Op::ControlGrant(ControlGrantParams {
+        automatic: false,
             reason: "display input".to_owned(),
             confirmation_id: "confirm-1".to_owned(),
         }))

@@ -51,7 +51,7 @@ test("seeded rerun model bounds calls and grants through state changes", async (
 		seed ^= seed << 5;
 		return seed >>> 0;
 	};
-	const codes = ["BackgroundUnavailable", "InputFailed", "AxUnconfirmed", "UserIntervened", "Cancelled", "Suspended"];
+	const codes = ["BackgroundUnavailable", "ControlRequired", "InputFailed", "AxUnconfirmed", "UserIntervened", "Cancelled", "Suspended"];
 	for (let run = 0; run < 64; run += 1) {
 		for (let step = 0; step < 40; step += 1) {
 			const bits = next();
@@ -60,10 +60,14 @@ test("seeded rerun model bounds calls and grants through state changes", async (
 			const explicit = (bits & 4) !== 0;
 			const loseDuringGrant = (bits & 8) !== 0;
 			const cancelDuringGrant = (bits & 16) !== 0;
-			const code = codes[next() % codes.length]!;
-			const expectedRetry = allowed && !explicit && code === "BackgroundUnavailable";
+			const cancelledBefore = (bits & 32) !== 0;
+			const method = (bits & 64) !== 0 ? "raiseWindow" : "typeText";
+			const code = codes[next() % codes.length] ?? "Suspended";
+			const eligible = method === "raiseWindow" ? code === "ControlRequired" : !explicit && code === "BackgroundUnavailable";
+			const expectedRetry = allowed && !cancelledBefore && eligible;
 			const expectedGrant = expectedRetry && !live;
 			const controller = new AbortController();
+			if (cancelledBefore) controller.abort();
 			let calls = 0;
 			let grants = 0;
 			const output = new RunOutput();
@@ -86,7 +90,7 @@ test("seeded rerun model bounds calls and grants through state changes", async (
 				output,
 				controller.signal,
 			);
-			await call("typeText", explicit ? { opts: { deliveryMode: "background" } } : {}).catch(() => undefined);
+			await call(method, explicit ? { opts: { deliveryMode: "background" } } : {}).catch(() => undefined);
 			const sentAgain = expectedRetry && !(expectedGrant && (loseDuringGrant || cancelDuringGrant));
 			expect(calls, `run=${run} step=${step}`).toBe(sentAgain ? 2 : 1);
 			expect(grants).toBe(expectedGrant ? 1 : 0);

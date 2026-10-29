@@ -76,6 +76,7 @@ fn click_desktop() -> Op {
 async fn grant(session: &Session) {
     session
         .submit(Op::ControlGrant(ControlGrantParams {
+        automatic: false,
             reason: "desktop click".to_owned(),
             confirmation_id: "confirm-1".to_owned(),
         }))

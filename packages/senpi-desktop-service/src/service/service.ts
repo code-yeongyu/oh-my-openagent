@@ -4,13 +4,18 @@ import {
 	type DesktopCapabilities,
 	ENGINE_ABI,
 	type EngineMethod,
+	type EscapeStopped,
 	PROTOCOL_VERSION,
 	type StopPathStatus,
 } from "@oh-my-opencode/senpi-desktop-protocol";
 import { type ChildFactory, engineChildFactory } from "./child";
 import { ControlGrants } from "./control-grants";
 import { deadline } from "./deadline";
+import { EscapeStops } from "./escape-stops";
 import { FullAccessConsent, isGlobalInput } from "./global-input";
+import { heartbeat } from "./heartbeat";
+import { Lifecycle } from "./lifecycle";
+import { malformed } from "./malformed-result";
 import { type Listener, NotificationHub, type Unsubscribe } from "./notifications";
 import { isDesktopCapabilities, isStopPathStatus, parseHello, parseSessionOpened } from "./parse";
 import { type CallOptions, DesktopEngineRpcError, DesktopServiceError, RpcClient } from "./rpc-client";
@@ -37,7 +42,7 @@ export interface DesktopServiceOptions {
 export class DesktopService {
 	readonly #createChild: ChildFactory;
 	readonly #hub = new NotificationHub();
-	#lifecycle: Promise<unknown> = Promise.resolve();
+	readonly #lifecycle = new Lifecycle();
 	#connection: Connection | undefined;
 	#backend: DesktopCapabilities["backend"] | undefined;
 	#desired: DesiredSession | undefined;
@@ -46,14 +51,29 @@ export class DesktopService {
 	readonly #fullAccess: () => boolean;
 	/** The user's stop, held by the host: only a stop sets it and only a successful resume clears it (#10788). */
 	#stopLatched = false;
+	readonly #escape = new EscapeStops(() => this.#grants.escapeStopped());
 
 	constructor(options: DesktopServiceOptions = {}) {
 		this.#createChild = options.createChild ?? engineChildFactory();
 		this.#fullAccess = options.fullAccess ?? (() => false);
 		this.#consent = new FullAccessConsent(this.#grants, this.#fullAccess);
+		this.#hub.onEscapeStopped(({ escapeStops }) => this.#escape.observe(escapeStops));
 		this.#hub.onStopPathChange((status) => {
 			if (status.suspended) this.#stopLatched = true;
 		});
+	}
+
+	onEscapeStopped(listener: Listener<EscapeStopped>): Unsubscribe {
+		return this.#escape.listen(listener);
+	}
+
+	escapeStopCount(): number {
+		return this.#escape.count;
+	}
+
+	/** Counter backstop without starting or restarting an unused engine. */
+	refreshEscapeStops(): Promise<number> {
+		return this.#escape.refresh(this.#connection);
 	}
 
 	onAudit(listener: Listener<AuditEvent>): Unsubscribe {
@@ -74,7 +94,7 @@ export class DesktopService {
 
 	/** Starts the engine when none runs, then opens (or reconfigures) the desktop session. */
 	open(params: DesktopSessionOpenParams): Promise<DesktopCapabilities> {
-		return this.#serialize(async () => {
+		return this.#lifecycle.run(async () => {
 			const normalized = { ...params, showCursor: params.showCursor ?? true };
 			this.#desired = { params: normalized, chord: this.#desired?.chord };
 			const live = this.#connection;
@@ -86,7 +106,7 @@ export class DesktopService {
 
 	/** Arms the stop path for `chord`; repeating the same chord only reads the status. */
 	ensureStopPath(chord: string): Promise<StopPathStatus> {
-		return this.#serialize(async () => {
+		return this.#lifecycle.run(async () => {
 			const connection = await this.#liveLocked();
 			if (connection.armedChord === chord) return this.#stopPath(connection, "stopPath.status", {});
 			const status = await this.#stopPath(connection, "stopPath.start", { chord });
@@ -97,13 +117,19 @@ export class DesktopService {
 	}
 
 	async call(method: EngineMethod, params: unknown, options: CallOptions = {}): Promise<unknown> {
-		const connection = await this.#live();
-		await this.#consent.fence(connection);
-		const request = () => connection.rpc.request(method, params, options);
-		if (method === "control.grant") return this.#grants.grant(request, options.signal?.aborted === true);
-		if (method === "control.revoke") return this.#grants.revoke(request);
-		if (isGlobalInput(method, params)) return this.#consent.send(connection, method, params, options);
-		return request();
+		try {
+			const connection = await this.#live();
+			await this.#consent.fence(connection);
+			const request = () => connection.rpc.request(method, params, options);
+			if (method === "control.grant") return await this.#grants.grant(request, options.signal?.aborted === true);
+			if (method === "control.revoke") return await this.#grants.revoke(request);
+			if (isGlobalInput(method, params)) return await this.#consent.send(connection, method, params, options);
+			return await request();
+		} catch (error) {
+			// Observe a missed notification before eval code can catch the native failure.
+			await this.refreshEscapeStops();
+			throw error;
+		}
 	}
 
 	/**
@@ -188,7 +214,7 @@ export class DesktopService {
 
 	/** Closes the session and lets the engine exit at EOF; kills it after `CLOSE_TIMEOUT_MS`. */
 	close(): Promise<void> {
-		return this.#serialize(async () => {
+		return this.#lifecycle.run(async () => {
 			this.#desired = undefined;
 			const connection = this.#connection;
 			if (connection === undefined) return;
@@ -209,19 +235,9 @@ export class DesktopService {
 		});
 	}
 
-	#serialize<T>(work: () => Promise<T>): Promise<T> {
-		const run = this.#lifecycle.then(work);
-		// The chain only orders lifecycle steps; each caller receives its own outcome through `run`.
-		this.#lifecycle = run.then(
-			() => undefined,
-			() => undefined,
-		);
-		return run;
-	}
-
 	#live(): Promise<Connection> {
 		const live = this.#connection;
-		return live?.rpc.alive === true ? Promise.resolve(live) : this.#serialize(() => this.#liveLocked());
+		return live?.rpc.alive === true ? Promise.resolve(live) : this.#lifecycle.run(() => this.#liveLocked());
 	}
 
 	/** The live connection, or a fresh child replaying the desired session; caller holds the lifecycle chain. */
@@ -249,9 +265,10 @@ export class DesktopService {
 				START_TIMEOUT_MESSAGE,
 			);
 			this.#connection = connection;
-			connection.heartbeat = setInterval(() => this.#heartbeat(connection), HEARTBEAT_MS);
+			connection.heartbeat = setInterval(() => heartbeat(connection, this.#hub), HEARTBEAT_MS);
 			return { connection, capabilities };
 		} catch (error) {
+			this.#backend = undefined;
 			rpc.kill();
 			throw error;
 		}
@@ -293,27 +310,12 @@ export class DesktopService {
 		return status;
 	}
 
-	#heartbeat(connection: Connection): void {
-		connection.rpc.request("stopPath.heartbeat", {}).catch((error: unknown) => {
-			// `Closed` means the child is gone; its exit already dropped the connection.
-			if (error instanceof DesktopServiceError && error.code === "Closed") return;
-			if (error instanceof DesktopServiceError || error instanceof DesktopEngineRpcError) {
-				this.#hub.emitError(error);
-				return;
-			}
-			throw error;
-		});
-	}
-
 	#drop(connection: Connection): void {
 		clearInterval(connection.heartbeat);
 		if (this.#connection === connection) {
 			this.#connection = undefined;
 			this.#backend = undefined;
+			this.#escape.resetNative();
 		}
 	}
-}
-
-function malformed(method: string): DesktopServiceError {
-	return new DesktopServiceError("Internal", `desktop engine sent a malformed ${method} result`);
 }

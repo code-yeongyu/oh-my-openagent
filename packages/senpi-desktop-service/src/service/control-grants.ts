@@ -13,6 +13,11 @@ export class ControlGrants {
 	/** Whether the newest possibly-live grant came from full access rather than a human confirm (#10788). */
 	#automatic = false;
 
+	/** The engine revoked every grant preceding this physical stop. */
+	escapeStopped(): void {
+		this.#revoked = this.#sent;
+	}
+
 	get possiblyLive(): boolean {
 		return this.#possiblyLive > this.#revoked;
 	}

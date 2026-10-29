@@ -65,6 +65,7 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `audit` | `AuditEvent` |
 | `stopPath.changed` | `StopPathStatus` |
 | `engine.log` | `EngineLog` |
+| `escape.stopped` | `EscapeStopped` |
 
 ## Errors
 

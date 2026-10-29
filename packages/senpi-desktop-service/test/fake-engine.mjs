@@ -56,6 +56,8 @@ let suspended = false;
 // A stop drops it, as the engine's stop epoch does. FAKE_ENGINE_GLOBAL_INPUT_GATE=1 refuses input on the
 // desktop or a display target without it, ControlRequired before any input (#10788).
 let control = { active: false };
+let escapeStops = 0;
+const controlState = () => process.env.FAKE_ENGINE_ESCAPE === "1" ? { ...control, escapeStops } : control;
 const GLOBAL_INPUT = new Set(["click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse"]);
 const WINDOW_INPUT = new Set([...GLOBAL_INPUT, "ax.click", "ax.typeText", "ax.keyChord"]);
 const backgroundGate = (method, params) => {
@@ -116,7 +118,7 @@ function handle(request) {
 			send({ method: "stopPath.changed", params: status() });
 			return reply(id, status());
 		case "control.state":
-			return reply(id, control);
+			return reply(id, controlState());
 		case "control.grant":
 			if (process.env.FAKE_ENGINE_CONTROL_BUSY === "1") {
 				return fail(id, "InputBusy", "another session holds the foreground control grant", -32021);
@@ -128,7 +130,7 @@ function handle(request) {
 				return fail(id, process.env.FAKE_ENGINE_GRANT_ERROR, `grant refused: ${process.env.FAKE_ENGINE_GRANT_ERROR}`);
 			}
 			control = { active: true, reason: params?.reason ?? null, grantedAt: CONTROL_GRANTED_AT };
-			return reply(id, control);
+			return reply(id, controlState());
 		case "control.revoke":
 			if (process.env.FAKE_ENGINE_REVOKE_ERROR !== undefined) {
 				return fail(id, process.env.FAKE_ENGINE_REVOKE_ERROR, `revoke failed: ${process.env.FAKE_ENGINE_REVOKE_ERROR}`);
@@ -141,6 +143,14 @@ function handle(request) {
 				fail(params.id, "Cancelled", "the hold request was cancelled; input release also failed: key up for shift failed");
 			}
 			return;
+	}
+	if (method === process.env.FAKE_ENGINE_ESCAPE_ON && params?.fake === undefined) {
+		control = { active: false };
+		escapeStops += 1;
+		if (process.env.FAKE_ENGINE_ESCAPE_SILENT !== "1") {
+			send({ method: "escape.stopped", params: { escapeStops } });
+		}
+		return fail(id, "Cancelled", "physical Escape cancelled the input", -32017);
 	}
 	if (desktop !== undefined && params?.fake === undefined) {
 		if (method === stalled) return cancellable.add(id);
@@ -181,6 +191,12 @@ function handle(request) {
 			return cancellable.add(id);
 		case "release-fails":
 			return releaseFails.add(id);
+		case "escape":
+		case "escape-silent":
+			control = { active: false };
+			escapeStops += 1;
+			if (params.fake === "escape") send({ method: "escape.stopped", params: { escapeStops } });
+			return reply(id, null);
 		case "notify":
 			send({ method: "audit", params: { action: method, target: "screen", delivery: "background", durationMs: 3 } });
 			send({ method: "stopPath.changed", params: status() });

@@ -94,3 +94,23 @@ fn grant_and_revoke_are_audited_without_the_raw_reason() {
         "{serialized}"
     );
 }
+
+#[test]
+fn escape_stop_counter_is_present_before_any_grant() {
+    let scenario = Scenario::two_displays_with(&json!({}));
+    let mut engine = headless(scenario.backend(), &[]);
+    make_stop_path_live(&mut engine);
+    assert_eq!(state(&mut engine)["result"]["escapeStops"], json!(0));
+}
+
+#[test]
+fn escape_automatic_grant_is_an_additive_wire_parameter() {
+    let scenario = Scenario::two_displays_with(&json!({}));
+    let mut engine = headless(scenario.backend(), &[]);
+    make_stop_path_live(&mut engine);
+    let granted = engine.invoke("control.grant", json!({
+        "reason": "already allowed", "confirmationId": "automatic-1", "automatic": true
+    }));
+    assert_eq!(granted["result"]["active"], json!(true), "{granted:?}");
+    assert_eq!(granted["result"]["escapeStops"], json!(0));
+}

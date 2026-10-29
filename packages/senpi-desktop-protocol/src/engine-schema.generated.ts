@@ -63,6 +63,7 @@ export const ENGINE_NOTIFICATIONS = [
 	"audit",
 	"stopPath.changed",
 	"engine.log",
+	"escape.stopped",
 ] as const;
 
 /** The frozen desktop error vocabulary mirrored from core `ErrorCode`. */

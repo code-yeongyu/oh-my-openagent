@@ -49,6 +49,13 @@ pub(crate) struct PanickyFake {
 }
 
 impl Backend for PanickyFake {
+    fn watch_escape(
+        &mut self,
+        stop: std::sync::Arc<senpi_desktop_core::escape::EscapeStop>,
+    ) -> CoreResult<()> {
+        self.inner.watch_escape(stop)
+    }
+
     fn permission_denied(&mut self, permission: TccPermission) -> DesktopError {
         DesktopError::permission_denied_with(PermissionDeniedData {
             permission,

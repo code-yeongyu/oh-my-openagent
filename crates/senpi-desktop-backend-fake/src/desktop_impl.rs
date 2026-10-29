@@ -14,6 +14,20 @@ use crate::method::FakeMethod;
 use crate::sink::{RecordedPointer, SinkOp};
 
 impl Backend for FakeBackend {
+    fn watch_escape(
+        &mut self,
+        stop: std::sync::Arc<senpi_desktop_core::escape::EscapeStop>,
+    ) -> CoreResult<()> {
+        if self.escape_watch_off {
+            return Err(DesktopError::new(
+                senpi_desktop_core::error::ErrorCode::StopPathUnavailable,
+                "the physical Escape watch cannot arm (scripted)",
+            ));
+        }
+        self.escape = Some(stop);
+        Ok(())
+    }
+
     fn capabilities(&mut self) -> DesktopCapabilities {
         self.capabilities.clone()
     }
@@ -143,6 +157,9 @@ impl Backend for FakeBackend {
                 delivered();
             }
             start = end;
+            if self.escape_on_text {
+                if let Some(stop) = &self.escape { stop.press(); }
+            }
         }
         Ok(())
     }

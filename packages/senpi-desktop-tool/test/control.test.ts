@@ -38,7 +38,7 @@ describe("computer tool control (#9651 B5b)", HANG_GUARD, () => {
 		expect(result.details.value).toMatchObject({ active: true });
 		expect(requests.map((request) => request.reason)).toEqual(["click Run"]);
 		const grant = log.requests.find((request) => request.method === "control.grant");
-		expect(grant?.params).toEqual({ reason: "click Run", confirmationId: expect.any(String) });
+		expect(grant?.params).toEqual({ reason: "click Run", confirmationId: expect.any(String), automatic: false });
 	});
 
 	it("a refusal stays ungranted and sends no control.grant", async () => {

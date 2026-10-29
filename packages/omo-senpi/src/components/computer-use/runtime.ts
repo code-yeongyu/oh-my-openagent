@@ -8,6 +8,8 @@ import {
 } from "@oh-my-opencode/senpi-desktop-tool"
 
 import type { ComputerUseEngineErrorCode } from "../telemetry/omo-native-computer-use"
+import { createEscapeStopGate } from "./escape-stop-gate"
+
 import { confirmComputerControl } from "./control-confirm"
 import { defaultEngineChild, describeEngineSource } from "./engine-source"
 import { engineErrorCode, TrackedDesktopService, type TrackedDesktopServiceOptions } from "./engine-status"
@@ -40,8 +42,11 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
     ...(options.fullAccess === undefined ? {} : { fullAccess: options.fullAccess }),
   })
   const handle = new ComputerHandle({ service, settings: () => options.settings })
-  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool, confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }) }
+  const escapeStopGate = createEscapeStopGate(() => service.refreshEscapeStops())
+  service.onEscapeStopped(() => escapeStopGate.stop(service.escapeStopCount()))
+  const deps: ComputerToolDeps = { escapeStopGate, handle, executeTool: options.executeTool, confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }) }
   return {
+    escapeStopGate,
     handle,
     service,
     computerTool: createComputerTool(deps),

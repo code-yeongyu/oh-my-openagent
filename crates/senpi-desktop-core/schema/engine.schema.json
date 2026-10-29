@@ -586,6 +586,11 @@
       "params": {
         "$ref": "#/definitions/EngineLog"
       }
+    },
+    "escape.stopped": {
+      "params": {
+        "$ref": "#/definitions/EscapeStopped"
+      }
     }
   },
   "errors": {
@@ -940,6 +945,11 @@
     "ControlGrantParams": {
       "type": "object",
       "properties": {
+        "automatic": {
+          "type": "boolean",
+          "description": "Full-access consent, not explicit held control (#11465).",
+          "default": false
+        },
         "reason": {
           "type": "string"
         },
@@ -957,6 +967,12 @@
     "ControlStateResult": {
       "type": "object",
       "properties": {
+        "escapeStops": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 0
+        },
         "active": {
           "type": "boolean"
         },
@@ -2752,6 +2768,21 @@
         "debug"
       ]
     },
+    "EscapeStopped": {
+      "type": "object",
+      "properties": {
+        "escapeStops": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "escapeStops"
+      ],
+      "description": "A physical Escape stopped this session; additive under #11459.",
+      "additionalProperties": false
+    },
     "RpcRequest": {
       "type": "object",
       "properties": {
@@ -3031,7 +3062,8 @@
       "enum": [
         "audit",
         "stopPath.changed",
-        "engine.log"
+        "engine.log",
+        "escape.stopped"
       ],
       "description": "Every server-to-client notification, by wire name."
     }

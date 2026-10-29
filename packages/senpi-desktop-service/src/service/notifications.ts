@@ -2,9 +2,10 @@ import {
 	type AuditEvent,
 	ENGINE_NOTIFICATIONS,
 	type EngineNotification,
+	type EscapeStopped,
 	type StopPathStatus,
 } from "@oh-my-opencode/senpi-desktop-protocol";
-import { isStopPathStatus, parseAuditEvent } from "./parse";
+import { isEscapeStopped, isStopPathStatus, parseAuditEvent } from "./parse";
 
 export type Unsubscribe = () => void;
 export type Listener<T> = (value: T) => void;
@@ -38,7 +39,12 @@ function assertNever(value: never): never {
 export class NotificationHub {
 	readonly #audit = new Set<Listener<AuditEvent>>();
 	readonly #stopPath = new Set<Listener<StopPathStatus>>();
+	readonly #escape = new Set<Listener<EscapeStopped>>();
 	readonly #errors = new Set<Listener<Error>>();
+
+	onEscapeStopped(listener: Listener<EscapeStopped>): Unsubscribe {
+		return subscribe(this.#escape, listener);
+	}
 
 	onAudit(listener: Listener<AuditEvent>): Unsubscribe {
 		return subscribe(this.#audit, listener);
@@ -80,6 +86,13 @@ export class NotificationHub {
 			case "stopPath.changed":
 				if (isStopPathStatus(params)) {
 					for (const listener of this.#stopPath) listener(params);
+				} else {
+					this.emitError(new DesktopNotificationError(method, "is malformed"));
+				}
+				return;
+			case "escape.stopped":
+				if (isEscapeStopped(params)) {
+					for (const listener of this.#escape) listener(params);
 				} else {
 					this.emitError(new DesktopNotificationError(method, "is malformed"));
 				}

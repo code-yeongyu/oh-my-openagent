@@ -51,6 +51,9 @@ pub struct FakeScenario {
     /// Marks every capture's frame geometry `legacyCapture` (B9 fallback
     /// shape), so the wire carries the flag.
     pub legacy_capture: bool,
+    /// Inject physical Escape after a delivered text chunk, without timing.
+    pub escape_on_text: bool,
+    pub escape_watch_off: bool,
 }
 
 impl Default for FakeScenario {
@@ -71,6 +74,8 @@ impl Default for FakeScenario {
             fail_next: Vec::new(),
             ax_cannot_complete: Vec::new(),
             legacy_capture: false,
+            escape_on_text: false,
+            escape_watch_off: false,
         }
     }
 }
@@ -249,6 +254,10 @@ struct RawScenario {
     ax_cannot_complete: Vec<AxWrite>,
     #[serde(default)]
     legacy_capture: bool,
+    #[serde(default)]
+    escape_on_text: bool,
+    #[serde(default)]
+    escape_watch_off: bool,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -282,6 +291,8 @@ impl TryFrom<RawScenario> for FakeScenario {
             fail_next: raw.fail_next,
             ax_cannot_complete: raw.ax_cannot_complete,
             legacy_capture: raw.legacy_capture,
+            escape_on_text: raw.escape_on_text,
+            escape_watch_off: raw.escape_watch_off,
         })
     }
 }

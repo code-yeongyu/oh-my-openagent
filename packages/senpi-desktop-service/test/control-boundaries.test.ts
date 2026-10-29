@@ -119,6 +119,7 @@ describe("foreground-control grant boundaries (#9967)", HANG_GUARD, () => {
 			reportError: (error: unknown) => void reported.push(error),
 			foregroundAllowed: () => false,
 			possiblyLive: () => false,
+			automaticGrantLive: () => false,
 			grantForFullAccess: () => Promise.resolve(false),
 		};
 

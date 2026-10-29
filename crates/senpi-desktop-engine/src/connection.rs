@@ -5,7 +5,8 @@
 //! exec (1) permits; each admitted request waits for its reply, deadline, or
 //! `$/cancel` on its own task, so replies may leave out of order. A writer
 //! task owns the output behind a bounded channel. Queued notifications are
-//! written right after each reply (see [`crate::outbox`]).
+//! written right after each reply, except Escape, which wakes every connected
+//! host immediately without waiting for a reply or heartbeat.
 
 use std::collections::HashMap;
 use std::io;
@@ -120,6 +121,23 @@ where
 {
     let (out, lines) = mpsc::channel(OUTBOUND_CAPACITY);
     let writer = tokio::spawn(write_lines(writer, lines));
+    let mut escaped = engine.outbox().subscribe_escape();
+    let (finish_escape, mut finished_escape) = oneshot::channel();
+    let escape_writer = tokio::spawn({
+        let out = out.clone();
+        async move {
+            loop {
+                let line = escaped.borrow_and_update().clone();
+                if let Some(line) = line { out.send(line).await?; }
+                tokio::select! {
+                    _ = &mut finished_escape => return Ok::<(), SendError<String>>(()),
+                    result = escaped.changed() => {
+                        if result.is_err() { return Ok(()); }
+                    }
+                }
+            }
+        }
+    });
     let (queue, queued) = mpsc::unbounded_channel();
     let in_flight = InFlight::default();
     let dispatcher = tokio::spawn(dispatch(
@@ -134,8 +152,11 @@ where
     if disconnect_cancels { in_flight.cancel_all(); } else { in_flight.cancel_holds(); }
     drop((queue, out));
     let dispatched = dispatcher.await.map_err(io::Error::other);
+    finish_escape.send(()).unwrap_or(());
+    let escaped = escape_writer.await.map_err(io::Error::other)
+        .and_then(|escaped| escaped.map_err(io::Error::other));
     let written = writer.await.map_err(io::Error::other).and_then(|written| written);
-    let result = read.and(dispatched).and(written);
+    let result = read.and(dispatched).and(escaped).and(written);
     match result {
         Err(error) if disconnect_cancels && matches!(error.kind(), io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionReset) => Ok(()),
         other => other,
@@ -260,3 +281,6 @@ async fn write_lines<W: AsyncWrite + Unpin>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

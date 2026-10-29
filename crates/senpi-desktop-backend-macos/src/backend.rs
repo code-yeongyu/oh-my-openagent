@@ -304,6 +304,13 @@ impl Backend for MacosBackend {
         crate::cursor::screen_locked()
     }
 
+    fn watch_escape(
+        &mut self,
+        stop: std::sync::Arc<senpi_desktop_core::escape::EscapeStop>,
+    ) -> CoreResult<()> {
+        self.user_input.watch_escape(stop)
+    }
+
     fn watch_user_input(&mut self) {
         self.user_input.start();
     }

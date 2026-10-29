@@ -40,7 +40,7 @@ export interface ComputerRunRequest {
 export interface ComputerRunHost {
 	readonly service: Pick<
 		DesktopService,
-		"call" | "onAudit" | "revokeControl" | "reportError" | "foregroundAllowed" | "possiblyLive" | "grantForFullAccess"
+		"call" | "onAudit" | "revokeControl" | "reportError" | "foregroundAllowed" | "possiblyLive" | "grantForFullAccess" | "automaticGrantLive"
 	>;
 	readonly executeTool: ExecuteTool;
 	/** Human confirmation behind `desktop.control.acquire`; absent: headless, never grants (#9651 B5b). */
@@ -157,6 +157,7 @@ export async function runComputerCode(request: ComputerRunRequest, host: Compute
 	const sandbox = vm.createContext(
 		{
 			desktop: createDesktopFacade({
+				automaticGrantLive: () => host.service.automaticGrantLive(),
 				context,
 				call,
 				resume,

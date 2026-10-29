@@ -93,7 +93,7 @@ export interface ForegroundRerunHost {
 
 const REASON: Record<RerunTrigger, string> = {
 	backgroundUnavailable: "the window could not take this input in the background",
-	controlRequired: "raising a window takes the foreground",
+	controlRequired: "this window or app operation takes the foreground",
 };
 
 /**

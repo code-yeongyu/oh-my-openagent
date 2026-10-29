@@ -1,5 +1,5 @@
 import type { EngineMethod, EngineNotification, ErrorCode } from "./engine-schema.generated";
-import type { AuditEvent, EngineLog, StopPathStatus } from "./wire";
+import type { AuditEvent, EngineLog, EscapeStopped, StopPathStatus } from "./wire";
 
 /** A JSON-RPC request id: a number or a string, echoed verbatim by the engine. */
 export type RequestId = number | string;
@@ -68,6 +68,7 @@ export type EngineNotificationParams = {
 	readonly audit: AuditEvent;
 	readonly "stopPath.changed": StopPathStatus;
 	readonly "engine.log": EngineLog;
+	readonly "escape.stopped": EscapeStopped;
 };
 
 /** A server-to-client notification, discriminated by `method`. */

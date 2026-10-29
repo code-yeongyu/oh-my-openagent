@@ -96,10 +96,13 @@ impl Engine {
             audit: Box::new(move |event| audited.push(Notification::Audit, event)),
             control_slot: stop_paths.control_slot(),
         };
+        let escaped = Arc::clone(&outbox);
         let hold_release_budget = config.timeouts.close;
         Ok(Self {
             hold_release_budget,
-            session: Session::start_supervised(factory, config.timeouts, safety)?,
+            session: Session::start_supervised_with_escape(factory, config.timeouts, safety, move |escape_stops| {
+                escaped.push(Notification::EscapeStopped, &senpi_desktop_core::protocol_results::EscapeStopped { escape_stops });
+            })?,
             resume_token: if shared_agent {
                 format!("{}{}", Ulid::generate(), Ulid::generate())
             } else {

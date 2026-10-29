@@ -124,13 +124,15 @@ const MIN_CONFIRM_BUDGET_MS = 3_000;
 
 /** The `control.state` result shape, mirrored from the engine's `ControlStateResult` (#9651 B5). */
 export interface ControlState {
+	readonly escapeStops?: number;
 	readonly active: boolean;
 	readonly reason?: string | null;
 	readonly grantedAt?: string | null;
 }
 
 function isControlState(value: unknown): value is ControlState {
-	return isRecord(value) && typeof value.active === "boolean";
+	return isRecord(value) && typeof value.active === "boolean" && (value.escapeStops === undefined ||
+		(typeof value.escapeStops === "number" && Number.isInteger(value.escapeStops) && value.escapeStops >= 0 && value.escapeStops <= 0xffff_ffff));
 }
 
 /**
@@ -151,9 +153,9 @@ function createControlFacade(scope: RunScope, method: ReturnType<typeof facadeMe
 					throw new ComputerRunError("assertion", "control.acquire requires a non-empty reason");
 				}
 				const current = expectResult("control.state", await call("control.state", {}), isControlState);
-				if (current.active) return current;
+				if (current.active && scope.automaticGrantLive?.() !== true) return current;
 				const confirm = scope.confirmControl;
-				if (confirm === undefined) return { active: false };
+				if (confirm === undefined) return current;
 				// The confirm must settle before the run budget ends, leaving time to send the grant and act on it.
 				const budgetMs = Math.max(0, context.deadline - Date.now() - CONFIRM_RUN_MARGIN_MS);
 				if (budgetMs < MIN_CONFIRM_BUDGET_MS) {
@@ -164,10 +166,10 @@ function createControlFacade(scope: RunScope, method: ReturnType<typeof facadeMe
 				}
 				const approved = await confirm(reason, context.signal, budgetMs);
 				context.signal.throwIfAborted();
-				if (approved !== true) return { active: false };
+				if (approved !== true) return current;
 				return expectResult(
 					"control.grant",
-					await call("control.grant", { reason, confirmationId: randomUUID() }),
+					await call("control.grant", { reason, confirmationId: randomUUID(), automatic: false }),
 					isControlState,
 				);
 			}),

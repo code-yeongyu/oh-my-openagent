@@ -19,6 +19,7 @@ export type ComputerService = Pick<
 	| "reportError"
 	| "foregroundAllowed"
 	| "possiblyLive"
+	| "automaticGrantLive"
 	| "grantForFullAccess"
 >;
 

@@ -44,6 +44,7 @@ fn grant_reports_the_live_grant_and_revoke_is_idempotent() {
     assert_eq!(
         state(&mut harness),
         ControlStateResult {
+            escape_stops: 0,
             active: false,
             reason: None,
             granted_at: None,
@@ -86,6 +87,7 @@ fn a_suspension_revokes_and_resume_never_restores_the_grant() {
     assert_eq!(
         state(&mut harness),
         ControlStateResult {
+            escape_stops: 0,
             active: false,
             reason: None,
             granted_at: None,

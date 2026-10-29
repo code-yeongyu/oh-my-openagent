@@ -7,6 +7,7 @@ import {
 } from "@oh-my-opencode/senpi-desktop-protocol";
 import { DesktopEngineRpcError, DesktopLaunchContextError, type ExecuteTool, runComputerCode } from "@oh-my-opencode/senpi-desktop-service";
 import type { ComputerHandle } from "./activation";
+import { type EscapeStopGate, withEscapeAdmission } from "./escape-admission";
 import { Check } from "typebox/value";
 import { actionBranches, argumentsError } from "./action-schema";
 import {
@@ -29,6 +30,7 @@ export interface ControlConfirmRequest {
 }
 
 export interface ComputerToolDeps {
+	readonly escapeStopGate?: EscapeStopGate;
 	readonly handle: ComputerHandle;
 	/** The host tool pipeline (`pi.executeTool`) behind `tool.<name>()` inside `run` code. */
 	readonly executeTool: ExecuteTool;
@@ -101,6 +103,16 @@ export async function runComputer(
 	request: { readonly code: string; readonly readOnly: boolean; readonly timeoutSeconds: number },
 	signal: AbortSignal | undefined,
 ): Promise<ComputerToolResult> {
+	return withEscapeAdmission(deps.escapeStopGate, signal, (admittedSignal) =>
+		runAdmittedComputer(deps, context, request, admittedSignal));
+}
+
+async function runAdmittedComputer(
+	deps: ComputerToolDeps,
+	context: ComputerHostContext,
+	request: Parameters<typeof runComputer>[2],
+	signal: AbortSignal | undefined,
+): Promise<ComputerToolResult> {
 	const { handle, executeTool } = deps;
 	await handle.activate(context);
 	const snapshot = runSnapshot(handle.settings(), context, request.readOnly);
@@ -170,10 +182,10 @@ export function createComputerTool(deps: ComputerToolDeps) {
 				}
 				case "capabilities":
 					// Like call/run, activation and capability-query permission failures are structured tool results.
-					return permissionResult((async () => {
+					return permissionResult(withEscapeAdmission(deps.escapeStopGate, signal, async () => {
 						await handle.activate(context);
 						return valueResult(await handle.service.capabilities(), "capabilities unavailable");
-					})(), handle);
+					}), handle);
 				case "close":
 					await handle.close();
 					return valueResult(undefined, "Closed the desktop session.");

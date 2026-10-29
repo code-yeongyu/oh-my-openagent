@@ -136,6 +136,7 @@ describe("automatic foreground rerun (D2)", () => {
 			reportError: service.reportError.bind(service),
 			foregroundAllowed: () => service.foregroundAllowed(),
 			possiblyLive: () => service.possiblyLive(),
+			automaticGrantLive: () => service.automaticGrantLive(),
 			grantForFullAccess: (signal: AbortSignal) => {
 				preset.value = false;
 				return service.grantForFullAccess(signal);

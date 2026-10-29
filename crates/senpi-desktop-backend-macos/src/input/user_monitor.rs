@@ -103,7 +103,10 @@ struct Heard {
 /// The presses the tap thread recorded, read by the session worker. The tap
 /// callback only takes this short lock to push.
 #[derive(Default)]
-struct UserInputLog(Mutex<LogState>);
+struct UserInputLog {
+    presses: Mutex<LogState>,
+    escape: Mutex<Option<Arc<senpi_desktop_core::escape::EscapeStop>>>,
+}
 
 #[derive(Default)]
 struct LogState {
@@ -111,7 +114,19 @@ struct LogState {
     dropped: u64,
 }
 
+/// Ported from oh-my-pi physical_escape (MIT): never synthetic or engine-tagged.
+const fn physical_escape(kind: u32, key: i64, source_pid: i64, tag: i64) -> bool {
+    kind == KEY_DOWN && key == 53 && source_pid == 0 && tag != ENGINE_EVENT_TAG
+}
+
 impl UserInputLog {
+    fn observe_escape(&self, kind: u32, key: i64, heard: Heard) {
+        if physical_escape(kind, key, heard.source_pid, heard.tag) {
+            let stop = self.escape.lock().clone();
+            if let Some(stop) = stop { stop.press(); }
+        }
+    }
+
     /// Records one event the tap heard, unless the engine posted it or it
     /// names no app.
     fn observe(
@@ -137,7 +152,7 @@ impl UserInputLog {
     }
 
     fn record(&self, press: UserPress) {
-        let mut state = self.0.lock();
+        let mut state = self.presses.lock();
         if state.presses.len() == LOG_CAPACITY {
             state.presses.pop_front();
             state.dropped += 1;
@@ -146,7 +161,7 @@ impl UserInputLog {
     }
 
     fn take(&self) -> UserPresses {
-        let mut state = self.0.lock();
+        let mut state = self.presses.lock();
         UserPresses {
             presses: state.presses.drain(..).collect(),
             dropped: std::mem::take(&mut state.dropped),
@@ -173,6 +188,23 @@ enum Watch {
 }
 
 impl UserInputWatch {
+    pub(crate) fn watch_escape(
+        &mut self,
+        stop: Arc<senpi_desktop_core::escape::EscapeStop>,
+    ) -> senpi_desktop_core::error::CoreResult<()> {
+        self.start();
+        if crate::ax::is_trusted() {
+            if let Watch::On { log, .. } = &self.0 {
+                *log.escape.lock() = Some(stop);
+                return Ok(());
+            }
+        }
+        Err(senpi_desktop_core::error::DesktopError::new(
+            senpi_desktop_core::error::ErrorCode::StopPathUnavailable,
+            "the physical Escape watch cannot arm; allow Accessibility before foreground input",
+        ))
+    }
+
     /// Starts the tap once; later calls keep whatever the first one got.
     pub(crate) fn start(&mut self) {
         self.start_with(crate::ax::is_trusted, tap::Monitor::start);

@@ -14,9 +14,10 @@ export async function closeDesktops(): Promise<void> {
 
 export async function openDesktop(
 	env: Record<string, string> = {},
+	fullAccess?: () => boolean,
 ): Promise<{ service: DesktopService; log: SpawnLog }> {
 	const log = fakeEngineFactory({ FAKE_ENGINE_DESKTOP: "1", ...env });
-	const service = new DesktopService({ createChild: log.factory });
+	const service = new DesktopService({ createChild: log.factory, ...(fullAccess === undefined ? {} : { fullAccess }) });
 	services.push(service);
 	await service.open({});
 	return { service, log };

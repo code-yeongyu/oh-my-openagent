@@ -157,6 +157,7 @@ pub(crate) fn delivery(mode: &str) -> Option<PointerOptions> {
 /// A `control.grant` request for `reason` with a fixed confirmation id.
 pub(crate) fn grant_control(reason: &str) -> Op {
     Op::ControlGrant(ControlGrantParams {
+        automatic: false,
         reason: reason.to_owned(),
         confirmation_id: "confirm-1".to_owned(),
     })

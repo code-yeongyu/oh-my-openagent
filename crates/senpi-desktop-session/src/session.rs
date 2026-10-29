@@ -26,6 +26,7 @@ pub const THREAD_NAME: &str = "senpi-desktop-session";
 type Reply = flume::Sender<CoreResult<Response>>;
 
 enum Message {
+    EscapeStopped,
     Open {
         options: DesktopSessionOptions,
         reply: Reply,
@@ -34,6 +35,7 @@ enum Message {
         op: Op,
         reply: Reply,
         signal: Arc<senpi_desktop_safety::HoldSignal>,
+        escape_epoch: u32,
     },
     /// Drops the backend, acknowledges, and ends the thread.
     Close {
@@ -47,7 +49,8 @@ pub struct Session {
     supervisor: Arc<senpi_desktop_safety::Supervisor>,
     /// `None` once `close` was requested: every later request fails `Closed`.
     queue: Mutex<Option<flume::Sender<Message>>>,
-    holds: Mutex<Vec<Weak<senpi_desktop_safety::HoldSignal>>>,
+    holds: Arc<Mutex<Vec<Weak<senpi_desktop_safety::HoldSignal>>>>,
+    escape: Arc<senpi_desktop_core::escape::EscapeStop>,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
     timeouts: SessionTimeouts,
 }
@@ -76,15 +79,41 @@ impl Session {
         timeouts: SessionTimeouts,
         safety: SessionSafety,
     ) -> CoreResult<Self> {
+        Self::start_supervised_with_escape(factory, timeouts, safety, |_| {})
+    }
+
+    /// Starts a session with a notification callback for physical Escape.
+    ///
+    /// # Errors
+    /// The same thread-start failures as [`Self::start_supervised`].
+    pub fn start_supervised_with_escape(
+        factory: impl BackendFactory,
+        timeouts: SessionTimeouts,
+        safety: SessionSafety,
+        escape_stopped: impl Fn(u32) + Send + Sync + 'static,
+    ) -> CoreResult<Self> {
         let capabilities = Arc::new(Mutex::new(DesktopCapabilities::unavailable()));
         let (queue, requests) = flume::unbounded();
+        let holds = Arc::new(Mutex::new(Vec::<Weak<senpi_desktop_safety::HoldSignal>>::new()));
+        let pending = Arc::clone(&holds);
+        let wake = queue.downgrade();
+        let escape = senpi_desktop_core::escape::EscapeStop::new(move |stops| {
+            for signal in pending.lock().iter().filter_map(Weak::upgrade) { signal.cancel(); }
+            if let Some(queue) = wake.upgrade() {
+                let _ = queue.send(Message::EscapeStopped);
+            }
+            // Wake the host even while the backend thread is still inside a native call.
+            escape_stopped(stops);
+        });
+        let worker_escape = Arc::clone(&escape);
         let (ready_tx, ready_rx) = flume::bounded(1);
         let shared = Arc::clone(&capabilities);
         let supervisor = Arc::clone(&safety.supervisor);
         thread::Builder::new()
             .name(THREAD_NAME.to_owned())
             .spawn(move || {
-                let worker = Worker::new(Box::new(factory), shared, safety);
+                let mut worker = Worker::new(Box::new(factory), shared, safety);
+                worker.escape = worker_escape;
                 // `start` is blocked on this receiver until it arrives.
                 ready_tx.send(()).unwrap_or(());
                 serve(worker, &requests);
@@ -96,7 +125,8 @@ impl Session {
         Ok(Self {
             supervisor,
             queue: Mutex::new(Some(queue)),
-            holds: Mutex::new(Vec::new()),
+            holds,
+            escape,
             capabilities,
             timeouts,
         })
@@ -121,11 +151,12 @@ impl Session {
         let budget = self.timeouts.budget_for(&op);
         let is_hold = matches!(op, Op::HoldKeys(_) | Op::HoldMouse(_));
         let signal = self.supervisor.hold_signal();
+        let escape_epoch = self.escape.stops();
         let mut pending = self.enqueue(|reply| {
             let mut holds = self.holds.lock();
             holds.retain(|hold| hold.strong_count() > 0);
             holds.push(Arc::downgrade(&signal));
-            Message::Op { op, reply, signal: Arc::clone(&signal) }
+            Message::Op { op, reply, signal: Arc::clone(&signal), escape_epoch }
         });
         pending.cancellation = Some(crate::cancel_on_drop::CancelOnDrop(signal));
         pending.budget = budget;
@@ -180,6 +211,10 @@ impl Drop for Session {
 fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
     while let Ok(message) = requests.recv() {
         let (reply, result) = match message {
+            Message::EscapeStopped => {
+                worker.reconcile_grant();
+                continue;
+            }
             Message::Close { ack } => {
                 drop(worker);
                 // A close waiter that timed out no longer listens.
@@ -190,13 +225,21 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
             // its receiver: its request must not reach the desktop.
             Message::Open { reply, .. } | Message::Op { reply, .. } if reply.is_disconnected() => continue,
             Message::Open { options, reply } => (reply, guarded(|| Ok(Response::Capabilities(worker.open(options))))),
-            Message::Op { op, reply, signal } => {
+            Message::Op { op, reply, signal, escape_epoch } => {
+                let escape = Arc::clone(&worker.escape);
+                if escape.stops() != escape_epoch {
+                    let _ = reply.send(Err(DesktopError::new(
+                        senpi_desktop_core::error::ErrorCode::Cancelled,
+                        "physical Escape cancelled the queued request",
+                    )));
+                    continue;
+                }
                 // `$/cancel` or a deadline drops the waiter: that is the
                 // request's cancellation signal while it runs.
                 worker.hold_signal = Some(signal);
                 worker.dispatch(
                     op,
-                    &|| reply.is_disconnected(),
+                    &|| reply.is_disconnected() || escape.stops() != escape_epoch,
                     |result| reply.send(result).is_ok(),
                 );
                 worker.hold_signal = None;

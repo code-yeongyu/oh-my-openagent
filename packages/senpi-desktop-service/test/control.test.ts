@@ -51,7 +51,7 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		expect(result.returnValue).toMatchObject({ active: true, reason: "click Run" });
 		expect(reasons).toEqual(["click Run"]);
 		const grant = log.requests.find((request) => request.method === "control.grant");
-		expect(grant?.params).toEqual({ reason: "click Run", confirmationId: expect.any(String) });
+		expect(grant?.params).toEqual({ reason: "click Run", confirmationId: expect.any(String), automatic: false });
 	});
 
 	it("returns early without re-confirming while the grant is already active", async () => {
@@ -295,4 +295,18 @@ describe("desktop.control facade (#9651 B5b)", HANG_GUARD, () => {
 		expect(error).toMatchObject({ reason: "aborted" });
 		expect(methods(log)).not.toContain("control.grant");
 	});
+});
+
+it.each([true, false, undefined])("promotes automatic consent to held control only after approved confirmation (%s)", async (approval) => {
+  const { service, log } = await openDesktop({ FAKE_ENGINE_BACKEND: "quartz" }, () => true);
+  await service.grantForFullAccess(new AbortController().signal);
+  expect(service.automaticGrantLive()).toBe(true);
+  const result = await run(service, 'return await desktop.control.acquire({ reason: "hold control" });',
+    approval === undefined ? {} : { confirmControl: async () => approval });
+  expect(result.returnValue).toMatchObject({ active: true });
+  expect(service.automaticGrantLive()).toBe(approval !== true);
+  const grants = log.requests.filter((request) => request.method === "control.grant");
+  expect(grants).toHaveLength(approval === true ? 2 : 1);
+  expect(grants[0]?.params).toMatchObject({ automatic: true });
+  if (approval === true) expect(grants[1]?.params).toMatchObject({ automatic: false });
 });

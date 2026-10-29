@@ -212,3 +212,17 @@ describe("computer_actions permission tier", () => {
 		expect(tier({ action: "nope" })).toEqual(["exec"]);
 	});
 });
+
+it("refuses computer_actions after Escape before activating the engine", async () => {
+  const { handle, log } = desktopFixture();
+  const deps = {
+    handle, executeTool: noTools,
+    escapeStopGate: { admit: async () => false, signal: AbortSignal.abort() },
+  };
+  const result = await createComputerActionsTool(deps).execute(
+    "escape-stopped", { action: "screenshot" }, undefined, undefined, hostContext(),
+  );
+  expect(result.isError).toBe(true);
+  expect(result.details.isError).toBe(true);
+  expect(methodsOf(log)).toEqual([]);
+});

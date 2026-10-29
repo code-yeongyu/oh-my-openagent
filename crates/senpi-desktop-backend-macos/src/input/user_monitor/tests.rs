@@ -142,3 +142,27 @@ fn a_watch_that_never_started_reports_not_started_and_has_nothing_to_read() {
     assert_eq!(watch.state(), InterventionWatch::NotStarted);
     assert_eq!(watch.take(), UserPresses::default());
 }
+
+#[test]
+fn physical_escape_only_stops_an_armed_owner_and_ignores_synthetic_input() {
+    let log = UserInputLog::default();
+    let stop = senpi_desktop_core::escape::EscapeStop::new(|_| {});
+    *log.escape.lock() = Some(Arc::clone(&stop));
+    log.observe_escape(KEY_DOWN, 53, heard(0, 0, 0));
+    assert_eq!(stop.stops(), 0);
+    stop.arm();
+    for (kind, key, event) in [
+        (KEY_DOWN, 53, heard(ENGINE_EVENT_TAG, 0, 0)),
+        (KEY_DOWN, 53, heard(0, 4242, 0)),
+        (KEY_DOWN, 53, heard(0, OWN_PID, 0)),
+        (KEY_DOWN, 36, heard(0, 0, 0)),
+        (11, 53, heard(0, 0, 0)),
+    ] {
+        log.observe_escape(kind, key, event);
+        assert_eq!(stop.stops(), 0);
+    }
+    log.observe_escape(KEY_DOWN, 53, heard(0, 0, 0));
+    assert_eq!(stop.stops(), 1);
+    log.observe_escape(KEY_DOWN, 53, heard(0, 0, 0));
+    assert_eq!(stop.stops(), 1);
+}

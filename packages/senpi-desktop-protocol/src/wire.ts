@@ -78,3 +78,8 @@ export interface DesktopCapabilities {
 	/** macOS: the display is asleep, so capture and input may fail; absent on older engines. */
 	readonly displayAsleep?: boolean | null;
 }
+
+/** A physical Escape revoked this engine session's foreground ownership. */
+export interface EscapeStopped {
+	readonly escapeStops: number;
+}

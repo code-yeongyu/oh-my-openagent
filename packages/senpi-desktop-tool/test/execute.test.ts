@@ -239,3 +239,19 @@ describe("computer tool execute", HANG_GUARD, () => {
 		}).toEqual({ starts: [{ chord: "ctrl+alt+shift+f12" }], opens: 1 });
 	});
 });
+
+it.each([
+  { action: "run", code: "return await desktop.windows();" },
+  { action: "call", chain: [{ method: "windows" }] },
+  { action: "capabilities" },
+])("refuses an Escape-stopped $action before activating the engine", async (params) => {
+  const { handle, log } = desktopFixture();
+  const deps = {
+    handle, executeTool: noTools,
+    escapeStopGate: { admit: async () => false, signal: AbortSignal.abort() },
+  };
+  const result = await createComputerTool(deps).execute("escape-stopped", params, undefined, undefined, hostContext());
+  expect(result.isError).toBe(true);
+  expect(result.details.isError).toBe(true);
+  expect(methodsOf(log)).toEqual([]);
+});

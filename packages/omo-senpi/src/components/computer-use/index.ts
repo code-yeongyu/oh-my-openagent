@@ -27,6 +27,7 @@ import {
   createComputerRuntimeLoader,
 } from "./runtime-loader"
 import { resolveOmoComputerSettings } from "./settings"
+import { wireComputerEscapeEvents } from "./escape-events"
 import { watchFullAccess } from "./full-access"
 import { initialComputerState, skillStatusLine, toolActivatedNames, wireComputerControlEvents } from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
@@ -145,6 +146,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
               },
             })
       wireComputerControlEvents(pi, runtime)
+      wireComputerEscapeEvents(pi, runtime)
 
       pi.registerCommand("computer", {
         description: "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)",
@@ -242,7 +244,8 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
       pi.on("tool_activated", async (payload, eventCtx) => {
         const activated = toolActivatedNames(payload)
         if (!activated.includes(COMPUTER_TOOL_NAME) && !activated.includes(COMPUTER_ACTIONS_TOOL_NAME)) return
-        const { handle, service } = await runtime.load()
+        const { handle, service, escapeStopGate } = await runtime.load()
+        if (!(await escapeStopGate.admit())) return
         if (handle.active) return
         state.telemetryContext = eventCtx
         await handle.activate(eventCtx as ComputerHostContext)

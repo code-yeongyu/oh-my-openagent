@@ -1,6 +1,7 @@
 import {
 	type AuditEvent,
 	type DesktopCapabilities,
+	type EscapeStopped,
 	ENGINE_METHODS,
 	ERROR_CODES,
 	type JsonRpcErrorData,
@@ -166,4 +167,9 @@ function parsePermission(value: unknown): PermissionDeniedData | undefined {
 		app: value.app,
 		relaunchRequired: value.relaunchRequired,
 	};
+}
+
+export function isEscapeStopped(value: unknown): value is EscapeStopped {
+	return isRecord(value) && typeof value.escapeStops === "number" && Number.isInteger(value.escapeStops)
+		&& value.escapeStops >= 0 && value.escapeStops <= 0xffff_ffff;
 }

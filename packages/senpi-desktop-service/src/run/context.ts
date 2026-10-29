@@ -67,6 +67,7 @@ export type ConfirmControl = (reason: string, signal: AbortSignal, budgetMs: num
 
 /** What every facade method needs: the run it belongs to, its engine channel, and the vm resume hook. */
 export interface RunScope {
+	readonly automaticGrantLive?: () => boolean;
 	readonly context: RunContext;
 	readonly call: EngineCall;
 	readonly resume: Resume;

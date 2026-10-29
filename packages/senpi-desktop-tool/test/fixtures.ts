@@ -22,6 +22,7 @@ export function closedService(): ComputerService {
 		reportError: () => undefined,
 		foregroundAllowed: () => false,
 		possiblyLive: () => false,
+		automaticGrantLive: () => false,
 		grantForFullAccess: unreachable,
 	};
 }

@@ -49,6 +49,7 @@ export {
 	type AuditEvent,
 	type DesktopCapabilities,
 	type EngineLog,
+	type EscapeStopped,
 	type LogLevel,
 	type StopPathKind,
 	type StopPathStatus,

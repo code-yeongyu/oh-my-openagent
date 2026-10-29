@@ -57,6 +57,10 @@ extern "C" fn observe(
             target: CGEventGetIntegerValueField(event, TARGET_UNIX_PID_FIELD),
         }
     };
+    // SAFETY: [FFI] the callback's non-null event remains live; field 9 is
+    // kCGKeyboardEventKeycode. No event is modified or retained.
+    let key = unsafe { CGEventGetIntegerValueField(event, 9) };
+    context.log.observe_escape(kind, key, heard);
     context
         .log
         .observe(kind, heard, context.own_pid, crate::skylight::front_pid);

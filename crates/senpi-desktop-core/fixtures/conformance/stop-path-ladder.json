@@ -236,6 +236,7 @@
             "id": 51,
             "result": {
               "active": true,
+              "escapeStops": 0,
               "reason": "desktop input after the human approved (#10788)",
               "grantedAt": "2026-01-01T00:00:00.000Z"
             }

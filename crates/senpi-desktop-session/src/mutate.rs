@@ -66,6 +66,8 @@ pub(crate) struct Mutation<'a> {
     /// `desktop`, a window id, or (AX requests) the window key of the ref.
     pub(crate) target: String,
     pub(crate) delivery: DeliveryMode,
+    /// A raise-shaped action without an explicit delivery option (AXRaise).
+    pub(crate) takes_over: bool,
     /// The capture the request's coordinates are pixels of.
     pub(crate) frame_id: Option<&'a str>,
     /// Typed text or an AX value: audited by length and hash only.
@@ -82,6 +84,7 @@ impl Mutation<'_> {
             action,
             target,
             delivery,
+            takes_over: false,
             frame_id: None,
             text: None,
             text_delivered: Cell::new(0),
@@ -131,9 +134,24 @@ impl Worker {
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> CoreResult<(T, AuditEvent)> {
         let started = Instant::now();
-        let (result, focus_restored) = match self.admit(cancelled) {
-            Ok(_transaction) => self.transaction(mutation, cancelled, act),
-            Err(stopped) => (Err(TransactionError::Primary(stopped)), None),
+        let escape = Arc::clone(&self.escape);
+        let epoch = escape.stops();
+        let cancelled = || cancelled() || escape.stops() != epoch;
+        let (result, focus_restored) = match self.arm_escape_operation(mutation) {
+            Err(error) => (Err(TransactionError::Primary(error)), None),
+            Ok(_operation) => {
+                let mut outcome = match self.admit(&cancelled) {
+                    Ok(_transaction) => self.transaction(mutation, &cancelled, act),
+                    Err(stopped) => (Err(TransactionError::Primary(stopped)), None),
+                };
+                if outcome.0.is_ok() && cancelled() {
+                    outcome.0 = Err(TransactionError::Primary(DesktopError::new(
+                        ErrorCode::Cancelled, "the operation was cancelled during input or restoration",
+                    )));
+                }
+                self.reconcile_grant();
+                outcome
+            }
         };
         let result = result.map_err(DesktopError::from);
         let code = result.as_ref().err().map(|error| error.code);

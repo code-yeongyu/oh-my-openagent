@@ -35,6 +35,8 @@ pub struct SessionOpenResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ControlStateResult {
+    #[serde(default)]
+    pub escape_stops: u32,
     pub active: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
@@ -135,4 +137,11 @@ pub enum LogLevel {
 pub struct EngineLog {
     pub level: LogLevel,
     pub message: String,
+}
+
+/// A physical Escape stopped this session; additive under #11459.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EscapeStopped {
+    pub escape_stops: u32,
 }

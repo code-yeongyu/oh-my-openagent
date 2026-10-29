@@ -1,4 +1,4 @@
-//! The FROZEN engine JSON-RPC method table and server notification set.
+//! The engine method/notification set; additive Escape amendment: #11459 D0b.
 //!
 //! One row binds a wire name to its effect, exposure, and params/result core
 //! types. Adding a row also changes `schema/engine.schema.json`,
@@ -17,7 +17,7 @@ use crate::protocol_params::{
     StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{
-    AuditEvent, AxInputResult, AxTextSelection, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
+    AuditEvent, AxInputResult, AxTextSelection, ControlStateResult, EngineLog, EscapeStopped, HelloResult, SessionOpenResult, StopPathStatus,
 };
 use crate::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
@@ -158,10 +158,12 @@ pub enum Notification {
     StopPathChanged,
     #[serde(rename = "engine.log")]
     EngineLog,
+    #[serde(rename = "escape.stopped")]
+    EscapeStopped,
 }
 
 impl Notification {
-    pub const ALL: [Self; 3] = [Self::Audit, Self::StopPathChanged, Self::EngineLog];
+    pub const ALL: [Self; 4] = [Self::Audit, Self::StopPathChanged, Self::EngineLog, Self::EscapeStopped];
 
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -169,6 +171,7 @@ impl Notification {
             Self::Audit => "audit",
             Self::StopPathChanged => "stopPath.changed",
             Self::EngineLog => "engine.log",
+            Self::EscapeStopped => "escape.stopped",
         }
     }
 
@@ -179,6 +182,7 @@ impl Notification {
             Self::Audit => "AuditEvent",
             Self::StopPathChanged => "StopPathStatus",
             Self::EngineLog => "EngineLog",
+            Self::EscapeStopped => "EscapeStopped",
         }
     }
 
@@ -187,6 +191,7 @@ impl Notification {
             Self::Audit => generator.subschema_for::<AuditEvent>(),
             Self::StopPathChanged => generator.subschema_for::<StopPathStatus>(),
             Self::EngineLog => generator.subschema_for::<EngineLog>(),
+            Self::EscapeStopped => generator.subschema_for::<EscapeStopped>(),
         }
     }
 }

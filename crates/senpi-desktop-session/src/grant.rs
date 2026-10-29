@@ -49,6 +49,8 @@ pub(crate) struct ControlGrant {
     pub(crate) granted_at: String,
     /// The supervisor stop epoch at grant time; a stop revokes the grant.
     pub(crate) stop_epoch: u64,
+    pub(crate) escape_epoch: u32,
+    pub(crate) automatic: bool,
 }
 
 /// Who the slot belongs to right now.
@@ -99,7 +101,7 @@ pub(crate) fn admits(delivery: DeliveryMode, live: bool) -> bool {
 /// Pointer and keyboard input on the `desktop` or a `display:*` target: every
 /// backend posts it globally (the user's own pointer and frontmost app), so it
 /// needs the grant whatever delivery was requested (#10788).
-fn posts_globally(mutation: &crate::mutate::Mutation<'_>) -> bool {
+pub(crate) fn posts_globally(mutation: &crate::mutate::Mutation<'_>) -> bool {
     let input = matches!(
         mutation.action,
         MutatingAction::Click
@@ -124,7 +126,7 @@ impl Worker {
             .as_ref()
             .is_some_and(|grant| grant.stop_epoch == self.stop_epoch());
         let global = posts_globally(mutation);
-        if admits(mutation.delivery, live) && (live || !global) {
+        if admits(mutation.delivery, live) && (live || (!global && !mutation.takes_over)) {
             return Ok(());
         }
         if global {
@@ -160,6 +162,8 @@ impl Worker {
         if self.safety.supervisor.is_suspended() {
             return Err(DesktopError::from(senpi_desktop_safety::GateError::Suspended));
         }
+        if let Some(signal) = &self.hold_signal { signal.check(&self.safety.supervisor)?; }
+        if !params.automatic { self.prepare_escape()?; }
         let mut slot = self.safety.control_slot.owner.lock();
         if let Some(owner) = slot.as_ref() {
             if owner.instance != self.instance {
@@ -169,6 +173,12 @@ impl Worker {
                 ));
             }
         }
+        let escape_epoch = if params.automatic {
+            self.escape.disarm();
+            self.escape.stops()
+        } else {
+            self.escape.arm()
+        };
         let generation = NEXT_GENERATION.fetch_add(1, Ordering::SeqCst);
         let grant = ControlGrant {
             id: ulid::Ulid::generate().to_string(),
@@ -176,17 +186,26 @@ impl Worker {
             generation,
             granted_at: crate::audit::rfc3339_ms(crate::audit::unix_now_ms()),
             stop_epoch,
+            escape_epoch,
+            automatic: params.automatic,
         };
         *slot = Some(SlotOwner {
             instance: self.instance,
             generation,
         });
         let state = ControlStateResult {
+            escape_stops: self.escape.stops(),
             active: true,
             reason: Some(grant.reason.clone()),
             granted_at: Some(grant.granted_at.clone()),
         };
+        drop(slot);
         self.control = Some(grant);
+        let stopped = self.hold_signal.as_ref().map_or(Ok(()), |signal| signal.check(&self.safety.supervisor));
+        if let Err(error) = stopped {
+            self.release_control();
+            return Err(error);
+        }
         Ok(state)
     }
 
@@ -205,6 +224,7 @@ impl Worker {
         }
         drop(slot);
         self.control = None;
+        self.escape.disarm();
     }
 
     /// Drops the grant when a stop was observed since it was granted. Runs at
@@ -214,7 +234,7 @@ impl Worker {
         let revoked = self
             .control
             .as_ref()
-            .is_some_and(|grant| grant.stop_epoch != self.stop_epoch());
+            .is_some_and(|grant| grant.stop_epoch != self.stop_epoch() || grant.escape_epoch != self.escape.stops());
         if revoked {
             self.release_control();
         }
@@ -224,11 +244,13 @@ impl Worker {
     pub(crate) fn control_state(&self) -> ControlStateResult {
         match self.control.as_ref() {
             Some(grant) => ControlStateResult {
+                escape_stops: self.escape.stops(),
                 active: true,
                 reason: Some(grant.reason.clone()),
                 granted_at: Some(grant.granted_at.clone()),
             },
             None => ControlStateResult {
+                escape_stops: self.escape.stops(),
                 active: false,
                 reason: None,
                 granted_at: None,

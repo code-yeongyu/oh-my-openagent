@@ -122,11 +122,12 @@ impl Worker {
         action: &str,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
+        let mut mutation = Mutation::new(
             MutatingAction::AxPerform,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
+        mutation.takes_over = action.eq_ignore_ascii_case("raise") || action == "AXRaise";
         self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
             let backend = worker.ax_parts()?.0;

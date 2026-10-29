@@ -108,6 +108,9 @@ pub struct RaiseWindowParams {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ControlGrantParams {
+    /// Full-access consent, not explicit held control (#11465).
+    #[serde(default)]
+    pub automatic: bool,
     pub reason: String,
     pub confirmation_id: String,
 }

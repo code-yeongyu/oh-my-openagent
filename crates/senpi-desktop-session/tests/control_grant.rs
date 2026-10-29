@@ -46,6 +46,7 @@ fn start(slot: &Arc<ControlSlot>) -> Session {
 
 fn grant(reason: &str) -> Op {
     Op::ControlGrant(ControlGrantParams {
+        automatic: false,
         reason: reason.to_owned(),
         confirmation_id: "confirm-1".to_owned(),
     })

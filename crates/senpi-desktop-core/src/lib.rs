@@ -7,6 +7,7 @@ pub mod backend;
 pub mod clipboard;
 pub mod drag_guard;
 pub mod error;
+pub mod escape;
 pub mod frame;
 pub mod holds;
 pub mod intervention;

@@ -107,6 +107,12 @@ pub enum ElementDelivery {
 }
 
 pub trait Backend: Send {
+    /// Attach the operation stop to a supported physical-input watch. Non-macOS
+    /// backends keep their existing behavior; macOS refuses when its tap is off.
+    fn watch_escape(&mut self, _stop: std::sync::Arc<crate::escape::EscapeStop>) -> CoreResult<()> {
+        Ok(())
+    }
+
     /// Independent release ownership, usable without borrowing a busy backend.
     /// Owners register this before admitting input into bounded fatal-stop mode.
     fn emergency_release(&self) -> Option<std::sync::Arc<dyn EmergencyRelease>> {

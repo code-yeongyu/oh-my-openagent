@@ -20,6 +20,9 @@ use crate::sink::{RecordingSink, SinkOp};
 /// desktop-target or `foreground` pointer input moves the cursor; `background`
 /// window input changes neither, like a real background-delivery backend.
 pub struct FakeBackend {
+    pub(crate) escape: Option<std::sync::Arc<senpi_desktop_core::escape::EscapeStop>>,
+    pub(crate) escape_on_text: bool,
+    pub(crate) escape_watch_off: bool,
     pub(crate) displays: Vec<DesktopDisplay>,
     pub(crate) windows: Vec<DesktopWindow>,
     pub(crate) capabilities: DesktopCapabilities,
@@ -53,6 +56,9 @@ impl FakeBackend {
             faults.cannot_complete_next(*write);
         }
         Self {
+            escape: None,
+            escape_on_text: scenario.escape_on_text,
+            escape_watch_off: scenario.escape_watch_off,
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
             drag_guard: scenario.drag_guard,

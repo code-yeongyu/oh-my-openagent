@@ -115,7 +115,7 @@ export class FullAccessConsent {
 	}
 
 	async #grant(connection: Connection, options: CallOptions): Promise<void> {
-		const params = { reason: FULL_ACCESS_GRANT_REASON, confirmationId: randomUUID() };
+		const params = { reason: FULL_ACCESS_GRANT_REASON, confirmationId: randomUUID(), automatic: true };
 		const signal = options.signal;
 		await this.#grants.grant(
 			() => connection.rpc.request("control.grant", params, signal === undefined ? {} : { signal }),
