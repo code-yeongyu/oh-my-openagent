@@ -40,7 +40,7 @@ use held::{Held, KeyRoute};
 
 pub(crate) use self::canary::CANARY_STOP_REASON;
 pub use self::canary::{CanaryMode, CanaryResult};
-pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
+pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event, ENGINE_EVENT_TAG};
 pub(crate) use self::keys::{key_code, update_modifier};
 pub(crate) use self::user_monitor::UserInputWatch;
 pub(crate) use self::release::post_helper_release;

@@ -11,6 +11,7 @@ pub mod error;
 pub mod frame;
 pub mod holds;
 pub mod intervention;
+pub mod key_reroute;
 pub mod keys;
 pub mod menus;
 pub mod methods;

@@ -30,6 +30,7 @@ tokio = { workspace = true, features = ["test-util"] }
 libc.workspace = true
 senpi-desktop-backend-macos = { path = "../senpi-desktop-backend-macos" }
 senpi-desktop-xpc = { path = "../senpi-desktop-xpc" }
+tokio = { workspace = true, features = ["signal"] }
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 core-graphics.workspace = true

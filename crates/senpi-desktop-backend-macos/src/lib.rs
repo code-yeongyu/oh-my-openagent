@@ -17,6 +17,9 @@ mod process;
 mod release_helper;
 mod responsible;
 mod input;
+mod key_reroute;
+mod exit_safety;
+pub use exit_safety::{invalidate_input_observers, shutdown_input_observers};
 #[cfg(test)]
 mod partial_coverage_tests;
 mod skylight;

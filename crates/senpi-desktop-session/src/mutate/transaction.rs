@@ -33,8 +33,9 @@ impl Worker {
             )
             && matches!(Target::parse(&mutation.target), Target::Window(_))
         {
+            let audit = self.reroute_audit_sink(&mutation.target);
             match self.backend().and_then(|backend| {
-                backend.begin_background_action(&Target::parse(&mutation.target))
+                backend.begin_background_action(&Target::parse(&mutation.target), audit)
             }) {
                 Ok(watch) => watch,
                 Err(error) => return (Err(TransactionError::Primary(error)), None),

@@ -18,6 +18,8 @@ mod selftest;
 mod serve;
 mod settle;
 mod stop_path;
+#[cfg(target_os = "macos")]
+mod exit;
 #[cfg(any(test, target_os = "macos"))]
 mod sessions;
 #[cfg(target_os = "macos")]
@@ -42,6 +44,8 @@ const USAGE_ERROR: u8 = 2;
 mod xpc_tests;
 
 fn main() -> ExitCode {
+    #[cfg(target_os = "macos")]
+    exit::install_panic_hook();
     // This exact, opt-in transport alone uses message authentication instead
     // of inherited responsibility. Clap rejects all combinations with old modes.
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--xpc-agent")) {
@@ -217,10 +221,16 @@ fn block_on(work: impl std::future::Future<Output = Result<(), String>>) -> Exit
         Ok(runtime) => runtime,
         Err(error) => return fail(&format!("cannot start the async runtime: {error}")),
     };
+    #[cfg(target_os = "macos")]
+    let outcome = runtime.block_on(exit::run(work));
+    #[cfg(not(target_os = "macos"))]
     let outcome = runtime.block_on(work);
     // A session thread stuck in a backend call must not hold the exit.
     runtime.shutdown_background();
     match outcome {
+        #[cfg(target_os = "macos")]
+        Ok(outcome) => outcome.code(),
+        #[cfg(not(target_os = "macos"))]
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => fail(&error),
     }

@@ -126,6 +126,29 @@ struct Retained(*mut c_void);
 // SAFETY: [data race] the owner only signals, wakes and releases these CF
 // objects, which CoreFoundation documents as safe from any thread.
 unsafe impl Send for Retained {}
+// SAFETY: CF retain/release, source signaling, run-loop wakeup and port
+// invalidation are thread-safe; this wrapper exposes no Rust pointee.
+unsafe impl Sync for Retained {}
+
+impl Retained {
+    fn retain(object: *mut c_void) -> Self {
+        // SAFETY: Caller passes a live CF object retained for this owner.
+        Self(unsafe { CFRetain(object.cast_const()).cast_mut() })
+    }
+
+    fn invalidate(&self) {
+        // SAFETY: The registration retains this port until its callback drops.
+        unsafe { CFMachPortInvalidate(self.0) };
+    }
+
+    fn signal(&self, run_loop: &Self) {
+        // SAFETY: Both CF objects remain retained by this registration.
+        unsafe {
+            CFRunLoopSourceSignal(self.0);
+            CFRunLoopWakeUp(run_loop.0);
+        }
+    }
+}
 
 impl Drop for Retained {
     fn drop(&mut self) {
@@ -244,6 +267,14 @@ fn run(log: Arc<UserInputLog>, ready: &SyncSender<Option<(Retained, Retained)>>)
         run_loop,
         sources: [source, stop_source],
     };
+    let exit_port = Retained::retain(tap);
+    let exit_loop = Retained::retain(run_loop);
+    let exit_source = Retained::retain(stop_source);
+    let _exit = crate::exit_safety::register(move || {
+        exit_port.invalidate();
+        // Signaling stays pending even before CFRunLoopRun begins.
+        exit_source.signal(&exit_loop);
+    });
     // SAFETY: [FFI] `tap` is live.
     unsafe { CGEventTapEnable(tap, true) };
     // SAFETY: [FFI] the run loop and the stop source are live CF objects;

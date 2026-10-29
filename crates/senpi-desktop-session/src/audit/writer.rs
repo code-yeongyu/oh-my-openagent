@@ -5,16 +5,21 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use super::{warn, AuditRecord};
+use super::warn;
+use serde::Serialize;
+
+// Linger workers and request workers share rotation and whole-line writes.
+static WRITER: parking_lot::Mutex<()> = parking_lot::const_mutex(());
 
 /// Rotate when the live file reaches this size.
 pub(crate) const ROTATE_BYTES: u64 = 50 * 1024 * 1024;
 
-pub(crate) fn append(path: &Path, record: &AuditRecord) {
+pub(crate) fn append(path: &Path, record: &impl Serialize) {
     append_rotating(path, record, ROTATE_BYTES);
 }
 
-pub(crate) fn append_rotating(path: &Path, record: &AuditRecord, rotate_bytes: u64) {
+pub(crate) fn append_rotating(path: &Path, record: &impl Serialize, rotate_bytes: u64) {
+    let _writer = WRITER.lock();
     if let Err(error) = try_append(path, record, rotate_bytes) {
         warn(format_args!(
             "audit log write failed ({}): {error}",
@@ -23,7 +28,7 @@ pub(crate) fn append_rotating(path: &Path, record: &AuditRecord, rotate_bytes: u
     }
 }
 
-fn try_append(path: &Path, record: &AuditRecord, rotate_bytes: u64) -> io::Result<()> {
+fn try_append(path: &Path, record: &impl Serialize, rotate_bytes: u64) -> io::Result<()> {
     rotate_if_needed(path, rotate_bytes);
     let mut options = OpenOptions::new();
     options.create(true).append(true);

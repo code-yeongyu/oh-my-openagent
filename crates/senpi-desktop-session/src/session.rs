@@ -76,6 +76,20 @@ impl Session {
         timeouts: SessionTimeouts,
         safety: SessionSafety,
     ) -> CoreResult<Self> {
+        Self::start_supervised_with_log(factory, timeouts, safety, Arc::new(|_| {}))
+    }
+
+    /// Starts a supervised session with a thread-safe sink for background
+    /// lifecycle records, including records emitted after an action returns.
+    ///
+    /// # Errors
+    /// See [`Self::start_supervised`].
+    pub fn start_supervised_with_log(
+        factory: impl BackendFactory,
+        timeouts: SessionTimeouts,
+        safety: SessionSafety,
+        log: Arc<dyn Fn(senpi_desktop_core::protocol_results::EngineLog) + Send + Sync>,
+    ) -> CoreResult<Self> {
         let capabilities = Arc::new(Mutex::new(DesktopCapabilities::unavailable()));
         let (queue, requests) = flume::unbounded();
         let (ready_tx, ready_rx) = flume::bounded(1);
@@ -84,7 +98,8 @@ impl Session {
         thread::Builder::new()
             .name(THREAD_NAME.to_owned())
             .spawn(move || {
-                let worker = Worker::new(Box::new(factory), shared, safety);
+                let mut worker = Worker::new(Box::new(factory), shared, safety);
+                worker.background_log = log;
                 // `start` is blocked on this receiver until it arrives.
                 ready_tx.send(()).unwrap_or(());
                 serve(worker, &requests);

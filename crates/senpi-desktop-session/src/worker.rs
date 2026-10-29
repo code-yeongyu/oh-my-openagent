@@ -22,6 +22,7 @@ const DEFAULT_ARTIFACT_DIR: &str = "senpi-desktop";
 
 /// Owned by the session thread: AX handles are `Rc`, so it never leaves it.
 pub(crate) struct Worker {
+    pub(crate) background_log: Arc<dyn Fn(senpi_desktop_core::protocol_results::EngineLog) + Send + Sync>,
     pub(crate) hold_signal: Option<Arc<senpi_desktop_safety::HoldSignal>>,
     emergency: Option<Arc<dyn senpi_desktop_core::backend::EmergencyRelease>>,
     factory: Box<dyn BackendFactory>,
@@ -61,6 +62,7 @@ impl Worker {
             ..DesktopSessionOptions::default()
         });
         let mut worker = Self {
+            background_log: Arc::new(|_| {}),
             hold_signal: None,
             emergency: None,
             factory,

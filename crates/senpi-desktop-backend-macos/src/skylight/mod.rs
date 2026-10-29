@@ -28,7 +28,7 @@ use self::psn::{
     SET_FRONT_NO_WINDOWS,
 };
 pub(crate) use self::partial::{mark_sent, reporting_partial};
-pub(crate) use self::spi::{front_pid, is_available};
+pub(crate) use self::spi::{front_pid, is_available, keyboard_holders};
 pub(crate) use self::window_query::{window_owner_pid, window_parent};
 use self::spi::required;
 

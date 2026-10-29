@@ -11,6 +11,7 @@
 mod chord;
 mod tap;
 mod worker;
+pub(crate) use tap::secure_input_enabled;
 
 #[cfg(test)]
 mod live_tests;

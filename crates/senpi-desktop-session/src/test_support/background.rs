@@ -6,6 +6,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use senpi_desktop_core::background_action::{BackgroundActionState, BackgroundActionWatch};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::key_reroute::audit::{AuditLease, AuditSink};
 
 #[derive(Clone, Default)]
 pub(crate) struct BackgroundFixture {
@@ -15,12 +16,17 @@ pub(crate) struct BackgroundFixture {
     pub(crate) drops: Arc<AtomicUsize>,
     pub(crate) finish_error: Arc<Mutex<Option<DesktopError>>>,
     pub(crate) visit_on_finish: Arc<AtomicBool>,
+    pub(crate) arm_reroute: Arc<AtomicBool>,
+    pub(crate) reroute: Arc<Mutex<Option<AuditLease>>>,
 }
 
 impl BackgroundFixture {
-    pub(crate) fn begin(&self) -> Option<Box<dyn BackgroundActionWatch>> {
+    pub(crate) fn begin(&self, audit: AuditSink) -> Option<Box<dyn BackgroundActionWatch>> {
         let state = self.state.lock().clone()?;
         self.begins.fetch_add(1, Ordering::SeqCst);
+        if self.arm_reroute.load(Ordering::SeqCst) {
+            *self.reroute.lock() = Some(AuditLease::arm(1, audit));
+        }
         Some(Box::new(Watch {
             fixture: self.clone(),
             state,

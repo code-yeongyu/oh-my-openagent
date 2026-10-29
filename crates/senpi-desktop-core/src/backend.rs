@@ -6,17 +6,18 @@
 
 use image::RgbaImage;
 
-use crate::ax::{AxHandle, AxProps};
+use crate::ax::AxHandle;
 use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
-use crate::protocol_results::AxTextSelection;
-use crate::text_range::TextSelectRequest;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
 use crate::user_input::{UserInputFeed, UserPresses};
+
+mod ax;
+pub use ax::{AxBackend, AxOwner};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeliveryMode {
@@ -111,6 +112,7 @@ pub trait Backend: Send {
     fn begin_background_action(
         &mut self,
         _target: &Target,
+        _audit: crate::key_reroute::audit::AuditSink,
     ) -> CoreResult<Option<Box<dyn crate::background_action::BackgroundActionWatch>>> {
         Ok(None)
     }
@@ -322,42 +324,6 @@ pub trait Backend: Send {
 /// Replays only tracked downs. Must not wait for the backend's input scope.
 pub trait EmergencyRelease: Send + Sync {
     fn release_all(&self) -> CoreResult<()>;
-}
-
-/// The native window that owns an accessibility element.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AxOwner {
-    /// The owner's id, in the form [`Backend::windows`] lists it.
-    Window(String),
-    /// The backend cannot name the owner; callers must not guess it.
-    Unknown,
-}
-
-pub trait AxBackend {
-    fn window_root(&mut self, win: &DesktopWindow) -> CoreResult<AxHandle>;
-    fn props(&mut self, h: &AxHandle) -> CoreResult<AxProps>;
-    fn children(&mut self, h: &AxHandle) -> CoreResult<Vec<AxHandle>>;
-    fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>>;
-    fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()>;
-    fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()>;
-    fn focus(&mut self, h: &AxHandle) -> CoreResult<()>;
-    fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;
-    fn focused_element(&mut self) -> CoreResult<Option<AxHandle>>;
-    fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>>;
-
-    /// The window that owns `h`, read live from the platform and named as
-    /// `windows` (the live [`Backend::windows`]) lists it. Backends that
-    /// cannot name it keep this default.
-    fn owner(&mut self, _h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
-        Ok(AxOwner::Unknown)
-    }
-
-    /// Selects the range `request` names in `h`'s value (`ax.selectText`) by
-    /// writing the element's selected text range: no key is sent and no
-    /// focus moves. Backends without text selection keep this default.
-    fn select_text(&mut self, _h: &AxHandle, _request: &TextSelectRequest) -> CoreResult<AxTextSelection> {
-        Err(DesktopError::ax_unsupported())
-    }
 }
 
 #[cfg(test)]

@@ -166,6 +166,7 @@ enum Watch {
     #[default]
     NotStarted,
     On {
+        exit_epoch: u64,
         log: Arc<UserInputLog>,
         _monitor: tap::Monitor,
     },
@@ -186,6 +187,14 @@ impl UserInputWatch {
         trusted: impl FnOnce() -> bool,
         tap: impl FnOnce(Arc<UserInputLog>) -> Option<tap::Monitor>,
     ) {
+        // A caught backend panic can keep the engine alive after its panic
+        // hook invalidated the taps. Do not report a dead watch as On or
+        // permanently lose intervention detection on subsequent requests.
+        if matches!(&self.0, Watch::On { exit_epoch, .. }
+            if *exit_epoch != crate::exit_safety::epoch())
+        {
+            self.0 = Watch::NotStarted;
+        }
         if !matches!(self.0, Watch::NotStarted) {
             return;
         }
@@ -194,8 +203,10 @@ impl UserInputWatch {
             return;
         }
         let log = Arc::new(UserInputLog::default());
+        let exit_epoch = crate::exit_safety::epoch();
         self.0 = match tap(Arc::clone(&log)) {
             Some(monitor) => Watch::On {
+                exit_epoch,
                 log,
                 _monitor: monitor,
             },
@@ -206,7 +217,8 @@ impl UserInputWatch {
     pub(crate) fn state(&self) -> InterventionWatch {
         match &self.0 {
             Watch::NotStarted => InterventionWatch::NotStarted,
-            Watch::On { .. } => InterventionWatch::On,
+            Watch::On { exit_epoch, .. } if *exit_epoch == crate::exit_safety::epoch() => InterventionWatch::On,
+            Watch::On { .. } => InterventionWatch::Off,
             Watch::Off => InterventionWatch::Off,
         }
     }

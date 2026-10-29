@@ -35,6 +35,7 @@ pub(crate) struct Harness {
     pub(crate) clock: Arc<FakeClock>,
     pub(crate) supervisor: Arc<Supervisor>,
     pub(crate) audits: Arc<Mutex<Vec<AuditEvent>>>,
+    pub(crate) background_logs: Arc<Mutex<Vec<senpi_desktop_core::protocol_results::EngineLog>>>,
     user_input: Arc<FakeUserInput>,
 }
 
@@ -94,6 +95,9 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
     };
     let capabilities = Arc::new(Mutex::new(DesktopCapabilities::unavailable()));
     let mut worker = Worker::new(Box::new(factory), capabilities, safety);
+    let background_logs = Arc::new(Mutex::new(Vec::new()));
+    let logged = Arc::clone(&background_logs);
+    worker.background_log = Arc::new(move |event| logged.lock().push(event));
     worker.open(DesktopSessionOptions::default());
     let (sink, faults, user_input) = built.lock().clone().expect("open built a backend");
     Harness {
@@ -105,6 +109,7 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
         clock,
         supervisor,
         audits,
+        background_logs,
         user_input,
     }
 }

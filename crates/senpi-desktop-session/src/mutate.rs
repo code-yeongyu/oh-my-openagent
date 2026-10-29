@@ -303,3 +303,5 @@ mod typing_tests;
 
 #[cfg(test)]
 mod background_tests;
+#[cfg(test)]
+mod reroute_tests;

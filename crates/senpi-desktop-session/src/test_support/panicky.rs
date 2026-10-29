@@ -51,13 +51,20 @@ pub(crate) struct PanickyFake {
     pub(crate) watches: Watches,
 }
 
+impl Drop for PanickyFake {
+    fn drop(&mut self) {
+        self.watches.background.reroute.lock().take();
+    }
+}
+
 impl Backend for PanickyFake {
     fn begin_background_action(
         &mut self,
         _target: &Target,
+        audit: senpi_desktop_core::key_reroute::audit::AuditSink,
     ) -> CoreResult<Option<Box<dyn senpi_desktop_core::background_action::BackgroundActionWatch>>>
     {
-        Ok(self.watches.background.begin())
+        Ok(self.watches.background.begin(audit))
     }
 
     fn permission_denied(&mut self, permission: TccPermission) -> DesktopError {

@@ -91,6 +91,7 @@ impl Engine {
     ) -> CoreResult<Self> {
         let outbox = Arc::new(Outbox::default());
         let audited = Arc::clone(&outbox);
+        let logged = Arc::clone(&outbox);
         let safety = SessionSafety {
             supervisor: stop_paths.supervisor(),
             audit: Box::new(move |event| audited.push(Notification::Audit, event)),
@@ -99,7 +100,10 @@ impl Engine {
         let hold_release_budget = config.timeouts.close;
         Ok(Self {
             hold_release_budget,
-            session: Session::start_supervised(factory, config.timeouts, safety)?,
+            session: Session::start_supervised_with_log(
+                factory, config.timeouts, safety,
+                Arc::new(move |event| logged.push(Notification::EngineLog, &event)),
+            )?,
             resume_token: if shared_agent {
                 format!("{}{}", Ulid::generate(), Ulid::generate())
             } else {

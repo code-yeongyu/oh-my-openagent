@@ -27,6 +27,7 @@ struct Shared {
 }
 
 struct Watch {
+    reroute: Option<crate::key_reroute::KeyReroute>,
     shared: Arc<Shared>,
     observer: Option<JoinHandle<CoreResult<()>>>,
     samplers: Vec<JoinHandle<()>>,
@@ -34,7 +35,11 @@ struct Watch {
 
 /// Reusable entry for a background action on `pid`, including Spaces once
 /// its branch is folded. Missing SPI preserves the previous no-watcher path.
-pub(crate) fn begin(pid: u32) -> CoreResult<Option<Box<dyn BackgroundActionWatch>>> {
+pub(crate) fn begin(
+    pid: u32,
+    owner: &crate::key_reroute::RerouteOwner,
+    audit: senpi_desktop_core::key_reroute::audit::AuditSink,
+) -> CoreResult<Option<Box<dyn BackgroundActionWatch>>> {
     if super::spi::foreground().is_none() || super::spi::required().is_err() {
         return Ok(None);
     }
@@ -72,6 +77,11 @@ pub(crate) fn begin(pid: u32) -> CoreResult<Option<Box<dyn BackgroundActionWatch
         stopped: AtomicBool::new(false),
     });
     let mut watch = Watch {
+        reroute: crate::key_reroute::KeyReroute::start(
+            owner, user_pid,
+            i32::try_from(pid).map_err(|_| DesktopError::background_unavailable("invalid target process"))?,
+            audit,
+        ),
         shared: Arc::clone(&shared),
         observer: None,
         samplers: Vec::new(),
@@ -147,6 +157,7 @@ impl Watch {
                 ));
             }
         }
+        self.reroute.take();
         result
     }
 }

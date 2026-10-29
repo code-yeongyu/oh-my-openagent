@@ -110,6 +110,30 @@ pub(crate) fn front_pid() -> Option<libc::pid_t> {
     (unsafe { get_pid(&psn, &mut pid) } == 0 && pid > 0).then_some(pid)
 }
 
+pub(crate) fn keyboard_holders() -> Option<(libc::pid_t, Option<libc::pid_t>)> {
+    type GetKeyFocus = unsafe extern "C" fn(*mut ProcessSerialNumber, *mut u8) -> i32;
+    static GET_KEY_FOCUS: LazyLock<Option<GetKeyFocus>> = LazyLock::new(|| {
+        if disabled_by_env() {
+            return None;
+        }
+        ensure_skylight_loaded()?;
+        symbol(c"SLPSGetKeyFocusProcess")
+    });
+    let front = front_pid()?;
+    let (_, get_pid) = (*FRONT_PID)?;
+    let focus = GET_KEY_FOCUS.and_then(|get_focus| {
+        let mut psn = ProcessSerialNumber::default();
+        let mut status = 0_u8;
+        let mut pid = 0;
+        // SAFETY: Both synchronous SPI calls receive writable, correctly sized
+        // out-pointers, using the resolved PSN/pid signatures.
+        (unsafe { get_focus(&mut psn, &mut status) } == 0
+            && unsafe { get_pid(&psn, &mut pid) } == 0
+            && pid > 0).then_some(pid)
+    });
+    Some((front, focus))
+}
+
 /// Test hook: `SENPI_DESKTOP_DISABLE_SKYLIGHT=1` makes every probe report the
 /// SPI as missing so the no-SkyLight failure paths stay exercisable.
 fn disabled_by_env() -> bool {
