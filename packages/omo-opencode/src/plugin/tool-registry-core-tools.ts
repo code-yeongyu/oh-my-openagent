@@ -28,7 +28,7 @@ export function createCoreTools(args: {
   readonly factories: ToolRegistryFactories
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
-  const loadCurrentModelConfig = args.sessionModelProfiles?.load ?? createRuntimeModelConfigLoader(ctx.directory, pluginConfig)
+  const loadCurrentModelConfig = args.sessionModelProfiles?.load ?? createRuntimeModelConfigLoader(ctx.directory, pluginConfig, process.env, { acceptPartialConfig: true })
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,

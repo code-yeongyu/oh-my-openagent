@@ -1,4 +1,5 @@
-import { describe, expect, mock, test } from "bun:test"
+import { describe, expect, mock, spyOn, test } from "bun:test"
+import * as validation from "../config/validate"
 import { tool } from "@opencode-ai/plugin"
 import type { SkillLoadOptions } from "../tools/skill/types"
 import type { ToolRegistryFactories } from "./tool-registry-factories"
@@ -166,6 +167,30 @@ describe("#given core skill tools are registered", () => {
 })
 
 describe("runtime model config wiring", () => {
+  test("the loader without session profiles accepts sanitized routing despite unrelated diagnostics", async () => {
+    const validate = spyOn(validation, "validatePluginConfig").mockReturnValue({
+      valid: false, messages: ["unrelated unknown setting"], warnings: ["ignored unrelated value"], path: null,
+      config: { agents: { explore: { model: "fixture/updated" } } },
+    })
+    try {
+      const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
+      const createCallOmoAgent = mock((...args: Parameters<ToolRegistryFactories["createCallOmoAgent"]>) => fakeTool)
+      createCoreTools({
+        ctx: unsafeTestValue({ directory: "/tmp/project", client: {} }),
+        pluginConfig: { disabled_agents: ["multimodal-looker"], agents: { explore: { model: "fixture/startup" } } },
+        managers: unsafeTestValue({ backgroundManager: {}, tmuxSessionManager: {}, skillMcpManager: {}, modelFallbackControllerAccessor: {} }),
+        skillContext: { mergedSkills: [], availableSkills: [], browserProvider: "playwright", disabledSkills: new Set() },
+        availableCategories: [],
+        factories: { ...createFactories(() => fakeTool), createDelegateTask, createCallOmoAgent },
+      })
+      const loader = createDelegateTask.mock.calls[0]?.[0].loadCurrentModelConfig
+      expect(loader).toBe(createCallOmoAgent.mock.calls[0]?.[6])
+      expect((await loader?.("session"))?.agents?.explore?.model).toBe("fixture/updated")
+    } finally {
+      validate.mockRestore()
+    }
+  })
+
   test("task and call_omo_agent share one dispatch-time snapshot loader without changing startup registration", () => {
     const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
     const createCallOmoAgent = mock((...args: Parameters<ToolRegistryFactories["createCallOmoAgent"]>) => fakeTool)
