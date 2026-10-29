@@ -33,19 +33,36 @@ export interface HostCollection {
 
 const locale = (): string => Intl.DateTimeFormat().resolvedOptions().locale
 
-const telemetryAllowed = (facts: HostFacts, config: unknown): boolean =>
+/** What the identity-hash gate reads: the env and the session's cwd (its omo config scope). */
+export type IdentityHashConsentFacts = Pick<HostFacts, "env"> & { readonly session?: Pick<HostSessionView, "cwd"> }
+
+const telemetryAllowed = (facts: IdentityHashConsentFacts, config: unknown): boolean =>
   !shouldDisableTelemetry({ env: { ...facts.env }, productEnvPrefix: "OMO_NATIVE" }) &&
   isOmoTelemetryEnabled(config as Parameters<typeof isOmoTelemetryEnabled>[0])
 
-export function collectHostSections(facts: HostFacts): HostCollection {
-  const loaded = loadSenpiOmoConfig({
+const loadConfig = (facts: IdentityHashConsentFacts) =>
+  loadSenpiOmoConfig({
     env: { ...facts.env },
     ...(facts.session?.cwd === undefined ? {} : { cwd: facts.session.cwd }),
   })
-  const hashesAllowed = loaded.diagnostics.length === 0 && telemetryAllowed(facts, loaded.config)
+
+const hashesAllowedFor = (facts: IdentityHashConsentFacts, loaded: ReturnType<typeof loadConfig>): boolean =>
+  loaded.diagnostics.length === 0 && telemetryAllowed(facts, loaded.config)
+
+/**
+ * The one gate for the install and session hashes, read fresh from the env and the omo config on disk. `prepare`
+ * collects the hashes through it and `submit` asks it again, so consent withdrawn in between is honored (#11638).
+ */
+export function identityHashesAllowed(facts: IdentityHashConsentFacts): boolean {
+  return hashesAllowedFor(facts, loadConfig(facts))
+}
+
+export function collectHostSections(facts: HostFacts): HostCollection {
+  const loaded = loadConfig(facts)
+  const hashesAllowed = hashesAllowedFor(facts, loaded)
   const installHash = hashesAllowed ? getOmoNativeAttribution({ env: { ...facts.env } }).install_hash : undefined
   const sessionHash =
-    hashesAllowed && facts.session?.sessionId !== undefined ? hashSessionId(facts.session.sessionId) : undefined
+    hashesAllowed && facts.session?.sessionId !== undefined ? hashSessionId(facts.session.sessionId, facts.env) : undefined
 
   const identity = [
     `device    ${hostname()}`,

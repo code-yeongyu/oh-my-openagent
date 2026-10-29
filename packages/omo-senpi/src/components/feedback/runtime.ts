@@ -6,8 +6,8 @@ import { randomUUID } from "node:crypto"
 import { createCredentialStore, type CredentialStore, quietNotice, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
 import type { ComponentLogger } from "../../extension/types"
 
-import { collectHostSections, type HostSessionView } from "./collect-host"
-import { buildDraft, type CollectedSection, type FeedbackDraft, type FeedbackKind, type UploadRedactor } from "./draft"
+import { collectHostSections, identityHashesAllowed, type HostSessionView } from "./collect-host"
+import { buildDraft, byteLength, type CollectedSection, type FeedbackDraft, type FeedbackKind, type UploadRedactor } from "./draft"
 import { feedbackUploadsDisabled, submitReport, type ReportClient, type ReportTransport, type SubmitResult } from "./submit"
 
 const DRAFT_TTL_MS = 30 * 60 * 1000
@@ -60,7 +60,19 @@ interface StoredDraft {
   readonly client: ReportClient
   readonly installHash?: string
   readonly sessionHash?: string
+  /** The session cwd the hashes' consent was read for; submit reads it again for the same scope. */
+  readonly cwd?: string
   readonly expiresAt: number
+}
+
+/** The draft without the identity lines that carry a withheld hash, so the value leaves the machine nowhere. */
+const withoutIdentityHashes = (draft: FeedbackDraft, hashes: readonly string[]): FeedbackDraft => {
+  const sections = draft.sections.map((section) => {
+    if (section.id !== "identity") return section
+    const text = section.text.split("\n").filter((line) => !hashes.some((hash) => line.includes(hash))).join("\n")
+    return { ...section, text, bytes: byteLength(text) }
+  })
+  return { ...draft, sections, totalBytes: sections.reduce((sum, section) => sum + section.bytes, 0) }
 }
 
 const sessionView = (ctx: FeedbackSessionLike | undefined): HostSessionView | undefined => {
@@ -153,13 +165,14 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
   const drafts = new Map<string, StoredDraft>()
 
   const prepare = (session: FeedbackSessionLike | undefined, input: unknown, redact: UploadRedactor): FeedbackDraft => {
+    const view = sessionView(session)
     const host = collectHostSections({
       env,
       omoVersion,
       senpiVersion,
       channel,
       now: now(),
-      ...(sessionView(session) === undefined ? {} : { session: sessionView(session) }),
+      ...(view === undefined ? {} : { session: view }),
     })
     const signedIn = typeof Reflect.get(Object(input), "accessToken") === "string"
     const draft = buildDraft({
@@ -180,6 +193,7 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
       client: { app: env.OMO_NATIVE_SURFACE === "desktop" ? "desktop" : "cli", omo: omoVersion, senpi: senpiVersion, os: process.platform, arch: process.arch, locale: Intl.DateTimeFormat().resolvedOptions().locale, channel },
       ...(host.installHash === undefined ? {} : { installHash: host.installHash }),
       ...(host.sessionHash === undefined ? {} : { sessionHash: host.sessionHash }),
+      ...(view?.cwd === undefined ? {} : { cwd: view.cwd }),
       expiresAt: now().getTime() + DRAFT_TTL_MS,
     })
     return draft
@@ -193,8 +207,12 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
     const description: unknown = Reflect.get(Object(input), "description")
     const accessToken: unknown = Reflect.get(Object(input), "accessToken")
     const idempotencyKey: unknown = Reflect.get(Object(input), "idempotencyKey")
+    // Consent is read again at send time, fresh, through the gate prepare used: a withdrawal after the draft was
+    // prepared drops the hashes (and their identity lines) and the rest of the report is still sent (#11638).
+    const captured = [stored.installHash, stored.sessionHash].filter((hash): hash is string => hash !== undefined)
+    const keepHashes = captured.length > 0 && identityHashesAllowed({ env, ...(stored.cwd === undefined ? {} : { session: { cwd: stored.cwd } }) })
     const result = await submitReport({
-      draft: stored.draft,
+      draft: keepHashes || captured.length === 0 ? stored.draft : withoutIdentityHashes(stored.draft, captured),
       kind: kind === "feedback" || kind === "other" ? kind : "bug",
       description: typeof description === "string" ? description : "",
       redact,
@@ -204,8 +222,8 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
       apiOrigin: config.apiOrigin(),
       accessToken: typeof accessToken === "string" ? accessToken : null,
       transport: config.transport,
-      ...(stored.installHash === undefined ? {} : { installHash: stored.installHash }),
-      ...(stored.sessionHash === undefined ? {} : { sessionHash: stored.sessionHash }),
+      ...(!keepHashes || stored.installHash === undefined ? {} : { installHash: stored.installHash }),
+      ...(!keepHashes || stored.sessionHash === undefined ? {} : { sessionHash: stored.sessionHash }),
       ...(typeof idempotencyKey === "string" ? { idempotencyKey } : {}),
     })
     if (result.kind === "refused" && (result.reason === "service-rejected" || result.reason === "service-unavailable")) config.logger?.warn("feedback.report_rejected", { code: result.code, requestId: result.requestId })

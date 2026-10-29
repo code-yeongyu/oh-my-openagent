@@ -72,8 +72,9 @@ export function getBuiltinSkillsRoot(): string {
   return fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "../../../skills/" : "../skills/", import.meta.url))
 }
 
-export function hashSessionId(rawId: string): string {
-  const salt = readOrCreateSalt(join(getOmoNativeStateDir(), SALT_FILE_NAME))
+/** The salt lives under the agent home resolved from `env`, the same env the caller resolves its other state from (#11638). */
+export function hashSessionId(rawId: string, env: TelemetryEnv = process.env): string {
+  const salt = readOrCreateSalt(join(getOmoNativeStateDir(env), SALT_FILE_NAME))
   return createHash("sha256").update(salt).update(rawId).digest("hex")
 }
 
@@ -166,7 +167,7 @@ function readOrCreateSalt(path: string): Buffer {
 
   const salt = randomBytes(SALT_LENGTH)
   try {
-    mkdirSync(getOmoNativeStateDir(), { recursive: true })
+    mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, salt, { flag: "wx", mode: 0o600 })
     fallbackSalts.delete(path)
     return salt

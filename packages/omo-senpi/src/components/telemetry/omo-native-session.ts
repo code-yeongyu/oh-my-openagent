@@ -97,7 +97,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
         })
         if (!client.enabled) return
 
-        const sessionHash = (options.hashSessionId ?? hashSessionId)(sessionId)
+        const sessionHash = options.hashSessionId === undefined ? hashSessionId(sessionId, env) : options.hashSessionId(sessionId)
         const activity = getDailyActiveCaptureState({
           diagnostics: options.diagnostics,
           now: options.now,

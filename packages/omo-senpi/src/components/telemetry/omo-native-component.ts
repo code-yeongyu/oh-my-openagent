@@ -192,7 +192,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         options,
       )
       const hashSession = (rawId: string): string =>
-        currentConsent(false) ? (options.hashSessionId ?? hashSessionId)(rawId) : OPTED_OUT_SESSION_HASH
+        !currentConsent(false) ? OPTED_OUT_SESSION_HASH : options.hashSessionId === undefined ? hashSessionId(rawId, env) : options.hashSessionId(rawId)
       // The span keeps the engine's own role name (dev's `omo.session.role`), separate from the closed event vocabulary above.
       // A host whose session context cannot be read must not stop registration (the event role is `unknown` then).
       const turnSpanContext = readTurnSpanContext(pi, env)
