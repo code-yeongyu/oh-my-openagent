@@ -3,13 +3,19 @@ import { spawn } from "node:child_process"
 import { Duplex } from "node:stream"
 import { readFrames, writeFrame } from "./desktop-sync/framing"
 
-async function registration(scenario: string): Promise<{ source?: string; cliBuilt: number; declared?: boolean; sharedSource?: boolean; error?: string; claims: number }> {
+async function registration(scenario: string): Promise<{
+  source?: string; cliBuilt: number; declared?: boolean; sharedSource?: boolean; error?: string; claims: number
+  observersBefore?: number; observersAfterFirst?: number; observersAfterSecond?: number
+}> {
   const env = { ...process.env }
   delete env.SENPI_PRIVATE_FDS
   delete env.SENPI_PRIVATE_FDS_FINAL
   if (scenario === "desktop" || scenario === "worker-desktop") env.SENPI_PRIVATE_FDS = '{"memory-sync":5}'
   else if (scenario !== "cli" && scenario !== "worker-absent") env.SENPI_PRIVATE_FDS = '{"memory-sync":null}'
-  const child = spawn(process.execPath, [new URL("./index-selection.fixture.ts", import.meta.url).pathname, scenario], {
+  const fixture = scenario.startsWith("observer-")
+    ? new URL("./index-observer.fixture.ts", import.meta.url)
+    : new URL("./index-selection.fixture.ts", import.meta.url)
+  const child = spawn(process.execPath, [fixture.pathname, scenario], {
     env, stdio: ["ignore", "pipe", "pipe", "ignore", "ignore", "pipe"],
   })
   let output = ""
@@ -56,6 +62,14 @@ async function registration(scenario: string): Promise<{ source?: string; cliBui
 }
 
 describe("memory component registration selects the engine account source", () => {
+  test("registering twice installs exactly one worker-lifetime observer", async () => {
+    expect(await registration("observer-twice")).toMatchObject({ observersBefore: 0, observersAfterFirst: 1, observersAfterSecond: 1 })
+  }, 30_000)
+
+  test("deviceAccount override still installs the worker-lifetime observer", async () => {
+    expect(await registration("observer-override")).toMatchObject({ observersBefore: 0, observersAfterFirst: 1 })
+  }, 30_000)
+
   test("(a) an in-process desktop daemon selects desktop through the real inherited channel", async () => {
     expect(await registration("desktop")).toEqual({ source: "desktop", cliBuilt: 0, declared: true, sharedSource: true, claims: 1 })
   }, 30_000)
