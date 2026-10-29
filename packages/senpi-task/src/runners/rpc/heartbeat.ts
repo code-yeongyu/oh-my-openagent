@@ -1,6 +1,7 @@
 import { RpcRequestTimeout } from "./errors"
 
 export const HEARTBEAT_DEADLINE_MS = 10_000
+const STOPPED = Symbol("heartbeat stopped")
 
 export function unresponsiveMessage(taskId: string): string {
   return `ended: the child stopped answering for 30 s (3 heartbeats). Action: inspect task_output ${taskId}; run it again with task`
@@ -50,10 +51,11 @@ export function startHeartbeat<T>(input: {
       if (!stopped) deadline = setTimeout(miss, HEARTBEAT_DEADLINE_MS)
     }
     deadline = setTimeout(miss, HEARTBEAT_DEADLINE_MS)
-    // A detached port can throw synchronously; Promise adoption keeps the same failure path.
-    const work = Promise.resolve().then(input.probe)
+    // A detached port can throw synchronously; Promise adoption keeps the same failure path. A stop that
+    // settles before this launch (a teardown continuation queued ahead of it) sends no probe (#11673).
+    const work = Promise.resolve().then<T | typeof STOPPED>(() => (stopped ? STOPPED : input.probe()))
     void work.then((state) => {
-      if (stopped || input.paused()) return
+      if (state === STOPPED || stopped || input.paused()) return
       failures = 0
       input.onState(state)
     }, (error: unknown) => {

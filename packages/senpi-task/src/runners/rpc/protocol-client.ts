@@ -46,6 +46,7 @@ export class RpcProtocolClient {
   private stderrBuffer = ""
   private nextRequestId = 0
   private isExited = false
+  private isDetached = false
   private writeErrorTimer: ReturnType<typeof setTimeout> | undefined
   private processExited = false
 
@@ -86,6 +87,7 @@ export class RpcProtocolClient {
 
   private request(command: { readonly type: string; readonly id?: string }, options: { readonly deadlineMs?: number }): Promise<RpcResponse> {
     const stdin = this.child.stdin
+    if (this.isDetached) return Promise.reject(new Error("RPC client detached"))
     if (this.isExited || stdin === null || stdin === undefined) {
       return Promise.reject(new Error(`RPC process is not running. Stderr: ${this.stderrTail}`))
     }
@@ -144,6 +146,7 @@ export class RpcProtocolClient {
   }
 
   detach(): void {
+    this.isDetached = true
     clearTimeout(this.writeErrorTimer)
     for (const [id, pending] of this.pending) {
       this.pending.delete(id)
@@ -233,6 +236,7 @@ export class RpcProtocolClient {
   }
 
   private write(payload: string): void {
+    if (this.isDetached) return
     try {
       this.child.stdin?.write(payload, (error) => {
         if (error) this.writeFailed(error)
@@ -243,7 +247,7 @@ export class RpcProtocolClient {
   }
 
   private writeFailed(error: Error): void {
-    if (this.isExited) return
+    if (this.isExited || this.isDetached) return
     if (!isHarmlessRpcShutdownError(error)) {
       this.finalize(error)
       return
