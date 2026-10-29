@@ -1,12 +1,10 @@
-//! Background-delivery policy: the app guard and the sole-window keyboard
-//! rule. Decisions only - no event posting happens here.
+//! Background-delivery policy: the app guard. Decisions only - no event
+//! posting happens here; the keyboard route lives in `background_keys`.
 
 use senpi_desktop_core::backend::{MouseButton, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::types::DesktopWindow;
 
-use crate::capture::MacCapture;
-use crate::skylight;
 
 /// Apps that coerce synthetic background right-clicks to left-clicks, and
 /// canvas/game engines that drop background events entirely.
@@ -31,38 +29,6 @@ pub(super) fn guard(window: &DesktopWindow, kind: &str, button: Option<MouseButt
         )));
     }
     Ok(())
-}
-
-/// Prepares background keyboard delivery for `window`, or refuses it.
-///
-/// macOS posts key events to a *process*, which hands them to whichever window
-/// it treats as key; unlike pointer events they carry no window id. Delivery is
-/// refused whenever the process owns more than one window, rather than typing
-/// into another of the user's windows. `DesktopWindow::focused` cannot
-/// disambiguate: xcap reports every window owned by the active application as
-/// focused on macOS.
-pub(super) fn prepare_keys(
-    window: &DesktopWindow,
-    pid: libc::pid_t,
-    wid: u32,
-    capture: &MacCapture,
-) -> CoreResult<()> {
-    let siblings = capture
-        .windows()?
-        .into_iter()
-        .filter(|candidate| candidate.pid == window.pid)
-        .count();
-    if siblings > 1 {
-        return Err(DesktopError::background_unavailable(format!(
-            "window {wid} is one of {siblings} windows in its application; macOS delivers \
-             background keystrokes to whichever window the application treats as key, so retry \
-             with delivery:\"foreground\" or use ax actions",
-        )));
-    }
-    // Sole window of its process, so the target is unambiguous: make it key
-    // without raising it or changing the frontmost application. A background app
-    // otherwise has no key window and drops the keystrokes entirely.
-    skylight::activate_without_raise(pid, wid)
 }
 
 pub(super) const fn pointer_kind(event: &PointerEvent) -> &'static str {

@@ -38,15 +38,15 @@ fn sent(error: AXError) -> AXError {
 /// The AX requests an element write sends, each answered by the app's
 /// `AXError` reply: the seam tests script replies through.
 pub(super) trait AxRequests {
-    /// The actions the element lists (`AXActionNames`).
-    fn action_names(&self) -> Vec<String>;
+    /// The actions the element lists (`AXActionNames`), or why it could not answer.
+    fn action_names(&self) -> Result<Vec<String>, AXError>;
     fn send_action(&self, action: &CFString) -> AXError;
     fn write_attribute(&self, attribute: &CFString, value: &CFType) -> AXError;
     fn read_date(&self, attribute: &str) -> Option<f64>;
 }
 
 impl AxRequests for AXUIElement {
-    fn action_names(&self) -> Vec<String> {
+    fn action_names(&self) -> Result<Vec<String>, AXError> {
         action_names(self)
     }
 
@@ -101,7 +101,13 @@ pub(super) fn perform_requested(
     reporting_partial(|| {
         check_press()?;
         let native = action_name(action);
-        let actions = element.action_names();
+        // A destroyed element or an app that does not answer is its own
+        // refusal, not an element with no actions.
+        let actions = element.action_names().map_err(|error| {
+            DesktopError::ax_failed(format!(
+                "the element's actions could not be read ({error:?}), so the press was not sent; nothing was sent"
+            ))
+        })?;
         if !actions.contains(&native) {
             return Err(unsupported_action(&native, &actions));
         }
@@ -163,16 +169,22 @@ pub(super) fn set_value(element: &AXUIElement, value: &str) -> CoreResult<()> {
         if replace_native_text(element, pid, started_in_background, value)? {
             return Ok(());
         }
-        // A control whose value is not text (a slider, stepper or checkbox)
-        // cannot be read back as the string that was written.
         let textual = element::copy_string(element, "AXValue").is_some();
         set_string_value(element, value)?;
-        let after = element::copy_string(element, "AXValue");
-        if !textual && after.is_none() {
-            return Ok(());
-        }
-        text_readback(value, value, after.as_deref(), is_secure(element))
+        value_readback(value, textual, element::copy_string(element, "AXValue").as_deref(), is_secure(element))
     })
+}
+
+/// The read-back after an `AXValue` write: a control whose value was not
+/// text before the write (a slider, stepper or checkbox) and still is not
+/// cannot be read back as the string that was written; one that reads as a
+/// string now, even if it read as none before (some empty fields report no
+/// value), must read back exactly.
+pub(super) fn value_readback(sent: &str, textual_before: bool, after: Option<&str>, secure: bool) -> CoreResult<()> {
+    if !textual_before && after.is_none() {
+        return Ok(());
+    }
+    text_readback(sent, sent, after, secure)
 }
 
 pub(super) fn set_string_value(element: &(impl AxRequests + ?Sized), value: &str) -> CoreResult<()> {

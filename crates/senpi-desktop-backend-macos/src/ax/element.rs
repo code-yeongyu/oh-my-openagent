@@ -234,11 +234,11 @@ pub(super) fn copy_name_array(
         .collect())
 }
 
-/// The actions `element` lists (`AXActionNames`); none when it cannot answer.
-pub(crate) fn action_names(element: &AXUIElement) -> Vec<String> {
+/// The actions `element` lists (`AXActionNames`), or why it could not answer.
+pub(crate) fn action_names(element: &AXUIElement) -> Result<Vec<String>, AXError> {
     // SAFETY: The retained element and the writable out slot stay valid for
     // the synchronous copy.
-    copy_name_array(|slot| unsafe { element.copy_action_names(slot) }).unwrap_or_default()
+    copy_name_array(|slot| unsafe { element.copy_action_names(slot) })
 }
 
 pub(crate) fn bounds(element: &AXUIElement) -> Option<AxBounds> {

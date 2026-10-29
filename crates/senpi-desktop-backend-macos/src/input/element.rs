@@ -17,7 +17,7 @@ use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_results::AxInputMethod;
 
 use super::held::KeyRoute;
-use super::{chord, guard, keys, resolve_window, window_identity, MacInput};
+use super::{background_keys, chord, guard, keys, resolve_window, window_identity, MacInput};
 use crate::ax::element;
 use crate::capture::MacCapture;
 use crate::skylight;
@@ -60,15 +60,16 @@ impl MacInput {
                 }
                 self.background(|this| {
                     guard::guard(&window, "keyboard", None)?;
-                    guard::prepare_keys(&window, pid, wid, capture)?;
+                    let prepared = background_keys::prepare(pid, wid)?;
                     this.last_activated = Some((pid, wid));
+                    let check = background_keys::rechecking(&prepared, check_stop);
                     element_keys(pid, element, || {
                         keys::type_text_interruptible(
                             &this.source,
                             &mut this.held,
                             text,
-                            KeyRoute::Process(pid),
-                            check_stop,
+                            KeyRoute::Process(prepared.process()),
+                            &check,
                             delivered,
                         )
                     })
@@ -115,10 +116,11 @@ impl MacInput {
         match mode {
             DeliveryMode::Background => self.background(|this| {
                 guard::guard(&window, "keyboard", None)?;
-                guard::prepare_keys(&window, pid, wid, capture)?;
+                let prepared = background_keys::prepare(pid, wid)?;
                 this.last_activated = Some((pid, wid));
+                let check = background_keys::rechecking(&prepared, check_stop);
                 element_keys(pid, element, || {
-                    chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), check_stop)
+                    chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(prepared.process()), &check)
                 })
             }),
             DeliveryMode::Foreground => skylight::with_foreground(pid, || {

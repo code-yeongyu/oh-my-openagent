@@ -16,8 +16,8 @@ pub(super) type SLEventPostToPidFn = unsafe extern "C" fn(libc::pid_t, *mut c_vo
 type SLEventSetIntegerValueFieldFn = unsafe extern "C" fn(*mut c_void, u32, i64);
 type SLPSPostEventRecordToFn = unsafe extern "C" fn(*const ProcessSerialNumber, *const u8) -> i32;
 type SLPSGetFrontProcessFn = unsafe extern "C" fn(*mut ProcessSerialNumber) -> i32;
-type CGSMainConnectionIDFn = unsafe extern "C" fn() -> u32;
-type SLSGetWindowOwnerFn = unsafe extern "C" fn(u32, u32, *mut u32) -> i32;
+pub(super) type CGSMainConnectionIDFn = unsafe extern "C" fn() -> u32;
+pub(super) type SLSGetWindowOwnerFn = unsafe extern "C" fn(u32, u32, *mut u32) -> i32;
 type SLSGetConnectionPSNFn = unsafe extern "C" fn(u32, *mut ProcessSerialNumber) -> i32;
 type GetProcessForPIDFn = unsafe extern "C" fn(libc::pid_t, *mut ProcessSerialNumber) -> i32;
 type GetProcessPIDFn = unsafe extern "C" fn(*const ProcessSerialNumber, *mut libc::pid_t) -> i32;
@@ -192,7 +192,7 @@ fn resolve_authentication() -> Option<AuthenticationSpi> {
     })
 }
 
-fn ensure_skylight_loaded() -> Option<()> {
+pub(super) fn ensure_skylight_loaded() -> Option<()> {
     static LOADED: LazyLock<bool> = LazyLock::new(|| {
         let path = c"/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight";
         // SAFETY: `path` is a static NUL-terminated framework path; the handle
@@ -202,7 +202,7 @@ fn ensure_skylight_loaded() -> Option<()> {
     (*LOADED).then_some(())
 }
 
-fn symbol<T: Copy>(name: &CStr) -> Option<T> {
+pub(super) fn symbol<T: Copy>(name: &CStr) -> Option<T> {
     // SAFETY: `name` is NUL-terminated and RTLD_DEFAULT is valid for
     // process-wide lookup.
     let raw = unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) };

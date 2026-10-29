@@ -3,6 +3,7 @@
 //! receipt canary. The `Backend` wiring lives in [`crate::backend`].
 
 mod background;
+mod background_keys;
 mod canary;
 mod cgevent;
 mod chord;
@@ -11,6 +12,7 @@ mod global;
 mod guard;
 mod held;
 mod holds;
+mod key_route;
 mod keys;
 mod menu_key;
 mod post;
@@ -182,10 +184,11 @@ impl MacInput {
                 match mode {
                     DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
-                        guard::prepare_keys(&window, pid, wid, capture)?;
+                        let prepared = background_keys::prepare(pid, wid)?;
                         this.last_activated = Some((pid, wid));
+                        let check = background_keys::rechecking(&prepared, check_stop);
                         keys::type_text_interruptible(
-                            &this.source, &mut this.held, text, KeyRoute::Process(pid), check_stop, delivered,
+                            &this.source, &mut this.held, text, KeyRoute::Process(prepared.process()), &check, delivered,
                         )
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
@@ -218,9 +221,10 @@ impl MacInput {
                 match mode {
                     DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
-                        guard::prepare_keys(&window, pid, wid, capture)?;
+                        let prepared = background_keys::prepare(pid, wid)?;
                         this.last_activated = Some((pid, wid));
-                        chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), check_stop)
+                        let check = background_keys::rechecking(&prepared, check_stop);
+                        chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(prepared.process()), &check)
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;

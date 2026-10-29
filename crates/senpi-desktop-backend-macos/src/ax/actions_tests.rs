@@ -6,7 +6,7 @@ use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 
 use super::{
     focus, perform_requested, request_result, scrolls_before_press, set_date_value, set_string_value, unsupported_action,
-    AxRequests,
+    value_readback, AxRequests,
 };
 
 /// Writes `AXValue` as the control publishes it: a `CFDate` for date and time
@@ -27,6 +27,8 @@ struct ScriptedElement {
     date: Option<f64>,
     requests: RefCell<Vec<String>>,
     date_reads: Cell<u32>,
+    /// Whether the `AXActionNames` read answers with `reply` instead of a list.
+    actions_unreadable: Cell<bool>,
 }
 
 impl ScriptedElement {
@@ -36,6 +38,7 @@ impl ScriptedElement {
             date: None,
             requests: RefCell::new(Vec::new()),
             date_reads: Cell::new(0),
+            actions_unreadable: Cell::new(false),
         }
     }
 
@@ -52,8 +55,11 @@ impl ScriptedElement {
 }
 
 impl AxRequests for ScriptedElement {
-    fn action_names(&self) -> Vec<String> {
-        ["AXPress", "AXShowMenu", "AXScrollToVisible"].map(str::to_owned).to_vec()
+    fn action_names(&self) -> Result<Vec<String>, AXError> {
+        if self.actions_unreadable.get() {
+            return Err(self.reply);
+        }
+        Ok(["AXPress", "AXShowMenu", "AXScrollToVisible"].map(str::to_owned).to_vec())
     }
 
     fn send_action(&self, action: &CFString) -> AXError {
@@ -276,4 +282,33 @@ fn a_uikit_press_sends_the_scroll_then_the_press() {
     let appkit = ScriptedElement::replying(AXError::Success);
     assert!(perform_requested(&appkit, "press", || false).is_ok());
     assert_eq!(appkit.requests(), ["perform AXPress"]);
+}
+
+#[test]
+fn an_unreadable_action_list_is_its_own_refusal_with_nothing_sent() {
+    let gone = ScriptedElement::replying(AXError::InvalidUIElement);
+    gone.actions_unreadable.set(true);
+    let error = perform_requested(&gone, "press", || false).unwrap_err();
+    assert_eq!(error.code, ErrorCode::AxFailed);
+    assert!(error.message.contains("could not be read"), "{}", error.message);
+    assert!(!error.message.contains("available actions: ;"), "{}", error.message);
+    assert!(gone.requests().is_empty());
+    // An app that does not answer the read in time still sent nothing: a
+    // failed read, never an outcome that may have taken effect.
+    let slow = ScriptedElement::replying(AXError::CannotComplete);
+    slow.actions_unreadable.set(true);
+    let error = perform_requested(&slow, "press", || false).unwrap_err();
+    assert_eq!(error.code, ErrorCode::AxFailed);
+    assert!(slow.requests().is_empty());
+}
+
+#[test]
+fn a_value_that_reads_as_text_only_after_the_write_is_read_back() {
+    // A slider never reads as text: an accepted write is enough.
+    assert!(value_readback("5", false, None, false).is_ok());
+    // An empty field that reported no value before the write reads back now.
+    assert!(value_readback("abc", false, Some("abc"), false).is_ok());
+    assert_eq!(value_readback("abc", false, Some("ab"), false).unwrap_err().code, ErrorCode::AxFailed);
+    // A text field that stops answering after the write is unconfirmed.
+    assert_eq!(value_readback("abc", true, None, false).unwrap_err().code, ErrorCode::AxUnconfirmed);
 }

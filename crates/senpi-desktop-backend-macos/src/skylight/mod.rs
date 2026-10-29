@@ -10,6 +10,7 @@ mod authentication;
 mod partial;
 mod psn;
 mod spi;
+mod window_query;
 
 use std::thread;
 use std::time::{Duration, Instant};
@@ -27,6 +28,7 @@ use self::psn::{
 };
 pub(crate) use self::partial::{mark_sent, reporting_partial};
 pub(crate) use self::spi::{front_pid, is_available};
+pub(crate) use self::window_query::{window_owner_pid, window_parent};
 use self::spi::required;
 
 /// Ensures the required background SPI resolved; the error names the missing
