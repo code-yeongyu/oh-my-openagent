@@ -37,6 +37,7 @@ function memoryStore(initial: Credentials | null): CredentialStore & { clear(): 
   let value = initial
   return {
     read: async () => value,
+    readAuthoritative: async () => value,
     write: async (next) => {
       value = next
     },
@@ -48,6 +49,7 @@ function memoryStore(initial: Credentials | null): CredentialStore & { clear(): 
 
 const meReply = (accountId: string): typeof fetch =>
   Object.assign(async (input: Parameters<typeof fetch>[0]) => {
+    if (String(input).endsWith("/v1/devices")) return Response.json({ devices: [{ id: "dev_service_row", current: true, revokedAt: null }] })
     if (!String(input).endsWith("/v1/me")) return new Response("{}", { status: 404 })
     return Response.json({ user: { id: "u" }, account: { id: accountId }, deviceId: "dev_service_row" })
   }, { preconnect: fetch.preconnect })
@@ -60,6 +62,9 @@ describe("the CLI device account source", () => {
   test("a host whose OS credential store cannot be used reads as signed out, not as a failure", async () => {
     const locked: CredentialStore = {
       read: async () => {
+        throw new SignInError("Cannot access the OS credential store.")
+      },
+      readAuthoritative: async () => {
         throw new SignInError("Cannot access the OS credential store.")
       },
       write: async () => undefined,
@@ -100,7 +105,7 @@ function fakeAccount(overrides: Partial<CliDeviceAccount> = {}): CliDeviceAccoun
   const material = credentials()
   return {
     kind: "cli",
-    descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId: "acct_7", serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture" },
+    descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId: "acct_7", serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
     signal: new AbortController().signal,
     boundary: async dispatch => dispatch(),
     forOperation: async () => { throw new Error("unused") },

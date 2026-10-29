@@ -1,150 +1,109 @@
-import * as Schema from "effect/Schema";
-import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts.ts";
-import { desktopSyncReplicationPort } from "./desktopSyncReplicationPort.ts";
-import { SyncDescriptor, DesktopSyncServiceError } from "./desktopSyncPortSchema.ts";
-import { openDesktopSyncOperation } from "./desktopSyncOperation.ts";
-import {
-  DesktopSyncRefused,
-  type DesktopSyncAuthority,
-  type DesktopSyncEvent,
-  type DesktopSyncWire,
-} from "./desktopSyncProtocol.ts";
+import { z } from "zod"
+import type { DesktopSyncAccount, DesktopSyncDescriptor, DesktopSyncOperation, SyncOperationAuthority } from "@oh-my-opencode/memory-core/sync-engine"
+import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
+import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts"
+import { desktopSyncBoundary } from "./desktopSyncBoundary"
+import { openDesktopSyncOperation } from "./desktopSyncOperation"
+import { DesktopSyncServiceError, SyncDescriptor } from "./desktopSyncPortSchema"
+import { DesktopSyncRefused, type DesktopSyncEvent, type DesktopSyncWire } from "./desktopSyncProtocol"
+import { desktopSyncReplicationPort } from "./desktopSyncReplicationPort"
 
-const decodeDescriptor = Schema.decodeUnknownSync(SyncDescriptor);
+export type DesktopSyncEngineWire = DesktopSyncWire & {
+  readonly signal: AbortSignal
+  close(): void
+  onEvent(listener: (event: DesktopSyncEvent) => void): () => void
+}
 
-type EngineWire = DesktopSyncWire & {
-  readonly signal: AbortSignal;
-  close(): void;
-  onEvent(listener: (event: DesktopSyncEvent) => void): () => void;
-};
-type SignRequest =
-  | { readonly purpose: "object-digest"; readonly digest: Uint8Array }
-  | { readonly purpose: "record" | "snapshot"; readonly canonicalJson: Uint8Array };
-const decodeSignature = Schema.decodeUnknownSync(
-  Schema.Struct({
-    op: Schema.Literal("sign"),
-    signature: Schema.String,
-  }),
-  { onExcessProperty: "error" },
-);
-const decodeUnsealed = Schema.decodeUnknownSync(
-  Schema.Struct({
-    op: Schema.Literal("unseal"),
-    plaintext: Schema.String,
-  }),
-  { onExcessProperty: "error" },
-);
+const signature = z.strictObject({ op: z.literal("sign"), signature: z.string() })
+const unsealed = z.strictObject({ op: z.literal("unseal"), plaintext: z.string() })
+const signedAccount = z.object({ account: z.string() })
 const bytes = (value: string, length?: number) => {
-  const decoded = Buffer.from(value, "base64url");
-  if (
-    decoded.toString("base64url") !== value ||
-    (length !== undefined && decoded.length !== length)
-  )
-    throw new DesktopSyncServiceError("malformed_reply", 200);
-  return new Uint8Array(decoded);
-};
+  const decoded = Buffer.from(value, "base64url")
+  if (decoded.toString("base64url") !== value || (length !== undefined && decoded.length !== length)) {
+    throw new DesktopSyncServiceError("malformed_reply", 200)
+  }
+  return new Uint8Array(decoded)
+}
 
-/** Install this source in the engine's composition root, not the CLI credential source. */
-export async function openDesktopSyncAccount(wire: EngineWire) {
-  const descriptor = decodeDescriptor(
-    await wire.request({ op: "descriptor" }),
-  );
-  const accountAuthority: DesktopSyncAuthority = {
+const sameDescriptor = (a: DesktopSyncDescriptor, b: DesktopSyncDescriptor) => a.generation === b.generation
+  && a.incarnation === b.incarnation && a.accountId === b.accountId && a.serviceOrigin === b.serviceOrigin
+  && a.serviceDeviceId === b.serviceDeviceId && a.syncPrincipalId === b.syncPrincipalId
+  && a.publicKeys.signing === b.publicKeys.signing && a.publicKeys.sealing === b.publicKeys.sealing
+
+/** Install this source in the engine's composition root, never the CLI credential source. */
+export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?: string): Promise<DesktopSyncAccount> {
+  const descriptor: DesktopSyncDescriptor = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
+  const boundary = desktopSyncBoundary(descriptor, wire.signal, home)
+  const accountAuthority: SyncOperationAuthority = {
     signal: wire.signal,
     admit(effect) {
-      if (wire.signal.aborted) throw new DesktopSyncRefused();
-      return effect();
+      if (wire.signal.aborted) throw new DesktopSyncRefused()
+      return effect()
     },
-  };
-  const forOperation = async (authority: DesktopSyncAuthority) => {
+    boundary,
+  }
+  const open = async (authority: SyncOperationAuthority) => {
     const operation = await openDesktopSyncOperation(wire, {
       signal: AbortSignal.any([wire.signal, authority.signal]),
-      admit: (effect) => accountAuthority.admit(() => authority.admit(effect)),
-    });
-    const call = (data: Readonly<Record<string, unknown>>) =>
-      operation.request({ op: "service", data });
-    return {
-      ...desktopSyncAccountPorts(call, descriptor),
-      handle: operation.handle,
-      call,
-      close: operation.close,
-      keyring: {
-        principal: () => ({ kind: "device" as const, id: descriptor.syncPrincipalId }),
-        publicKeys: () => descriptor.publicKeys,
-        async sign(request: SignRequest) {
-          const data =
-            request.purpose === "object-digest"
-              ? {
-                  op: "sign",
-                  purpose: request.purpose,
-                  digest: Buffer.from(request.digest).toString("base64url"),
-                }
-              : {
-                  op: "sign",
-                  purpose: request.purpose,
-                  canonicalJson: Buffer.from(request.canonicalJson).toString("base64url"),
-                };
-          return bytes(
-            decodeSignature(await operation.request({ op: "keyring", data })).signature,
-            64,
-          );
-        },
-        async unseal(
-          wrap: Uint8Array,
-          binding: { readonly account: string; readonly epoch: number; readonly id: string },
-        ) {
-          if (binding.account !== descriptor.accountId) throw new DesktopSyncRefused();
-          const reply = decodeUnsealed(
-            await operation.request({
-              op: "keyring",
-              data: { op: "unseal", wrap: Buffer.from(wrap).toString("base64url"), binding },
-            }),
-          );
-          return bytes(reply.plaintext);
-        },
+      admit: effect => accountAuthority.admit(() => authority.admit(effect)),
+    })
+    const call = (data: Readonly<Record<string, unknown>>) => operation.request({ op: "service", data })
+    const keyring: DeviceKeyring = {
+      principal: () => ({ kind: "device", id: descriptor.syncPrincipalId }),
+      publicKeys: () => descriptor.publicKeys,
+      async sign(request) {
+        if (request.purpose !== "object-digest") {
+          // Main signs a record only for the captured account; refuse a foreign one before it reaches the channel.
+          const parsed = signedAccount.safeParse(JSON.parse(Buffer.from(request.canonicalJson).toString("utf8")))
+          if (!parsed.success || parsed.data.account !== descriptor.accountId) throw new DesktopSyncRefused()
+        }
+        const data = request.purpose === "object-digest"
+          ? { op: "sign", purpose: request.purpose, digest: Buffer.from(request.digest).toString("base64url") }
+          : { op: "sign", purpose: request.purpose, canonicalJson: Buffer.from(request.canonicalJson).toString("base64url") }
+        return bytes(signature.parse(await operation.request({ op: "keyring", data })).signature, 64)
       },
-    };
-  };
-  const background = await forOperation(accountAuthority);
-  const transport = desktopSyncReplicationPort(background.call, (handlers) => {
-    let active = true;
-    let subscription: Awaited<ReturnType<typeof forOperation>> | undefined;
-    const remove = wire.onEvent((event) => {
-      if (
-        !active ||
-        wire.signal.aborted ||
-        event.event === "retired" ||
-        event.handle !== subscription?.handle
-      )
-        return;
-      switch (event.event) {
-        case "advanced":
-          handlers.onAdvanced(event.head);
-          break;
-        case "connected":
-          handlers.onConnected(event.connected);
-          break;
-      }
-    });
-    void forOperation(accountAuthority)
-      .then(async (operation) => {
-        subscription = operation;
-        if (!active) return operation.close();
-        await operation.call({ op: "subscribe" });
+      async unseal(wrap, binding) {
+        if (binding.account !== descriptor.accountId) throw new DesktopSyncRefused()
+        const reply = unsealed.parse(await operation.request({
+          op: "keyring",
+          data: { op: "unseal", wrap: Buffer.from(wrap).toString("base64url"), binding },
+        }))
+        return bytes(reply.plaintext)
+      },
+    }
+    return { ...desktopSyncAccountPorts(call, descriptor), handle: operation.handle, call, close: operation.close, keyring }
+  }
+  const background = await open(accountAuthority)
+  const transport = desktopSyncReplicationPort(background.call, handlers => {
+    let active = true
+    let subscription: Awaited<ReturnType<typeof open>> | undefined
+    const remove = wire.onEvent(event => {
+      if (!active || wire.signal.aborted || event.event === "retired" || event.handle !== subscription?.handle) return
+      if (event.event === "advanced") handlers.onAdvanced(event.head)
+      else handlers.onConnected(event.connected)
+    })
+    void open(accountAuthority)
+      .then(async operation => {
+        subscription = operation
+        if (!active) return operation.close()
+        await operation.call({ op: "subscribe" })
       })
       .catch(() => {
-        if (active && !wire.signal.aborted) handlers.onConnected(false);
-      });
+        if (active && !wire.signal.aborted) handlers.onConnected(false)
+      })
     return () => {
-      if (!active) return;
-      active = false;
-      remove();
-      if (subscription !== undefined && !wire.signal.aborted)
-        void subscription.close().catch(() => undefined);
-    };
-  });
+      if (!active) return
+      active = false
+      remove()
+      if (subscription !== undefined && !wire.signal.aborted) void subscription.close().catch(() => undefined)
+    }
+  })
+  const forOperation = async (authority: SyncOperationAuthority): Promise<DesktopSyncOperation> => {
+    const operation = await open(authority)
+    return { keyring: operation.keyring, chain: operation.chain, pairing: operation.pairing, devices: operation.devices, close: operation.close }
+  }
   return {
-    kind: "desktop" as const,
+    kind: "desktop",
     descriptor,
     signal: wire.signal,
     keyring: background.keyring,
@@ -152,22 +111,13 @@ export async function openDesktopSyncAccount(wire: EngineWire) {
     pairing: background.pairing,
     devices: background.devices,
     transport,
+    boundary,
     forOperation,
     async isCurrent() {
-      if (wire.signal.aborted) return false;
-      const current = decodeDescriptor(
-        await wire.request({ op: "descriptor" }),
-      );
-      return (
-        !wire.signal.aborted &&
-        current.generation === descriptor.generation &&
-        current.accountId === descriptor.accountId &&
-        current.serviceOrigin === descriptor.serviceOrigin &&
-        current.serviceDeviceId === descriptor.serviceDeviceId &&
-        current.syncPrincipalId === descriptor.syncPrincipalId &&
-        current.publicKeys.signing === descriptor.publicKeys.signing &&
-        current.publicKeys.sealing === descriptor.publicKeys.sealing
-      );
+      if (wire.signal.aborted) return false
+      const current = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
+      if (wire.signal.aborted || !sameDescriptor(current, descriptor)) return false
+      return boundary(() => true).then(() => true, () => false)
     },
-  };
+  }
 }

@@ -6,7 +6,7 @@ import { type DeviceAccountRuntimeModule, lazyCliAccountSource } from "./account
 
 const account = (accountId: string): CliDeviceAccount => ({
   kind: "cli",
-  descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId, serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture" },
+  descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId, serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
   signal: new AbortController().signal,
   boundary: async dispatch => dispatch(),
   forOperation: async () => { throw new Error("unused") },

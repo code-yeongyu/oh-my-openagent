@@ -8,15 +8,23 @@ import { serviceOrigin } from "./protocol"
 
 const held = new AsyncLocalStorage<ReadonlySet<string>>()
 
-/** Writers and effect boundaries share one origin lock; nested session writes retain ownership. */
-export async function withCredentialLock<T>(api: string, action: () => Promise<T>, home = homedir()): Promise<T> {
+/**
+ * The one per-origin lock and desktop generation record (account-transport-api v7 section 4.1). The CLI, desktop main
+ * and the engine pin boundary all derive these paths here or with the same inputs; never pass a path around instead.
+ */
+export function credentialLockPaths(api: string, home = homedir()): { readonly directory: string; readonly lock: string; readonly desktopRecord: string } {
   const id = createHash("sha256").update(serviceOrigin(api)).digest("hex")
   const directory = join(home, ".omo", "session-locks")
-  const path = join(directory, `${id}.lock`)
+  return { directory, lock: join(directory, `${id}.lock`), desktopRecord: join(directory, `${id}.desktop-generation.json`) }
+}
+
+/** Writers and effect boundaries share one origin lock; nested session writes retain ownership. */
+export async function withCredentialLock<T>(api: string, action: () => Promise<T>, home = homedir(), ownerTag = "cli-session"): Promise<T> {
+  const { directory, lock } = credentialLockPaths(api, home)
   const owned = held.getStore()
-  if (owned?.has(path)) return action()
+  if (owned?.has(lock)) return action()
   await mkdir(directory, { recursive: true, mode: 0o700 })
-  return withLock(path, () => held.run(new Set([...owned ?? [], path]), action), {
-    ownerTag: "cli-session", staleAfterMs: Number.POSITIVE_INFINITY,
+  return withLock(lock, () => held.run(new Set([...owned ?? [], lock]), action), {
+    ownerTag, staleAfterMs: Number.POSITIVE_INFINITY,
   })
 }

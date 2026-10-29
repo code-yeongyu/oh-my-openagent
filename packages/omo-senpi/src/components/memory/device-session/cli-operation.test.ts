@@ -28,6 +28,7 @@ describe("CLI operation-scoped account", () => {
         fetch: Object.assign(async (url: Parameters<typeof fetch>[0]) => {
           const path = new URL(String(url)).pathname
           if (path === "/v1/me") return Response.json({ account: { id: "account" }, deviceId: "service-device" })
+          if (path === "/v1/devices") return Response.json({ devices: [{ id: "service-device", current: true, revokedAt: null }] })
           sent.push(path)
           return Response.json({ pending: [] })
         }, { preconnect: fetch.preconnect }),

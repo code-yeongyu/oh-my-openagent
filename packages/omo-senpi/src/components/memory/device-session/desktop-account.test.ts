@@ -19,6 +19,7 @@ function fixture() {
       syncPrincipalId: principal.id,
       publicKeys,
       generation: "generation-1",
+      incarnation: "incarnation-1",
     },
     signal: lifetime.signal,
     boundary: async dispatch => dispatch(),

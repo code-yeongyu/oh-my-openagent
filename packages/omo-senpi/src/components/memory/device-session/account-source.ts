@@ -4,10 +4,12 @@
 // the desktop. Private keys stay in the credential store and reach only the keyring built from them.
 
 import {
+  CredentialIdentityChanged,
   type Credentials,
   createCredentialStore,
   type CredentialStore,
   createSession,
+  currentServiceDevice,
   KeychainApprovalPendingError,
   quietNotice,
   serviceOrigin,
@@ -62,11 +64,22 @@ async function accountIdOf(api: string, token: string, doFetch: typeof fetch): P
   return id
 }
 
+/** The service device this token authenticates: the one row the device list marks current. */
+async function currentDeviceOf(api: string, token: string, doFetch: typeof fetch): Promise<string | null> {
+  const response = await doFetch(`${api}/v1/devices`, { headers: { authorization: `Bearer ${token}` } })
+  if (!response.ok) throw new Error(`memory sync: the device read failed (${response.status})`)
+  return currentServiceDevice(await response.json())
+}
+
+const sameKeys = (a: Credentials, b: Credentials): boolean => a.device.id === b.device.id
+  && a.signingPrivateKey === b.signingPrivateKey && a.sealingPrivateKey === b.sealingPrivateKey
+
 export function createCliAccountSource(options: {
   readonly api?: string
   readonly env?: Record<string, string | undefined>
   readonly store?: CredentialStore
   readonly fetch?: typeof fetch
+  readonly home?: string
 }): () => Promise<CliDeviceAccount | null> {
   const configured = options.api === undefined ? options.env?.OMO_SERVICE_API_URL : undefined
   let api: string
@@ -93,7 +106,7 @@ export function createCliAccountSource(options: {
     try {
       // A host runs under a TUI: the CLI's keyring-fallback notice must not write over it, and the fallback is
       // the same libsecret path the CLI uses (#10658 review).
-      store = options.store ?? createCredentialStore(api, { notice: quietNotice })
+      store = options.store ?? createCredentialStore(api, { notice: quietNotice, ...(options.home === undefined ? {} : { home: options.home }) })
       credentials = await store.read()
     } catch (error) {
       if (error instanceof KeychainApprovalPendingError) throw error
@@ -103,34 +116,46 @@ export function createCliAccountSource(options: {
       throw error
     }
     if (credentials === null) { active?.abort.abort(); active = undefined; return null }
-    const session = createSession({ api, store })
-    const initial = credentials
-    const matches = (current: Credentials): boolean => current.device.id === initial.device.id
-      && current.signingPrivateKey === initial.signingPrivateKey && current.sealingPrivateKey === initial.sealingPrivateKey
-      && (initial.credentialGeneration === undefined || current.credentialGeneration === initial.credentialGeneration)
-    const accountId = await accountIdOf(api, await session.accessToken(), doFetch)
-    credentials = await session.update(async current => {
-      if (current === null || !matches(current)) return null
-      if (current.credentialGeneration === undefined || current.accountId !== accountId) {
-        await store.write({ ...current, accountId, credentialGeneration: current.credentialGeneration ?? randomUUID() })
-        return store.read()
-      }
-      return current
+    const session = createSession({ api, store, ...(options.home === undefined ? {} : { home: options.home }) })
+    // One credential transaction captures a concrete generation before the first token or identity await: a legacy
+    // credential is stamped and re-read under the lock, so an absent generation is never a wildcard afterwards.
+    const initial = await session.update(async current => {
+      if (current === null || current.credentialGeneration !== undefined) return current
+      await store.write({ ...current, credentialGeneration: randomUUID() })
+      return store.readAuthoritative()
     })
-    if (credentials === null || credentials.credentialGeneration === undefined || credentials.accountId !== accountId) return null
+    if (initial === null || initial.credentialGeneration === undefined) return null
+    const generation = initial.credentialGeneration
+    const sameGeneration = (current: Credentials): boolean => sameKeys(current, initial) && current.credentialGeneration === generation
+    let accountId: string
+    try {
+      const token = await session.accessToken(sameGeneration)
+      accountId = await accountIdOf(api, token, doFetch)
+      // The token must authenticate the captured device; another generation's reply is discarded, never persisted.
+      if (await currentDeviceOf(api, token, doFetch) !== initial.device.id) return null
+    } catch (error) {
+      if (error instanceof CredentialIdentityChanged) return null
+      throw error
+    }
+    credentials = await session.update(async current => {
+      if (current === null || !sameGeneration(current)) return null
+      if (current.accountId === accountId) return current
+      if (current.accountId !== undefined) return null
+      await store.write({ ...current, accountId })
+      return store.readAuthoritative()
+    })
+    if (credentials === null || credentials.credentialGeneration !== generation || credentials.accountId !== accountId) return null
     const captured = credentials
-    const generation = credentials.credentialGeneration
     if (active?.generation !== generation) {
       active?.abort.abort()
       active = { generation, abort: new AbortController() }
     }
     const abort = active.abort
     const sameCaptured = (current: Credentials | null): boolean => current !== null && current.accountId === accountId
-      && current.credentialGeneration === generation && current.device.id === captured.device.id
-      && current.signingPrivateKey === captured.signingPrivateKey && current.sealingPrivateKey === captured.sealingPrivateKey
+      && current.credentialGeneration === generation && sameKeys(current, captured)
     const isCurrent = async (): Promise<boolean> => {
       if (abort.signal.aborted) return false
-      const current = await store.read()
+      const current = await session.update(async stored => stored)
       const same = sameCaptured(current)
       if (!same) abort.abort()
       return same && !abort.signal.aborted
@@ -147,14 +172,25 @@ export function createCliAccountSource(options: {
       return result.value
     }
     const check = async () => { if (!await isCurrent()) throw new Error("The CLI sync account is no longer current.") }
-    const accessToken = async () => { await check(); const token = await session.accessToken(); await check(); return token }
+    const accessToken = async () => {
+      await check()
+      let token: string
+      try {
+        token = await session.accessToken(sameCaptured)
+      } catch (error) {
+        if (error instanceof CredentialIdentityChanged) abort.abort()
+        throw error
+      }
+      await check()
+      return token
+    }
     const material = { signingPrivatePkcs8: base64url(captured.signingPrivateKey), sealingPrivatePkcs8: base64url(captured.sealingPrivateKey) }
     const raw = await deviceKeyringFromMaterial(material)
     await check()
     const descriptor: DesktopSyncDescriptor = {
       genesis: "unsupported", rpId: null, userName: null,
       serviceOrigin: api, accountId, serviceDeviceId: captured.device.id,
-      syncPrincipalId: raw.principal().id, publicKeys: raw.publicKeys(), generation,
+      syncPrincipalId: raw.principal().id, publicKeys: raw.publicKeys(), generation, incarnation: "cli",
     }
     const authority: SyncOperationAuthority = {
       signal: abort.signal,

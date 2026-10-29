@@ -14,6 +14,8 @@ export type SecretApi = {
 }
 export type SealedStore<T> = {
   readonly read: () => Promise<T | null>
+  /** A read started now that never joins a coalesced read begun earlier; credential transactions use it under the lock. */
+  readonly readAuthoritative: () => Promise<T | null>
   readonly write: (value: T) => Promise<void>
   readonly clear: () => Promise<void>
 }
@@ -23,6 +25,10 @@ export class CredentialStoreError extends SignInError {}
 export class KeychainLockedError extends CredentialStoreError {}
 export class SecretServiceUnavailableError extends CredentialStoreError {}
 export class InvalidCredentialState extends SignInError {}
+/** The stored credential is no longer the identity and generation a caller captured. */
+export class CredentialIdentityChanged extends Error {
+  constructor() { super("The stored sign-in changed; the captured account is no longer current.") }
+}
 /** The OS store has not answered a read in time: it is waiting on a person (a keychain approval dialog, #11262). */
 export class KeychainApprovalPendingError extends CredentialStoreError {}
 
@@ -77,6 +83,7 @@ export function createCredentialStore(
     readonly lockProbe?: SecretServiceLockProbe
     readonly notice?: (message: string) => void
     readonly wait?: CredentialReadWait
+    readonly home?: string
   } = {},
 ): CredentialStore {
   const store = createSealedStore(api, "omo-cli", credentialSchema, options.secrets, options.platform, options.lockProbe, options.notice, options.wait,
@@ -84,7 +91,7 @@ export function createCredentialStore(
       const sameIdentity = current !== null && current.device.id === value.device.id
         && current.signingPrivateKey === value.signingPrivateKey
         && current.sealingPrivateKey === value.sealingPrivateKey
-        && (value.accountId === undefined || current.accountId === value.accountId)
+        && (value.accountId === undefined || current.accountId === undefined || current.accountId === value.accountId)
       const accountId = value.accountId ?? (sameIdentity ? current?.accountId : undefined)
       // An incoming snapshot cannot restore its old generation after A -> B -> A or clear.
       return {
@@ -95,8 +102,9 @@ export function createCredentialStore(
     })
   return {
     read: store.read,
-    write: value => withCredentialLock(api, () => store.write(value)),
-    clear: () => withCredentialLock(api, store.clear),
+    readAuthoritative: store.readAuthoritative,
+    write: value => withCredentialLock(api, () => store.write(value), options.home),
+    clear: () => withCredentialLock(api, store.clear, options.home),
   }
 }
 
@@ -196,25 +204,27 @@ export function createSealedStore<T>(
       notice("omo: could not check whether the keyring is locked (gdbus or the Secret Service did not answer); using libsecret directly.")
     }
   }
+  const parsedRead = async (fresh: boolean): Promise<T | null> => {
+    await assertUsable()
+    let value: string | null
+    try {
+      value = await answered(secrets, fresh)
+    } catch (error) {
+      if (error instanceof KeychainApprovalPendingError) throw error
+      throw unavailable(error)
+    }
+    if (value === null) return null
+    try {
+      return schema.parse(JSON.parse(value))
+    } catch {
+      throw new InvalidCredentialState(signInRoute() === "cli"
+        ? "Stored sign-in data is invalid. Run omo logout, then omo login."
+        : "The OmO sign-in saved on this computer can't be read, and it can't be reset from the terminal yet.")
+    }
+  }
   return {
-    async read() {
-      await assertUsable()
-      let value: string | null
-      try {
-        value = await answered(secrets)
-      } catch (error) {
-        if (error instanceof KeychainApprovalPendingError) throw error
-        throw unavailable(error)
-      }
-      if (value === null) return null
-      try {
-        return schema.parse(JSON.parse(value))
-      } catch {
-        throw new InvalidCredentialState(signInRoute() === "cli"
-          ? "Stored sign-in data is invalid. Run omo logout, then omo login."
-          : "The OmO sign-in saved on this computer can't be read, and it can't be reset from the terminal yet.")
-      }
-    },
+    read: () => parsedRead(false),
+    readAuthoritative: () => parsedRead(true),
     async write(value) {
       // One OS-store replacement commits the rotating token and its access token together.
       await assertUsable()

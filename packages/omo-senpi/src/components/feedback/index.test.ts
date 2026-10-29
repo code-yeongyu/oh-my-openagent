@@ -79,6 +79,7 @@ describe("feedback component", () => {
   test("#given no usable OS credential store #when /bug sends #then anonymous reporting remains available", async () => {
     const { pi, api, component, requests } = host({ withRedactor: true, credentialStore: {
       read: async () => { throw new KeychainLockedError("locked") },
+      readAuthoritative: async () => { throw new KeychainLockedError("locked") },
       write: async () => { throw new Error("must not write") },
       clear: async () => { throw new Error("must not clear") },
     } })

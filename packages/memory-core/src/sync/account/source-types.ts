@@ -16,6 +16,8 @@ export interface DesktopSyncDescriptor {
   readonly syncPrincipalId: string
   readonly publicKeys: { readonly signing: string; readonly sealing: string }
   readonly generation: string
+  /** The issuing main incarnation for a desktop account; the CLI reports "cli". */
+  readonly incarnation: string
 }
 
 export interface SyncDevice {

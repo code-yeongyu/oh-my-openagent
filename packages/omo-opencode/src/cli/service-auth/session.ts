@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { withCredentialLock } from "./credential-lock"
 import { signInHint } from "./accounts-gate"
-import { credentialId, type CredentialStore, CredentialStoreError } from "./keystore"
+import { CredentialIdentityChanged, credentialId, type CredentialStore, CredentialStoreError } from "./keystore"
 import {
   ApiRefusal,
   type ChooseDevice,
@@ -100,13 +100,14 @@ export function createSession(options: { readonly api: string; readonly store: C
     signedOutMarker: () => readSignedOutMarker(markerPath),
     clearSignedOutMarker: () => clearSignedOutMarker(markerPath),
     async update<T>(action: (current: Credentials | null) => Promise<T>): Promise<T> {
-      return locked(async () => action(await store.read()))
+      // Under the lock only a read started now is authoritative: a coalesced read may predate another writer.
+      return locked(async () => action(await store.readAuthoritative()))
     },
     async logout(): Promise<boolean> {
       return locked(async () => {
         let current: Credentials | null = null
         try {
-          current = await store.read()
+          current = await store.readAuthoritative()
           if (current !== null) {
             if (current.refreshState === "uncertain") return false
             const access = Date.parse(current.accessTokenExpiresAt) <= Date.now() ? await refreshedAccess(current) : current.accessToken
@@ -128,10 +129,12 @@ export function createSession(options: { readonly api: string; readonly store: C
         }
       })
     },
-    async accessToken(): Promise<string> {
+    /** `expect` rejects a stored credential that is no longer the caller's captured identity before any refresh. */
+    async accessToken(expect?: (current: Credentials) => boolean): Promise<string> {
       return locked(async () => {
-        const current = await store.read()
+        const current = await store.readAuthoritative()
         if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+        if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
         return refreshedAccess(current)
       })
     },
