@@ -132,6 +132,10 @@ export function createEventHandler(args: {
       }
     }
 
+    const requestSessionID = getEventSessionID(input);
+    const eventInfo = (input.event.properties as { info?: Record<string, unknown> } | undefined)?.info;
+    const requestEvent = requestSessionID ? args.sessionModelProfiles?.captureRequestEvent?.(requestSessionID, eventInfo) : undefined;
+    try {
     await dispatchToHooks(input);
     if (syntheticIdle) await dispatchSyntheticIdle(syntheticIdle);
 
@@ -171,7 +175,11 @@ export function createEventHandler(args: {
       await runEventHookSafely("teamMemberStatusHandler", teamHandlers.teamMemberStatusHandler, input);
     }
 
-    if (event.type === "message.removed") handleMessageRemovedEvent(props);
+    if (event.type === "message.removed") {
+      handleMessageRemovedEvent(props);
+      const sessionID = resolveSessionEventID(props);
+      if (sessionID) requestEvent?.remove(props?.messageID);
+    }
 
     if (event.type === "session.idle") {
       const sessionID = resolveSessionEventID(props);
@@ -194,6 +202,7 @@ export function createEventHandler(args: {
         invalidateContextWindowUsageCache(pluginContext as PluginInput, state.sessionID);
       }
       if (state.sessionID && state.role === "assistant") {
+        requestEvent?.complete(state.info ?? {});
         try {
           const shouldStop = await modelFallbackHandler.handleAssistantMessageUpdated({
             sessionID: state.sessionID,
@@ -243,6 +252,9 @@ export function createEventHandler(args: {
       }
 
       await runEventHookSafely("teamMemberErrorHandler", teamHandlers.teamMemberErrorHandler, input);
+    }
+    } finally {
+      requestEvent?.release();
     }
   };
 }

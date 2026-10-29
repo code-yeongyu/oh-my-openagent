@@ -3,6 +3,7 @@ import { describe, it, expect, afterEach, mock, spyOn } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { createEventHandler, extractErrorMessage } from "./event"
+import { createRequestSnapshotStore } from "./request-snapshots"
 import { createChatMessageHandler } from "./chat-message"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { _resetForTesting, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
@@ -14,6 +15,46 @@ type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
 type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
+
+it.each(["replacement", "retry"])("a removal awaiting hooks cannot delete a later %s snapshot", async (action) => {
+  const store = createRequestSnapshotStore<string>()
+  store.set("parent", "user", "old")
+  let release!: () => void
+  const barrier = new Promise<void>((resolve) => { release = resolve })
+  const handler = createEventHandler({
+    ctx: asEventHandlerContext({ directory: "/tmp", client: {} }),
+    sessionModelProfiles: cast<EventHandlerArgs["sessionModelProfiles"]>({ primaryConfig: () => undefined, captureRequestEvent: (id: string) => store.capture(id) }),
+    pluginConfig: asPluginConfig({}),
+    firstMessageVariantGate: { markSessionCreated: () => {}, clear: () => {} },
+    managers: createEventHandlerManagers(),
+    hooks: createEventHandlerHooks({ autoUpdateChecker: { event: async () => { await barrier } } }),
+  })
+  const pending = handler(asEventHandlerInput({ event: { type: "message.removed", properties: { sessionID: "parent", messageID: "user" } } }))
+  if (action === "replacement") { store.remove("parent", "user"); store.set("parent", "user", "new") }
+  else store.resume("parent", "user")
+  release(); await pending
+  expect(store.get("parent", "user")).toBe(action === "replacement" ? "new" : "old")
+})
+
+it("forwards primary request completion and removal without releasing on abort-idle", async () => {
+  const completeRequest = mock(() => {})
+  const releaseRequest = mock(() => {})
+  const handler = createEventHandler({
+    ctx: asEventHandlerContext({ directory: "/tmp", client: {} }),
+    sessionModelProfiles: cast<EventHandlerArgs["sessionModelProfiles"]>({ primaryConfig: () => undefined, captureRequestEvent: () => ({ complete: completeRequest, remove: releaseRequest, release: () => {} }), releaseRequest }),
+    pluginConfig: asPluginConfig({}),
+    firstMessageVariantGate: { markSessionCreated: () => {}, clear: () => {} },
+    managers: createEventHandlerManagers(),
+    hooks: createEventHandlerHooks(),
+  })
+  const info = { id: "assistant", sessionID: "parent", parentID: "user", role: "assistant", finish: "stop", time: { completed: 1 } }
+  await handler(asEventHandlerInput({ event: { type: "message.updated", properties: { info } } }))
+  expect(completeRequest).toHaveBeenCalledWith(info)
+  await handler(asEventHandlerInput({ event: { type: "session.idle", properties: { sessionID: "parent" } } }))
+  expect(releaseRequest).not.toHaveBeenCalled()
+  await handler(asEventHandlerInput({ event: { type: "message.removed", properties: { sessionID: "parent", messageID: "user" } } }))
+  expect(releaseRequest).toHaveBeenCalledWith("user")
+})
 
 function cast<T>(value: unknown): T {
 	return value as T
