@@ -222,6 +222,7 @@ export class ReflectionReservationStore {
       launcherPid: launcher.pid,
       launcherHostname: launcher.hostname,
       launcherProcessStart: launcher.processStart,
+      ...(launcher.machineId === undefined || launcher.machineId === null ? {} : { launcherMachineId: launcher.machineId }),
     }
   }
 
