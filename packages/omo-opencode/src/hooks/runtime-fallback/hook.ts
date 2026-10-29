@@ -116,6 +116,7 @@ export function createRuntimeFallbackHook(
   }
 
   return {
+    setRequestSnapshotRecovery: (begin) => { deps.requestSnapshotRecovery = begin },
     event: eventHandler,
     "chat.message": chatMessageHandler,
     dispose,

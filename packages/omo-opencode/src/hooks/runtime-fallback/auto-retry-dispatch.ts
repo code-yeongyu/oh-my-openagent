@@ -86,6 +86,7 @@ export function createAutoRetryDispatcher(
     sessionRetryInFlight.add(sessionID)
     let retryDispatched = false
     let retryMayHaveBeenAccepted = false
+    const snapshotLease = deps.requestSnapshotRecovery?.(sessionID)
     let acceptedStatus: AutoRetryDispatchOutcome["status"] = "dispatched"
     try {
       const messagesResp = await ctx.client.session.messages({
@@ -125,6 +126,7 @@ export function createAutoRetryDispatcher(
               return [createRuntimeFallbackRetryTextPart("continue")]
             })()
       const retryMessageID = usingFetchedUserParts ? originalRetryMetadata.messageID : undefined
+      snapshotLease?.bind(retryMessageID)
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
         sessionID,
         model: newModel,
@@ -264,6 +266,8 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
       return { accepted: false, status: "failed", reason: retryError.message }
     } finally {
+      if (retryDispatched || retryMayHaveBeenAccepted) snapshotLease?.commit()
+      else snapshotLease?.release()
       const ownsFallbackGeneration = isCurrentFallbackGeneration()
       if (ownsFallbackGeneration) {
         sessionRetryInFlight.delete(sessionID)

@@ -331,6 +331,8 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       availableSkills: toolsResult.availableSkills,
     })
 
+    hooks.runtimeFallback?.setRequestSnapshotRecovery?.(sessionModelProfiles.beginRequestRecovery)
+
     const pluginInterface = deps.createPluginInterface({
       sessionModelProfiles,
       ctx: input,
