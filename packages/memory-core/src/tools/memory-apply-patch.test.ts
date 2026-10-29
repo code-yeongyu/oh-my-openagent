@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
 
+import { GitCommandError } from "../git"
+import { renderMemoryFile } from "../memfs/frontmatter"
+import { installHooks } from "../memfs/hooks"
 import { runMemoryTool } from "./memory"
 import {
   author,
@@ -7,6 +12,7 @@ import {
   git,
   memoryApplyPatch,
   params,
+  rejected,
 } from "./memory-apply-patch.test-support"
 
 // Each case drives a real git repository through commit and patch application; the 5s default is not
@@ -183,5 +189,48 @@ describe("memoryApplyPatch secret screening", () => {
     expect(await repo.head()).toBe(headBefore)
     expect((await repo.status()).trim()).toBe("")
     await git(dir, ["diff", "--cached", "--quiet"])
+  })
+})
+
+describe("memory tool apply_patch hook refusal", () => {
+  it("#given a hook-refused patch #when the registered command fails #then tracked bytes and the next patch survive", async () => {
+    // given
+    const original = renderMemoryFile({ description: "Seed" }, "\noriginal\n")
+    const refused = renderMemoryFile({ description: "Refused" }, '\napiKey: "!op read example"\n')
+    const { dir, repo } = await fixture({ "reference/seed.md": original })
+    installHooks(dir)
+    await repo.configSet("core.autocrlf", "true")
+    const head = await git(dir, ["rev-parse", "HEAD"])
+    const apply = (input: string) => runMemoryTool({
+      repo,
+      lock: async (_domain, operation) => operation(),
+      params: { command: "apply_patch", reason: "patch memories", author, input },
+    })
+    const add = (path: string, content: string) => [
+      `*** Add File: ${path}`,
+      ...content.trimEnd().split("\n").map(line => `+${line}`),
+    ]
+
+    // when
+    const error = await rejected(apply([
+      "*** Begin Patch",
+      "*** Update File: reference/seed.md",
+      "@@",
+      "-original",
+      "+changed",
+      ...add("reference/refused.md", refused),
+      "*** End Patch",
+    ].join("\n")))
+
+    // then
+    expect(error.cause instanceof GitCommandError && error.cause.argv.includes("commit")).toBe(true)
+    expect(error.message).toContain("credential_assignment")
+    expect(await repo.head()).toBe(head)
+    expect(await repo.status()).toBe("")
+    expect(await readFile(join(dir, "reference/seed.md"), "utf8")).toBe(original)
+    const next = await apply(["*** Begin Patch", ...add("reference/recovered.md", original), "*** End Patch"].join("\n"))
+    expect(next.commit?.affectedPaths).toEqual(["reference/recovered.md"])
+    expect(await git(dir, ["rev-parse", "HEAD^"])).toBe(head)
+    expect(await repo.status()).toBe("")
   })
 })
