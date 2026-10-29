@@ -837,6 +837,25 @@ jobs:
         shell: bash
         run: bash .github/scripts/ci-senpi-posix.sh
 
+      # EQ.omo (brain/hand plan P0-06f): E21-E24 through the real senpi CLI with the built plugin, against the
+      # linux-x64 B0 goldens. The collectors, normalizer and fake model server are the senpi EQ harness at a pinned commit.
+      - name: Run omo fused-path equivalence (EQ.omo E21-E24)
+        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
+        shell: bash
+        timeout-minutes: 45
+        env:
+          SENPI_EQ_HARNESS_SHA: 5ab795e3392325c961596d7944a1740f4d0a9e20
+        run: |
+          set -euo pipefail
+          cargo build --release -p senpi-desktop-engine --locked
+          git init -q "$RUNNER_TEMP/senpi-eq"
+          git -C "$RUNNER_TEMP/senpi-eq" fetch -q --depth 1 https://github.com/code-yeongyu/senpi.git "$SENPI_EQ_HARNESS_SHA"
+          git -C "$RUNNER_TEMP/senpi-eq" -c advice.detachedHead=false checkout -q FETCH_HEAD
+          # E24 observes the pinned TypeScript language server only; the runner's own servers never reach a case.
+          npm install --prefix "$RUNNER_TEMP/eq-lsp" --no-save --no-audit --no-fund typescript-language-server@5.3.0 typescript@5.9.3
+          node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
+            --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
+
       - name: Run Senpi compatibility tests with Windows telemetry
         id: senpi-tests-windows
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
