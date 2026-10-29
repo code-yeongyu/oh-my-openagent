@@ -69,6 +69,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
   return {
     name: "memory",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      if (isMainThread) installLockWorkerObserver()
       const resolveCwd = options.resolveCwd ?? (() => extensionCwd(pi))
       const cwd = resolveCwd()
       const bootConfig = resolveMemoryConfig(loadConfig({ cwd }))
@@ -86,7 +87,6 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       if (deviceAccount === undefined) {
         let selection: Promise<MemorySyncSelection>
         if (isMainThread) {
-          installLockWorkerObserver()
           const host = memorySyncHost ?? selectHostMemorySyncSource({
             inherited: { declared: privateChannelDeclared, tablePresent: privateTablePresent, take: takeInheritedPrivateChannel },
             attach: (stream) => attachDesktopSyncChannel(stream),
