@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, expect, spyOn, test } from "bun:test"
+import * as logger from "../shared/logger"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 import { createSemanticPromptDedupeKey } from "@oh-my-opencode/utils/prompt-async-gate/semantic-dedupe"
 import { getPromptReservation, setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
@@ -60,6 +61,20 @@ test.each(["throw", "sdk-error"])("abort failure %s cannot release or retry", as
   await f.run()
   expect(f.prompts).toHaveLength(0)
   expect(getPromptReservation(id)?.token).toBe(f.reservation.token)
+})
+
+test("SDK abort errors emit a fixed diagnostic without copying provider errors", async () => {
+  const logged = spyOn(logger, "log").mockImplementation(() => {})
+  try {
+    const f = fixture(async () => ({ error: { message: "PRIVATE_PROVIDER_TOKEN" } }))
+    await f.run()
+    expect(logged.mock.calls).toContainEqual(["[event] model-fallback abort failed", { sessionID: id, source: "session.error", code: "sdk-error" }])
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("PRIVATE_PROVIDER_TOKEN")
+    expect(f.prompts).toHaveLength(0)
+    expect(getPromptReservation(id)?.token).toBe(f.reservation.token)
+  } finally {
+    logged.mockRestore()
+  }
 })
 
 test.each(["call-omo-agent:sync", "user-prompt", "model-fallback:new-generation"])("replacement during abort preserves the new %s reservation", async (source) => {

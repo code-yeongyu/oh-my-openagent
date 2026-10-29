@@ -188,7 +188,10 @@ export function createModelFallbackContinuationController(args: {
       }
       try {
         const abortResult = await pluginContext.client.session.abort({ path: { id: sessionID } });
-        if (abortResult && typeof abortResult === "object" && "error" in abortResult && abortResult.error) return;
+        if (abortResult && typeof abortResult === "object" && "error" in abortResult && abortResult.error) {
+          log("[event] model-fallback abort failed", { sessionID, source, code: "sdk-error" });
+          return;
+        }
       } catch (error) {
         log("[event] model-fallback abort failed", {
           sessionID,
