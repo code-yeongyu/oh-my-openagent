@@ -9,7 +9,7 @@ import {
 } from "./model-capability-guardrails"
 
 describe("model-capability-guardrails", () => {
-  test.each(["gpt-5.6-luna-fast", "gpt-6-luna-fast", "gpt-6-sol-fast", "gpt-6.1-sol", "gpt-6.1-sol-fast"])("keeps %s aligned with its bundled canonical model", (modelID) => {
+  test.each(["gpt-5.6-luna-fast", "gpt-6-luna-fast", "gpt-6-sol-fast", "gpt-6.1-sol", "gpt-6.1-sol-fast", "kimi-k3.1-pro"])("keeps %s aligned with its bundled canonical model", (modelID) => {
     const issues = collectModelCapabilityGuardrailIssues({
       snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
     })
@@ -31,6 +31,7 @@ describe("model-capability-guardrails", () => {
     expect(modelIDs).not.toContain("gpt-5.5")
     expect(modelIDs).toContain("gpt-5.6-sol")
     expect(modelIDs).toContain("kimi-k3")
+    expect(modelIDs).toContain("kimi-k3.1-pro")
   })
 
   test("flags exact aliases whose canonical target disappears from the snapshot", () => {

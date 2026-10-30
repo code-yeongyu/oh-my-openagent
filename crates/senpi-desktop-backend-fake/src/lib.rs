@@ -16,7 +16,9 @@ mod menus_impl;
 mod method;
 mod remote_impl;
 mod scenario;
+mod scenario_nodes;
 mod sink;
+mod user_input_impl;
 
 pub use clock::FakeClock;
 pub use fake::FakeBackend;
@@ -28,3 +30,4 @@ pub use scenario::{
     ScenarioError, ScriptedFailure,
 };
 pub use sink::{RecordedPointer, RecordingSink, SinkOp};
+pub use user_input_impl::{FakeUserInput, ScriptedPressKind, ScriptedUserPress};

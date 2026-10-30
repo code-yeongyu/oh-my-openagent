@@ -298,4 +298,8 @@ impl Backend for MacosBackend {
     fn take_user_presses(&mut self) -> UserPresses {
         self.user_input.take()
     }
+
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+        self.user_input.feed()
+    }
 }

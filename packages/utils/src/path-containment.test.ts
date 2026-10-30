@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
-import { containedRelativePath, isPathInside } from "./path-containment"
+import { containedRelativePath, isDarwinAutomountTriggerPath, isPathInside } from "./path-containment"
 
 const shortHome = String.raw`C:\Users\RUNNER~1`
 const longHome = String.raw`C:\Users\runneradmin`
@@ -132,4 +132,39 @@ test("#given an absent target #when strict containment runs #then it throws inst
   const { inside } = symlinkFixture()
 
   expect(() => isPathInside(join(inside, "missing.md"), inside)).toThrow()
+})
+
+describe("isDarwinAutomountTriggerPath (#11545)", () => {
+  const darwin = { platform: "darwin" as const, homeDir: "/Users/someone" }
+  const cases: ReadonlyArray<readonly [string, typeof darwin | { platform: NodeJS.Platform; homeDir: string }, boolean]> = [
+    ["/home", darwin, true],
+    ["/home/", darwin, true],
+    ["/home/other/work/run.sh", darwin, true],
+    ["/net", darwin, true],
+    ["/net/host/share", darwin, true],
+    ["/Users/someone/../../home/x", darwin, true],
+    ["/HOME/other", darwin, true],
+    ["/Net/host/share", darwin, true],
+    ["/System/Volumes/Data/home/other", darwin, true],
+    ["/system/volumes/data/net/host", darwin, true],
+    ["/System/Volumes/Data/homebrew", darwin, false],
+    ["/System/Volumes/Data/Users/someone", darwin, false],
+    ["/HOME/Someone/work", { platform: "darwin", homeDir: "/home/someone" }, false],
+    ["/homebrew/bin", darwin, false],
+    ["/network", darwin, false],
+    ["/Users/someone/home", darwin, false],
+    ["/opt/home", darwin, false],
+    ["/var/home/x", darwin, false],
+    ["/home/someone/work", { platform: "darwin", homeDir: "/home/someone" }, false],
+    ["/home/someone", { platform: "darwin", homeDir: "/home/someone" }, false],
+    ["/home/other", { platform: "darwin", homeDir: "/home/someone" }, true],
+    ["/home", { platform: "darwin", homeDir: "/home/someone" }, true],
+    ["/home/x", { platform: "darwin", homeDir: "/" }, true],
+    ["/home/x", { platform: "linux", homeDir: "/home/someone" }, false],
+    ["/net/host", { platform: "linux", homeDir: "/home/someone" }, false],
+    ["/home/x", { platform: "win32", homeDir: "C:\\Users\\someone" }, false],
+  ]
+  test.each(cases)("%s %o -> %p", (path, options, expected) => {
+    expect(isDarwinAutomountTriggerPath(path, options)).toBe(expected)
+  })
 })

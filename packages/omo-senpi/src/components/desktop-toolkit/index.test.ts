@@ -19,7 +19,7 @@ type ToolkitTool = {
 
 const GRANT = { endpoint: "http://127.0.0.1:41234/toolkit/browser", tokenFile: "/tmp/omo-toolkit/browser.token" }
 
-function setup(options: { readonly sessionContext?: unknown; readonly timeoutMs?: number; readonly withRpc?: boolean } = {}) {
+async function setup(options: { readonly sessionContext?: unknown; readonly timeoutMs?: number; readonly withRpc?: boolean } = {}) {
   const pi = new FakeExtensionAPI() as FakeExtensionAPI & { sessionContext?: unknown }
   const handlers = new Map<string, Handler>()
   if (options.withRpc !== false) {
@@ -34,10 +34,10 @@ function setup(options: { readonly sessionContext?: unknown; readonly timeoutMs?
   }
   pi.sessionContext = "sessionContext" in options ? options.sessionContext : { omo_toolkits: "browser" }
   const ctx: ComponentContext = { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } }
-  createDesktopToolkitComponent({ timeoutMs: options.timeoutMs ?? 1_000 }).register(pi, ctx)
+  await createDesktopToolkitComponent({ timeoutMs: options.timeoutMs ?? 1_000 }).register(pi, ctx)
   const tool = pi.tools.find((entry) => entry.name === DESKTOP_TOOLKIT_TOOL_NAME) as unknown as ToolkitTool
   const nextRequest = async () => {
-    while (pi.rpcEvents.length === 0) await Promise.resolve()
+    expect(pi.rpcEvents.length).toBeGreaterThan(0)
     return pi.rpcEvents.at(-1) as { name: string; data: { requestId: string; toolkit: string } }
   }
   return { pi, handlers, tool, nextRequest }
@@ -45,7 +45,7 @@ function setup(options: { readonly sessionContext?: unknown; readonly timeoutMs?
 
 describe("desktop toolkit", () => {
   it("#given the app offers the browser #when the skill acquires it #then it gets the app's grant for that request", async () => {
-    const { handlers, tool, nextRequest } = setup()
+    const { handlers, tool, nextRequest } = await setup()
 
     const pendingResult = tool.execute("c1", { op: "acquire", toolkit: "browser" })
     const request = await nextRequest()
@@ -59,19 +59,19 @@ describe("desktop toolkit", () => {
 
   it("#given an app that offers no toolkits #when the skill acquires one #then it is told at once and nothing is asked", async () => {
     for (const sessionContext of [undefined, {}, { omo_toolkits: "" }, { omo_toolkits: "pull-requests" }]) {
-      const { pi, tool } = setup({ sessionContext })
+      const { pi, tool } = await setup({ sessionContext })
 
       const result = await tool.execute("c1", { op: "acquire", toolkit: "browser" })
 
       expect(result.details).toEqual({ ok: false, reason: "unavailable" })
       expect(pi.rpcEvents).toEqual([])
     }
-    const noHost = setup({ withRpc: false })
+    const noHost = await setup({ withRpc: false })
     expect((await noHost.tool.execute("c1", { op: "acquire", toolkit: "browser" })).details).toEqual({ ok: false, reason: "unavailable" })
   })
 
   it("#given the app never answers #when the deadline passes #then the skill gets a timeout and a late grant is refused", async () => {
-    const { handlers, tool, nextRequest } = setup({ timeoutMs: 20 })
+    const { handlers, tool, nextRequest } = await setup({ timeoutMs: 20 })
 
     const pendingResult = tool.execute("c1", { op: "acquire", toolkit: "browser" })
     const request = await nextRequest()
@@ -81,7 +81,7 @@ describe("desktop toolkit", () => {
   })
 
   it("#given the app refuses #when the skill acquires #then it gets the app's reason", async () => {
-    const { handlers, tool, nextRequest } = setup()
+    const { handlers, tool, nextRequest } = await setup()
 
     const pendingResult = tool.execute("c1", { op: "acquire", toolkit: "browser" })
     const request = await nextRequest()
@@ -100,7 +100,7 @@ describe("desktop toolkit", () => {
       { endpoint: "http://127.0.0.1:1/toolkit", token: "secret" },
     ]
     for (const grant of bad) {
-      const { handlers, tool, nextRequest } = setup()
+      const { handlers, tool, nextRequest } = await setup()
       const pendingResult = tool.execute("c1", { op: "acquire", toolkit: "browser" })
       const request = await nextRequest()
       await handlers.get(TOOLKIT_GRANT_RPC)?.({ requestId: request.data.requestId, grant })
@@ -111,8 +111,8 @@ describe("desktop toolkit", () => {
   })
 
   it("#given two sessions #when one is granted #then the other's request is unaffected", async () => {
-    const first = setup()
-    const second = setup({ timeoutMs: 20 })
+    const first = await setup()
+    const second = await setup({ timeoutMs: 20 })
 
     const firstResult = first.tool.execute("c1", { op: "acquire", toolkit: "browser" })
     const secondResult = second.tool.execute("c1", { op: "acquire", toolkit: "browser" })

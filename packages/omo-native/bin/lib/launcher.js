@@ -3,6 +3,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
+import { privateFdHandoff } from "./private-fds.js"
 import { doctorCoverageLines } from "./category-coverage.js"
 import { runDoctorModels } from "./model-chains.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
@@ -52,7 +53,8 @@ async function spawnSenpi(args, withExtension) {
     : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
-  if (process.platform !== "win32" && typeof process.execve === "function") {
+  const handoff = privateFdHandoff(env)
+  if (handoff === undefined && process.platform !== "win32" && typeof process.execve === "function") {
     try {
       process.execve(process.execPath, [process.execPath, senpi.cliPath, ...finalArgs], env)
       return
@@ -60,7 +62,7 @@ async function spawnSenpi(args, withExtension) {
       // A failed replacement still uses the signal-aware child path below.
     }
   }
-  await spawnNode(senpi.cliPath, finalArgs, { env })
+  await spawnNode(senpi.cliPath, finalArgs, handoff ?? { env })
 }
 
 // Routine launch notices go straight to stderr: Bun renders every console.error line red on a

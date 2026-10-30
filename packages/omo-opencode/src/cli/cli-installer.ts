@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline/promises"
+import { TELEMETRY_INSTALL_DISCLOSURE_LINES } from "@oh-my-opencode/telemetry-core/install-disclosure"
 import color from "picocolors"
 import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../shared"
 import type { InstallArgs, InstallPlatform } from "./types"
@@ -214,10 +215,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     console.log()
   }
 
-  printInfo(
-    "Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.",
-  )
-  printInfo("Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md")
+  for (const line of TELEMETRY_INSTALL_DISCLOSURE_LINES) printInfo(line)
   console.log()
 
   printBox(

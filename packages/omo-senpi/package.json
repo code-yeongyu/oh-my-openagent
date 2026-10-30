@@ -1,10 +1,11 @@
 {
   "name": "@oh-my-opencode/omo-senpi",
-  "version": "5.1.49",
+  "version": "5.1.52",
   "type": "module",
   "private": true,
   "description": "Senpi harness adapter for oh-my-openagent.",
   "imports": {
+    "#omo-desktop-toolkit-runtime": "./src/components/desktop-toolkit/runtime.ts",
     "#omo-telemetry-posthog-runtime": "./src/components/telemetry/posthog-runtime.ts",
     "#omo-telemetry-otlp-runtime": "./src/components/telemetry/otlp-runtime.ts",
     "#omo-task-runtime": "./src/extension/omo-task.ts",
@@ -52,7 +53,7 @@
   },
   "dependencies": {
     "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
-    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.27-1",
+    "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.27-2",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -74,7 +75,7 @@
     "typebox": "1.3.34"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.10.27-1"
+    "@code-yeongyu/senpi": "2026.10.27-2"
   },
   "peerDependenciesMeta": {
     "@code-yeongyu/senpi": {
@@ -82,8 +83,8 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.10.27-1",
-    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.27-1",
+    "@code-yeongyu/senpi": "2026.10.27-2",
+    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.10.27-2",
     "@types/node": "26.6.2",
     "bun-types": "1.4.4",
     "terser": "5.51.2"

@@ -73,8 +73,8 @@ export interface DesktopCapabilities {
 	readonly screenLocked: boolean;
 	/** Captures run through the legacy `screencapture` path, not the ScreenCaptureKit worker (B9). */
 	readonly legacyCapture?: boolean;
-	/** The watch of the user's own key presses and clicks; absent on backends without one. */
-	readonly interventionWatch?: "on" | "off" | "not_started";
+	/** The watch of the user's own key presses and clicks behind `UserIntervened`; absent on backends without one and on older engines. */
+	readonly interventionWatch?: "on" | "off" | "not_started" | null;
 	/** macOS: the display is asleep, so capture and input may fail; absent on older engines. */
 	readonly displayAsleep?: boolean | null;
 }

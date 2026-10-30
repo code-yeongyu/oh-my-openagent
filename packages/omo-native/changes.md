@@ -1,3 +1,7 @@
+## 2026-10-27 - SENPI_BRAND carries the OmO logo (#11445)
+
+`bin/lib/brand-logo.generated.js` (written by `bun script/build-brand-logo.ts` from `.github/assets/omo-icon-light.svg`) exports `OMO_BRAND_LOGO`, the icon as a base64 SVG data URI. `engine-environment.js` `brandProfile()` and `compiled-environment.ts` put it in `SENPI_BRAND.logo`, which the engine renders on the provider sign-in result page once the pinned senpi includes senpi#4432/#4434 (2026.10.27-1 ignores it). `bun run brand-logo:check` (also in CI's committed-bundle step) fails when the module is stale; the generator normalizes the icon to LF and `.gitattributes` keeps `*.svg` LF, so a Windows checkout produces the same module.
+
 ## 2026-10-26 - Reinstall and sign-in guidance (#11390)
 
 The launcher sets `OMO_REINSTALL_COMMAND` (`updateTarget().command`) for the engine so the plugin can name the reinstall command after `SENPI_BRAND` is scrubbed. `runThreadCommand` takes a `reinstall` step from its caller (npm: the reinstall command; compiled: the releases page). `omo update` on an install already at the channel version whose engine tree cannot be resolved exits 1 with the reinstall command. `omo sync` reads the account refusal body's code through `ApiRefusal`, using the shared guidance and falling back to HTTP status for unknown or malformed bodies. Forbidden accounts are not told to sign in again; deleted accounts get the account-deleted action both here and during session refresh.

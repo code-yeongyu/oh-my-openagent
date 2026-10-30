@@ -11,6 +11,7 @@ use crate::method::{AxWrite, FakeMethod};
 #[derive(Debug, Clone, Default)]
 pub struct Faults {
     queues: Arc<Mutex<BTreeMap<FakeMethod, VecDeque<Fault>>>>,
+    calls: Arc<Mutex<BTreeMap<FakeMethod, usize>>>,
 }
 
 enum Fault {
@@ -97,7 +98,13 @@ impl Faults {
         self.next(write.method())
     }
 
+    /// How many times the backend began `method` so far.
+    pub fn calls(&self, method: FakeMethod) -> usize {
+        self.calls.lock().get(&method).copied().unwrap_or(0)
+    }
+
     fn next(&self, method: FakeMethod) -> CoreResult<Reply> {
+        *self.calls.lock().entry(method).or_insert(0) += 1;
         let fault = {
             let mut queues = self.queues.lock();
             let queue = queues.get_mut(&method);
