@@ -132,8 +132,10 @@ describe("child task progress", () => {
       () => 2_000,
     )
 
-    progress.accept({ type: "model_changed", model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinkingLevel: "high", source: "fallback" })
-    progress.accept({ type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" })
+    const fallbackSwitch = { type: "model_changed", model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinkingLevel: "high", source: "fallback" }
+    const fallbackApplied = { type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" }
+    progress.accept(fallbackSwitch)
+    progress.accept(fallbackApplied)
 
     expect(progress.details().progress.activity).toBe(
       "st_00000005 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · starting",
@@ -148,8 +150,10 @@ describe("child task progress", () => {
       () => 2_000,
     )
 
-    progress.accept({ type: "model_changed", model: { provider: "anthropic", id: "claude-opus-5-5" }, thinkingLevel: "max", source: "fallback" })
-    progress.accept({ type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" })
+    const otherModelSwitch = { type: "model_changed", model: { provider: "anthropic", id: "claude-opus-5-5" }, thinkingLevel: "max", source: "fallback" }
+    const fallbackApplied = { type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" }
+    progress.accept(otherModelSwitch)
+    progress.accept(fallbackApplied)
 
     expect(progress.details().progress.activity).toBe(
       "st_00000007 · category:deep(openai-codex/gpt-5.6-sol) · fallback:1 · starting",
