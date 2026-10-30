@@ -18,7 +18,7 @@ const unused = (): never => {
   throw new Error("not used by this case")
 }
 
-function context(overrides: { readonly keys?: number; readonly pending?: PendingApproval[]; readonly switches?: string[] } = {}): SyncContext {
+async function context(overrides: { readonly keys?: number; readonly pending?: PendingApproval[]; readonly switches?: string[] } = {}): Promise<SyncContext> {
   const switches = overrides.switches ?? []
   const chain: AccountHttp = {
     listKeys: async () => Array.from({ length: overrides.keys ?? 0 }, unused),
@@ -30,7 +30,7 @@ function context(overrides: { readonly keys?: number; readonly pending?: Pending
     listPending: async () => overrides.pending ?? [],
     openPending: unused, readPending: unused, answerPending: unused, revealPending: unused,
   }
-  return { account: "acct", serviceDeviceId: "dev_svc", keyring: createInMemoryDeviceKeyring("p"), pinDir: "/nonexistent-pins", chain, pairing }
+  return { account: "acct", serviceDeviceId: "dev_svc", keyring: createInMemoryDeviceKeyring("p"), pinDir: await temporaryHome(), chain, pairing }
 }
 
 async function runSync(args: string[], dependencies: Partial<SyncCommandDependencies>): Promise<{ readonly out: string[]; readonly err: string[]; readonly exit: typeof process.exitCode }> {
@@ -87,10 +87,10 @@ describe("omo sync", () => {
     expect(result.err.join("\n")).toContain("omo sync approve")
   })
 
-  test("enable on an account with no synced memory turns the switches on, then explains the first device and exits 2", async () => {
+  test("enable without a genesis bridge preserves switches and exits 2 on an empty account", async () => {
     const switches: string[] = []
     const result = await runSync(["sync", "enable"], { context: async () => context({ keys: 0, switches }) })
-    expect(switches).toEqual(["account true", "device dev_svc true"])
+    expect(switches).toEqual([])
     expect(result.exit).toBe(EXIT_UNSUPPORTED_HERE)
   })
 

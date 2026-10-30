@@ -46,8 +46,8 @@ async function tracedArgvs(traceDir: string): Promise<string[]> {
 }
 
 describe("memory commit path and git auto-maintenance (omo #10177)", () => {
-  test("#given a memory repo whose git config asks for aggressive auto gc #when the commit path commits and merges #then no git auto-maintenance or auto gc is ever spawned", async () => {
-    // #given: raw git init like the two-process fixture, plus gc.auto=1 so git would gc on any commit
+  test("#given a memory repo whose git config asks for auto maintenance and aggressive auto gc #when the commit path commits and merges #then no git auto-maintenance or auto gc is ever spawned", async () => {
+    // #given: raw git init like the two-process fixture, plus maintenance.auto=true and gc.auto=1 so git would gc on any commit
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-auto-maintenance-")))
     roots.push(root)
     const dir = join(root, "repo")
@@ -57,6 +57,9 @@ describe("memory commit path and git auto-maintenance (omo #10177)", () => {
     await git(dir, ["init", "-b", "main"])
     await git(dir, ["config", "commit.gpgsign", "false"])
     await git(dir, ["config", "gc.auto", "1"])
+    // The test preload turns auto maintenance off globally (#11742); the repository turns it back on, so only the
+    // commit path's own flags can keep git from starting it.
+    await git(dir, ["config", "maintenance.auto", "true"])
     // Production repos get a repo-local identity from GitMemoryRepo.init -> ensureIdentity; this
     // raw fixture must set the same, or `merge` cannot resolve a committer on hosts with no
     // global git identity (CI runners, clean boxes).

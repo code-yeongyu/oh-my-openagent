@@ -64,7 +64,7 @@ describe("OmoMemorySettingsSchema per-agent overrides", () => {
 })
 
 describe("memory projection limits", () => {
-  test("#given no projection block #when parsed #then the limits default to forty names and 24576 bytes", () => {
+  test("#given no projection block #when parsed #then the limits default to no per-directory cap and 40960 bytes", () => {
     // given
     const input = {}
 
@@ -72,18 +72,18 @@ describe("memory projection limits", () => {
     const parsed = OmoMemorySettingsSchema.parse(input)
 
     // then
-    expect(parsed.projection).toEqual({ max_entries_per_directory: 40, max_bytes: 24576 })
+    expect(parsed.projection).toEqual({ max_entries_per_directory: 0, max_bytes: 40960 })
   })
 
-  test("#given only one limit set to zero #when parsed #then the other keeps its default", () => {
+  test("#given only one limit set #when parsed #then the other keeps its default", () => {
     // given
-    const input = { projection: { max_entries_per_directory: 0 } }
+    const input = { projection: { max_entries_per_directory: 5 } }
 
     // when
     const parsed = OmoMemorySettingsSchema.parse(input)
 
     // then
-    expect(parsed.projection).toEqual({ max_entries_per_directory: 0, max_bytes: 24576 })
+    expect(parsed.projection).toEqual({ max_entries_per_directory: 5, max_bytes: 40960 })
   })
 
   test("#given a negative, fractional or unknown projection value #when parsed #then each is rejected", () => {

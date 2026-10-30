@@ -38,6 +38,7 @@ async function makePackagedPlugin(): Promise<string> {
   await writeFixtureFile(join(pluginPath, "extensions", "omo-thread-client.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-recovery.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-feedback.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-desktop-toolkit.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-claim-receipt.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")

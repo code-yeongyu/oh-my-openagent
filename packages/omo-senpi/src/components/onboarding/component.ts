@@ -112,9 +112,9 @@ export function createOnboardingComponent(
   const processState = globalThis as { [forcedKey]?: boolean }
   return {
     name: "onboarding",
-    register(pi: SenpiExtensionAPI, _ctx: ComponentContext): void {
+    register(pi: SenpiExtensionAPI, componentContext: ComponentContext): void {
       const stateDir = dependencies.stateDir ?? getOmoNativeStateDir(process.env)
-      const tour = `Follow ${getBuiltinSkillsRoot()}/onboarding/SKILL.md.`
+      const tour = `Follow ${getBuiltinSkillsRoot(process.env, componentContext.logger)}/onboarding/SKILL.md.`
       const scanEnvironment = dependencies.scanEnvironment ?? (() => ({}))
       // The first onboarding turn awaits only `omo setup`'s sources (sessions: false): its rows, value
       // summary and migration inventory. Session digests are read by a second scan that starts only

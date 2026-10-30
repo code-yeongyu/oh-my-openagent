@@ -59,6 +59,9 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `WindowNotFound`, `InvalidTarget` | The window closed, or the filter matched nothing or several windows | List windows again and pick one |
 | `AxUnsupported`, `AxFailed` | The element or platform does not support that accessibility operation | Fall back to pointer input |
 | `FocusRestoreFailed`, `CursorRestoreFailed` | Foreground delivery could not put the previous window or cursor back | Tell the user; nothing is hidden |
+| `UserIntervened` | The user was using the target app, or brought another window forward, so the action stopped; the message says whether any input was sent | Read the window again once the user pauses; never repeat the action as it was |
+| `AxUnconfirmed` | An accessibility request was made but the app did not confirm it (no reply in time, or a modal dialog opened). On macOS, `ax.perform` (press and the other named actions), `ax.setValue` and `ax.focus` report it when the app answers `kAXErrorCannotComplete`; a refused request stays `AxFailed`, and so does a value the app answered but did not take | It may already have taken effect: read the element back before any retry |
+| `SpaceUnsupported`, `SpaceMoveDenied` | A window could not be moved to the current Space (macOS), because the platform lacks support or the window server refused or could not verify the move | Ask the user to bring the window to the current Space |
 | `CaptureFailed`, `InputFailed`, `Timeout`, `Cancelled`, `Closed`, `TransactionFailed`, `Internal` | The platform call failed, took too long, was aborted, or the session ended | Observe again before retrying; stop after repeated failures |
 
 Engine start failures are reported by `/computer status` as `engine: native-unavailable`, `quarantined` or `abi-mismatch`, and are described in [Troubleshooting](../guide/computer-use.md#troubleshooting).

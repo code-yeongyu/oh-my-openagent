@@ -9,8 +9,10 @@ import { getOmoNativeStateDir } from "./product-identity"
 
 const SOURCE = "omo-native-notice"
 const MARKER_FILE_NAME = "notice-shown"
-const DOCS_URL = "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/reference/senpi-telemetry.md"
-const NOTICE = `OmO Native sends anonymous usage telemetry (no prompts, no paths). Docs: ${DOCS_URL} - opt out: DO_NOT_TRACK=1`
+const PRIVACY_POLICY_URL = "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md"
+const NOTICE = "OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States to improve the product. "
+  + "Turn it off with DO_NOT_TRACK=1, or set \"telemetry\": { \"enabled\": false } in ~/.omo/omo.jsonc. "
+  + `Details: ${PRIVACY_POLICY_URL}`
 
 type NotificationUi = {
   notify(message: string, type?: "info" | "warning" | "error"): void

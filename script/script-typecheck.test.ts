@@ -90,7 +90,7 @@ describe("script TypeScript project", () => {
 
     // then
     expect(toPackagePath(manifestPath)).toBe("package.json")
-    expect(scriptTypecheck).toBe("tsgo --noEmit -p script/tsconfig.json")
+    expect(scriptTypecheck).toBe("bun check --no-script --all -p script/tsconfig.json")
     expect(typecheck).toContain("bun run typecheck:script")
   })
 })
