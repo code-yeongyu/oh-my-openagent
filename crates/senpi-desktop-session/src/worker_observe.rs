@@ -64,6 +64,10 @@ impl Worker {
             self.begin_activity();
         }
         let display = op_display(&op);
+        // A read of a window that began now shows the user's input there only
+        // once its result reaches the caller (plan todo 17): the record is told
+        // after a successful delivery, never for a reply the waiter gave up on.
+        let read = crate::intervention::window_read(&op).map(|target| (target.to_owned(), self.safety.supervisor.now_ms()));
         let result = guarded(|| self.process(op, cancelled))
             .map_err(|error| self.notes.explain(error, display.as_ref()));
         let success = result.is_ok();
@@ -74,6 +78,9 @@ impl Worker {
         }
         if activity {
             self.awake.finish(std::time::Instant::now());
+        }
+        if let Some((target, started_ms)) = read.filter(|_| success && delivered) {
+            self.note_read(&target, started_ms);
         }
     }
 }

@@ -14,7 +14,7 @@ use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
     ScreenState, Target,
 };
-use crate::user_input::UserPresses;
+use crate::user_input::{UserInputFeed, UserPresses};
 
 /// Keeps the display awake until dropped (macOS: a
 /// `PreventUserIdleDisplaySleep` power assertion).
@@ -270,6 +270,12 @@ pub trait Backend: Send {
     /// Lock and display-sleep reads that need no backend borrow, so a waiter
     /// can explain its timeout while the backend is busy.
     fn screen_probe(&self) -> Option<std::sync::Arc<dyn ScreenProbe>> {
+        None
+    }
+
+    /// The watch's shared feed, once `watch_user_input` ran; `None` while
+    /// nothing is watched. The session reads it between and inside requests.
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
         None
     }
 }

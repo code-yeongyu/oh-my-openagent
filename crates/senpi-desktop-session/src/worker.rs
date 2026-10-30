@@ -45,6 +45,8 @@ pub(crate) struct Worker {
     pub(crate) notes: ScreenNotes,
     /// Whether this backend's watch of the user's own input was started.
     pub(crate) watching_user_input: bool,
+    /// The user's input into the apps this session works in (#11459).
+    pub(crate) intervention: crate::intervention::Intervention,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -81,6 +83,7 @@ impl Worker {
             awake,
             notes,
             watching_user_input: false,
+            intervention: crate::intervention::Intervention::new(),
         };
         worker.install_screen_probe();
         worker.refresh_capabilities();
@@ -117,6 +120,7 @@ impl Worker {
         }
         self.backend = self.factory.create(&options);
         self.watching_user_input = false;
+        self.intervention = crate::intervention::Intervention::new();
         self.emergency = self.backend.as_ref().ok().and_then(|backend| backend.emergency_release());
         if let Some(release) = &self.emergency {
             if let Err(error) = self.safety.supervisor.register_emergency_release(release) {
@@ -163,7 +167,13 @@ impl Worker {
         self.maybe_gc();
         if crate::user_input_watch::reads_or_acts_on_an_app(&op) {
             self.watch_user_input();
+            self.attach_user_input_feed();
+            self.drain_user_input();
         }
+        self.serve(op, cancelled)
+    }
+
+    fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
         let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
