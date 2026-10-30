@@ -80,6 +80,9 @@ impl Backend for FakeBackend {
             Guarded::Deliver(ev) => (ev, None),
             Guarded::PickedUp { recorded, error } => (recorded, Some(error)),
         };
+        if matches!(ev, PointerEvent::Click { .. } | PointerEvent::Drag { .. }) {
+            self.press_check(method)?;
+        }
         let event = RecordedPointer::from(ev);
         if matches!(target, Target::Desktop | Target::Display(_)) || mode == DeliveryMode::Foreground {
             self.cursor = self.cursor.and(event.end_point());
@@ -96,6 +99,7 @@ impl Backend for FakeBackend {
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::TypeText)?;
         self.input_gate(target, mode)?;
+        self.press_check(FakeMethod::TypeText)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::TypeText {
             target: target.clone(),
@@ -149,6 +153,7 @@ impl Backend for FakeBackend {
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::KeyChord)?;
         self.input_gate(target, mode)?;
+        self.press_check(FakeMethod::KeyChord)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::KeyChord {
             target: target.clone(),
@@ -264,5 +269,12 @@ impl Backend for FakeBackend {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         self.begin(FakeMethod::ScreenLocked)?;
         Ok(self.capabilities.screen_locked)
+    }
+
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+        if !self.user_input_feed {
+            return None;
+        }
+        Some(self.user_input())
     }
 }

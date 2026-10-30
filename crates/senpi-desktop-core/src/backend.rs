@@ -13,7 +13,7 @@ use crate::keys::KeyName;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
-use crate::user_input::UserPresses;
+use crate::user_input::{UserInputFeed, UserPresses};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeliveryMode {
@@ -253,6 +253,12 @@ pub trait Backend: Send {
     /// The user's presses the watch recorded since the last call.
     fn take_user_presses(&mut self) -> UserPresses {
         UserPresses::default()
+    }
+
+    /// The watch's shared feed, once `watch_user_input` ran; `None` while
+    /// nothing is watched. The session reads it between and inside requests.
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
+        None
     }
 }
 
