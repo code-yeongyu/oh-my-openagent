@@ -6,16 +6,26 @@ import { join, sep } from "node:path"
 
 const packageRoot = join(import.meta.dir, "..")
 
+function expectSuccess(command: string, result: Bun.SyncSubprocess<"pipe", "pipe">) {
+  const decoder = new TextDecoder()
+  const message = [
+    `${command} exited ${result.exitCode} (signal=${result.signalCode ?? "none"}, timeout=${result.exitedDueToTimeout ?? false}, maxBuffer=${result.exitedDueToMaxBuffer ?? false})`,
+    `stdout:\n${decoder.decode(result.stdout).slice(-8192)}`,
+    `stderr:\n${decoder.decode(result.stderr).slice(-8192)}`,
+  ].join("\n")
+  expect(result.exitCode, message).toBe(0)
+}
+
 describe("omo-ai packed install", () => {
   test("ships the Senpi patch installer and installs a Senpi that surfaces pre-replay results natively", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-ai-packed-install-"))
     try {
       const pack = Bun.spawnSync(["bun", "pm", "pack", "--ignore-scripts", "--destination", root], { cwd: packageRoot, stdout: "pipe", stderr: "pipe" })
-      expect(pack.exitCode).toBe(0)
+      expectSuccess("bun pm pack --ignore-scripts", pack)
       const tarball = [...new Bun.Glob("*.tgz").scanSync(root)][0]
       expect(tarball).toBeDefined()
       const listing = Bun.spawnSync(["tar", "-tzf", join(root, tarball!)], { stdout: "pipe", stderr: "pipe" })
-      expect(listing.exitCode).toBe(0)
+      expectSuccess("tar -tzf", listing)
       const entries = new TextDecoder().decode(listing.stdout).split(/\r?\n/).filter(Boolean).map((entry) => entry.replaceAll("/", sep))
       expect(entries).toContain(join("package", "bin", "senpi-patch.mjs"))
 
@@ -23,7 +33,7 @@ describe("omo-ai packed install", () => {
       Bun.spawnSync(["mkdir", "-p", consumer], { stdout: "ignore", stderr: "ignore" })
       writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "omo-ai-consumer", private: true }))
       const install = Bun.spawnSync(["bun", "add", "--trust", join(root, tarball!)], { cwd: consumer, stdout: "pipe", stderr: "pipe" })
-      expect(install.exitCode).toBe(0)
+      expectSuccess("bun add --trust", install)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
       const installedFloor = join(installedPackageRoot, "bin", "lib", "claude-code-floor.js")
       expect(readFileSync(installedFloor, "utf8")).toContain("claudeCodeVersionFloor")
@@ -55,7 +65,7 @@ describe("omo-ai packed install", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-ai-ignore-scripts-"))
     try {
       const pack = Bun.spawnSync(["bun", "pm", "pack", "--ignore-scripts", "--destination", root], { cwd: packageRoot, stdout: "pipe", stderr: "pipe" })
-      expect(pack.exitCode).toBe(0)
+      expectSuccess("bun pm pack --ignore-scripts", pack)
       const tarball = [...new Bun.Glob("*.tgz").scanSync(root)][0]
       expect(tarball).toBeDefined()
       const consumer = join(root, "consumer")
@@ -63,7 +73,7 @@ describe("omo-ai packed install", () => {
       Bun.spawnSync(["mkdir", "-p", consumer, home], { stdout: "ignore", stderr: "ignore" })
       writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "omo-ai-consumer", private: true }))
       const install = Bun.spawnSync(["bun", "add", "--ignore-scripts", "--backend", "copyfile", join(root, tarball!)], { cwd: consumer, stdout: "pipe", stderr: "pipe" })
-      expect(install.exitCode).toBe(0)
+      expectSuccess("bun add --ignore-scripts --backend copyfile", install)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
       const consumerRequire = createRequire(join(installedPackageRoot, "package.json"))
       const searchPaths = consumerRequire.resolve.paths("@code-yeongyu/senpi") ?? []
@@ -81,7 +91,7 @@ describe("omo-ai packed install", () => {
         stderr: "pipe",
       })
       expect(new TextDecoder().decode(launch.stderr)).not.toContain("could not prepare the installed engine")
-      expect(launch.exitCode).toBe(0)
+      expectSuccess("node omo.js --help", launch)
       expect(readFileSync(rpcMode, "utf8")).toContain("invalid_stream_event")
       const omoVersion = JSON.parse(readFileSync(join(installedPackageRoot, "package.json"), "utf8")).version
       expect(readFileSync(stamp, "utf8").trim()).toBe(omoVersion)
