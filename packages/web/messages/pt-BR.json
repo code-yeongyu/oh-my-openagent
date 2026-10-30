@@ -12,7 +12,8 @@
     "githubStars": "{count} estrelas no GitHub",
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu",
-    "primary": "Principal"
+    "primary": "Principal",
+    "skipToContent": "Pular para o conteúdo"
   },
   "footer": {
     "brand": "OmO",
@@ -38,6 +39,7 @@
       "getStarted": "Começar",
       "readManifesto": "Ler o manifesto",
       "downloadDesktop": "Baixar o app para desktop",
+      "downloadDesktopBeta": "Baixar a beta para desktop",
       "installLabel": "Um comando, uma ferramenta"
     },
     "command": {
@@ -180,13 +182,6 @@
       "installNow": "Instalar agora",
       "readTheDocs": "Ler a documentação"
     },
-    "dori": {
-      "eyebrow": "Spoiler",
-      "title": "Alguém andou trabalhando enquanto você dorme.",
-      "body": "Não é o OmO. É um novo contratado da mesma equipe. Ele não bate ponto, e você paga a ele em tokens.",
-      "cta": "Conheça o Dori",
-      "alt": "Dori, um cachorrinho branco de desenho segurando uma pedra, espiando na parte inferior da página"
-    },
     "dag": {
       "region": "OmO para desktop com o grafo de workflow aberto",
       "windowTitle": "OmO — pesquisa de mercado, 12k fontes",
@@ -213,6 +208,8 @@
   "docs": {
     "mobileHeader": "Docs do OmO",
     "searchPlaceholder": "Buscar nos docs...",
+    "searchLabel": "Filtrar seções da documentação",
+    "sectionsLabel": "Seções da documentação",
     "install": {
       "title": "Instalar o OmO",
       "description": "Instale o OmO com um comando no macOS, Linux, WSL e Windows."
@@ -232,9 +229,9 @@
     "chapters": {
       "yourWork": {
         "title": "Seu trabalho",
-        "p1": "Você liga o notebook. Abre o Slack.\nTodo dia sentamos diante de um teclado e um mouse e fazemos o mesmo trabalho que todo mundo.\nSó que não é o mesmo.\nTodo dia, misturamos ali um pouco da nossa própria sabedoria e experiência.",
-        "p2": "Ninguém mais tem a sua sabedoria e experiência.\nÉ isso que dá valor ao seu trabalho.",
-        "p3": "Seu trabalho importa.\nNão porque você revirou pilhas de material, montou um experimento e escreveu o código.\nPorque a sua sabedoria e experiência entraram nele.\nO resto foram só suas mãos se movendo."
+        "p1": "Você liga o notebook. Abre o Slack.\nTodo dia sentamos diante de um teclado e um mouse e fazemos o mesmo trabalho que todo mundo.\nSó que não é o mesmo.\nTodo dia, misturamos ali um pouco da nossa própria conhecimento e experiência.",
+        "p2": "Ninguém mais tem a sua conhecimento e experiência.\nÉ isso que dá valor ao seu trabalho.",
+        "p3": "Seu trabalho importa.\nNão porque você revirou pilhas de material, montou um experimento e escreveu o código.\nPorque a sua conhecimento e experiência entraram nele.\nO resto foram só suas mãos se movendo."
       },
       "ourTool": {
         "title": "A ferramenta que construímos",
@@ -243,18 +240,18 @@
         "p3": "Então deveria ser simples.\nVocê coloca tokens de qualidade e poder computacional,\ne sai um ótimo trabalho.",
         "p4": "É isso que a ferramenta de hoje precisa ser.",
         "p5": "Qual harness, quais manias de cada modelo, quais skills...\nnada disso deveria ser problema seu.",
-        "p6": "Quando a sua sabedoria encontra tokens de qualidade, isso deveria compilar direto em um bom trabalho.",
+        "p6": "Quando a sua conhecimento encontra tokens de qualidade, isso deveria compilar direto em um bom trabalho.",
         "p7": "Essa é a ferramenta que estamos construindo.\nEla pega os seus tokens de qualidade e os transforma em um ótimo trabalho."
       },
       "ourThinking": {
         "title": "O que pensamos",
-        "p1": "Os agentes de hoje podem agir em seu nome,\nmas não têm a sua sabedoria nem a sua experiência.",
+        "p1": "Os agentes de hoje podem agir em seu nome,\nmas não têm a sua conhecimento nem a sua experiência.",
         "p2": "Dê a eles tudo o que você sabe, e mais um pouco.\nO que você aprendeu vivendo como ser humano\nainda não vai sair dos poucos caracteres que um agente usa para entender o mundo.",
         "p3Link": "Já vivemos em um mundo onde a IA resolve um Problema do Prêmio do Milênio,",
-        "p3Rest": "\ne até mesmo essa prova nasceu de uma semente, uma única linha de sabedoria humana.",
-        "p4": "Valorizamos a sua sabedoria e experiência.\nE a de todas as outras pessoas, na mesma medida.",
-        "p5": "Nossa ferramenta pega a sabedoria e a experiência de alguém, e como essa pessoa chegou lá,\ne entrega nas suas mãos, ainda viva.",
-        "p6": "O nosso próprio pensamento chega até você como sabedoria viva.\nSob o nome de um agente. Sob o nome de uma ferramenta.",
+        "p3Rest": "\ne até mesmo essa prova nasceu de uma semente, uma única linha de conhecimento humana.",
+        "p4": "Valorizamos a sua conhecimento e experiência.\nE a de todas as outras pessoas, na mesma medida.",
+        "p5": "Nossa ferramenta pega a conhecimento e a experiência de alguém, e como essa pessoa chegou lá,\ne entrega nas suas mãos, ainda viva.",
+        "p6": "O nosso próprio pensamento chega até você como conhecimento viva.\nSob o nome de um agente. Sob o nome de uma ferramenta.",
         "p7": "O seu pensamento pode chegar a outra pessoa da mesma forma.\nAssim, todo mundo pode dedicar seu tempo aos problemas que realmente importam para si,\ne resolvê-los.\nAcreditamos que podemos construir esse mundo."
       },
       "tomorrow": {
@@ -387,7 +384,7 @@
           "purpose": "Pesquisar em paralelo sem bloquear você"
         },
         "wisdomAccumulation": {
-          "feature": "Acúmulo de Sabedoria",
+          "feature": "Acúmulo de Conhecimento",
           "purpose": "Aprender com o trabalho, não repetir erros"
         }
       }
@@ -517,5 +514,10 @@
       "discord": "Perguntar no Discord"
     },
     "privacy": "Esta página não salva seu relatório, mas ele foi enviado para omo.dev no link aberto pelo app. Ele só chega ao GitHub quando você mesmo envia a issue."
+  },
+  "notFound": {
+    "title": "Não encontramos esta página.",
+    "body": "O link pode estar desatualizado ou a página pode ter mudado de lugar.",
+    "home": "Voltar para o início"
   }
 }

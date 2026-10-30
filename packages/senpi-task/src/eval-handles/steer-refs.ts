@@ -58,6 +58,8 @@ export async function sendRef(deps: SteerDeps, ref: HandleRef, message: string, 
       return runAt(outcome.run_epoch).delivered(ref, `revived as epoch ${outcome.run_epoch}`)
     case "steered":
       return runAt(ref.run_epoch).delivered(ref, undefined)
+    case "held":
+      return runAt(ref.run_epoch).delivered(ref, "held until the run resumes")
     case "queued":
       return runAt(ref.run_epoch).queued(ref)
     case "stale":
@@ -71,6 +73,7 @@ export async function sendRef(deps: SteerDeps, ref: HandleRef, message: string, 
     case "one_shot_agent":
       throw new EvalHandleHostError("eval_handle_send_refused", outcome.message)
     case "admission_refused":
+    case "unresponsive":
     case "capacity_deferred":
     case "cwd_unavailable":
     case "config_generation_mismatch":

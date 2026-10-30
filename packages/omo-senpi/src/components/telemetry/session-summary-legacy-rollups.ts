@@ -36,11 +36,12 @@ export function legacyRollupDir(stateDir: string): string {
 }
 
 /**
- * Removes `<state>/rollups/` without following a link. A `rollups` link is unlinked itself and its target
+ * Removes `<state>/rollups/` without deleting what a link points to. A `rollups` link is unlinked itself and its target
  * is never read. Inside the directory only files and links are removed (`unlink` never follows), at most
  * `limit` per call; subdirectories are left. Before every removal the path is checked again to still be the
- * same directory (device and inode), so a `rollups` swapped for a link mid-pass stops the pass instead of
- * deleting inside the link's target. The emptied directory is removed last.
+ * same directory (device and inode), so a `rollups` swapped for a link mid-pass stops the pass at the next
+ * removal. Node has no unlinkat, so a swap landing between that check and the unlink can still take one
+ * same-named file in the link's target. The emptied directory is removed last.
  */
 export function removeLegacyRollups(stateDir: string, limit: number = LEGACY_ROLLUP_REMOVE_LIMIT): LegacyRollupsResult {
   const dir = legacyRollupDir(stateDir)

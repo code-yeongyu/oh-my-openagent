@@ -2,7 +2,6 @@
 !/plugin/extensions/assets.generated.json
 !/plugin/extensions/dream-persona.md
 !/plugin/extensions/facts-persona.md
-!/plugin/extensions/gateway-rules-extension.mjs
 !/plugin/extensions/gateway-store-worker.mjs
 !/plugin/extensions/kibitzer-persona.md
 !/plugin/extensions/memory-run-supervisor.mjs
@@ -13,8 +12,9 @@
 !/plugin/extensions/omo-memory-commands.js
 !/plugin/extensions/omo-session-history.js
 !/plugin/extensions/omo-recall-store.js
-!/plugin/extensions/omo-dori-migration.js
 !/plugin/extensions/omo-telemetry-posthog.js
+!/plugin/extensions/omo-telemetry-otlp.js
+!/plugin/extensions/omo-desktop-toolkit.js
 !/plugin/extensions/omo-memory-sync.js
 !/plugin/extensions/loro_wasm_bg.wasm
 !/plugin/extensions/CaseFolding.txt

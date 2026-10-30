@@ -64,10 +64,6 @@ export type StoreExtensionRefusalCode =
   | "gateway_schema_too_new"
   /** An await ended without a final status (expiring it, or the status read after, was refused): the request may still complete. */
   | "await_unresolved"
-  /** A layer-2 toolkit replay differed from what its key recorded (another op or other arguments); the call was not run. */
-  | "toolkit_replay_divergence"
-  /** A layer-2 toolkit replay belongs to a turn older than the seven-day window; the call was not run. */
-  | "toolkit_replay_expired"
 
 export type StoreExtensionRefusal = {
   readonly kind: "refused"
@@ -116,18 +112,7 @@ export type DeclaredSessionOp = ToolSessionOp & {
 }
 
 /** The engine-resolved caller a session call runs as; never taken from the op's arguments. */
-export type SessionCaller = { readonly callerDurableId: string; readonly replay?: ToolkitReplayRequest }
-
-/** The durable replay identity of one layer-2 toolkit call, from the engine's own turn and branch data. */
-export type ToolkitReplayRequest = {
-  readonly key: string
-  readonly op: string
-  readonly args_sha256: string
-  readonly turn_at: number
-}
-
-/** How long a replay receipt is kept, past which a turn never runs again. */
-export const TOOLKIT_REPLAY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+export type SessionCaller = { readonly callerDurableId: string }
 
 /**
  * The session channel: reachable only from the session's own extension tools (never the SDK), so

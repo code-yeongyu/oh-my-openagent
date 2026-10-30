@@ -1,5 +1,6 @@
 import type { JSX } from "react"
 import { NextIntlClientProvider } from "next-intl"
+import { getTranslations } from "next-intl/server"
 import { Footer } from "@/components/footer"
 import { NavHeader } from "@/components/nav-header"
 import type { Locale } from "@/i18n/config"
@@ -11,15 +12,6 @@ type LocalizedPageShellProps = {
 }
 
 type IntlMessages = Record<string, Record<string, unknown>>
-
-function getLanguageTag(locale: Locale): string {
-  switch (locale) {
-    case "zh":
-      return "zh-CN"
-    default:
-      return locale
-  }
-}
 
 async function getStarsLabel(): Promise<string> {
   try {
@@ -35,14 +27,19 @@ export async function LocalizedPageShell({
   locale,
 }: LocalizedPageShellProps): Promise<JSX.Element> {
   const messages = (await import(`../../messages/${locale}.json`)).default as IntlMessages
-  const languageTag = getLanguageTag(locale)
+  const t = await getTranslations({ locale, namespace: "nav" })
   const stars = await getStarsLabel()
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <div lang={languageTag} data-locale={locale} className="flex min-h-screen flex-col">
+      <div data-locale={locale} className="flex min-h-dvh flex-col">
+        <a href="#main-content" className="skip-link focus-ring">
+          {t("skipToContent")}
+        </a>
         <NavHeader stars={stars} />
-        <main className="flex-1">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1">
+          {children}
+        </main>
         <Footer locale={locale} />
       </div>
     </NextIntlClientProvider>

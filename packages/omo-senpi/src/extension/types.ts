@@ -16,7 +16,18 @@ export type ReadClassifier = (input: {
 
 export interface BeforeAgentStartHandlerOptions {
   previewSafe?: boolean
+  /** Stable omo subscriber name, retained in bundled settle diagnostics. */
+  hookLabel?: string
 }
+
+export interface SettleObserver {
+  readonly signal: AbortSignal
+  /** Names the current await and refuses to begin another phase after retirement. */
+  phase(label: string): void
+}
+
+/** Figures for one section of senpi's on-demand memory report. */
+export type MemoryReporter = () => Readonly<Record<string, number>>
 
 export interface SenpiExtensionAPI {
   readonly sessionKind?: "interactive" | "worker"
@@ -35,7 +46,7 @@ export interface SenpiExtensionAPI {
   readonly sessionContext?: unknown
   on(
     event: string,
-    handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>,
+    handler: (payload: unknown, ctx?: unknown, observer?: SettleObserver) => unknown | Promise<unknown>,
     options?: BeforeAgentStartHandlerOptions,
   ): void
   rpc?: {
@@ -47,6 +58,11 @@ export interface SenpiExtensionAPI {
     on(name: string, handler: (payload: unknown) => void): () => void
   }
   registerTool(tool: Record<string, unknown>): void
+  /**
+   * Adds figures to senpi's on-demand memory report (`SENPI_MEMORY_REPORT=1`), read only when a report
+   * is taken. Optional: hosts older than the release that added the report do not have it.
+   */
+  registerMemoryReporter?(name: string, reporter: MemoryReporter): void
   registerCommand(name: string, options: Record<string, unknown>): void
   registerFlag(
     name: string,
@@ -95,6 +111,14 @@ export interface SenpiExtensionAPI {
     text: string,
     options?: { readonly extraLiterals?: readonly string[] },
   ): { readonly text: string; readonly counts: Readonly<Record<string, number>> }
+  /**
+   * The engine's session lifecycle (senpi#3864). `markRunCompleted` tells it a workflow run finished inside the
+   * current epoch, so the epoch's `done` reads `completion.kind = "run"`. Feature-detected: hosts before senpi
+   * 2026.10.23-1 expose nothing.
+   */
+  readonly lifecycle?: {
+    markRunCompleted(run: { readonly runId: string }): void
+  }
   /** Run a command. Feature-detected: hosts older than the release that added it expose nothing. */
   exec?(
     command: string,

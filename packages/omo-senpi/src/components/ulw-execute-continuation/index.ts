@@ -3,6 +3,7 @@ import { join } from "node:path"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { readAgentEndOutcome } from "./agent-end-eligibility"
 import { findContinuableBoulderWork } from "./boulder-eligibility"
+import { createRunCompletionTracker } from "./run-completion"
 
 export interface UlwExecuteContinuationComponentOptions {
   // none yet; retained for future DI seams
@@ -41,6 +42,16 @@ export function createUlwExecuteContinuationComponent(
         // This run's agent_end payload and session identity. The decision runs on agent_settled.
         pendingRun: undefined as { payload: unknown; sessionId: string | undefined; cwd: string | undefined } | undefined,
       }
+      const runCompletion = createRunCompletionTracker((runId) => {
+        try {
+          pi.lifecycle?.markRunCompleted({ runId })
+        } catch (error) {
+          ctx.logger.warn("omo-senpi ulw-execute run completion not recorded", {
+            runId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      })
 
       pi.on("input", async (payload, eventCtx) => {
         if (!isInputEvent(payload)) return { action: "continue" }
@@ -49,10 +60,11 @@ export function createUlwExecuteContinuationComponent(
         state.consecutiveContinuations = 0
         state.lastSignature = undefined
         state.pendingRun = undefined
-        if (payload.streamingBehavior === undefined) return { action: "continue" }
-
         const sessionId = extractSessionId(eventCtx)
         const cwd = extractCwd(eventCtx)
+        // The baseline for run completion: what this session's work looked like before the turn this input starts.
+        if (sessionId && cwd) runCompletion.observe(cwd, sessionId)
+        if (payload.streamingBehavior === undefined) return { action: "continue" }
         if (!sessionId || !cwd) return { action: "continue" }
 
         const continuable = findContinuableBoulderWork(cwd, sessionId)
@@ -76,6 +88,8 @@ export function createUlwExecuteContinuationComponent(
         const run = state.pendingRun
         state.pendingRun = undefined
         if (run === undefined) return
+        // A work this run completed is a completion whatever the run's own outcome, so this precedes every skip below.
+        if (run.sessionId && run.cwd) runCompletion.observe(run.cwd, run.sessionId)
 
         const outcome = readAgentEndOutcome(run.payload)
         if (outcome.blockedBy !== null) {

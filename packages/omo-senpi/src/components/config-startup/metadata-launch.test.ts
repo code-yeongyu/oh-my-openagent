@@ -5,7 +5,6 @@ import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
-import { doriSectionRename } from "@oh-my-opencode/omo-opencode/config-migration/dori-section-rename"
 
 import { createConfigStartupComponent, runSenpiStartupMigration } from "./index"
 
@@ -48,9 +47,8 @@ describe("config-startup migration gate", () => {
     const component = createConfigStartupComponent({
       argv,
       loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
-      prepareDoriSectionRename: async () => ({ rename: doriSectionRename }),
       resolveCwd: () => home,
-      runMigration: ({ cwd, doriSectionRename: rename }) => runSenpiStartupMigration({ cwd, doriSectionRename: rename, environment, homeDir: home }),
+      runMigration: ({ cwd }) => runSenpiStartupMigration({ cwd, environment, homeDir: home }),
     })
 
     // when

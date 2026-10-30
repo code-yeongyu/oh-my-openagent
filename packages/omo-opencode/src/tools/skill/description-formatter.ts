@@ -1,10 +1,12 @@
+import { realpathSync } from "node:fs"
 import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants"
 import { sortByScopePriority } from "./scope-priority"
-import type { SkillInfo } from "./types"
+import type { CoreListedSkill, SkillInfo } from "./types"
 import type { CommandInfo } from "../slashcommand/types"
 
 interface CombinedDescriptionOptions {
   includeSkills?: boolean
+  coreListedSkills?: readonly CoreListedSkill[]
 }
 
 function formatSkillCommand(skill: SkillInfo): string {
@@ -46,6 +48,39 @@ function normalizeSkillName(name: string): string {
   return name.toLowerCase()
 }
 
+function normalizeSkillLocation(location: string): string {
+  return location.replace(/\\/g, "/").replace(/\/+$/, "")
+}
+
+// Core and OMO can reach one file through different roots (a symlinked skills dir), so a location is
+// compared as the file it resolves to; a path that does not resolve is compared as written.
+function skillFileIdentity(location: string): string {
+  try {
+    return normalizeSkillLocation(realpathSync.native(location))
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    return normalizeSkillLocation(location)
+  }
+}
+
+function coreRenderedSkillKey(name: string, location: string): string {
+  return `${name}\u0000${skillFileIdentity(location)}`
+}
+
+// OpenCode core renders a skill in <available_skills> only when Skill.all() has it with a description
+// (Skill.fmt). A skill is left out here only when core lists that same name at that same file; with no
+// core list (unavailable or empty) nothing is left out, so no skill can end up in neither list.
+function createCoreRenderedSkillFilter(
+  coreListedSkills: readonly CoreListedSkill[] | undefined,
+): (skill: SkillInfo) => boolean {
+  const rendered = new Set(
+    (coreListedSkills ?? [])
+      .filter((entry) => (entry.description ?? "").trim() !== "")
+      .map((entry) => coreRenderedSkillKey(entry.name, entry.location)),
+  )
+  return (skill) => skill.location !== undefined && rendered.has(coreRenderedSkillKey(skill.name, skill.location))
+}
+
 export function deduplicatePathAliasedSkills(skills: SkillInfo[]): SkillInfo[] {
   // After the shared/ prefix cutover, skills register under bare names only.
   // Exact-name deduplication is handled by the upstream merge; this pass is now
@@ -72,8 +107,10 @@ export function formatCombinedDescription(
   commands?: CommandInfo[],
   options: CombinedDescriptionOptions = {}
 ): string {
-  const availableSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
-  const availableCommands = deduplicateCommandsForPathAliasedSkills(commands ?? [], availableSkills)
+  const allSkills = options.includeSkills ? deduplicatePathAliasedSkills(skills ?? []) : []
+  const isRenderedByCore = createCoreRenderedSkillFilter(options.coreListedSkills)
+  const availableSkills = allSkills.filter((skill) => !isRenderedByCore(skill))
+  const availableCommands = deduplicateCommandsForPathAliasedSkills(commands ?? [], allSkills)
 
   if (availableSkills.length === 0 && availableCommands.length === 0) {
     if ((skills?.length ?? 0) > 0) {

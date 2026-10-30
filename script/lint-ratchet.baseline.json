@@ -248,9 +248,6 @@
   "packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
-  "packages/omo-opencode/src/shared/git-worktree/collect-git-diff-stats.test.ts": {
-    "typescript/no-non-null-assertion": 3
-  },
   "packages/omo-opencode/src/shared/model-availability.test.ts": {
     "typescript/no-explicit-any": 5
   },

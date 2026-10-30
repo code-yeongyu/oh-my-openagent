@@ -32,7 +32,7 @@ coding-agent-sessions/
 
 ## CLI CONTRACT
 
-`python3 scripts/find-agent-sessions.py <command>`; aliases `find`=`search`, `read`=`get`. Commands: `list`, `find`/`search` (repeated `--query` lanes, `--from 7d`, repeated `--platform`, `--workers`, `--cwd/--model`, `--include-subagents`, `--limit`), `get`/`read <session-id>`. Output is JSON with `match_reasons` and reconstructed first/last user prompts — that JSON shape is the stable contract.
+`python3 -B scripts/find-agent-sessions.py <command>`; aliases `find`=`search`, `read`=`get`. Commands: `list`, `find`/`search` (repeated `--query` lanes, `--from 7d`, repeated `--platform`, `--workers`, `--cwd/--model`, `--include-subagents`, `--limit`), `get`/`read <session-id>`. Output is JSON with `match_reasons` and reconstructed first/last user prompts — that JSON shape is the stable contract.
 
 ## CONVENTIONS
 
@@ -41,6 +41,7 @@ coding-agent-sessions/
 - Main sessions hide subagent children by default but report child counts; `--include-subagents` flips it. Parent/child linkage preserved and records deduplicated.
 - Tests are pytest with `tmp_path` + `MonkeyPatch` isolation; in-file `# pyright: ignore[reportMissingImports]`-style relaxations for import diagnostics only.
 - `.npmignore` strips `scripts/tests/`, `pyrightconfig.json`, and caches from the shipped skill.
+- The shipped skill must never write next to itself (#11373): `find-agent-sessions.py` sets `sys.dont_write_bytecode` before importing `agent_sessions`, and every documented command passes `-B`. `packages/shared-skills/bundled-skill-scripts-write-nothing.test.ts` runs every bundled entry and fails on any new file.
 
 ## ANTI-PATTERNS
 
@@ -53,9 +54,9 @@ coding-agent-sessions/
 
 ```bash
 # from packages/shared-skills/skills/coding-agent-sessions/
-python3 scripts/find-agent-sessions.py list --limit 20
-python3 scripts/find-agent-sessions.py find "commit" --from 7d --platform senpi --platform opencode
-python3 scripts/find-agent-sessions.py read <session-id>
+python3 -B scripts/find-agent-sessions.py list --limit 20
+python3 -B scripts/find-agent-sessions.py find "commit" --from 7d --platform senpi --platform opencode
+python3 -B scripts/find-agent-sessions.py read <session-id>
 pytest scripts/tests
 ```
 

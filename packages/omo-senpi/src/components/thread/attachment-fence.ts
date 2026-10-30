@@ -1,7 +1,18 @@
 import { log } from "@oh-my-opencode/utils/logger"
 import { authRequiredError, type RpcObject, type RpcRequest } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 
-const MUTATIONS: ReadonlySet<string> = new Set(["prompt", "interrupt", "set_session_name", "set_model", "set_thinking_level", "wake", "release_session", "extension_ui_response"])
+// The commands the host lets an unattached connection send (senpi session-attachment-gate.ts: ATTACH_GATE_EXEMPT,
+// plus close_session, set_session_context and release_attachment, which its gate skips). Every other session
+// command is fenced: deny by default, so a command the client learns later is never sent unattached.
+const UNFENCED: ReadonlySet<string> = new Set([
+  "get_protocol_info", "list_sessions", "subscribe_sessions", "unsubscribe_sessions", "get_subscription_limits", "warm",
+  "detach_connection", "open_session", "attach_session", "reclaim_session", "get_effect_status", "get_state", "get_messages",
+  "get_entries", "get_tree", "get_fork_messages", "get_last_assistant_text", "get_media", "get_commands", "get_loaded_surfaces",
+  "get_available_models", "get_available_thinking_levels", "get_fast_mode", "get_session_stats", "get_pending_inputs",
+  "get_steering_messages", "get_follow_up_messages", "get_auth_providers", "get_provider_accounts", "resolve_path",
+  "memory_report", "eval_cells.list", "eval_cells.peek", "check_reload_veto",
+  "close_session", "set_session_context", "release_attachment",
+])
 
 function errorCodeOf(frame: RpcObject): unknown {
   return frame.errorCode ?? frame.error
@@ -17,6 +28,12 @@ function errorReasonOf(frame: RpcObject): unknown {
 const TYPED_REFUSAL: ReadonlySet<string> = new Set(["release_session", "extension_ui_response"])
 
 type AttachRefusal = { readonly code: string; readonly errorData?: unknown; readonly frame: RpcObject }
+
+class SessionAttachmentError extends Error {
+  constructor(readonly code: "unknown_session" | "session_identity_mismatch", sessionId: unknown) {
+    super(`${code}:${String(sessionId)}`)
+  }
+}
 
 /**
  * Attaches the selected session on this connection; undefined once attached, else the refusal. A
@@ -37,6 +54,7 @@ async function attachSelectedSession(request: RpcRequest, socketPath: string, se
 function attachRefusalError(refusal: AttachRefusal, socketPath: string, sessionId: unknown): Error {
   if (refusal.code === "host_draining") return new Error(`host_draining:${socketPath}`)
   if (refusal.code === "session_not_attached") return new Error(`session_not_attached:${String(sessionId)}`)
+  if (refusal.code === "unknown_session" || refusal.code === "session_identity_mismatch") return new SessionAttachmentError(refusal.code, sessionId)
   return new Error(`thread RPC request failed: ${JSON.stringify(refusal.frame.error ?? refusal.frame)}`)
 }
 
@@ -63,8 +81,9 @@ async function releaseAttachment(request: RpcRequest, command: RpcObject): Promi
 
 /**
  * Runs one command on an authenticated connection under the v1.1 attachment fence. Only a
- * session-scoped mutation is fenced, as the host gates only commands that name a session: a wake
- * with no routing id carries no `sessionId` and is sent as it always was.
+ * session-scoped mutation is fenced, as the host gates only commands that name a session: a host
+ * command always names one (`live-surface.ts` resolves a missing routing id first), and a terminal's
+ * session-less wake is sent as it always was.
  */
 export async function fencedCommand(
   request: RpcRequest,
@@ -74,7 +93,7 @@ export async function fencedCommand(
   durableSessionId: string | undefined,
   send: () => Promise<RpcObject>,
 ): Promise<RpcObject> {
-  const attach = MUTATIONS.has(String(command.type)) && command.sessionId !== undefined && capabilities.has("attach_session")
+  const attach = !UNFENCED.has(String(command.type)) && command.sessionId !== undefined && capabilities.has("attach_session")
     && (command.type !== "release_session" || capabilities.has("release_caller_aware"))
   if (!attach) return await send()
   if (durableSessionId === undefined) throw new Error("session_identity_mismatch:missing selected durable session id")

@@ -1,7 +1,10 @@
 //! Shared CGEvent helpers: the never-suppressing combined-session event source,
-//! modifier flags, button type tables, point clamping, and the click-group id.
+//! the tagged event constructors every engine event comes from, modifier
+//! flags, button type tables, point clamping, and the click-group id.
 
-use core_graphics::event::{CGEventFlags, CGEventType, CGMouseButton};
+use core_graphics::event::{
+    CGEvent, CGEventFlags, CGEventType, CGMouseButton, EventField, ScrollEventUnit,
+};
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use core_graphics::geometry::CGPoint;
 use core_graphics::sys::CGEventSourceRef;
@@ -10,6 +13,61 @@ use senpi_desktop_core::backend::{Modifiers, MouseButton};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// `kCGEventSourceUserData` (field 42) on every event the engine creates, so
+/// the user-input watch tells the engine's own input from the user's even
+/// when another process relays it (D3). ASCII `senpidsk`.
+pub(crate) const ENGINE_EVENT_TAG: i64 = i64::from_be_bytes(*b"senpidsk");
+
+// Hardware input carries 0 in this field: the tag must differ from it.
+const _: () = assert!(ENGINE_EVENT_TAG != 0);
+
+fn tagged(event: CGEvent) -> CGEvent {
+    event.set_integer_value_field(EventField::EVENT_SOURCE_USER_DATA, ENGINE_EVENT_TAG);
+    event
+}
+
+pub(crate) fn keyboard_event(source: &CGEventSource, code: u16, down: bool) -> CoreResult<CGEvent> {
+    CGEvent::new_keyboard_event(source.clone(), code, down)
+        .map(tagged)
+        .map_err(|()| DesktopError::input_failed("failed to create a Quartz keyboard event"))
+}
+
+pub(crate) fn mouse_event(
+    source: &CGEventSource,
+    event_type: CGEventType,
+    location: CGPoint,
+    button: CGMouseButton,
+) -> CoreResult<CGEvent> {
+    CGEvent::new_mouse_event(source.clone(), event_type, location, button)
+        .map(tagged)
+        .map_err(|()| DesktopError::input_failed("failed to create a Quartz pointer event"))
+}
+
+/// A pixel scroll of the vertical and horizontal wheels.
+pub(crate) fn scroll_event(
+    source: &CGEventSource,
+    wheel_y: i32,
+    wheel_x: i32,
+) -> CoreResult<CGEvent> {
+    CGEvent::new_scroll_event(
+        source.clone(),
+        ScrollEventUnit::PIXEL,
+        2,
+        wheel_y,
+        wheel_x,
+        0,
+    )
+    .map(tagged)
+    .map_err(|()| DesktopError::input_failed("failed to create a Quartz scroll event"))
+}
+
+/// An event that is read, never posted (the cursor-position probe).
+pub(crate) fn probe_event(source: &CGEventSource) -> CoreResult<CGEvent> {
+    CGEvent::new(source.clone())
+        .map(tagged)
+        .map_err(|()| DesktopError::input_failed("failed to create a Quartz probe event"))
+}
 
 pub(crate) fn modifier_flags(modifiers: Modifiers) -> CGEventFlags {
     let mut flags = CGEventFlags::CGEventFlagNull;
@@ -56,6 +114,19 @@ pub(super) const fn button_types(
             2,
         ),
     }
+}
+
+/// Whether a pointer event presses or moves, so the user-intervention check
+/// runs before it. A button release or a drag step always follows the press it
+/// belongs to, so a refusal never leaves a button down.
+pub(super) const fn is_press(event_type: CGEventType) -> bool {
+    matches!(
+        event_type,
+        CGEventType::LeftMouseDown
+            | CGEventType::RightMouseDown
+            | CGEventType::OtherMouseDown
+            | CGEventType::MouseMoved
+    )
 }
 
 pub(super) fn point(x: f64, y: f64) -> CoreResult<CGPoint> {
@@ -157,6 +228,29 @@ mod tests {
     }
 
     #[test]
+    fn every_event_the_engine_creates_carries_its_tag() {
+        let source = event_source().expect("Quartz event source");
+        let events = [
+            keyboard_event(&source, 0, true).expect("keyboard event"),
+            mouse_event(
+                &source,
+                CGEventType::LeftMouseDown,
+                CGPoint::new(1.0, 1.0),
+                CGMouseButton::Left,
+            )
+            .expect("pointer event"),
+            scroll_event(&source, -3, 0).expect("scroll event"),
+            probe_event(&source).expect("probe event"),
+        ];
+        for event in events {
+            assert_eq!(
+                event.get_integer_value_field(EventField::EVENT_SOURCE_USER_DATA),
+                ENGINE_EVENT_TAG
+            );
+        }
+    }
+
+    #[test]
     fn flags_map_each_modifier() {
         let none = modifier_flags(Modifiers::default());
         let all = modifier_flags(Modifiers {
@@ -177,6 +271,17 @@ mod tests {
         assert!(finite_i32(f64::NAN, "x").is_err());
         assert!(finite_i32(1e12, "x").is_err());
         assert_eq!(finite_i32(3.6, "x"), Ok(4));
+    }
+
+    #[test]
+    fn only_presses_and_moves_run_the_press_check() {
+        for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
+            let (_, down, up, dragged, _) = button_types(button);
+            assert!(is_press(down));
+            assert!(!is_press(up));
+            assert!(!is_press(dragged));
+        }
+        assert!(is_press(CGEventType::MouseMoved));
     }
 
     #[test]

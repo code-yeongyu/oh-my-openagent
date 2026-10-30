@@ -242,6 +242,29 @@ async function openSession(
 const turnRows = (logs: readonly InspectedLogRecord[]) => logs.filter(({ eventName }) => eventName === "omo.turn_completed")
 
 describe("omo.turn span per assistant turn", () => {
+
+  test("#given a turn on a model the collector pin does not list #then the span's model attributes leave as custom", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given: claude-fable-5-5 is in the client vocabulary but not in the pinned enum (required on the span)
+      const collector = await otlpCollector()
+      const { pi, ctx } = await openSession(agentDir, collector.factory, "main-unpinned")
+      const unpinnedCtx = { ...ctx, model: { provider: "anthropic", id: "claude-fable-5-5" } }
+      const end = turnEnd(0)
+      const message = { ...(end.message as Record<string, unknown>), provider: "anthropic", model: "claude-fable-5-5" }
+
+      // when
+      await pi.dispatch("turn_start", turnStart(0), unpinnedCtx)
+      await pi.dispatch("turn_end", { ...end, message }, unpinnedCtx)
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, unpinnedCtx)
+      const { spans } = await collector.drain()
+
+      // then
+      expect(spans).toHaveLength(1)
+      expect(spans[0]?.attributes["omo.model_id"]).toBe("custom")
+      expect(spans[0]?.attributes["gen_ai.request.model"]).toBe("custom")
+      expect(spans[0]?.attributes["gen_ai.response.model"]).toBe("custom")
+    })
+  })
   test("#given a three-turn session on the collector sink #then three ok spans carry the D-P attributes, each turn_completed carries its own span's exact pair, and events outside a turn carry none", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given

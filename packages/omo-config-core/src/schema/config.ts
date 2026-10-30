@@ -7,13 +7,13 @@ import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./g
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
 import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catalog"
+import { OmoModelPadSchema } from "./model-pad"
 import { OmoModelProfilesLayerSchema, OmoModelProfilesSchema } from "./model-profile"
 import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./side-panel"
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
-import { OmoDoriSectionSchema } from "./dori"
 import { OmoProvenanceSettingsSchema } from "./provenance"
 
 export type { OmoHarnessId }
@@ -37,7 +37,6 @@ export const OmoExcludedModelsSchema = z.array(z.string())
 export const OmoTypedHarnessConfigSchema = z.object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -46,6 +45,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
@@ -57,7 +57,6 @@ export const OmoTypedHarnessConfigSchema = z.object({
 export const OmoConfigProfileSchema = z.object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
@@ -66,6 +65,7 @@ export const OmoConfigProfileSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
@@ -81,7 +81,6 @@ export const OmoConfigProfileSchema = z.object({
 export const OmoConfigSchema = z.object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -91,6 +90,7 @@ export const OmoConfigSchema = z.object({
   models: OmoModelCatalogSchema.optional(),
   model_profiles: OmoModelProfilesSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
@@ -109,7 +109,6 @@ export const OmoConfigSchema = z.object({
 export const OmoConfigLayerSchema = z.object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
-  dori: OmoDoriSectionSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -119,6 +118,7 @@ export const OmoConfigLayerSchema = z.object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),

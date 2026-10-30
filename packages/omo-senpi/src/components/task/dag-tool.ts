@@ -9,6 +9,7 @@ import { DagManagerError, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
 import { quietNodesNotice } from "./dag-quiet-nodes"
 import { amendAction, retryAction, sendAction } from "./dag-tool-control"
+import { guideAction } from "./dag-tool-guide"
 import {
   failure,
   invalidNodeTargets,
@@ -72,7 +73,12 @@ function requireRunId(params: DagToolInput): string | undefined {
   return runId !== undefined && runId.trim().length > 0 ? runId.trim() : undefined
 }
 
-async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
+// The slice of senpi's tool context the workflow tool reads: the model the parent session runs now.
+export type DagToolContext = {
+  readonly model?: { readonly provider: string; readonly id: string } | undefined
+}
+
+async function startAction(deps: DagToolDeps, params: DagToolInput, context: DagToolContext | undefined): Promise<DagToolResult> {
   const input = params.definition
   if (input === undefined) {
     return failure("invalid_definition", "action=start requires a definition. Provide definition.key, definition.name, and definition.nodes.")
@@ -87,6 +93,7 @@ async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<Dag
     definition: toDefinition(input),
     parentSessionId: deps.parentSessionId(),
     rootSessionId: deps.rootSessionId(),
+    ...(context?.model === undefined ? {} : { parentModel: `${context.model.provider}/${context.model.id}` }),
   })
   const verb = result.reused ? "Reused" : "Started"
   const warningText =
@@ -153,9 +160,9 @@ async function cancelAction(deps: DagToolDeps, runId: string, reason?: string): 
   })
 }
 
-export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
+export async function runDagTool(deps: DagToolDeps, params: DagToolInput, context?: DagToolContext): Promise<DagToolResult> {
   try {
-    if (params.action === "start") return await startAction(deps, params)
+    if (params.action === "start") return await startAction(deps, params, context)
 
     const runId = requireRunId(params)
     if (runId === undefined) {
@@ -183,12 +190,30 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
         return await waitAction(deps, params, runId)
       case "cancel":
         return await cancelAction(deps, runId, params.reason)
+      case "cancel_node": {
+        deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
+        if (params.node_id === undefined || params.node_id.trim().length === 0) return failure("invalid_arguments", "cancel_node requires node_id.")
+        if (deps.cancelNode === undefined) return failure("node_not_continuable", "Paused child cancellation is not available in this session.")
+        const nodeId = params.node_id.trim()
+        await deps.cancelNode(runId as DagRunId, nodeId)
+        return toolResult(`Cancelled dag node ${nodeId}.`, {
+          kind: "node_cancelled", run_id: runId, node_id: nodeId, snapshot: deps.manager.snapshot(runId as DagRunId, deps.parentSessionId()),
+        })
+      }
       case "retry":
         return await retryAction(deps, params, runId)
+      case "guide":
+        return await guideAction(deps, params, runId as DagRunId)
       case "send":
         return await sendAction(deps, params, runId)
       case "amend":
         return await amendAction(deps, params, runId)
+      case "resume": {
+        const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
+        return snapshot.pause?.reason === "user_stop"
+          ? failure("run_paused_by_user", "Only the user's Resume on the parent session may restart this run.")
+          : failure("invalid_arguments", "Use the parent session Resume control.")
+      }
     }
   } catch (error) {
     if (error instanceof DagManagerError) return fromManagerError(error)
@@ -203,6 +228,6 @@ export function createDagTool(deps: DagToolDeps): ToolDefinition<typeof DagToolP
     label: "Workflow",
     description: DESCRIPTION,
     parameters: DagToolParams,
-    execute: (_toolCallId, params) => runDagTool(deps, params),
+    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runDagTool(deps, params, ctx),
   }
 }

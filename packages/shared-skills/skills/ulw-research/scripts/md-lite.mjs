@@ -23,6 +23,9 @@ const TABLE_SEPARATOR = /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|
 const CLOSING_HASHES = /[ \t]+#+[ \t]*$|^#+[ \t]*$/
 const THEMATIC_BREAK = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/
 
+/** The Markdown block grammar, one named pattern per syntax. */
+export const MD_BLOCK_PATTERNS = Object.freeze({ FENCE, HEADING, BLOCKQUOTE, LIST_ITEM, TABLE_SEPARATOR, CLOSING_HASHES, THEMATIC_BREAK })
+
 /** Split into lines with offsets; end excludes the newline and a trailing carriage return. */
 function linesOf(text) {
 	const lines = []
@@ -110,7 +113,7 @@ export function parseMarkdown(text) {
 			const codeStart = Math.min(line.next, source.length)
 			let close = lines.length
 			for (let k = i + 1; k < lines.length; k++) {
-				const candidate = lines[k].raw.trim()
+				const candidate = lines[k].raw.replace(/^ {0,3}/, "").trimEnd()
 				if (candidate.startsWith(open[0].repeat(open.length)) && /^(`+|~+)$/.test(candidate)) {
 					close = k
 					break

@@ -4,7 +4,7 @@ Translations in this repository (the README files and the omo.dev site catalogs 
 
 ## Never translated
 
-OmO, OmO Native, Dori, Jobdori, Sisyphus Labs, Sisyphus, Hephaestus, Prometheus, Atlas, Oracle, Momus, senpi, pi, pi-mono, CodeMode, ultrawork, ulw, mass ulw, ultracode, IntentGate, Team Mode, Ralph Loop, Herdr, OpenCode, Claude Code, Codex, Cursor, Grok Build, GitHub, Discord, npm, Bun, Node.js, Electron, T3 Code, Vite+, MCP, LSP, CLI, API.
+OmO, OmO Native, Sisyphus Labs, Sisyphus, Hephaestus, Prometheus, Atlas, Oracle, Momus, senpi, pi, pi-mono, CodeMode, ultrawork, ulw, mass ulw, ultracode, IntentGate, Team Mode, Ralph Loop, Herdr, OpenCode, Claude Code, Codex, Cursor, Grok Build, GitHub, Discord, npm, Bun, Node.js, Electron, T3 Code, Vite+, MCP, LSP, CLI, API.
 
 ## Preferred terms
 

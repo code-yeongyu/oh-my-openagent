@@ -179,7 +179,7 @@ describe("utils win32 console suppression", () => {
       // then
       expect(asyncOptions.windowsHide).toBe(true)
       expect(syncOptions.windowsHide).toBe(true)
-      expect(createBunSpawnOptions(options)).toEqual({ cwd: "/tmp", windowsHide: true })
+      expect(createBunSpawnOptions(options)).toEqual({ cwd: "/tmp", env: process.env, windowsHide: true })
     })
   })
 

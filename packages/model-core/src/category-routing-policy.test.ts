@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
+import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("category routing policy", () => {
-  test("visual-engineering prioritizes Argon low, Fable 5.1 max, Opus max, then Kimi K3 max", () => {
+  test("visual-engineering prioritizes Argon low, Fable 5.1 max, Opus max, then Kimi K3.1 Pro max and Kimi K3 max", () => {
     // given
     const visual = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -17,6 +18,11 @@ describe("category routing policy", () => {
         model: "gemini-4-argon",
         variant: "low",
       },
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -28,7 +34,12 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
       }
@@ -195,12 +206,22 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
       }
     ])
     expect(artistryChain).toEqual([
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -212,7 +233,12 @@ describe("category routing policy", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
       }

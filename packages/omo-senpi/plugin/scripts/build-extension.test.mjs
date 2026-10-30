@@ -3,6 +3,7 @@ import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFil
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
+import bundleBudget from "../../bundle-budget.json" with { type: "json" }
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
@@ -14,7 +15,7 @@ import {
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
-import { runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
+import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture } from "./build-extension.test-support.mjs"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
 import { removeTestRootBestEffort } from "../../../../test-support/held-test-root.mjs"
@@ -23,7 +24,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
 const repoRoot = join(scriptDir, "..", "..", "..", "..")
 const fixture = createBuildFixture()
-const { sharedOutputs, mutableOutputs } = fixture
+const { sharedOutputs, mutableOutputs, reproductionRoot } = fixture
 
 // A focused run builds the six artifacts twice in ~14s, while the package suite shares CPU and disk
 // with other build/staging files. Keep the test bounded, but give the real two-build workload enough
@@ -51,6 +52,12 @@ describe("checkExtensionCurrent", () => {
     const outputs = await mutableOutputs()
     await rm(outputs.toolkitSdkOutputPath)
     expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.toolkitSdkOutputPath })
+  })
+
+  test("#given a missing OTLP sidecar #when freshness is checked #then it reports that output", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.telemetryOtlpOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({ ok: false, reason: "missing-output", output: outputs.telemetryOtlpOutputPath })
   })
 
   test("#given the rollback migration runtime #when built #then its store entry and migration event are present", async () => {
@@ -82,6 +89,7 @@ describe("checkExtensionCurrent", () => {
       outputPath: outputs.outputPath,
       memberOutputPath: outputs.memberOutputPath,
       supervisorOutputPath: outputs.supervisorOutputPath,
+      expectedRoot: await reproductionRoot(),
     })
     // Compare the whole result so a failure names the stale artifact instead of printing "false".
     expect(check).toMatchObject({ ok: true })
@@ -131,7 +139,7 @@ describe("checkExtensionCurrent", () => {
     ])
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: true })
@@ -155,7 +163,7 @@ describe("checkExtensionCurrent", () => {
     await appendFile(outputs.supervisorOutputPath, "\nchanged\n")
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.supervisorOutputPath })
@@ -169,7 +177,7 @@ describe("checkExtensionCurrent", () => {
     await utimes(outputs.outputPath, future, future)
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.outputPath })
@@ -184,7 +192,7 @@ describe("checkExtensionCurrent", () => {
     await writeFile(outputs.outputPath, `${prefix}:${"0".repeat(43)}:${bodyDigest}\n${artifact.slice(newline + 1)}`)
 
     // when
-    const result = await checkExtensionCurrent(outputs)
+    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.outputPath })
@@ -273,6 +281,15 @@ describe("checkExtensionCurrent", () => {
       expect(feedbackInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
     }
     expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/feedback/index.ts"))).toBe(true)
+  })
+
+  test("#given offered desktop toolkits #when bundle inputs are inspected #then the runtime is lazy and carries no third-party dependencies", async () => {
+    const { mainInputs, desktopToolkitInputs } = await sharedOutputs()
+    for (const suffix of ["/desktop-toolkit/runtime.ts", "/desktop-toolkit/thread-tools.ts"]) {
+      expect(mainInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(desktopToolkitInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
+    expect(desktopToolkitInputs.filter(input => toPortableBuildPath(input).includes("node_modules/"))).toEqual([])
   })
 
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
@@ -407,6 +424,26 @@ describe("checkExtensionCurrent", () => {
     expect(await readFile(telemetryPosthogOutputPath, "utf8")).not.toContain("#omo-telemetry-posthog-runtime")
   })
 
+  test("#given the split telemetry build #when inputs and bytes are inspected #then OTLP and its SDKs stay outside the small main entry", async () => {
+    const { mainInputs, telemetryOtlpInputs, telemetryOtlpOutputPath, outputPath } = await sharedOutputs()
+    for (const pattern of [
+      /node_modules\/(?:@opentelemetry|@bufbuild)\//,
+      /telemetry-core\/src\/otlp-entry\.ts$/,
+      /telemetry\/otlp-(?:runtime|projection)\.ts$/,
+    ]) {
+      expect(mainInputs.some(input => pattern.test(toPortableBuildPath(input)))).toBe(false)
+      expect(telemetryOtlpInputs.some(input => pattern.test(toPortableBuildPath(input)))).toBe(true)
+    }
+    const main = await readFile(outputPath, "utf8")
+    expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
+    // Measured, not estimated (#11431 review): origin/dev 1,422,748 B; #11431 head 0b551794 1,423,520 B (1 B under the
+    // old 1_419_425 + 4_096 cap); this branch 1,423,766 B after the persisted-opt-out spool purge (node 24, bun 1.4.4,
+    // linux x64). Base reset to the measurement with the standing 4,096 B headroom; bundle-size.test.ts's 1,425,000 B
+    // budget stays the binding package ceiling.
+    expect(Buffer.byteLength(main)).toBeLessThanOrEqual(bundleBudget.omoJsBytes)
+    expect(await readFile(telemetryOtlpOutputPath, "utf8")).not.toContain("#omo-telemetry-otlp-runtime")
+  })
+
   test("#given the split extension build #when sync inputs are inspected #then the Loro engine and its wasm live only in the sync sidecar", async () => {
     const { mainInputs, memorySyncInputs, memorySyncOutputPath, outputPath } = await sharedOutputs()
     for (const suffix of [
@@ -443,7 +480,8 @@ describe("checkExtensionCurrent", () => {
       await cp(join(pluginRoot, "package.json"), join(pkg, "package.json"))
       await cp(memorySyncOutputPath, join(pkg, "extensions", "omo-memory-sync.js"))
       for (const asset of MEMORY_SYNC_ASSET_NAMES) await cp(join(dirname(memorySyncOutputPath), asset), join(pkg, "extensions", asset))
-      const packed = await runBoundedStage("npm pack", "npm", ["pack", "--silent", "--pack-destination", work], { cwd: pkg, shell: process.platform === "win32" }, PACKED_STAGE_CAPS.pack)
+      const pack = npmPackStage(pkg, work)
+      const packed = await runBoundedStage("npm pack", pack.command, pack.args, pack.options, PACKED_STAGE_CAPS.pack)
       expect(packed.status, packed.stderr).toBe(0)
       const tarball = join(work, packed.stdout.trim().split("\n").at(-1))
       const installed = join(work, "installed")
@@ -468,20 +506,6 @@ describe("checkExtensionCurrent", () => {
     }
   }, PACKED_TEST_TIMEOUT_MS)
 
-  test("#given the split extension build #when config-startup inputs are inspected #then the gateway -> dori rename loads only from its lazy entry", async () => {
-    const { mainInputs, doriMigrationInputs, doriMigrationOutputPath } = await sharedOutputs()
-    for (const suffix of [
-      "packages/omo-senpi/src/components/config-startup/dori-migration-runtime.ts",
-      "packages/omo-opencode/src/config-migration/dori-section-rename.ts",
-      "packages/omo-config-core/src/schema/legacy-dori-section.ts",
-    ]) {
-      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
-      expect(doriMigrationInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
-    }
-    expect(doriMigrationInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/config-startup/dori-migration-loader.ts"))).toBe(false)
-    expect(await readFile(doriMigrationOutputPath, "utf8")).not.toContain("#omo-dori-migration-runtime")
-  })
-
   test("#given a packaged task import map #when generated artifacts are inspected #then the main bundle resolves its task sidecar", async () => {
     const outputs = await sharedOutputs()
     const main = await readFile(outputs.outputPath, "utf8")
@@ -497,13 +521,17 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-device-account-runtime")')
     expect(main).toContain('import("#omo-session-history-runtime")')
     expect(main).toContain('import("#omo-recall-store-runtime")')
-    expect(main).toContain('import("#omo-dori-migration-runtime")')
+    expect(main).toContain('import("#memory-external-projection")')
+    // The <external_projection> renderer (its legend is the marker) ships in the recall-store sidecar, not the entry.
+    expect(main).not.toContain("stand for similar names")
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
+    expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
     expect(main).toContain('import("#omo-telemetry-recovery-runtime")')
     expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
     expect(main).toContain('import("#omo-feedback-runtime")')
+    expect(main).toContain('import("#omo-desktop-toolkit-runtime")')
     expect(main).toContain('import("#omo-claim-receipt-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
@@ -518,10 +546,12 @@ describe("checkExtensionCurrent", () => {
       "#omo-device-account-runtime": "./extensions/omo-device-account.js",
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
-      "#omo-dori-migration-runtime": "./extensions/omo-dori-migration.js",
+      "#memory-external-projection": "./extensions/omo-recall-store.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
+      "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",
+      "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",

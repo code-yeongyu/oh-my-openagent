@@ -1,9 +1,14 @@
+import { join } from "node:path"
+
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
+
+import { defaultCommentCheckerCacheDir } from "../components/comment-checker/resolver"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
 import { AGENT_TOOLKIT_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
+import { deliverItems } from "./deliver-items"
 import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
 import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
@@ -82,6 +87,11 @@ export function composeOmoSenpiExtension(
 
   return async (pi: unknown): Promise<void> => {
     releaseHerdrAgentHint()
+    // Shell children inherit process.env: a bundled skill's Python must not write __pycache__ into a signed app (#11373),
+    // so bytecode goes to <user cache>/omo-senpi/pycache unless the user set either variable, even to an empty string.
+    if (process.env.PYTHONDONTWRITEBYTECODE === undefined) {
+      process.env.PYTHONPYCACHEPREFIX ??= join(defaultCommentCheckerCacheDir(process.platform, process.env, "omo-senpi"), "..", "pycache")
+    }
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
     provisionAgentToolkitSdkRoot()
@@ -126,8 +136,7 @@ export function composeOmoSenpiExtension(
     // 200ms timer behind after a `quit` shutdown.
     const publishChildWork = publishWakeQueueChildWork(pi, logger)
     const idleCoordinator = new IdleInjectionCoordinator(
-      (message, options) =>
-        pi.sendMessage(message, { triggerTurn: true, deliverAs: options.deliverAs }),
+      (message, options) => deliverItems((native, delivery) => pi.sendMessage(native, delivery), { ...options, message }),
       {
         scheduleFlush: (flush) => {
           const timer = setTimeout(flush, IDLE_FLUSH_BATCH_WINDOW_MS)

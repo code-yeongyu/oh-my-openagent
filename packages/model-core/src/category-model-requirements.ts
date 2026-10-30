@@ -1,13 +1,19 @@
+import { FABLE_55_LAUNCH, launchRungs } from "./fable-55-launch"
 import type { ModelRequirement } from "./model-requirement-types"
 import { LATEST_MODEL_BY_FAMILY } from "./latest-models"
 
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "visual-engineering": {
-    fallbackChain: [
+    fallbackChain: launchRungs([
       // Argon at its lowest accepted thinking level leads (#10187): off/minimal map to null for
       // this model, so `low` is the floor; Copilot joins once code-yeongyu/senpi#3379 verifies its
       // thinking control. The rung is unresolvable until the engine catalog carries the model.
       { providers: ["google", "google-vertex", "opencode"], model: LATEST_MODEL_BY_FAMILY.geminiPro, variant: "low" },
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: FABLE_55_LAUNCH.id,
+        variant: "max",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeFable,
@@ -19,11 +25,12 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      }
-    ],
+      },
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+    ]),
   },
   ultrabrain: {
     fallbackChain: [
@@ -60,7 +67,12 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   artistry: {
-    fallbackChain: [
+    fallbackChain: launchRungs([
+      {
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: FABLE_55_LAUNCH.id,
+        variant: "max",
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeFable,
@@ -72,11 +84,12 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      }
-    ],
+      },
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+    ]),
   },
   quick: {
     fallbackChain: [
@@ -142,10 +155,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["zai-coding-plan", "opencode-go"], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      }
+      },
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
     ],
   },
   writing: {

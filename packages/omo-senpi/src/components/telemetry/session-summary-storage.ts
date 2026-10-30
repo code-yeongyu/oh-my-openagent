@@ -2,7 +2,7 @@ import { join } from "node:path"
 import type { EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 
 import { CORRUPT, listNames, readJsonOrCorrupt, removeFile, writeJsonAtomic } from "./session-summary-files"
-import { summaryDir } from "./session-summary-purge"
+import { parseConfigSelection, summaryDir, type ConfigSelection } from "./session-summary-purge"
 import { createOwnerRegistry, parseOwner, type ProcessOwner } from "./session-summary-owner"
 import { parseTelemetrySessionRole, type TelemetrySessionRole } from "./session-role"
 import { SUMMARY_EPOCH_SHAPE, isSummaryWindow, type SummaryWindow } from "./session-summary-window"
@@ -18,7 +18,7 @@ const OWNER_ENTRY_REFRESH_MS = 60_000
 export type RecordConsent = "enabled" | "unconsented"
 
 /** Where the writing session read its consent: before a record is sent or resumed, consent is re-read for it. */
-export type ConsentScope = { readonly cwd?: string }
+export type ConsentScope = { readonly cwd?: string; readonly config?: ConfigSelection }
 
 /**
  * The single send/resume gate for a persisted record: it must carry the `enabled` mark AND its originating
@@ -30,7 +30,9 @@ export function isRecordSendable(
   isScopeConsented: (scope: ConsentScope) => boolean,
 ): boolean {
   const cwd = record.scope?.cwd
-  return record.consent === "enabled" && cwd !== undefined && cwd.length > 0 && isScopeConsented({ cwd })
+  if (record.consent !== "enabled" || cwd === undefined || cwd.length === 0) return false
+  const config = record.scope?.config
+  return isScopeConsented(config === undefined ? { cwd } : { cwd, config })
 }
 
 export type WindowRecord = {
@@ -204,8 +206,12 @@ function parseConsent(value: unknown): RecordConsent {
 function parseScope(value: unknown): ConsentScope | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined
   const cwd: unknown = Reflect.get(value, "cwd")
-  if (cwd === undefined) return {}
-  return typeof cwd === "string" ? { cwd } : undefined
+  const rawConfig: unknown = Reflect.get(value, "config")
+  const config = rawConfig === undefined ? undefined : parseConfigSelection(rawConfig)
+  if (rawConfig !== undefined && config === undefined) return undefined
+  if (cwd === undefined) return config === undefined ? {} : { config }
+  if (typeof cwd !== "string") return undefined
+  return config === undefined ? { cwd } : { cwd, config }
 }
 
 function fileName(sessionHash: string): string {

@@ -103,7 +103,7 @@ export interface MemoryRpcBridge {
   /** Binds the bridge to a session; a later attach replaces the binding and clears the dedupe. */
   attach(sessionId: string): void
   /** Publishes the current snapshot unless it is byte-identical to the last published one. */
-  sync(): Promise<void>
+  sync(signal?: AbortSignal): Promise<void>
   /** Unbinds the session so later syncs publish nothing. */
   detach(): void
   /** Retires the bridge; every later call is a no-op. */
@@ -176,10 +176,11 @@ export function createMemoryRpcBridge(
     })
   }
 
-  async function publishSnapshot(): Promise<void> {
-    if (disposed || pi.rpc?.emit === undefined) return
+  async function publishSnapshot(signal?: AbortSignal): Promise<void> {
+    if (disposed || signal?.aborted || pi.rpc?.emit === undefined) return
+    const generation = bindingGeneration
     const snapshot = await buildSnapshot()
-    if (snapshot === undefined) return
+    if (snapshot === undefined || signal?.aborted || disposed || generation !== bindingGeneration) return
     const fingerprint = JSON.stringify(snapshot)
     if (fingerprint === lastSnapshot) return
     lastSnapshot = fingerprint

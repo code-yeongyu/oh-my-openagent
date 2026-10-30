@@ -21,7 +21,6 @@ Live Senpi QA harness: E2E drivers, continuation probes, scenario fixtures, and 
 | Thread | `thread-tools/` cross-surface suite: `cli-surface.mjs` (CLI session drives create/send/steer on a peer), `desktop-client.mjs` (same ops through the REAL desktop provider client), `terminal-to-ui.mjs` and `desktop-to-cli.mjs` (each surface's sessions addressable from the other), `run-all.mjs`, shared `lib/harness.mjs` |
 | Resilience | `task-14/` fault injections against a real socket host: `kill-mid-turn.mjs`, `version-capability.mjs` (incompatible unmanaged host is refused, never adopted or replaced), `run-all.mjs`, shared `common.mjs` |
 | Agent toolkit eval SDK | `agent-toolkit-eval-sdk-qa.mjs` (real-surface QA: a detached worker builds a real AgentSession from the built plugin and drives the agent toolkit eval SDK through js/py eval cells (7 checks); run `bun packages/omo-senpi/scripts/qa/agent-toolkit-eval-sdk-qa.mjs --evidence-dir <dir>`; exit 0 only on 7/7), `agent-toolkit-eval-sdk-qa-support.mjs`, `agent-toolkit-eval-sdk-docs.mjs` |
-| Dori toolkit seam | `dori-toolkit-replay-qa.mjs [--evidence-dir <d>] [--plugin-root <p>]` (#10316: a real `senpi --mode rpc` host with the built plugin and the scripted mock model (`childSteps`, since the mock treats every rpc session as a child) runs a real turn whose `eval` tool call `cell-qa-1` calls `reply.mark` and two concurrent `send.post`; the store's receipts must hold indexes 0-2 in program order under that cell's turn with one dispatch each. Fresh worker processes then replay the same calls (recorded results, no new dispatch), stop on other arguments (`differs: ["args"]`) and another op (`["op"]`), refuse a foreign cell and an in-process eval cell outside any turn (`toolkit_replay_turn_unknown`), and refuse an eight-day-old turn (`toolkit_replay_expired`); `off` shows no namespaces. The supervisor counts dispatches in the gateway store; writes `task-15-dori-extension-v1.txt`.) |
 | Infra | `drive.mjs`, `task-e2e-{analysis,process}.mjs`, `mock-completions-server.mjs`, `mock-provider/` |
 
 ## Shared hubs
@@ -67,7 +66,7 @@ bun packages/omo-senpi/scripts/qa/kibitzer-legacy-absence-probe.mjs --evidence-d
 bun packages/omo-senpi/scripts/qa/dependency-diff-check.mjs --base <sha> --head <sha> --evidence-dir <d>/dependency-diff   # exit 0 only when no dependency entry was added in any manifest or lockfile
 SENPI_BIN="$(command -v senpi)" node scripts/qa/task-e2e.mjs   # live mode; same for team-e2e.mjs
 bun test scripts/qa/task-e2e-analysis.test.mjs scripts/qa/resume-e2e-runtime.test.mjs
-bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs        # cross-surface thread tools
+THREAD_QA_SENPI_VERSION=<engine> bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs   # cross-surface thread tools; the variable is required
 bun packages/omo-senpi/scripts/qa/task-14/run-all.mjs             # resilience fault injections
 node packages/omo-senpi/scripts/qa/task-host-e2e-shards.mjs --bin <compiled-omo> --before-bin <R0-omo> --out <evidence-dir>
 bun run test:senpi                                             # gate: build + stage + typecheck + test

@@ -1,40 +1,26 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
-
+import { PROMOTION } from "./fact-commands-meaning.mjs"
+import { writeFidelityRecord } from "./fidelity-records.mjs"
+import { PAIR_KINDS } from "./fact-pairs.mjs"
+import { VERDICT_SCHEMA } from "./meaning-check.mjs"
+import { POLISH_MARKUP_REASON } from "./polish-apply.mjs"
 import { COMMANDS, run } from "./report-tools.mjs"
+import { SCRIPT, FIXTURES, sessionDir, nodeWithoutBun, defectsFile, FIDELITY, sha256, CliRow, CliJson, nodeJson, fidelitySession, verify, codesOf, Pair, pairedSession, verdicts, calibrationRows, runLines, PolishJson, polishSession, polishApply, setField, fillTemplate, textSource, ledgerRow } from "./tests/report-tools-support"
 
-const SCRIPT = join(import.meta.dir, "report-tools.mjs")
-const FIXTURES = join(import.meta.dir, "tests", "fixtures")
 
-function sessionDir() {
-	const root = mkdtempSync(join(tmpdir(), "report-tools-cli-"))
-	onTestFinished(() => rmSync(root, { recursive: true, force: true }))
-	const dir = join(root, "20260101-120000")
-	mkdirSync(dir)
-	return dir
-}
-
-function nodeWithoutBun(args: string[]) {
-	const nodePath = Bun.which("node")
-	if (nodePath === null) throw new Error("node not found on PATH")
-	const path = (process.env.PATH ?? "").split(delimiter).filter((entry) => !entry.includes(".bun")).join(delimiter)
-	return Bun.spawnSync({ cmd: [nodePath, SCRIPT, ...args], env: { ...process.env, PATH: path } })
-}
-
-function defectsFile(dir: string, name: string, codes: string[]) {
-	const file = join(dir, name)
-	writeFileSync(file, JSON.stringify(codes.map((code) => ({ code, message: code }))))
-	return file
-}
 
 describe("help and usage", () => {
 	test("#given --help --json #when run #then it lists exactly the command matrix", async () => {
 		const result = await run(["--help", "--json"])
 		expect(result.json.commands).toEqual([...COMMANDS])
-		expect(COMMANDS).toEqual(["check", "layout-probe", "repair decide", "outcome init", "outcome set", "outcome gate", "outcome render", "outcome state", "outcome verify", "outcome finish", "outcome briefing", "format-extract", "fact add", "fact quote", "fact retract", "fact export", "fact fill", "fact verify", "fact derive", "source snapshot", "claims index"])
+		expect(result.json.usage["source snapshot"]).toContain("--raw <file>")
+		expect(result.json.usage["source snapshot"]).toContain("converted-only")
+		expect(Object.keys(result.json.usage)).toEqual(["source snapshot", "source refresh"])
+		expect(COMMANDS).toEqual(["check", "layout-probe", "repair decide", "outcome init", "outcome set", "outcome gate", "outcome render", "outcome state", "outcome verify", "outcome finish", "outcome briefing", "format-extract", "fact add", "fact quote", "fact retract", "fact export", "fact fill", "fact verify", "fact derive", "source snapshot", "source refresh", "source probe-conversion", "claims index"])
 	})
 
 	test("#given no arguments under node #when spawned #then it exits 2 with a usage line on stderr", () => {
@@ -213,215 +199,5 @@ describe("format-extract exit codes", () => {
 		const dir = sessionDir()
 		const proc = nodeWithoutBun(["format-extract", "http://127.0.0.1:9/report.html", "--from-url", "--out", join(dir, "design-spec.md")])
 		expect(proc.exitCode).toBe(2)
-	})
-})
-
-const FIDELITY = join(FIXTURES, "fidelity")
-const sha256 = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex")
-
-type CliRow = { fact_id: string; kind: string; value: string | null }
-type CliJson = { data: { row: CliRow; context: { match: string } }; defects: { code: string }[] }
-
-function nodeJson(args: string[]) {
-	const proc = nodeWithoutBun(args)
-	const stdout = proc.stdout.toString()
-	let json = {} as CliJson
-	try {
-		json = JSON.parse(stdout) as CliJson
-	} catch {}
-	return { code: proc.exitCode, json, stdout, stderr: proc.stderr.toString() }
-}
-
-/** A session with the locked brief, S4 snapshotted, F1 (span), Q1 (completion), and F<n> (span in mm). */
-function fidelitySession() {
-	const dir = sessionDir()
-	copyFileSync(join(FIXTURES, "fidelity-brief-locked.md"), join(dir, "brief.md"))
-	const s = ["--session-dir", dir]
-	const snap = nodeJson(["source", "snapshot", "--id", "S4", "--html", join(FIDELITY, "sources", "S4.html"), ...s])
-	const add = nodeJson(["fact", "add", "--source", "S4", "--find", "Span length", "--label", "span_len", "--json", ...s])
-	const quote = nodeJson(["fact", "quote", "--source", "S4", "--match", "no earlier than 2027", "--label", "completion", "--json", ...s])
-	const derive = nodeJson(["fact", "derive", "--op", "convert", "F1", "--to", "mm", "--label", "span_mm", "--json", ...s])
-	const mm = derive.json.data?.row?.fact_id
-	const source = [
-		'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Bridge</title></head><body><h1>Bridge</h1>',
-		"<h2>Findings</h2>",
-		"<p>The span length is {{F1:span_len}} [S4].</p>",
-		`<p>In millimetres the span is {{${mm}:span_mm}} [S4].</p>`,
-		"<p>The operator wrote {{Q1:completion}} [S4].</p>",
-		"<h2>How this report was made</h2><p>Collected from one cited public page [S4].</p>",
-		'<h2>Sources</h2><ol><li id="s4">[S4] Bridge page, retrieved 2026-10-01.</li></ol></body></html>',
-	].join("\n")
-	writeFileSync(join(dir, "report.src.html"), source)
-	return { dir, s, snap, add, quote, derive, mm }
-}
-
-function verify(dir: string, report: string, extra: string[] = []) {
-	return nodeJson(["fact", "verify", join(dir, report), "--sources", join(dir, "sources"), "--brief", join(dir, "brief.md"), "--session-dir", dir, ...extra])
-}
-
-const codesOf = (json: { defects?: { code: string }[] }) => (json.defects ?? []).map((d) => d.code)
-
-describe("fact, source, and claims under node", () => {
-	test("#given a fresh session #when snapshot, add, quote, derive, fill, and verify run #then the filled report verifies clean", () => {
-		// given
-		const { dir, s, snap, add, quote, derive, mm } = fidelitySession()
-		// when
-		const filled = nodeJson(["fact", "fill", join(dir, "report.src.html"), "--out", join(dir, "report.html"), ...s])
-		const checked = verify(dir, "report.html")
-		// then
-		expect(snap.code).toBe(0)
-		expect(add.code).toBe(0)
-		expect(add.json.data.row.value).toBe("320")
-		expect(add.json.data.context.match).toBe("320 m")
-		expect(quote.code).toBe(0)
-		expect(quote.json.data.row.fact_id).toBe("Q1")
-		expect(derive.code).toBe(0)
-		expect(mm).toBe("F2")
-		expect(filled.code).toBe(0)
-		expect(readFileSync(join(dir, "report.html"), "utf8")).toContain("320,000 mm (320 m)")
-		expect(checked.code).toBe(0)
-		expect(checked.json.defects).toEqual([])
-		const record = JSON.parse(readFileSync(join(dir, "fidelity-defects.json"), "utf8"))
-		expect(record.artifact_sha256).toBe(sha256(join(dir, "report.html")))
-	})
-
-	test("#given a filled report #when a value is hand-edited or a number typed #then verify exits 1 with the code", () => {
-		const { dir, s } = fidelitySession()
-		nodeJson(["fact", "fill", join(dir, "report.src.html"), "--out", join(dir, "report.html"), ...s])
-		const html = readFileSync(join(dir, "report.html"), "utf8")
-		writeFileSync(join(dir, "unit.html"), html.replace("320 m", "320 mm"))
-		writeFileSync(join(dir, "typed.html"), html.replace("<h2>How", "<p>Revenue grew 12% [S4].</p>\n<h2>How"))
-		const unit = verify(dir, "unit.html")
-		const typed = verify(dir, "typed.html")
-		expect(unit.code).toBe(1)
-		expect(codesOf(unit.json)).toContain("unit_mismatch")
-		expect(typed.code).toBe(1)
-		expect(codesOf(typed.json)).toContain("untraceable_number")
-	})
-
-	test("#given an anchor that is not in the source #when fact add runs #then it exits 1 with fact_not_located and writes no row", () => {
-		const { dir, s } = fidelitySession()
-		const proc = nodeJson(["fact", "add", "--source", "S4", "--find", "nope", "--label", "x", ...s])
-		expect(proc.code).toBe(1)
-		expect(proc.stdout).toContain("fact_not_located")
-		expect(JSON.parse(readFileSync(join(dir, "fact-ledger.json"), "utf8")).rows.map((r: { fact_id: string }) => r.fact_id)).toEqual(["F1", "Q1", "F2"])
-	})
-
-	test("#given a snapshotted source #when snapshotted again with the same or different content #then same is a no-op and different exits 1", () => {
-		const { dir, s } = fidelitySession()
-		writeFileSync(join(dir, "other.txt"), "Span length: 999 m\n")
-		expect(nodeJson(["source", "snapshot", "--id", "S4", "--html", join(FIDELITY, "sources", "S4.html"), ...s]).code).toBe(0)
-		expect(nodeJson(["source", "snapshot", "--id", "S4", "--text", join(dir, "other.txt"), ...s]).code).toBe(1)
-	})
-
-	test("#given an assumed value with and without a rationale #when added #then the row is kind assumed, and no rationale exits 2", () => {
-		const { s } = fidelitySession()
-		const added = nodeJson(["fact", "add", "--assumed", "12", "--unit", "%", "--rationale", "planning share chosen by the requester", "--label", "share_assumed", "--json", ...s])
-		expect(added.code).toBe(0)
-		expect(added.json.data.row.kind).toBe("assumed")
-		expect(nodeJson(["fact", "add", "--assumed", "12", "--label", "x", ...s]).code).toBe(2)
-	})
-
-	test("#given the fixture claim graph #when claims index runs #then claims.json lists its claims", () => {
-		const dir = sessionDir()
-		const proc = nodeJson(["claims", "index", join(FIDELITY, "claim-graph.md"), "--out", join(dir, "claims.json")])
-		expect(proc.code).toBe(0)
-		expect(JSON.parse(readFileSync(join(dir, "claims.json"), "utf8")).claims.length).toBeGreaterThan(0)
-	})
-
-	test("#given a ledger #when exported as csv #then rows carry fact_id and plot_value and stderr has the coverage line", () => {
-		const { s } = fidelitySession()
-		const proc = nodeJson(["fact", "export", "--csv", ...s])
-		expect(proc.code).toBe(0)
-		expect(proc.stdout.split("\n")[0]).toContain("fact_id")
-		expect(proc.stdout).toContain("F2")
-		expect(proc.stderr).toContain("1 of 1 sources snapshotted")
-	})
-})
-
-describe("repair decide with several defect files", () => {
-	test("#given two --defects files #when decided #then the attempt signature carries both codes", async () => {
-		const dir = sessionDir()
-		const state = join(dir, "repair-state.json")
-		await run(["repair", "decide", "--state", state, "--defects", defectsFile(dir, "a.json", ["heading_generic"]), "--defects", defectsFile(dir, "b.json", ["untraceable_number"])])
-		const signature = JSON.parse(readFileSync(state, "utf8")).attempts[0].signature
-		expect(signature).toContain("heading_generic")
-		expect(signature).toContain("untraceable_number")
-	})
-})
-
-describe("fidelity delivery barrier", () => {
-	async function deliveredSession(codes: string[]) {
-		const { dir, s } = fidelitySession()
-		nodeJson(["fact", "fill", join(dir, "report.src.html"), "--out", join(dir, "report.html"), ...s])
-		const record = (list: string[]) => writeFileSync(join(dir, "fidelity-defects.json"), JSON.stringify({ command: "fact verify", artifact_sha256: sha256(join(dir, "report.html")), defects: list.map((code) => ({ code, message: code })) }))
-		record(codes)
-		await run(["outcome", "init", "--session-dir", dir, "--promised", "html"])
-		await run(["outcome", "set", "html", "delivered", "--path", join(dir, "report.html"), "--verified-by", join(dir, "fidelity-defects.json"), "--session-dir", dir])
-		const decide = ["repair", "decide", "--state", join(dir, "repair-state.json"), "--defects", join(dir, "fidelity-defects.json"), "--artifact-bytes", "4096", "--renders", "1", "--session-dir", dir]
-		await run(decide)
-		const decision = await run(decide)
-		return { dir, record, decision }
-	}
-
-	test("#given an unregistered appendix value #when verified #then untraceable_number and outcome verify refuses", async () => {
-		const { dir, s } = fidelitySession()
-		nodeJson(["fact", "fill", join(dir, "report.src.html"), "--out", join(dir, "report.html"), ...s])
-		const html = readFileSync(join(dir, "report.html"), "utf8").replace("<h2>How", "<h2>Appendix</h2>\n<p>Revenue grew 12% [S4].</p>\n<h2>How")
-		writeFileSync(join(dir, "report.html"), html)
-		const checked = verify(dir, "report.html")
-		await run(["outcome", "init", "--session-dir", dir, "--promised", "html"])
-		await run(["outcome", "set", "html", "delivered", "--path", join(dir, "report.html"), "--verified-by", join(dir, "fidelity-defects.json"), "--session-dir", dir])
-		const outcome = await run(["outcome", "verify", "--session-dir", dir])
-		expect(codesOf(checked.json)).toContain("untraceable_number")
-		expect(outcome.exitCode).toBe(1)
-		expect(outcome.json.problems.map((p: { code: string }) => p.code)).toContain("fidelity_unresolved")
-	})
-
-	for (const code of ["untraceable_number", "unbound_sentence"]) {
-		test(`#given ${code} left after repair delivers on exhaustion #when verified and finished #then both refuse, and an empty record passes`, async () => {
-			const { dir, record, decision } = await deliveredSession([code])
-			const refused = await run(["outcome", "verify", "--session-dir", dir])
-			const finish = await run(["outcome", "finish", "--session-dir", dir])
-			record([])
-			const passed = await run(["outcome", "verify", "--session-dir", dir])
-			const finished = await run(["outcome", "finish", "--session-dir", dir])
-			expect(decision.json.decision.action).toBe("deliver")
-			expect(refused.exitCode).toBe(1)
-			expect(JSON.stringify(refused.json.problems)).toContain(`fidelity_unresolved: ${code}`)
-			expect(finish.exitCode).toBe(1)
-			expect(passed.exitCode).toBe(0)
-			expect(finished.exitCode).toBe(0)
-		})
-	}
-
-	test("#given a clean main report and an inline edition #when the edition lacks or mismatches its verify record #then edition_unverified, and its own record passes", async () => {
-		// given
-		const { dir, s } = fidelitySession()
-		nodeJson(["fact", "fill", join(dir, "report.src.html"), "--out", join(dir, "report.html"), ...s])
-		expect(verify(dir, "report.html").code).toBe(0)
-		expect(nodeJson(["fact", "fill", join(dir, "report.src.html"), "--inline", "--out", join(dir, "report.inline.html"), ...s]).code).toBe(0)
-		await run(["outcome", "init", "--session-dir", dir, "--promised", "html,pdf"])
-		await run(["outcome", "set", "html", "delivered", "--path", join(dir, "report.html"), "--verified-by", join(dir, "fidelity-defects.json"), "--session-dir", dir])
-		const problems = async () => {
-			const result = await run(["outcome", "verify", "--session-dir", dir])
-			return { exitCode: result.exitCode, codes: result.json.problems.map((p: { code: string }) => p.code) }
-		}
-		// when: no --verified-by
-		await run(["outcome", "set", "pdf", "delivered", "--path", join(dir, "report.inline.html"), "--session-dir", dir])
-		const missing = await problems()
-		// when: a record for different bytes
-		expect(verify(dir, "report.inline.html", ["--out", join(dir, "fidelity-inline.json")]).code).toBe(0)
-		const inline = readFileSync(join(dir, "report.inline.html"), "utf8")
-		writeFileSync(join(dir, "report.inline.html"), inline.replace("320,000 mm", "330,000 mm"))
-		await run(["outcome", "set", "pdf", "delivered", "--path", join(dir, "report.inline.html"), "--verified-by", join(dir, "fidelity-inline.json"), "--session-dir", dir])
-		const altered = await problems()
-		// when: restored to the verified bytes
-		writeFileSync(join(dir, "report.inline.html"), inline)
-		const matched = await problems()
-		// then
-		expect(missing).toEqual({ exitCode: 1, codes: ["edition_unverified"] })
-		expect(altered).toEqual({ exitCode: 1, codes: ["edition_unverified"] })
-		expect(matched).toEqual({ exitCode: 0, codes: [] })
 	})
 })

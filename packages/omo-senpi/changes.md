@@ -1,30 +1,111 @@
+## 2026-10-29 - Desktop private sync channel receiver (#11750)
+
+`components/memory/desktop-sync/channel.ts` adds `attachDesktopSyncChannel(stream)`, the memory component's receiver for the desktop's private sync duplex (claimed through `takeInheritedPrivateChannel("memory-sync")`). It bootstraps once (the reply names the child capability every later request carries), writes each request synchronously before returning its promise, keeps at most 64 requests in flight, settles each reply once, and retires the channel on disconnect, a malformed or foreign frame, another child's event or `retired`, rejecting every waiter with one fixed, body-free error. A bootstrap main never answers is unavailable after 10 s (a contract bound) and a late reply is discarded. A missing stream or a refused or invalid bootstrap is `private_channel_unavailable`, never a CLI account fallback; Windows is `platform_not_supported`. `framing.ts` (LF JSON, canonical `$omoSyncBytes` base64url, 92 MiB frame bound) and `protocol.ts` (strict zod schemas matching the desktop wire contract) are local, so the plugin does not import the unpublished desktop package. Registration in `memory/index.ts` belongs to the account-source change.
+
+## 2026-10-28 - getBuiltinSkillsRoot honours OMO_BUNDLED_SKILLS_DIR (#11631)
+
+`getBuiltinSkillsRoot()` resolves a valid `OMO_BUNDLED_SKILLS_DIR` through `resolveBundledSkillsOverride`, the resolver the bundled-skills loader uses, so `skill-pointers`, `onboarding`, `init-deep-advisor` and the `skill_loaded` telemetry root name the tree skills actually load from; the returned root still ends in a path separator. The resolver moved unchanged to the leaf module `bundled-skills/override.ts` (node builtins only), re-exported from `bundled-skills/index.ts`, so the telemetry helper and the advisor bundle do not pull the component's config loading. An invalid value is still reported once per process and falls back to the plugin-relative root; `onboarding` and the telemetry component pass their component logger so that one report reaches the component log whichever registers first. Telemetry still exports only the allowlisted skill name, never the directory.
+
+## 2026-10-28 - Distinguish runner argv from nested command pairs
+
+Do not credit a test merely mentioned in an echo argument inside an eval cell. Preserve real command kinds, offsets and supported test receipts. Refs #10802, runner-argv blocker only; the other tracking and replay follow-ups remain open.
+
+## 2026-10-27 - Preserve ordinary thread attachment refusal identity
+
+Keep the host's two session identity refusal codes on ordinary mutation errors. Preserve the existing authentication, draining and typed release/UI reply paths. Refs #10944 item 5 only; the tracking issue's other follow-ups remain open.
+
+## 2026-10-27 - Recover failed facts parking without a restart
+
+Keep migration retryable when a hot-to-parked move fails after the failure ledger is durable. Preserve the original error, ledger, bytes and healthy queued work; restore the existing cache after successful movement. Refs #11091, post-ledger movement only; batching, orphan cleanup and claim revalidation remain open.
+
+## 2026-10-27 - OTLP projection and startup privacy follow-ups (#11431)
+
+Project the actual client field names against the pinned collector types, derive
+summary cost from USD, and purge the previous run's OTLP spool when startup is
+opted out. Cleanup uses the existing recovery sidecar, not the exporter. Reject
+unlisted events and unsupported platforms before importing OTLP, retry failed
+startup after the same 60-second backoff as PostHog, dispose late transports, and
+keep PostHog acknowledgement timing independent of OTLP lifecycle bounds.
+
+## 2026-10-27 - OTLP model ids fall back to custom (#11428)
+
+`pinned-model-ids.ts` holds the pin's model enum (omo-telemetry 13c6e61b, 44 values) and `pinnedModelId`.
+The projection applies it to the 15 keys that share that enum and to the ranked `omo.m*_model` keys
+(`none` kept). The turn span applies it to its three model attributes. The list lives in its own module, so
+the turn span in the main bundle does not pull in the projection tables. Update the list together with the pin.
+
+## 2026-10-26 - model-profile outcomes leave the conversation (#11365)
+
+`components/model-profile/index.ts` records every outcome with `pi.appendEntry(<type>, { content, details }, { startupBookkeeping: true })` instead of `pi.sendMessage`. senpi's `convertToLlm` turns every custom message into user text in the next provider request (its context-exclusion predicate is false for every type), so the notice reached the model, and one sent while the first prompt streamed was delivered as a steer. The three custom types and their `details` are unchanged; only the entry kind moved from `custom_message` to `custom`. An outcome that leaves the profile unapplied also goes to `ctx.ui.notify`: `warning` for a chosen profile that no available model serves, an unknown profile name or a stored login that failed, `info` when the unset default falls back to the session's own model. `notice.ts` names the next step per host (rpc: Provider authentication settings or the composer; headless: `/login` or `--model`). A clean apply is recorded and logged only.
+
+Must not break: no profile outcome may go through `pi.sendMessage`; `index.test.ts` runs senpi's own `convertToLlm` over the component's conversation output for every outcome kind. Live proof: `scripts/qa/model-profile-e2e.mjs` checks `notice_not_in_conversation` and `notice_not_in_request` (the mock provider records whether the request it received carried a profile notice).
+
+## 2026-10-26 - Align project-memory grants with raw file reads (#11339)
+
+Suffix-classified external file tools no longer receive a grant for a different file when a symlink is followed by `..`. Built-in resolved reads remain supported, and the missing-note exception is limited to ENOENT with plain missing segments: a missing path such as `missing/../note.md`, `a/./b` or `a//b` is not granted. Real filesystem tests cover grants, the soft guard, temporary HOME detection, and native case aliases. A missing remainder under a file is refused on every platform (Windows reports ENOENT there, not ENOTDIR), and the temporary-HOME check judges HOME the way the install id is written (lexically resolved), so a HOME like `<tmp>/link/../home` that writes inside the temp root counts as temporary, and a lexical HOME that does not exist yet counts as temporary too (telemetry stays off).
+
+## 2026-10-26 - Admit sessions before host reconciliation (#11335)
+
+The task event bridge restores local pause and transition state, attaches RPC and workpools, then lets the existing durable recovery chain finish asynchronously. Its abort signal fences the recovery tail on a newer start, switch or shutdown. The lifecycle carries its own disposal and shutdown generation through host probes, admission and revival; stale probe completions cannot claim newer ownership, and late respawn handles use fenced suspension. Endpoint groups reconcile independently while the shared admission lease still enforces per-session capacity. Deterministic regressions cover blocked probes, disposal, shutdown, newer same-process claims, independent hosts and late handles.
+
+## 2026-10-27 - The local launcher sends the OmO logo (#11445)
+
+`install/local-launcher.ts` imports the same `OMO_BRAND_LOGO` from omo-native, so a sibling-store install brands the sign-in result page like the published launcher; `plugin/scripts/install.mjs` and `bundle-inputs.json` are regenerated.
+
+## 2026-10-25 - Close research fidelity gate findings (#11310)
+
+Source-backed facts fail verification when their own snapshot metadata or body cannot be checked, with the cause in the message, while facts on healthy sources keep their checks. Grouped derived values verify exactly as fill writes them. Conversion originals remain bound to their operand rows under one bracket grammar: a conversion shown without its original, with a non-numeric or nested bracket, with a dash separator, or with a second original (a bare figure in the operand's dimension right after it) is a mismatch, while another filled fact, prose with a figure, or a range after it is not, and a correct original passes in any bracket style or fullwidth form in HTML and Markdown. The V, A, and D claim prefixes preserve their marks through fill and Markdown projection. Packaged research skills use the shared runtime and the corrected format guidance.
+
+## 2026-10-26 - Optional lazy OTLP dual-send (#11413)
+
+An optional second telemetry transport, inactive by default and consent-gated; it
+never blocks the existing sink.
+
+## 2026-10-26 - Cover restored Stop admission through the real manager (#11401)
+
+The restart regression reconstructs pause custody over a shared state directory, releases the restored Stop, injects a child restore failure, and verifies that real manager admission changes from held to started. It then verifies a successful child retry using the durable acknowledgement without a live hold observer.
+
+A native-session regression also quits, disposes and reopens the same persisted JSONL, sends a real person prompt through AgentSession, and verifies the actual manager admits a new task. The native engine's input release is the person-reachable action; `/resume` remains the session picker.
+
+## 2026-10-26 - Recovery guidance distinguishes prose from commands (#11390)
+
+Missing-runtime notices describe an incomplete installation without spelling a retired CLI command. A host missing the computer-use API now names the registered `omo update` command. The command audit allowlist stays unchanged; owner tests pin the update command emitted by `/computer` and the npm/Bun reinstall commands passed through `OMO_REINSTALL_COMMAND`.
+
+## 2026-10-25 - Optional shared bundled skills directory (#11332)
+
+Every bundled skill consumer (resources discovery, the task skill loader, and
+the bare skill commands) uses one resolver for `OMO_BUNDLED_SKILLS_DIR`. The
+override replaces only `plugin/skills`; `plugin/skills-conditional` remains
+relative to the plugin. Absent or empty is unchanged. An invalid
+`OMO_BUNDLED_SKILLS_DIR` (relative, missing, not a directory, unreadable) now
+logs ONE error naming the variable and falls back to the plugin-relative
+bundled skills, plus one session notice; the report is once per
+process across both extension bundles. An explicit `skillsDir`
+option wins over a valid override.
+
+## 2026-10-25 - Report hosted child availability as parent status (#11317)
+
+Deliver debounced unresponsive, close-pending, and recovered-running status through stable per-child coordinator keys without sending false terminal completions. Use the parent streaming batch window for status delivery.
+
+## 2026-10-25 - memory sync defers a pass while the keychain waits for approval (#11264)
+
+`device-session/account-source.ts` turns the credential store's `KeychainApprovalPendingError` (a session read past its 5 s deadline in `service-auth/keystore.ts`) into `SyncSessionDeferredError` (`sync-session-deferred.ts`, matched by its code because the account sidecar carries its own copy of the class), and `signedOut()` answers false while the keychain waits, so a pending keychain never reads as signed out. `sync-runner.ts` logs the store's message, leaves the repo idle (status `null`, so the `memory` tool's status read returns at once), and launches the pass again after `deferredRetryMs` (15 s initially, doubling to a 5-minute cap, with one warning per escalation) while the same sessions still hold the repo.
+
+Settled answers are never cached. A write or clear invalidates the pending-read entry, and an old read settling afterward cannot restore it. Native writes retain their existing unbounded behavior; safe write deadlines need the single credential-owner design tracked in #11262.
+
+Must not break: a retry joins the process's one parked keychain read instead of starting another, so it adds no prompt; a pass that resolves the session normally schedules no retry.
+
+## 2026-10-25 - Supervisor slot event waits (#11288)
+
+The slot harness observes TCP starts, filesystem transitions and supervisor exits against one deadline with time reserved for cleanup. Filesystem waits retain the macOS event-loss re-check. Regressions exercise a real supervisor exiting before TCP start and simulated Windows admission rename contention exhausting the existing retry budget. The simulation establishes a possible failure path, not the cause of the historical Windows CI failures.
+
+## 2026-10-25 - Remove automatic engine crash telemetry
+
+The session-start component no longer reads, claims or sends earlier process crash records. Retire the legacy crash capture entry point and its reviewed writer site. Recording-transport coverage requires zero crash events while normal session telemetry continues. Preserve operational crash files and user-initiated reports. No replacement signal or local bundle regeneration is included.
+
 ## 2026-10-20 - git-master adds the sisyphus-dev-ai co-author trailer by default (#10713)
 
 `components/git-master/directive.ts` builds the attribution directive whenever `git_master.include_co_authored_by` (default `true` again, no longer a no-op) or `commit_footer` is on. Its commit example is `git -c trailer.ifexists=addIfDifferent commit -m ... --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`, under the `git_env_prefix` from #10613, so git keeps one copy when the message already carries the trailer. A squash joins messages without `--trailer`, so the directive asks for one `--amend` rewrite afterwards. `skill-content.ts` runs the shared template rewrite with `include_co_authored_by: false`, because the directive carries attribution, and both channels (the `read` hook and `task-skill-loader.ts`) append the directive only when the text does not already contain `<commit_attribution>`. `scripts/qa/git-master-attribution-e2e.mjs` now expects the trailer exactly once by default, and adds an `include_co_authored_by: false` run that expects none.
-
-## 2026-10-18 - A committed layer-2 effect survives a lost response; off means not callable (#10458 review T1/T2)
-
-The replay identity no longer lives in a journal file next to the store: `gateway/schema.ts` v10 (after dev's v8 provenance trigger and the v9 thread-creation tables) adds `toolkit_replay_receipts`, and the receipt is committed INSIDE the op's own transaction (op, canonical-arguments sha256, result, the turn's time). A call whose response was lost after commit - the store worker answered, the caller never heard - returns the recorded result on retry; the effect runs once. The old sidecar file, its pending state and its claim deletion on dispatch failure are gone: nothing outside the transaction can judge whether an ambiguous failure ran the effect.
-
-With the `dori` section off, the dori extension's declared layer-2 tools are no longer built at all, so a stale registration cannot dispatch an effectful op without replay protection; the old behaviour (tools listed, dispatching bare) was the review's T2. On, and only on, those tools' schemas also accept the optional `omo_toolkit_replay` context argument, and `help()` hides it.
-
-Also: the divergence refusal carries a machine-readable tail (`replay_differs=op,args recorded_op=... attempted_op=...`) that the engine converts to the structured stop, so the kernel error keeps `key`, `differs`, and both ops; and a store at v6 upgrading to v9 drops nothing (the mixed-case migration fixture rewinds the new table too).
-
-## 2026-10-17 - The dori toolkit replay identity covers arguments, expiry and program order (#10316 review)
-
-A layer-2 call's replay identity is again the agreed one: op plus canonical arguments plus turn and call index. The journal stores a sha256 of the arguments (sorted-key JSON) beside the op, and the same key with other arguments now stops as `toolkit_replay_divergence` naming what differed, instead of returning another call's result. A turn older than the seven-day window stops as `toolkit_replay_expired` before any claim, so a pruned key can no longer let an old turn run again.
-
-Call indexes follow program order: the SDK reads the calling eval cell from the stack (the kernel evaluates each cell under its tool call id) and numbers its calls synchronously per cell, so concurrent `Promise.all` calls replay with the same indexes. The engine accepts that cell only as a tool call on the caller's own branch and files the call under the turn the cell started in, so a cell that outlives its turn stays in it; any other cell is refused as `toolkit_replay_turn_unknown`. Layer-2 tools accept the context parameter only while the toolkit is on, and `help()` hides it.
-
-Both dori layers now ship as their own sidecars, `runtime/dori/layer2.js` and `runtime/dori/replay.js`, loaded by URL only while the gate is on; the shipped SDK runs with its sidecar deleted while off. Nested function names such as `send.call` are reachable.
-
-## 2026-10-17 - The agent toolkit gets the layer-2 namespace seam a dori host fills (#10316)
-
-With an enabled `dori` section in `omo.json`, the agent toolkit SDK gains eleven namespaces (`route`, `reply`, `room`, `send`, `thread`, `describe`, `file`, `rules`, `iam`, `call`, `work`); without one, the properties do not exist and no layer module is imported. omo ships no namespace behavior: each function calls the session tool a separately installed dori host declares through a store extension named `dori` (`ext_dori_<ns>_<fn>`), so the caller is stamped by the engine as for every session-callable op, and `help()` lists the registered functions with signatures rendered from their JSON Schemas.
-
-Every such call is journaled by the engine under a replay key, `JSON.stringify(["turn", turnId, callIndex])` (inbound deliveries use `["inbound", dedupeKey]`); dori-link derives its envelope ids from the same string, and `replay-key.test.ts` pins the vectors. The turn is the calling session plus the newest assistant entry on its branch. Replaying a turn returns each recorded result without dispatching again; a different op at a recorded index stops with `ToolkitReplayStopError` (`toolkit_replay_divergence`), and a call an earlier run started but never recorded stops as `toolkit_replay_pending` instead of being sent twice. Keys are kept seven days.
-
-Tests: the key vectors, the journal (replay, divergence, per-turn indices, released claims, pending, retention, missing turn), the session-tool wiring against a real gateway store (one dispatch on replay, divergence, off means no journal, other extensions untouched), the kernel namespaces and `help()`, and an import-graph walk proving the SDK and the thread component load no layer module statically. `scripts/qa/dori-toolkit-replay-qa.mjs` drives the same contract through real eval kernels, one process per phase.
 
 ## 2026-10-19 - desktop-toolkit component: the session's channel to toolkits the app hosts for its thread
 
@@ -189,7 +270,7 @@ The computer-use engine probe's timeout phase names where the handshake stopped.
 
 ## 2026-10-10 - Bindings take whatsapp as a native platform name
 
-The omo-gateway WhatsApp channel binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.
+A WhatsApp connector binds its chats through the session-gateway store, but the binding contract refused the platform: `bindings.ts` `BINDING_PLATFORMS`, the `thread_bind` tool schema (`contracts/params.ts`), and the store's `bindings.platform` CHECK all stopped at `custom`. The first admitted WhatsApp message would have been refused by core's thread store.
 
 `whatsapp` is now a binding platform in all three spellings. Because SQLite cannot widen a CHECK in place, schema v7 rebuilds the `bindings` table with the widened list, carrying every column over verbatim and recreating `bindings_one_active_thread` and `bindings_session` before the old table drops. The rebuild runs with foreign keys off so an extension table referencing `bindings` is neither cascade-deleted nor able to block the migration, and the AUTOINCREMENT high-water mark is carried over so a deleted newest row's key is never reused. Before the version bump commits, `migrate()` runs `PRAGMA foreign_key_check` from TypeScript and throws (rolling back to v6) if the step introduced a violation referencing `bindings`; the `foreign_keys` pragma is restored to its prior value afterwards. A store migrated from v6 keeps its live bindings and accepts a `whatsapp` bind (`store-v7-whatsapp.test.ts`); the tool schema takes the native name and the store keeps it (`bindings.test.ts`).
 
@@ -401,10 +482,6 @@ Tests (`store-idle-retire.test.ts`; the last one in `component.test.ts`):
 
 The `ulw-plan` skill's delegation-router row listed a `git` category that no edition ships (`SKILL.md`), and its reference copy (`references/full-workflow.md`) also still listed `deep`, which was split into `deep-low` and `deep-high`. A plan that followed either name sent `task(category: ...)` to a category the user's session does not have. Both rows now list exactly the built-in categories.
 
-## 2026-10-04 - The committed gateway rules sidecar is no longer an ignored path
-
-`packages/omo-senpi/.gitignore` ignores `/plugin/extensions/*` and re-admits each committed bundle with a `!` line. The `gateway_rules` store-extension sidecar (`gateway-rules-extension.mjs`, from #9540) was committed without its `!` line, so `script/tracked-ignored-paths-audit.test.ts` failed on `dev` and on the v5.1.17 release-state PR. A local `git add` of a fresh regen would also silently skip that file. Added the negation next to its sibling `gateway-store-worker.mjs`.
-
 ## 2026-10-04 - A runtime advisory no longer makes a failed reflection child look like a provider outage (#9553)
 
 On Windows every failed memory reflection child was recorded as "refused by its provider", and automatic reflection parked for hours. `worker/model-miss.ts` `providerFailureDetail` took the first stderr line as the provider's answer. On a Bun host on win32 that line is Bun's `child reaper unavailable under Bun on win32: ...` advisory, printed once per terminated worker thread before anything the child says. The shared retryable-error classifier matches the bare word `unavailable`, so any failure became `provider_unavailable`, the real cause was hidden, and every candidate in the chain was marked as refused.
@@ -419,14 +496,6 @@ Tests (`model-miss.test.ts`, the exact advisory text):
 - a provider sentence then a stack `Error:` line: the provider's sentence decides.
 
 **Known limit:** an advisory with neither a runtime marker nor a log-level prefix, and nothing after it, is still taken as the detail. There is no better line to report then.
-
-## 2026-10-04 - Gateway operating-rules injection into lead and bound sessions (#9190)
-
-- New `components/gateway`: the scope lead and every session with an active binding get the scope's compiled behavioral rules as one `<operating-rules version="<rules sha>">` block in the system prompt through `before_agent_start`, rendered beside the memory block. The component lazily connects only when the `gateway.scopes` config is non-empty and the store database exists; every other session's prompt passes through byte-identical. Rules are computed by the gateway package; omo owns only the `gateway_rules` store extension (a `gateway_rules_blocks` table plus the `rulesCommitted`/`blockForSession` ops) and the exactly-once `rules_changed` fanout per session and version. `plugin/scripts/build-extension-core.mjs` emits the ops module as `extensions/gateway-rules-extension.mjs` beside `omo.js`, covered by the build freshness check.
-
-## 2026-10-04 - Escape untrusted gateway rule text and add `sessionsWithRules`
-
-- Behavioral rule lines, scope and version render with `&`, `<` and `>` escaped, so a rule carrying the end sentinel or the closing tag can neither break the byte-identical turn guarantee nor close the block early; the `rules_changed` delivery text escapes scope and version the same way. New `sessionsWithRules({scope})` op lists a scope's `gateway_rules_blocks` rows ordered by session id so the gateway can clear sessions whose binding ended while the connector was down.
 
 ## 2026-10-04 - Live QA: a task child's fallback after a tool call, and the user's settings untouched (#9512)
 

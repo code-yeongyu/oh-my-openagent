@@ -1,6 +1,8 @@
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
+import { FABLE_55_LAUNCH } from "../fable-55-launch"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
+	[FABLE_55_LAUNCH.id]: FABLE_55_LAUNCH,
 	"kimi-k3": {
 		id: "kimi-k3",
 		family: "kimi",
@@ -14,6 +16,38 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		limit: {
 			context: 262144,
 			output: 262144,
+		},
+	},
+	// Kimi K3.1 Pro (Moonshot docs, 2026-10-27): 1M context, max_completion_tokens up to the full
+	// window (131072 by default), thinking always on, same parameter constraints as kimi-k3.
+	"kimi-k3.1-pro": {
+		id: "kimi-k3.1-pro",
+		family: "kimi",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "video"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 1048576,
+		},
+	},
+	"kimi-k3.1-pro-highspeed": {
+		id: "kimi-k3.1-pro-highspeed",
+		family: "kimi",
+		reasoning: true,
+		temperature: true,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "video"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1048576,
+			output: 1048576,
 		},
 	},
 	"kimi-k2.6": {

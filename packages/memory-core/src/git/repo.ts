@@ -68,6 +68,7 @@ export class GitMemoryRepo {
     this.hookInstaller = options.installHooks ?? (() => undefined)
     this.commitTimeoutMs = options.commitTimeoutMs ?? COMMIT_TIMEOUT_MS
     this.reads = new GitRevisionReads({
+      dir: this.dir,
       run: (argv, timeoutMs) => this.git(argv, timeoutMs),
       result: (argv, stdin) => this.gitResult(argv, stdin),
     })

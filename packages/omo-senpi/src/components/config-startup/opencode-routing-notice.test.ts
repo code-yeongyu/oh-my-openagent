@@ -6,7 +6,6 @@ import { join } from "node:path"
 import { parse } from "jsonc-parser"
 
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import { doriSectionRename } from "@oh-my-opencode/omo-opencode/config-migration/dori-section-rename"
 
 import { notificationMessages, runSenpiStartupMigration } from "./index"
 
@@ -32,7 +31,6 @@ function tempHome(omoJsonc?: string): string {
 function start(home: string) {
   const migration = runSenpiStartupMigration({
     cwd: join(home, "project"),
-    doriSectionRename,
     env: { HOME: home },
     environment: { HOME: home, XDG_CONFIG_HOME: join(home, ".config") },
     homeDir: home,

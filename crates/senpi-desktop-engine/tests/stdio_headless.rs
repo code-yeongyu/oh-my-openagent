@@ -7,6 +7,8 @@
 mod common;
 #[path = "headless/error_codes.rs"]
 mod error_codes;
+#[path = "headless/input_calls.rs"]
+mod input_calls;
 
 use common::scenario::{capture, headless, make_stop_path_live, snapshot_ref, Scenario};
 use common::{error_code, fake_backend, Engine, TWO_DISPLAYS};
@@ -292,7 +294,7 @@ fn without_a_backend_capture_fails_and_every_input_stops_at_the_stop_path() {
     engine.invoke("session.open", json!({}));
     // When
     let captured = engine.invoke("capture", json!({"target": "desktop"}));
-    let inputs = error_codes::input_calls().map(|(method, params)| (method, engine.invoke(method, params)));
+    let inputs = input_calls::input_calls().map(|(method, params)| (method, engine.invoke(method, params)));
     // Then: the gate refuses before any backend call
     assert_eq!(capabilities["result"]["backend"], json!("unavailable"));
     assert_eq!(error_code(&captured), &json!("CaptureFailed"));

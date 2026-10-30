@@ -1,29 +1,28 @@
-// fact-commands.mjs - the `fact` subcommands of report-tools: add, quote, retract, export, fill,
-// derive, and verify (fact-commands-verify.mjs). Every value reaches the ledger from a source
+// fact-commands.mjs - the `fact` subcommands of report-tools: add, quote, retract, export, derive,
+// fill (fact-commands-fill.mjs), verify (fact-commands-verify.mjs), pairs and meaning-check
+// (fact-commands-meaning.mjs), polish-apply and polish-diff (fact-commands-polish.mjs). Every value reaches the ledger from a source
 // snapshot through a deterministic locator or from a declared derivation; nothing here accepts a
 // typed value. add and quote print the row with 60 chars of source context on each side (JSON
 // with --json). Exit 0 ok, 1 semantic failure (fact_not_located, fill errors, a refused
 // derivation), 2 usage. node: builtins and sibling imports only.
 
-import { createHash } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, extname, join, resolve } from "node:path"
+import { join, resolve } from "node:path"
 
-import { CliError, parseArgs, writeJsonAtomic } from "./cli-support.mjs"
+import { CliError, parseArgs, sha256Of } from "./cli-support.mjs"
 import { DEFECT_CODES } from "./contracts.mjs"
+import { alteredIn } from "./conversion-probe.mjs"
 import { derive } from "./fact-derive.mjs"
-import { fill } from "./fact-fill.mjs"
 import { addRow, readLedger, retractRow, supersedeRow, writeLedger } from "./fact-ledger.mjs"
 import { locateFind, locateMatch, locatePageLine, locateTable } from "./fact-locate.mjs"
 import { QUALIFIER_FORMS } from "./fidelity-lexicon.mjs"
-import { readState, writeState } from "./fidelity-state.mjs"
 import { exportRows } from "./fidelity-values.mjs"
+import { rawLocated } from "./raw-locator.mjs"
 import { pointedFlag, sessionDirOf, snapshotOf } from "./source-commands.mjs"
 
 const CONTEXT = 60
 const BOOLEANS = ["json", "csv", "md", "inline", "view", "replace-failed", "disjoint"]
 const QUALIFIER_OF = new Map(Object.entries(QUALIFIER_FORMS).flatMap(([term, forms]) => forms.map((form) => [form, term])))
-const sha256Of = (content) => createHash("sha256").update(content).digest("hex")
 const slug = (text) => String(text).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) || "fact"
 
 function readText(path) {
@@ -34,26 +33,30 @@ function readText(path) {
 	}
 }
 
-function nowIso(flags) {
-	const date = flags.now === undefined ? new Date() : new Date(flags.now)
+/** A caller-supplied --now value as ISO; parsing only, never the clock. */
+function isoOf(text) {
+	const date = new Date(text)
 	if (Number.isNaN(date.getTime())) throw new CliError("--now requires an ISO timestamp")
 	return date.toISOString()
 }
+
+const nowIso = (flags) => (flags.now === undefined ? new Date().toISOString() : isoOf(flags.now))
 
 function failure(command, error, detail) {
 	const json = { command, status: "fail", exitCode: 1, error, ...detail }
 	return { json, summary: `${command}: ${error}${detail.message ? ` (${detail.message})` : ""}`, exitCode: 1 }
 }
 
-function locate(flags, snapshot, id, quote) {
+/** Every locator reads the view text (visible text nodes for a page), never raw markup. */
+function locate(flags, view, id, quote) {
 	const sourceId = id
-	if (quote) return locateMatch(snapshot.text, { match: flags.match, sourceId })
-	if (flags.find !== undefined) return locateFind(snapshot.text, { find: flags.find, unitExpected: flags["unit-expected"], sourceId })
+	if (quote) return locateMatch(view.text, { match: flags.match, sourceId })
+	if (flags.find !== undefined) return locateFind(view.text, { find: flags.find, unitExpected: flags["unit-expected"], sourceId })
 	if (flags.table !== undefined) {
-		if (snapshot.html === null) throw new CliError(`source ${id} has no source.html; --table needs a page snapshot`)
-		return locateTable(snapshot.html, { table: flags.table, row: flags.row, col: flags.col, sourceId })
+		if (view.root === null) throw new CliError(`source ${id} is not an HTML page snapshot; --table needs one`)
+		return locateTable(view, { table: flags.table, row: flags.row, col: flags.col, sourceId })
 	}
-	if (flags.page !== undefined) return locatePageLine(snapshot.text, { page: Number(flags.page), line: Number(flags.line), sourceId })
+	if (flags.page !== undefined) return locatePageLine(view.text, { page: Number(flags.page), line: Number(flags.line), sourceId })
 	throw new CliError("usage: fact add --source S<n> (--find TEXT | --table T --row R --col C | --page P --line L) --label LABEL")
 }
 
@@ -80,11 +83,17 @@ function runAdd(args, quote) {
 	const id = args.required("source")
 	if (quote) args.required("match")
 	const sessionDir = sessionDirOf(flags)
-	const snapshot = snapshotOf(sessionDir, id)
-	const found = locate(flags, snapshot, id, quote)
+	const { meta, view, sha256, drift } = snapshotOf(sessionDir, id)
+	const converted = view.mode === "converted"
+	if (drift.length > 0) return failure(command, "snapshot_hash_mismatch", { message: `${id}: ${drift.join("; ")}` })
+	if (view.mode === "legacy") return failure(command, "snapshot_not_raw", { message: `${id} is a legacy text.txt snapshot without raw.bin; snapshot the source again under a new id` })
+	if (converted && !quote) return failure(command, "snapshot_not_raw", { message: `${id} is converted-only (no raw bytes); measured rows need source snapshot --raw <original> --text <extraction>` })
+	const located = locate(flags, view, id, quote)
+	const found = rawLocated(view, located)
 	if (found.error === "unit_expected_mismatch") return failure(command, "unit_mismatch", { message: `expected ${found.expected}, found ${found.found}`, candidates: found.candidates })
 	if (found.error) return failure(command, found.error, { message: `no single match in ${id}`, candidates: found.candidates })
-	const { meta } = snapshot
+	const altered = alteredIn(join(sessionDir, "sources", id), [found.raw, found.quote])
+	if (altered.length > 0) return failure(command, "conversion_altered_number", { message: `${id}'s conversion altered ${[...new Set(altered)].join(", ")} (sources/${id}/conversion.json); the converted text cannot back this number, even where the source also shows it unaltered: write a verified text of the source and run \`source snapshot --id ${id} --text <verified.txt> --replace\`, then add the fact again`, tokens: altered, hint: DEFECT_CODES.conversion_altered_number.hint })
 	const host = URL.canParse(meta.url) ? new URL(meta.url).hostname : null
 	const labelSource = flags.find ?? flags.match ?? (flags.table !== undefined ? `${flags.row}_${flags.col}` : `p${flags.page}_l${flags.line}`)
 	const ledger = readLedger(sessionDir)
@@ -93,9 +102,10 @@ function runAdd(args, quote) {
 		...(quote ? {} : { value: found.value, unit: found.unit, value_span: found.value_span, qualifier: QUALIFIER_OF.get(found.qualifier) ?? null }),
 		raw: found.raw,
 		quote: found.quote,
+		context: found.context,
 		source_id: id,
 		locator: { ...found.locator, source_kind: meta.kind, url: meta.url, host, pointed: pointedFlag(sessionDir, meta.url) },
-		snapshot_sha256: meta.sha256,
+		snapshot_sha256: sha256,
 		sentence_id: found.sentence_id ?? null,
 		extracted_by: meta.extractor,
 		observed_at: nowIso(flags),
@@ -108,11 +118,14 @@ function runAdd(args, quote) {
 		fuzzy: found.fuzzy === true,
 	})
 	writeLedger(sessionDir, ledger)
-	const context = contextOf(snapshot.text, row)
-	const json = { command, status: "pass", exitCode: 0, defects: [], data: { row, context } }
+	const context = contextOf(view.text, located)
+	const { severity, integrity } = DEFECT_CODES.quote_converted_only
+	const defects = converted ? [{ code: "quote_converted_only", severity, integrity, message: `${id} is converted-only; the quote is not bound to the original fetched bytes` }] : []
+	const json = { command, status: "pass", exitCode: 0, defects, data: { row, context } }
 	if (flags.json) return { json, exitCode: 0 }
 	const shown = quote ? row.quote : `${row.raw} (value ${row.value}${row.unit ? `, unit ${row.unit}` : ""})`
-	return { text: `${row.fact_id} ${row.label}: ${shown} [${id} ${row.sentence_id ?? "-"}]\n  ...${context.before}[${context.match}]${context.after}...`, exitCode: 0 }
+	const warnings = defects.map((defect) => `\n  warning ${defect.code}: ${defect.message}`).join("")
+	return { text: `${row.fact_id} ${row.label}: ${shown} [${id} ${row.sentence_id ?? "-"}]\n  ...${context.before}[${context.match}]${context.after}...${warnings}`, exitCode: 0 }
 }
 
 function runRetract(args) {
@@ -158,52 +171,16 @@ function runExport(args) {
 	return { json: { command: "fact export", status: "pass", exitCode: 0, data: { out: resolve(args.flags.out), format: args.flags.csv ? "csv" : "json", sha256: sha256Of(text), coverage } }, summary: coverage, exitCode: 0 }
 }
 
-/** The inline edition: local stylesheets and scripts inlined, relative image paths made absolute. */
-function inlineAssets(html, baseDir) {
-	const local = (ref) => !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(ref)
-	return html
-		.replace(/<link\b[^>]*\brel=["']stylesheet["'][^>]*>/gi, (tag) => {
-			const href = /\bhref=["']([^"']+)["']/i.exec(tag)?.[1]
-			return href && local(href) ? `<style>${readText(resolve(baseDir, href))}</style>` : tag
-		})
-		.replace(/<script\b([^>]*)\bsrc=["']([^"']+)["']([^>]*)><\/script>/gi, (tag, pre, src, post) => (local(src) ? `<script${pre}${post}>${readText(resolve(baseDir, src))}</script>` : tag))
-		.replace(/(<img\b[^>]*\bsrc=["'])([^"']+)(["'])/gi, (tag, pre, src, post) => (local(src) && !src.startsWith("/") ? `${pre}${resolve(baseDir, src)}${post}` : tag))
-}
-
-function runFill(args) {
-	const [source] = args.positionals
-	const { flags } = args
-	if (!source || (flags.out === undefined && !flags.view)) throw new CliError("usage: fact fill <src> (--out <path> | --view) [--format html|md|tex] [--inline] [--replace-failed]")
-	const format = flags.format ?? ({ ".md": "md", ".tex": "tex" }[extname(source).toLowerCase()] ?? "html")
-	if (!["html", "md", "tex"].includes(format)) throw new CliError("--format must be html, md, or tex")
-	if (flags.inline && format !== "html") throw new CliError("--inline applies to the html edition only")
-	const sessionDir = sessionDirOf(flags)
-	const state = flags["replace-failed"] ? readState(sessionDir) : null
-	const result = fill(readText(source), readLedger(sessionDir), { format: format === "tex" ? "md" : format, view: flags.view === true, ...(state ? { replaceFailed: state } : {}) })
-	const warnings = result.warnings
-	if (result.out === null) {
-		const defects = result.errors.map((error) => ({ ...error, severity: DEFECT_CODES[error.code]?.severity ?? "blocker", hint: DEFECT_CODES[error.code]?.hint ?? null }))
-		return { json: { command: "fact fill", status: "fail", exitCode: 1, defects, warnings }, summary: `fact fill: FAIL - ${defects.length} error(s), nothing written`, exitCode: 1 }
-	}
-	const out = flags.inline ? inlineAssets(result.out, dirname(resolve(source))) : result.out
-	if (flags.view) return { text: out, summary: `fact fill --view: ${result.fillMap.length} pointer(s), ${warnings.length} warning(s)`, exitCode: 0 }
-	writeFileSync(flags.out, out)
-	if (state) writeState(sessionDir, state)
-	const artifact = sha256Of(out)
-	const map = `${resolve(flags.out)}.fill-map.json`
-	writeJsonAtomic(map, { schemaVersion: 1, format, artifact: resolve(flags.out), artifact_sha256: artifact, entries: result.fillMap })
-	const data = { out: resolve(flags.out), map, artifact_sha256: artifact, occurrences: result.fillMap.length, warnings }
-	return { json: { command: "fact fill", status: "pass", exitCode: 0, defects: [], data }, summary: `fact fill: wrote ${flags.out} (${result.fillMap.length} pointer(s))`, exitCode: 0 }
-}
-
 function runDerive(args) {
 	const { flags } = args
 	const op = args.required("op")
+	// Time is the caller's: without --now the CLI refuses with the library's missing_now code (exit 2) and never reads the clock.
+	if (flags.now === undefined) throw new CliError("missing_now: fact derive needs --now <ISO timestamp> (the row's observed_at); no row written")
 	const sessionDir = sessionDirOf(flags)
 	const ledger = readLedger(sessionDir)
 	// The registry refuses any field outside the operation's inputFields, so only the given flags go in; --unit null declares a dimensionless result.
 	const picked = ["to", "from", "num", "den", "part", "whole", "reference", "rationale", "label"].filter((key) => flags[key] !== undefined)
-	const spec = { op, now: nowIso(flags), ...Object.fromEntries(picked.map((key) => [key, flags[key]])) }
+	const spec = { op, now: isoOf(flags.now), ...Object.fromEntries(picked.map((key) => [key, flags[key]])) }
 	if (op === "expr") spec.formula = args.positionals[0]
 	else if (args.positionals.length > 0) spec.operands = args.positionals
 	if (flags.disjoint === true) spec.disjoint = true
@@ -218,6 +195,8 @@ function runDerive(args) {
 
 export async function runFact(argv) {
 	const [sub, ...rest] = argv
+	if (sub === "pairs" || sub === "meaning-check") return (await import("./fact-commands-meaning.mjs")).runFactMeaning(sub, rest)
+	if (sub === "polish-apply" || sub === "polish-diff") return (await import("./fact-commands-polish.mjs")).runFactPolish(sub, rest)
 	const args = parseArgs(rest, { booleans: BOOLEANS })
 	switch (sub) {
 		case "add":
@@ -229,12 +208,12 @@ export async function runFact(argv) {
 		case "export":
 			return runExport(args)
 		case "fill":
-			return runFill(args)
+			return (await import("./fact-commands-fill.mjs")).runFactFill(args)
 		case "derive":
 			return runDerive(args)
 		case "verify":
 			return (await import("./fact-commands-verify.mjs")).runFactVerify(args)
 		default:
-			throw new CliError("usage: fact <add|quote|retract|export|fill|verify|derive> ...")
+			throw new CliError("usage: fact <add|quote|retract|export|fill|verify|derive|pairs|meaning-check|polish-apply|polish-diff> ...")
 	}
 }

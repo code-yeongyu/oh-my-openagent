@@ -14,7 +14,7 @@ import { gatewayDatabasePath } from "./paths"
 import { argumentFailure } from "./session-args-schema"
 import type { StoreExtensions } from "./store-extension-ops"
 import { transaction, type StoreContext } from "./store-ops"
-import { TOOLKIT_REPLAY_RETENTION_MS, type StoreExtensionRefusal, type StoreExtensionResult, type ToolkitReplayRequest } from "./store-extensions"
+import type { StoreExtensionRefusal, StoreExtensionResult } from "./store-extensions"
 import { UNKNOWN_CALLER } from "../tools/ports"
 
 export type SessionCallRequest = {
@@ -25,8 +25,6 @@ export type SessionCallRequest = {
   readonly args: unknown
   readonly caller: string
   readonly now: number
-  /** The layer-2 toolkit call's replay identity (op phase only): its receipt is committed with the op. */
-  readonly replay?: ToolkitReplayRequest
 }
 
 /** The op's result, and for a declared await the facade's wait parameters. */
@@ -59,12 +57,8 @@ export async function recordThreadCreation(ctx: StoreContext, request: { readonl
   })
 }
 
-function refusal(code: StoreExtensionRefusal["code"], message: string): SessionCallReply {
-  return { result: { kind: "refused", code, message } }
-}
-
 export async function sessionCall(ctx: StoreContext, extensions: StoreExtensions, request: SessionCallRequest): Promise<SessionCallReply> {
-  const { name, caller, phase, replay } = request
+  const { name, caller, phase } = request
   if (typeof caller !== "string" || caller.length === 0 || caller === UNKNOWN_CALLER) {
     return refused("caller_context_missing", "A session-callable op needs the calling session's engine-resolved durable id.")
   }
@@ -105,10 +99,7 @@ export async function sessionCall(ctx: StoreContext, extensions: StoreExtensions
   })
   const { wakeDir } = descriptor
   const wake = isToolSessionOp(entry) ? entry.wake : undefined
-  if (phase === "op" && replay !== undefined && request.now - replay.turn_at > TOOLKIT_REPLAY_RETENTION_MS) {
-    return refusal("toolkit_replay_expired", `Call ${replay.key} (${replay.op}) belongs to a turn older than the seven-day replay window; it was not run again.`)
-  }
   const effects = phase === "op" && wake !== undefined && wakeDir !== undefined ? [() => touchWake(ctx.config.agent_dir, wakeDir, wake)] : []
-  const result = await extensions.run({ name, descriptor, module: loaded.module, op, args: stamped, effects, ...(phase === "op" && replay === undefined ? {} : { replay }) }, request.now)
+  const result = await extensions.run({ name, descriptor, module: loaded.module, op, args: stamped, effects }, request.now)
   return phase === "op" && awaited !== undefined && wakeDir !== undefined ? { result, await: { timeout_ms: awaited.timeoutMs, wake_dir: wakeDir } } : { result }
 }

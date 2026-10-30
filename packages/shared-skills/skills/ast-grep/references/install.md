@@ -105,7 +105,7 @@ sudo chmod +x /usr/local/bin/sg
 sg --version
 ```
 
-The skill's `install.sh` does steps 1-3 automatically and drops the binary in `<skill_root>/bin/sg` so you can use it without sudo.
+The skill's `install.sh` does steps 1-3 automatically and drops the binary in `${XDG_CACHE_HOME:-~/.cache}/omo-ast-grep/bin/sg` (`%LOCALAPPDATA%\omo-ast-grep\bin\sg.exe` on Windows; override with `OMO_AST_GREP_BIN_DIR`) so you can use it without sudo. It never writes into the skill directory, which can sit inside a signed app bundle.
 
 ---
 
@@ -163,4 +163,4 @@ See `references/cli.md` for `ast-grep lsp` flags.
 | scoop | `scoop uninstall ast-grep` |
 | winget | `winget uninstall --id ast-grep.ast-grep` |
 | choco | `choco uninstall ast-grep` |
-| GitHub binary | `rm <skill_root>/bin/sg` |
+| GitHub binary | `rm ${XDG_CACHE_HOME:-~/.cache}/omo-ast-grep/bin/sg` |

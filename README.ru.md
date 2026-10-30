@@ -13,12 +13,6 @@
 > | :-----| :----- |
 
 
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
->
-> > **OmO поддерживается Jobdori, ИИ-ассистентом, показанным выше. Познакомьтесь со своим Jobdori, Dori. <br />Присоединяйтесь к листу ожидания [здесь](https://sisyphuslabs.ai).**
-
 > [!TIP] Будьте с нами!
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | Вступайте в наш [Discord](https://discord.gg/PUwSMR9XNk), чтобы общаться с контрибьюторами и пользователями OmO. |

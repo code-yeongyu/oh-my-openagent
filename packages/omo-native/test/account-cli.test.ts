@@ -8,7 +8,7 @@ import { appendEntries, emptyChain } from "../../memory-core/src/sync/crypto/cha
 import { createRejectionCounter } from "../../memory-core/src/sync/crypto/rejection.ts"
 import { pinTrustAnchor } from "../../memory-core/src/sync/crypto/trust-pin.ts"
 import { createWorld, removeWorldStateDirs } from "../../memory-core/src/sync/recovery/testing/world.test-support.ts"
-import { createCredentialStore, type CredentialStore, KeychainLockedError } from "../../omo-opencode/src/cli/service-auth/keystore"
+import { createCredentialStore, type CredentialStore, KeychainLockedError, type SecretApi } from "../../omo-opencode/src/cli/service-auth/keystore"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
@@ -198,7 +198,7 @@ describe("omo account", () => {
 describe("omo account on a locked OS credential store (desktop#3509)", () => {
   test("every verb reports keychain locked as its own exit code, never a generic failure", async () => {
     const locked = () => Promise.reject(Object.assign(new Error("SecKeychain write failed (-25308)"), { code: "ERR_SECRETS_PLATFORM_ERROR" }))
-    const store = createCredentialStore("http://127.0.0.1:1", { get: locked, set: locked, delete: locked }, "darwin")
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: { get: locked, set: locked, delete: locked }, platform: "darwin" })
     for (const [args, stdin] of [[["show"]], [["token"]], [["export"]], [["forget"]], [["adopt"], JSON.stringify(credential("dev_x", 60_000))]] as const) {
       const result = await run(store, [...args], stdin === undefined ? {} : { stdin })
       expect({ args, code: result.code, out: result.out }).toEqual({ args, code: ACCOUNT_EXIT.keychainLocked, out: [{ keychain: "locked" }] })
@@ -208,7 +208,7 @@ describe("omo account on a locked OS credential store (desktop#3509)", () => {
 
   test("an immediate native store failure returns store-unavailable", async () => {
     const broken = () => Promise.reject(new Error("boom"))
-    const store = createCredentialStore("http://127.0.0.1:1", { get: broken, set: broken, delete: broken }, "darwin")
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: { get: broken, set: broken, delete: broken }, platform: "darwin" })
     const result = await run(store, ["show"])
     expect(result.code).toBe(9)
     expect(result.out).toEqual([{ error: "store-unavailable" }])
@@ -221,9 +221,7 @@ describe("omo account storage failures do not trigger another store call", () =>
     const entered = Promise.withResolvers<void>()
     const pending = Promise.withResolvers<never>()
     const calls: string[] = []
-    const store = createCredentialStore(
-      "http://127.0.0.1:1",
-      {
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: {
         get: async () => {
           calls.push("get")
           entered.resolve()
@@ -236,9 +234,7 @@ describe("omo account storage failures do not trigger another store call", () =>
           calls.push("delete")
           return true
         },
-      },
-      "darwin",
-    )
+      }, platform: "darwin" })
 
     // when
     const operation = run(store, [verb], { stdin: JSON.stringify(credential("dev_wait", 60_000)) })
@@ -268,9 +264,7 @@ describe("omo account storage failures do not trigger another store call", () =>
       entered.resolve()
       return pending.promise
     }
-    const store = createCredentialStore(
-      service.api,
-      {
+    const store = createCredentialStore(service.api, { secrets: {
         get: async () => {
           calls.push("get")
           return value
@@ -286,9 +280,7 @@ describe("omo account storage failures do not trigger another store call", () =>
           await fail()
           return true
         },
-      },
-      "darwin",
-    )
+      }, platform: "darwin" })
     try {
       // when
       const operation = run(store, ["token"], { api: service.api })
@@ -309,15 +301,11 @@ describe("omo account storage failures do not trigger another store call", () =>
   })
 
   test("invalid stored credentials remain a non-storage failure", async () => {
-    const store = createCredentialStore(
-      "http://127.0.0.1:1",
-      {
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: {
         get: async () => "not-json",
         set: async () => {},
         delete: async () => true,
-      },
-      "darwin",
-    )
+      }, platform: "darwin" })
     const result = await run(store, ["show"])
     expect({ code: result.code, out: result.out }).toEqual({ code: ACCOUNT_EXIT.failed, out: [] })
   })
@@ -327,18 +315,12 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
   const empty = { get: async () => null, set: async () => {}, delete: async () => true }
   const linuxStore = (
     lock: "locked" | "unlocked" | "absent" | "unknown",
-    secrets: Parameters<typeof createCredentialStore>[1] = empty,
+    secrets: SecretApi = empty,
     notices: string[] = [],
   ) =>
-    createCredentialStore(
-      "http://127.0.0.1:1",
-      secrets,
-      "linux",
-      async () => lock,
-      message => {
+    createCredentialStore("http://127.0.0.1:1", { secrets, platform: "linux", lockProbe: async () => lock, notice: message => {
         notices.push(message)
-      },
-    )
+      } })
   const memorySecretApi = () => {
     const values = new Map<string, string>()
     return {
@@ -405,7 +387,7 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
     homes.push(emptyBin)
     process.env.PATH = emptyBin
     try {
-      const store = createCredentialStore("http://127.0.0.1:1", memorySecretApi(), "linux", undefined, () => {})
+      const store = createCredentialStore("http://127.0.0.1:1", { secrets: memorySecretApi(), platform: "linux", notice: () => {} })
       expect(await loginShowLogout(store)).toEqual([
         ACCOUNT_EXIT.ok,
         { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok" },
@@ -442,16 +424,10 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
 
   test("an unlocked answer is asked once per process, not before every secret call", async () => {
     let probes = 0
-    const store = createCredentialStore(
-      "http://127.0.0.1:1",
-      memorySecretApi(),
-      "linux",
-      async () => {
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: memorySecretApi(), platform: "linux", lockProbe: async () => {
         probes += 1
         return "unlocked"
-      },
-      () => {},
-    )
+      }, notice: () => {} })
     await loginShowLogout(store)
     expect(probes).toBe(1)
   })

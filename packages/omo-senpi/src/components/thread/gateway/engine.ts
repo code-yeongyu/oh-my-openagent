@@ -212,7 +212,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       if (endpoint === null) return await settle(resultFromRow(outcome.row, outcome.queue_position, null, false, true))
       let reached = true
       try {
-        await options.endpoints.wake(endpoint, [deliveryId])
+        reached = (await options.endpoints.wake(endpoint, [deliveryId])).unroutable === undefined
       } catch {
         reached = false
       }

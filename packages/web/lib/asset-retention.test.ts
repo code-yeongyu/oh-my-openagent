@@ -121,8 +121,8 @@ test("a reused stylesheet keeps an older document's longer deadline across later
       const cHistory: unknown = JSON.parse(
         await readFile(join(c, ASSET_HISTORY_PATH.slice(1)), "utf8"),
       )
-      await exercise(cHistory, async (d, dOrigin) => {
-        await carry(d, dOrigin, now + 259_200_000)
+      await exercise(cHistory, async (d, originD) => {
+        await carry(d, originD, now + 259_200_000)
         // Then: the original page's stylesheet is still downloadable.
         expect(await readFile(join(d, oldPath.slice(1)), "utf8")).toBe(oldCss)
       })

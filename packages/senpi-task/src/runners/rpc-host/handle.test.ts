@@ -211,8 +211,12 @@ describe("createHostSessionHandle over a daemon session", () => {
     await handle.close()
 
     // then
+    // The probe sends get_protocol_info; on macOS and Linux the session connection sends one too, because the
+    // engine client authenticates every new connection with it since senpi 2026.10.25-1 (senpi#3815).
+    const authFrame = process.platform === "win32" ? [] : ["get_protocol_info"]
     expect(host.commands.map((command) => command.type)).toEqual([
       "get_protocol_info",
+      ...authFrame,
       "open_session",
       "close_session",
     ])
