@@ -18,7 +18,7 @@ import { log } from "./logger"
  */
 export type RuntimeFallbackRecoveryDecision = "retry-owned" | "declined" | "timed-out"
 
-export const RUNTIME_FALLBACK_RECOVERY_DECISION_TIMEOUT_MS = 20_000
+const RUNTIME_FALLBACK_RECOVERY_DECISION_TIMEOUT_MS = 20_000
 
 type SettledDecision = Exclude<RuntimeFallbackRecoveryDecision, "timed-out">
 

@@ -55,7 +55,7 @@ export function recordCompactionEnd(
   entry.endedAt = Date.now()
 }
 
-export function clearCompaction(sessionID: string): void {
+function clearCompaction(sessionID: string): void {
   compactions.delete(sessionID)
   generations.delete(sessionID)
 }
