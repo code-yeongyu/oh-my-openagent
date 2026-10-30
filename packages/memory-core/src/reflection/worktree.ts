@@ -2,7 +2,8 @@ import { existsSync } from "../fs/resilient"
 import { mkdir, readFile, rm } from "../fs/resilient"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
-import { validateCompletion } from "./completion-validation"
+import { describeDroppedEntries, validateCompletion } from "./completion-validation"
+import { preflightReflectionDescriptions, type DescriptionPreflightWarn } from "./description-preflight"
 import { cleanupReflectionWorktree, integrateValidatedReflection } from "./worktree-integration"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -40,7 +41,7 @@ export interface ReflectionFinalizeResult {
 
 type WriterLock = <T>(operation: () => Promise<T>) => Promise<T>
 
-export type ReflectionFinalizeOptions =
+export type ReflectionFinalizeOptions = (
   | {
       readonly mode: "auto"
       readonly summary: string
@@ -49,6 +50,7 @@ export type ReflectionFinalizeOptions =
       readonly withWriterLock: WriterLock
     }
   | { readonly mode: "explicit"; readonly withWriterLock: WriterLock }
+) & { readonly warn?: DescriptionPreflightWarn }
 
 export async function createReflectionWorktree(
   repo: GitMemoryRepo,
@@ -111,10 +113,12 @@ export async function finalizeReflectionWorktree(
   let detail: string | undefined
 
   try {
+    await preflightReflectionDescriptions(worktree, worktree.baseSha, worktree.exec, options.warn)
     const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+    const droppedNote = "dropped" in validation && validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
     if (validation.status !== "valid") {
       status = validation.status
-      detail = "detail" in validation ? validation.detail : undefined
+      detail = "detail" in validation ? validation.detail : droppedNote
     } else if (options.mode === "auto" && options.allowedPaths !== undefined
       && validation.changedPaths.some((path) => !options.allowedPaths?.includes(path))) {
       detail = `Dream document maintenance changed paths outside its target: ${validation.changedPaths.join(", ")}`
@@ -127,15 +131,17 @@ export async function finalizeReflectionWorktree(
         withWriterLock: options.withWriterLock,
       })
       status = integrated.outcome
-      detail = integrated.detail
+      detail = [integrated.detail, droppedNote].filter(Boolean).join("; ") || undefined
     }
   } catch (error) {
     detail = errorMessage(error)
   }
 
+  // Cleanup is bookkeeping, not integration: demoting a landed reflection to "failed" here would
+  // re-reflect content that is already in the parent. The leftovers are reclaimed by the orphan
+  // sweep instead, so the receipt only annotates the outcome it observed.
   const cleanup = await cleanupReflectionWorktree(worktree)
   if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) {
-    status = "failed"
     detail = [detail, "Reflection cleanup did not fully complete"].filter(Boolean).join("; ")
   }
   return { status, ...(detail ? { detail } : {}), cleanup }

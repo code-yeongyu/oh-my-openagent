@@ -1,0 +1,4 @@
+.selected { border-radius: 8px; border: 2px solid #6366f1; }
+.plan { border-radius: 16px; box-shadow: inset 0 0 0 2px #6366f1; }
+.card { border-radius: 12px; }
+.card.is-active { border-width: 2px; border-style: solid; border-color: var(--primary); }

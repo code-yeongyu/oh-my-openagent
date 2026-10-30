@@ -11,7 +11,7 @@ const TOAST_BODY = {
 } as const
 const NON_ERROR_FAILURE = { reason: "toast unavailable" } as const
 
-function createContext(showToast: () => unknown): PluginInput {
+function createContext(showToast: (options: unknown) => unknown): PluginInput {
 	return unsafeTestValue<PluginInput>({
 		client: {
 			tui: { showToast },
@@ -35,13 +35,17 @@ describe("showToastBestEffort", () => {
 
 	test("#given showToast rejects asynchronously #when toast is shown #then rejection is swallowed", async () => {
 		// given
-		const ctx = createContext(() => Promise.reject(NON_ERROR_FAILURE))
+		const showToastCalls: unknown[] = []
+		const ctx = createContext((options) => {
+			showToastCalls.push(options)
+			return Promise.reject(NON_ERROR_FAILURE)
+		})
 
 		// when
 		showToastBestEffort(ctx, TOAST_BODY)
-		await Promise.resolve()
+		await new Promise<void>((resolve) => setImmediate(resolve))
 
-		// then
-		expect(true).toBe(true)
+		// then: the rejecting toast was attempted, and bun:test fails this test if the rejection escapes unhandled
+		expect(showToastCalls).toEqual([{ body: TOAST_BODY }])
 	})
 })

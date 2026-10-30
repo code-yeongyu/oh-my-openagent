@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Standalone feature modules wired into `plugin/` layer. Each is self-contained with own types, implementation, and co-located tests. Several directories now provide OpenCode adapter shims over extracted Core packages; keep those shim paths stable unless the plugin wiring is moved at the same time.
+Standalone feature modules wired into `plugin/` layer. Each is self-contained with own types, implementation, and co-located tests. Several directories now provide OpenCode adapter shims over extracted Core packages; keep the shim paths that production code imports stable unless the plugin wiring is moved at the same time. A shim whose only importers are tests is deleted, not kept alive by an identity test; tests import the Core package directly.
 
 ## MODULE MAP
 
@@ -75,4 +75,4 @@ State-first tmux integration. Shared tmux primitives are extracted to `packages/
 
 The built-in skill catalog now lives entirely in `packages/skills-loader-core/src/features/builtin-skills/` — see [its AGENTS.md](../../../skills-loader-core/src/features/builtin-skills/AGENTS.md) for the skill table and browser-variant selection rules. Import through `@oh-my-opencode/skills-loader-core/builtin-skills`.
 
-Browser variant selected by `browser_automation_engine` config: `playwright` (default) | `playwright-cli` | `agent-browser`.
+`browser_automation_engine` selects one of `playwright`, `dev-browser`, or `playwright-cli`; the provider enum lives in `config/schema/browser-automation.ts`. Removed providers fail schema validation and the `browser-provider` doctor check reports migration guidance. Browser QA guidance in the shipped skills comes from omowright (the `browser` skill's owned and attached engines); the OpenCode provider enum is independent of it.

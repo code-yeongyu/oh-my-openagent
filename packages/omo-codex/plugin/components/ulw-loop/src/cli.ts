@@ -2,7 +2,7 @@
 import { isUlwLoopSubcommand, ulwLoopCommand } from "./cli-commands.js";
 import { ULW_LOOP_HELP } from "./cli-output.js";
 import { runPreToolUseGoalBudgetGuardCli, runUlwLoopHookCli } from "./codex-hook.js";
-import { runSpawnGuardCli } from "./spawn-guard.js";
+import { runSpawnAdmissionRecorderCli, runSpawnGuardCli } from "./spawn-guard.js";
 import { runStopResumeHookCli } from "./stop-resume-hook.js";
 
 async function main(): Promise<number> {
@@ -27,6 +27,10 @@ async function main(): Promise<number> {
 		}
 		if (sub === "stop") {
 			await runStopResumeHookCli(process.stdin, process.stdout);
+			return 0;
+		}
+		if (sub === "post-tool-use-spawn") {
+			await runSpawnAdmissionRecorderCli(process.stdin, process.stdout);
 			return 0;
 		}
 		if (sub === "pre-tool-use-spawn") {

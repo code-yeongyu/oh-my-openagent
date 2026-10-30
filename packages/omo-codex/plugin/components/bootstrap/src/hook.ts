@@ -8,7 +8,7 @@ import { resolveBootstrapLockPath, resolveBootstrapStatePath } from "./environme
 import { readBootstrapState, readPluginVersion } from "./worker.ts";
 
 export const BOOTSTRAP_RESTART_NOTICE =
-	"LazyCodex bootstrap running in background — restart the session when it completes";
+	"LazyCodex bootstrap running in background: restart the session when it completes";
 
 export type SessionStartAction =
 	| "spawned"

@@ -186,14 +186,14 @@ describe("applyAgentVariant", () => {
 
 describe("resolveVariantForModel", () => {
   test("returns agent reasoning before legacy variant and fallback chain metadata", () => {
-    // given - use a model in sisyphus chain (claude-opus-5 has default variant "max")
+    // given - use a model in sisyphus chain (claude-opus-5-5 has default variant "max")
     // to verify the canonical field takes precedence over both legacy sources
     const config = {
       agents: {
         sisyphus: { reasoning: "high", variant: "low" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-5" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-5-5" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -205,7 +205,7 @@ describe("resolveVariantForModel", () => {
   test("returns correct variant for anthropic provider", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-5" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-5-5" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -324,7 +324,7 @@ describe("resolveVariantForModel", () => {
   test("returns correct variant for oracle agent with anthropic", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-5" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-5-5" }
 
     // when
     const variant = resolveVariantForModel(config, "oracle", model)

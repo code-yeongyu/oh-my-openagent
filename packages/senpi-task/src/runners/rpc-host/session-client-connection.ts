@@ -1,0 +1,292 @@
+import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionReplaced, HostSessionClientOptions } from "./session-client-contract"
+import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
+import { log } from "@oh-my-opencode/utils"
+
+import type { SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
+import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
+import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
+import { createChildExtensionEvents } from "../child-extension-events"
+import { socketAcceptsConnection } from "./busy-host"
+import { SESSION_PARKED_CAUSE } from "./exit-mapping"
+import { dispatchHostCommand } from "./host-command-dispatch"
+import {
+  createSenpiRpcClient,
+  probeWithEngine,
+  type HostProtocolProbe,
+  type HostPendingInputs,
+  type HostRpcClient,
+  type HostRpcClientFactory,
+  type HostSessionOpenInput,
+} from "./session-transport"
+import {
+  HostSessionDetachedError,
+  isAgentSessionEvent,
+  isRoutedTo,
+  parseControlRecord,
+  type HostControlRecord,
+} from "./session-wire"
+import { createHostTaskParentWire } from "./task-parent-wire"
+import type { TaskParentWire } from "../task-parent-control"
+import { confirmHostSessionAbsent } from "./session-close-proof"
+import { openHostSessionConnection } from "./session-client-opening"
+
+
+/**
+ * ONE senpi `RpcClient` per child, over the machine-wide daemon's public socket. The client probes
+ * the daemon per child (never a cached answer), opens the child's session, filters every frame down
+ * to that session's routing handle, auto-answers extension UI requests so a headless child never
+ * blocks on a human, and surfaces park/close/transport-loss as typed signals. It never retries a
+ * held session path and never signals a process - a daemon session has no pid of its own.
+ *
+ * The engine's `RpcClient` exposes no raw-command seam, so the protocol probe rides its own
+ * short-lived connection to the same socket; `instanceId` is informational (records key liveness on
+ * the session path, never on the instance).
+ */
+export class HostSessionClient {
+  readonly extensionEvents = createChildExtensionEvents()
+  readonly onExtensionEvent = this.extensionEvents.subscribe
+  readonly socketPath: string
+  readonly transportGone: Promise<RpcTransportGoneError>
+  private readonly createClient: HostRpcClientFactory
+  private readonly probeProtocolInfo: HostProtocolProbe
+  private readonly socketAccepts: (socketPath: string) => Promise<boolean>
+  private readonly transportLoss = Promise.withResolvers<RpcTransportGoneError>()
+  private readonly eventListeners = new Set<ChildEventListener>()
+  private readonly parkedListeners = new Set<(event: HostSessionParked) => void>()
+  private readonly closedListeners = new Set<(event: HostSessionClosed) => void>()
+  private readonly replacedListeners = new Set<(event: HostSessionReplaced) => void>()
+  private client: HostRpcClient | undefined
+  // One wire per engine connection: a reattach's new connection declares task_parent again.
+  private readonly taskParentWires = new WeakMap<HostRpcClient, TaskParentWire>()
+  private routingId: string | undefined
+  private identity: SenpiHostProtocolInfo | undefined
+  private reattached = false
+  private confirmingClose = false
+
+  constructor(options: HostSessionClientOptions) {
+    this.socketPath = options.socketPath
+    this.createClient = options.ports?.createClient ?? createSenpiRpcClient
+    this.probeProtocolInfo = options.ports?.probeProtocolInfo ?? probeWithEngine
+    this.socketAccepts = options.ports?.socketAccepts ?? socketAcceptsConnection
+    this.transportGone = this.transportLoss.promise
+  }
+
+  /** The live routing handle, or undefined once the session was parked, closed or dropped. */
+  get sessionId(): string | undefined {
+    return this.routingId
+  }
+
+  /** Whether the last successful open re-joined a session that was still live on the host. */
+  get attached(): boolean {
+    return this.reattached
+  }
+
+  get instanceId(): string | undefined {
+    return this.identity?.instanceId
+  }
+
+  get engineVersion(): string | undefined {
+    return this.identity?.engineVersion
+  }
+
+  async open(input: HostSessionOpenInput): Promise<OpenedHostSession> {
+    const { opened, identity, retryFallbackDropped } = await openHostSessionConnection(input, {
+      socketPath: this.socketPath,
+      createClient: this.createClient,
+      probeProtocolInfo: this.probeProtocolInfo,
+      socketAccepts: this.socketAccepts,
+      onDisconnect: (error) => this.handleTransportLoss(error),
+      onEvent: (record) => this.ingest(record),
+      bindClient: (client) => { this.client = client },
+    })
+    this.identity = identity
+    this.routingId = opened.sessionId
+    this.reattached = opened.attached ?? false
+    return {
+      sessionId: opened.sessionId,
+      attached: this.reattached,
+      instanceId: identity.instanceId,
+      engineVersion: identity.engineVersion,
+      ...(retryFallbackDropped ? { retryFallbackDropped } : {}),
+    }
+  }
+
+  send(command: HostSessionCommand): Promise<void> {
+    return dispatchHostCommand(this.connected(command.type), this.routingId, command)
+  }
+
+  taskParentWire(): TaskParentWire {
+    const client = this.connected("task_parent")
+    const known = this.taskParentWires.get(client)
+    if (known !== undefined) return known
+    const wire = createHostTaskParentWire(client)
+    this.taskParentWires.set(client, wire)
+    return wire
+  }
+
+  getState(): Promise<RpcSessionState> {
+    return this.connected("get_state").getState()
+  }
+
+  getAvailableModels(): ReturnType<HostRpcClient["getAvailableModels"]> {
+    return this.connected("get_available_models").getAvailableModels()
+  }
+
+  getEntries(since?: string): Promise<RpcEntriesResult> {
+    return this.connected("get_entries").getEntries(since)
+  }
+
+  async getPendingInputs(knownClientMessageIds: readonly string[]): Promise<HostPendingInputs | undefined> {
+    const client = this.connected("get_pending_inputs")
+    return client.getPendingInputs === undefined ? undefined : client.getPendingInputs(knownClientMessageIds)
+  }
+
+  switchSession(sessionPath: string): Promise<RpcSwitchSessionResult> {
+    return this.connected("switch_session").switchSession(sessionPath)
+  }
+
+  onEvent(listener: ChildEventListener): () => void {
+    this.eventListeners.add(listener)
+    return () => this.eventListeners.delete(listener)
+  }
+
+  onParked(listener: (event: HostSessionParked) => void): () => void {
+    this.parkedListeners.add(listener)
+    return () => this.parkedListeners.delete(listener)
+  }
+
+  onClosed(listener: (event: HostSessionClosed) => void): () => void {
+    this.closedListeners.add(listener)
+    return () => this.closedListeners.delete(listener)
+  }
+
+  onReplaced(listener: (event: HostSessionReplaced) => void): () => void {
+    this.replacedListeners.add(listener)
+    return () => this.replacedListeners.delete(listener)
+  }
+
+  /** End the session on the host (`close_session`), then drop this child's connection. */
+  async close(): Promise<void> {
+    this.extensionEvents.clear()
+    const client = this.client
+    const routingId = this.routingId
+    this.client = undefined
+    this.routingId = undefined
+    if (client === undefined) return
+    try {
+      if (routingId !== undefined) await client.closeSession(routingId)
+    } finally {
+      await client.stop()
+    }
+  }
+
+  /** Only a live post-close host listing releases ownership; ACKs and frames are not proof. */
+  async closeConfirmed(): Promise<void> {
+    const client = this.connected("close_session")
+    const routingId = this.routingId
+    if (routingId === undefined) throw new HostSessionDetachedError("close_session")
+    this.confirmingClose = true
+    await confirmHostSessionAbsent(client, routingId, () => this.client === client)
+    this.extensionEvents.clear()
+    this.client = undefined
+    this.routingId = undefined
+    await client.stop()
+  }
+
+  /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */
+  async detach(): Promise<void> {
+    this.extensionEvents.clear()
+    const client = this.client
+    this.client = undefined
+    this.routingId = undefined
+    this.eventListeners.clear()
+    await client?.stop()
+  }
+
+  private connected(operation: string): HostRpcClient {
+    const client = this.client
+    if (client === undefined) throw new HostSessionDetachedError(operation)
+    return client
+  }
+
+  private ingest(record: unknown): void {
+    if (!isRoutedTo(record, this.routingId)) return
+    if (this.extensionEvents.ingest(record)) return
+    const control = parseControlRecord(record)
+    if (control === undefined) {
+      if (isAgentSessionEvent(record)) for (const listener of this.eventListeners) listener(record)
+      return
+    }
+    this.handleControl(control)
+  }
+
+  private handleControl(control: HostControlRecord): void {
+    switch (control.type) {
+      case "extension_ui_request":
+        this.answerUi(control)
+        return
+      case "session_parked": {
+        if (this.confirmingClose) return
+        const sessionId = this.routingId ?? control.sessionId
+        this.routingId = undefined
+        try {
+          for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+        } finally {
+          this.releaseEndedSession()
+        }
+        return
+      }
+      case "session_closed": {
+        if (this.confirmingClose) return
+        const sessionId = this.routingId ?? control.sessionId ?? ""
+        this.routingId = undefined
+        try {
+          for (const listener of this.closedListeners) listener({ sessionId, reason: control.reason })
+        } finally {
+          this.releaseEndedSession()
+        }
+        return
+      }
+      case "session_replaced": {
+        // The host keeps the routing handle live across the swap: the child follows the new
+        // identity instead of ending, and the next reattach reopens the NEW transcript (F9).
+        const sessionId = this.routingId ?? control.sessionId ?? ""
+        for (const listener of this.replacedListeners) {
+          listener({ sessionId, durableSessionId: control.durableSessionId, sessionFile: control.sessionFile })
+        }
+        return
+      }
+      default:
+        unreachable(control)
+    }
+  }
+
+  // Notify the handle first so it marks itself parked/exited before the client goes; the engine's
+  // deliberate stop() never fires onDisconnect, so this release cannot start a recovery attach.
+  // Detach only this session's client; retained transcripts and sibling attach holds stay intact.
+  private releaseEndedSession(): void {
+    void this.detach().catch((error: unknown) => {
+      log("senpi-task ended host session detach failed", { socket: this.socketPath, error: String(error) })
+    })
+  }
+
+  // The child must never wait on a human: the deny/cancel answer is written and NOT awaited, so a
+  // UI request cannot hold up the record stream or a command in flight.
+  private answerUi(request: AutoAnswerableUiRequest): void {
+    const answer = buildAutoUiResponse(request)
+    if (answer === null) return
+    void this.client?.sendExtensionUIResponse(answer).catch((error: unknown) => {
+      log("senpi-task host session ui auto-answer failed", { socket: this.socketPath, error: String(error) })
+    })
+  }
+
+  private handleTransportLoss(error: RpcTransportGoneError): void {
+    this.routingId = undefined
+    this.client = undefined
+    this.transportLoss.resolve(error)
+  }
+}
+
+function unreachable(value: never): never {
+  throw new Error(`unhandled host session command: ${JSON.stringify(value)}`)
+}

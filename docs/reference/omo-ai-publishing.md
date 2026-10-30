@@ -1,6 +1,6 @@
 # omo-ai Publishing Runbook
 
-`omo-ai` is the npm package for the senpi-native edition of OMO. It ships a single bin, `omo`, which launches the exact-pinned `@code-yeongyu/senpi` release with the full OMO extension loaded. This runbook records the registry state the package was bootstrapped into, the mechanism that keeps the package beta-only, and the checks a maintainer runs around each release.
+`omo-ai` is the npm package for OmO Native. It ships a single bin, `omo`, which launches the exact-pinned `@code-yeongyu/senpi` release with the full OMO extension loaded. This runbook records the registry state the package was bootstrapped into, how a release picks its channel, and the checks a maintainer runs around each release.
 
 The package publishes exclusively through GitHub Actions (`publish.yml`) with npm OIDC trusted publishing. There is no local publish path, and this document must never grow one.
 
@@ -10,26 +10,22 @@ The name was reserved with a one-time placeholder publish:
 
 - `omo-ai@0.0.0-beta.0` was published public with `--tag beta`, using a scoped granular token that was issued, used, and revoked on the same day (2026-08-03).
 - The placeholder was then `npm deprecate`d with a message pointing users at the beta channel.
-- npm set the `latest` dist-tag on that first publish and refuses to delete it. Deletion was attempted and the registry answered E400 (measured 2026-08-03). `latest` therefore stays pinned to the deprecated `0.0.0-beta.0` placeholder forever, by design.
+- npm set the `latest` dist-tag on that first publish and refuses to delete it. Deletion was attempted and the registry answered E400 (measured 2026-08-03). `latest` stayed on the deprecated `0.0.0-beta.0` placeholder through the whole 5.0.0 beta line, until the first stable release moved it.
 
 Never republish the placeholder and never recreate the bootstrap token. Both were one-time actions; the pipeline covers everything after them.
 
-## How the beta gate works
+## How a release picks its channel
 
-The gate is registry semantics, not the deprecation message:
+The channel follows the version being released (`Calculate omo-ai metadata` in `publish.yml`):
 
-1. A bare `npm i -g omo-ai` resolves the default spec as the range `*`.
-2. Prerelease versions never satisfy `*`.
-3. Every omo-ai version is a prerelease: the placeholder is `0.0.0-beta.0`, and the release pipeline maps each root version to a prerelease (`X.Y.Z` becomes `X.Y.Z-1`, `X.Y.Z-foo` becomes `X.Y.Z-0.foo`), so no stable version can ever exist.
-4. Resolution finds no candidate and fails with ETARGET: `No matching version found for omo-ai@*` (measured live 2026-08-09).
+| Root version | omo-ai version | dist-tag | Install line |
+| --- | --- | --- | --- |
+| `X.Y.Z-<suffix>` (prerelease) | `X.Y.Z-0.<suffix>` | `beta` | `bun add -g omo-ai@beta` |
+| `X.Y.Z` (stable) | `X.Y.Z` | `latest` | `bun add -g omo-ai` |
 
-The deprecation notice on the placeholder is cosmetic guidance only. Deprecation does not affect npm resolution, and un-deprecating the placeholder would not open the bare channel. The only thing that could is publishing a non-prerelease version, which the version mapping makes impossible.
+Every product surface derives the same spelling from the running package's own version: the update banner (`update.distTag`), `omo update`, `omo doctor`, the launcher's reinstall hints, the OpenCode installer and its in-session nudge, and the release-notes install footer. A stable build never tells a user to add `@beta`, and a prerelease build never points at `latest`.
 
-Installing works only with an explicit opt-in:
-
-```bash
-npm i -g omo-ai@beta
-```
+History: through the 5.0.0 beta line every root version mapped to a prerelease (`X.Y.Z` became `X.Y.Z-1`), so a bare `npm i -g omo-ai` resolved nothing and failed with ETARGET (measured 2026-08-09). The 5.0.0 release retired that gate.
 
 Repository beta releases are dispatched with `/publish <explicit-semver>`, for example `/publish 5.0.0-beta.9`. The command sends that exact value through the workflow's `version` input, records the returned workflow run ID, and follows only that run. Release notes compare a beta against the preceding beta in the same channel. The GitHub release itself is always a full release, never a GitHub pre-release: the npm dist-tag carries the channel semantics. The **Latest** badge is decided by [`script/release-latest-flag.ts`](../../script/release-latest-flag.ts) from the highest already published semver (`Bun.semver` ordering, non-semver tags such as `_pr-attachments` ignored), not by creation order, so a hotfix dispatched for an older line gets `--latest=false` and does not steal the badge. That badge is load-bearing: the compiled `omo` binary's update hint downloads from `releases/latest/download/<asset>`.
 
@@ -46,30 +42,27 @@ Verification procedure (npmjs.com, may need one Touch ID or security-key approva
 3. Save, then reload the settings page and confirm the entry persisted. Capture a screenshot as evidence.
 4. Confirm the npm access tokens list shows no live omo-ai token.
 
-## Beta channel contract
+## Channel contract
 
-- Every omo-ai publish uses `--tag beta`. Always. The tag is hardcoded in the workflow and independent of the repo-wide `DIST_TAG` derivation.
-- Every version is a prerelease, forever, through the release mapping described above.
-- `latest` never advances past the placeholder. Leaving beta is out of scope for this plan and requires a separately approved plan.
-- Remediation if `latest` ever advances anyway:
+- A prerelease publishes with `--tag beta`; a stable release publishes with `--tag latest`. The tag comes from `omo_ai_dist_tag`, never from the repo-wide `DIST_TAG`.
+- `Guard omo-ai dist-tags` asserts the channel tag points at the new version, and that a prerelease never lands on `latest`.
+- `Verify omo-ai live install` installs the channel's own spelling in a fresh prefix (`omo-ai` for stable, `omo-ai@beta` for a prerelease) and requires the new version.
+- After a stable release, move `beta` to it with `npm-dist-tag-rollback.yml` (`version=X.Y.Z`, `dist_tag=beta`) so users still on `@beta` get the stable build.
+- Remediation if a prerelease ever reaches `latest`: `npm dist-tag add omo-ai@<last stable> latest`.
 
-```bash
-npm dist-tag add omo-ai@0.0.0-beta.0 latest
-```
+## Release checklist
 
-## First-beta-release checklist (user-dispatched)
-
-The first real omo-ai release is not automated into any merge. The user dispatches `publish.yml` as usual, then confirms in the run log:
+The user dispatches `publish.yml` as usual, then confirms in the run log:
 
 - [ ] The bin-ownership assertion passed (root `package.json` does not re-declare `.bin.omo`).
 - [ ] The omo-ai stamp, build, payload-verify, and publish steps ran with OIDC. No `NODE_AUTH_TOKEN` appears anywhere in the omo-ai steps.
-- [ ] The dist-tag guard passed: `beta` points at the new version and `latest` is still `0.0.0-beta.0`.
-- [ ] Live verification passed: a fresh-prefix `npm i -g omo-ai@beta` installed the stamped version, `omo --version` exited 0, and the bare-channel `npm i -g omo-ai` probe failed with ETARGET.
+- [ ] The dist-tag guard passed: the channel tag (`latest` for stable, `beta` for a prerelease) points at the new version.
+- [ ] Live verification passed: a fresh-prefix install of the channel spelling installed the stamped version and `omo --version` exited 0.
 
 ## Brand contract (what makes the product read as omo)
 
 The launcher hands the pinned engine a single `SENPI_BRAND` JSON profile before spawning it. The
-engine resolves it once and then scrubs it, so a senpi the agent itself spawns keeps the engine
+engine resolves it once and then scrubs it, so a senpi engine the agent itself spawns keeps the engine
 identity instead of impersonating the product.
 
 | field | value | effect |
@@ -79,7 +72,7 @@ identity instead of impersonating the product.
 | `configDir` + `flatLayout` | `.omo`, nested | agent state lives at `~/.omo/agent` - the one directory every omo entry point resolves through `bin/lib/agent-dir.js`; the launcher pins it for the engine with `OMO_CODING_AGENT_DIR` plus the legacy `SENPI_CODING_AGENT_DIR` |
 | `envPrefix` | `OMO` | `OMO_*` variables are read first, then the legacy `SENPI_*` and `PI_*` names |
 | `userAgent` / `originator` | `omo` | outgoing request identity |
-| `update` | `omo-ai`, `beta`, `npm i -g omo-ai@beta` | the update banner checks the beta dist-tag of omo-ai and prints the product's own command |
+| `update` | `omo-ai`, the channel tag, `npm i -g omo-ai` (stable) or `npm i -g omo-ai@beta` (prerelease) | the update banner checks the dist-tag of this build's channel and prints the product's own command |
 
 The display name also becomes Senpi's `APP_NAME`, so process titles, exported
 session filenames, debug-log filenames, and opt-in provider attribution headers
@@ -97,14 +90,18 @@ must point at that release or newer.
 
 ## Install and upgrade order (EEXIST)
 
-Machines that still carry a pre-rename root package (oh-my-openagent or oh-my-opencode at 4.19.4 or earlier) have a global `omo` bin shim from that package. Installing omo-ai on top of it fails with EEXIST because npm refuses to overwrite a bin link owned by another package.
+Machines that still carry a pre-rename root package (oh-my-openagent or oh-my-opencode at 4.19.4 or earlier) have a global `omo` bin shim from that package. `latest` is still 4.19.4, so this is the state of every machine that never moved to the 5.x beta. Two ways it breaks:
 
-Order matters:
+- `npm i -g omo-ai@beta` fails with `EEXIST: file already exists <prefix>/bin/omo`; npm refuses to overwrite a bin link owned by another package.
+- `bun add -g omo-ai@beta` succeeds into the bun prefix, but both bins now exist. With the npm prefix earlier on PATH, `omo --version` keeps printing `4.19.4` and the user is silently running the old CLI.
 
-1. First upgrade oh-my-openagent/oh-my-opencode to a post-rename release (which drops the `omo` bin), or uninstall it.
-2. Then `npm i -g omo-ai@beta`.
+`bunx oh-my-openagent@beta install --platform=native` is the supported path and does the ordering itself (the `@beta` tag is required: `latest` 4.19.4 rejects `--platform=native`):
 
-Machines already on a renamed release have no global `omo` and install cleanly in one step.
+1. It scans the PATH directories and the bun global bin dir for an `omo` command, resolves each to its owning package (symlink target, or the package path inside a launcher shim), and removes only the ones owned by oh-my-openagent / oh-my-opencode, plus the generated `omo` wrapper a pre-rename Codex Light install wrote into `~/.local/bin`. The package itself and its other commands (`oh-my-openagent`, `lazycodex`, ...) stay; only the alias the rename orphaned is dropped, and the removal is printed.
+2. It installs `omo-ai@beta` with bun, or npm when bun is absent.
+3. It runs the resolved `omo --version` and requires the answer to come from omo-ai. If another `omo` still resolves first, or omo-ai landed in a directory that is not on PATH, it prints the exact `export PATH=...` fix instead of claiming success.
+
+By hand, the equivalent is: remove `<prefix>/bin/omo` (or uninstall the old package), then `npm i -g omo-ai@beta`. Uninstalling the old package after omo-ai is in place is not symmetric: `npm uninstall -g oh-my-openagent` unlinks every bin name that package declares, so it also deletes the `omo` in the npm bin dir that npm-installed omo-ai now owns (the installer prints this note on the npm path); reinstall with `npm i -g omo-ai@beta` afterwards. `bun remove -g` keeps a bin another package owns. Machines already on a renamed release have no global `omo` and install cleanly in one step.
 
 ## Runtime selection (bun wherever it exists)
 

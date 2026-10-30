@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import { OPENAI_CATEGORIES } from "../../category/openai-categories"
+import { categoryGateModels } from "../../category/builtins"
 import { listTaskCategories } from "./categories"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 function requiredAnnotation(name: string): string {
-  const definition = OPENAI_CATEGORIES.find((category) => category.name === name)
-  if (definition?.requiresModel === undefined) throw new Error(`builtin category ${name} is not model-gated`)
-  return `(requires ${definition.requiresModel.join(" or ")})`
+  const gateModels = categoryGateModels(name)
+  if (gateModels === undefined) throw new Error(`builtin category ${name} is not model-gated`)
+  return `(requires ${gateModels.join(" or ")})`
 }
 
 function entryFor(name: string, config: Parameters<typeof listTaskCategories>[0]) {
@@ -20,7 +21,7 @@ describe("gated category listing", () => {
       const entry = entryFor("architect", {})
 
       // then
-      expect(entry?.description).toContain("(requires claude-fable-5-1)")
+      expect(entry?.description).toContain(FABLE_55_RELEASED ? "(requires claude-fable-5-5 or claude-fable-5-1)" : "(requires claude-fable-5-1)")
     })
 
     test("#when the categories are listed #then ultrabrain carries its required model annotation", () => {
@@ -31,12 +32,17 @@ describe("gated category listing", () => {
       expect(entry?.description).toContain(requiredAnnotation("ultrabrain"))
     })
 
-    test("#when the categories are listed #then deep carries its required model annotation", () => {
+    test("#when the categories are listed #then each deep lane carries its own required model annotation", () => {
       // given / when
-      const entry = entryFor("deep", {})
+      const low = entryFor("deep-low", {})
+      const high = entryFor("deep-high", {})
 
       // then
-      expect(entry?.description).toContain(requiredAnnotation("deep"))
+      expect(low?.description).toContain("(requires gpt-6.1-sol or gpt-6.1-sol-fast or gpt-5.6-sol-fast or gpt-5.6-sol)")
+      expect(low?.description).toContain(requiredAnnotation("deep-low"))
+      expect(low?.description).not.toContain("gpt-6-sol")
+      expect(high?.description).toContain("(requires gpt-6-astra)")
+      expect(high?.description).toContain(requiredAnnotation("deep-high"))
     })
   })
 

@@ -49,7 +49,7 @@ These are not "optional extras". They are the correct tool in their domain, and 
 
 | Tool | Use when | Reference |
 |---|---|---|
-| **Playwright CLI** | Any browser-served web UI bug. Any flow that requires clicking/typing/navigating. Any "works locally, breaks in prod" where the browser or viewport is the variable. **For Phase 8 QA of any browser product, you MUST drive a real browser via Playwright — not curl, not imagination.** | 📖 **[references/tools/playwright-cli.md](references/tools/playwright-cli.md)** |
+| **omowright** | Any browser-served web UI bug. Any flow that requires clicking/typing/navigating. Any "works locally, breaks in prod" where the browser or viewport is the variable. **For Phase 8 QA of any browser product, you MUST drive a real browser through omowright — not curl, not imagination.** | 📖 **[references/tools/browser-qa.md](references/tools/browser-qa.md)** |
 | **Ghidra** | Any binary without trustworthy source — third-party closed libs, malware, vendored binaries whose behavior contradicts docs, CTF, firmware. **Use Ghidra's decompiler before `strings`/`objdump` guessing. It turns machine code into readable C.** | 📖 **[references/tools/ghidra.md](references/tools/ghidra.md)** |
 | **pwndbg** | Any native binary debugging session. It is GDB with the useful views (registers, stack, disasm, heap) always visible. **If you'd reach for plain `gdb`, reach for `pwndbg` instead — it is strictly a superset.** | 📖 **[references/tools/pwndbg.md](references/tools/pwndbg.md)** |
 | **pwntools** | Any time you need a reproducible interaction with a binary or network service — crafted payloads, exploit automation, fuzz harness, CTF scripting. | 📖 **[references/tools/pwntools.md](references/tools/pwntools.md)** |
@@ -73,7 +73,7 @@ Each phase has exactly one reference. Read it as you enter the phase — not in 
 | 4 | **Oracle Triple** — after 2 consecutive failed rounds, spawn three Oracles with orthogonal framings and synthesize | [references/methodology/04-oracle-triple.md](references/methodology/04-oracle-triple.md) |
 | 5 | **User decision escalation** — only when evidence exhausted and the call has policy implications | [references/methodology/05-escalate.md](references/methodology/05-escalate.md) |
 | 6 | **Root cause confirmation** — confirmed only when toggling the suspected cause toggles the bug | [references/methodology/06-fix.md](references/methodology/06-fix.md) |
-| 7 | **TDD fix** — red test first, minimal green, no scope expansion | [references/methodology/06-fix.md](references/methodology/06-fix.md) |
+| 7 | **Fix locked by a failing proof** — reuse the owner test that already fails or add one regression that fails on the pre-fix code, minimal green, no scope expansion | [references/methodology/06-fix.md](references/methodology/06-fix.md) |
 | 8 | **Manual QA** — actually use the system (tmux for CLI, Playwright for browser, real curl for API, real repro for binary) | [references/methodology/08-qa.md](references/methodology/08-qa.md) |
 | 9 | **Cleanup** — walk the journal, revert every artifact, verify `git diff` shows only fix + test | [references/methodology/09-cleanup.md](references/methodology/09-cleanup.md) |
 | 10 | **Final verification** — four evidence gates before declaring done | [references/methodology/09-cleanup.md](references/methodology/09-cleanup.md) |
@@ -97,7 +97,7 @@ These are not phases — read them when the situation calls for them:
 <safety>
 1. **Runtime state is the only source of truth.** A hypothesis without an observed value is a guess. Do not fix guesses.
 2. **Every debug artifact is journaled before it is created.** Journal-then-modify, not modify-then-remember-maybe.
-3. **Never ship a fix without a failing-first test.** Red→green transition required, or the fix is unverified.
+3. **Never ship a fix without its reproduction.** The failing case captured BEFORE the fix, the same case passing after it, or the fix is unverified. Where the repository keeps tests for this behavior, that case is the regression test.
 4. **Never declare done on type-check/compile alone.** Types catch declaration bugs. Only running the actual user scenario catches the actual user bug.
 5. **Never ask the user a question that runtime evidence can already answer.** Escalation is for genuine ambiguity.
 6. **Never silently swallow errors while debugging.** If the system swallows errors, that is often the bug itself. Make them loud temporarily; restore at cleanup.

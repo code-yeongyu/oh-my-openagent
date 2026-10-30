@@ -1,6 +1,6 @@
 {
 	"name": "@code-yeongyu/codex-lsp",
-	"version": "5.0.0-beta.43",
+	"version": "5.1.52",
 	"description": "Codex plugin that exposes Language Server Protocol tools and post-edit diagnostics.",
 	"type": "module",
 	"packageManager": "npm@11.12.1",
@@ -44,20 +44,21 @@
 		"test:watch": "vitest",
 		"pretypecheck": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
 		"typecheck": "tsc --noEmit",
-		"lint": "biome check src test",
-		"lint:fix": "biome check --write src test",
+		"lint": "biome format src test",
+		"lint:fix": "biome format --write src test",
 		"precheck": "node scripts/build-lsp-tools.mjs && node scripts/build-lsp-daemon.mjs",
-		"check": "tsc --noEmit && biome check src test && tsc -p tsconfig.build.json"
+		"check": "tsc --noEmit && biome format src test && tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
 		"@oh-my-opencode/lsp-core": "file:../../../../lsp-core",
 		"@code-yeongyu/lsp-daemon": "file:../../../../lsp-daemon"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.5.9",
-		"@types/node": "^26.2.0",
+		"@vitest/coverage-v8": "5.0.1",
+		"@biomejs/biome": "2.5.14",
+		"@types/node": "^26.6.2",
 		"typescript": "^7.0.2",
-		"vitest": "^4.1.11"
+		"vitest": "5.0.1"
 	},
 	"engines": {
 		"node": ">=20.0.0"

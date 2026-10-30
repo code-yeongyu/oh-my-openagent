@@ -18,7 +18,6 @@ export const CACHE_DIR_NAME = "omo-codex";
 export const EVENT_NAME = "omo_codex_daily_active";
 export const LEGACY_PARENT_PACKAGE = "oh-my-opencode";
 export const PRODUCT_ENV_PREFIX = "OMO_CODEX";
-export const MACHINE_ID_PREFIX = "omo-codex:";
 
 type ComponentPackageManifest = { readonly version?: string };
 
@@ -57,7 +56,6 @@ export function createComponentTelemetryProductConfig(
 		defaultApiKey: DEFAULT_POSTHOG_API_KEY,
 		defaultHost: DEFAULT_POSTHOG_HOST,
 		eventName: EVENT_NAME,
-		machineIdPrefix: MACHINE_ID_PREFIX,
 		packageName: PACKAGE_NAME,
 		packageVersion: getComponentVersion(),
 		platform: "omo-codex",

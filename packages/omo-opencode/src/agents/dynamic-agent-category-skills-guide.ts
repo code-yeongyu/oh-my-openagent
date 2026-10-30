@@ -120,7 +120,7 @@ Every delegation MUST use the category that matches the task's domain. Mismatche
 
 **ANY VISUAL DESIGN RELATION = ALWAYS \`visual-engineering\`. NO EXCEPTIONS.**
 
-Any task with even a minor visual-design relationship — including UI, UX, CSS, styling, layout, animation, design systems, frontend components, screenshots, diagrams, visual polish, or presentation — MUST go to \`visual-engineering\`. Never delegate it to \`quick\`, \`unspecified-*\`, or any other category.
+Any task with even a minor visual-design relationship (including UI, UX, CSS, styling, layout, animation, design systems, frontend components, screenshots, diagrams, visual polish, or presentation) MUST go to \`visual-engineering\`. Never delegate it to \`quick\`, \`unspecified-*\`, or any other category.
 
 \`\`\`typescript
 // CORRECT: Visual work → visual-engineering category
@@ -134,7 +134,8 @@ task(category="quick", load_skills=[], run_in_background=true, prompt="Redesign 
 |---|---|
 | Visual design, UI, styling, animations, layout, design systems | \`visual-engineering\` |
 | Hard logic and architecture decisions | \`ultrabrain\` |
-| 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, autonomous research + end-to-end implementation | \`deep\` |
+| 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, autonomous research + end-to-end implementation | \`deep-low\` |
+| Any of the above whose central decision cannot be settled from evidence: a trade-off, a contract crossing a package boundary, a mechanism with no in-repo pattern, correctness argued from invariants | \`deep-high\` |
 | Single-file typo, trivial config change | \`quick\` |
 
 **When in doubt about category, it is almost never \`quick\` or \`unspecified-*\`. Match the domain.**`

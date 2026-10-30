@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, jest, test } from "bun:test"
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -8,11 +8,14 @@ import {
   admissionLeasePath,
   type AcquireAdmissionLeaseResult,
   type SessionAdmissionLease,
+  setAdmissionLeaseFsForTests,
 } from "./admission-lease"
 
 const cleanupRoots: string[] = []
+const restoreLeaseFs: Array<() => void> = []
 
 afterEach(() => {
+  for (const restore of restoreLeaseFs.splice(0).reverse()) restore()
   for (const root of cleanupRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
@@ -20,6 +23,10 @@ function tempStateDir(): string {
   const directory = mkdtempSync(join(tmpdir(), "senpi-task-lease-"))
   cleanupRoots.push(directory)
   return directory
+}
+
+function codedError(code: string): Error & { code: string } {
+  return Object.assign(new Error(code), { code })
 }
 
 function acquired(result: AcquireAdmissionLeaseResult): SessionAdmissionLease {
@@ -48,6 +55,107 @@ describe("acquireSessionAdmissionLease", () => {
     expect(existsSync(lease.path)).toBe(false)
     const next = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 40 }))
     next.release()
+  })
+
+  test("#given a link-published lease truncated by a power loss #when two contenders arrive after the incomplete grace #then one reclaims it and the other sees the new owner", async () => {
+    // given: a normal link publication, then the empty durable state a power loss can leave
+    const stateDir = tempStateDir()
+    let now = Date.now()
+    const timing = { renewMs: 60_000, staleMs: 1_000, incompleteGraceMs: 100, acquireTimeoutMs: 0, retryMs: 10, now: () => now }
+    const original = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", timing))
+    writeFileSync(original.path, "")
+    now = statSync(original.path).mtimeMs
+
+    // when: a contender arrives inside the incomplete-file grace period
+    const early = await acquireSessionAdmissionLease(stateDir, "parent-1", timing)
+
+    // then: the empty lease is held rather than stolen
+    expect(early.kind).toBe("contended")
+    expect(readFileSync(original.path, "utf8")).toBe("")
+
+    // when: two contenders race after the injected clock passes the grace period
+    now += 101
+    const [first, second] = await Promise.all([
+      acquireSessionAdmissionLease(stateDir, "parent-1", timing),
+      acquireSessionAdmissionLease(stateDir, "parent-1", timing),
+    ])
+
+    // then: exactly one contender owns the replacement
+    const winners = [first, second].filter((result) => result.kind === "acquired")
+    expect(winners).toHaveLength(1)
+    const winner = winners[0]
+    if (winner === undefined || winner.kind !== "acquired") throw new Error("expected exactly one winner")
+    expect(winner.lease.isOwner()).toBe(true)
+    original.release()
+    expect(winner.lease.isOwner()).toBe(true)
+    winner.lease.release()
+  })
+
+  test("#given link EACCES #when two contenders race the exclusive-create fallback #then exactly one wins", async () => {
+    // given
+    const stateDir = tempStateDir()
+    restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError("EACCES") } }))
+    const timing = { renewMs: 60_000, acquireTimeoutMs: 0, retryMs: 10 }
+
+    // when
+    const [first, second] = await Promise.all([
+      acquireSessionAdmissionLease(stateDir, "parent-1", timing),
+      acquireSessionAdmissionLease(stateDir, "parent-1", timing),
+    ])
+
+    // then
+    const winners = [first, second].filter((result) => result.kind === "acquired")
+    expect(winners).toHaveLength(1)
+    expect([first, second].filter((result) => result.kind === "contended")).toHaveLength(1)
+    const winner = winners[0]
+    if (winner === undefined || winner.kind !== "acquired") throw new Error("expected exactly one winner")
+    expect(winner.lease.isOwner()).toBe(true)
+    winner.lease.release()
+  })
+
+  for (const code of ["EPERM", "ENOTSUP"]) {
+    test(`#given link ${code} #when a lease is published #then the exclusive-create fallback succeeds`, async () => {
+      const stateDir = tempStateDir()
+      restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError(code) } }))
+
+      const lease = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000 }))
+
+      expect(lease.isOwner()).toBe(true)
+      lease.release()
+    })
+  }
+
+  test("#given the fallback writer crashes after exclusive create #when contenders arrive across the grace boundary #then the empty lease is held before one contender reclaims it", async () => {
+    // given
+    const stateDir = tempStateDir()
+    let now = Date.now()
+    const timing = { renewMs: 60_000, staleMs: 1_000, incompleteGraceMs: 100, acquireTimeoutMs: 0, retryMs: 10, now: () => now }
+    restoreLeaseFs.push(setAdmissionLeaseFsForTests({
+      linkSync: () => { throw codedError("EACCES") },
+      writeFallback: () => { throw new Error("simulated writer crash") },
+    }))
+    await expect(acquireSessionAdmissionLease(stateDir, "parent-1", timing)).rejects.toThrow("simulated writer crash")
+    const path = admissionLeasePath(stateDir, "parent-1")
+    expect(readFileSync(path, "utf8")).toBe("")
+    restoreLeaseFs.pop()?.()
+    restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError("EACCES") } }))
+    now = statSync(path).mtimeMs
+
+    // when / then: held during grace
+    expect((await acquireSessionAdmissionLease(stateDir, "parent-1", timing)).kind).toBe("contended")
+
+    // when / then: stale after grace and recoverable
+    now += 101
+    const replacement = acquired(await acquireSessionAdmissionLease(stateDir, "parent-1", timing))
+    expect(replacement.isOwner()).toBe(true)
+    replacement.release()
+  })
+
+  test("#given a non-fallback link error #when a lease is published #then the original error is thrown", async () => {
+    const stateDir = tempStateDir()
+    restoreLeaseFs.push(setAdmissionLeaseFsForTests({ linkSync: () => { throw codedError("EIO") } }))
+
+    await expect(acquireSessionAdmissionLease(stateDir, "parent-1", { renewMs: 60_000 })).rejects.toMatchObject({ code: "EIO" })
   })
 
   test("#given a holder renewing on virtual time #when several stale windows pass before a waiter contends #then the holder is NOT reclaimed and the waiter yields contended", async () => {

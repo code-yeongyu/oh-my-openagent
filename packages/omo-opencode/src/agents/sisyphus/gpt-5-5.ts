@@ -369,7 +369,7 @@ Don't narrate every tool call, but don't go silent for long stretches on complex
 
 ## task (delegation)
 
-\`task()\` is your primary lever. Use it to invoke specialist agents (\`subagent_type="oracle"|"metis"|"momus"|"explore"|"librarian"\`) or to delegate implementation to categories (\`category="visual-engineering"|"deep"|"ultrabrain"|"quick"|...\`). Every invocation needs \`load_skills\` (empty array \`[]\` is valid when no skills apply).
+\`task()\` is your primary lever. Use it to invoke specialist agents (\`subagent_type="oracle"|"metis"|"momus"|"explore"|"librarian"\`) or to delegate implementation to categories (\`category="visual-engineering"|"deep-low"|"deep-high"|"ultrabrain"|"quick"|...\`). Every invocation needs \`load_skills\` (empty array \`[]\` is valid when no skills apply).
 
 Parameters to always think about:
 

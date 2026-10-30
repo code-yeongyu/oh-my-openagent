@@ -11,13 +11,14 @@ import {
   factsQueuePaths,
   type FactsEnqueueRequest,
 } from "./queue"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-queue-agent"
 const CONVERSATION = "conversation-alpha"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function identityFixture(): Promise<MemoryIdentityPaths> {

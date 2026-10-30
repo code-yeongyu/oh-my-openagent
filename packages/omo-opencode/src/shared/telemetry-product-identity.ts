@@ -12,7 +12,6 @@ export function createOpencodeTelemetryProductConfig(): TelemetryProductConfig {
     defaultApiKey: DEFAULT_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: "omo_daily_active",
-    machineIdPrefix: "oh-my-openagent:",
     packageName: PUBLISHED_PACKAGE_NAME,
     packageVersion: packageJson.version,
     platform: "oh-my-opencode",

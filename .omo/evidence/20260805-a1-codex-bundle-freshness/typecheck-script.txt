@@ -1,3 +1,0 @@
-$ bun run typecheck:script
-$ tsgo --noEmit -p script/tsconfig.json
-exit=0

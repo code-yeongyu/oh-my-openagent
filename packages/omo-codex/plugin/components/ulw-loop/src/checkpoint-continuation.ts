@@ -42,12 +42,7 @@ export async function checkpoint(
 	const goalId = required(argv, "--goal-id");
 	const statusValue = checkpointStatus(required(argv, "--status"));
 	const evidence = required(argv, "--evidence");
-	const codexGoalJson = await parseCodexGoalJson(
-		statusValue === "complete" ? required(argv, "--codex-goal-json") : readValue(argv, "--codex-goal-json"),
-	);
-	if (statusValue === "complete" && codexGoalJson === undefined) {
-		throw new UlwLoopError("Missing --codex-goal-json.", "ULW_LOOP_CODEX_GOAL_JSON_REQUIRED");
-	}
+	const codexGoalJson = await parseCodexGoalJson(readValue(argv, "--codex-goal-json"));
 	const qualityGateJson = readValue(argv, "--quality-gate-json");
 	const args: CheckpointUlwLoopArgs & { readonly advance: boolean } = {
 		goalId,

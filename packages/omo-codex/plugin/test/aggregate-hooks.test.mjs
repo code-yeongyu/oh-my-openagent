@@ -63,7 +63,7 @@ test("#given aggregate Stop hooks #when inspected #then ulw-execute continuation
 	assert.ok(stopCommands.some((command) => command.includes("ulw-loop/dist/cli.js\" hook stop")));
 });
 
-test("#given aggregate SubagentStop hooks #when inspected #then ulw-execute and LazyCodex executor verifier are separate groups", async () => {
+test("#given aggregate SubagentStop hooks #when inspected #then only LazyCodex executor verification remains", async () => {
 	// given
 	const manifests = await readAggregateHookManifests();
 
@@ -77,9 +77,8 @@ test("#given aggregate SubagentStop hooks #when inspected #then ulw-execute and 
 	);
 
 	// then
-	assert.equal(subagentStopGroups.length, 2);
-	assert.equal(subagentStopGroups[0]?.matcher, undefined);
-	assert.equal(subagentStopGroups[1]?.matcher, "^lazycodex-worker-(low|medium|high)$");
+	assert.equal(subagentStopGroups.length, 1);
+	assert.equal(subagentStopGroups[0]?.matcher, "^lazycodex-worker-(low|medium|high)$");
 	assert.equal(verifierGroups.length, 1);
 	assert.equal(verifierGroups[0]?.groupIndex, 0);
 	assert.equal(verifierGroups[0]?.handler.timeout, 10);
@@ -160,6 +159,11 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 		"^(spawn_agent|collaborationspawn_agent|collaboration\\.spawn_agent)$",
 	]);
 	assert.match(text, /hook pre-tool-use-spawn/);
+	const admissionGroups = manifests.flatMap(({ hooks }) => hooks.hooks.PostToolUse ?? [])
+		.filter((group) => group.hooks.some((hook) => hook.command.endsWith(" hook post-tool-use-spawn")));
+	assert.equal(admissionGroups.length, 1);
+	assert.equal(admissionGroups[0].matcher, preToolUseGroups[2].matcher);
+	assert.match(admissionGroups[0].hooks[0].commandWindows, /hook post-tool-use-spawn$/);
 });
 
 test("#given aggregate OMO plugin has a dedicated ultrawork trigger #when hooks are inspected #then ulw-loop does not duplicate ultrawork injection", async () => {

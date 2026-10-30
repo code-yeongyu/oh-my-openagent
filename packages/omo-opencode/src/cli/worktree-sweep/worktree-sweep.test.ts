@@ -15,6 +15,9 @@ import type { WorktreeSweepRepoReport } from "./types"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const GIT_COMMAND_TIMEOUT_MS = 10_000
+// Windows CI runners have much slower git/fs I/O than the 5 s Bun default;
+// give every git-heavy test enough room to avoid flakes.
+const GIT_HEAVY_TEST_TIMEOUT_MS = 30_000
 const temporaryDirectories: string[] = []
 
 afterAll(async () => {
@@ -401,7 +404,7 @@ describe("sweepWorktrees --older-than", () => {
     })
     expect(result.sweepCount).toBe(1)
     expect(result.keepCount).toBe(2)
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("olderThanDays 0 never sweeps unmerged worktrees regardless of age", async () => {
     const { base, repo } = await createFixture("wt-sweep-age0-")
@@ -440,7 +443,7 @@ describe("sweepWorktrees --apply", () => {
     expect(porcelain).not.toContain(toPosix(missing))
     expect(porcelain).not.toContain(toPosix(merged))
     expect(porcelain).toContain(toPosix(kept))
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("leaves locked and dirty worktrees in place even under --apply", async () => {
     const { base, repo } = await createFixture("wt-sweep-apply2-")
@@ -459,7 +462,63 @@ describe("sweepWorktrees --apply", () => {
     expect(await fs.stat(locked)).toBeTruthy()
     expect(await fs.stat(dirty)).toBeTruthy()
     expect(result.sweepCount).toBe(0)
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+
+  test("started from inside a linked worktree keeps that worktree and still removes its merged siblings", async () => {
+    const { base, repo } = await createFixture("wt-sweep-inside-")
+    const first = path.join(base, "wt-first")
+    const second = path.join(base, "wt-second")
+    const third = path.join(base, "wt-third")
+
+    await addMergedWorktree(repo, "first-branch", first)
+    await addMergedWorktree(repo, "second-branch", second)
+    await addMergedWorktree(repo, "third-branch", third)
+
+    const result = await sweepWorktrees({ cwd: second, apply: true })
+    const report = result.repos[0]!
+
+    expect(report.repo).toBe(repo)
+    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
+    expect(report.failed).toEqual([])
+    expect([...report.removed].sort()).toEqual([first, third].sort())
+    expect(await fs.stat(second)).toBeTruthy()
+    const porcelain = git(repo, ["worktree", "list", "--porcelain"])
+    expect(porcelain).toContain(toPosix(second))
+    expect(porcelain).not.toContain(toPosix(first))
+    expect(porcelain).not.toContain(toPosix(third))
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+
+  test("dry-run from inside a linked worktree reports it as KEEP(current) and removes nothing", async () => {
+    const { base, repo } = await createFixture("wt-sweep-inside-dry-")
+    const first = path.join(base, "wt-first")
+    const second = path.join(base, "wt-second")
+
+    await addMergedWorktree(repo, "first-branch", first)
+    await addMergedWorktree(repo, "second-branch", second)
+
+    const result = await sweepWorktrees({ cwd: second })
+    const report = result.repos[0]!
+
+    expect(report.repo).toBe(repo)
+    expect(decisionFor(report, first)).toMatchObject({ decision: "SWEEP" })
+    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "current" })
+    expect(report.removed).toEqual([])
+    expect(await fs.stat(first)).toBeTruthy()
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
+
+  test("a locked worktree the sweep was started from keeps the locked reason", async () => {
+    const { base, repo } = await createFixture("wt-sweep-inside-locked-")
+    const second = path.join(base, "wt-second")
+
+    await addMergedWorktree(repo, "second-branch", second)
+    git(repo, ["worktree", "lock", second])
+
+    const result = await sweepWorktrees({ cwd: second, apply: true })
+    const report = result.repos[0]!
+
+    expect(decisionFor(report, second)).toMatchObject({ decision: "KEEP", reason: "locked" })
+    expect(report.removed).toEqual([])
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 })
 
 describe("worktreeSweep output", () => {
@@ -492,7 +551,7 @@ describe("worktreeSweep output", () => {
     expect(summary).toBe(
       "SUMMARY mode=dry-run repos=1 sweep=1 keep=1 prune=0 removed=0 failed=0",
     )
-  })
+  }, { timeout: GIT_HEAVY_TEST_TIMEOUT_MS })
 
   test("returns exit code 1 and a stderr message for a non-repository path", async () => {
     const base = await newTmpDir("wt-sweep-bad-")

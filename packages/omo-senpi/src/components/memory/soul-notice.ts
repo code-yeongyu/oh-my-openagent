@@ -1,5 +1,5 @@
 // Soul-edit visible notice channel (plan IC-4 / todo 7). A committed change
-// touching system/persona.md or system/identity.md emits a NON-MODEL-FACING
+// touching any SOUL_PATHS entry (persona, identity, boundaries) emits a NON-MODEL-FACING
 // entry through appendEntry + registerEntryRenderer; sendMessage is never used
 // because senpi converts it into user-role model context. On the direct tool
 // surface the commit metadata arrives through MemoryToolsOptions.onCommit; on
@@ -29,7 +29,7 @@ export const renderSoulUpdatedEntry: EntryRenderer<SoulUpdatedRecord> = (entry, 
   return noticeComponent(
     {
       glyph: "●",
-      title: joinFields(["Memory soul updated", sha.slice(0, 7)]),
+      title: joinFields(["Remembered", "about myself"]),
       tone: "accent",
       why: soulWhy(paths),
       extra: paths.map((path) => ({ text: path, tone: "dim" as const })),

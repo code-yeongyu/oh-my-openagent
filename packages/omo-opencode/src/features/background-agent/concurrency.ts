@@ -52,19 +52,32 @@ export class ConcurrencyManager {
     return model
   }
 
-  async acquire(model: string, taskId?: string): Promise<void> {
+  /**
+   * Non-blocking acquire: takes a slot immediately when one is free.
+   * Returns true when a slot was taken, false when the group is full (in
+   * which case nothing is held and the caller decides whether to queue).
+   */
+  tryAcquire(model: string): boolean {
     const key = this.getConcurrencyKey(model)
     const limit = this.getConcurrencyLimit(model)
     if (limit === Infinity) {
-      return
+      return true
     }
 
     const current = this.counts.get(key) ?? 0
     if (current < limit) {
       this.counts.set(key, current + 1)
+      return true
+    }
+    return false
+  }
+
+  async acquire(model: string, taskId?: string): Promise<void> {
+    if (this.tryAcquire(model)) {
       return
     }
 
+    const key = this.getConcurrencyKey(model)
     return new Promise<void>((resolve, reject) => {
       const queue = this.queues.get(key) ?? []
 

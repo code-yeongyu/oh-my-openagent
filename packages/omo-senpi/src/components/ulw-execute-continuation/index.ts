@@ -1,7 +1,9 @@
 import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { readAgentEndOutcome } from "./agent-end-eligibility"
 import { findContinuableBoulderWork } from "./boulder-eligibility"
+import { createRunCompletionTracker } from "./run-completion"
 
 export interface UlwExecuteContinuationComponentOptions {
   // none yet; retained for future DI seams
@@ -11,7 +13,7 @@ const CONTINUATION_LIMIT = 8
 
 const ULW_EXECUTE_STEERING_REMINDER = [
   "<omo-senpi-ulw-execute>",
-  "An active Prometheus ulw-execute plan is present in this working directory.",
+  "An active ulw-execute work plan is present in this working directory.",
   "Before continuing, read `.omo/boulder.json` and the active plan file to determine what remains; use the ledger and plan as the source of truth.",
   "Continue the current work with evidence-bound execution; do not start unrelated work until every top-level checkbox is `- [x]`.",
   "</omo-senpi-ulw-execute>",
@@ -37,7 +39,19 @@ export function createUlwExecuteContinuationComponent(
       const state = {
         consecutiveContinuations: 0,
         lastSignature: undefined as string | undefined,
+        // This run's agent_end payload and session identity. The decision runs on agent_settled.
+        pendingRun: undefined as { payload: unknown; sessionId: string | undefined; cwd: string | undefined } | undefined,
       }
+      const runCompletion = createRunCompletionTracker((runId) => {
+        try {
+          pi.lifecycle?.markRunCompleted({ runId })
+        } catch (error) {
+          ctx.logger.warn("omo-senpi ulw-execute run completion not recorded", {
+            runId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      })
 
       pi.on("input", async (payload, eventCtx) => {
         if (!isInputEvent(payload)) return { action: "continue" }
@@ -45,10 +59,12 @@ export function createUlwExecuteContinuationComponent(
 
         state.consecutiveContinuations = 0
         state.lastSignature = undefined
-        if (payload.streamingBehavior === undefined) return { action: "continue" }
-
+        state.pendingRun = undefined
         const sessionId = extractSessionId(eventCtx)
         const cwd = extractCwd(eventCtx)
+        // The baseline for run completion: what this session's work looked like before the turn this input starts.
+        if (sessionId && cwd) runCompletion.observe(cwd, sessionId)
+        if (payload.streamingBehavior === undefined) return { action: "continue" }
         if (!sessionId || !cwd) return { action: "continue" }
 
         const continuable = findContinuableBoulderWork(cwd, sessionId)
@@ -61,7 +77,31 @@ export function createUlwExecuteContinuationComponent(
         }
       })
 
-      pi.on("agent_end", async (_payload, eventCtx) => {
+      // Record only: the outcome is decided on agent_settled, the host edge that guarantees no
+      // automatic retry, compaction or queued continuation will run, and the last point at which a
+      // late user abort can still have mutated this payload.
+      pi.on("agent_end", (payload, eventCtx) => {
+        state.pendingRun = { payload, sessionId: extractSessionId(eventCtx), cwd: extractCwd(eventCtx) }
+      })
+
+      pi.on("agent_settled", () => {
+        const run = state.pendingRun
+        state.pendingRun = undefined
+        if (run === undefined) return
+        // A work this run completed is a completion whatever the run's own outcome, so this precedes every skip below.
+        if (run.sessionId && run.cwd) runCompletion.observe(run.cwd, run.sessionId)
+
+        const outcome = readAgentEndOutcome(run.payload)
+        if (outcome.blockedBy !== null) {
+          ctx.logger.info("omo-senpi ulw-execute-continuation skipped", {
+            reason: "terminal-outcome",
+            blockedBy: outcome.blockedBy,
+            stopReason: outcome.stopReason,
+            aborted: outcome.aborted,
+            willRetry: outcome.willRetry,
+          })
+          return
+        }
         if (state.consecutiveContinuations >= CONTINUATION_LIMIT) {
           ctx.logger.info("omo-senpi ulw-execute-continuation skipped", {
             reason: "continuation-cap-reached",
@@ -70,8 +110,7 @@ export function createUlwExecuteContinuationComponent(
           return
         }
 
-        const sessionId = extractSessionId(eventCtx)
-        const cwd = extractCwd(eventCtx)
+        const { sessionId, cwd } = run
         if (!sessionId || !cwd) {
           ctx.logger.info("omo-senpi ulw-execute-continuation skipped", { reason: "missing-context" })
           return
@@ -114,13 +153,19 @@ const ULW_EXECUTE_CONTINUATION_INJECTION_KEY = "omo-senpi-ulw-execute-continuati
 
 function deliverContinuation(pi: SenpiExtensionAPI, ctx: ComponentContext, content: string): void {
   if (ctx.idleCoordinator !== undefined) {
-    ctx.idleCoordinator.enqueue({
+    const accepted = ctx.idleCoordinator.enqueue({
       key: ULW_EXECUTE_CONTINUATION_INJECTION_KEY,
       source: "boulder-continuation",
       customType: "omo-senpi:ulw-execute-continuation",
       content,
       display: false,
     })
+    // Refused = the coordinator retired with the session. The continuation is derived state, not a
+    // durable notification: the next boulder edge re-derives it. Log rather than drop in silence.
+    if (accepted === false) {
+      ctx.logger.warn("omo-senpi ulw execute continuation skipped: idle-injection coordinator retired")
+      return
+    }
     ctx.idleCoordinator.scheduleFlush()
     return
   }
@@ -157,7 +202,7 @@ function renderDirective(state: DirectiveState): string {
 
   return [
     "<omo-senpi-ulw-execute-continuation>",
-    "You are mid-flight on a Prometheus work plan; this turn is an automatic continuation. Do NOT ask whether to continue — the contract is auto-continue until every top-level checkbox is `- [x]`.",
+    "You are mid-flight on a ulw-execute work plan; this turn is an automatic continuation. Do NOT ask whether to continue: the contract is auto-continue until every top-level checkbox is `- [x]`.",
     "",
     "# State",
     "",
@@ -172,7 +217,7 @@ function renderDirective(state: DirectiveState): string {
     "",
     "# What to do this turn",
     "",
-    "1. Read the plan file AND the ledger first — they are the only sources of truth for what remains and what evidence exists; do not trust your memory of prior turns.",
+    "1. Read the plan file AND the ledger first: they are the only sources of truth for what remains and what evidence exists; do not trust your memory of prior turns.",
     `2. When the remaining count is \`0\`, skip checkbox execution and perform the Final gate now. Otherwise, pick the FIRST unchecked top-level checkbox in \`## TODOs\` or \`## Final Verification Wave\`.${finalGateHint}`,
     "3. Apply the checkbox's tier and verify with real-surface evidence. Decompose and dispatch sub-tasks in parallel via Senpi's `task` tool when safe.",
     "4. Honor the delivery mode recorded in the goal/ledger at session start: `--make-pr` finishes through the task-owned worktree and an opened PR, then hands off with the PR URL; `--ship` keeps working until that PR is MERGED, then removes the worktree and syncs `.omo/` state back.",

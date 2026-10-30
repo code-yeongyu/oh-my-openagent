@@ -15,18 +15,20 @@ function dropRawSisyphusLead(content) {
 export function applySenpiSkillRosterOverlay(skillName, content) {
   if (skillName === "review-work") {
     // The shared skill dispatches its single gate reviewer as `oracle`; omo-senpi ships a purpose-built
-    // gate reviewer (category-routed deep -> unspecified-high), so hand the lane to it instead of a
-    // generic category worker.
-    return renameNamedAgent(content, "oracle", "omo-senpi-gate-reviewer")
+    // gate reviewer (category-routed deep-high -> unspecified-high), so hand the lane to it instead of
+    // a generic category worker.
+    return renameNamedAgent(content, "oracle", "omo-native-gate-reviewer")
   }
   if (skillName === "visual-qa") {
     return routeNamedAgent(content, "oracle", "unspecified-high")
   }
   if (skillName === "debugging") {
-    return dropRawSisyphusLead(routeNamedAgent(content, "oracle", "deep"))
+    // The oracle lane is a second opinion on a stuck hypothesis: the decision it settles is the one
+    // the investigation could not settle from evidence, which is the deep-high gate.
+    return dropRawSisyphusLead(routeNamedAgent(content, "oracle", "deep-high"))
   }
   if (skillName === "refactor") {
-    return dropRawSisyphusLead(routeNamedAgent(content, "plan", "deep"))
+    return dropRawSisyphusLead(routeNamedAgent(content, "plan", "deep-high"))
   }
   return content
 }

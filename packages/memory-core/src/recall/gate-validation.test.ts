@@ -19,14 +19,13 @@ it("#given a hand-edited payload with an invalid hint #when taken #then nothing 
     JSON.stringify({
       version: 1,
       sessionId: "session-1",
-      compactionEpoch: 0,
       writtenAt: new Date().toISOString(),
       nudges: [{ path: "reference/a.md", hint: "password=hunter2" }],
     }),
     "utf8",
   )
 
-  const taken = await new PendingNudges(dir).take("session-1", { currentEpoch: 0 })
+  const taken = await new PendingNudges(dir).take("session-1")
 
   expect(taken).toEqual([])
   expect(await readdir(dir)).toEqual([])

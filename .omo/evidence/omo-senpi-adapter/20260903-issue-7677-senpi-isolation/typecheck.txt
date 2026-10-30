@@ -1,3 +1,0 @@
-Command: bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
-Exit: 0
-Output: none

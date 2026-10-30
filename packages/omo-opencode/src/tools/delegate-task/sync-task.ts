@@ -25,7 +25,7 @@ export async function executeSyncTask(
   fallbackChain?: FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
-  const { client, directory, syncPollTimeoutMs } = executorCtx
+  const { client, directory, syncPollTimeoutMs, taskCleanupDelayMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
@@ -52,6 +52,7 @@ export async function executeSyncTask(
       agentToUse,
       description: args.description,
       defaultDirectory: directory,
+      category: args.category,
       categoryModel,
     })
 
@@ -180,7 +181,7 @@ export async function executeSyncTask(
           log(`[task] Failed to abort completed sync session:`, error)
         })
       }
-      scheduleSyncSessionDeletion(client, syncSessionID)
+      scheduleSyncSessionDeletion(client, syncSessionID, taskCleanupDelayMs)
     }
     if (concurrencyAcquired && typeof manager?.releaseSyncSubagentConcurrency === "function") {
       manager.releaseSyncSubagentConcurrency(concurrencyModel)

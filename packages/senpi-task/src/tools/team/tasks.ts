@@ -9,8 +9,10 @@ import {
   TeamTaskCrossOwnerUpdateError,
   TeamTaskInvalidTransitionError,
 } from "../../team"
-import { toolResult } from "../control"
+import { toolErrorResult, toolResult } from "../control"
+import type { ToolExecutionResult } from "../control"
 import { isMissingStateError } from "./classify-error"
+import { renderTeamTaskCall, renderTeamTaskResult } from "./renderers"
 import type { TeamToolDeps, TeamToolsService } from "./types"
 
 const TaskStatusSchema = Type.Union(
@@ -66,7 +68,7 @@ function collapseEcho(value: string, max = ECHO_TEXT_MAX): string {
   return collapsed.length <= max ? collapsed : `${collapsed.slice(0, max)}...`
 }
 
-export async function runTeamTaskCreate(service: TeamToolsService, params: TeamTaskCreateInput): Promise<AgentToolResult<TeamTaskCreateDetails>> {
+export async function runTeamTaskCreate(service: TeamToolsService, params: TeamTaskCreateInput): Promise<ToolExecutionResult<TeamTaskCreateDetails>> {
   const task = await service.createTask(params.team_run_id, {
     subject: params.subject,
     description: params.description,
@@ -77,7 +79,7 @@ export async function runTeamTaskCreate(service: TeamToolsService, params: TeamT
   return toolResult(`Created task ${task.id}: '${collapseEcho(task.subject)}' (status: ${task.status}${blockers}).`, { kind: "created", task })
 }
 
-export async function runTeamTaskList(service: TeamToolsService, params: TeamTaskListInput): Promise<AgentToolResult<TeamTaskListDetails>> {
+export async function runTeamTaskList(service: TeamToolsService, params: TeamTaskListInput): Promise<ToolExecutionResult<TeamTaskListDetails>> {
   const filter = {
     ...(params.status !== undefined ? { status: params.status } : {}),
     ...(params.owner !== undefined ? { owner: params.owner } : {}),
@@ -91,7 +93,7 @@ export async function runTeamTaskList(service: TeamToolsService, params: TeamTas
   return toolResult([`${tasks.length} task(s).`, ...lines].join("\n"), { kind: "list", tasks })
 }
 
-export async function runTeamTaskGet(service: TeamToolsService, params: TeamTaskGetInput): Promise<AgentToolResult<TeamTaskGetDetails>> {
+export async function runTeamTaskGet(service: TeamToolsService, params: TeamTaskGetInput): Promise<ToolExecutionResult<TeamTaskGetDetails>> {
   try {
     const task = await service.getTask(params.team_run_id, params.task_id)
     const lines = [
@@ -104,12 +106,12 @@ export async function runTeamTaskGet(service: TeamToolsService, params: TeamTask
     ]
     return toolResult(lines.join("\n"), { kind: "task", task })
   } catch (error) {
-    if (isMissingStateError(error)) return toolResult(`No task '${params.task_id}'.`, { kind: "not_found", task_id: params.task_id })
+    if (isMissingStateError(error)) return toolErrorResult(`No task '${params.task_id}'.`, { kind: "not_found", task_id: params.task_id })
     throw error
   }
 }
 
-export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamTaskUpdateInput): Promise<AgentToolResult<TeamTaskUpdateDetails>> {
+export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamTaskUpdateInput): Promise<ToolExecutionResult<TeamTaskUpdateDetails>> {
   try {
     const task = await service.updateTask({
       teamRunId: params.team_run_id,
@@ -121,10 +123,10 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
     return toolResult(`Updated task ${task.id} to ${task.status}${owner}: '${collapseEcho(task.subject)}'.`, { kind: "updated", task })
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
-    if (error instanceof TeamTaskAlreadyClaimedError) return toolResult(reason, { kind: "already_claimed", task_id: params.task_id, reason })
-    if (error instanceof TeamTaskBlockedByError) return toolResult(reason, { kind: "blocked_by", task_id: params.task_id, reason })
-    if (error instanceof TeamTaskInvalidTransitionError) return toolResult(reason, { kind: "invalid_transition", task_id: params.task_id, reason })
-    if (error instanceof TeamTaskCrossOwnerUpdateError) return toolResult(reason, { kind: "cross_owner", task_id: params.task_id, reason })
+    if (error instanceof TeamTaskAlreadyClaimedError) return toolErrorResult(reason, { kind: "already_claimed", task_id: params.task_id, reason })
+    if (error instanceof TeamTaskBlockedByError) return toolErrorResult(reason, { kind: "blocked_by", task_id: params.task_id, reason })
+    if (error instanceof TeamTaskInvalidTransitionError) return toolErrorResult(reason, { kind: "invalid_transition", task_id: params.task_id, reason })
+    if (error instanceof TeamTaskCrossOwnerUpdateError) return toolErrorResult(reason, { kind: "cross_owner", task_id: params.task_id, reason })
     throw error
   }
 }
@@ -141,46 +143,54 @@ function taskSearchMeta(searchText: string, searchKeywords: readonly string[]): 
   return { exposure: "search", searchText, searchKeywords, searchGroup: TEAM_TASK_SEARCH_GROUP, allowLazyActivation: true }
 }
 
-export function createTeamTaskCreateTool(deps: TeamToolDeps): ToolDefinition {
+export function createTeamTaskCreateTool(deps: TeamToolDeps): ToolDefinition<typeof TeamTaskCreateParams, TeamTaskCreateDetails> {
   return {
     name: "task_create",
     label: "Task Create",
     description: "Adds a pending entry to a running team's shared tasklist so members can claim it, for when the user wants to break work into claimable items without spawning an agent yet. Spawning child work itself goes through task.",
     parameters: TeamTaskCreateParams,
     execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params),
+    renderCall: (args, theme) => renderTeamTaskCall("create", args, theme),
+    renderResult: (result, options, theme) => renderTeamTaskResult("create", result, options, theme),
     ...taskSearchMeta("add a task to the team board, register a work item for the team to claim, break work into claimable team tasks", ["add team task", "claimable work item", "team tasklist entry"]),
   }
 }
 
-export function createTeamTaskListTool(deps: TeamToolDeps): ToolDefinition {
+export function createTeamTaskListTool(deps: TeamToolDeps): ToolDefinition<typeof TeamTaskListParams, TeamTaskListDetails> {
   return {
     name: "task_list",
     label: "Task List",
     description: "Lists the entries on a running team's shared tasklist, optionally filtered by status or owner, for when the user wants to see what work items exist and who holds them. Child-agent run state is read through task_output, not here.",
     parameters: TeamTaskListParams,
     execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params),
+    renderCall: (args, theme) => renderTeamTaskCall("list", args, theme),
+    renderResult: (result, options, theme) => renderTeamTaskResult("list", result, options, theme),
     ...taskSearchMeta("see the team task board, what work items are pending or claimed, who owns which team task", ["team task list", "task board", "who owns a task", "pending team tasks"]),
   }
 }
 
-export function createTeamTaskGetTool(deps: TeamToolDeps): ToolDefinition {
+export function createTeamTaskGetTool(deps: TeamToolDeps): ToolDefinition<typeof TeamTaskGetParams, TeamTaskGetDetails> {
   return {
     name: "task_get",
     label: "Task Get",
     description: "Reads one entry from a running team's shared tasklist by its tasklist id, for when the user needs a single item's details or status. A child agent's output is read through task_output with its st_... id, not here.",
     parameters: TeamTaskGetParams,
     execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params),
+    renderCall: (args, theme) => renderTeamTaskCall("get", args, theme),
+    renderResult: (result, options, theme) => renderTeamTaskResult("get", result, options, theme),
     ...taskSearchMeta("read one team task, check a work item's status or description by id", ["read team task", "task details", "task by id"]),
   }
 }
 
-export function createTeamTaskUpdateTool(deps: TeamToolDeps): ToolDefinition {
+export function createTeamTaskUpdateTool(deps: TeamToolDeps): ToolDefinition<typeof TeamTaskUpdateParams, TeamTaskUpdateDetails> {
   return {
     name: "task_update",
     label: "Task Update",
     description: "Moves one entry on a running team's shared tasklist between pending, claimed, in_progress, completed, and deleted, for when the user or a member marks work started, finished, or abandoned. The transition rules and claim owner are enforced by the service.",
     parameters: TeamTaskUpdateParams,
     execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params),
+    renderCall: (args, theme) => renderTeamTaskCall("update", args, theme),
+    renderResult: (result, options, theme) => renderTeamTaskResult("update", result, options, theme),
     ...taskSearchMeta("mark a team task done or in progress, claim or release a work item, change a task's status on the team board", ["mark task done", "claim task", "update task status", "task progress"]),
   }
 }

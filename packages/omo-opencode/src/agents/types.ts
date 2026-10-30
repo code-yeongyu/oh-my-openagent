@@ -13,9 +13,12 @@ import {
   isGptModel,
   isGrok45Model,
   isGrok46Model,
+  isKimiK2CodeModel,
   isKimiK2Model,
   isKimiK27Model,
+  isKimiK28Model,
   isKimiK3Model,
+  isKimiK31Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
@@ -32,9 +35,12 @@ export {
   isGptModel,
   isGrok45Model,
   isGrok46Model,
+  isKimiK2CodeModel,
   isKimiK2Model,
   isKimiK27Model,
+  isKimiK28Model,
   isKimiK3Model,
+  isKimiK31Model,
   isMiniMaxModel,
 };
 

@@ -1,0 +1,4 @@
+# The omowright engine is staged here at build/prepack time from the root devDependency by
+# packages/shared-skills/stage-omowright-runtime.mjs (bundled index.js + page-bundle.js +
+# manifest.json). The repo holds no copy; the sibling .npmignore lets the staged files ship.
+runtime/omowright/

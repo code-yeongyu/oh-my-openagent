@@ -463,15 +463,10 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("kimi-k3")
   })
 
-  test("returns 'kimi-k3' for k3p1 shorthand", () => {
-    // given
-    const model = "kimi-for-coding/k3p1"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k3")
+  test("returns 'kimi-k3-1' for the K3.1 ids and the k3p1 shorthand", () => {
+    for (const model of ["kimi-for-coding/k3p1", "kimi-coding/k3.1-pro", "moonshotai/kimi-k3.1-pro"]) {
+      expect({ model, source: getSisyphusJuniorPromptSource(model) }).toEqual({ model, source: "kimi-k3-1" })
+    }
   })
 
   test("returns 'kimi-k2-7' for kimi-k2.7 model, not 'kimi-k2'", () => {
@@ -494,6 +489,22 @@ describe("getSisyphusJuniorPromptSource", () => {
 
     // then
     expect(source).toBe("kimi-k2-7")
+  })
+
+  test("returns 'kimi-k2-7' for Kimi K2.8 and the Kimi Code rolling ids", () => {
+    // given
+    const models = [
+      "moonshotai/kimi-k2.8",
+      "kimi-for-coding/k2p8",
+      "kimi-for-coding/kimi-for-coding",
+      "kimi-for-coding/kimi-for-coding-highspeed",
+    ]
+
+    // when
+    const sources = models.map((model) => getSisyphusJuniorPromptSource(model))
+
+    // then
+    expect(sources).toEqual(["kimi-k2-7", "kimi-k2-7", "kimi-k2-7", "kimi-k2-7"])
   })
 
   test("returns 'gpt-5-4' for GPT 5.4 models", () => {

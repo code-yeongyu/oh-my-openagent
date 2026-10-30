@@ -13,6 +13,7 @@ import {
   settings,
   tempStore,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 const parentSessionId = "session-capacity"
 
@@ -63,6 +64,7 @@ function harness(options: { readonly reservationOk: boolean; readonly legacy: bo
   }
   const calls: string[] = []
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry: new FakeRegistry(),
     config: settings(),

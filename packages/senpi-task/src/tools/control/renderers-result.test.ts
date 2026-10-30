@@ -22,6 +22,9 @@ const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
 type SendResultRenderCase = readonly [name: string, details: SendResultDetails, expected: string]
 
 const SEND_RESULT_RENDER_CASES = [
+  ["unresponsive", { kind: "unresponsive", task_id: "st_1", retryable: true, reason: "HOST_STATUS_SENTINEL" }, "[muted]task_send unresponsive st_1: HOST_STATUS_SENTINEL[/muted]"],
+  ["uncertain", { kind: "uncertain", task_id: "st_1", effect_id: "st_1:0:1", reason: "Delivery pending." }, "[warning]task_send Delivery pending. Effect id: st_1:0:1[/warning]"],
+  ["failed", { kind: "failed", task_id: "st_1", effect_id: "st_1:0:1", reason: "conflict", detail: "Different input", action: "Use a new id" }, "[error]task_send conflict: Different input. Action: Use a new id.[/error]"],
   ["steered", { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" }, "[accent]task_send delivered st_1 as steer (running)[/accent]"],
   ["revived", { kind: "revived", task_id: "st_1", run_epoch: 2 }, "[success]task_send revived st_1 epoch 2[/success]"],
   ["delivery_uncertain", { kind: "delivery_uncertain", task_id: "st_1", run_epoch: 2, reason: "Child exited.", suggestion: "Inspect output." }, "[warning]task_send delivery uncertain st_1 epoch 2: Child exited. Inspect output.[/warning]"],
@@ -32,9 +35,9 @@ const SEND_RESULT_RENDER_CASES = [
   ["not_found", { kind: "not_found", reason: "No task.", known_tasks: ["alpha"] }, "[error]task_send not found: No task. known:alpha[/error]"],
   ["invalid_arguments", { kind: "invalid_arguments", reason: "message is required" }, "[error]task_send invalid: message is required[/error]"],
   ["team_message", { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1" } }, "[success]task_send team message msg-1 enqueued to lead[/success]"],
-  ["shutdown_requested", { kind: "shutdown_requested", team_run_id: "team-1", member: "atlas" }, "[warning]task_send shutdown requested team-1 member:atlas[/warning]"],
-  ["shutdown_responded", { kind: "shutdown_responded", team_run_id: "team-1", member: "atlas", approved: false }, "[warning]task_send shutdown rejected team-1 member:atlas[/warning]"],
-  ["shutdown_failed", { kind: "shutdown_failed", operation: "reject", team_run_id: "team-1", member: "atlas", code: "team_state_missing", reason: "Team state is unavailable." }, "[error]task_send shutdown reject failed team-1 member:atlas: Team state is unavailable.[/error]"],
+  ["shutdown_requested", { kind: "shutdown_requested", team_run_id: "team-1", member: "builder" }, "[warning]task_send shutdown requested team-1 member:builder[/warning]"],
+  ["shutdown_responded", { kind: "shutdown_responded", team_run_id: "team-1", member: "builder", approved: false }, "[warning]task_send shutdown rejected team-1 member:builder[/warning]"],
+  ["shutdown_failed", { kind: "shutdown_failed", operation: "reject", team_run_id: "team-1", member: "builder", code: "team_state_missing", reason: "Team state is unavailable." }, "[error]task_send shutdown reject failed team-1 member:builder: Team state is unavailable.[/error]"],
 ] satisfies readonly SendResultRenderCase[]
 
 
@@ -64,7 +67,7 @@ describe("task_send result renderers", () => {
           kind: "shutdown_failed",
           operation: "approve",
           team_run_id: "team-9",
-          member: "atlas",
+          member: "builder",
           code: "team_state_missing",
           reason: "Team state is unavailable.",
         }),
@@ -74,7 +77,7 @@ describe("task_send result renderers", () => {
       120,
     )
 
-    expect(line).toBe("[error]task_send shutdown approve failed team-9 member:atlas: Team state is unavailable.[/error]")
+    expect(line).toBe("[error]task_send shutdown approve failed team-9 member:builder: Team state is unavailable.[/error]")
     expect(line).not.toContain("ENOENT")
     expect(line).not.toContain("/private/secret")
     expect(line).not.toContain("state.json")

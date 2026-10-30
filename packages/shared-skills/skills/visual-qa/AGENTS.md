@@ -11,7 +11,7 @@ The visual-QA skill's executable core: a zero-dependency Node CLI that produces 
 ```
 visual-qa/
 ├── SKILL.md                      # reviewer workflow (dual oracle, evidence gates) — the prose contract
-├── references/agent-browser-setup.md
+├── references/browser-setup.md
 └── scripts/
     ├── visual-qa.mjs             # SHIPPED RUNTIME: bun-build bundle of cli.ts (+ embedded modules)
     ├── cli.ts                    # development source; dispatches image-diff / tui-check

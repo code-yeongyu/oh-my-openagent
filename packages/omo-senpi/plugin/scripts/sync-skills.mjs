@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { existsSync } from "node:fs"
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, extname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -108,89 +109,27 @@ function applyTier1Adaptation(content) {
 }
 
 function applyUlwExecuteOverlay(content) {
-  return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
-}
-
-const ulwPlanReviewOverride = `## Senpi Review Policy (authoritative)
-
-In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file, and a momus approval whose remaining items are notes counts as approval.
-
-Only a plan file produced by this skill and recorded with \`review_required\` authorizes a \`momus\` or \`metis\` review. A bare \`ulw\` run without that file uses notepad self-review instead, however large the work feels.
-
-If a section below conflicts with this section, this section wins.
-
-`
-
-const ulwPlanMomusOnlyRewrites = [
-  [
-    'The high-accuracy review is DUAL and both passes must return OKAY before handoff: (1) the native \`momus\` reviewer subagent, and (2) an independent Oracle review via \`task(subagent_type="oracle", ...)\` on the strongest available reasoning model, in a fully isolated sub-session with normal approval and sandbox policy. Do not add flags that disable approvals or sandboxing.',
-    'In omo-senpi the high-accuracy review is MOMUS-ONLY: one round is exactly ONE native \`momus\` review of the complete plan file.',
-  ],
-  ["### High-accuracy review (dual review)", "### High-accuracy review (momus-only in omo-senpi)"],
-  [
-    'One round = exactly ONE \`momus\` + ONE independent review, dispatched together',
-    'One round = exactly ONE \`momus\` review, dispatched',
-  ],
-  ['"independent_reviewer": "oracle",', '"independent_reviewer": null,'],
-  ['"lanes": ["momus", "independent"],', '"lanes": ["momus"],'],
-  [
-    '(all read-only, plus \`oracle\` for the high-accuracy review)',
-    '(all read-only; \`momus\` also runs the high-accuracy review)',
-  ],
-  [
-    'the dual high-accuracy review (native \`momus\` + the independent Oracle review) is now REQUIRED',
-    'the high-accuracy review (momus-only in omo-senpi) is now REQUIRED',
-  ],
-]
-
-function rewriteUlwPlanReviewToMomusOnly(content) {
-  let rewritten = content
-  for (const [source, replacement] of ulwPlanMomusOnlyRewrites) {
-    rewritten = rewritten.replaceAll(source, replacement)
-  }
-  return rewritten
-}
-
-const ulwPlanConsultationLanes = `## Senpi Design Consultation Lanes (authoritative)
-
-When the task tool's available categories include \`architect\` and/or \`ultrabrain\`, ACTIVELY consult them as background advisory lanes while grounding and drafting the plan:
-
-| Lane | Category | Ask it for |
-| --- | --- | --- |
-| Big-picture design | \`architect\` | module boundaries, decomposition options, trade-offs, blast radius |
-| Detail design | \`ultrabrain\` | algorithms, edge cases, exact interfaces and contracts |
-
-Spawn them with \`task(category: "architect" \\| "ultrabrain", run_in_background: true)\` in the same wave as your research lanes, and integrate their answers before the approval brief. Every such prompt MUST start with TASK / DELIVERABLE / SCOPE / VERIFY / STOP WHEN and MUST declare itself advisory-only: read-only analysis, NO file edits, recommendations returned as text. Treat what comes back as claims to verify, not as decisions already made.
-
-This section is an EXPLICIT EXCEPTION to the later rule "Never dispatch with \`category=\`": it authorizes exactly these two advisory lanes. Every other category dispatch stays forbidden. When neither category is listed as available, skip these lanes silently.
-
-`
-
-function applyUlwPlanOverlay(content) {
-  const rewritten = rewriteUlwPlanReviewToMomusOnly(content)
-  if (rewritten.includes("# ulw-plan - full workflow")) {
-    return insertAfterFrontmatter(rewritten, ulwPlanReviewOverride)
-  }
-  if (/^#\s+ulw-plan\s*$/m.test(rewritten)) {
-    return insertAfterFrontmatter(rewritten, `${ulwPlanReviewOverride}${ulwPlanConsultationLanes}`)
-  }
-  return rewritten
-}
-
-function insertAfterFrontmatter(content, section) {
-  const frontmatterEnd = content.indexOf("\n---\n", content.startsWith("---\n") ? 4 : 0)
-  if (!content.startsWith("---\n") || frontmatterEnd === -1) return `${section}${content}`
-  const insertAt = frontmatterEnd + "\n---\n".length
-  return `${content.slice(0, insertAt)}\n${section}${content.slice(insertAt)}`
+  return content
+    .replace(
+      "## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER",
+      "## ABSOLUTE RULE (root session): YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER",
+    )
+    .replace(
+      "NO EXCEPTIONS.",
+      "NO EXCEPTIONS for the root session that owns the Boulder work; a dispatched executor does its assigned unit itself and does not delegate it again.",
+    )
+    .replace(
+      "Give every dispatched sub-task its completion condition and watch for it per the section below.",
+      "Give every dispatched sub-task its completion condition and its role: the brief names the unit, allowed files, acceptance evidence, and states that the worker is its executor, does it itself, and does not delegate it. Watch for its completion per the section below.",
+    )
+    .replace(/codex:<session_id>/g, "senpi:<session_id>")
+    .replace(/\bcodex:/g, "senpi:")
 }
 
 function applySharedTierAdaptation(skillName, content) {
   let adapted = applySenpiSkillRosterOverlay(skillName, content)
   if (skillName === "ulw-execute") {
     adapted = applyUlwExecuteOverlay(adapted)
-  }
-  if (skillName === "ulw-plan") {
-    adapted = applyUlwPlanOverlay(adapted)
   }
   adapted = stripNamedSections(adapted)
   adapted = stripForbiddenGuidanceLines(adapted)
@@ -234,6 +173,45 @@ async function assertSourceExists(source) {
   }
 }
 
+// Shared assets are copied byte-for-byte (no text adaptation) after the native copy and its blank-line
+// normalization, so the shipped files equal their shared sources. A missing asset or one that the
+// native source already provides fails the sync instead of silently shadowing either side.
+async function overlaySharedAssets(name, nativeSource, destination, sharedAssets) {
+  const sharedSkillRoot = join(sharedSkillsRoot, name)
+  for (const asset of sharedAssets) {
+    const sharedPath = join(sharedSkillRoot, asset)
+    if (!existsSync(sharedPath)) {
+      throw new Error(`${name}: shared asset "${asset}" does not exist at ${sharedPath}`)
+    }
+
+    const nativePath = join(nativeSource, asset)
+    if (existsSync(nativePath)) {
+      const collisions = (await stat(nativePath)).isDirectory() ? await listFiles(nativePath) : [nativePath]
+      if (collisions.length > 0) {
+        throw new Error(`${name}: shared asset "${asset}" would overwrite native source file(s): ${collisions.join(", ")}`)
+      }
+    }
+
+    await cp(sharedPath, join(destination, asset), {
+      filter: createSkillSourceCopyFilter(sharedSkillRoot, senpiFilterOptions),
+      recursive: true,
+    })
+  }
+}
+
+// Read-only inventory shared by generation and shipped-payload validation.
+export async function getSkillOutputManifest() {
+  const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true })
+  const sharedSkillNames = sharedSkillEntries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+  return {
+    root: skillsRoot,
+    names: [...new Set([...componentSkillNames, ...nativeSkillNames, ...sharedSkillNames])],
+  }
+}
+
 export async function syncSkills() {
   await rm(skillsRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   await mkdir(skillsRoot, { recursive: true })
@@ -245,20 +223,16 @@ export async function syncSkills() {
     await adaptSkillTree(destination, normalizeBlankLines)
   }
 
-  for (const { name, source } of nativeSkillSources) {
+  for (const { name, source, sharedAssets = [] } of nativeSkillSources) {
     await assertSourceExists(source)
     const destination = join(skillsRoot, name)
     await cp(source, destination, { filter: createSkillSourceCopyFilter(source, senpiFilterOptions), recursive: true })
     await adaptSkillTree(destination, normalizeBlankLines)
+    await overlaySharedAssets(name, source, destination, sharedAssets)
   }
 
-  const sharedSkillEntries = await readdir(sharedSkillsRoot, { withFileTypes: true })
-  const sharedSkillNames = sharedSkillEntries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
-
-  for (const skillName of sharedSkillNames) {
+  const { names } = await getSkillOutputManifest()
+  for (const skillName of names) {
     if (componentSkillNames.has(skillName) || nativeSkillNames.has(skillName)) continue
     const source = join(sharedSkillsRoot, skillName)
     const destination = join(skillsRoot, skillName)

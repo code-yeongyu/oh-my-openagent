@@ -85,4 +85,7 @@ export type CategoryResolutionResult<TModel extends SenpiModelPort> =
       // Dead-chain detail: present when the builtin fallback chain had zero resolvable rungs.
       readonly attempted_chain?: readonly DelegateFallbackEntry[]
       readonly missing_providers?: readonly string[]
+      // A dead chain whose rung model an unlisted provider (a gateway or custom proxy) still serves:
+      // that `provider/id`, never selected, named so the user can opt in with a category pin (#9146).
+      readonly unlisted_provider_model?: string
     }

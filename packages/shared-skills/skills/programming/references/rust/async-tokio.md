@@ -5,8 +5,8 @@ Structured concurrency, cancellation, blocking-work isolation, channel selection
 ## Runtime selection
 
 ```rust
-// Default for services and CLIs that do real work
-#[tokio::main(flavor = "multi_thread", worker_threads = 8)]
+// Default for services and CLIs that do real work: multi-thread, one worker per core
+#[tokio::main]
 async fn main() -> anyhow::Result<()> { ... }
 
 // For tiny CLIs or wasm where you measured single-thread is enough
@@ -14,7 +14,7 @@ async fn main() -> anyhow::Result<()> { ... }
 async fn main() -> anyhow::Result<()> { ... }
 ```
 
-Pick worker count explicitly. The default (`num_cpus`) is fine for servers; for desktop tools you usually want 2-4.
+Keep the default worker count. Set `worker_threads` only for a measured reason or a deployment constraint (a container CPU quota the runtime cannot see, a desktop tool sharing the machine). CPU-heavy work does not get more workers; it leaves the runtime (see Blocking work).
 
 ## Spawning
 
@@ -48,12 +48,13 @@ while let Some(joined) = set.join_next().await {
 - Dropping the set aborts every still-running task.
 - Lets you handle failures one by one rather than all-or-nothing.
 
-For wait-for-all semantics with one type, `join!`:
+For a fixed set of independent futures, `join!` waits for all; for fallible ones, `try_join!` returns on the first `Err`:
 
 ```rust
-let (a, b, c) = tokio::join!(load_a(), load_b(), load_c());
-let a = a?; let b = b?; let c = c?;
+let (a, b, c) = tokio::try_join!(load_a(), load_b(), load_c())?;
 ```
+
+On that first error `try_join!` drops the other futures mid-flight. Dropping is cancellation, not rollback: side effects they already started stay started (see Cancellation).
 
 For first-of-many, `select!`:
 
@@ -76,19 +77,19 @@ Without `biased`, branches are polled in random order each iteration (good for f
 
 A future is cancelled when it is dropped (e.g., the `select!` arm wins another branch). **Always think: if this future is dropped mid-await, what state is left behind?**
 
-Cancel-safe futures (you can drop without lasting effect):
-- `recv()` on channels
-- `accept()` on listeners
-- `wait_for` on `watch::Receiver`
-- `read_buf`/`write_all` on streams **only when buffers are owned by the future**, otherwise no
+Cancel-safe futures (you can drop them without losing data):
+- `recv()` on channels, `accept()` on listeners
+- `changed()` / `wait_for` on `watch::Receiver`
+- `AsyncReadExt::read` / `read_buf`: bytes land in your buffer only when the call completes
 
-Cancel-unsafe futures (dropping mid-way leaves partial state):
-- Manual `read_exact` into an external buffer
-- Custom futures that perform partial side effects before suspending
+Cancel-unsafe futures (dropping mid-way loses data or leaves partial state):
+- `read_exact`, `read_to_end`, `read_to_string`: bytes already read are gone
+- `write_all` / `write_all_buf`: an unknown prefix was already written
+- Custom futures that perform side effects before suspending
 
-If a function is cancel-unsafe, document it in a rustdoc `# Cancel Safety` section.
+Tokio documents cancel safety per method; check it for every future used as a `select!` branch in a loop. When an operation is cancel-unsafe, keep its progress outside the future (a buffer that lives across loop iterations) or move it into its own task. If your own function is cancel-unsafe, document it in a rustdoc `# Cancel Safety` section.
 
-To explicitly opt out of cancellation, use `tokio_util::sync::CancellationToken`:
+Cooperative cancellation of a whole task tree uses `tokio_util::sync::CancellationToken`: tasks watch the token and exit at a point they choose, so cleanup runs.
 
 ```rust
 use tokio_util::sync::CancellationToken;
@@ -135,7 +136,7 @@ let result = tokio::task::spawn_blocking(|| {
 }).await?;
 ```
 
-Long-running blocking jobs (more than ~1 second of CPU) → use a dedicated thread pool (`rayon`), not tokio's blocking pool which is sized for short bursts.
+Sustained CPU parallelism → a dedicated pool (`rayon`), not tokio's blocking pool, which is sized for many short blocking calls. The same rule covers the blocking std APIs that look harmless inside `async fn`: `std::thread::sleep` (use `tokio::time::sleep`), `std::fs::*` (use `tokio::fs`, or batch it into one `spawn_blocking`), and `blocking_recv` / `blocking_lock` (they panic inside a runtime).
 
 ## Channels
 
@@ -199,21 +200,31 @@ serve_sse(stream).await
 ```rust
 use tokio::signal;
 
+/// Resolves on Ctrl-C or SIGTERM. A signal source that cannot be installed is
+/// logged and never fires, so the other source still works.
 async fn shutdown_signal() {
-    let ctrl_c = async { signal::ctrl_c().await.expect("ctrl_c handler") };
+    let ctrl_c = async {
+        if let Err(error) = signal::ctrl_c().await {
+            tracing::error!(%error, "cannot listen for ctrl-c");
+            std::future::pending::<()>().await;
+        }
+    };
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("install signal handler")
-            .recv()
-            .await;
+        match signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            Ok(mut sigterm) => { sigterm.recv().await; }
+            Err(error) => {
+                tracing::error!(%error, "cannot listen for SIGTERM");
+                std::future::pending::<()>().await;
+            }
+        }
     };
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
     tracing::info!("shutdown signal received");
 }
@@ -224,7 +235,10 @@ async fn main() -> anyhow::Result<()> {
     let server = tokio::spawn(run_server(token.child_token()));
     shutdown_signal().await;
     token.cancel();
-    let _ = tokio::time::timeout(Duration::from_secs(10), server).await;
+    match tokio::time::timeout(Duration::from_secs(10), server).await {
+        Ok(joined) => joined??, // JoinError (panic) and the server's own error both surface
+        Err(_elapsed) => tracing::warn!("server did not stop within 10s"),
+    }
     Ok(())
 }
 ```
@@ -235,14 +249,16 @@ Pattern: catch signal → cancel a token shared with the server → server's `se
 
 - `tokio::sync::Mutex` — async mutex. Use for state shared between async tasks. **Do not hold across `.await` without thinking** (you'll serialize the whole system).
 - `tokio::sync::RwLock` — async read-write lock. Same caveat.
-- `parking_lot::Mutex` — sync mutex, faster than `std::sync::Mutex`, no poisoning. Use when the lock is held briefly and you do not need to `.await` while holding it.
+- `std::sync::Mutex` / `parking_lot::Mutex` — sync mutex for a critical section that never spans an `.await` (see [concurrency.md](concurrency.md) for choosing between them).
+- Nothing guard-like lives across an `.await`: not a sync lock guard, not a `watch` borrow ([concurrency.md](concurrency.md)), not a `span.enter()` guard. Instrument the future instead: `fut.instrument(span).await`.
 - `tokio::sync::Semaphore` — bound concurrent operations. Perfect for "max 10 in-flight HTTP requests" or "max 3 DB writers".
 
 ```rust
 let sem = Arc::new(tokio::sync::Semaphore::new(10));
+let mut set = JoinSet::new();
 for url in urls {
-    let permit = sem.clone().acquire_owned().await?;
-    tokio::spawn(async move {
+    let permit = Arc::clone(&sem).acquire_owned().await?;
+    set.spawn(async move {
         let _permit = permit;  // released on task end
         fetch(&url).await
     });
@@ -278,6 +294,8 @@ async fn fetches_and_parses() {
 async fn parallel_work() { ... }
 ```
 
+`current_thread` is the default test runtime; it chooses a scheduler, it does not make a test deterministic. Wait on the exact event (a channel message, a `Notify`, a `watch` change) or on paused virtual time below, never on a real `sleep`.
+
 For time-sensitive tests, advance virtual time:
 
 ```rust
@@ -289,6 +307,20 @@ async fn time_travel() {
     // Real wallclock elapsed: ~0ms.
 }
 ```
+
+## Async traits and async closures
+
+`async fn` in traits is stable (1.75) and dispatches statically:
+
+```rust
+trait Store {
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>, StoreError>;
+}
+```
+
+Two limits: callers cannot require the returned future to be `Send` (spawning a generic `S: Store` call fails), and the trait is not `dyn`-compatible. For `Send` futures, declare the method as `fn get(&self, key: &str) -> impl Future<Output = ...> + Send;`. For `dyn Store`, box the future (`Pin<Box<dyn Future<Output = T> + Send + '_>>`) or use `async-trait`; pick `dyn` only for runtime heterogeneity.
+
+A parameter that is an async callback borrowing from its caller takes `F: AsyncFn(&Request) -> Response` (1.85, `std::ops::AsyncFn`), not `F: Fn(&Request) -> Fut`: the `Fut` form cannot name a future that borrows its argument.
 
 ## When NOT to use async
 

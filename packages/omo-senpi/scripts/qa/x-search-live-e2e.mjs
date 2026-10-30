@@ -7,6 +7,7 @@ import { delimiter, dirname, extname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, seedSandbox, snapshotDirectory, changedSnapshotPaths, credentialDigest } from "./drive.mjs"
 import { resolveSenpiInvocation } from "./team-e2e-runtime.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "../../../../")
@@ -252,7 +253,7 @@ function runScenario(scenario, prompt, outDir) {
   const sandbox = createSandbox()
   seedSandbox(sandbox)
   let credentialReceipt
-  const { env: scrubbedEnv, scrubbed } = createScrubbedEnvironment({ ...process.env })
+  const { env: scrubbedEnv, scrubbed } = createScrubbedEnvironment({ ...isolatedChildEnv(process.env, sandbox.agentDir) })
   Object.assign(scrubbedEnv, {
     HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir,
     OMO_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_DIR: sandbox.agentDir, PI_CODING_AGENT_DIR: sandbox.agentDir,

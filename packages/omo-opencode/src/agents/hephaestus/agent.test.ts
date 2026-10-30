@@ -47,6 +47,12 @@ describe("isHephaestusSupportedModel with a hosted vendor prefix", () => {
       ["opencode/gpt-5.3-codex-spark", true],
       ["openai/gpt-4o", false],
       ["anthropic/claude-opus-4-7", false],
+      ["opencode-go/qwen3.7-plus", false],
+      ["opencode-go/qwen3.7PLUS", false],
+      ["qwen3.7PLUS", false],
+      ["bailian-coding-plan/qwen3.7PLUS", false],
+      ["Qwen3.7PLUS", false],
+      ["opencode-go/qwen3.5-plus", false],
       ["gpt-5.10", false],
       ["some-gpt-5.4-tune", false],
     ];

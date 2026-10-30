@@ -29,6 +29,18 @@ describe("memory tool registration", () => {
     }
   })
 
+  test("#given memory tools that carry renderResult #when created #then each definition has renderShell self", () => {
+    // given / when
+    const tools = createMemoryTools(() => undefined)
+
+    // then
+    expect(tools.length).toBeGreaterThan(0)
+    for (const tool of tools) {
+      expect(typeof tool.renderResult).toBe("function")
+      expect(tool.renderShell).toBe("self")
+    }
+  })
+
   test("#given the memory tool description #when inspected #then it documents omo identity, frontmatter rules, and result strings", () => {
     // given
     const pi = new FakeExtensionAPI()
@@ -56,7 +68,8 @@ describe("memory tool activation", () => {
     // then
     expect(memoryResult.isError).toBe(true)
     expect(textOf(memoryResult)).toContain("no memory identity bound")
-    expect(textOf(memoryResult)).toContain("restart")
+    expect(textOf(memoryResult)).toContain("next user turn")
+    expect(textOf(memoryResult)).not.toContain("enable omo memory")
   })
 
   test("#given a resolver that binds after registration #when the tool executes #then activation follows binding", async () => {

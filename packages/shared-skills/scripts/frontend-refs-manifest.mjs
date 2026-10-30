@@ -10,9 +10,12 @@ export const upstreamsRoot = join(sharedSkillsRoot, "upstreams");
 export const designOriginals = [
 	"README.md",
 	"_INDEX.md",
+	"ambience-skill.md",
 	"aside.md",
 	"clone-from-url.md",
+	"component-catalogs.md",
 	"design-system-architecture.md",
+	"grounding.md",
 	"interaction-skill.md",
 	"layout-skill.md",
 	"lazyweb.md",

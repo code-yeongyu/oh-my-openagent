@@ -41,6 +41,17 @@
 - Hooks must fail closed/silent on malformed input; migration must not mutate user-owned settings or change bytes on repeat runs.
 - Never assert prompt/skill prose wording — machine-consumed fields and shipped-copy equality only.
 
+## TEST AUTHORING GATE
+
+Before adding or changing a suite here, answer all four. A missing answer means do not add it yet:
+
+1. What observable contract over the generated or installed artifact does it protect?
+2. What credible regression in the build, sync, or install makes it fail?
+3. Why does an existing suite not already catch it? Extend the family's owner suite or shared fixture instead of adding a near-duplicate.
+4. Does it need a seam no shipped artifact needs? If yes, check the real artifact instead.
+
+Reject the following unless the case independently guards a manifest, hook, migration, install, or cross-platform contract (and say which one): copied inventories, exact string greps over sources, replays of a shared fixture through a wrapper, and assertions that restate a manifest field. A retained suite that fails on the base is a product bug to fix, never a suite to delete. The full list is `.omo/rules/test-discipline.md` `## AUTHORING GATE` in the OmO repository.
+
 ## COMMANDS
 
 - `npm test` (from `plugin/`, after `npm run build`)

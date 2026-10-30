@@ -12,15 +12,40 @@ function createTemporaryDirectory(prefix: string): string {
   return directory;
 }
 
-afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) {
-    // Windows can transiently report EBUSY while the OS releases the fake bash.exe image of
-    // the just-exited child; retrying the removal is a no-op on POSIX platforms.
-    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+/**
+ * Windows holds the just-exited fake `bash.exe` image open past the child's exit, so removing its
+ * directory reports EBUSY/EPERM/ENOTEMPTY for a while. Bun's `rmSync` ignores `maxRetries`, so the
+ * retry is manual. The assertions have already run by the time this executes, so once the retries are
+ * spent a still-locked directory is left to the OS temp reaper rather than failing a passing test;
+ * every other error still throws, and POSIX - where this race does not exist - stays strict.
+ */
+function removeTemporaryDirectory(directory: string): void {
+  const MAX_ATTEMPTS = 10;
+  const DELAY_MS = 200;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      rmSync(directory, { recursive: true, force: true });
+      return;
+    } catch (error: unknown) {
+      const code = error !== null && typeof error === "object" && "code" in error ? (error as { code: string }).code : "";
+      const lockRace = code === "EBUSY" || code === "EPERM" || code === "ENOTEMPTY";
+      if (!lockRace) throw error;
+      if (attempt + 1 >= MAX_ATTEMPTS) {
+        if (process.platform === "win32") return;
+        throw error;
+      }
+      Bun.sleepSync(DELAY_MS);
+    }
   }
+}
+
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) removeTemporaryDirectory(directory);
 });
 
 describe("Git Bash runner", () => {
+  // Windows CI compiles a fake bash.exe via Bun.build and then spawns it; both
+  // steps are much slower than the 5 s Bun default on the shared runners.
   it("#given fake bash executable #when command runs #then invokes bash with -lc and command payload", async () => {
     const directory = createTemporaryDirectory("omo-git-bash-runner-");
     const argvPath = join(directory, "argv.txt");
@@ -71,5 +96,5 @@ describe("Git Bash runner", () => {
       stderr: `fake stderr${expectedLineEnding}`,
       timedOut: false,
     });
-  });
+  }, { timeout: 30_000 });
 });

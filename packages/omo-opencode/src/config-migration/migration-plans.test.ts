@@ -11,6 +11,48 @@ import {
   createLegacyConfigMigrationPlans,
   executeLegacyConfigMigrationPlan,
 } from "./index"
+import { runOpenCodeStartupMigration } from "../startup-migration"
+import { REASONING_UNIFICATION_MIGRATION_ID } from "./reasoning-unification"
+import { HARNESS_NATIVE_RENAME_MIGRATION_ID } from "./harness-native-rename"
+
+for (const extension of ["json", "jsonc"]) {
+  for (const [index, key] of [String.fromCharCode(100, 111, 114, 105), ["gate", "way"].join("")].entries()) {
+    test(`startup preserves ${extension} with ignored section ${index}`, () => {
+      const homeDir = realpathSync(mkdtempSync(join(tmpdir(), "omo-ignored-startup-")))
+      const cwd = join(homeDir, "project")
+      mkdirSync(cwd)
+      mkdirSync(join(homeDir, ".omo"))
+      const path = join(homeDir, ".omo", `omo.${extension}`)
+      const section = { [key]: { arbitrary: true } }
+      const content = `${extension === "jsonc" ? "// keep comment\n" : ""}${JSON.stringify({
+        ...section,
+        disabled_skills: ["kept"],
+        "[senpi]": section,
+        profiles: { work: { ...section, "[senpi]": section } },
+        _migrations: [REASONING_UNIFICATION_MIGRATION_ID, HARNESS_NATIVE_RENAME_MIGRATION_ID],
+      })}\n`
+      writeFileSync(path, content)
+      try {
+        const writes: string[] = []
+        const result = runOpenCodeStartupMigration({
+          cwd,
+          homeDir,
+          environment: { HOME: homeDir },
+          env: { HOME: homeDir },
+          onBoundary: (boundary) => writes.push(boundary),
+        })
+        expect(result.error).toBeUndefined()
+        expect(result.results.every((entry) => entry.status === "skipped")).toBe(true)
+        expect(result.results.flatMap((entry) => entry.diagnostics)).toEqual([])
+        expect(result.targetBackupPaths).toEqual([])
+        expect(writes).not.toContain("target-written")
+        expect(readFileSync(path, "utf-8")).toBe(content)
+      } finally {
+        rmSync(homeDir, { recursive: true, force: true })
+      }
+    })
+  }
+}
 
 describe("legacy config migration plans", () => {
   test("#given user, profile, config.jsonc, project, and sidecar fixtures #when planning and executing #then distinct group markers and exact backup destinations preserve every source", () => {
@@ -125,8 +167,8 @@ describe("legacy config migration plans", () => {
       const migrated = executeLegacyConfigMigrationPlan(plan, { env: { HOME: homeDir } })
 
       // then
-      expect(dryRun.diagnostics).toContain("conflict: [senpi] legacy [omo] kept [senpi]")
-      expect(migrated.diagnostics).toContain("conflict: [senpi] legacy [omo] kept [senpi]")
+      expect(dryRun.diagnostics).toContain("conflict: [native] legacy [omo] kept [native]")
+      expect(migrated.diagnostics).toContain("conflict: [native] legacy [omo] kept [native]")
     } finally {
       rmSync(fixtureRoot, { force: true, recursive: true })
     }

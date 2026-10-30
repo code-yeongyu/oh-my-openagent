@@ -12,7 +12,13 @@ import { parse } from "jsonc-parser"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import { createConfigStartupComponent, runSenpiStartupMigration, type SenpiStartupMigrationResult } from "./index"
+import {
+  createConfigStartupComponent,
+  notificationMessages,
+  runSenpiStartupMigration,
+  type SenpiStartupMigrationResult,
+} from "./index"
+
 
 function fileError(code: string, message: string): Error {
   return Object.assign(new Error(message), { code })
@@ -116,7 +122,15 @@ describe("runSenpiStartupMigration", () => {
 
     // then
     expect(result.error).toBeUndefined()
-    expect(result.results.map((entry) => entry.status)).toEqual(["migrated", "migrated", "migrated"])
+    expect(result.results.map((entry) => entry.status)).toEqual([
+      "migrated",
+      "migrated",
+      "migrated",
+      "skipped",
+      "skipped",
+      "skipped",
+      "skipped",
+    ])
     expect(parse(fileSystem.readFileSync("/home/alice/.omo/omo.jsonc", "utf-8"))).toMatchObject({
       _migrations: [
         "2026-07-opencode-config-unification",
@@ -194,7 +208,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => migration,
@@ -209,10 +223,10 @@ describe("createConfigStartupComponent", () => {
     // then
     expect(notifications).toEqual([
       {
-        message: "omo-senpi: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
+        message: "OmO Native: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
         type: "info",
       },
-      { message: "omo-senpi: configuration diagnostics: JSONC parse error", type: "warning" },
+      { message: "OmO Native: configuration diagnostics: JSONC parse error", type: "warning" },
     ])
     expect(logs).toEqual([])
   })
@@ -225,7 +239,7 @@ describe("createConfigStartupComponent", () => {
     const migration = runSenpiStartupMigration(migrationOptions(fileSystem))
     const pi = new FakeExtensionAPI()
     const logs: string[] = []
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => ({ config: {}, diagnostics: [], layers: [], sources: [] }),
       resolveCwd: () => "/project",
       runMigration: () => migration,
@@ -240,11 +254,11 @@ describe("createConfigStartupComponent", () => {
     // then
     expect(notifications).toEqual([
       {
-        message: "omo-senpi: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
+        message: "OmO Native: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.jsonc",
         type: "info",
       },
       {
-        message: "omo-senpi: configuration migration: skipped: [opencode].model_fallback legacy=true kept=false",
+        message: "OmO Native: configuration migration: skipped: [opencode].model_fallback legacy=true kept=false",
         type: "warning",
       },
     ])
@@ -261,7 +275,7 @@ describe("createConfigStartupComponent", () => {
       layers: [],
       sources: [],
     }
-    createConfigStartupComponent({
+    await createConfigStartupComponent({
       loadConfig: () => config,
       resolveCwd: () => "/project",
       runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
@@ -272,6 +286,154 @@ describe("createConfigStartupComponent", () => {
     await pi.dispatch("session_start", {})
 
     // then
-    expect(logs).toEqual(["warn:omo-senpi: configuration diagnostics: Invalid omo config"])
+    expect(logs).toEqual(["warn:OmO Native: configuration diagnostics: Invalid omo config"])
+  })
+
+  test("#given a retired agents.momus key in omo.json #when session_start captures a UI #then nothing is reported about it", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const logs: string[] = []
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { momus: { model: "omo-mock/mock-1" } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+    await createConfigStartupComponent({
+      loadConfig: () => config,
+      resolveCwd: () => "/project",
+      runMigration: () => ({ journalResumed: false, migratedFrom: [], results: [] }),
+    }).register(pi, context(logs))
+    const notifications: Array<{ message: string; type: string | undefined }> = []
+    const eventContext = { ui: { notify: (message: string, type?: string) => notifications.push({ message, type }) } }
+
+    // when
+    await pi.dispatch("session_start", {}, eventContext)
+
+    // then: the retired key is an ordinary custom agent now, so it produces no notice at all
+    expect(notifications).toEqual([])
+    expect(logs).toEqual([])
+  })
+})
+
+describe("notificationMessages", () => {
+  const quietMigration: SenpiStartupMigrationResult = { journalResumed: false, migratedFrom: [], results: [] }
+
+  test("#given retired agents.momus and agents.metis keys #when notices are built #then no notice is produced for them", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { momus: { model: "omo-mock/mock-1" }, metis: { disable: true } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then: the one-release alias window closed, so the keys are plain custom agents
+    expect(notices).toEqual([])
+  })
+
+  test("#given category and agent pins naming Devin SWE-2 ids Cascade does not serve #when notices are built #then one warning names each and the served lanes", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: {
+          quick: { model: "devin/swe-2-low" },
+          "deep-low": { models: ["devin/swe-2-max", { model: "devin/swe-2-high-lite" }] },
+          writing: { model: "devin/swe-2-high", fallback_models: ["devin/swe-2"] },
+        },
+        agents: { scout: { model: "devin/swe-2-medium" } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([{
+      message: "OmO Native: Devin does not serve devin/swe-2-low (categories.quick.model), devin/swe-2-high-lite (categories.deep-low.models[1]), devin/swe-2 (categories.writing.fallback_models[0]); SWE-2 runs as devin/swe-2-medium, devin/swe-2-high or devin/swe-2-max",
+      type: "warning",
+    }])
+  })
+
+  test("#given categories named after a builtin and a configured agent #when notices are built #then one warning names each ignored category key and its agents key", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: { "plan-consultant": { model: "omo-mock/mock-1" }, scout: { model: "omo-mock/mock-2" }, quick: { model: "omo-mock/mock-3" } },
+        agents: { scout: { description: "Project scout" } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([{
+      message: 'OmO Native: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": ["omo-mock/mock-1"] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning; categories."scout" is not read for subagent_type "scout" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "scout": { "models": ["omo-mock/mock-2"] } }. If you also use task(category: "scout") on purpose, the key keeps working there; giving the agent its own models silences this warning',
+      type: "warning",
+    }])
+  })
+
+  test("#given a category named after an agent that already sets its own models #when notices are built #then no category-shadow warning is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: { explore: { model: "a/b" } },
+        agents: { explore: { models: ["x/y"] } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([])
+  })
+
+  test("#given a category named after an agent that sets a single model #when notices are built #then no category-shadow warning is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: {
+        categories: { explore: { model: "a/b" } },
+        agents: { explore: { model: "x/y" } },
+      },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([])
+  })
+
+  test("#given only canonical and custom agent keys #when notices are built #then no alias-deprecated notice is produced", () => {
+    // given
+    const config: SenpiOmoConfigResult = {
+      config: { agents: { "plan-reviewer": { model: "omo-mock/mock-1" }, scout: { description: "Project scout" } } },
+      diagnostics: [],
+      layers: [],
+      sources: [],
+    }
+
+    // when
+    const notices = notificationMessages(quietMigration, config)
+
+    // then
+    expect(notices).toEqual([])
   })
 })

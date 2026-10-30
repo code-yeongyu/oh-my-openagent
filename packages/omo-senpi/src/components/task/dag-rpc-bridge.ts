@@ -12,6 +12,7 @@ import { dagUpdatedPayload } from "./dag-snapshot-payload"
 export { DAG_MAX_RUN_SNAPSHOTS } from "./dag-snapshot-payload"
 export type {
   DagBridgeActivityEvent,
+  DagBridgeLogger,
   DagBridgeRun,
   DagBridgeRunEvent,
   DagBridgeTimers,
@@ -63,10 +64,32 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
   let lastSnapshotFingerprint: string | undefined
   let attached = false
   let disposed = false
+  const reportedReadFaults = new Set<string>()
 
   const emit = (name: string, data: unknown): void => {
     pi.rpc?.emit(name, data)
   }
+
+  // Store reads run from timers (heartbeat, snapshot flush) where a throw has no caller left to reach:
+  // it becomes an uncaughtException and ends the whole session ("OmO exiting due to uncaughtException:
+  // ENOENT ... dag/runs" after a worktree cleanup removed .omo mid-run). A read fault is reported once
+  // per distinct message, read as "nothing to publish", and forgotten once the store reads again.
+  const readStore = <T>(read: () => T, surface: string): T | undefined => {
+    try {
+      const value = read()
+      reportedReadFaults.clear()
+      return value
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!reportedReadFaults.has(message)) {
+        reportedReadFaults.add(message)
+        deps.logger?.warn(`omo-dag ${surface} read failed; nothing published until the store reads again`, { error: message })
+      }
+      return undefined
+    }
+  }
+
+  const ownedRuns = (): readonly DagBridgeRun[] => readStore(deps.liveRuns, "run list") ?? []
 
   const forward = (event: DagBridgeRunEvent): void => {
     if (!attached) return
@@ -78,7 +101,7 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
   }
 
   const liveRuns = (): readonly DagBridgeRun[] =>
-    deps.liveRuns().filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
+    ownedRuns().filter((run) => !TERMINAL_RUN_STATUSES.has(run.status))
 
   const stopHeartbeat = (): void => {
     if (heartbeat === undefined) return
@@ -128,7 +151,11 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
     if (!attached) return
     const parentSessionId = deps.parentSessionId?.()
     if (parentSessionId === undefined || deps.runSnapshots === undefined) return
-    const data = dagUpdatedPayload(parentSessionId, deps.runSnapshots())
+    // An unreadable store must not publish an empty run list: consumers swap their whole view on
+    // this channel, so that would make every live run look finished.
+    const snapshots = readStore(deps.runSnapshots, "run snapshot")
+    if (snapshots === undefined) return
+    const data = dagUpdatedPayload(parentSessionId, snapshots)
     const fingerprint = JSON.stringify(data)
     if (fingerprint === lastSnapshotFingerprint) return
     lastSnapshotFingerprint = fingerprint
@@ -161,7 +188,7 @@ export function createDagRpcBridge(pi: SenpiExtensionAPI, deps: DagRpcBridgeDeps
 
   const sync = (): void => {
     if (!attached) return
-    for (const run of deps.liveRuns()) {
+    for (const run of ownedRuns()) {
       if (subscriptions.has(run.runId)) continue
       subscriptions.set(run.runId, run.subscribe(forward))
     }

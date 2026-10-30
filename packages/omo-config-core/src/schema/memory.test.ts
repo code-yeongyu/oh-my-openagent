@@ -1,44 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  OmoMemoryRecallLayerSchema,
   OmoMemorySettingsLayerSchema,
   OmoMemorySettingsSchema,
   type OmoMemorySettings,
 } from "./memory"
 
-const FULL_DEFAULTS: OmoMemorySettings = {
-  enabled: true,
-  agent: "auto",
-  reflection: {
-    enabled: true,
-    trigger: { step_count: 25, on_compaction: true },
-    merge: "auto",
-    category: "quick",
-    timeout_minutes: 15,
-    sandbox: "auto",
-  },
-  nudge: { enabled: true, every_user_turns: 10 },
-  facts: { enabled: true, debounce_settles: 4 },
-  dream: {
-    enabled: true,
-    idle_minutes: 30,
-    min_hours_between: 24,
-    shutdown_launch: true,
-    auto_select_max: 5,
-    auto_select_max_chars: 150000,
-  },
-  people: { enabled: true, max_entries: 40, max_entry_chars: 200 },
-  soul: { edit_notice: true },
-  write_notice: { enabled: true },
-  sync: { enabled: true },
-  search: { enabled: true },
-  recall: {
-    enabled: true,
-    max_items: 2,
-  },
-  compile_warn_tokens: 30000,
-  agents: {},
-}
+import { FULL_DEFAULTS } from "./memory.test-support"
 
 describe("OmoMemorySettingsSchema defaults", () => {
   test("#given an empty memory block #when parsed #then the pinned v2 defaults apply", () => {
@@ -57,12 +26,14 @@ describe("OmoMemorySettingsSchema defaults", () => {
     const input: OmoMemorySettings = {
       enabled: false,
       agent: "backend-lead",
+      auto_identity: "git",
       reflection: {
         enabled: false,
         trigger: { step_count: 25, on_compaction: false },
         merge: "integration",
         category: "deep",
         timeout_minutes: 30,
+        max_concurrent_runs: 2,
         sandbox: "required",
       },
       nudge: { enabled: false, every_user_turns: 5 },
@@ -76,6 +47,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
         auto_select_max_chars: 100000,
       },
       people: { enabled: false, max_entries: 20, max_entry_chars: 100 },
+      agreements: { enabled: false, needs_human_threshold: 5, max_items: 32 },
       soul: { edit_notice: false },
       write_notice: { enabled: false },
       sync: { remote: "file:///tmp/memory-mirror.git", enabled: true },
@@ -83,12 +55,21 @@ describe("OmoMemorySettingsSchema defaults", () => {
       recall: {
         enabled: false,
         max_items: 5,
+        category: "quick",
+        event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
+        sidecar_max_tokens: 48000,
+        max_concurrent_wakes: 2,
+        tool_budget: 8,
+        query_expansion: false,
       },
+      project_scope: { nudge: false, recall: false },
+      projection: { max_entries_per_directory: 12, max_bytes: 4096 },
       compile_warn_tokens: 50000,
       agents: {
         "backend-lead": {
           enabled: true,
           reflection: { trigger: { step_count: 10 }, category: "quick" },
+          agreements: { needs_human_threshold: 2 },
         },
       },
     }
@@ -215,7 +196,16 @@ describe("OmoMemorySettingsSchema defaults", () => {
     const parsed = OmoMemorySettingsSchema.parse(input)
 
     // then
-    expect(parsed.recall).toEqual({ enabled: true, max_items: 2 })
+    expect(parsed.recall).toEqual({
+      enabled: true,
+      max_items: 2,
+      category: "quick",
+      event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
+      sidecar_max_tokens: 48000,
+      max_concurrent_wakes: 2,
+      tool_budget: 8,
+      query_expansion: false,
+    })
   })
 
   test("#given an empty recall block #when parsed #then nested defaults still materialize", () => {
@@ -228,17 +218,39 @@ describe("OmoMemorySettingsSchema defaults", () => {
     // then
     expect(parsed.recall.enabled).toBe(true)
     expect(parsed.recall.max_items).toBe(2)
+    expect(parsed.recall.category).toBe("quick")
+    expect(parsed.recall.event_caps).toEqual({ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 })
   })
 
   test("#given an explicit recall override #when parsed #then the explicit values win", () => {
     // given
-    const input = { recall: { enabled: false, max_items: 4 } }
+    const input = {
+      recall: {
+        enabled: false,
+        max_items: 4,
+        category: "deep",
+        event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
+        sidecar_max_tokens: 48000,
+        max_concurrent_wakes: 2,
+        tool_budget: 8,
+        query_expansion: false,
+      },
+    }
 
     // when
     const parsed = OmoMemorySettingsSchema.parse(input)
 
     // then
-    expect(parsed.recall).toEqual({ enabled: false, max_items: 4 })
+    expect(parsed.recall).toEqual({
+      enabled: false,
+      max_items: 4,
+      category: "deep",
+      event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
+      sidecar_max_tokens: 48000,
+      max_concurrent_wakes: 2,
+      tool_budget: 8,
+      query_expansion: false,
+    })
   })
 
   test("#given recall max_items outside 1..5 #when parsed #then validation fails", () => {
@@ -298,6 +310,11 @@ describe("OmoMemorySettingsSchema defaults", () => {
     }
   })
 
+  test("#given malformed event_caps.tool_args #when parsed #then validation fails", () => {
+    const result = OmoMemorySettingsSchema.safeParse({ recall: { event_caps: { tool_args: -1 } } })
+    expect(result.success).toBe(false)
+  })
+
   test("#given a per-agent recall override #when parsed #then the layer accepts it as a deep-partial", () => {
     // given
     const input = { recall: { enabled: false }, agents: { "backend-lead": { recall: { max_items: 1 } } } }
@@ -307,5 +324,57 @@ describe("OmoMemorySettingsSchema defaults", () => {
 
     // then
     expect(parsed).toEqual(input)
+  })
+})
+
+describe("memory.auto_identity", () => {
+  test("#given a value outside path and git #when parsed on the block or its layer #then validation fails", () => {
+    // given
+    const input = { auto_identity: "repo" }
+
+    // when
+    const block = OmoMemorySettingsSchema.safeParse(input)
+    const layer = OmoMemorySettingsLayerSchema.safeParse(input)
+
+    // then
+    expect(block.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+    expect(layer.error?.issues.map((issue) => issue.path)).toEqual([["auto_identity"]])
+  })
+
+  test("#given git on a layer #when parsed #then the layer keeps it without materializing other defaults", () => {
+    // given
+    const input = { auto_identity: "git" }
+
+    // when
+    const parsed = OmoMemorySettingsLayerSchema.parse(input)
+
+    // then
+    expect(parsed).toEqual({ auto_identity: "git" })
+  })
+})
+
+describe("memory.recall.query_expansion", () => {
+  test("#given no recall block #when parsed #then query expansion is off", () => {
+    expect(OmoMemorySettingsSchema.parse({}).recall.query_expansion).toBe(false)
+  })
+
+  test("#given query expansion set at the root and for one agent #when parsed #then both values are kept", () => {
+    // given
+    const input = { recall: { query_expansion: true }, agents: { research: { recall: { query_expansion: false } } } }
+
+    // when
+    const parsed = OmoMemorySettingsSchema.parse(input)
+
+    // then
+    expect(parsed.recall.query_expansion).toBe(true)
+    expect(parsed.agents.research?.recall).toEqual({ query_expansion: false })
+  })
+
+  test("#given a query expansion value that is not a boolean #when parsed #then validation fails", () => {
+    const recall = { query_expansion: "on" }
+    expect(OmoMemorySettingsSchema.safeParse({ recall }).success).toBe(false)
+    expect(OmoMemoryRecallLayerSchema.safeParse(recall).success).toBe(false)
+    expect(OmoMemorySettingsLayerSchema.safeParse({ recall }).success).toBe(false)
+    expect(OmoMemorySettingsLayerSchema.safeParse({ agents: { research: { recall } } }).success).toBe(false)
   })
 })

@@ -145,7 +145,7 @@ function createLauncherFixture(fixture: Fixture): string {
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const artifact of [
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
-    "plugin/runtime/agent-toolkit/cli.js",
+
   ]) write(join(packageRoot, artifact), "fixture\n")
   return join(packageRoot, "bin", "omo.js")
 }

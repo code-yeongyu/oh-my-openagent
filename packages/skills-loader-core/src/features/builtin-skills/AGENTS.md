@@ -8,6 +8,8 @@ Skills shipped inside the plugin (always available, no install). Registered via 
 
 ## STRUCTURE
 
+Selected modules and resources:
+
 ```
 builtin-skills/
 ├── index.ts              # Barrel exports
@@ -17,12 +19,10 @@ builtin-skills/
 │   ├── git-master.ts                  # Wraps git-master/ SKILL.md + section constants
 │   ├── git-master-sections/           # Prompt sub-sections (history-search, rebase, atomic-planning…)
 │   ├── git-master-skill-metadata.ts   # Companion to git-master
-│   ├── playwright.ts                  # Facade over MCP + agent-browser variants
+│   ├── playwright.ts                  # Facade over browser provider variants
 │   ├── playwright-mcp-skill.ts        # createPlaywrightSkill() factory (mcp_args)
 │   ├── playwright-cli.ts              # CLI variant
 │   ├── dev-browser.ts                 # Persistent page state
-│   ├── agent-browser-skill.ts         # agent-browser variant (`agent-browser:*` Bash)
-│   ├── agent-browser-template.ts      # Shared template/factory for agent-browser
 │   ├── debugging.ts                   # Debugging methodology
 │   ├── visual-qa.ts                   # Visual QA
 │   ├── frontend.ts              # Design-first UI guidance
@@ -35,19 +35,19 @@ builtin-skills/
 │   └── index.ts                       # skill barrel
 ├── git-master/                        # Resources for git-master skill
 ├── frontend/                    # Resources for frontend skill
-├── agent-browser/                     # Resources for agent-browser variant
 ├── dev-browser/                       # Resources for dev-browser
 └── security-research/                 # Resources for security-research
 ```
 
 ## SKILL CATALOG
 
+Selected skills; the provider registry is defined in `skills.ts`.
+
 | Skill | MCP | Notes |
 |-------|-----|-------|
 | `git-master` | — | 1107-LOC SKILL.md; atomic commits, rebase, history search; included by default for delegate-task `git` category |
 | `playwright` | `@playwright/mcp` | Browser automation via MCP |
 | `playwright-cli` | — | Browser automation via shell CLI (no MCP) |
-| `agent-browser` | — | Browser via `agent-browser:*` Bash commands (own module now) |
 | `dev-browser` | — | Persistent page state browser for dev work |
 | `frontend` | — | Design-first UI development guidance |
 | `review-work` | — | Post-implementation gate review (orchestrator manual QA + one gate reviewer) |
@@ -61,13 +61,12 @@ builtin-skills/
 
 ## BROWSER VARIANT SELECTION
 
-Config `browser_automation_engine` selects which browser skill loads:
+Config `browser_automation_engine` selects which browser skill loads. Selected values:
 
 | Value | Skill Loaded |
 |-------|-------------|
 | `"playwright"` (default) | playwright (MCP-backed) |
 | `"playwright-cli"` | playwright-cli (CLI-backed) |
-| `"agent-browser"` | agent-browser (`agent-browser-skill.ts`) |
 
 Only one browser skill is active per session; non-selected variants are skipped.
 `resolveActiveBuiltinSkills({ systemMcpNames })` additionally filters out builtin

@@ -4,6 +4,7 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
 import { firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
+import { withoutExcludedModels } from "../model-exclusion"
 import type { ResolvedModelRecord } from "../state"
 import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
 import {
@@ -11,7 +12,9 @@ import {
   parseAvailableAgentModels,
   type ParsedAgentModel,
 } from "./agent-model-registry"
+import { agentToolPolicy } from "./agent-tool-policy"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
+import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
 
 export type ResolveAgentOptions = {
@@ -63,11 +66,13 @@ type AgentResolutionContext = {
 }
 
 export function resolveAgent<TModel extends SenpiModelPort>(
-  name: string,
+  requestedName: string,
   agents: Readonly<Record<string, AgentDefinition>>,
-  registry: SenpiModelRegistryPort<TModel> | undefined,
+  liveRegistry: SenpiModelRegistryPort<TModel> | undefined,
   options: ResolveAgentOptions = {},
 ): AgentResolutionResult {
+  const registry = liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, options.omoConfig?.exclude_models)
+  const name = canonicalAgentName(requestedName.trim())
   const availableAgents = Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
     .map(([agentName]) => agentName)
@@ -89,9 +94,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     }
   }
 
-  const fallbackChain = Object.hasOwn(AGENT_FALLBACK_CHAINS, name)
-    ? AGENT_FALLBACK_CHAINS[name]
-    : undefined
+  const fallbackChain = Object.hasOwn(AGENT_FALLBACK_CHAINS, name) ? AGENT_FALLBACK_CHAINS[name] : undefined
   if (registry === undefined) {
     const fallbackHead = fallbackChain?.[0]
     const fallbackProvider = fallbackHead?.providers[0]
@@ -199,18 +202,11 @@ export function resolveAgent<TModel extends SenpiModelPort>(
 }
 
 function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
-  const literalToolRules = definition.tools?.filter((rule) =>
-    !rule.pattern.includes(" ") && !rule.pattern.includes("*")
-  )
-  const toolAllowlist = literalToolRules?.filter((rule) => rule.allow).map((rule) => rule.pattern)
-  const toolRuleDenylist = literalToolRules?.filter((rule) => !rule.allow).map((rule) => rule.pattern)
-  const toolDenylist = [...(definition.disallowedTools ?? []), ...(toolRuleDenylist ?? [])]
   const agentExecutionMode = toExecutionMode(definition.executionMode)
   return {
     agentType: name,
     ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
-    ...(toolAllowlist !== undefined ? { toolAllowlist } : {}),
-    ...(toolDenylist.length > 0 ? { toolDenylist } : {}),
+    ...agentToolPolicy(definition),
     ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
     ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
     ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),

@@ -79,14 +79,14 @@ describe("omo-senpi package shape", () => {
     expect(readBoolean(manifest, "private")).toBe(true)
     expect(readString(manifest, "type")).toBe("module")
     expect(readString(manifest, "version")).toBe(readString(rootManifest, "version"))
-    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./extension", "./install"])
+    expect(Object.keys(exportsMap).toSorted()).toEqual([".", "./agent-home", "./extension", "./install", "./onboarding/session-history"])
     expect(scripts).toMatchObject({
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
     })
-    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.9.5-3")
+    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.27-2")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
-    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.9.5-3")
+    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.27-2")
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -110,6 +110,9 @@ describe("omo-senpi package shape", () => {
     expect(files).toContain("extensions")
     expect(files).toContain("skills")
     expect(files).toContain("runtime")
+    // The task daemon's only argv source ships with the plugin; without it `omo daemon run`
+    // fails closed (exit 5) on every npm install.
+    expect(files).toContain("daemon-launch-spec.json")
     expect(files).toContain("README.md")
     expect(files).toContain("NOTICE")
     expect(files).toContain("LICENSE")
@@ -128,6 +131,6 @@ describe("omo-senpi package shape", () => {
     expect(workspaces).toContain("packages/omo-senpi")
     expect(workspaces).not.toContain("packages/lsp-daemon")
     expect(devDependencies["@oh-my-opencode/omo-senpi"]).toBe("workspace:*")
-    expect(typecheckPackages).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(typecheckPackages).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
   })
 })

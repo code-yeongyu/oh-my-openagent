@@ -35,7 +35,11 @@ npx lazycodex-ai install --no-tui --codex-autonomous
 
 To install **both** the Ultimate edition (OpenCode plugin) and the Light edition (this package) at once, use `--platform=both`.
 
-The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, writes the valid `[features.multi_agent_v2]` limit table without enabling MultiAgentV2, and registers the `sisyphuslabs` marketplace from the local built cache. If an older config used `[features] multi_agent_v2 = false`, the installer preserves that explicit disable as table-form `enabled = false`. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
+The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. It never enables MultiAgentV2 and never writes or raises subagent thread caps. `agents.max_threads` and `features.multi_agent_v2.max_concurrent_threads_per_session` are not inserted; values LazyCodex wrote in earlier releases (`1000`, `16`) are removed so Codex stock defaults apply. One exception: when the root model prefers `multi_agent_v2` (the `gpt-6-astra` default), the V1-only `agents.max_threads` key is removed whatever its value, because Codex rejects it while V2 is active. Every other user-set value, including your own `max_concurrent_threads_per_session`, is left as is. If an older config used `[features] multi_agent_v2 = false`, the installer preserves that explicit disable as table-form `enabled = false`.
+
+### Default model
+
+The managed catalog (`plugin/model-catalog.json`, version `2026-09-08.gpt-6-astra-600k-high`) sets the root model to `gpt-6-astra` with `model_context_window = 600000`, `model_reasoning_effort = "high"`, and `plan_mode_reasoning_effort = "xhigh"`. The 12 bundled agent TOMLs also run on `gpt-6-astra`, each keeping its own reasoning effort. A config still on a managed legacy profile (the gpt-5.5 entries, or `legacy.gpt-5.6-sol-650k-high` for `gpt-5.6-sol` at 650k / high / xhigh) is upgraded to the current values; any other root model you picked yourself is preserved. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
 
 To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
@@ -84,6 +88,16 @@ The installer does not write a global Codex shell config. On Windows it enables 
 
 To install both editions in one command, use `--platform=both`.
 
+### Subagent model and reasoning
+
+The bundled agent TOMLs ship LazyCodex defaults (currently `gpt-6-astra`). To pick another model per role durably, set it in `~/.omo/omo.jsonc`; every reinstall and marketplace bootstrap re-applies it, and deleting the entry restores the bundled default:
+
+```jsonc
+{ "[codex]": { "agents": { "explorer": { "model": "gpt-6-luna", "reasoning": "low" } } } }
+```
+
+A `model` or `model_reasoning_effort` you edit directly in `~/.codex/agents/<role>.toml` is also kept across updates; a model LazyCodex itself wrote there follows the new bundled default. See [`docs/reference/omo-json.md`](../../docs/reference/omo-json.md#codex-managed-agent-roles).
+
 ### Subagent service tier (explorer/librarian)
 
 The bundled `explorer` and `librarian` agent TOMLs ship with `service_tier = "fast"` so recon subagents run on the cheaper Fast tier by default. To opt out, edit the tier in your installed agent files and the installer will preserve your choice across every reinstall and bootstrap:
@@ -104,7 +118,7 @@ Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits t
 | `install` | `install_completed` | `npx lazycodex-ai install` or `--platform=both` finishes (handled by `src/cli/install-codex/install-codex.ts`) |
 | `plugin` | `session_start` | Codex plugin `SessionStart` hook fires (handled by `plugin/components/telemetry/`) |
 
-Both sources share the same SHA256-hashed installation identifier (`sha256("omo-codex:" + hostname)`), suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
+Both sources share the same distinct id, `sha256` of a random install id stored in `~/.local/share/omo-codex/install-id`, suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
 
 The captured properties are limited to product/runtime metadata, operating-system metadata, coarse machine shape (`cpu_count`, `cpu_model`, `total_memory_gb`), locale/timezone, shell/terminal hints, `source`, `reason`, and `day_utc`. Telemetry does not send prompt contents, chat transcripts, source files, repository contents, file paths, access tokens, API keys, raw hostnames, Git remotes, usernames, email addresses, or runtime error diagnostics.
 

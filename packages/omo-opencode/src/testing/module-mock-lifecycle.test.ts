@@ -44,7 +44,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     // when
@@ -73,7 +73,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     // when
@@ -101,7 +101,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     // when
@@ -126,7 +126,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -161,7 +161,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: () => "node:fs/promises",
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -194,7 +194,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -233,7 +233,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
       shouldPreserveActiveMocksOnRestore: () => true,
     })
 
@@ -265,7 +265,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -299,7 +299,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -336,7 +336,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: () => "resolved:./shared-dependency",
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency", () => ({ named: "first-mock" }))
@@ -372,7 +372,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -405,7 +405,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -439,7 +439,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -472,7 +472,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => callerUrl,
       resolveSpecifier: (specifier, ownerUrl) => `${ownerUrl}:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
     })
 
     mockApi.module("./dependency-a", () => ({ named: "mock-a" }))
@@ -504,7 +504,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: () => "file:///repo/src/dependency.ts",
-      loadOriginalModule: () => {
+      loadUnmockedModule: () => {
         loadCount += 1
         return { ok: true, value: { named: "original" } }
       },
@@ -531,7 +531,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => specifier,
-      loadOriginalModule: () => ({ ok: false, error: new Error("Cannot find module") }),
+      loadUnmockedModule: () => ({ ok: false, error: new Error("Cannot find module") }),
     })
 
     // when
@@ -557,7 +557,7 @@ describe("installModuleMockLifecycle", () => {
     const lifecycle = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/preserved.test.ts",
       resolveSpecifier: (specifier) => specifier,
-      loadOriginalModule: () => ({ ok: false, error: new Error("Cannot find module") }),
+      loadUnmockedModule: () => ({ ok: false, error: new Error("Cannot find module") }),
     })
 
     // when

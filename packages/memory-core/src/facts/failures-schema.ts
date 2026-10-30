@@ -14,6 +14,7 @@ export const FACTS_FAILURE_REASONS = [
   "unknown_liveness",
   "payload_envelope_oversize",
   "payload_entry_oversize",
+  "secret_like_content",
   "other",
 ] as const
 

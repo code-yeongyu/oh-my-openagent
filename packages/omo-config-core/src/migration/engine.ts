@@ -7,6 +7,7 @@ export function runMigration(options: RunMigrationOptions): MigrationRunResult {
     discover: () => [{
       id: options.id,
       ...(options.mode === undefined ? {} : { mode: options.mode }),
+      ...(options.shouldRun === undefined ? {} : { shouldRun: options.shouldRun }),
       sources: options.sources,
       targetPath: options.targetPath,
       transform: options.transform,

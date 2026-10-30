@@ -11,7 +11,7 @@ const workflow = readFileSync(join(repoRoot, ".github", "workflows", "ci.yml"), 
 const preload = readFileSync(join(repoRoot, "test-setup.ts"), "utf8")
 
 describe("per-file test timeout budget", () => {
-  test("#given a sequential multi-file run #when files rely on the preload default #then only the first file gets it (the Bun defect this contract guards)", () => {
+  test("#given a sequential multi-file run #when files rely on the preload default #then only the first file gets it, and an explicit --timeout covers both (the Bun defect this contract guards)", () => {
     // Two files, each sleeping past Bun's 5000ms built-in but inside test-setup.ts's budget. Without
     // an explicit --timeout the second file must die at 5000ms; with it both must pass. This is the
     // whole reason ci.yml and the Windows wrapper pass the flag explicitly.
@@ -29,7 +29,17 @@ describe("per-file test timeout budget", () => {
           "",
         ].join("\n"))
       }
-      const run = (...extra: string[]) => spawnSync(process.execPath, ["test", ...extra, dir], { cwd: repoRoot, encoding: "utf8" })
+      // The parent runs in GitHub Actions, but the probe's captured output must not use Bun's
+      // GitHub log-group reporter. Bun 1.4.x sends the grouped test output to stderr after the
+      // initial header on CI, and Windows can return the sync capture at that split point.
+      const probeEnv = { ...process.env }
+      delete probeEnv.CI
+      delete probeEnv.GITHUB_ACTIONS
+      const run = (...extra: string[]) => spawnSync(process.execPath, ["test", ...extra, dir], { cwd: repoRoot, encoding: "utf8", env: probeEnv })
+      // Without the flag the second file falls back to Bun's 5000ms built-in. When Bun fixes that,
+      // this half goes red and the explicit flags in ci.yml and the Windows wrapper can be revisited.
+      const implicit = run()
+      expect(`${implicit.stdout}${implicit.stderr}`).toMatch(/timed out after 5000ms/)
       const explicit = run("--timeout", "20000")
       expect(`${explicit.stdout}${explicit.stderr}`).toMatch(/\b2 pass\b/)
       expect(`${explicit.stdout}${explicit.stderr}`).not.toMatch(/timed out after 5000ms/)
@@ -45,7 +55,9 @@ describe("per-file test timeout budget", () => {
   })
 
   test("#given ci.yml #when a POSIX job runs bun test over more than one file #then the invocation carries --timeout 20000", () => {
-    const multiFileRuns = workflow
+    const sharedScripts = ["ci-root-shard-2.sh", "ci-senpi-posix.sh"]
+      .map((file) => readFileSync(join(repoRoot, ".github", "scripts", file), "utf8")).join("\n")
+    const multiFileRuns = (workflow + "\n" + sharedScripts)
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => /^(run: )?bun (--config=\S+ )?test\b/.test(line))
@@ -61,10 +73,8 @@ describe("per-file test timeout budget", () => {
     expect(multiFileRuns).toEqual([])
   })
 
-  test("#given test-setup.ts #when its budget is documented #then it states the first-file-only behaviour and the three numbers to keep in step", () => {
+  test("#given test-setup.ts #when it sets the preload budget #then it matches the explicit CI budgets", () => {
     expect(preload).toMatch(/setDefaultTimeout\(process\.platform === "win32" \? 30_000 : 20_000\)/)
-    expect(preload).toMatch(/FIRST test file of a sequential run only/)
-    expect(preload).toMatch(/Windows wrapper injects 30000/)
-    expect(preload).toMatch(/carry 20000/)
+    expect(readFileSync(join(repoRoot, "test-support/test-deadline.ts"), "utf8")).toMatch(/export const DEFAULT_TEST_TIMEOUT_MS = process\.platform === "win32" \? 30_000 : 20_000/)
   })
 })

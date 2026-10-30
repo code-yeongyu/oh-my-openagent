@@ -3,25 +3,37 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { RpcChildHandle, RpcRunnerSpec } from "./types"
 import { RunnerError } from "./in-process/runner-error"
-import { createRpcChildHandle } from "./rpc/handle"
+import { childRetryFallbackProfile } from "./retry-fallback-profile"
+import { createRpcChildHandle, type CreateRpcChildHandleOptions } from "./rpc/handle"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
 import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
+import { createTaskRecordStore } from "../store"
+import { InputUncertainError } from "./input-effects"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
+/** senpi capability: a single-session `--mode rpc` process accepts `set_retry_fallback` before its first turn. */
+const RETRY_FALLBACK_COMMAND_CAPABILITY = "retry_fallback_command"
+/** How long a child's start waits for the engine to answer its fallback chain before prompting without it. */
+const DEFAULT_FALLBACK_CHAIN_DEADLINE_MS = 10_000
 
 export type RpcProcessRunnerOptions = {
+  readonly terminateChild?: CreateRpcChildHandleOptions["terminateChild"]
   readonly spawnChild?: (descriptor: RpcSpawnDescriptor) => ChildProcess
   readonly spawnProcess?: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess
   readonly buildSpawn?: (spec: RpcRunnerSpec) => RpcSpawnDescriptor
   readonly heartbeatIntervalMs?: number
+  readonly fallbackChainDeadlineMs?: number
   readonly onMalformedLine?: MalformedLineHandler
   readonly now?: () => number
   readonly modelAdmission?: RpcModelAdmission
   // The parent's `-e` extension entries, forwarded to every child so a detached process reproduces the
   // parent's extensions. Applied only when a spec does not already carry its own extensions.
   readonly inheritedExtensions?: readonly string[]
+  // Told once when a child's fallback models cannot reach its process: an engine without
+  // `retry_fallback_command` (#9582).
+  readonly onWarning?: (message: string) => void | (() => void)
 }
 
 /**
@@ -38,8 +50,14 @@ export class RpcProcessRunner {
   private readonly now: () => number
   private readonly modelAdmission: RpcModelAdmission
   private readonly inheritedExtensions: readonly string[]
+  private readonly onWarning: (message: string) => void | (() => void)
+  private readonly fallbackChainDeadlineMs: number
+  private fallbackChainUnsupportedNoticed = false
+  private readonly pendingTeardowns = new Set<Promise<void>>()
+  private readonly terminateChild: CreateRpcChildHandleOptions["terminateChild"]
 
   constructor(options: RpcProcessRunnerOptions = {}) {
+    this.terminateChild = options.terminateChild
     this.spawnChild =
       options.spawnChild ??
       ((descriptor) => defaultSpawnChild(descriptor, options.spawnProcess ?? spawn))
@@ -49,6 +67,8 @@ export class RpcProcessRunner {
     this.now = options.now ?? Date.now
     this.modelAdmission = options.modelAdmission ?? createRpcModelAdmission()
     this.inheritedExtensions = options.inheritedExtensions ?? []
+    this.onWarning = options.onWarning ?? ((message) => log("senpi-task process runner", { message }))
+    this.fallbackChainDeadlineMs = options.fallbackChainDeadlineMs ?? DEFAULT_FALLBACK_CHAIN_DEADLINE_MS
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
@@ -64,27 +84,59 @@ export class RpcProcessRunner {
       client,
       child,
       taskId: spec.task_id,
+      ...(spec.taskStoreDir === undefined ? {} : {
+        inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
+      }),
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
+      childEnv: descriptor.env,
+      terminateChild: this.terminateChild,
     })
-    const resume = spec.resumeSessionPath === undefined ? undefined : client.switchSession(spec.resumeSessionPath)
+    let resume: ReturnType<RpcProtocolClient["switchSession"]> | undefined
     try {
+      // The chain is a launch-time setting: senpi refuses it once the session has a turn, so it goes before
+      // the resumed session is switched in and before the first prompt.
+      await this.applyFallbackChain(client, spec)
+      resume = spec.resumeSessionPath === undefined ? undefined : client.switchSession(spec.resumeSessionPath)
       if (resume === undefined) {
         await handle.startInitialPrompt(spec.prompt)
       } else {
         await resume
+        await handle.reconcileInputs?.()
       }
     } catch (error) {
+      if (error instanceof InputUncertainError) error = error.cause
+      // Capture this BEFORE cleanup: a rejected prompt can leave the child alive, and the cleanup
+      // termination must never be recorded as the cause of the rejection.
+      const exitOutcome = handle.exitOutcome()
       try {
-        await discardUnstartedRpcHandle(handle)
+        const onFailure = (cleanupError: unknown): void => {
+          log("senpi-task rpc start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
+        }
+        if (spec.resumeSessionPath === undefined) {
+          void discardUnstartedRpcHandle(handle, { pending: this.pendingTeardowns, onFailure })
+        } else {
+          await discardUnstartedRpcHandle(handle)
+        }
       } catch (cleanupError) {
         log("senpi-task rpc start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
       }
       const message = error instanceof Error ? error.message : String(error)
+      // The child's own model resolution is the authority admission defers to (#10863): a child that
+      // exited because it could not resolve its `--model` fails typed, carrying its own error.
+      const unresolvedModel = exitOutcome?.kind === "crashed" ? childUnresolvedModelError(exitOutcome.facts.stderrTail) : undefined
+      // A child that died before its first prompt leaves its cause ONLY here: the classified exit is
+      // otherwise folded into `message`, which is stderr-derived and gets sanitized away downstream.
       throw new RunnerError({
-        kind: resume === undefined ? "child-prompt-failed" : "session_unavailable",
-        message,
+        kind: unresolvedModel !== undefined
+          ? "model_unavailable"
+          : spec.resumeSessionPath === undefined ? "child-prompt-failed" : "session_unavailable",
+        message: unresolvedModel === undefined ? message : `the child could not resolve its model: ${unresolvedModel}`,
         cause: error,
+        rejected_while: exitOutcome === undefined ? "alive" : "exited",
+        ...(exitOutcome === undefined
+          ? {}
+          : { exit: { kind: exitOutcome.kind, code: exitOutcome.facts.code, signal: exitOutcome.facts.signal } }),
       })
     }
     return Object.assign(handle, {
@@ -100,6 +152,100 @@ export class RpcProcessRunner {
       getEntries: (since?: string) => client.getEntries(since),
     })
   }
+
+  async settleTeardowns(): Promise<void> {
+    await Promise.all(this.pendingTeardowns)
+  }
+
+  // The child's own chain reaches its process as `set_retry_fallback`, held in memory there and never
+  // written to a settings file (#9582). An engine without the command keeps the manager's fallback before
+  // any tool call; the in-session switch after a tool call is what it loses, so say so once.
+  // The chain only improves a turn that hits a limit later; it never holds the start up. A refusal or a
+  // missing answer leaves the child on the manager's fallback (the same as an older engine), the task id is
+  // named, and the first prompt goes out. A child that died meanwhile fails on that prompt as before.
+  private async applyFallbackChain(client: RpcProtocolClient, spec: RpcRunnerSpec): Promise<void> {
+    const retryFallback = childRetryFallbackProfile(spec)
+    if (retryFallback === undefined) return
+    // Past the deadline the first prompt goes out, so a probe answered late must not send the chain after it.
+    const expired = new AbortController()
+    const outcome = await withDeadline(
+      this.sendFallbackChain(client, retryFallback, expired.signal),
+      this.fallbackChainDeadlineMs,
+      expired,
+    )
+    if (outcome === "applied") return
+    if (outcome === "unsupported") {
+      this.noticeFallbackChainUnsupported()
+      return
+    }
+    // A child that died meanwhile fails on its first prompt next; the warning must not blame the engine.
+    if (client.exited) {
+      this.onWarning(`task ${spec.task_id}: its fallback chain was not applied because the child exited while it was being sent`)
+      return
+    }
+    const reason = outcome === "timeout" ? `no answer within ${this.fallbackChainDeadlineMs} ms` : outcome.refused
+    this.onWarning(
+      `task ${spec.task_id}: its fallback chain was not applied (${reason}), so it switches to a fallback model ` +
+        "only when a turn fails before any tool call",
+    )
+  }
+
+  private async sendFallbackChain(
+    client: RpcProtocolClient,
+    retryFallback: NonNullable<ReturnType<typeof childRetryFallbackProfile>>,
+    expired: AbortSignal,
+  ): Promise<"applied" | "unsupported" | { readonly refused: string }> {
+    try {
+      if (!(await engineAcceptsFallbackChain(client))) return "unsupported"
+      if (expired.aborted) return { refused: "deadline passed" }
+      const response = await client.send({ type: "set_retry_fallback", retryFallback })
+      return response.success ? "applied" : { refused: `refused: ${response.error}` }
+    } catch (error) {
+      return { refused: `refused: ${error instanceof Error ? error.message : String(error)}` }
+    }
+  }
+
+  private noticeFallbackChainUnsupported(): void {
+    if (this.fallbackChainUnsupportedNoticed) return
+    this.fallbackChainUnsupportedNoticed = true
+    this.onWarning(
+      "this senpi engine cannot take a task child's fallback chain (no retry_fallback_command), so children " +
+        "started as their own process switch to their fallback models only when a turn fails before any tool call",
+    )
+  }
+}
+
+async function withDeadline<T>(work: Promise<T>, ms: number, expired: AbortController): Promise<T | "timeout"> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => {
+      expired.abort()
+      resolve("timeout")
+    }, ms)
+  })
+  try {
+    return await Promise.race([work, deadline])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function engineAcceptsFallbackChain(client: RpcProtocolClient): Promise<boolean> {
+  const response = await client.send({ type: "get_protocol_info" })
+  if (!response.success || response.command !== "get_protocol_info") return false
+  const capabilities = (response.data as { readonly capabilities?: unknown }).capabilities
+  return Array.isArray(capabilities) && capabilities.includes(RETRY_FALLBACK_COMMAND_CAPABILITY)
+}
+
+const ANSI_ESCAPE = /\u001B\[[0-?]*[ -/]*[@-~]/g
+// senpi's two `model_unresolved` startup diagnostics, printed before it exits 1 (core/model-resolver):
+// an unknown model, and an unknown provider in a `provider/model` pin. Both mean the child can't serve
+// the requested model, so both fail typed and let the start fallback chain move on.
+const SENPI_UNRESOLVED_MODEL =
+  /Model "[^"\n]+" not found\. Use --list-models to see available models\.|Unknown provider "[^"\n]+"\. Use --list-models to see available providers\/models\./
+
+function childUnresolvedModelError(stderrTail: string): string | undefined {
+  return SENPI_UNRESOLVED_MODEL.exec(stderrTail.replace(ANSI_ESCAPE, ""))?.[0]
 }
 
 function defaultSpawnChild(

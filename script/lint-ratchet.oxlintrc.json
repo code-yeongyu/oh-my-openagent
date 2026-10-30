@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript"
+  ],
+  "categories": {
+    "correctness": "off"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-non-null-assertion": "error"
+  }
+}

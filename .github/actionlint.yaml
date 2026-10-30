@@ -1,0 +1,6 @@
+# actionlint v1.7.10 predates this GitHub-hosted label. Its additional-label
+# registry is named self-hosted-runner, but does not change runner selection.
+# Official label: https://github.com/actions/runner-images/issues/14748
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

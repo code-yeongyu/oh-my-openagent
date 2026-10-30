@@ -6,6 +6,31 @@ import { registerSkillsUsage } from "./skills-usage-wiring"
 import { eventContext, fixture, toolCall } from "./skills-usage.test-support"
 
 describe("registerSkillsUsage", () => {
+  test("#given a read tool and context only on the callback context #when dispatched then flushed #then the skill ledger records the read", async () => {
+    // #given
+    const { context, repoDir } = await fixture()
+    const pi = new FakeExtensionAPI()
+    const sessionContext = eventContext("session-1")
+    const trackers = registerSkillsUsage(pi, {
+      resolveContext: (candidate) => candidate === sessionContext ? context : undefined,
+      resolveCwd: () => repoDir,
+      now: () => new Date("2026-01-15T10:00:00Z"),
+    })
+
+    // #when
+    await pi.dispatch(
+      "tool_call",
+      toolCall("read", { path: join(repoDir, "skills", "foo", "SKILL.md") }),
+      sessionContext,
+    )
+    const tracker = trackers.get(context.identity)
+    await tracker?.flush()
+
+    // #then
+    const ledger = await readSkillsUsageLedger(skillsUsagePaths(context.identityPaths).ledgerPath)
+    expect(ledger.foo).toEqual({ count: 1, lastUsedAt: "2026-01-15T10:00:00.000Z" })
+  })
+
   test("#given a read tool targeting skills/foo/SKILL.md #when dispatched then flushed #then foo.count is 1", async () => {
     // #given
     const { context, repoDir } = await fixture()

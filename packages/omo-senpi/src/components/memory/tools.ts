@@ -2,14 +2,16 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import {
   MemoryToolError,
   createNodeGitExec,
+  parseClaimReceipt,
   runMemoryTool,
   type MemoryToolCommit,
   type MemoryToolProvenance,
+  USER_QUOTE_RULE,
 } from "@oh-my-opencode/memory-core"
 import { Type, type Static, type TSchema } from "typebox"
 
 import { prepareMemoryEngineSession } from "./engine-session"
-import { createMemoryWriteRenderResult } from "./memory-write-render"
+import { createMemoryWriteRenderResult, renderMemoryWriteCall } from "./memory-write-render"
 import type { MemoryRpcSnapshot } from "./memory-rpc-bridge"
 import { buildMemorySnapshot, createMemoryRpcGitRepo } from "./memory-rpc-snapshot-state"
 
@@ -24,7 +26,7 @@ import {
 export { MEMORY_TOOL_NAME }
 
 const UNBOUND_IDENTITY_MESSAGE =
-  "no memory identity bound to this session; enable omo memory and restart the session so the memory tools can initialize"
+  "no memory identity bound to this session yet; the binding is re-established on the next user turn, or start a new session if this persists"
 
 export const MemoryToolParams = Type.Object({
   command: Type.Union([
@@ -47,6 +49,8 @@ export const MemoryToolParams = Type.Object({
   description: Type.Optional(Type.String({ description: "Frontmatter description of the memory block. Required by create and update_description." })),
   file_text: Type.Optional(Type.String({ description: "Initial body text for create." })),
   input: Type.Optional(Type.String({ description: "Codex-style patch text for apply_patch." })),
+  source: Type.Optional(Type.Union([Type.Literal("user"), Type.Literal("agent"), Type.Literal("inferred")], { description: "Who the saved content came from: user (the user said it), agent (your own suggestion or statement), inferred (your conclusion). Omitted means inferred. Saved as the note's provenance receipt." })),
+  user_quote: Type.Optional(Type.String({ description: USER_QUOTE_RULE })),
 })
 
 /** One path touched by the commit, with the line counts `git show --numstat` reported for it. */
@@ -150,11 +154,13 @@ function createMemoryTool(
     promptSnippet: "memory - edit omo memory blocks (create/str_replace/insert/delete/rename/update_description/apply_patch); auto-commits each change",
     promptGuidelines: [
       "Record durable facts, preferences, and decisions with the memory tool as you learn them; every change is committed with the reason you provide.",
+      "Pass source on every write. Record a user decision only as source user with one whole user message, verbatim, in user_quote; your own recommendations are source agent, never 'the user agreed'.",
       "Memory files are markdown with YAML frontmatter; keep each block's description accurate because the memory index surfaces it.",
       "When creating, renaming, or deleting memory files, update [[path]] references in other memory files so they stay discoverable.",
     ],
     parameters: MemoryToolParams,
     executionMode: "sequential",
+    renderShell: "self",
     execute: async (_toolCallId, params) => {
       const context = resolveContext()
       if (context === undefined) return errorResult(`${MEMORY_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
@@ -173,6 +179,7 @@ function createMemoryTool(
         throw error
       }
     },
+    renderCall: renderMemoryWriteCall,
     renderResult: renderResultFor(options),
   }
 }
@@ -339,7 +346,8 @@ function readToolProvenance(value: unknown): MemoryToolProvenance | undefined {
     || !Number.isSafeInteger(provenance.userTurns)
     || provenance.userTurns < 0
   ) return undefined
-  return { sessionId: provenance.sessionId, userTurns: provenance.userTurns }
+  const claim = parseClaimReceipt(provenance.claim)
+  return { sessionId: provenance.sessionId, userTurns: provenance.userTurns, ...(claim === undefined ? {} : { claim }) }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

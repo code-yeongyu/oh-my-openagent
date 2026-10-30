@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { posix } from "node:path"
-import { maybeReexecUnderBun, resolveBunReexec } from "../bin/lib/bun-runtime.js"
+import { bunTooOldMessage, maybeReexecUnderBun, resolveBunReexec } from "../bin/lib/bun-runtime.js"
 
 const POSIX_HOME = "/home/dev"
+/** An npm global install of the launcher, outside the bun global tree. */
+const plainScript = "/usr/local/lib/node_modules/omo-ai/bin/omo.js"
 
 /** Injected everywhere so no assertion touches the host filesystem; see bun-runtime.test.ts. */
 const identityRealpath = (path: string): string => path
@@ -20,7 +22,6 @@ describe("bun runtime re-exec decision", () => {
   describe("#given the re-exec decision table", () => {
     const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
     const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
-    const plainScript = "/usr/local/lib/node_modules/omo-ai/bin/omo.js"
 
     function decide(overrides: {
       scriptPath?: string
@@ -132,20 +133,18 @@ describe("bun runtime re-exec decision", () => {
     })
 
     describe("#when OMO_RUNTIME asks for bun", () => {
-      test("#then it re-execs without consulting the version floor", async () => {
-        // given
-        let probed = 0
-        // when
-        const decision = await decide({
-          env: { OMO_RUNTIME: "bun" },
-          bunVersion: async () => {
-            probed += 1
-            return "1.3.9"
-          },
-        })
+      test("#then a bun that meets the floor re-execs", async () => {
+        // given / when
+        const decision = await decide({ env: { OMO_RUNTIME: "bun" } })
         // then
         expect(decision).toEqual({ reexec: true, bunPath })
-        expect(probed).toBe(0)
+      })
+
+      test("#then an older bun is refused with the upgrade message instead of silently using node (#9563)", async () => {
+        // given / when
+        const decision = await decide({ env: { OMO_RUNTIME: "bun" }, bunVersion: async () => "1.3.14" })
+        // then
+        expect(decision).toEqual({ reexec: false, refuse: "OmO needs Bun >= 1.4.0 (found 1.3.14); run `bun upgrade`" })
       })
 
       test("#then a missing bun binary leaves the process on node", async () => {
@@ -157,20 +156,18 @@ describe("bun runtime re-exec decision", () => {
     })
 
     describe("#when the script is installed in the bun global tree", () => {
-      test("#then it re-execs under the bun that installed it without a probe", async () => {
-        // given
-        let probed = 0
-        // when
-        const decision = await decide({
-          scriptPath: treeScript,
-          bunVersion: async () => {
-            probed += 1
-            return undefined
-          },
-        })
+      test("#then it re-execs under the bun that installed it when that bun meets the floor", async () => {
+        // given / when
+        const decision = await decide({ scriptPath: treeScript })
         // then
         expect(decision).toEqual({ reexec: true, bunPath })
-        expect(probed).toBe(0)
+      })
+
+      test("#then a bun 1.3 that installed it is refused with the upgrade message (#9563)", async () => {
+        // given / when
+        const decision = await decide({ scriptPath: treeScript, bunVersion: async () => "1.3.14" })
+        // then
+        expect(decision).toEqual({ reexec: false, refuse: "OmO needs Bun >= 1.4.0 (found 1.3.14); run `bun upgrade`" })
       })
 
       test("#then a relocated BUN_INSTALL tree is honored", async () => {
@@ -200,6 +197,56 @@ describe("bun runtime re-exec decision", () => {
     const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
     const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
 
+    test("replaces the POSIX launcher with exact argv[0] and environment", async () => {
+      // given
+      const env = { OMO_RUNTIME: "bun", PRESERVED: "fixture-value" }
+      const execs: unknown[][] = []
+      const spawns: unknown[][] = []
+      const propagated: unknown[] = []
+      // when
+      const consumed = await maybeReexecUnderBun({
+        scriptPath: treeScript, argv: ["node", treeScript, "say", "hi"],
+        env, versions: {}, homedir: () => POSIX_HOME, platform: "linux",
+        exists: existsOnly(bunPath), realpath: identityRealpath, bunVersion: async () => "1.4.0",
+        execve: (...args: unknown[]) => { execs.push(args) },
+        spawn: (...args: unknown[]) => { spawns.push(args); return { status: 37, signal: null } },
+        propagate: (result: unknown) => { propagated.push(result) },
+      })
+      // then
+      expect(consumed).toBe(true)
+      expect(execs.map(([file, argv]) => [file, argv])).toEqual([[bunPath, [bunPath, treeScript, "say", "hi"]]])
+      // input.env controls runtime discovery; the existing runChild path inherits process.env.
+      expect(execs[0]?.[2] === process.env).toBe(true)
+      expect(spawns).toEqual([])
+      expect(propagated).toEqual([])
+    })
+
+    for (const mode of ["throw", "absent", "win32"] as const) {
+      test(`keeps async fallback arguments, environment and exit status for ${mode}`, async () => {
+        // given
+        const env = { OMO_RUNTIME: "bun", PRESERVED: "fallback-value", BUN_INSTALL: POSIX_HOME }
+        const calls: unknown[][] = []
+        const propagated: unknown[] = []
+        let execs = 0
+        // when
+        const consumed = await maybeReexecUnderBun({
+          scriptPath: treeScript, argv: ["node", treeScript, "say", "hi"],
+          env, versions: {}, homedir: () => POSIX_HOME, platform: mode === "win32" ? "win32" : "linux",
+          exists: () => true, realpath: identityRealpath, bunVersion: async () => "1.4.0",
+          execve: mode === "absent" ? null : () => { execs += 1; throw new Error("injected unavailable") },
+          spawn: (...args: unknown[]) => { calls.push(args); return { status: 37, signal: null } },
+          propagate: (result: unknown) => { propagated.push(result) },
+        })
+        // then
+        expect(consumed).toBe(true)
+        expect(execs).toBe(mode === "throw" ? 1 : 0)
+        expect(calls).toHaveLength(1)
+        expect(calls[0]?.[1]).toEqual([treeScript, "say", "hi"])
+        expect(calls[0]?.[2]).toEqual({ stdio: "inherit", windowsHide: true })
+        expect(propagated).toEqual([{ status: 37, signal: null }])
+      })
+    }
+
     test("#then the script and its arguments are handed to bun with inherited stdio", async () => {
       // given
       const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
@@ -212,8 +259,10 @@ describe("bun runtime re-exec decision", () => {
         versions: {},
         homedir: () => POSIX_HOME,
         platform: "linux",
+        execve: null,
         exists: existsOnly(bunPath),
         realpath: identityRealpath,
+        bunVersion: async () => "1.4.0",
         spawn: (command: string, args: string[], options: Record<string, unknown>) => {
           calls.push({ command, args, options })
           return { status: 0, signal: null }
@@ -277,6 +326,79 @@ describe("bun runtime re-exec decision", () => {
       // then
       expect(consumed).toBe(false)
       expect(spawned).toBe(0)
+    })
+  })
+
+  describe("#given the process already runs on an older bun (#9563)", () => {
+    const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
+    const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
+    const nodePath = "/usr/local/bin/node"
+
+    function run(overrides: {
+      scriptPath?: string
+      env?: Record<string, string | undefined>
+      exists?: (path: string) => boolean
+      realpath?: (path: string) => string
+    }) {
+      const execs: unknown[][] = []
+      const consumed = maybeReexecUnderBun({
+        scriptPath: overrides.scriptPath ?? plainScript,
+        argv: ["bun", overrides.scriptPath ?? plainScript, "say", "hi"],
+        env: overrides.env ?? { PATH: "/usr/local/bin" },
+        versions: { bun: "1.3.14" },
+        execPath: bunPath,
+        homedir: () => POSIX_HOME,
+        platform: "linux",
+        exists: overrides.exists ?? existsOnly(bunPath, nodePath),
+        realpath: overrides.realpath ?? identityRealpath,
+        execve: (...args: unknown[]) => { execs.push(args) },
+        spawn: () => { throw new Error("the POSIX path must replace the process") },
+        propagate: () => {},
+      })
+      return { consumed, execs }
+    }
+
+    test("#when omo was installed with bun add -g #then it fails with the upgrade message and runs nothing", async () => {
+      // given / when
+      const { consumed, execs } = run({ scriptPath: treeScript })
+      // then
+      await expect(consumed).rejects.toThrow("OmO needs Bun >= 1.4.0 (found 1.3.14); run `bun upgrade`")
+      expect(execs).toEqual([])
+    })
+
+    test("#when nobody chose bun and node is installed #then the launch moves to node, pinned there", async () => {
+      // given / when
+      const { consumed, execs } = run({})
+      // then
+      expect(await consumed).toBe(true)
+      expect(execs.map(([file, argv]) => [file, argv])).toEqual([[nodePath, [nodePath, plainScript, "say", "hi"]]])
+      expect((execs[0]?.[2] as Record<string, string>).OMO_RUNTIME).toBe("node")
+    })
+
+    test("#when the only node on PATH is bun's own shim and no real node exists #then it fails with the upgrade message", async () => {
+      // given: /usr/local/bin/node resolves to the running bun executable
+      const shimRealpath = (path: string): string => (path === nodePath ? bunPath : path)
+      // when
+      const { consumed, execs } = run({ realpath: shimRealpath })
+      // then
+      await expect(consumed).rejects.toThrow(bunTooOldMessage("1.3.14"))
+      expect(execs).toEqual([])
+    })
+
+    test("#when no node exists at all #then it fails with the upgrade message", async () => {
+      // given / when
+      const { consumed, execs } = run({ exists: existsOnly(bunPath) })
+      // then
+      await expect(consumed).rejects.toThrow(bunTooOldMessage("1.3.14"))
+      expect(execs).toEqual([])
+    })
+
+    test("#when a node hand-off already happened and still landed on the old bun #then it fails instead of looping", async () => {
+      // given / when
+      const { consumed, execs } = run({ env: { PATH: "/usr/local/bin", OMO_RUNTIME: "node" } })
+      // then
+      await expect(consumed).rejects.toThrow(bunTooOldMessage("1.3.14"))
+      expect(execs).toEqual([])
     })
   })
 })

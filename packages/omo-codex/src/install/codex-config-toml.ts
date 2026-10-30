@@ -2,7 +2,7 @@ import { mkdir, readFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import { ensureAgentConfig, removeStaleManagedAgentBlocks } from "./codex-config-agents"
 import { writeFileAtomic } from "./codex-config-atomic-write"
-import { ensureFeatureEnabled } from "./codex-config-features"
+import { ensureFeatureEnabled, removeFeature } from "./codex-config-features"
 import {
   ensureMarketplaceBlock,
   hasMarketplaceBlock,
@@ -58,6 +58,7 @@ export async function updateCodexConfig(input: {
   config = ensureFeatureEnabled(config, "plugins")
   config = ensureFeatureEnabled(config, "plugin_hooks")
   config = ensureFeatureEnabled(config, "multi_agent")
+  config = removeFeature(config, "child_agents_md")
   config = removeUnsupportedCodexMultiAgentModeConfig(config)
   config = ensureCodexReasoningConfig(
     config,

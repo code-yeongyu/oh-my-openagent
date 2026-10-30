@@ -67,6 +67,22 @@ describe("GitPathStateStore", () => {
     expect(bothDirty.worktree).not.toEqual(worktreeDirty.worktree)
   })
 
+  for (const variable of ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const) {
+    it(`#given inherited ${variable} #when capturing a tracked path #then literal lookup still succeeds`, async () => {
+      const { repo } = await fixture([{ relativePath: "tracked.md", content: "base\n" }])
+      const expected = await repo.pathState.capture("tracked.md")
+      const saved = process.env[variable]
+      try {
+        process.env[variable] = "1"
+        expect(await repo.pathState.capture("tracked.md")).toEqual(expected)
+        expect(process.env[variable]).toBe("1")
+      } finally {
+        if (saved === undefined) delete process.env[variable]
+        else process.env[variable] = saved
+      }
+    })
+  }
+
   // Windows has no POSIX executable bit and git reports core.filemode=false there, so a chmod-only
   // change is not a diff at all: the commit correctly raises NoEffectiveChangesError. The behaviour
   // under test is real but POSIX-only, matching the repo's existing skipIf convention for

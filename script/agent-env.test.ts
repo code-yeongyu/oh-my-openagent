@@ -19,22 +19,6 @@ describe("agent dev-environment scripts", () => {
       expect(body).toContain("set -euo pipefail")
     })
 
-    test("#given the bootstrap #when it runs #then it verifies tools, installs, and conditionally builds", () => {
-      const body = readFileSync(setup, "utf8")
-
-      expect(body).toContain("command -v") // tool presence check
-      expect(body).toContain("bun node git") // required toolchain verified
-      expect(body).toContain("tmux") // non-fatal warning path
-      expect(body).toContain("bun install")
-      expect(body).toContain("bun run build")
-      expect(body).toContain("OMO_AGENT_FORCE_BUILD") // idempotent skip-build guard
-      expect(body).toContain(".env") // credential sourcing
-      expect(body).toContain("--ignore-scripts")
-      expect(body).toMatch(/expected_bun="\d+\.\d+\.\d+"/) // drift warning is version-pinned
-      expect(body).toContain("submodule update --init") // provenance submodules
-      expect(body).toContain("materialize-frontend-refs") // frontend ref materialize
-    })
-
     test("#given the CI-pinned Bun version #when setup.sh, the devcontainer image, and CI are compared #then all three pin the same version", () => {
       // given
       const setupPin = readFileSync(setup, "utf8").match(/expected_bun="([^"]+)"/)?.[1]

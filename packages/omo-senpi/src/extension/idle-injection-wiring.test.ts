@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
+import { dispatchRunEnd, FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { createUlwLoopComponent } from "../components/ulw-loop"
 import { activeStatus, createLogger, sessionEventCtx } from "../components/ulw-loop/ulw-loop.test-support"
 import { createParentNotifier } from "../components/task/parent-notifier"
@@ -17,20 +17,19 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
     const delivered: string[] = []
     const scheduled: Array<() => void> = []
     const coordinator = new IdleInjectionCoordinator((message) => delivered.push(message.content), {
-      scheduleFlush: (flush) => scheduled.push(flush),
+      scheduleFlush: (flush) => { scheduled.push(flush) },
     })
 
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
     const outputs = [activeStatus()]
     await createUlwLoopComponent({
-      resolveOmoBin: () => "/tmp/omo",
       planExists: () => true,
-      runCommand: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
+      readStatus: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator: coordinator })
 
     // when the ulw continuation fires at turn end (enqueues, defers its flush)
-    await pi.dispatch("agent_end", { type: "agent_end" }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
     expect(delivered).toEqual([])
 
     // and a background completion wakes the idle parent on the same edge (synchronous, throw-safe path)
@@ -44,7 +43,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
           task_id: "st_done",
           name: "bg",
           status: "completed",
-          model: "openai-codex/gpt-5.6-luna-fast",
+          model: "chatgpt-subscription/gpt-5.6-luna-fast",
           duration_ms: 1,
           final_response: "",
           continuation_hint: "",
@@ -59,7 +58,7 @@ describe("idle-injection wiring: real producers on one idle edge", () => {
     // then exactly one injection carried both, completion first, via the coordinator (no plaintext races)
     expect(delivered).toHaveLength(1)
     expect(delivered[0]).toContain("task st_done completed")
-    expect(delivered[0]).toContain("Continue the active omo-agent-toolkit ulw-loop run")
+    expect(delivered[0]).toContain("Continue the active ulw-loop run")
     expect(pi.userMessages).toEqual([])
   })
 })

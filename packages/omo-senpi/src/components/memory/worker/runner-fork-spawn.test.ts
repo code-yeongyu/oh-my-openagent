@@ -77,9 +77,9 @@ describe("reflection fork-mode spawn", () => {
         childMode: "commit",
         models: [
           { provider: "kimi", id: "kimi-for-coding-highspeed", cost: KIMI },
-          { provider: "anthropic", id: "claude-opus-5", cost: OPUS },
+          { provider: "anthropic", id: "claude-opus-5-5", cost: OPUS },
         ],
-        resolveSessionModel: () => ({ provider: "anthropic", id: "claude-opus-5" }),
+        resolveSessionModel: () => ({ provider: "anthropic", id: "claude-opus-5-5" }),
         resolveParentContextTokens: () => 156_872,
       })
       roots.push(harness.root)

@@ -3,6 +3,8 @@ import { type ChildProcess, spawn } from "node:child_process"
 import type { TerminateOptions } from "../types"
 
 const DEFAULT_SIGKILL_DELAY_MS = 5_000
+const PROCESS_EXIT_OBSERVATION_TIMEOUT_MS = 2_000
+const PROCESS_EXIT_OBSERVATION_INTERVAL_MS = 10
 
 /**
  * THE definition of RPC child termination (single-writer rule): terminate the
@@ -31,6 +33,8 @@ async function terminatePosixProcessGroup(child: ChildProcess, pid: number, dela
   await waitForExitOrDelay(exited, delay)
   if (processGroupExists(pid)) {
     signalProcessGroup(pid, "SIGKILL")
+    await waitForCondition(() => processGroupExists(pid), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
+    return
   }
   await exited
 }
@@ -44,8 +48,17 @@ async function terminateDirectChild(child: ChildProcess, delay: number): Promise
   await waitForExitOrDelay(exited, delay)
   if (!hasExited(child)) {
     child.kill("SIGKILL")
+    await waitForCondition(() => !hasExited(child), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
+    return
   }
   await exited
+}
+
+async function waitForCondition(condition: () => boolean, timeout: number): Promise<void> {
+  const deadline = Date.now() + timeout
+  while (condition() && Date.now() < deadline) {
+    await new Promise<void>((resolve) => setTimeout(resolve, PROCESS_EXIT_OBSERVATION_INTERVAL_MS))
+  }
 }
 
 async function waitForExitOrDelay(exited: Promise<void>, delay: number): Promise<void> {

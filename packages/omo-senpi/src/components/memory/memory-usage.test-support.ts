@@ -1,4 +1,4 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -9,11 +9,6 @@ import { createMemoryIdentityContext, type MemoryIdentityContext } from "./conte
 import { memoryUsagePaths } from "./memory-usage"
 
 export const IDENTITY = "memory-usage-agent"
-const tempDirs: string[] = []
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
-})
 
 export async function fixture(): Promise<{
   readonly context: MemoryIdentityContext
@@ -21,7 +16,7 @@ export async function fixture(): Promise<{
   readonly paths: ReturnType<typeof memoryUsagePaths>
 }> {
   const dir = await mkdtemp(join(tmpdir(), "memory-usage-"))
-  tempDirs.push(dir)
+  onTestFinished(() => rm(dir, { recursive: true, force: true }))
   const identityPaths = buildIdentityPaths(join(dir, "memory"), IDENTITY)
   await mkdir(identityPaths.locks, { recursive: true })
   await mkdir(identityPaths.runtime, { recursive: true })

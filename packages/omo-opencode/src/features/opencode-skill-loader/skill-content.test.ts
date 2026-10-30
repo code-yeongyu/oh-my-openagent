@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdirSync, writeFileSync } from "node:fs"
+import { frontendSkill } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/frontend"
+import { playwrightSkill } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/playwright"
 import {
 	clearSkillCache,
 	resolveSkillContent,
@@ -95,10 +97,12 @@ describe("resolveMultipleSkills", () => {
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
-		// then: all skills resolved, none not found
-		expect(result.resolved.size).toBe(2)
+		// then: all skills resolve to their source templates in request order, none not found
+		expect([...result.resolved.entries()]).toEqual([
+			["frontend", frontendSkill.template],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
 	})
 
 	it("should handle partial success - some skills not found", () => {
@@ -108,10 +112,12 @@ describe("resolveMultipleSkills", () => {
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
-		// then: resolves existing skills, lists not found skills
-		expect(result.resolved.size).toBe(2)
+		// then: resolves the existing skills to their source templates and lists the missing names in order
+		expect([...result.resolved.entries()]).toEqual([
+			["frontend", frontendSkill.template],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual(["nonexistent", "another-missing"])
-		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
 	})
 
 	it("should handle empty array", () => {
@@ -304,8 +310,8 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
 	})
 
-	it("should inject watermark when enabled (default)", async () => {
-		// given: git-master skill with default config (watermark enabled)
+	it("should inject the footer and the co-author trailer when both flags are enabled", async () => {
+		// given: git-master skill with the footer and the co-author on
 		const skillNames = ["git-master"]
 		const options = {
 			gitMasterConfig: {
@@ -318,11 +324,12 @@ describe("resolveMultipleSkillsAsync", () => {
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: watermark section is injected
+		// then: the footer and exactly one sisyphus-dev-ai trailer are injected
 		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master")
+		const gitMasterContent = result.resolved.get("git-master") ?? ""
 		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent).toContain("Co-authored-by: Sisyphus")
+		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
+		expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
 	})
 
 	it("should inject only footer when co-author is disabled", async () => {
@@ -345,22 +352,23 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
 	})
 
-	it("should inject watermark by default when no config provided", async () => {
+	it("should inject only the co-author trailer by default when no config provided", async () => {
 		// given: git-master skill with NO config (default behavior)
 		const skillNames = ["git-master"]
 
 		// when: resolving without any gitMasterConfig
 		const result = await resolveMultipleSkillsAsync(skillNames)
 
-		// then: watermark is injected (default is ON)
+		// then: the footer stays off and the sisyphus-dev-ai trailer is on by default
 		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent).toContain("Co-authored-by: Sisyphus")
+		const gitMasterContent = result.resolved.get("git-master") ?? ""
+		expect(gitMasterContent).not.toContain("Ultraworked with")
+		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
+		expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
 	})
 
-	it("should inject only co-author when footer is disabled", async () => {
-		// given: git-master skill with only co-author enabled
+	it("should inject only the co-author trailer when the footer is off", async () => {
+		// given: git-master skill with the footer off and the co-author on
 		const skillNames = ["git-master"]
 		const options = {
 			gitMasterConfig: {
@@ -373,10 +381,10 @@ describe("resolveMultipleSkillsAsync", () => {
 		// when: resolving with git-master config
 		const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: only co-author is injected
-		const gitMasterContent = result.resolved.get("git-master")
+		// then: only the trailer is injected
+		const gitMasterContent = result.resolved.get("git-master") ?? ""
 		expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent).toContain("Co-authored-by: Sisyphus")
+		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
 	})
 
 	it("should inject custom string footer when commit_footer is a string", async () => {
@@ -475,95 +483,43 @@ describe("resolveMultipleSkillsAsync", () => {
 	})
 })
 
-describe("resolveSkillContent with browserProvider", () => {
-	it("should resolve agent-browser skill when browserProvider is 'agent-browser'", () => {
-		// given: browserProvider set to agent-browser
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when: resolving content for 'agent-browser'
-		const result = resolveSkillContent("agent-browser", options)
-
-		// then: returns agent-browser template
-		expect(result).not.toBeNull()
-		expect(result).toContain("agent-browser")
-	})
-
-	it("should return null for agent-browser when browserProvider is default", () => {
-		// given: no browserProvider (defaults to playwright)
-
-		// when: resolving content for 'agent-browser'
-		const result = resolveSkillContent("agent-browser")
-
-		// then: returns null because agent-browser is not in default builtin skills
-		expect(result).toBeNull()
-	})
-
-	it("should return null for playwright when browserProvider is agent-browser", () => {
-		// given: browserProvider set to agent-browser
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when: resolving content for 'playwright'
+describe("browser provider forwarding", () => {
+	it("excludes playwright when dev-browser is selected", () => {
+		// given: an explicit alternate provider
+		const options = { browserProvider: "dev-browser" as const }
+		// when
 		const result = resolveSkillContent("playwright", options)
-
-		// then: returns null because playwright is replaced by agent-browser
+		// then
 		expect(result).toBeNull()
 	})
-})
 
-describe("resolveMultipleSkills with browserProvider", () => {
-	it("should resolve agent-browser when browserProvider is set", () => {
-		// given: agent-browser and git-master requested with browserProvider
-		const skillNames = ["agent-browser", "git-master"]
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when: resolving multiple skills
-		const result = resolveMultipleSkills(skillNames, options)
-
-		// then: both resolved
-		expect(result.resolved.has("agent-browser")).toBe(true)
-		expect(result.resolved.has("git-master")).toBe(true)
-		expect(result.notFound).toHaveLength(0)
+	it("resolves selected browser skills through the synchronous adapter", () => {
+		// given: a mixed skill request
+		const names = ["dev-browser", "git-master"]
+		// when
+		const result = resolveMultipleSkills(names, { browserProvider: "dev-browser" })
+		// then
+		expect([...result.resolved.keys()]).toEqual(names)
+		expect(result.notFound).toEqual([])
 	})
 
-	it("should not resolve agent-browser without browserProvider option", () => {
-		// given: agent-browser requested without browserProvider
-		const skillNames = ["agent-browser"]
-
-		// when: resolving multiple skills
-		const result = resolveMultipleSkills(skillNames)
-
-		// then: agent-browser not found
-		expect(result.resolved.has("agent-browser")).toBe(false)
-		expect(result.notFound).toContain("agent-browser")
-	})
-})
-
-describe("resolveMultipleSkillsAsync with browserProvider filtering", () => {
-	it("should exclude discovered agent-browser when browserProvider is playwright", async () => {
-		// given: playwright is the selected browserProvider (default)
-		const skillNames = ["playwright", "git-master"]
-		const options = { browserProvider: "playwright" as const }
-
-		// when: resolving multiple skills
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: playwright resolved, agent-browser would be excluded if discovered
-		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.resolved.has("git-master")).toBe(true)
-		expect(result.notFound).not.toContain("playwright")
+	it("resolves selected browser skills through the asynchronous adapter", async () => {
+		// given: a mixed skill request
+		const names = ["dev-browser", "git-master"]
+		// when
+		const result = await resolveMultipleSkillsAsync(names, { browserProvider: "dev-browser" })
+		// then
+		expect([...result.resolved.keys()]).toEqual(names)
+		expect(result.notFound).toEqual([])
 	})
 
-	it("should exclude discovered playwright when browserProvider is agent-browser", async () => {
-		// given: agent-browser is the selected browserProvider
-		const skillNames = ["agent-browser", "git-master"]
-		const options = { browserProvider: "agent-browser" as const }
-
-		// when: resolving multiple skills
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
-
-		// then: agent-browser resolved, playwright would be excluded if discovered
-		expect(result.resolved.has("agent-browser")).toBe(true)
-		expect(result.resolved.has("git-master")).toBe(true)
-		expect(result.notFound).not.toContain("agent-browser")
+	it("reports the removed builtin as missing", () => {
+		// given: the former builtin id
+		const name = ["agent", "browser"].join("-")
+		// when
+		const result = resolveMultipleSkills([name])
+		// then
+		expect(result.notFound).toEqual([name])
+		expect(result.resolved.size).toBe(0)
 	})
 })

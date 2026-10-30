@@ -1,7 +1,7 @@
-import { afterEach, expect } from "bun:test"
+import { expect, onTestFinished } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
-import { appendFile, mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises"
+import { appendFile, mkdtemp, readFile, readdir, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -14,30 +14,55 @@ import {
   type TranscriptEntry,
 } from "@oh-my-opencode/memory-core"
 import { OmoMemorySettingsSchema } from "@oh-my-opencode/omo-config-core"
-import type { ChildHandle, ChildSpec, InProcessRunnerLike, SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import type { ChildHandle, ChildModelRegistry, ChildSpec, InProcessRunnerLike, SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
+import { ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import { FactsExtractorRunner, type FactsExtractorRunnerOptions } from "./facts-runner"
 import { createFactsRecordTool } from "./facts-record-tool"
 import type { FactsRunLedger } from "./facts-runner-types"
+import { rmEfaultTolerant } from "./teardown.test-support"
 
 export const AVAILABLE_MODEL: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
-const tempDirs: string[] = []
-
-afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
-})
-
-export async function fixture() {
+export async function fixture(
+  now?: () => Date,
+  options: { readonly registerCleanup?: boolean } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), "omo-facts-runner-"))
-  tempDirs.push(root)
+  const cleanup = () => rmEfaultTolerant(root, { recursive: true, force: true })
+  if (options.registerCleanup !== false) onTestFinished(cleanup)
   const identity: MemoryIdentity = {
     id: "facts-agent",
     safeSlug: "facts-agent",
     paths: buildIdentityPaths(root, "facts-agent"),
   }
-  const queue = new FactsQueue({ identityPaths: identity.paths })
+  const queue = new FactsQueue({ identityPaths: identity.paths, ...(now === undefined ? {} : { now }) })
   await enqueue(queue, identity, "session-1", "m1", "The project uses Bun.")
-  return { root, identity, queue }
+  return { root, identity, queue, cleanup }
+}
+
+/**
+ * The registry snapshot as production captures it: the parent session's concrete ModelRegistry.
+ * The runtime is created catalog-free (modelsPath: null) so the fixture owns exactly which models
+ * exist - the shipped catalog would otherwise satisfy the quick chain on its own. An in-process
+ * child shares this exact instance, so the facts child cannot drift onto another engine's model set.
+ */
+export function registrySnapshot(models: readonly { readonly id: string; readonly contextWindow?: number; readonly maxTokens?: number }[] = [{ id: "mock-1" }]): ChildModelRegistry {
+  const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
+  registry.registerProvider("omo-mock", {
+    api: "openai-completions",
+    baseUrl: "https://example.test",
+    apiKey: "test-key",
+    models: models.map((model) => ({
+      id: model.id,
+      name: `Mock ${model.id}`,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: model.contextWindow ?? 1,
+      maxTokens: model.maxTokens ?? 1,
+    })),
+  })
+  return registry
 }
 
 export async function enqueue(
@@ -108,7 +133,7 @@ export function runnerOptions(
         inProcessAttempts += 1
         if (mode === "fail") throw new Error("facts child failed")
         if (mode === "timeout") return await new Promise<ChildHandle>(() => undefined)
-        const tool = createFactsRecordTool({ extractionPath: join(spec.cwd, "extraction.jsonl") })
+        const tool = createFactsRecordTool({ exchanges: [], extractionPath: join(spec.cwd, "extraction.jsonl") })
         const payloadStart = spec.prompt.indexOf("\n\n")
         const payload = JSON.parse(spec.prompt.slice(payloadStart + 2)) as { readonly entries: readonly unknown[] }
         if (mode === "fact" || mode === "model-fallback") {
@@ -121,6 +146,7 @@ export function runnerOptions(
         return {
           task_id: spec.taskId,
           sessionId: `session-${spec.taskId}`,
+          effectiveModel: () => undefined,
           steer: async () => undefined,
           followUp: async () => undefined,
           abort: async () => undefined,

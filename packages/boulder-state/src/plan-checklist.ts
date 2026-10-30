@@ -1,20 +1,27 @@
 import { existsSync, readFileSync } from "node:fs"
 
+import { isClosingFence, parseOpeningFence, type MarkdownFence } from "./markdown-fence"
 import type { PlanChecklist, TopLevelTaskRef } from "./types"
 
-const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX]?)[ \t]*\][ \t]+(.+)$/
+const SIMPLE_CHECKBOX_PATTERN = /^[-*][ \t]*\[[ \t]*([xX~]?)[ \t]*\][ \t]+(.+)$/
 const TODO_HEADING_PATTERN = /^##[ \t]+TODOs(?:[ \t]+#+)?[ \t]*$/i
 const FINAL_VERIFICATION_HEADING_PATTERN =
   /^##[ \t]+Final Verification Wave(?:[ \t]+#+)?[ \t]*$/i
 const SECTION_BOUNDARY_HEADING_PATTERN = /^#{1,2}(?:[ \t]+|$)/
-const FENCE_PATTERN = /^[ \t]{0,3}(`{3,}|~{3,})(.*)$/
-const TODO_CHECKBOX_PATTERN = /^- \[([ xX])\] ([1-9]\d*\. .+)$/
-const FINAL_WAVE_CHECKBOX_PATTERN = /^- \[([ xX])\] (F[1-9]\d*\. .+)$/i
+const STRUCTURED_CHECKBOX_PATTERN = /^- \[([ xX~])\] (.+)$/
+const TODO_TASK_LABEL_PATTERN =
+  /^([1-9]\d*|T[1-9]\d*(?:\.[1-9]\d*[a-z]?)?)(?:\.[ \t]+|[ \t]+(?:[-\u2014][ \t]+)?)(.+)$/i
+const FINAL_WAVE_TASK_LABEL_PATTERN =
+  /^([FH][1-9]\d*(?:\.[1-9]\d*[a-z]?)?)(?:\.[ \t]+|[ \t]+(?:[-\u2014][ \t]+)?)(.+)$/i
 
 type ChecklistSection = "todo" | "final-wave" | "other"
 
+// `[~]` marks a task the agent could not finish (blocked on the user or external input): it counts
+// toward the total but is neither completed nor actionable, so it never keeps a continuation alive.
+type CheckboxStatus = "open" | "done" | "in-progress"
+
 type ParsedCheckbox = {
-  readonly checked: boolean
+  readonly status: CheckboxStatus
   readonly label: string
 }
 
@@ -22,14 +29,10 @@ type ParsedStructuredCheckbox = ParsedCheckbox & {
   readonly task: TopLevelTaskRef
 }
 
-type MarkdownFence = {
-  readonly marker: "`" | "~"
-  readonly length: number
-}
-
 type ParsedStructuredPlan = {
   readonly checklist: PlanChecklist
   readonly nextTask: TopLevelTaskRef | null
+  readonly hasUntrackedTopLevelCheckbox: boolean
 }
 
 export function getPlanChecklist(planPath: string): PlanChecklist {
@@ -53,7 +56,17 @@ export function parsePlanChecklist(markdown: string): PlanChecklist {
     return parseSimpleChecklist(lines)
   }
 
-  return parseStructuredPlan(lines).checklist
+  const structuredPlan = parseStructuredPlan(lines)
+  if (structuredPlan.checklist.total === 0 && structuredPlan.hasUntrackedTopLevelCheckbox) {
+    return parseSimpleChecklist(lines)
+  }
+
+  return structuredPlan.checklist
+}
+
+/** Whether `line` is a top-level task row the structured parser counts inside `section`. */
+export function isStructuredTaskRow(line: string, section: "todo" | "final-wave"): boolean {
+  return parseStructuredTopLevelCheckbox(line, section) !== null
 }
 
 export function parseCurrentTopLevelTask(markdown: string): TopLevelTaskRef | null {
@@ -66,10 +79,12 @@ export function parseCurrentTopLevelTask(markdown: string): TopLevelTaskRef | nu
 }
 
 function parseStructuredPlan(lines: readonly string[]): ParsedStructuredPlan {
+  let completed = 0
   let remaining = 0
   let total = 0
   let nextTaskLabel: string | null = null
   let nextTask: TopLevelTaskRef | null = null
+  let hasUntrackedTopLevelCheckbox = false
   let section: ChecklistSection = "other"
   let fence: MarkdownFence | null = null
 
@@ -92,6 +107,9 @@ function parseStructuredPlan(lines: readonly string[]): ParsedStructuredPlan {
       continue
     }
     if (section === "other") {
+      if (parseSimpleTopLevelCheckbox(line) !== null) {
+        hasUntrackedTopLevelCheckbox = true
+      }
       continue
     }
 
@@ -101,7 +119,11 @@ function parseStructuredPlan(lines: readonly string[]): ParsedStructuredPlan {
     }
 
     total += 1
-    if (checkbox.checked) {
+    if (checkbox.status === "done") {
+      completed += 1
+      continue
+    }
+    if (checkbox.status === "in-progress") {
       continue
     }
 
@@ -114,16 +136,18 @@ function parseStructuredPlan(lines: readonly string[]): ParsedStructuredPlan {
 
   return {
     checklist: {
-      completed: total - remaining,
+      completed,
       remaining,
       total,
       nextTaskLabel,
     },
     nextTask,
+    hasUntrackedTopLevelCheckbox,
   }
 }
 
 function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
+  let completed = 0
   let remaining = 0
   let total = 0
   let nextTaskLabel: string | null = null
@@ -149,7 +173,11 @@ function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
     }
 
     total += 1
-    if (checkbox.checked) {
+    if (checkbox.status === "done") {
+      completed += 1
+      continue
+    }
+    if (checkbox.status === "in-progress") {
       continue
     }
 
@@ -159,7 +187,7 @@ function parseSimpleChecklist(lines: readonly string[]): PlanChecklist {
     }
   }
 
-  return { completed: total - remaining, remaining, total, nextTaskLabel }
+  return { completed, remaining, total, nextTaskLabel }
 }
 
 function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
@@ -169,7 +197,14 @@ function parseSimpleTopLevelCheckbox(line: string): ParsedCheckbox | null {
   if (marker === undefined || label === undefined) {
     return null
   }
-  return { checked: marker.toLowerCase() === "x", label }
+  return { status: parseCheckboxStatus(marker), label }
+}
+
+function parseCheckboxStatus(marker: string): CheckboxStatus {
+  if (marker.toLowerCase() === "x") {
+    return "done"
+  }
+  return marker === "~" ? "in-progress" : "open"
 }
 
 function hasStructuredSection(lines: readonly string[]): boolean {
@@ -208,8 +243,7 @@ function parseStructuredTopLevelCheckbox(
   line: string,
   section: "todo" | "final-wave",
 ): ParsedStructuredCheckbox | null {
-  const pattern = section === "todo" ? TODO_CHECKBOX_PATTERN : FINAL_WAVE_CHECKBOX_PATTERN
-  const match = line.match(pattern)
+  const match = line.match(STRUCTURED_CHECKBOX_PATTERN)
   const marker = match?.[1]
   const label = match?.[2]
   if (marker === undefined || label === undefined) {
@@ -219,11 +253,11 @@ function parseStructuredTopLevelCheckbox(
   if (task === null) {
     return null
   }
-  return { checked: marker.toLowerCase() === "x", label, task }
+  return { status: parseCheckboxStatus(marker), label, task }
 }
 
 function buildTaskRef(section: "todo" | "final-wave", label: string): TopLevelTaskRef | null {
-  const pattern = section === "todo" ? /^([1-9]\d*)\. (.+)$/ : /^(F[1-9]\d*)\. (.+)$/i
+  const pattern = section === "todo" ? TODO_TASK_LABEL_PATTERN : FINAL_WAVE_TASK_LABEL_PATTERN
   const match = label.match(pattern)
   const rawLabel = match?.[1]
   const title = match?.[2]
@@ -236,27 +270,6 @@ function buildTaskRef(section: "todo" | "final-wave", label: string): TopLevelTa
     label: rawLabel,
     title,
   }
-}
-
-function parseOpeningFence(line: string): MarkdownFence | null {
-  const match = line.match(FENCE_PATTERN)
-  const run = match?.[1]
-  const info = match?.[2]
-  const marker = run?.charAt(0)
-  if (
-    run === undefined ||
-    info === undefined ||
-    (marker !== "`" && marker !== "~") ||
-    (marker === "`" && info.includes("`"))
-  ) {
-    return null
-  }
-  return { marker, length: run.length }
-}
-
-function isClosingFence(line: string, fence: MarkdownFence): boolean {
-  const run = line.match(/^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/)?.[1]
-  return run?.charAt(0) === fence.marker && run.length >= fence.length
 }
 
 function emptyChecklist(): PlanChecklist {

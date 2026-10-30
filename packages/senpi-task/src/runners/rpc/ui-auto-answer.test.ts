@@ -1,7 +1,7 @@
 import type { RpcExtensionUIRequest } from "@code-yeongyu/senpi"
 import { describe, expect, test } from "bun:test"
 
-import { buildAutoUiResponse } from "./ui-auto-answer"
+import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "./ui-auto-answer"
 
 describe("buildAutoUiResponse", () => {
   test("#given a confirm request #when auto-answering #then it denies (confirmed:false)", () => {
@@ -29,6 +29,16 @@ describe("buildAutoUiResponse", () => {
     }
   })
 
+  test("#given a question request #when auto-answering #then it cancels", () => {
+    const request: {
+      readonly type: "extension_ui_request"
+      readonly id: string
+      readonly method: "question"
+    } = { type: "extension_ui_request", id: "q1", method: "question" }
+
+    expect(buildAutoUiResponse(request)).toEqual({ type: "extension_ui_response", id: "q1", cancelled: true })
+  })
+
   test("#given a display-only request #when auto-answering #then no response is emitted", () => {
     // given
     const notify: RpcExtensionUIRequest = { type: "extension_ui_request", id: "n", method: "notify", message: "hi" }
@@ -43,5 +53,17 @@ describe("buildAutoUiResponse", () => {
     // when / then
     expect(buildAutoUiResponse(notify)).toBeNull()
     expect(buildAutoUiResponse(setStatus)).toBeNull()
+  })
+
+  test("#given a request parsed off a socket (id and method only) #when auto-answering #then the method still decides the default", () => {
+    // given - a daemon connection yields frames with no compile-time variant, only the wire minimum
+    const confirm: AutoAnswerableUiRequest = { type: "extension_ui_request", id: "c", method: "confirm" }
+    const select: AutoAnswerableUiRequest = { type: "extension_ui_request", id: "s", method: "select" }
+    const unknown: AutoAnswerableUiRequest = { type: "extension_ui_request", id: "u", method: "setWidget" }
+
+    // when / then
+    expect(buildAutoUiResponse(confirm)).toEqual({ type: "extension_ui_response", id: "c", confirmed: false })
+    expect(buildAutoUiResponse(select)).toEqual({ type: "extension_ui_response", id: "s", cancelled: true })
+    expect(buildAutoUiResponse(unknown)).toBeNull()
   })
 })

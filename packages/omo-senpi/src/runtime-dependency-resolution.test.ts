@@ -117,8 +117,16 @@ function collectPackageNames(value: unknown): Set<string> {
   return new Set(Object.keys(value))
 }
 
+// An `npm:<name>@<version>` alias installs <name>'s manifest under the alias directory.
+function installedPackageNameOf(packageName: string): string {
+  const dependencies = readPackageManifest().dependencies as Record<string, string> | undefined
+  const spec = dependencies?.[packageName]
+  if (spec === undefined || !spec.startsWith("npm:")) return packageName
+  return spec.slice("npm:".length, spec.lastIndexOf("@"))
+}
+
 function findPackageRoot(specifier: string): string {
-  const packageName = packageNameOf(specifier)
+  const packageName = installedPackageNameOf(packageNameOf(specifier))
   let current = dirname(requireFromPackage.resolve(specifier))
   for (;;) {
     const manifestPath = join(current, "package.json")

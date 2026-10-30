@@ -14,6 +14,13 @@ import {
  * Both memory write paths use this shared validation.
  * They differ only in tool-name error prefixes, comments, and formatting.
  */
+const MEMORY_CONTENT_PATH_RE = /^(?:memory\/)?(?:(?:system|reference|people)\/.*\.md|skills\/.+\/SKILL\.md)$/
+
+/** Paths whose frontmatter is under the memory contract (the same set the pre-commit hook validates). */
+export function isMemoryContentPath(path: string): boolean {
+  return MEMORY_CONTENT_PATH_RE.test(path.replace(/\\/g, "/"))
+}
+
 export class MemoryPathError extends Error {
   override readonly name = "MemoryPathError";
 }

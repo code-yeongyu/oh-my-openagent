@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -7,11 +7,12 @@ import { MemoryFakeExtensionAPI } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke, tempIdentity } from "./commands.test-support"
 import { registerSearchCommand } from "./search"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function writeSession(
@@ -126,5 +127,21 @@ describe("/search", () => {
     // then
     expect(text).toContain("no senpi sessions directory")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
+  })
+
+  test("#given a transcript carrying an aws key #when searched #then the rendered snippet masks the key", async () => {
+    // given
+    const { sessionsDir, pi } = await setup()
+    await writeSession(sessionsDir, "sess-secret", "sess-secret", [
+      { id: "msg-s1", role: "user", text: "my key is AKIAABCDEFGHIJKLMNOP please store it", timestamp: "2026-08-04T10:00:00.000Z" },
+    ])
+    const ctx = fakeCommandContext()
+
+    // when
+    const text = await invoke(pi, "search", "AKIAABCDEFGHIJKLMNOP", ctx)
+
+    // then
+    expect(text).not.toContain("AKIAABCDEFGHIJKLMNOP")
+    expect(text).toContain("***")
   })
 })

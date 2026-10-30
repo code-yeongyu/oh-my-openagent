@@ -1,7 +1,8 @@
 // Test harness for the memory command suite: fake contexts, temp identities,
 // seeded git repos, and overridable deps.
 
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { onTestFinished } from "bun:test"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -95,8 +96,14 @@ export function trackSendOrder(pi: MemoryFakeExtensionAPI, ctx: FakeCommandConte
   return ctx.order
 }
 
+async function createdIdentityRoot(): Promise<string> {
+  const identityRoot = await mkdtemp(join(tmpdir(), "memory-commands-"))
+  onTestFinished(() => rm(identityRoot, { recursive: true, force: true }))
+  return identityRoot
+}
+
 export async function tempIdentity(root?: string): Promise<{ root: string; identity: MemoryCommandIdentity }> {
-  const identityRoot = root ?? (await mkdtemp(join(tmpdir(), "memory-commands-")))
+  const identityRoot = root ?? (await createdIdentityRoot())
   return {
     root: identityRoot,
     identity: {

@@ -2,25 +2,36 @@ import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
-import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/owner"
-import type { ResolvedModelRecord, TaskRecord, TaskRunStats, TaskStatus } from "../state"
+import type { IsolationRuntime, IsolationStartedDetails } from "../isolation"
+import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
+import type { KernelToolGrant } from "../kernel-tools/resolve"
 import type {
-  CancelOptions,
-  CancelOutcome,
-  DestructionPort,
-  InterruptOutcome,
-  SendInput,
-  SendOutcome,
-} from "../steering"
+  EffectiveModelRecord,
+  ResolvedModelRecord,
+  TaskRecord,
+  TaskStartFailureKind,
+  TaskStartFailureReason,
+  TaskStatus,
+} from "../state"
+import type { DestructionPort, SendOutcome } from "../steering"
 import type { TaskRecordStore } from "../store"
-import type { ManagedChildHandle, ManagedChildListener } from "./child-handle"
-import type { ExecutionMode } from "./execution-mode"
+import type { ManagedChildHandle } from "./child-handle"
+import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
+import type { TaskConcurrency } from "./concurrency"
+import type { InheritedExtensions } from "../runners/rpc/parent-extensions"
+import type { ChildExtensionEvent } from "../runners/child-extension-events"
+import type { ExitConfirmationSchedule } from "./provisional-exit"
+import type { ChildCreationPort, ChildPausePort, ResumedChildTurn, RunPauseOwner } from "../pause/ports"
+import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
+import type { HeldStart, StartAdmission } from "./start-admission"
+import type { HostLivenessStatus } from "../runners/rpc-host/handle-heartbeat"
 
-export type { ExecutionMode } from "./execution-mode"
+export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
 // The unified spec both runner adapters accept. A superset: the rpc adapter uses the subset it
 // needs (task_id, cwd, state_dir, prompt); the in-process adapter also consumes model/tools/agent.
 export type ManagedStartSpec = {
+  readonly admission?: StartAdmission
   readonly taskId: string
   readonly cwd: string
   readonly stateDir: string
@@ -41,22 +52,45 @@ export type ManagedStartSpec = {
   // Names of tools the child must NOT get (the agent definition's disallowedTools), applied through
   // senpi's excludeTools so a resumed child never comes back with a wider tool surface.
   readonly toolDenylist?: readonly string[]
+  readonly includeTaskTools?: boolean
   // Names of the member-scoped ToolDefinitions, persisted on spawn_spec so a respawn can re-resolve
   // the executable definitions against the live parent registries.
   readonly memberScopedToolNames?: readonly string[]
   readonly memberScopedTools?: readonly ToolDefinition[]
+  // TRANSIENT parent kernel-tool grant (item 6). Process-lifetime only: never persisted onto the
+  // record or the v1 spawn_spec, which carry plain launch data exclusively.
+  readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
+  // The delegating turn's W3C traceparent, for a process child's own turn spans. Launch-time only:
+  // never persisted on the spawn spec, so a respawned or resumed child starts its own trace.
+  readonly traceparent?: string
+}
+
+// A created child whose first prompt is not sent yet; `begin` sends it and returns that turn.
+export type StagedManagedChild = {
+  readonly child: ManagedChildHandle
+  readonly firstPrompt: string
+  begin(): ResumedChildTurn
 }
 
 export type ManagedRunner = {
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle>
+  // Runners that can create a child without its first prompt, so a Stop that lands during creation
+  // holds that prompt instead of letting the first turn start.
+  startStaged?(spec: ManagedStartSpec): Promise<StagedManagedChild>
+  settleTeardowns?(): Promise<void>
   // Rebuild a persisted child from its session transcript without replaying its prompt. Optional
   // until the mode adapters grow their resume paths (todo 10); start-only fakes keep compiling.
   resume?(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle>
 }
 
 export type ManagerStartSpec = {
+  readonly admission?: StartAdmission
+  readonly resumeCredential?: ResumeCredential
+  readonly isolated?: boolean
+  readonly apply?: boolean
+  readonly merge?: "patch" | "branch"
   readonly prompt: string
   readonly task_summary?: string
   readonly parent_session_id: string
@@ -66,13 +100,21 @@ export type ManagerStartSpec = {
   readonly subagent_type?: string
   readonly execution_mode?: ExecutionMode
   readonly model?: string
+  // `provider/model` the parent session runs at spawn; appended as a category child's last rung (#10750).
+  readonly parent_model?: string
   readonly name?: string
   readonly description?: string
+  readonly team_run_id?: string
+  readonly team_name?: string
+  readonly team_member_name?: string
+  readonly team_role?: "member"
   readonly cwd?: string
   readonly instructions?: string
   readonly allowed_subagents?: readonly string[]
   readonly run_in_background?: boolean
   readonly memberScopedTools?: readonly ToolDefinition[]
+  // TRANSIENT parent kernel-tool grant resolved by the caller against its LIVE capability.
+  readonly kernelTools?: KernelToolGrant
   readonly extensions?: readonly string[]
   readonly memberEnv?: Readonly<Record<string, string>>
 }
@@ -105,6 +147,7 @@ export type PlanResolutionError = {
   readonly category?: string
   readonly attempted_chain?: readonly DelegateFallbackEntry[]
   readonly missing_providers?: readonly string[]
+  readonly unlisted_provider_model?: string
 }
 
 export type PlanResolution =
@@ -114,14 +157,25 @@ export type PlanResolution =
 export type ChildPlanner = (spec: ManagerStartSpec) => PlanResolution
 
 export type StartResult =
+  | HeldStart
   | {
       readonly kind: "started"
       readonly task_id: string
+      // Emitted by the manager; optional for existing host implementations of TaskManager.
+      readonly run_epoch?: number
       readonly status: "running" | "pending"
       readonly name: string
       readonly resolved_model?: ResolvedModelRecord
+      // The model the child ACTUALLY started on, read from the child itself (never the plan) -
+      // absent for a queued start that has not launched yet (#9722).
+      readonly effective_model?: EffectiveModelRecord
       readonly queue_position?: number
+      // The task host has not admitted the child yet; its start outcome arrives on the record (#10042).
+      // run_epoch and resolved_model are then the plan's: a start-time fallback may still move both.
+      readonly starting?: true
       readonly name_warning?: string
+      // Where an isolated child is working. The merge outcome is NOT here: it does not exist yet.
+      readonly isolation?: IsolationStartedDetails
     }
   | {
       readonly kind: "depth_denied"
@@ -141,12 +195,42 @@ export type StartResult =
       readonly resolved_model?: ResolvedModelRecord
       readonly run_in_background: boolean
       readonly error_message: string
+      // The runner's typed failure kind (RunnerFailure["kind"]) when the runner rejected the start,
+      // or `isolation_unavailable` when the child's copy-on-write clone could not be created.
+      // so a caller can classify the refusal without parsing the sanitized message.
+      readonly failure_kind?: TaskStartFailureKind | "isolation_unavailable"
+      readonly failure_reason?: TaskStartFailureReason
     }
-  | { readonly kind: "residency_denied"; readonly reason: string }
+  | ResidencyDenied
+
+// A resident child named by a residency rejection: enough for the caller to tell whether the cap
+// is held by live work (wait for it) or by nothing that could ever free a slot (give up).
+export type ResidentSummary = {
+  readonly task_id: string
+  readonly name: string
+  readonly status: TaskStatus
+}
+
+// #8396: a residency denial states WHY admission failed so the caller can decide whether waiting
+// helps. `residents` = the session's resident children occupy the cap; every one of them frees its
+// slot on settlement, eviction, or when its pending sends drain, so a caller parks and re-probes
+// after `TaskManager.residencyChanged(parentSessionId)`. A denial that names NO resident can never
+// be helped by waiting. `lease` = the per-session admission lease was contended or displaced; the
+// lease acquisition itself is a bounded wait, so the caller simply probes again.
+export type ResidencyDenied =
+  | {
+      readonly kind: "residency_denied"
+      readonly reason: string
+      readonly cause: "residents"
+      readonly max_children?: number | "unlimited"
+      readonly residents: readonly ResidentSummary[]
+    }
+  | { readonly kind: "residency_denied"; readonly reason: string; readonly cause: "lease" }
 
 export type ContinueDelivery = "steer" | "followUp" | "revive"
 
 export type ContinueResult =
+  | Extract<SendOutcome, { kind: "uncertain" | "unresponsive" }>
   | {
       readonly kind: "continued"
       readonly task_id: string
@@ -154,6 +238,8 @@ export type ContinueResult =
       readonly delivered: ContinueDelivery
     }
   | { readonly kind: "not_continuable"; readonly task_id?: string; readonly reason: string; readonly suggestion: string }
+
+export type ForgetOptions = { readonly path: "park" | "evict" } | { readonly path: "end"; readonly reason?: "target_gone" }
 
 export type ListScope =
   | { readonly scope: "parent-session"; readonly session_id: string }
@@ -170,7 +256,14 @@ export type ListedTask = {
 export type SpawnAdmission =
   | { readonly kind: "admitted" }
   | { readonly kind: "evicted"; readonly evicted_task_id: string }
-  | { readonly kind: "rejected"; readonly message: string }
+  | {
+      readonly kind: "rejected"
+      readonly message: string
+      // The residents that hold the cap (lifecycle AgentLimitReached). Omitted = the adapter could
+      // not name them, which the manager reports as a denial nothing can free (#8396).
+      readonly max_children?: number | "unlimited"
+      readonly residents?: readonly ResidentSummary[]
+    }
 
 export type AdmitResident = (parentSessionId: string) => Promise<SpawnAdmission>
 
@@ -182,12 +275,24 @@ export type TrustedRespawnLaunch = {
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
 export type TaskManagerOptions = {
+  readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void
+  readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
+  readonly childCreationPort?: ChildCreationPort
+  readonly admissionBarrier?: AdmissionBarrier
+  readonly onHeldAdmission?: (result: HeldStart, spec: ManagerStartSpec) => void
+  readonly childPausePort?: ChildPausePort
+  readonly onChildExtensionEvent?: (event: ChildExtensionEvent, owner: TaskRecord) => void
+  readonly concurrency?: TaskConcurrency
+  // Injected by row 17. Absent, `isolated` children are refused rather than silently run against the
+  // parent checkout, so a wiring that forgot it can never break the isolation promise.
+  readonly isolation?: IsolationRuntime
   readonly store: TaskRecordStore
   readonly runners: Readonly<Record<ExecutionMode, ManagedRunner>>
   readonly planner: ChildPlanner
   readonly config: OmoTaskSettings
   readonly cwd: string
   readonly now?: () => number
+  readonly scheduleExitConfirmation?: ExitConfirmationSchedule
   // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
   // a no-op so the manager stays usable before lifecycle wiring lands.
   readonly destruction?: DestructionPort
@@ -197,44 +302,27 @@ export type TaskManagerOptions = {
   // Resolves launch inputs from the current runtime. Persisted task records never supply executable
   // extensions or environment during a respawn.
   readonly trustedRespawnLaunch?: TrustedRespawnLaunchResolver
+  // What a child of this session inherits when the caller names no explicit list. The composition
+  // root passes a resolver that includes settings-installed package providers (#8492); absent, the
+  // parent's argv entries are used, which is what a wiring without a package manager can know.
+  readonly resolveInheritedExtensions?: InheritedExtensions
   // Pid recorded as host_pid on every claimed record so sibling processes sharing the project store
   // can tell a live owner from a dead one. Defaults to process.pid; injectable for tests.
   readonly hostPid?: number
+  // Whether a recorded owner host still runs; defaults to the lifecycle's signal-0 probe.
+  readonly isProcessAlive?: (pid: number) => boolean
+  // The parent engine's RUNTIME-ONLY kernel-tool capability map (item 6). Shared with the runner so
+  // a same-host parked child revives onto the same live parent closures; absent = no kernel tools.
+  readonly kernelToolBindings?: KernelToolBindingRegistry
+  // The names a child of this parent already carries (same list the task tool grant reads).
+  readonly resolveChildToolNames?: () => readonly string[]
+  // Resolves `task.default_execution_mode: "auto"` ONCE per parent session (the shared-daemon
+  // capability check). Absent -> `auto` reads as in-process, which is what a wiring without a
+  // daemon (tests, a pinned engine without the host surface) must do.
+  readonly executionModeGate?: ExecutionModeGate
+  // The parent session's current turn traceparent (raw session id in), read once per launch. Absent or
+  // undefined -> the child carries no inherited trace context.
+  readonly traceparentFor?: (parentSessionId: string) => string | undefined
 }
 
-export type TaskManager = {
-  start(spec: ManagerStartSpec): Promise<StartResult>
-  startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
-  findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined
-  continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
-  sendToTask(input: SendInput): Promise<SendOutcome>
-  interruptTask(idOrName: string): Promise<InterruptOutcome>
-  cancelTask(idOrName: string, reason?: string, options?: CancelOptions): Promise<CancelOutcome>
-  get(taskId: string): TaskRecord | undefined
-  hasPendingSends?(taskId: string): boolean
-  tryClaimEviction?(taskId: string): boolean
-  releaseEviction?(taskId: string): void
-  isEvicting?(taskId: string): boolean
-  tryBeginSend?(taskId: string): boolean
-  endSend?(taskId: string): void
-  list(scope: ListScope): readonly ListedTask[]
-  waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>
-  // Live read of the manager-owned run-stats accumulator. Snapshot and live TUI surfaces need
-  // in-flight turns/tool-calls/tok-s; the record only carries run_stats once terminal.
-  // Optional so downstream structural fakes keep compiling; the concrete manager always implements it.
-  runStatsSnapshot?(taskId: string): TaskRunStats | undefined
-  // W1-V F3: prune a live handle (and its per-epoch release/background bookkeeping) so the lifecycle
-  // destruction port and eviction path never leave a stale handle behind or grow #live unbounded.
-  forget(taskId: string): void
-  // Live-handle read seam for the wiring's ResidencyRegistry (W1-V F7: registry and #live share one
-  // forget path). Returns the ManagedChildHandle for a task this process still owns, if any.
-  getResidentHandle(taskId: string): ManagedChildHandle | undefined
-  // Subscribe at the runner-agnostic handle seam now or when a queued task is promoted.
-  subscribeChild(taskId: string, listener: ManagedChildListener): () => void
-  residentTaskIds(): readonly string[]
-  // Promote a foreground task when the tool stops waiting inline. The completion bridge reads this
-  // state live at terminal transition, so promotion makes the eventual completion notify normally.
-  promoteToBackground(taskId: string): boolean
-  // Whether a task is currently background, either from its spawn spec or a later promotion.
-  wasBackground(taskId: string): boolean
-}
+export type { TaskManager } from "./manager-contract"

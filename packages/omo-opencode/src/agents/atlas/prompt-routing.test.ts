@@ -22,12 +22,24 @@ describe("getAtlasPromptSource routes each model family to its dedicated variant
 
   test("Kimi K3 routes to its own variant, ahead of K2.7 and generic kimi", () => {
     expect(getAtlasPromptSource("opencode-go/kimi-k3")).toBe("kimi-k3")
-    expect(getAtlasPromptSource("kimi-for-coding/k3p1")).toBe("kimi-k3")
+  })
+
+  test("Kimi K3.1 routes to its own variant, ahead of K3", () => {
+    expect(getAtlasPromptSource("kimi-for-coding/k3p1")).toBe("kimi-k3-1")
+    expect(getAtlasPromptSource("kimi-coding/k3.1-pro")).toBe("kimi-k3-1")
+    expect(getAtlasPromptSource("moonshotai/kimi-k3.1-pro-highspeed")).toBe("kimi-k3-1")
   })
 
   test("Kimi K2.7 routes to its own variant, ahead of generic kimi", () => {
     expect(getAtlasPromptSource("opencode-go/kimi-k2.7")).toBe("kimi-k2-7")
     expect(getAtlasPromptSource("kimi-for-coding/k2p7")).toBe("kimi-k2-7")
+  })
+
+  test("Kimi K2.8 and the Kimi Code rolling ids share the K2.7 variant", () => {
+    expect(getAtlasPromptSource("moonshotai/kimi-k2.8")).toBe("kimi-k2-7")
+    expect(getAtlasPromptSource("kimi-for-coding/k2p8")).toBe("kimi-k2-7")
+    expect(getAtlasPromptSource("kimi-for-coding/kimi-for-coding")).toBe("kimi-k2-7")
+    expect(getAtlasPromptSource("kimi-for-coding/kimi-for-coding-highspeed")).toBe("kimi-k2-7")
   })
 
   test("Claude Opus 4.7 routes to opus-4-7", () => {

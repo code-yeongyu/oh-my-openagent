@@ -1,4 +1,6 @@
 import type { BuiltinCategoryDefinition } from "./types"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+import { launchDefaultModelId } from "@oh-my-opencode/model-core"
 
 // Ported from packages/omo-opencode/src/tools/delegate-task/google-categories.ts.
 const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -88,6 +90,10 @@ Design-first mindset (AFTER design system is established):
 
 AVOID: Generic fonts, purple gradients on white, predictable layouts, cookie-cutter patterns.
 </DESIGN_QUALITY>
+
+<OBSERVE_EACH_CHANGE>
+Visual state is not text: after each change, render or screenshot the affected surface and look at it before making the next change. Check desktop and mobile widths for blank, misframed, or overlapping output; check a 3D scene from several angles. Compare what you see with the reference or the stated intent, and ask only where two readings of that intent diverge. A change you have not looked at is not done.
+</OBSERVE_EACH_CHANGE>
 </Category_Context>`
 
 const ARTISTRY_CATEGORY_PROMPT_APPEND = `<Category_Context>
@@ -110,13 +116,13 @@ Approach:
 export const GOOGLE_CATEGORIES = [
   {
     name: "visual-engineering",
-    config: { model: "anthropic/claude-fable-5-1", variant: "max" },
+    config: { model: `google/${LATEST_MODEL_BY_FAMILY.geminiPro}`, variant: "low" },
     description: "Visual design, UI/UX, frontend, styling, animation, and design systems",
     promptAppend: VISUAL_CATEGORY_PROMPT_APPEND,
   },
   {
     name: "artistry",
-    config: { model: "anthropic/claude-fable-5-1", variant: "max" },
+    config: { model: `anthropic/${launchDefaultModelId()}`, variant: "max" },
     description: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
     promptAppend: ARTISTRY_CATEGORY_PROMPT_APPEND,
   },

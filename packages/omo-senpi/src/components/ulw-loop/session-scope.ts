@@ -3,15 +3,13 @@
 // `PI_SESSION_ID`). Senpi never sets any of those on the extension host process, so a status probe that
 // inherits the host env resolves NO session and reads the repo-global `.omo/ulw-loop/goals.json` instead
 // of this session's directory. This module resolves the host's own session identity and hands it to the
-// toolkit explicitly as `--session-id`, using the toolkit's own normalization rules so both sides agree
-// on the directory name (`packages/omo-codex/plugin/components/ulw-loop/src/paths.ts`). The adapter
+// toolkit explicitly, using the toolkit's own normalization rules so both sides agree on the directory
+// name (`packages/omo-codex/plugin/components/ulw-loop/src/paths.ts`). The adapter
 // boundary forbids importing that package from here, so the rules — including the scoped `goals.json`
 // path the status probe gates on — are mirrored and pinned by a parity test.
 
 import { join } from "node:path"
 
-const STATUS_ARGS = ["ulw-loop", "status", "--json"] as const
-const SESSION_ID_FLAG = "--session-id"
 const ULW_LOOP_DIR = ".omo/ulw-loop"
 const ULW_LOOP_GOALS = "goals.json"
 
@@ -44,10 +42,6 @@ export function extractSessionId(eventCtx: unknown): string | undefined {
 // back to the unscoped repo-global plan, which every session in the cwd can see.
 export function resolveUlwLoopSessionScope(eventCtx: unknown): string | null {
   return normalizeUlwLoopSessionId(extractSessionId(eventCtx))
-}
-
-export function ulwLoopStatusArgs(normalizedSessionId: string): readonly string[] {
-  return [...STATUS_ARGS, SESSION_ID_FLAG, normalizedSessionId]
 }
 
 // Mirrors toolkit `ulwLoopGoalsPath(repoRoot, { sessionId })` once the id is already normalized.

@@ -1,15 +1,184 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { rmSync } from "node:fs"
+
+import { ModelRegistry, ModelRuntime } from "@code-yeongyu/senpi"
+
 import { InProcessRunner, RunnerError } from "./in-process"
 import { baseSpec, createFakeSession, makeTool, tmpSessionDirs } from "./in-process-child-spec.test-support"
 import type { CreateAgentSessionOptions } from "./in-process-child-spec.test-support"
 import type { ChildSession } from "./in-process"
+
+type RealModel = NonNullable<CreateAgentSessionOptions["model"]>
+
+function realModel(provider: string, id: string): RealModel {
+  const registry = new ModelRegistry(ModelRuntime.createSync())
+  registry.registerProvider(provider, {
+    api: "openai-completions",
+    baseUrl: `file://${provider}-pin-test`,
+    apiKey: "test-key",
+    models: [{
+      id,
+      name: id,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 16_000,
+      maxTokens: 4096,
+    }],
+  })
+  const model = registry.find(provider, id)
+  if (model === undefined) throw new Error(`registry did not serve ${provider}/${id}`)
+  return model
+}
 
 const unhandled: unknown[] = []
 const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
 afterEach(() => { unhandled.length = 0; while (tmpSessionDirs.length > 0) rmSync(tmpSessionDirs.pop() ?? "", { recursive: true, force: true }) })
 
 describe("InProcessRunner", () => {
+  test("#given a session that starts on a different model than the spec resolved #when start runs #then it fails typed as model_unavailable and disposes the session (#9722)", async () => {
+    // given: the spec asks for model A; the engine hands back a session on model B
+    const fake = createFakeSession()
+    fake.session = { ...fake.session, model: { provider: "vendor-b", id: "substitute" } }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when / then: the spawn refuses the substitution, and the opened session is torn down
+    const failure = await runner
+      .start(
+        baseSpec({
+          model: realModel("vendor-a", "pinned"),
+          selectedModel: "vendor-a/pinned",
+          resolvedModel: {
+            provider: "vendor-a",
+            model_id: "pinned",
+            display: "vendor-a/pinned",
+            source: "explicit",
+          },
+        }),
+      )
+      .catch((error: unknown) => error)
+    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
+    expect(failure instanceof Error ? failure.message : "").toContain("vendor-b/substitute")
+    expect(failure instanceof Error ? failure.message : "").toContain("vendor-a/pinned")
+    expect(fake.disposeCount).toBe(1)
+    expect(fake.promptCalls).toBe(0)
+  })
+
+  test("#given a mismatch whose session teardown also fails #when start runs #then the failure is still typed (#9722)", async () => {
+    // given
+    const fake = createFakeSession()
+    fake.session = {
+      ...fake.session,
+      model: { provider: "vendor-b", id: "substitute" },
+      dispose() {
+        throw new Error("dispose exploded")
+      },
+    }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when
+    const failure = await runner
+      .start(
+        baseSpec({
+          model: realModel("vendor-a", "pinned"),
+          selectedModel: "vendor-a/pinned",
+          resolvedModel: {
+            provider: "vendor-a",
+            model_id: "pinned",
+            display: "vendor-a/pinned",
+            source: "explicit",
+          },
+        }),
+      )
+      .catch((error: unknown) => error)
+
+    // then
+    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
+    expect(failure instanceof Error ? failure.message : "").toContain("shutting down its session failed")
+  })
+
+  test("#given a session on exactly the model the spec resolved #when start runs #then the child is accepted (#9722)", async () => {
+    // given
+    const fake = createFakeSession()
+    fake.session = { ...fake.session, model: { provider: "vendor-a", id: "pinned" } }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when
+    const handle = await runner.start(
+      baseSpec({
+        model: realModel("vendor-a", "pinned"),
+        selectedModel: "vendor-a/pinned",
+        resolvedModel: {
+          provider: "vendor-a",
+          model_id: "pinned",
+          display: "vendor-a/pinned",
+          source: "explicit",
+        },
+      }),
+    )
+
+    // then
+    fake.lastText.value = "done"
+    fake.resolvePrompt()
+    await expect(handle.waitForIdle()).resolves.toMatchObject({ status: "completed" })
+    await handle.dispose()
+  })
+
+  test.each([
+    ["a -fast pin reported on its base model", "pinned-fast", "pinned"],
+    ["a base pin reported on its -fast variant", "pinned", "pinned-fast"],
+  ])("#given %s #when start runs #then the child is accepted, not refused as a substitution (#9793)", async (_label, pinnedId, startedId) => {
+    // given: senpi starts a -fast catalog pin on its base model with the priority tier remembered
+    const fake = createFakeSession()
+    fake.session = {
+      ...fake.session,
+      ...{ effectiveServiceTier: "priority" },
+      model: { provider: "vendor-a", id: startedId, serviceTier: "priority", upstreamModelId: "pinned" },
+    }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when
+    const handle = await runner.start(
+      baseSpec({
+        model: { ...realModel("vendor-a", pinnedId), serviceTier: "priority", upstreamModelId: "pinned" },
+        selectedModel: `vendor-a/${pinnedId}`,
+        resolvedModel: { provider: "vendor-a", model_id: pinnedId, display: `vendor-a/${pinnedId}`, source: "explicit" },
+      }),
+    )
+
+    // then
+    fake.lastText.value = "done"
+    fake.resolvePrompt()
+    await expect(handle.waitForIdle()).resolves.toMatchObject({ status: "completed" })
+    await handle.dispose()
+  })
+
+  test.each([
+    ["another model", "vendor-a", "other-model"],
+    ["another suffix", "vendor-a", "pinned-ultra"],
+    ["the base model on another provider", "vendor-b", "pinned"],
+  ])("#given a -fast pin reported on %s #when start runs #then it is still refused as a substitution (#9793)", async (_label, provider, startedId) => {
+    // given
+    const fake = createFakeSession()
+    fake.session = { ...fake.session, model: { provider, id: startedId } }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when
+    const failure = await runner
+      .start(
+        baseSpec({
+          model: realModel("vendor-a", "pinned-fast"),
+          selectedModel: "vendor-a/pinned-fast",
+          resolvedModel: { provider: "vendor-a", model_id: "pinned-fast", display: "vendor-a/pinned-fast", source: "explicit" },
+        }),
+      )
+      .catch((error: unknown) => error)
+
+    // then
+    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
+    expect(fake.promptCalls).toBe(0)
+  })
+
   test("#given a running child #when steered while the prompt is in flight #then the fake session receives it", async () => {
     const fake = createFakeSession()
     const runner = new InProcessRunner({ createSession: async () => fake.session })
@@ -69,7 +238,7 @@ describe("InProcessRunner", () => {
     expect(handle.lastAssistantText()).toBe("final answer")
   })
 
-  test("#given shared and member-scoped tools #when a child is started #then only member-scoped tools cross the family exclusion", async () => {
+  test("#given shared and member-scoped tools #when a restricted child is started #then only member-scoped tools cross the family exclusion", async () => {
     let captured: CreateAgentSessionOptions | undefined
     const fake = createFakeSession()
     const runner = new InProcessRunner({

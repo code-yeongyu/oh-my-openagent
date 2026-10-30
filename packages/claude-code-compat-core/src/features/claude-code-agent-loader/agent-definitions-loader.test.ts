@@ -127,7 +127,7 @@ Prompt.`
 
       const result = parseMarkdownAgentFile(filePath, "definition-file", "kiro")
 
-      expect(result?.config.model).toBe("kiro/claude-opus-4-8")
+      expect(result?.config.model).toBe("kiro/claude-opus-5-5")
     })
   })
 
@@ -322,7 +322,7 @@ Provider prompt.`,
 
       const result = loadAgentDefinitions([mdPath], "definition-file", "kiro")
 
-      expect(result["provider-agent"].model).toBe("kiro/claude-sonnet-4-6")
+      expect(result["provider-agent"].model).toBe("kiro/claude-sonnet-5-5")
     })
   })
 })

@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { isGpt5_5Model, isGpt6Model, isGptModel, isGptNativeSisyphusModel } from "../../agents/types"
 import {
   getSessionAgent,
+  isAgentRegistered,
   resolveRegisteredAgentName,
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
@@ -14,11 +15,17 @@ const TOAST_MESSAGE = [
   "Do NOT use Sisyphus with GPT (except GPT-5.4, GPT-5.5, and GPT-5.6 Sol, which have GPT-native prompt support).",
   "For other GPT models, always use Hephaestus.",
 ].join("\n")
-function showToast(ctx: PluginInput, sessionID: string): void {
+const HEPHAESTUS_UNAVAILABLE_TOAST_MESSAGE = [
+  "Sisyphus is running with a GPT model it has no native prompt for.",
+  "Hephaestus is not available in this session (disabled, or its configured model is not a supported GPT model), so the agent was not switched.",
+  "Use a Claude, Kimi, or GLM model for Sisyphus, or enable Hephaestus with a supported GPT model.",
+].join("\n")
+
+function showToast(ctx: PluginInput, sessionID: string, message: string): void {
   ctx.client.tui.showToast({
     body: {
       title: TOAST_TITLE,
-      message: TOAST_MESSAGE,
+      message,
       variant: "error",
       duration: 10000,
     },
@@ -73,10 +80,20 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
       }
 
       if (agentKey === "sisyphus" && modelID && isGptModel(modelID) && !isGptNativeSisyphusModel(modelID) && !isGpt6Model(modelID)) {
-        showToast(ctx, input.sessionID)
-        input.agent = resolveRegisteredAgentName("hephaestus") ?? "hephaestus"
+        if (!isAgentRegistered("hephaestus")) {
+          showToast(ctx, input.sessionID, HEPHAESTUS_UNAVAILABLE_TOAST_MESSAGE)
+          log("[no-sisyphus-gpt] Hephaestus is not registered; keeping Sisyphus instead of redirecting", {
+            sessionID: input.sessionID,
+            modelID,
+          })
+          return
+        }
+
+        const hephaestusAgent = resolveRegisteredAgentName("hephaestus") ?? "hephaestus"
+        showToast(ctx, input.sessionID, TOAST_MESSAGE)
+        input.agent = hephaestusAgent
         if (output?.message) {
-          output.message.agent = resolveRegisteredAgentName("hephaestus") ?? "hephaestus"
+          output.message.agent = hephaestusAgent
         }
         updateSessionAgent(input.sessionID, "hephaestus")
       }

@@ -14,7 +14,7 @@ export interface WorktreeRecord {
 
 export type WorktreeDecision = "SWEEP" | "KEEP" | "PRUNE"
 
-export type WorktreeKeepReason = "locked" | "external" | "unmerged" | "dirty"
+export type WorktreeKeepReason = "locked" | "external" | "unmerged" | "dirty" | "current"
 
 export interface WorktreeClassification {
   readonly path: string
@@ -34,6 +34,8 @@ export interface ClassificationInput {
   readonly dirty: boolean
   /** True when the path lives under one of the configured protected prefixes. */
   readonly external: boolean
+  /** True when the sweep was started from inside this linked worktree. */
+  readonly current?: boolean
 }
 
 export interface WorktreeSweepRepoReport {

@@ -100,18 +100,20 @@ const fn fibonacci(n: usize) -> usize {
 const FIB_20: usize = fibonacci(20); // computed at compile time: 6765
 
 // Use in array sizes
+#[expect(clippy::indexing_slicing, reason = "const evaluation: an out-of-bounds index is a compile error")]
 const LOOKUP: [u8; 256] = {
     let mut table = [0u8; 256];
-    let mut i = 0;
-    while i < 256 {
-        table[i] = (i as u8).wrapping_mul(7);
+    let mut i: u8 = 0;
+    loop {
+        table[i as usize] = i.wrapping_mul(7); // u8 -> usize widens: lossless
+        if i == u8::MAX { break; }
         i += 1;
     }
     table
 };
 ```
 
-**Stable since Rust 1.82:** `const fn` supports `match`, loops, `if`, references, mutable locals — nearly full Rust. Use `const { }` blocks (Rust 1.79+) for inline compile-time assertions.
+`const fn` bodies may use `if`, `match`, `loop`/`while`, and mutable locals; trait methods (`From`, `TryFrom`, `Iterator`) are not callable in `const` on stable. That makes a **lossless widening `as` inside `const`** the one accepted numeric cast: iterate in the narrow type and widen to index, as above, so no value can truncate. Use `const { }` blocks (Rust 1.79+) for inline compile-time assertions.
 
 ```rust
 fn process<const N: usize>(data: &[u8; N]) {
@@ -123,6 +125,7 @@ fn process<const N: usize>(data: &[u8; N]) {
 ### const generics — Type-Level Values
 
 ```rust
+#[derive(Debug)]
 struct Buffer<const N: usize> {
     data: [u8; N],
     len: usize,
@@ -134,11 +137,15 @@ impl<const N: usize> Buffer<N> {
     }
 
     fn push(&mut self, byte: u8) -> Result<(), BufferFullError> {
-        if self.len >= N { return Err(BufferFullError); }
-        self.data[self.len] = byte;
-        self.len += 1;
+        let slot = self.data.get_mut(self.len).ok_or(BufferFullError)?;
+        *slot = byte;
+        self.len = self.len.saturating_add(1); // < N after the get_mut above
         Ok(())
     }
+}
+
+impl<const N: usize> Default for Buffer<N> {
+    fn default() -> Self { Self::new() }
 }
 
 // Compiler enforces: Buffer<16> and Buffer<32> are distinct types.
@@ -148,26 +155,7 @@ let large: Buffer<1024> = Buffer::new();
 
 ### proc macros — Code Generation (Zig comptime type creation)
 
-When `const fn` is not enough (generating struct fields, impl blocks, or derive logic), proc macros fill the gap.
-
-```rust
-// In a proc-macro crate:
-use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
-
-#[proc_macro_derive(Builder)]
-pub fn derive_builder(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    // ... generate builder struct and impl
-    TokenStream::from(quote! {
-        impl #name {
-            pub fn builder() -> #name##Builder { /* ... */ }
-        }
-    })
-}
-```
+When `const fn` is not enough (generating struct fields, impl blocks, or derive logic), proc macros fill the gap. Crate layout, `syn`/`quote`, identifier construction, and spanned errors → [macros.md](macros.md).
 
 **Decision tree:**
 
@@ -195,15 +183,14 @@ fn process(input: &str) -> String {
 
 // GOOD: caller provides output buffer, zero allocation
 fn process(input: &[u8], output: &mut [u8]) -> usize {
-    let len = input.len().min(output.len());
-    for i in 0..len {
-        output[i] = input[i].to_ascii_uppercase();
+    for (dst, src) in output.iter_mut().zip(input) {
+        *dst = src.to_ascii_uppercase();
     }
-    len // returns bytes written
+    input.len().min(output.len()) // bytes written; zip stopped at the shorter slice
 }
 
 // GOOD: return borrowed data when possible
-fn find_token<'a>(input: &'a str) -> Option<&'a str> {
+fn find_token(input: &str) -> Option<&str> {
     input.split_whitespace().next() // no allocation — borrows from input
 }
 ```
@@ -231,8 +218,27 @@ tags.push(1); // on stack if <= 8 elements
 
 // ArrayVec: purely stack, fixed capacity, no heap ever
 let mut buf: ArrayVec<u8, 64> = ArrayVec::new();
-buf.try_push(42).map_err(|_| "full")?; // returns error instead of panic
+buf.try_push(42).map_err(|_| BufferFullError)?; // typed error instead of panic
 ```
+
+### Move Out of `&mut` Without Cloning
+
+```rust
+// Take the value, leave Default behind: no clone, no Option dance.
+let pending = std::mem::take(&mut self.pending);      // Vec/String/HashMap
+let old = std::mem::replace(&mut self.state, State::Idle);
+let conn = self.conn.take();                          // Option<T> field
+```
+
+A `.clone()` whose only purpose is to satisfy the borrow checker behind `&mut self` is almost always one of these three.
+
+### Reuse and Pre-Size
+
+- Reserve from a known size: `Vec::with_capacity(n)` / `String::with_capacity(n)`, or `reserve(n)` before a batch `extend`.
+- In a loop, hoist a scratch buffer and `clear()` it each iteration instead of allocating a fresh one; `clear` keeps the capacity. Drop or `shrink_to` it when one outlier would pin a huge allocation.
+- Format into an existing buffer with `write!(buf, ...)` (`use std::fmt::Write as _`) instead of building intermediate `format!` strings, and pass `&str` literals where no formatting happens.
+
+Apply these on paths a profile or benchmark shows to be hot; elsewhere the clearer allocation wins.
 
 ### Cow — Defer Allocation Until Mutation
 
@@ -264,15 +270,7 @@ Even in `std` code, the *mindset* applies: prefer `&[T]` over `Vec<T>` in functi
 
 ### Clippy Lints for Hidden Allocations
 
-```toml
-# Cargo.toml — catch accidental allocations
-[lints.clippy]
-# These warn on patterns that allocate when a borrow would suffice:
-unnecessary_to_owned = "warn"       # .to_string() / .to_vec() when borrow works
-redundant_clone = "warn"            # .clone() that's immediately consumed
-large_stack_arrays = "warn"         # accidental large stack usage
-vec_init_then_push = "warn"         # Vec::new() + push instead of vec![]
-```
+The groups in [cargo-strict.md](cargo-strict.md) already enable the allocation lints: `unnecessary_to_owned` and `vec_init_then_push` (in `all`, denied), `redundant_clone` (nursery), `large_stack_arrays` (pedantic). Do not re-list them in `[lints.clippy]`: a per-lint `"warn"` entry overrides the group and silently downgrades a deny.
 
 ---
 
@@ -408,22 +406,24 @@ Zig's `errdefer` runs cleanup only on error paths. Rust's `Drop` always runs, bu
 ### scopeguard — The errdefer Equivalent
 
 ```rust
-use scopeguard::{defer, guard};
+use scopeguard::{guard, ScopeGuard};
 use std::fs;
 
 fn create_and_process(path: &str) -> std::io::Result<()> {
     let file = fs::File::create(path)?;
     // If anything below fails, clean up the file.
     // This is exactly Zig's errdefer.
-    let _cleanup = guard((), |_| {
-        let _ = fs::remove_file(path);
+    let cleanup = guard((), |()| {
+        if let Err(error) = fs::remove_file(path) {
+            tracing::warn!(%error, path, "cleanup after failed write");
+        }
     });
 
     write_data(&file)?;
     validate_data(path)?;
 
     // Success: defuse the guard so it does NOT run cleanup.
-    std::mem::forget(_cleanup);
+    ScopeGuard::into_inner(cleanup);
     Ok(())
 }
 ```
@@ -437,7 +437,7 @@ fn with_temp_dir() -> anyhow::Result<()> {
     let dir = tempfile::tempdir()?;
     defer! {
         // Runs when scope exits, success or failure.
-        println!("Cleaning up {}", dir.path().display());
+        tracing::debug!(path = %dir.path().display(), "leaving temp dir scope");
         // dir's Drop also cleans up, but this shows the pattern.
     }
 
@@ -449,6 +449,7 @@ fn with_temp_dir() -> anyhow::Result<()> {
 ### Drop as RAII Cleanup
 
 ```rust
+#[derive(Debug)]
 struct TempFile { path: std::path::PathBuf }
 
 impl TempFile {
@@ -461,7 +462,10 @@ impl TempFile {
 
 impl Drop for TempFile {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        // Drop cannot return an error; report it instead of discarding it.
+        if let Err(error) = std::fs::remove_file(&self.path) {
+            tracing::warn!(%error, path = %self.path.display(), "temp file not removed");
+        }
     }
 }
 
@@ -469,19 +473,25 @@ impl Drop for TempFile {
 let tmp = TempFile::new("/tmp/scratch.dat")?;
 ```
 
+### Drop Order Is Part of the Contract
+
+Locals drop in reverse declaration order; struct fields drop in declaration order (first field first). When one resource must outlive another (a transaction before its connection, a worker handle before the channel it drains), encode it: declare the dependent field first, or call `drop(x)` at the exact point the dependency ends. Never rely on an order the code does not state.
+
 ### The errdefer Pattern — Defuse on Success
 
 The key insight from Zig's `errdefer`: you want cleanup on error but NOT on success. In Rust:
 
 ```rust
-use scopeguard::ScopeGuard;
+use scopeguard::{guard, ScopeGuard};
 
 fn deploy(artifact: &Path) -> Result<(), DeployError> {
     let backup = backup_current()?;
 
     // errdefer: restore backup if anything fails
-    let rollback = guard(backup.clone(), |b| {
-        let _ = restore_from_backup(&b);
+    let rollback = guard(backup, |b| {
+        if let Err(error) = restore_from_backup(&b) {
+            tracing::error!(%error, "rollback failed; manual restore needed");
+        }
     });
 
     upload(artifact)?;
@@ -522,6 +532,6 @@ All achievable within Rust's single toolchain. You get Zig's explicitness **plus
 - **Zero-alloc APIs** hurt readability when the function naturally produces owned data. Don't force `&mut [u8]` output buffers on a function that logically returns `String`.
 - **`#[repr(packed)]`** only for wire formats and FFI. Never for regular domain types.
 - **Scope guards** unnecessary when `Drop` on the value itself handles cleanup (e.g., `tempfile::NamedTempFile` already does this).
-- **`const fn`** everything? No — only when the value is genuinely needed at compile time or the function is trivially const-eligible. Don't contort logic just to be const.
+- **`const fn`** everything? No — only when a `const` context needs the function or it is trivially const-eligible. Don't contort logic just to be const.
 
 The goal is **visible costs and explicit control**, not asceticism. Use `String` and `Vec` freely when they're the right tool. Reach for these patterns when allocation behavior matters for correctness or performance.

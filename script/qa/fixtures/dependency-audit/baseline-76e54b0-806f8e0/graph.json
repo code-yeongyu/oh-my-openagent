@@ -1,0 +1,73 @@
+{
+  "command": [
+    "bun",
+    "script/qa/dependency-audit-capture.ts",
+    "--phase",
+    "baseline",
+    "--binary",
+    "$INPUT_BINARY",
+    "--out",
+    "$OUT"
+  ],
+  "machine": "darwin-arm64-20030cfa6181",
+  "versions": {
+    "bun": "1.4.2",
+    "node": "v26.7.0"
+  },
+  "exitCode": 0,
+  "timestamp": "2026-09-13T10:48:10.329Z",
+  "schemaVersion": 1,
+  "phase": "baseline",
+  "case": "graph",
+  "binarySha256": "c593321c06beacd0af1a94cda7a93fc5d76608e0f62efeb7fc5bf324c6059d76",
+  "pass": true,
+  "moduleCount": 4390,
+  "metafile": "graph-artifacts/meta.json",
+  "metafileSha256": "089a022d09c71c6e6683ce3b4655e1e3caf95724cbb3819ca35542bd2fa07115",
+  "releaseArgv": [
+    "build",
+    "--compile",
+    "--target=bun-darwin-arm64",
+    "--minify-whitespace",
+    "--compile-autoload-package-json",
+    "--no-compile-autoload-dotenv",
+    "--no-compile-autoload-bunfig",
+    "--asset=unused",
+    "$REPO/packages/omo-native/compile-entry.ts",
+    "--root=$REPO",
+    "--define=SENPI_RPC_SESSION_WORKER_ENTRY=\"./node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js\"",
+    "$REPO/node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js",
+    "--outfile",
+    "unused"
+  ],
+  "commands": [
+    {
+      "command": [
+        "$SANDBOX/omo",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "omob dev build\nomo   76e54b0a9bfa7bc730afefa877aea03f2c948b08 2026-09-13T12:03:49+09:00 (dev)\nsenpi 806f8e0ab4de7d4237e835c5f3cd4e2378c97f38 2026-09-13T01:17:58Z (main)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "bun",
+        "build",
+        "--target=bun",
+        "--minify-whitespace",
+        "$REPO/packages/omo-native/compile-entry.ts",
+        "--root=$REPO",
+        "--define=SENPI_RPC_SESSION_WORKER_ENTRY=\"./node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js\"",
+        "$REPO/node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js",
+        "--outdir",
+        "$OUT/graph-artifacts",
+        "--metafile=$OUT/graph-artifacts/meta.json"
+      ],
+      "exitCode": 0,
+      "stdout": "Bundled 4390 modules in 1832ms\n\n  packages/omo-native/compile-entry.js                                                                                               22.18 MB  (entry point)\n  node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js  22.1 MB   (entry point)\n  SKILL-8gt84szq.md                                                                                                                  9.34 KB   (asset)\n\n",
+      "stderr": ""
+    }
+  ],
+  "cleanup": "isolated HOME, agent, copied binary, and temporary workspace removed"
+}

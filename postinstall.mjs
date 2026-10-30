@@ -15,9 +15,19 @@ import { detectPlatformBinaryMismatch } from "./bin/version-mismatch.js";
 const require = createRequire(import.meta.url);
 
 const MIN_OPENCODE_VERSION = "1.4.0";
+const OPENCODE_VERSION_PROBE_TIMEOUT_MS = 3_000;
 const OPENCODE_PLUGIN_PACKAGES = ["oh-my-opencode", "oh-my-openagent"];
 const RENAME_NOTICE =
   "oh-my-openagent: the 'omo' command is now 'omo-agent-toolkit' (the old name was removed in this major release).";
+/**
+ * The OmO Native install line on this package's channel: a prerelease build points at
+ * `omo-ai@beta`, a stable build at the bare `omo-ai` that resolves to latest.
+ * @param {string | null} version
+ */
+export function nativeNotice(version) {
+  const spec = typeof version === "string" && version.includes("-") ? "omo-ai@beta" : "omo-ai";
+  return `oh-my-openagent: OmO Native is the same omo as one 'omo' command, with no OpenCode host: bun add -g ${spec}`;
+}
 
 /**
  * Parse version string into numeric parts
@@ -62,6 +72,7 @@ function checkOpenCodeVersion() {
     const result = require("child_process").execSync("opencode --version", {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "ignore"],
+      timeout: OPENCODE_VERSION_PROBE_TIMEOUT_MS,
     });
     const version = result.trim();
     const ok = compareVersions(version, MIN_OPENCODE_VERSION);
@@ -141,6 +152,7 @@ function main() {
   // npm >= 7 hides lifecycle output unless --foreground-scripts, so this notice is
   // best-effort: the reliable migration surfaces are the CHANGELOG, docs, and README.
   console.log(RENAME_NOTICE);
+  console.log(nativeNotice(getMainPackageVersion()));
 
   invalidateOpenCodePluginCache();
 

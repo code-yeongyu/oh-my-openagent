@@ -6,7 +6,6 @@ import { failedStartDetail, itemError, startedDetail, type StartedResult } from 
 import { trackBatchProgress } from "./batch-progress"
 import type { ForegroundWaitOptions, ForegroundWaitResult } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
-import { MAX_TASK_BATCH_ITEMS } from "./params"
 import { appendMissingSkills } from "./skill-result"
 import { backgroundConversionText } from "./start-presentation"
 import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDetails, TaskToolItemDetail } from "./types"
@@ -61,11 +60,6 @@ async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]
   return starts
 }
 
-function oversizedBatchResult(): AgentToolResult<TaskToolDetails> {
-  const reason = `tasks supports at most ${MAX_TASK_BATCH_ITEMS} items.`
-  return result(reason, { task_id: "", status: "invalid_arguments", mode: "spawn", reason })
-}
-
 function backgroundText(starts: readonly BatchStart[], status: "running" | "error"): string {
   const lines = starts.map((start, index) => {
     if (start.kind === "failed") {
@@ -81,9 +75,11 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
   const live = starts.filter((start): start is LiveStart => start.kind === "started")
   const status = live.length > 0 ? "running" : "error"
   const taskId = live[0]?.result.task_id ?? ""
+  const runEpoch = live[0]?.result.run_epoch
   const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result, start.skills) : start.detail)
   return result(appendMissingSkills(backgroundText(starts, status), starts.map((start) => start.skills)), {
     task_id: taskId,
+    ...(runEpoch === undefined ? {} : { run_epoch: runEpoch }),
     status,
     mode: "spawn",
     run_in_background: true,
@@ -95,6 +91,7 @@ function recordOutput(record: TaskRecord, start: StartedResult, skills?: TaskSki
   return {
     detail: {
       task_id: record.task_id,
+      run_epoch: record.notification.run_epoch,
       name: record.name ?? start.name,
       status: record.status,
       ...(record.error_message !== undefined && { error_message: record.error_message }),
@@ -215,9 +212,11 @@ async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[
   const items = outputs.map((output) => output.detail)
   const status = aggregateStatus(items, batchAborted)
   const taskId = live[0]?.result.task_id ?? ""
+  const runEpoch = items.find((item) => item.task_id === taskId)?.run_epoch
   const runInBackground = items.some((item) => item.run_in_background === true)
   return result(appendMissingSkills(syncText(status, outputs), starts.map((start) => start.skills)), {
     task_id: taskId,
+    ...(runEpoch === undefined ? {} : { run_epoch: runEpoch }),
     status,
     mode: "spawn",
     run_in_background: runInBackground,
@@ -230,7 +229,16 @@ export async function executeBatch(input: ExecuteBatchInput): Promise<AgentToolR
     const reason = "Parent aborted before spawn"
     return result(reason, { task_id: "", status: "cancelled", mode: "spawn", reason })
   }
-  if (input.items.length > MAX_TASK_BATCH_ITEMS) return oversizedBatchResult()
   const starts = await startAll(input)
-  return input.runInBackground ? backgroundResult(starts) : syncResult(input, starts)
+  if (input.runInBackground) return backgroundResult(starts)
+  const parent = input.manager.findTaskByChildSession?.(input.ctx.sessionManager.getSessionId())
+  const parked = parent === undefined ? undefined : input.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
+  let promoted = false
+  try {
+    const result = await syncResult(input, starts)
+    promoted = result.details.run_in_background === true
+    return result
+  } finally {
+    await input.manager.concurrency?.unpark(parked, input.signal, { overflow: promoted })
+  }
 }

@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { isAbsolute, relative, resolve, sep, win32 } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -102,7 +103,10 @@ function builtinSkillName(rawPath: unknown, eventContext: unknown, skillsRoot: s
   try {
     const root = realpathSync(skillsRoot)
     const cwd = isRecord(eventContext) && typeof eventContext.cwd === "string" ? eventContext.cwd : process.cwd()
-    const target = realpathSync(resolve(cwd, rawPath))
+    const lexical = resolve(cwd, rawPath)
+    // A macOS automount trigger is never a shipped skill, and resolving it can park the host loop (#11545).
+    if (isDarwinAutomountTriggerPath(lexical)) return undefined
+    const target = realpathSync(lexical)
     return builtinSkillNameFromCanonicalPaths(root, target, { isAbsolute, relative, sep })
   } catch {
     return undefined
@@ -156,7 +160,9 @@ function spawnTarget(item: Record<string, unknown>, parent: Record<string, unkno
   const category = itemCategory ?? (itemSubagent === undefined ? identifier(parent.category) : undefined)
   const subagent = itemSubagent ?? (itemCategory === undefined ? identifier(parent.subagent_type) : undefined)
   if ((category === undefined) === (subagent === undefined)) return undefined
-  return category === undefined ? { kind: "subagent", name: subagent ?? "" } : { kind: "category", name: category }
+  return category === undefined
+    ? { kind: "subagent", name: subagent ?? "" }
+    : { kind: "category", name: category }
 }
 
 function featureForTool(toolName: string): "goal_tool" | "team_create" | "memory_tool" | undefined {

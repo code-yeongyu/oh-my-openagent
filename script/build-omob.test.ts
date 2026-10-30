@@ -4,17 +4,23 @@ import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 import {
 	acquireCacheLock,
 	deriveOmobAiVersion,
 	ensureCacheClone,
+	fetchCacheClones,
+	fetchRefArgs,
+	parseCommitLog,
 	hostTargetFor,
+	packSenpiSiblingTarballs,
 	packSoleSenpiTarball,
 	parseOmobArgs,
-	planRuntimePrune,
-	selectPruneEntries,
+	resolveCachedSenpiPackage,
+	SENPI_ARTIFACT_ASSEMBLY,
 } from "./build-omob"
+import { planRuntimePrune, selectPruneEntries } from "./omob-runtime-prune"
 
 function tempDir(prefix: string): string {
 	return mkdtempSync(join(tmpdir(), prefix))
@@ -22,20 +28,22 @@ function tempDir(prefix: string): string {
 
 /** A pid that is guaranteed dead: spawn a trivial process and wait for it to exit. */
 function deadPid(): number {
-	const result = spawnSync("true", [], { stdio: "ignore" })
+	const result = spawnSync(process.execPath, ["-e", "process.exit(0)"], { stdio: "ignore" })
+	expect(result.error).toBeUndefined()
+	expect(result.status).toBe(0)
 	return result.pid as number
 }
 
 describe("parseOmobArgs", () => {
-	test("defaults to the latest tracked refs and the host target", () => {
+	test.skipIf(process.platform === "win32")("defaults to the latest tracked refs and the host target", () => {
 		const parsed = parseOmobArgs([], "darwin", "arm64", "/home/dev")
 		expect(parsed.senpiRef).toBe("origin/main")
 		expect(parsed.omoRef).toBe("origin/dev")
 		expect(parsed.name).toBe("omob")
 		expect(parsed.keep).toBe(2)
 		expect(parsed.target).toBe("darwin-arm64")
-		expect(parsed.installDir).toBe(join("/home/dev", ".local", "bin"))
-		expect(parsed.cacheDir).toBe(join("/home/dev", ".cache", "omob"))
+		expect(parsed.installDir).toBe(resolve("/home/dev", ".local", "bin"))
+		expect(parsed.cacheDir).toBe(resolve("/home/dev", ".cache", "omob"))
 		expect(parsed.skipFetch).toBe(false)
 		expect(parsed.skipInstall).toBe(false)
 	})
@@ -73,58 +81,6 @@ describe("deriveOmobAiVersion", () => {
 		expect(deriveOmobAiVersion("c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7")).toBe(
 			"0.0.0-omob.c6e7dd7.7fd18df",
 		)
-	})
-})
-
-describe("selectPruneEntries", () => {
-	const entries = [
-		{ name: "0.0.0-omob.aaaaaaa.bbbbbbb", mtimeMs: 3 },
-		{ name: "0.0.0-omob.ccccccc.ddddddd", mtimeMs: 1 },
-		{ name: "0.0.0-omob.eeeeeee.fffffff", mtimeMs: 2 },
-		{ name: "5.0.0-0.beta.39", mtimeMs: 0 },
-		{ name: "0.0.0-omob.1111111.2222222", mtimeMs: 5 },
-	]
-
-	test("keeps the newest dev runtimes and never touches release runtimes", () => {
-		expect(selectPruneEntries(entries, 2)).toEqual(["0.0.0-omob.ccccccc.ddddddd", "0.0.0-omob.eeeeeee.fffffff"])
-	})
-
-	test("keeps everything below the budget", () => {
-		expect(selectPruneEntries(entries, 3)).toEqual(["0.0.0-omob.ccccccc.ddddddd"])
-		expect(selectPruneEntries(entries, 4)).toEqual([])
-	})
-})
-
-describe("planRuntimePrune", () => {
-	const entries = [
-		{ name: "0.0.0-omob.cur0000.cur0000", mtimeMs: 5 },
-		{ name: "0.0.0-omob.aaaaaaa.bbbbbbb", mtimeMs: 3 },
-		{ name: "0.0.0-omob.ccccccc.ddddddd", mtimeMs: 1 },
-		{ name: "0.0.0-omob.eeeeeee.fffffff", mtimeMs: 2 },
-		{ name: "5.0.0-0.beta.40", mtimeMs: 0 },
-	]
-
-	test("reserves a slot for the version being built and prunes the rest oldest-first", () => {
-		expect(planRuntimePrune(entries, 2, "0.0.0-omob.cur0000.cur0000")).toEqual([
-			"0.0.0-omob.ccccccc.ddddddd",
-			"0.0.0-omob.eeeeeee.fffffff",
-		])
-	})
-
-	test("never counts the current version against the budget even when its dir is absent", () => {
-		const withoutCurrent = entries.filter((entry) => !entry.name.includes("cur0000"))
-		expect(planRuntimePrune(withoutCurrent, 2, "0.0.0-omob.cur0000.cur0000")).toEqual([
-			"0.0.0-omob.ccccccc.ddddddd",
-			"0.0.0-omob.eeeeeee.fffffff",
-		])
-	})
-
-	test("keep=1 leaves only the version being built", () => {
-		expect(planRuntimePrune(entries, 1, "0.0.0-omob.cur0000.cur0000")).toEqual([
-			"0.0.0-omob.ccccccc.ddddddd",
-			"0.0.0-omob.eeeeeee.fffffff",
-			"0.0.0-omob.aaaaaaa.bbbbbbb",
-		])
 	})
 })
 
@@ -246,6 +202,79 @@ describe("packSoleSenpiTarball", () => {
 	})
 })
 
+describe("resolveCachedSenpiPackage", () => {
+	test("#given a cache manifest for one commit #when resolving another commit #then it never reuses the package", () => {
+		const cacheDir = tempDir("omob-artifact-cache-")
+		try {
+			const artifactRoot = join(cacheDir, "artifacts", "senpi", "aaa1111", "install", "node_modules", "@code-yeongyu", "senpi")
+			mkdirSync(artifactRoot, { recursive: true })
+			writeFileSync(
+				join(cacheDir, "artifacts", "senpi", "aaa1111", "manifest.json"),
+				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz", assembly: SENPI_ARTIFACT_ASSEMBLY }),
+			)
+			expect(resolveCachedSenpiPackage(cacheDir, "bbb2222")).toBeUndefined()
+			expect(resolveCachedSenpiPackage(cacheDir, "aaa1111")).toBe(artifactRoot)
+		} finally {
+			rmSync(cacheDir, { recursive: true, force: true })
+		}
+	})
+
+	// Storage contract: an install assembled with registry siblings must never be reused.
+	test("#given a same-commit artifact from an older assembly scheme #when resolving #then it is rebuilt", () => {
+		const cacheDir = tempDir("omob-artifact-legacy-")
+		try {
+			const artifactRoot = join(cacheDir, "artifacts", "senpi", "aaa1111", "install", "package")
+			mkdirSync(artifactRoot, { recursive: true })
+			writeFileSync(
+				join(cacheDir, "artifacts", "senpi", "aaa1111", "manifest.json"),
+				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz" }),
+			)
+			expect(resolveCachedSenpiPackage(cacheDir, "aaa1111")).toBeUndefined()
+		} finally {
+			rmSync(cacheDir, { recursive: true, force: true })
+		}
+	})
+})
+
+describe("packSenpiSiblingTarballs", () => {
+	function writeSenpiFixture(root: string, workspaces: Readonly<Record<string, string>>): void {
+		mkdirSync(join(root, "scripts"), { recursive: true })
+		writeFileSync(
+			join(root, "scripts", "registry-packages.mjs"),
+			`export const registrySourcePackageNames = new Set(${JSON.stringify(["@fixture/main", "@fixture/tui", "@fixture/ai"])});\n`,
+		)
+		for (const [directory, name] of Object.entries(workspaces)) {
+			mkdirSync(join(root, "packages", directory), { recursive: true })
+			writeFileSync(join(root, "packages", directory, "package.json"), JSON.stringify({ name, version: "0.0.0-dev" }))
+		}
+	}
+
+	test("#given every lockstep workspace #when packing #then each sibling except the engine maps to its own tarball", async () => {
+		const root = tempDir("omob-siblings-")
+		try {
+			writeSenpiFixture(join(root, "senpi"), { "coding-agent": "@fixture/main", tui: "@fixture/tui", ai: "@fixture/ai", chord: "@fixture/chord" })
+			const tarballs = await packSenpiSiblingTarballs(join(root, "senpi"), join(root, "tarballs"), (workspaceDir, destination) => {
+				const { name } = JSON.parse(readFileSync(join(workspaceDir, "package.json"), "utf8")) as { name: string }
+				writeFileSync(join(destination, `${name.replace("@", "").replace("/", "-")}.tgz`), name)
+			})
+			expect(Object.keys(tarballs).sort()).toEqual(["@fixture/ai", "@fixture/tui"])
+			for (const [name, tarball] of Object.entries(tarballs)) expect(readFileSync(tarball, "utf8")).toBe(name)
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
+	})
+
+	test("#given a lockstep sibling missing from the checkout #when packing #then it fails instead of using a registry copy", async () => {
+		const root = tempDir("omob-siblings-missing-")
+		try {
+			writeSenpiFixture(join(root, "senpi"), { "coding-agent": "@fixture/main", ai: "@fixture/ai" })
+			await expect(packSenpiSiblingTarballs(join(root, "senpi"), join(root, "tarballs"), () => {})).rejects.toThrow(/@fixture\/tui/)
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
+	})
+})
+
 describe("ensureCacheClone submodule ordering", () => {
 	// git refuses file:// submodule transport by default (CVE-2022-39253), and
 	// ensureCacheClone shells out with process.env, so the allowance has to live there for
@@ -289,7 +318,7 @@ describe("ensureCacheClone submodule ordering", () => {
 			writeFileSync(join(superWork, "README.md"), "super\n")
 			git(["add", "-A"], superWork)
 			git(["commit", "-qm", "init"], superWork)
-			git(["submodule", "add", "-q", `file://${subBare}`, "upstreams/skill"], superWork)
+			git(["submodule", "add", "-q", pathToFileURL(subBare).href, "upstreams/skill"], superWork)
 			const subInSuper = join(superWork, "upstreams", "skill")
 			git(["checkout", "-q", "--detach", "HEAD~1"], subInSuper)
 			git(["add", "-A"], superWork)
@@ -306,21 +335,21 @@ describe("ensureCacheClone submodule ordering", () => {
 			Object.assign(process.env, fixtureEnv)
 
 			// fresh clone at the tip: submodule must be at v2
-			ensureCacheClone(`file://${superBare}`, cache, "origin/dev", false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, "origin/dev", false)
 			expect(read()).toBe("v2")
 
 			// switch BACK to the commit that pins v1 — reusing the same cache. checkout/reset do
 			// not recurse, so only a post-checkout submodule sync can make this match the ref.
-			ensureCacheClone(`file://${superBare}`, cache, "origin/dev~1", false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, "origin/dev~1", false)
 			expect(read()).toBe("v1")
 
 			// and forward again
-			ensureCacheClone(`file://${superBare}`, cache, "origin/dev", false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, "origin/dev", false)
 			expect(read()).toBe("v2")
 
 			// A raw SHA is not a fetchable refspec either; resolving it must still work.
 			const olderSha = spawnSync("git", ["rev-parse", "origin/dev~1"], { cwd: cache, encoding: "utf8" }).stdout.trim()
-			ensureCacheClone(`file://${superBare}`, cache, olderSha, false)
+			ensureCacheClone(pathToFileURL(superBare).href, cache, olderSha, false)
 			expect(read()).toBe("v1")
 
 			for (const key of Object.keys(fixtureEnv)) delete process.env[key]
@@ -329,4 +358,67 @@ describe("ensureCacheClone submodule ordering", () => {
 			rmSync(rootDir, { recursive: true, force: true })
 		}
 	}, 120_000)
+})
+
+describe("fetchCacheClones", () => {
+	const specs = [
+		{ url: "https://example.invalid/senpi.git", directory: "/cache/senpi", ref: "origin/main" },
+		{ url: "https://example.invalid/omo.git", directory: "/cache/omo", ref: "origin/dev" },
+	] as const
+
+	test("#given two independent clones #when the refresh fetches them #then neither waits for the other to finish", async () => {
+		const events: string[] = []
+		await fetchCacheClones(specs, async (spec) => {
+			events.push(`start:${spec.directory}`)
+			await Promise.resolve()
+			await Promise.resolve()
+			events.push(`end:${spec.directory}`)
+		})
+		expect(events).toHaveLength(4)
+		// Serialized fetches produce start,end,start,end; the launch path pays one network
+		// round trip per repository, so the second start must precede the first end.
+		expect(events.indexOf("start:/cache/omo")).toBeLessThan(events.indexOf("end:/cache/senpi"))
+	})
+
+	test("#given one failing fetch #when both run #then the failure is reported", async () => {
+		const attempted: string[] = []
+		const failing = fetchCacheClones(specs, async (spec) => {
+			attempted.push(spec.directory)
+			if (spec.directory === "/cache/omo") throw new Error("fetch refused")
+		})
+		await expect(failing).rejects.toThrow("fetch refused")
+		expect(attempted).toHaveLength(2)
+	})
+
+	test("#given one fetch fails while its sibling is still running #when the refresh reports the failure #then no fetch is left running against the cache", async () => {
+		const settled: string[] = []
+		let releaseSlow: (() => void) | undefined
+		const slow = new Promise<void>((resolve) => { releaseSlow = resolve })
+		const failing = fetchCacheClones(specs, async (spec) => {
+			if (spec.directory === "/cache/omo") throw new Error("fetch refused")
+			await slow
+			settled.push(spec.directory)
+		})
+		let reported = false
+		void failing.catch(() => undefined).then(() => { reported = true })
+		for (let tick = 0; tick < 12; tick++) await Promise.resolve()
+		// Reporting the failure while the sibling git process is still writing would let this
+		// process release the cache lock with a fetch still running against that cache.
+		expect(reported, "the refresh must not report failure while a sibling fetch is still running").toBe(false)
+		releaseSlow?.()
+		await expect(failing).rejects.toThrow("fetch refused")
+		expect(settled).toEqual(["/cache/senpi"])
+	})
+
+	test("#given one git log line pair #when commit info is parsed #then the commit and its date come from a single git call", () => {
+		expect(parseCommitLog("abc123\n2026-09-20T01:44:58+09:00\n")).toEqual({ commit: "abc123", committedAt: "2026-09-20T01:44:58+09:00" })
+		expect(parseCommitLog("")).toEqual({ commit: "", committedAt: "" })
+	})
+
+	test("#given a plain branch ref #when fetch args are built #then only that branch is fetched, and anything else falls back to the whole remote", () => {
+		expect(fetchRefArgs("origin/dev")).toEqual(["--prune", "origin", "+refs/heads/dev:refs/remotes/origin/dev"])
+		expect(fetchRefArgs("origin/main")).toEqual(["--prune", "origin", "+refs/heads/main:refs/remotes/origin/main"])
+		expect(fetchRefArgs("origin/dev~1")).toEqual(["--prune", "origin"])
+		expect(fetchRefArgs("a".repeat(40))).toEqual(["--prune", "origin"])
+	})
 })

@@ -16,6 +16,17 @@ const THREAD_TOOL_NAMES = [
 	"thread_send",
 	"thread_interrupt",
 	"thread_handoff",
+	"thread_rename",
+	"thread_set_model",
+	"thread_set_reasoning",
+	"thread_bind",
+	"thread_unbind",
+	"thread_rebind",
+	"thread_bindings",
+	"thread_report",
+	"thread_outbox",
+	"thread_outbox_ack",
+	"thread_answer",
 ] as const
 
 const sampleParameters: ToolInfo["parameters"] = {
@@ -104,6 +115,17 @@ describe("thread tool discovery through the real tool-search service", () => {
 			["message another session that is already running", "thread_send"],
 			["stop the turn running in another session", "thread_interrupt"],
 			["hand this off to the old session about the payments bug", "thread_handoff"],
+			["rename this session", "thread_rename"],
+			["switch this session to a different model", "thread_set_model"],
+			["set the reasoning level for this session", "thread_set_reasoning"],
+			["connect a discord thread to this session", "thread_bind"],
+			["disconnect the chat thread from this session", "thread_unbind"],
+			["move the chat to another session", "thread_rebind"],
+			["which chats are connected to sessions", "thread_bindings"],
+			["post progress to the discord thread", "thread_report"],
+			["drain the outbox for the chat", "thread_outbox"],
+			["confirm the reports were posted to chat", "thread_outbox_ack"],
+			["answer the relayed question from the chat", "thread_answer"],
 		]
 		for (const [query, expected] of cases) {
 			// when each user phrase goes through the real BM25 scorer
@@ -122,7 +144,7 @@ describe("thread tool discovery through the real tool-search service", () => {
 		expect(results[0]?.name).toBe("task")
 	})
 
-	test("no keyword string repeats across the six tools", () => {
+	test("no keyword string repeats across the family", () => {
 		const all = THREAD_TOOL_SEARCH_METADATA.flatMap((entry) => [...entry.searchKeywords])
 		expect(new Set(all).size).toBe(all.length)
 	})
@@ -151,6 +173,43 @@ describe("thread tool discovery through the real tool-search service", () => {
 			for (const text of indexed) {
 				expect(text.match(/\b(?:not|never)\b/i), `${entry.name}: ${text}`).toBeNull()
 			}
+		}
+	})
+})
+
+describe("thread family metadata shape", () => {
+	test("the family carries seventeen entries with unique names", () => {
+		expect(THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)).toEqual([...THREAD_TOOL_NAMES])
+		const names = THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)
+		expect(new Set(names).size).toBe(names.length)
+	})
+
+	test("every label leads with its verb, pinned literally", () => {
+		expect(THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.label)).toEqual([
+			"Create session",
+			"List sessions",
+			"Read session",
+			"Send message to session",
+			"Interrupt session turn",
+			"Hand off session",
+			"Rename session",
+			"Switch session model",
+			"Set session reasoning level",
+			"Bind session to chat thread",
+			"Unbind chat thread",
+			"Rebind chat thread",
+			"List chat bindings",
+			"Report to chat thread",
+			"Read chat outbox",
+			"Acknowledge chat outbox",
+			"Answer relayed question",
+		])
+	})
+
+	test("every entry is search-exposed and lazily activatable", () => {
+		for (const entry of THREAD_TOOL_SEARCH_METADATA) {
+			expect(entry.exposure, entry.name).toBe("search")
+			expect(entry.allowLazyActivation, entry.name).toBe(true)
 		}
 	})
 })

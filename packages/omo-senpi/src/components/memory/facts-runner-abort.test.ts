@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, readdir } from "node:fs/promises"
+import { mkdir, readFile, readdir, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 import { FactsFailureStore } from "@oh-my-opencode/memory-core"
@@ -38,6 +38,7 @@ describe("facts runner shutdown abort boundary", () => {
           return {
             task_id: "facts-child",
             sessionId: "facts-child",
+            effectiveModel: () => undefined,
             steer: async () => undefined,
             followUp: async () => undefined,
             abort: async () => { aborted += 1 },
@@ -89,5 +90,41 @@ describe("facts runner shutdown abort boundary", () => {
     expect(result.status).toBe("skipped")
     expect(await queue.listPending()).toHaveLength(1)
     expect(existsSync(join(identity.paths.facts, "runs"))).toBe(false)
+  }, 30_000)
+
+  test("#given a bind-time reconcile still in flight #when cancelActive is requested #then it settles only after the reconcile stops, and the reconcile launches nothing", async () => {
+    // Maintenance floats past bind. Shutdown must join its real artifact cleanup before
+    // releasing the identity, even though reconcile no longer reads launch/failure eligibility.
+    const { root, identity, queue } = await fixture()
+    const tombstone = join(identity.paths.facts, "runs", ".prune-interrupted")
+    await mkdir(tombstone, { recursive: true })
+    const cleanupStarted = Promise.withResolvers<void>()
+    const cleanupGate = Promise.withResolvers<void>()
+    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
+      resolveModelRegistry: () => { throw new Error("maintenance must not resolve a launch model") },
+      removeRunArtifact: async (path) => {
+        if (path === tombstone) {
+          cleanupStarted.resolve()
+          await cleanupGate.promise
+        }
+        await rm(path, { recursive: true, force: true })
+      },
+    }))
+    const order: string[] = []
+    const reconcile = runner.reconcilePending().then((result) => { order.push("reconcile"); return result })
+    await cleanupStarted.promise
+
+    // when
+    const cancel = runner.cancelActive().then(() => { order.push("cancel") })
+    cleanupGate.resolve()
+    await Promise.all([cancel, reconcile])
+
+    // then
+    expect(order).toEqual(["reconcile", "cancel"])
+    expect((await reconcile).status).toBe("skipped")
+    expect(await queue.listPending()).toHaveLength(1)
+    expect(await readdir(join(identity.paths.facts, "runs"))).toEqual([])
+    expect(existsSync(tombstone)).toBe(false)
+    expect(existsSync(join(identity.paths.repo, ".git"))).toBe(false)
   }, 30_000)
 })

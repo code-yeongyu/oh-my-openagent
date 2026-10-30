@@ -1,9 +1,9 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import { consumeSoulNoticeDelta, type MemoryBlockCache, type ReservedRun } from "@oh-my-opencode/memory-core"
+import type { MemoryBlockCache, ReservedRun } from "@oh-my-opencode/memory-core"
 
-import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import { registerMemoryCommands } from "./commands/register"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
@@ -18,13 +18,15 @@ import { registerMemorySkillsScope } from "./skills-scope"
 import { registerSkillsUsage, type SkillsUsageTracker } from "./skills-usage"
 import { registerMemoryUsage, type MemoryUsageTracker } from "./memory-usage"
 import type { createMemoryNoticeWiring } from "./memory-notice-wiring"
-import type { MemorianGateWiring } from "./memorian-wiring"
+import type { KibitzerComposition } from "./kibitzer"
 import type { createMemoryRecallWiring } from "./recall-wiring"
+import { recoverStaleReflectionHolder } from "./reflection-stale-active"
 import { createReflectionTriggerWiring } from "./trigger-wiring"
 import { registerMemoryToolSurface } from "./tools"
 import {
   registerReflectionCompletionRenderer,
   registerReflectionHealthRenderer,
+  registerReflectionParkedRenderer,
   type ReflectionCompletionApi,
 } from "./worker"
 import { branchEntryCount, sessionIdFrom } from "./wiring-context"
@@ -32,16 +34,23 @@ import { registerMemoryWriteListener } from "./wiring-memory-write"
 import type { MemoryWiringOptions } from "./wiring-types"
 import type { MemoryIdentityContext } from "./context"
 import { createMemoryPromptHandler as createPromptHandler } from "./prompt"
+import { createMemoryNoticeInputs } from "./wiring-notice-inputs"
+import { createProjectionPins, PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
+import { projectionLimits } from "./projection-limits"
+import { resolveMemoryModelRegistry } from "./model-registry-resolver"
+import { resolveMemorySessionModel } from "./session-model-resolver"
 
 export function registerMemoryStatic(input: {
   readonly pi: SenpiExtensionAPI
   readonly ctx: ComponentContext
   readonly options: MemoryWiringOptions
   readonly promptCache: MemoryBlockCache
+  /** Set to the prompt handler's prebuild once registered; session bind calls it. */
+  readonly promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> }
   readonly nudgeWiring: ReturnType<typeof createMemoryNudgeWiring>
   readonly noticeWiring: ReturnType<typeof createMemoryNoticeWiring>
   readonly recallWiring: ReturnType<typeof createMemoryRecallWiring>
-  readonly memorianGateWiring: MemorianGateWiring
+  readonly kibitzer: KibitzerComposition
   readonly dreamTriggerWiring: DreamTriggerWiring
   readonly completionApi: (pi: SenpiExtensionAPI) => ReflectionCompletionApi | undefined
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
@@ -55,57 +64,74 @@ export function registerMemoryStatic(input: {
   readonly activeSession: { current?: string }
   readonly skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> }
   readonly memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> }
+  readonly hasUserActivity: (sessionId: string) => boolean
   /** Fires at the manual reflection launch site so the footer animates while the run is in flight. */
   readonly onReflectionLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
   /** Fires after each settle so the footer can refresh its segments behind the fingerprint gate. */
-  readonly onSettled?: (sessionId: string, eventCtx: unknown) => void | Promise<void>
+  readonly onSettled?: (sessionId: string, eventCtx: unknown, observer?: SettleObserver) => void | Promise<void>
   /** Fires after every successful memory write, independent of the once-only footer latch. */
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
   const {
-    pi, ctx, options, promptCache, nudgeWiring, noticeWiring, recallWiring, memorianGateWiring, dreamTriggerWiring,
+    pi, ctx, options, promptCache, promptPrebuild, nudgeWiring, noticeWiring, recallWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
     activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
   } = input
   const api = completionApi(pi)
-  // The gate is detached, so it receives the live appendEntry seam rather than the disposed event ctx.
-  // Registration is capability-gated below; this callback is only used when the host supports it.
   if (api !== undefined) {
     registerReflectionCompletionRenderer(api)
     registerReflectionHealthRenderer(api)
+    registerReflectionParkedRenderer(api)
   }
   if (hasMemoryCapabilities(pi)) {
     nudgeWiring.register(pi)
     noticeWiring.register(pi)
-    memorianGateWiring.attachEntrySink((customType, data) => pi.appendEntry(customType, data))
   }
+  const projectionPins = createProjectionPins(options.deviceName === undefined ? {} : { deviceName: options.deviceName })
+  const entryApi = hasMemoryCapabilities(pi) ? pi : undefined
+  const noticeInputs = createMemoryNoticeInputs({
+    resolveContext,
+    loadSettings: () => loadCommandSettings().settings,
+    ...(entryApi === undefined ? {} : { appendEntry: (customType, data) => entryApi.appendEntry(customType, data) }),
+    onWarn: (message, detail) => options.logger?.warn(message, detail),
+  })
   const promptHandler = createPromptHandler({
     resolveContext,
     cache: promptCache,
+    pins: projectionPins,
+    ...(entryApi === undefined ? {} : { recordPin: (record) => entryApi.appendEntry(PROJECTION_PIN_ENTRY_TYPE, record) }),
+    onRepin: (sessionId, reason) => options.logger?.info("omo-senpi memory projection repinned", { sessionId, reason }),
     resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
+    resolveProjectionLimits: (identity) => projectionLimits(loadCommandSettings().settings, identity),
     resolveNudgeTurns: (repo, sessionId, identity) => nudgeWiring.nudgeTurns(repo, sessionId, identity),
-    resolveSoulNotice: async (repo, sessionId, identity) => {
-      const context = resolveContext(sessionId)
-      if (context === undefined || context.identity !== identity) return undefined
-      return consumeSoulNoticeDelta(repo, {
-        noticesDir: context.identityPaths.notices,
-        locksDir: context.identityPaths.locks,
+    onNoticeInputFailed: (notice, sessionId, error) => {
+      options.logger?.warn("omo-senpi memory notice input failed; this turn has no such notice", {
+        notice,
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
       })
     },
+    ...noticeInputs,
   })
+  promptPrebuild.current = (context) => promptHandler.prebuild(context)
   pi.on("before_agent_start", (payload, eventCtx) => {
-    lastEventCtx.current = eventCtx
+    if (!isPreview(payload)) lastEventCtx.current = eventCtx
     return promptHandler(payload, eventCtx)
-  })
+  }, { previewSafe: true })
   // Recall owns a SEPARATE before_agent_start handler registered AFTER the projection handler:
   // senpi merges one message per handler in registration order, so the hint lands last and the
   // prompt handler stays the only writer of systemPrompt.
   if (hasMemoryCapabilities(pi)) recallWiring.register(pi)
+  // Kibitzer hooks come LAST: their before_agent_start handler only captures the prompt for the
+  // resident sidecar and never contributes a message, so registering it after the projection
+  // handler keeps handler results ordered projection-first, the same invariant the recall
+  // registration above documents. Its agent_settled handler is bookkeeping, never a wake.
+  if (hasMemoryCapabilities(pi)) input.kibitzer.registerHooks(pi)
   pi.on("session_start", (_payload, eventCtx) => {
     if (eventCtx !== undefined) lastEventCtx.current = eventCtx
   })
-  pi.on("agent_settled", async (_payload, eventCtx) => {
+  pi.on("agent_settled", async (_payload, eventCtx, observer) => {
     lastEventCtx.current = eventCtx
     const sessionId = sessionIdFrom(eventCtx)
     if (sessionId === undefined) return undefined
@@ -113,16 +139,26 @@ export function registerMemoryStatic(input: {
     if (identity === undefined) return undefined
     activeSession.current = sessionId
     if (branchEntryCount(eventCtx) === 0) {
-      await onSettled?.(sessionId, eventCtx)
+      await onSettled?.(sessionId, eventCtx, observer)
       return undefined
     }
-    const result = await journalWiringFor(identity).reconcileSession(eventCtx)
-    await factsWiringFor(identity).onSettled(sessionId)
-    // Fire-and-forget by contract: the gate advises the NEXT turn, so this one never waits for it.
-    memorianGateWiring.onSettled(eventCtx)
-    await onSettled?.(sessionId, eventCtx)
+    // Read host getters while this event context is live, before journal or queue I/O.
+    const selection = input.hasUserActivity(sessionId) ? {
+      registry: resolveMemoryModelRegistry(eventCtx), sessionModel: resolveMemorySessionModel(eventCtx),
+    } : undefined
+    observer?.phase("onSettled.journal.reconcileSession")
+    const result = await journalWiringFor(identity).reconcileSession(eventCtx, observer?.signal)
+    observer?.signal.throwIfAborted()
+    if (resolveContext(sessionId) !== identity) return result
+    if (input.hasUserActivity(sessionId)) {
+      observer?.phase("onSettled.facts.enqueue")
+      await factsWiringFor(identity).onSettled(sessionId, selection, observer?.signal)
+    }
+    observer?.signal.throwIfAborted()
+    if (resolveContext(sessionId) !== identity) return result
+    await onSettled?.(sessionId, eventCtx, observer)
     return result
-  })
+  }, { hookLabel: "onSettled" })
   registerMemoryWriteListener(pi, options, onMemoryWrite)
   registerMemoryToolSurface(pi, () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)), {
     onCommit: (commit) => {
@@ -173,7 +209,10 @@ export function registerMemoryStatic(input: {
     contextForSession: (sessionId) => asCommandIdentity(resolveContext(sessionId)),
     resolveIdentity: () => (activeSession.current === undefined ? undefined : asCommandIdentity(resolveContext(activeSession.current))),
     loadSettings: loadCommandSettings,
-    bustPromptCache: () => promptCache.clear(),
+    bustPromptCache: () => {
+      promptCache.clear()
+      projectionPins.requestRefresh()
+    },
     reflectionSink: {
       request: async (request) => {
         if (activeSession.current === undefined) throw new Error("no bound memory session")
@@ -187,20 +226,32 @@ export function registerMemoryStatic(input: {
           ...(request.conversationIds === undefined ? {} : { conversationIds: request.conversationIds }),
         })
         if (result === null) throw new Error("reflection reservation rejected")
+        if (result.status === "parked") throw new Error("manual reflection must bypass the park gate")
         if (result.status === "active") {
-          runtime.launch(result.run)
+          void runtime.launch(result.run)
           await onReflectionLaunch?.(identity.identity, result.run)
+          return { disposition: "reserved", runId: result.run.runId }
         }
-        return { disposition: result.status === "active" ? "reserved" : "pending", runId: result.run.runId }
+        // The lock may be held by a run whose host died after this session reconciled (#10377).
+        const recovery = await recoverStaleReflectionHolder({
+          reflectionDir: identity.identityPaths.reflection,
+          reconcile: () => runtime.reconcile(),
+          ...(options.reflectionHolderSeams === undefined ? {} : { seams: options.reflectionHolderSeams }),
+        })
+        return {
+          disposition: "pending",
+          runId: result.run.runId,
+          ...(recovery.verdict.state === "dead" && recovery.notice === undefined ? { recoveredRunId: recovery.verdict.runId } : {}),
+          ...(recovery.notice === undefined ? {} : { stuck: recovery.notice }),
+        }
       },
     },
     dreamSink: { request: (request) => dreamTriggerWiring.requestManualDream(request) },
     factsSink: {
-      // ONE attempt after a manual unpark: `reconcileExtractor` fires the extractor's own
-      // reconcile-then-launch path, which owns the re-entrancy latch, so this never loops.
+      // An explicit unpark is a user action, not boot reconciliation.
       reconcile: async () => {
         const identity = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
-        if (identity !== undefined) factsWiringFor(identity).reconcileExtractor()
+        if (identity !== undefined) factsWiringFor(identity).launchExtractor()
       },
     },
     sessionsDir: () => join(options.env.SENPI_CODING_AGENT_DIR ?? join(homedir(), ".senpi", "agent"), "sessions"),
@@ -209,11 +260,15 @@ export function registerMemoryStatic(input: {
     resolveSession: triggerSessionFor,
     onLaunch: () => {},
     // A compaction rewrites the transcript the pending nudges were judged against, so they die with it.
-    onCompactionAccepted: (conversationId) => memorianGateWiring.onCompactionAccepted(conversationId),
+    onCompactionAccepted: (conversationId) => input.kibitzer.onCompactionAccepted(conversationId, resolveContext(conversationId)),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   triggerWiring.register(pi)
   dreamTriggerWiring.register(pi)
+}
+
+function isPreview(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }
 
 /** memory.write_notice.enabled for the bound identity, honouring its per-agent override. */

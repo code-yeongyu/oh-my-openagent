@@ -42,4 +42,13 @@ describe("sg manifest", () => {
     expect(asset.url).toContain("/0.43.0/")
     expect(asset.sha256).toHaveLength(64)
   })
+
+  it("pins an https URL and a sha256 for every platform the bootstrap provisions", () => {
+    // given / when / then
+    for (const slug of ["darwin-arm64", "darwin-x64", "linux-x64", "win32-x64"] as const) {
+      const asset = SG_RELEASE_ASSETS[slug]
+      expect(asset.url, slug).toStartWith("https://")
+      expect(asset.sha256, slug).toMatch(/^[0-9a-f]{64}$/)
+    }
+  })
 })

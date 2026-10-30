@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import replace
 from pathlib import Path
 from typing import Callable, TypeAlias
 
@@ -95,8 +96,13 @@ def _dedupe(sessions: list[Session]) -> list[Session]:
     for session in sessions:
         key = (session.platform, session.id)
         current = found.get(key)
-        if current is None or _linkage_score(session) > _linkage_score(current):
+        if current is None:
             found[key] = session
+            continue
+        winner, twin = (session, current) if _linkage_score(session) > _linkage_score(current) else (current, session)
+        if winner.user_messages is None and twin.user_messages is not None:
+            winner = replace(winner, user_messages=twin.user_messages)
+        found[key] = winner
     return list(found.values())
 
 

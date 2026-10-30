@@ -10,6 +10,7 @@ import {
   settings,
   tempStore,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -48,6 +49,7 @@ describe("reconcileOnSessionStart multi-session sibling sweep", () => {
       host_pid: thisPid,
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),
@@ -81,6 +83,7 @@ describe("reconcileOnSessionStart multi-session sibling sweep", () => {
       host_pid: foreignPid,
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: new FakeRegistry(),
       config: settings(),

@@ -61,9 +61,11 @@ export function createFakeSession(sessionId = "child-session-1"): FakeSessionCon
     },
     async steer(text: string) {
       steerCalls.push(text)
+      return "handled"
     },
     async followUp(text: string) {
       followUpCalls.push(text)
+      return "handled"
     },
     async abort() {
       counters.abortCalls += 1
