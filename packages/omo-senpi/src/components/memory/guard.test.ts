@@ -295,3 +295,19 @@ describe("memory guard never resolves a macOS automount trigger (#11545)", () =>
     expect(touched).toEqual([])
   })
 })
+
+test("#given a link out of own memory, an unresolvable segment and dot-dot #when the raw relative path is opened #then it is denied", async () => {
+  const setup = fixture()
+  const foreignRepo = dirname(dirname(setup.foreignFile))
+  mkdirSync(join(foreignRepo, "subdir"), { recursive: true })
+  symlinkSync(join(foreignRepo, "subdir"), join(setup.own.identityPaths.repo, "link-to-other"), process.platform === "win32" ? "junction" : "dir")
+
+  const raw = relative(setup.workspace, setup.own.identityPaths.repo) + "/link-to-other/missing/../system/persona.md"
+  const result = await dispatch(setup, "vendor_read", { path: raw })
+
+  if (process.platform === "win32") {
+    expect(result).toBeUndefined()
+    return
+  }
+  expect(result?.block).toBe(true)
+})

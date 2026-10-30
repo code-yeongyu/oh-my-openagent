@@ -179,7 +179,11 @@ function isForbiddenTarget(rawPath: string, cwd: string, roots: GuardRoots, recu
   const lexical = resolve(cwd, rawPath)
   // The raw sequence is what the opener walks; `resolve` has already collapsed any `..` after a link.
   const rawAbsolute = isAbsolute(rawPath) ? rawPath : `${cwd}${sep}${rawPath}`
-  const candidates = uniquePaths([lexical, canonicalizeFromNearestExisting(rawAbsolute)])
+  const canonical = canonicalizeFromNearestExisting(rawAbsolute)
+  // A path that cannot be canonicalized is not provably ours. With a `..` in it the lexical candidate
+  // can sit inside our own root while the opener reaches somewhere else, so it is denied instead.
+  if (canonical === undefined && rawAbsolute.split(sep).includes("..")) return true
+  const candidates = uniquePaths([lexical, canonical])
   const deniedRoots = uniquePaths(roots.deniedRoots.flatMap((root) => [root, canonicalizeFromNearestExisting(root)]))
   const ownRoots = uniquePaths([roots.ownRoot, canonicalizeFromNearestExisting(roots.ownRoot)])
 
