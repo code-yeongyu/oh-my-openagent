@@ -18,6 +18,27 @@ async function observedWithin(signal: Promise<void>): Promise<boolean> {
 }
 
 describe("HostSessionClient connection lifetime", () => {
+  test("#given an unacknowledged close_session #when teardown detaches #then it releases the in-flight close transport", async () => {
+    const host = await harness.fakeHost()
+    const client = harness.hostClient(host)
+    await client.open(childOpenInput("/tmp/sessions/lifetime-unacknowledged-close.jsonl"))
+    await host.waitForConnections(1)
+    host.withholdReply("close_session")
+    const requested = host.waitForCommand("close_session")
+    const released = host.waitForConnections(0)
+    const closing = client.close().catch(() => undefined)
+    try {
+      await requested
+      await client.detach()
+      expect(await observedWithin(released)).toBe(true)
+      expect(host.connections).toBe(0)
+      await closing
+    } finally {
+      host.cutConnections()
+      await closing
+    }
+  })
+
   for (const ending of ["park", "close"] as const) {
     test(`#given an attached task session #when the host sends ${ending} #then public client occupancy returns to baseline`, async () => {
       // given
