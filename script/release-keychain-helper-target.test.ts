@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { buildRuntimeManifest, RELEASE_BINARY_TARGETS, resolveExpectedSidecarRelPaths, stageSidecarPayload } from "./build-omo-binary"
+import { engineTrustHelperTarget } from "./release-desktop-engine-target"
 import { KEYCHAIN_HELPER_PAYLOAD, KEYCHAIN_HELPER_SOURCE, keychainHelperPayload, stageKeychainHelper } from "./release-keychain-helper-target"
 
 function withRoot(body: (root: string) => void | Promise<void>): () => Promise<void> {
@@ -57,6 +58,10 @@ describe("keychain helper in the compiled release payload (#11262)", () => {
     const engine = join(root, "target", "aarch64-apple-darwin", "release", "senpi-desktop-engine")
     mkdirSync(dirname(engine), { recursive: true })
     writeFileSync(engine, "engine")
+    const trustHelper = engineTrustHelperTarget(target.target).source
+    if (trustHelper === null) throw new Error("darwin-arm64 engine trust helper expected")
+    mkdirSync(dirname(join(root, trustHelper)), { recursive: true })
+    writeFileSync(join(root, trustHelper), "trust helper")
 
     expect(() => stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root)).toThrow(/missing required keychain helper for darwin-arm64:/)
     expect(existsSync(join(root, "stage", "plugin"))).toBe(false)
