@@ -14,9 +14,9 @@ import {
   type TelemetryOsProvider,
   type TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core/injected"
-import { createLazyPostHogTransportFactory } from "./lazy-posthog"
+import { createSenpiTelemetryTransportFactory } from "./otlp"
 import { isOmoTelemetryEnabled, type OmoConfig } from "@oh-my-opencode/omo-config-core"
-import { isPathInside, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
+import { isDarwinAutomountTriggerPath, isPathInside, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { OmoSenpiComponent } from "../../extension/types"
@@ -78,7 +78,7 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
 
         const osProvider = options.osProvider ?? getDefaultTelemetryOsProvider()
         const sessionId = extractSessionId(eventCtx) ?? "unknown"
-        const attribution = getOmoNativeAttribution({ env, now: options.now, osProvider })
+        const attribution = getOmoNativeAttribution({ env })
         client = createEventTelemetryClient({
           diagnostics: options.diagnostics,
           distinctId: attribution.install_hash,
@@ -88,7 +88,9 @@ export function createOmoNativeSessionComponent(options: OmoNativeSessionOptions
           schemaVersion: OMO_NATIVE_SCHEMA_VERSION,
           setTimeoutFn: options.setTimeoutFn,
           source: SOURCE,
-          transportFactory: options.transportFactory ?? createLazyPostHogTransportFactory({
+          transportFactory: options.transportFactory ?? createSenpiTelemetryTransportFactory({
+            env,
+            consent: () => isOmoNativeTelemetryEnabled(options, eventCtx, env),
             diagnostics: options.diagnostics,
             source: SOURCE,
           }),
@@ -282,6 +284,8 @@ const POSIX_ROOT_HOMES = ["/root", "/var/root"]
  * - Otherwise it is ephemeral when it lies inside os.tmpdir() (or a fixed POSIX temp root), decided by the shared
  *   path-containment helper: native realpath on both sides, case-insensitive on win32. A temp root that resolves to
  *   a filesystem root is ignored.
+ * - A macOS automount trigger (`/home`, `/net`, outside this HOME) is never resolved: realpath opens it, and a wedged
+ *   automounter parks the host loop in that open for good (#11545). Such a candidate is compared lexically instead.
  */
 function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): boolean {
   const windows = (deps.platform ?? process.platform) === "win32"
@@ -302,17 +306,30 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
       return false
     }
   }
-  const target = resolve(path)
+  // The install id is written under path.join(home, ...), which resolves `..` lexically, so every check below
+  // judges that lexically resolved path (the helper's contract for lexical openers), not the raw HOME. A lexical
+  // HOME that does not exist yet cannot hold a stable id either: it counts as ephemeral (telemetry OFF).
+  const lexical = paths.resolve(path)
+  const target = resolve(lexical)
   if (target === undefined) return true
+  const trigger = (candidate: string): boolean =>
+    !windows && isDarwinAutomountTriggerPath(candidate, { platform: deps.platform ?? process.platform, homeDir: path })
+  const lexicallyInside = (candidate: string): boolean => {
+    const root = paths.resolve(candidate)
+    return paths.dirname(root) !== root && [paths.resolve(path), target].some((home) => home === root || home.startsWith(`${root}${paths.sep}`))
+  }
   const usersDirs = windows ? [win32.join(`${env["SystemDrive"]?.trim() || "C:"}\\`, "Users")] : POSIX_USERS_DIRS
   const rootHomes = windows ? [] : POSIX_ROOT_HOMES
-  if (usersDirs.some((dir) => same(paths.dirname(target), dir)) || rootHomes.some((home) => same(target, home))) return false
+  const parent = paths.dirname(target)
+  const isUsersDir = (dir: string): boolean => (trigger(dir) || trigger(parent) ? parent === dir : same(parent, dir))
+  if (usersDirs.some(isUsersDir) || rootHomes.some((home) => same(target, home))) return false
   const candidates = [(deps.tmpdir ?? os.tmpdir)(), ...(windows ? [] : (deps.posixTempRoots ?? POSIX_TEMP_ROOTS))]
   return candidates.some((candidate) => {
+    if (trigger(candidate)) return lexicallyInside(candidate)
     const root = resolve(candidate)
     if (root === undefined || paths.dirname(root) === root) return false
     try {
-      return isPathInside(path, candidate, options)
+      return isPathInside(lexical, candidate, options)
     } catch {
       return false
     }

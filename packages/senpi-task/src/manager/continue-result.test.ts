@@ -5,6 +5,15 @@ import { toContinueResult } from "./continue-result"
 import { CONTINUE_SUGGESTION } from "./manager-helpers"
 
 describe("toContinueResult", () => {
+  test("unresponsive continuation preserves retryability instead of becoming permanently refused", () => {
+    const result = toContinueResult({
+      kind: "unresponsive", task_id: "st_00000001", retryable: true, reason: "HOST_STATUS_SENTINEL",
+    })
+    expect(result).toEqual({
+      kind: "unresponsive", task_id: "st_00000001", retryable: true, reason: "HOST_STATUS_SENTINEL",
+    })
+  })
+
   for (const kind of ["cwd_unavailable", "config_generation_mismatch", "admission_refused", "capacity_deferred"] as const) {
     test(`#given ${kind} #when adapted #then continuation remains refused with the original task and diagnostic`, () => {
       const outcome = { kind, task_id: "st_00000001", reason: "FAILURE_SENTINEL" }

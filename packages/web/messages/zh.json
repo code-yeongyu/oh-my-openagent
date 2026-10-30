@@ -12,7 +12,8 @@
     "githubStars": "GitHub {count} 星标",
     "openMenu": "打开菜单",
     "closeMenu": "关闭菜单",
-    "primary": "主菜单"
+    "primary": "主菜单",
+    "skipToContent": "跳到正文"
   },
   "footer": {
     "brand": "OmO",
@@ -207,6 +208,8 @@
   "docs": {
     "mobileHeader": "OmO 文档",
     "searchPlaceholder": "搜索文档...",
+    "searchLabel": "筛选文档章节",
+    "sectionsLabel": "文档章节",
     "install": {
       "title": "安装 OmO",
       "description": "在 macOS、Linux、WSL 和 Windows 上用一条命令安装 OmO。"
@@ -511,5 +514,10 @@
       "discord": "在 Discord 提问"
     },
     "privacy": "此页面不会保存你的报告，但报告已包含在应用打开的链接中发送到 omo.dev。只有在你自己提交 issue 时，报告才会发送到 GitHub。"
+  },
+  "notFound": {
+    "title": "找不到此页面。",
+    "body": "链接可能已过期，或页面已移动。",
+    "home": "返回首页"
   }
 }

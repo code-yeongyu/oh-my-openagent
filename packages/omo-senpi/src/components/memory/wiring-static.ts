@@ -94,6 +94,7 @@ export function registerMemoryStatic(input: {
     resolveContext,
     loadSettings: () => loadCommandSettings().settings,
     ...(entryApi === undefined ? {} : { appendEntry: (customType, data) => entryApi.appendEntry(customType, data) }),
+    onWarn: (message, detail) => options.logger?.warn(message, detail),
   })
   const promptHandler = createPromptHandler({
     resolveContext,

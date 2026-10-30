@@ -158,6 +158,7 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly started_at?: string
   /** Live snapshot metadata from the owning handle, not a persisted liveness claim. */
   readonly last_seen_at?: string
+  readonly host_liveness?: import("./host-liveness").HostLivenessStatus
   readonly terminal_at?: string
   readonly pid?: number
   readonly host_pid?: number

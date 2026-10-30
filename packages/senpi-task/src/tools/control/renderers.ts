@@ -144,6 +144,8 @@ function optionalToken(label: string, value: string | undefined): string | undef
 
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
+    case "unresponsive":
+      return { color: "muted", text: `task_send unresponsive ${details.task_id}: ${details.reason}` }
     case "uncertain":
       return { color: "warning", text: `task_send ${details.reason} Effect id: ${details.effect_id}` }
     case "failed":

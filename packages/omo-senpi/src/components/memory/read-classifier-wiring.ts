@@ -1,4 +1,5 @@
 import { realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { isAbsolute, relative, resolve, sep } from "node:path"
 
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
@@ -53,6 +54,8 @@ function isGitMetadata(label: string | undefined): boolean {
 }
 
 function realPath(path: string): string | undefined {
+  // A macOS automount trigger is compared lexically: resolving it can park the host loop (#11545).
+  if (isDarwinAutomountTriggerPath(path)) return undefined
   try {
     return realpathSync.native(path)
   } catch (error) {

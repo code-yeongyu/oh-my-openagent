@@ -4,6 +4,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { grant, memorySecrets, privateKeys } from "../../../../omo-opencode/src/cli/service-auth/test-support"
+import { type CredentialStore, KeychainLockedError } from "../../../../omo-opencode/src/cli/service-auth/keystore"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { FeedbackDraft } from "./draft"
 import { createFeedbackComponent, FEEDBACK_PREPARE_RPC_METHOD, FEEDBACK_SUBMIT_RPC_METHOD } from "./index"
@@ -18,7 +20,7 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-function host(options: { withRedactor: boolean; extraEnv?: Record<string, string>; noStateDir?: boolean }) {
+function host(options: { withRedactor: boolean; extraEnv?: Record<string, string>; noStateDir?: boolean; response?: () => Response | Promise<Response>; credentialStore?: CredentialStore }) {
   const pi = new FakeExtensionAPI()
   const handlers = new Map<string, Handler>()
   const api = pi as unknown as SenpiExtensionAPI
@@ -43,7 +45,9 @@ function host(options: { withRedactor: boolean; extraEnv?: Record<string, string
   dirs.push(homeDir)
   const sent: string[] = []
   const requests: RequestInit[] = []
+  const store = options.credentialStore ?? memorySecrets().store("https://api.omo.dev")
   const component = createFeedbackComponent({
+    credentialStore: store,
     env: { HOME: homeDir, OMO_CODING_AGENT_DIR: join(stateDir, "agent"), DO_NOT_TRACK: "1", ...options.extraEnv },
     ...(options.noStateDir === true ? {} : { stateDir }),
     omoVersion: "5.1.36",
@@ -52,10 +56,11 @@ function host(options: { withRedactor: boolean; extraEnv?: Record<string, string
     transport: async (_url, init) => {
       sent.push(String(init.body))
       requests.push(init)
+      if (options.response !== undefined) return options.response()
       return new Response(JSON.stringify({ id: "rpt_9" }), { status: 201 })
     },
   })
-  return { pi, api, handlers, component, sent, requests, stateDir, homeDir }
+  return { pi, api, handlers, component, sent, requests, stateDir, homeDir, store }
 }
 
 const sessionCtx = {
@@ -71,6 +76,77 @@ const sessionCtx = {
 }
 
 describe("feedback component", () => {
+  test("#given no usable OS credential store #when /bug sends #then anonymous reporting remains available", async () => {
+    const { pi, api, component, requests } = host({ withRedactor: true, credentialStore: {
+      read: async () => { throw new KeychainLockedError("locked") },
+      write: async () => { throw new Error("must not write") },
+      clear: async () => { throw new Error("must not clear") },
+    } })
+    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined } }
+    const command = pi.commands.find((entry) => entry.name === "bug")
+    await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+    expect(requests).toHaveLength(1)
+    expect(new Headers(requests[0]?.headers).has("authorization")).toBe(false)
+  })
+  test("#given stored CLI sign-in credentials #when /bug sends #then the request carries the current token outside the body", async () => {
+    const { pi, api, component, requests, sent, store } = host({ withRedactor: true })
+    await store.write({ ...grant, ...privateKeys })
+    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined } }
+    const command = pi.commands.find((entry) => entry.name === "bug")
+    await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+    expect(new Headers(requests[0]?.headers).get("authorization")).toBe("Bearer synthetic-access-token")
+    expect(sent[0]).not.toContain("synthetic-access-token")
+  })
+
+  test.each(["expired", "uncertain"] as const)("#given a stored sign-in that is %s #when /bug sends #then the report goes anonymously with a warning and no refresh is attempted", async (state) => {
+    const refreshes: string[] = []
+    using intake = Bun.serve({ port: 0, fetch: (request) => {
+      refreshes.push(new URL(request.url).pathname)
+      return Response.json({ error: { code: "rate_limited", message: "synthetic", retryable: true, requestId: "req_refresh" } }, { status: 429 })
+    } })
+    const { pi, api, component, requests, store } = host({ withRedactor: true, extraEnv: { OMO_SERVICE_API_URL: `http://127.0.0.1:${intake.port}` } })
+    const credentials = state === "expired"
+      ? { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00.000Z" }
+      : { ...grant, ...privateKeys, refreshState: "uncertain" as const }
+    await store.write(credentials)
+    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+    const levels: (string | undefined)[] = []
+    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: (_message: string, level?: string) => levels.push(level) } }
+    const command = pi.commands.find((entry) => entry.name === "bug")
+    await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+    expect(requests).toHaveLength(1)
+    expect(new Headers(requests[0]?.headers).has("authorization")).toBe(false)
+    expect(levels).toEqual(["warning", "info"])
+    expect(refreshes).toEqual([])
+    expect(await store.read()).toEqual(credentials)
+  })
+
+  test.each([401, 403, "network"] as const)("#given a %s failure #when /bug sends #then authentication and network actions stay distinct", async (failure) => {
+    const { pi, api, component } = host({ withRedactor: true, response: async () => {
+      if (failure === "network") throw new Error("connection refused")
+      return Response.json({ error: { code: "unauthorized" } }, { status: failure })
+    } })
+    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+    const notices: string[] = []
+    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: (message: string) => notices.push(message) } }
+    const command = pi.commands.find((entry) => entry.name === "bug")
+    await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+    expect(notices).toEqual([failure === "network" ? "The report could not be sent right now. Check your connection and try again." : "Sign in to send a report: run omo login"])
+  })
+
+  test("#given an intake contract rejection #when /bug sends #then it shows the safe code and request identifier rather than a connection failure", async () => {
+    const { pi, api, component } = host({ withRedactor: true, response: () => Response.json({ error: { code: "invalid_request", requestId: "req_contract_1", message: "private server detail" } }, { status: 400 }) })
+    const diagnostics: unknown[] = []
+    await component.register(api, { logger: { ...console, warn: (message, details) => diagnostics.push({ message, details }) }, config: { getFlag: () => undefined } })
+    const notices: string[] = []
+    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: (message: string) => notices.push(message) } }
+    const command = pi.commands.find((entry) => entry.name === "bug")
+    await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+    expect(notices).toEqual(["The report was rejected by the service (invalid_request). Request ID: req_contract_1. Update OmO and try again."])
+    expect(diagnostics).toEqual([{ message: "feedback.report_rejected", details: { code: "invalid_request", requestId: "req_contract_1" } }])
+  })
   test("#given a host without the upload redactor #when the desktop asks for a draft #then it is told feedback is unavailable instead of sending unredacted text", async () => {
     const { api, handlers, component } = host({ withRedactor: false })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
@@ -274,7 +350,7 @@ describe("feedback component", () => {
     const first = await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: draft.draftId, description: "x" })
     const second = await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: draft.draftId, description: "x" })
 
-    expect(first).toEqual({ kind: "refused", reason: "unavailable" })
+    expect(first).toEqual({ kind: "refused", reason: "service-unavailable", code: "unknown" })
     expect(second).toEqual({ kind: "sent", reportId: "rpt_retry" })
   })
 
@@ -387,4 +463,3 @@ describe("feedback component", () => {
     expect(new Headers(sent[1]?.headers).get("idempotency-key")).toBe(`feedback-${second.draftId}`)
   })
 })
-

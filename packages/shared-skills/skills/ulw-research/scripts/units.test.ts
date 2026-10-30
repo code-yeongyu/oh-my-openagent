@@ -14,6 +14,16 @@ describe("normalizeUnit", () => {
 		expect(normalizeUnit("furlongs")).toBeNull()
 	})
 
+	test("common measure suffixes read as units: mn, pct, hrs, yr(s), mo", () => {
+		expect(normalizeUnit("mn")).toBe(normalizeUnit("M"))
+		expect(normalizeUnit("pct")).toBe(normalizeUnit("%"))
+		expect(normalizeUnit("hrs")).toBe(normalizeUnit("h"))
+		expect(normalizeUnit("yrs")).toBe(normalizeUnit("yr"))
+		expect(normalizeUnit("mo")).not.toBeNull()
+		expect(convertFactor("yr", "mo")).toEqual({ num: 12n, den: 1n })
+		expect(convertFactor("yr", "s")).toBeNull()
+	})
+
 	test("a normalized token normalizes to itself", () => {
 		for (const raw of ["억 원", "m", "kg", "GB", "%p", "USD", "C", "F"]) {
 			const token = normalizeUnit(raw)

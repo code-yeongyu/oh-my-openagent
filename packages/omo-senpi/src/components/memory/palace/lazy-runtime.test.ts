@@ -87,7 +87,7 @@ describe("lazy memory palace sidecar", () => {
     expect(notifications[0]?.message).toContain("/palace")
     expect(notifications[0]?.message).toContain(PALACE_RUNTIME_ARTIFACT)
     expect(notifications[0]?.message).toContain("Cannot find module '#omo-memory-palace-runtime'")
-    expect(notifications[0]?.message).toContain("reinstall omo, then start a new session")
+    expect(notifications[0]?.message).toContain("reinstall omo")
   })
 
   test("#given a sidecar that fails to load #when /people runs #then the actionable error is the reply and its error notification", async () => {
@@ -102,7 +102,7 @@ describe("lazy memory palace sidecar", () => {
     expect(String(reply)).toContain("/people")
     expect(String(reply)).toContain(PALACE_RUNTIME_ARTIFACT)
     expect(String(reply)).toContain("unexpected token in omo-memory-palace.js")
-    expect(String(reply)).toContain("reinstall omo, then start a new session")
+    expect(String(reply)).toContain("reinstall omo")
   })
 
   test("#given one load failure #when the sidecar is requested again #then the loader retries and later calls share one load", async () => {

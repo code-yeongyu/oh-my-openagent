@@ -142,7 +142,7 @@ test("the real session_start bridge awaits registry restoration before lifecycle
       return { outcomes: [] }
     },
   } }
-  wireEventBridge(pi, {
+  const eventBridge = wireEventBridge(pi, {
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
     config: { getFlag: () => false }, getCapturedTools: () => [],
   }, engine, { scheduleSync: () => undefined, syncNow: () => undefined, observeRecord: () => undefined, dispose: () => undefined },
@@ -154,6 +154,8 @@ test("the real session_start bridge awaits registry restoration before lifecycle
   })
   const context = { sessionManager: { getSessionId: () => "parent" }, getPauseState: () => held(7) }
   await pi.dispatch("session_start", {}, context)
+  // Reconciliation runs after admission, in the background (#11335).
+  await eventBridge.sessionStartRecovered()
   expect(reconciled).toBe(true)
   expect(h.registry.require("parent").phase).toBe("applied")
   await pi.dispatch("session_shutdown", { reason: "quit" }, context)

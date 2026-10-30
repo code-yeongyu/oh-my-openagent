@@ -100,6 +100,20 @@ describe("dag tool start action", () => {
     expect(String(manager.snapshot(result.details.run_id as DagRunId, parentSessionId).runId)).toBe(result.details.run_id)
   })
 
+  test("#given the parent session runs a model #when the workflow tool starts a run #then the run record captures that model for its category nodes' last rung (#10783)", async () => {
+    // given
+    const { manager } = fixture()
+    const tool = createDagTool(deps(manager))
+    const ctx = { model: { provider: "chatgpt-subscription", id: "gpt-6.1-sol" } } as unknown as Parameters<typeof tool.execute>[4]
+
+    // when
+    const result = await tool.execute("call-1", { action: "start", definition: definition() }, undefined, undefined, ctx)
+
+    // then
+    if (result.details.kind !== "started") throw new Error("Expected the start action to succeed")
+    expect(manager.record(result.details.run_id as DagRunId, parentSessionId).parentModel).toBe("chatgpt-subscription/gpt-6.1-sol")
+  })
+
   test("#given an identical definition #when start runs twice #then the second call reuses the same run", async () => {
     // given
     const { manager, runFileCount } = fixture()
@@ -802,6 +816,7 @@ describe("dag tool control verb refusal vocabulary", () => {
     { code: "node_not_found", message: 'unknown dag node "ghost"' },
     { code: "node_not_retryable", message: 'dag node "plan" already completed' },
     { code: "node_not_continuable", message: 'dag node "plan" cannot be continued' },
+    { code: "node_unresponsive", message: "HOST_STATUS_SENTINEL" },
     { code: "run_still_active", message: "run is still active" },
     { code: "invalid_arguments", message: "a retry prompt override requires exactly one explicit node id" },
   ] as const

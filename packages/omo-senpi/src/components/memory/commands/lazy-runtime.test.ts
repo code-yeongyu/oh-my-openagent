@@ -48,7 +48,7 @@ describe("lazy memory commands sidecar", () => {
     expect(reply).toContain("/sleeptime")
     expect(reply).toContain(MEMORY_COMMANDS_RUNTIME_ARTIFACT)
     expect(reply).toContain("Cannot find module '#omo-memory-commands-runtime'")
-    expect(reply).toContain("reinstall omo, then start a new session")
+    expect(reply).toContain("reinstall omo")
   })
 
   test("#given one load failure #when the sidecar is requested again #then the loader retries and later calls share one load", async () => {

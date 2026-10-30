@@ -8,7 +8,7 @@ test.describe("Download page while the launch flag is off", () => {
     // Shipped desktop builds link /download; this site's own page stays off, so it must not 404.
     for (const path of ["/download", "/ko/download", "/download?channel=beta"]) {
       const response = await request.get(path, { maxRedirects: 0 })
-      expect(response.status(), path).toBe(301)
+      expect(response.status(), path).toBe(307)
       expect(response.headers()["location"], path).toBe("https://get.omo.dev/desktop/beta/")
     }
   })

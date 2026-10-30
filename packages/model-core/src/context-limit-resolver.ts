@@ -1,4 +1,5 @@
 import process from "node:process"
+import { FABLE_55_LAUNCH } from "./fable-55-launch"
 
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const ANTHROPIC_GA_1M_LIMIT = 1_000_000
@@ -35,6 +36,11 @@ export function resolveActualContextLimit(
   modelID: string,
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
+  if (modelID === FABLE_55_LAUNCH.id) {
+    return modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`)
+      ?? FABLE_55_LAUNCH.limit?.context
+      ?? null
+  }
   if (isAnthropicProvider(providerID, modelID)) {
     const explicit1M = getAnthropicActualLimit(modelCacheState)
     if (explicit1M === ANTHROPIC_GA_1M_LIMIT) return explicit1M

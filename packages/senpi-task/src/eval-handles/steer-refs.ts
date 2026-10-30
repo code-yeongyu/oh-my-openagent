@@ -73,6 +73,7 @@ export async function sendRef(deps: SteerDeps, ref: HandleRef, message: string, 
     case "one_shot_agent":
       throw new EvalHandleHostError("eval_handle_send_refused", outcome.message)
     case "admission_refused":
+    case "unresponsive":
     case "capacity_deferred":
     case "cwd_unavailable":
     case "config_generation_mismatch":

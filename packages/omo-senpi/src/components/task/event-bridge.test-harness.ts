@@ -228,9 +228,17 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     config: { getFlag: () => undefined },
   } as unknown as ComponentContext
 
-  wireEventBridge(pi, ctx, engine, statusUi, transitions, state, {
+  const bridge = wireEventBridge(pi, ctx, engine, statusUi, transitions, state, {
     ...(options.taskRpcTimers === undefined ? {} : { taskRpc: { timers: options.taskRpcTimers } }),
   })
+  // Session-start recovery runs in the background (#11335): a dispatch here returns once that chain
+  // has ended too, so the chain tests read its settled order rather than a moment in it.
+  const dispatch = pi.dispatch.bind(pi)
+  pi.dispatch = async (...args: Parameters<typeof pi.dispatch>) => {
+    const result = await dispatch(...args)
+    if (args[0] === "session_start") await bridge.sessionStartRecovered()
+    return result
+  }
 
   return {
     pi,

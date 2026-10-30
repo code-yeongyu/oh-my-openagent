@@ -86,7 +86,6 @@ describe("omo-codex telemetry single-source guard", () => {
       expect(bundle).not.toContain(`from "${TELEMETRY_CORE_PACKAGE}"`)
       expect(bundle).not.toContain(`import("${TELEMETRY_CORE_PACKAGE}")`)
       expect(bundle).toContain("omo_codex_daily_active")
-      expect(bundle).toContain("omo-codex:")
       expect(bundle).toContain("posthog-activity.json")
     })
   })

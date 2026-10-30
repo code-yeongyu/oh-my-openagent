@@ -12,7 +12,8 @@
     "githubStars": "GitHubスター {count}",
     "openMenu": "メニューを開く",
     "closeMenu": "メニューを閉じる",
-    "primary": "メインメニュー"
+    "primary": "メインメニュー",
+    "skipToContent": "本文へスキップ"
   },
   "footer": {
     "brand": "OmO",
@@ -207,6 +208,8 @@
   "docs": {
     "mobileHeader": "OmO ドキュメント",
     "searchPlaceholder": "ドキュメントを検索...",
+    "searchLabel": "ドキュメントのセクションを絞り込む",
+    "sectionsLabel": "ドキュメントのセクション",
     "install": {
       "title": "OmO のインストール",
       "description": "macOS、Linux、WSL、Windows でコマンドひとつで OmO をインストールします。"
@@ -511,5 +514,10 @@
       "discord": "Discord で質問"
     },
     "privacy": "このページはレポートを保存しませんが、アプリが開いたリンクに含まれて omo.dev に送られています。GitHub には、ご自身で issue を送信したときにだけ届きます。"
+  },
+  "notFound": {
+    "title": "ページが見つかりません。",
+    "body": "リンクが古いか、ページが移動した可能性があります。",
+    "home": "ホームに戻る"
   }
 }

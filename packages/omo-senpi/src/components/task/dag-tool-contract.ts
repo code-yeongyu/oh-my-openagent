@@ -31,6 +31,7 @@ export type DagToolErrorCode =
   | "node_not_found"
   | "node_not_retryable"
   | "node_not_continuable"
+  | "node_unresponsive"
   | "node_has_no_task"
   | "amend_running_node"
   | "invalid_amendment"

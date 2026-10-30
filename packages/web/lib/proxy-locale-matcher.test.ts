@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { NextRequest } from "next/server"
@@ -16,15 +16,24 @@ const redirectOf = (path: string) => {
 // Shipped desktop builds open https://omo.dev/download (reinstall screen, deb update pill). While the
 // omo.dev page is off, that path must reach the public beta download page instead of a 404.
 describe("desktop download path while the omo.dev download page is off", () => {
+  const saved = process.env.OMO_WEB_DESKTOP_DOWNLOAD
+  beforeEach(() => {
+    delete process.env.OMO_WEB_DESKTOP_DOWNLOAD
+  })
+  afterEach(() => {
+    if (saved === undefined) delete process.env.OMO_WEB_DESKTOP_DOWNLOAD
+    else process.env.OMO_WEB_DESKTOP_DOWNLOAD = saved
+  })
+
   test.each([
     "/download",
     "/download?channel=beta",
     ...locales.map((locale) => `/${locale}/download`),
   ])(
-    "#given %s #when requested #then it redirects permanently to the public beta download page",
+    "#given %s #when requested #then it redirects temporarily to the public beta download page",
     (path) => {
       expect(redirectOf(path)).toEqual({
-        status: 301,
+        status: 307,
         location: "https://get.omo.dev/desktop/beta/",
       })
     },

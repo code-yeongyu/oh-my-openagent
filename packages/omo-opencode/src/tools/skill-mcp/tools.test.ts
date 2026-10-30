@@ -203,7 +203,7 @@ describe("skill_mcp tool", () => {
   })
 
   describe("cdp_url execution", () => {
-    it("passes cdpUrl options through to manager.callTool when provided", async () => {
+    it("passes cdpUrl and the session abort signal through to manager.callTool when provided", async () => {
       // given
       loadedSkills = [
         createMockSkillWithMcp("browser-skill", {
@@ -231,11 +231,11 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "browser_navigate",
         { url: "https://example.com" },
-        { cdpUrl: "http://localhost:9222" },
+        { cdpUrl: "http://localhost:9222", signal: mockContext.abort },
       )
     })
 
-    it("uses manager.callTool when cdp_url is omitted", async () => {
+    it("passes only the session abort signal to manager.callTool when cdp_url is omitted", async () => {
       // given
       loadedSkills = [
         createMockSkillWithMcp("browser-skill", {
@@ -262,7 +262,7 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "browser_navigate",
         { url: "https://example.com" },
-        undefined,
+        { signal: mockContext.abort },
       )
     })
   })
@@ -326,7 +326,7 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "some-tool",
         {},
-        undefined,
+        { signal: mockContext.abort },
       )
     })
 
@@ -353,7 +353,7 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "some-tool",
         {},
-        undefined,
+        { signal: mockContext.abort },
       )
     })
   })

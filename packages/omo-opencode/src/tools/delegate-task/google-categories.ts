@@ -1,5 +1,6 @@
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
 import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+import { launchDefaultModelId } from "@oh-my-opencode/model-core"
 
 const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on VISUAL/UI tasks.
@@ -120,7 +121,7 @@ export const GOOGLE_CATEGORIES: BuiltinCategoryDefinition[] = [
   },
   {
     name: "artistry",
-    config: { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeFable}`, variant: "max" },
+    config: { model: `anthropic/${launchDefaultModelId()}`, variant: "max" },
     description: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
     promptAppend: ARTISTRY_CATEGORY_PROMPT_APPEND,
   },
