@@ -111,6 +111,51 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
+  test.each(["new", "failed-full"] as const)("#given a %s binding without a published snapshot #when journal delivery runs #then it never reads git", async (mode) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    let gitReads = 0
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined,
+      createGitRepo: () => stubRepo({ head: async () => { gitReads++; throw new Error("git unavailable") } }),
+    })
+    bridge.attach("session-1")
+    if (mode === "failed-full") await expect(bridge.sync()).rejects.toThrow("git unavailable")
+    const before = gitReads
+    await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+    expect(gitReads).toBe(before)
+    expect(host.emits).toHaveLength(1)
+    expect(host.emits[0]?.data).toMatchObject({
+      nonJournalState: "unknown", journal: { sessionId: "session-1", totalSteps: 1 },
+      reflection: { backlogSteps: 1 },
+    })
+  })
+
+  test.each(["changed", "unchanged"] as const)("#given an unreadable transcript and %s durable counters #when journal delivery runs #then durable accounting is still published", async (mode) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(),
+    })
+    bridge.attach("session-1")
+    const state = {
+      total_completed_steps: 7, reflected_completed_steps: 3,
+      steps_since_last_successful_reflection: 4, pending_compaction: true,
+    }
+    if (mode === "unchanged") await writeTranscriptState(context, "session-1", state)
+    await bridge.sync()
+    if (mode === "changed") await writeTranscriptState(context, "session-1", state)
+    // A directory at the file path produces a real non-ENOENT filesystem error, without permission assumptions.
+    await mkdir(join(context.identityPaths.transcripts, "session-1", "transcript.jsonl"))
+    await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+    expect(host.emits).toHaveLength(2)
+    expect(host.emits[1]?.data).toMatchObject({
+      journal: { totalSteps: 7, reflectedSteps: 3 },
+      reflection: { backlogSteps: 4, pendingCompaction: true },
+    })
+    if (mode === "unchanged") expect(host.emits[1]?.data).toEqual(host.emits[0]?.data)
+  })
+
   test("#given persisted and observed branch steps #when replay, reflection and rebinding occur #then counters count each canonical answer once", async () => {
     const context = await contextFixture()
     const host = rpcHost()

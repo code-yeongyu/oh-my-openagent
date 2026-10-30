@@ -6,6 +6,7 @@ import { TranscriptJournal, isCanonicalEntry } from "@oh-my-opencode/memory-core
 import type { MemoryIdentityContext } from "./context"
 
 interface MemoryRpcJournalState {
+  readonly transcriptReadFailed?: true
   readonly backlogSteps: number
   readonly pendingCompaction: boolean
   readonly totalSteps: number
@@ -24,7 +25,12 @@ export async function readMemoryRpcJournalState(
   // double count a step, including when journal reconciliation is still pending.
   const entries = await new TranscriptJournal({
     journalDir: join(context.identityPaths.transcripts, sessionId),
-  }).readEntriesSnapshot()
+  }).readEntriesSnapshot().catch((error: unknown) => {
+    // An unreadable transcript must not drop the required update; state.json remains usable.
+    if (error instanceof Error && "code" in error && typeof error.code === "string") return undefined
+    throw error
+  })
+  if (entries === undefined) return { ...state, transcriptReadFailed: true }
   const steps = new Set(observedSteps)
   for (const entry of entries) {
     if (entry.kind === "assistant" && isCanonicalEntry(entry)) steps.add(entry.source_line_id)
