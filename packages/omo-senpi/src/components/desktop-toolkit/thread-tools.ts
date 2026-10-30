@@ -162,9 +162,15 @@ export function listThreadTools(
           continue
         }
         const tool = object(value)
-        const attachment = typeof tool._meta === "object" && tool._meta !== null && "senpi/host-tool" in tool._meta
-          ? hostAttachment(tool._meta)
-          : undefined
+        let attachment: DesktopTool["attachment"]
+        try {
+          attachment = typeof tool._meta === "object" && tool._meta !== null && "senpi/host-tool" in tool._meta
+            ? hostAttachment(tool._meta)
+            : undefined
+        } catch {
+          onInvalid?.("invalid_descriptor")
+          continue
+        }
         if (typeof tool.name !== "string" || tool.name.length === 0 || !/^[a-zA-Z0-9_-]{1,64}$/.test(attachment === undefined ? `desktop_${tool.name}` : tool.name)) {
           onInvalid?.("invalid_name")
           continue
@@ -191,7 +197,7 @@ export function listThreadTools(
 /** senpi's event-bus channel that routes one host tool (`{ name, execute? }`). */
 export const HOST_TOOL_ROUTE_CHANNEL = "senpi:host-tool-route"
 /** The `Error.name` senpi's host tool wrapper reads as "run this call on the standalone tool and drop the route". */
-export const HOST_TOOL_ROUTE_UNAVAILABLE = "HostToolRouteUnavailable"
+const HOST_TOOL_ROUTE_UNAVAILABLE = "HostToolRouteUnavailable"
 
 function routeUnavailable(): Error {
   return Object.assign(new Error("The host could not serve this call."), { name: HOST_TOOL_ROUTE_UNAVAILABLE })
@@ -205,13 +211,16 @@ export async function callThreadTool(
   signal?: AbortSignal,
   attachment = false,
 ) {
+  if (attachment && signal?.aborted) throw new DOMException("Desktop toolkit call aborted.", "AbortError")
   if (grant === undefined) {
     if (attachment) throw routeUnavailable()
     return { isError: true, content: [{ type: "text", text: "Desktop thread toolkit is not granted to the calling session." }], details: { reason: "no_session_grant" } }
   }
+  const deadline = AbortSignal.timeout(timeoutMs)
+  const callSignal = signal === undefined ? deadline : AbortSignal.any([deadline, signal])
   try {
     const result = await withClient(grant, timeoutMs, (request) =>
-      request("tools/call", { name, arguments: args }), signal)
+      request("tools/call", { name, arguments: args }), callSignal)
     if (!Array.isArray(result.content) || (result.isError !== undefined && typeof result.isError !== "boolean")) {
       throw new Error("invalid desktop toolkit content")
     }
@@ -224,6 +233,7 @@ export async function callThreadTool(
     return { ...result, details: {} }
   } catch {
     // Neither transport errors nor server replies may disclose the file's bearer.
+    if (attachment && callSignal.aborted) throw new DOMException("Desktop toolkit call aborted.", "AbortError")
     if (attachment) throw routeUnavailable()
     return { isError: true, content: [{ type: "text", text: "Desktop thread toolkit call failed." }], details: { reason: "call_failed" } }
   }
