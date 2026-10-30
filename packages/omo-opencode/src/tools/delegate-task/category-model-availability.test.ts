@@ -1,4 +1,10 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
+import { join } from "node:path"
+import { validatePluginConfig } from "../../config/validate"
+import { loadOmoConfig, resolveModelReferences } from "@oh-my-opencode/omo-config-core"
+import { mapOmoConfigAgents } from "@oh-my-opencode/senpi-task"
+import { createTaskChildPlanner } from "../../../../omo-senpi/src/components/task/planner"
 import type { CategoryConfig } from "../../config/schema"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -58,6 +64,71 @@ function createExecutorContext(
 }
 
 describe("category canonical model availability", () => {
+  for (const runtime of ["opencode", "senpi"] as const) {
+    for (const [target, catalog] of [
+      ["agent", false], ["agent", true], ["category", false], ["category", true],
+    ] as const) {
+      test(`real ${runtime} ${catalog ? "catalog" : "literal"} config preserves ${target} distribution through materialization`, async () => {
+        const home = mkdtempSync("/home/yeongyu/omo-runs/acct-vis/distribution-config-")
+        try {
+          mkdirSync(join(home, ".omo"))
+          mkdirSync(join(home, "project"))
+          const name = `loaded-${runtime}-${target}-${catalog}`
+          const definition = {
+            models: catalog ? ["first", "second", "third"]
+              : ["test-provider/a", { model: "test-provider/b", reasoning: "high" }, "test-provider/c"],
+            models_distribution: "round_robin",
+          }
+          writeFileSync(join(home, ".omo", "omo.json"), JSON.stringify({
+            ...(catalog ? { models: {
+              first: { model: "test-provider/a" },
+              second: { model: "test-provider/b", reasoning: "high" },
+              third: { model: "test-provider/c" },
+            } } : {}),
+            [target === "agent" ? "agents" : "categories"]: { [name]: definition },
+          }))
+          const env = { HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, ".config") }
+          const context = createExecutorContext({}, ["a", "b", "c"])
+          const actual: string[] = []
+          if (runtime === "opencode") {
+            const loaded = validatePluginConfig(join(home, "project"), env)
+            expect(loaded.valid).toBe(true)
+            context.agentOverrides = loaded.config.agents
+            context.userCategories = loaded.config.categories
+            for (let i = 0; i < 4; i++) {
+              if (target === "agent") {
+                const result = await resolveSubagentModel(name, { name, mode: "subagent" }, context)
+                actual.push(result.categoryModel?.modelID ?? "missing")
+              } else {
+                const result = await resolveCategoryExecution({ ...args, category: name }, context, undefined, undefined)
+                actual.push(result.categoryModel?.modelID ?? "missing")
+              }
+            }
+          } else {
+            const loaded = loadOmoConfig({ cwd: join(home, "project"), env, harness: "senpi" })
+            const config = resolveModelReferences(loaded.config).view
+            const models = ["a", "b", "c"].map((id) => ({ provider: "test-provider", id }))
+            const planner = createTaskChildPlanner(config, mapOmoConfigAgents(config), () => ({
+              getAvailable: () => models,
+              find: (provider, id) => models.find((model) => model.provider === provider && model.id === id),
+            }))
+            for (let i = 0; i < 4; i++) {
+              const result = planner({
+                prompt: "fixture", parent_session_id: "parent", depth: 0,
+                ...(target === "agent" ? { subagent_type: name } : { category: name }),
+              })
+              if (result.kind !== "resolved") throw new Error(JSON.stringify(result))
+              actual.push(result.plan.resolved_model?.model_id ?? "missing")
+            }
+          }
+          expect(actual).toEqual(["a", "b", "c", "a"])
+        } finally {
+          rmSync(home, { recursive: true, force: true })
+        }
+      })
+    }
+  }
+
   test("reactive fallback consumes the spawn snapshot and exhausts without wrapping twice", async () => {
     const category = {
       models: ["test-provider/a", "test-provider/b", "test-provider/c"],
