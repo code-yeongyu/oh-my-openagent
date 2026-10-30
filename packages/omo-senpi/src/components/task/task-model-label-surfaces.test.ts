@@ -125,7 +125,7 @@ async function dagNodeLine(record: TaskRecord): Promise<string> {
         },
       ],
       edges: [],
-      waves: [{ nodeIds: ["n"] }],
+      waves: [{ index: 0, nodeIds: ["n"] }],
       criticalPath: [],
       bottlenecks: [],
     }),
