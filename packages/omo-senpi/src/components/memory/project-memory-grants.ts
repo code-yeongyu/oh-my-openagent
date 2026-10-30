@@ -1,5 +1,5 @@
 import { lstatSync, realpath, realpathSync } from "@oh-my-opencode/memory-core/fs"
-import { containedRelativePath, isDarwinAutomountTriggerPath, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
+import { containedRelativePath, isDarwinAutomountTriggerPath, resolveSegmentwise, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
 import * as path from "node:path"
 
 import type { MemoryIdentityContext } from "./context"
@@ -53,7 +53,19 @@ export function isGrantedProjectMemoryRead(context: MemoryIdentityContext, targe
   const lstat = options.lstat ?? lstatSync
   // A macOS automount trigger is never a granted repo note, and resolving it can park the host loop (#11545).
   if (!windows && isDarwinAutomountTriggerPath(paths.resolve(target), { platform: options.platform ?? process.platform })) return false
-  const resolve = (input: string) => input === target ? canonicalAllowingMissing(input, canonicalPath, lstat, paths) : canonicalPath(input)
+  const resolve = (input: string) => {
+    if (input !== target) return canonicalPath(input)
+    // A dot-free opener is faithful through realpath alone. Anything carrying `..` must be walked
+    // segment by segment: realpath collapses it lexically before the kernel resolves a link first.
+    if (!input.split(paths.sep).includes("..")) {
+      try {
+        return canonicalPath(input)
+      } catch (error) {
+        if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
+      }
+    }
+    return resolveSegmentwise(input, { platform: options.platform, realpath: canonicalPath, lstat })
+  }
   for (const root of roots) {
     try {
       // Roots are stored canonical; a root that now resolves elsewhere was replaced (for example by a
@@ -78,52 +90,8 @@ function samePath(left: string, right: string, paths: typeof path.posix, windows
   return windows ? a.toLowerCase() === b.toLowerCase() : a === b
 }
 
-// The deepest existing ancestor is resolved natively and the missing segments are appended verbatim,
-// never through a lexical join: a `.`, `..` or empty missing segment would make the rebuilt path name
-// another file than the one the opener resolves, so such a remainder is refused. Segments are cut at
-// the last separator, so none of them can hold one.
-function canonicalAllowingMissing(
-  input: string,
-  canonicalPath: (path: string) => string,
-  lstat: (path: string) => { isDirectory(): boolean },
-  paths: typeof path.posix,
-): string {
-  const root = paths.parse(input).root
-  const missing: string[] = []
-  let current = input
-  for (;;) {
-    try {
-      const ancestor = canonicalPath(current)
-      if (missing.length === 0) return ancestor
-      // A missing remainder can only live under a directory. POSIX reports a file ancestor as ENOTDIR, but
-      // Windows reports ENOENT, so the walk would otherwise grant `<note>/missing.md` there.
-      if (!lstat(ancestor).isDirectory()) throw Object.assign(new Error(`not a directory: ${ancestor}`), { code: "ENOTDIR" })
-      return (ancestor.endsWith(paths.sep) ? ancestor : ancestor + paths.sep) + missing.join(paths.sep)
-    } catch (error) {
-      // A dangling link is an entry, not a missing note: its target could appear outside the repo later.
-      if (!isMissingPathError(error) || current.length <= root.length || isEntry(current, lstat)) throw error
-      const cut = paths.sep === "\\" ? Math.max(current.lastIndexOf("/"), current.lastIndexOf("\\")) : current.lastIndexOf("/")
-      const segment = current.slice(cut + 1)
-      if (segment === "" || segment === "." || segment === "..") throw error
-      missing.unshift(segment)
-      current = cut < root.length ? root : current.slice(0, cut)
-    }
-  }
-}
-
-function isEntry(input: string, lstat: (path: string) => unknown): boolean {
-  try {
-    lstat(input)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function isMissingPathError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "ENOENT"
-}
-
+  // The opener walks the raw component sequence, so containment must too: a lexical join would collapse
+  // a `..` that follows a symlink and name a file the read never reaches.
 async function canonicalAsync(path: string): Promise<string | undefined> {
   try {
     return await realpath(path)

@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs"
+import { lstatSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { posix, win32 } from "node:path"
 
@@ -53,9 +53,107 @@ export function isPathInside(child: string, parent: string, options: PathContain
 export function containedRelativePath(child: string, parent: string, options: PathContainmentOptions = {}): string | undefined {
   const paths = (options.platform ?? process.platform) === "win32" ? win32 : posix
   const realpath = options.realpath ?? realpathSync.native
-  const canonicalChild = paths.normalize(realpath(child))
-  const canonicalParent = paths.normalize(realpath(parent))
+  // Without an injected resolver the child is walked like the parent; a caller that supplies one decides
+  // its own canonical form (the grant check needs to allow a note that does not exist yet).
+  const canonicalChild = paths.normalize(options.realpath === undefined
+    ? resolveSegmentwise(child, { ...options, allowMissing: false })
+    : realpath(child))
+  // The parent is walked segment by segment for the same reason the child is: a lexical `..` after a
+  // link names a directory the opener never reaches, and a containment verdict inherits that error.
+  const canonicalParent = paths.normalize(resolveSegmentwise(parent, { ...options, allowMissing: false }))
   const relative = paths.relative(canonicalParent, canonicalChild)
   const escapes = relative === ".." || relative.startsWith(`..${paths.sep}`) || paths.isAbsolute(relative)
   return escapes ? undefined : relative
+}
+
+export interface SegmentwiseResolveOptions extends PathContainmentOptions {
+  readonly lstat?: (path: string) => { isDirectory(): boolean }
+  /** When false, a remainder that does not exist throws instead of being returned verbatim. */
+  readonly allowMissing?: boolean
+}
+
+/**
+ * Canonicalizes `target` the way `open(2)` resolves it: symlinks expand one segment at a time, so a
+ * `..` after a link climbs from the link's target, never from the literal string. `path.resolve` and
+ * `realpathSync` collapse that `..` lexically first and name a different file, which let a symlink
+ * inside a granted repo read a third identity's note while the containment check still said "inside".
+ *
+ * A remainder that does not exist yet keeps its segments verbatim, because a missing note stays
+ * readable. A `.`, `..` or empty segment inside such a remainder throws: collapsing it would once
+ * again name a path the opener never reaches.
+ */
+export function resolveSegmentwise(target: string, options: SegmentwiseResolveOptions = {}): string {
+  const platform = options.platform ?? process.platform
+  const realpath = options.realpath ?? realpathSync.native
+  const lstat = options.lstat ?? lstatSync
+  // Windows collapses dot segments before the kernel sees them, so the lexical path is what opens; the
+  // existing prefix still resolves natively (8.3 short names included) and a missing remainder is appended.
+  if (platform === "win32") return resolveWindowsLexical(target, realpath, lstat)
+
+  const root = posix.parse(target).root === "" ? "/" : posix.parse(target).root
+  const segments = target.split("/")
+  let resolved = root
+  let missing: string[] | undefined
+  for (const segment of segments) {
+    if (missing !== undefined) {
+      if (segment === "" || segment === "." || segment === ".." || options.allowMissing === false) {
+        throw Object.assign(new Error(`unresolvable remainder: ${target}`), { code: "ENOENT" })
+      }
+      missing.push(segment)
+      continue
+    }
+    if (segment === "") continue
+    if (segment === ".") continue
+    if (segment === "..") {
+      resolved = posix.dirname(resolved)
+      continue
+    }
+    const candidate = posix.join(resolved, segment)
+    try {
+      resolved = realpath(candidate)
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== "ENOENT") throw error
+      // A dangling link is an entry, not a missing note: its target could appear outside the repo later.
+      if (isEntry(candidate, lstat)) throw error
+      // A missing remainder can only live under a directory.
+      if (!lstat(resolved).isDirectory()) throw error
+      missing = [segment]
+    }
+  }
+  if (missing === undefined) return resolved
+  if (options.allowMissing === false) throw Object.assign(new Error(`unresolvable remainder: ${target}`), { code: "ENOENT" })
+  return posix.join(resolved, ...missing)
+}
+
+function isEntry(input: string, lstat: (path: string) => unknown): boolean {
+  try {
+    lstat(input)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function resolveWindowsLexical(
+  target: string,
+  realpath: (path: string) => string,
+  lstat: (path: string) => { isDirectory(): boolean },
+): string {
+  const lexical = win32.resolve(target)
+  const root = win32.parse(lexical).root
+  let current = lexical
+  let missing: string[] = []
+  for (;;) {
+    try {
+      const ancestor = realpath(current)
+      if (missing.length === 0) return ancestor
+      if (!lstat(ancestor).isDirectory()) throw Object.assign(new Error(`not a directory: ${ancestor}`), { code: "ENOTDIR" })
+      return win32.join(ancestor, ...missing)
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== "ENOENT") throw error
+      if (isEntry(current, lstat) || current.length <= root.length) throw error
+      missing = [win32.basename(current), ...missing]
+      current = win32.dirname(current)
+    }
+  }
 }

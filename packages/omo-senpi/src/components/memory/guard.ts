@@ -1,6 +1,6 @@
 import { lstatSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
-import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
+import { isDarwinAutomountTriggerPath, resolveSegmentwise } from "@oh-my-opencode/utils/path-containment"
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import type { ToolCallEventResult } from "@code-yeongyu/senpi"
 
@@ -177,7 +177,9 @@ function resolveGuardRoots(context: MemoryIdentityContext): GuardRoots {
 function isForbiddenTarget(rawPath: string, cwd: string, roots: GuardRoots, recursive: boolean): boolean {
   if (rawPath.includes("\0")) return false
   const lexical = resolve(cwd, rawPath)
-  const candidates = uniquePaths([lexical, canonicalizeFromNearestExisting(rawPath)])
+  // The raw sequence is what the opener walks; `resolve` has already collapsed any `..` after a link.
+  const rawAbsolute = isAbsolute(rawPath) ? rawPath : `${cwd}${sep}${rawPath}`
+  const candidates = uniquePaths([lexical, canonicalizeFromNearestExisting(rawAbsolute)])
   const deniedRoots = uniquePaths(roots.deniedRoots.flatMap((root) => [root, canonicalizeFromNearestExisting(root)]))
   const ownRoots = uniquePaths([roots.ownRoot, canonicalizeFromNearestExisting(roots.ownRoot)])
 
@@ -192,19 +194,10 @@ function isForbiddenTarget(rawPath: string, cwd: string, roots: GuardRoots, recu
 function canonicalizeFromNearestExisting(target: string): string | undefined {
   // A macOS automount trigger stays lexical: lstat/realpath under it can park the host loop (#11545).
   if (isDarwinAutomountTriggerPath(target)) return undefined
-  let candidate = target
-  const missingSegments: string[] = []
-  while (true) {
-    try {
-      lstatSync(candidate)
-      return resolve(realpathSync.native(candidate), ...missingSegments.reverse())
-    } catch (error) {
-      if (!isMissingPathError(error)) return undefined
-      const parent = dirname(candidate)
-      if (parent === candidate) return undefined
-      missingSegments.push(basename(candidate))
-      candidate = parent
-    }
+  try {
+    return resolveSegmentwise(target, { realpath: realpathSync.native, lstat: lstatSync })
+  } catch {
+    return undefined
   }
 }
 
