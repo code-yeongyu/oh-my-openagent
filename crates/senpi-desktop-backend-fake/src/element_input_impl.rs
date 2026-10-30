@@ -2,7 +2,7 @@
 
 use senpi_desktop_core::ax::AxHandle;
 use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, KeyboardFocus};
-use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::protocol_results::AxInputMethod;
 
 use crate::ax_tree::node_id;
@@ -32,8 +32,14 @@ pub(crate) fn ax_type_text(
     let native_role = backend.ax_tree.props(node)?.native_role;
     let inserts = matches!(native_role.as_str(), "AXTextField" | "AXTextArea" | "AXComboBox");
     if inserts {
+        if backend.faults().take_refused_focus() {
+            return Err(DesktopError::ax_failed(
+                "a refuse_focus fault was armed for an element that takes inserted text; the fault was \
+                 consumed and nothing was written (insertion never takes focus)",
+            ));
+        }
         let reply = backend.begin_write(AxWrite::AxTypeText)?;
-        backend.ax_tree.append_value(node, text)?;
+        backend.ax_tree.insert_text(node, text)?;
         backend.record(SinkOp::AxTypeText {
             node,
             text: text.to_owned(),
@@ -66,7 +72,7 @@ pub(crate) fn ax_type_text(
     for character in text.chars() {
         check_stop()?;
         typed.push(character);
-        backend.ax_tree.append_value(node, &character.to_string())?;
+        backend.ax_tree.insert_text(node, &character.to_string())?;
         delivered();
     }
     backend.record(SinkOp::AxTypeText {

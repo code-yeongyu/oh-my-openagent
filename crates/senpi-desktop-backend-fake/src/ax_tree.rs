@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use senpi_desktop_core::ax::{AxBounds, AxHandle, AxProps};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::text_range::{replace_utf16_selection, utf16_byte_range, Utf16Range};
 
 use crate::scenario::FakeAxNode;
 
@@ -11,6 +12,9 @@ struct AxEntry {
     props: AxProps,
     parent: Option<u64>,
     children: Vec<u64>,
+    /// The selected range of a text value, in UTF-16 units; `None` is a caret
+    /// at the end of the value.
+    selection: Option<Utf16Range>,
 }
 
 #[derive(Default)]
@@ -64,6 +68,7 @@ impl AxTree {
                 props,
                 parent,
                 children,
+                selection: None,
             },
         );
         id
@@ -113,15 +118,47 @@ impl AxTree {
         Ok(())
     }
 
-    /// Appends `text` to the node's value, as an insertion at the end of its
-    /// selection does.
-    pub(crate) fn append_value(&mut self, id: u64, text: &str) -> CoreResult<()> {
+    /// Inserts `text` at the node's selection (a caret at the end of the
+    /// value unless one was selected), replacing the selected text; the caret
+    /// then sits after the inserted text.
+    pub(crate) fn insert_text(&mut self, id: u64, text: &str) -> CoreResult<()> {
         let entry = self
             .nodes
             .get_mut(&id)
             .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
-        entry.props.value.get_or_insert_with(String::new).push_str(text);
+        let value = entry.props.value.get_or_insert_with(String::new);
+        let selection = entry.selection.unwrap_or(Utf16Range {
+            start: value.encode_utf16().count(),
+            length: 0,
+        });
+        *value = replace_utf16_selection(value, selection, text)?;
+        entry.selection = Some(Utf16Range {
+            start: selection.start + text.encode_utf16().count(),
+            length: 0,
+        });
         Ok(())
+    }
+
+    /// Selects `range` of the node's value; the range must lie inside it.
+    pub(crate) fn select(&mut self, id: u64, range: Utf16Range) -> CoreResult<()> {
+        let entry = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
+        let value = entry.props.value.as_deref().unwrap_or_default();
+        if utf16_byte_range(value, range).is_none() {
+            return Err(DesktopError::ax_failed(format!(
+                "selection {}+{} is outside fake AX node {id}'s value",
+                range.start, range.length
+            )));
+        }
+        entry.selection = Some(range);
+        Ok(())
+    }
+
+    /// The node's value, for locating text to select.
+    pub(crate) fn value(&self, id: u64) -> CoreResult<Option<String>> {
+        self.entry(id).map(|entry| entry.props.value.clone())
     }
 
     /// Moves AX focus to `id`, clearing it everywhere else.

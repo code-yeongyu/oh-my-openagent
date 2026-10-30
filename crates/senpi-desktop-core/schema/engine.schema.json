@@ -471,6 +471,17 @@
         "$ref": "#/definitions/AxInputResult"
       }
     },
+    "ax.selectText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxSelectTextParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxTextSelection"
+      }
+    },
     "stopPath.start": {
       "effect": "exec",
       "hostOnly": true,
@@ -2272,6 +2283,70 @@
       ],
       "description": "How `ax.typeText` delivered its text."
     },
+    "AxSelectTextParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "suffix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "select": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "description": "`ax.selectText`: selects `text` inside the value of the element `ref`\nnames, disambiguated by the `prefix` and `suffix` around it; `select` is\n`text` (the match), `start` or `end` (a caret before or after it).",
+      "additionalProperties": false
+    },
+    "AxTextSelection": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "length": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        },
+        "focused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "start",
+        "length",
+        "text",
+        "focused"
+      ],
+      "description": "`ax.selectText` reply: the selection that was applied, in UTF-16 code\nunits of the element's value, with the text it covers and whether the\nelement holds its application's focus.",
+      "additionalProperties": false
+    },
     "StopPathStartParams": {
       "type": "object",
       "properties": {
@@ -2528,6 +2603,7 @@
         "ax.focus",
         "ax.click",
         "ax.typeText",
+        "ax.selectText",
         "stopPath.start",
         "stopPath.status",
         "stopPath.heartbeat",

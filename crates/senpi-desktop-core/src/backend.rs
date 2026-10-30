@@ -11,6 +11,8 @@ use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
+use crate::protocol_results::AxTextSelection;
+use crate::text_range::TextSelectRequest;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
@@ -327,6 +329,13 @@ pub trait AxBackend {
     /// cannot name it keep this default.
     fn owner(&mut self, _h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
         Ok(AxOwner::Unknown)
+    }
+
+    /// Selects the range `request` names in `h`'s value (`ax.selectText`) by
+    /// writing the element's selected text range: no key is sent and no
+    /// focus moves. Backends without text selection keep this default.
+    fn select_text(&mut self, _h: &AxHandle, _request: &TextSelectRequest) -> CoreResult<AxTextSelection> {
+        Err(DesktopError::ax_unsupported())
     }
 }
 
