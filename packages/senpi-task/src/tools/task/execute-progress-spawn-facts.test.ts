@@ -7,11 +7,12 @@ import type { TaskToolDetails } from "./types"
 import { CTX, createFakeManager, makeDeps, makeRecord } from "./__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "./execute"
 
-type Deferred<T> = { readonly promise: Promise<T>; resolve(value: T): void }
+type Deferred<T> = { readonly promise: Promise<T>; resolve(value: T): void; reject(reason: unknown): void }
 
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void
-  return { promise: new Promise<T>((done) => { resolve = done }), resolve }
+  let reject!: (reason: unknown) => void
+  return { promise: new Promise<T>((done, fail) => { resolve = done; reject = fail }), resolve, reject }
 }
 
 // Bounded wait on a signal: GREEN resolves through the event, RED fails with a named reason.
@@ -131,6 +132,66 @@ describe("progress partials carry the spawn facts once the launch settles, howev
         launch.resolve()
         completion.resolve({ ...current, status: "completed", final_response: "done" })
         await execution
+      }
+    })
+  }
+})
+
+const REJECTING_ROWS: readonly { readonly name: string; readonly params: ExecuteParams }[] = [
+  { name: "a foreground spawn", params: { prompt: "inspect", category: "quick" } },
+  { name: "a foreground batch", params: { category: "quick", tasks: [{ prompt: "inspect" }, { prompt: "review" }] } },
+]
+
+// whenLaunched is optional on the manager contract and does not promise never to reject.
+describe("a rejected launch releases the held progress partials", () => {
+  for (const row of REJECTING_ROWS) {
+    test(`#given ${row.name} whose launch rejects #when a child event was held #then partials resume and no rejection escapes`, async () => {
+      // given
+      const record = makeRecord({ task_id: TASK_ID, status: "running", resolved_model: PLANNED })
+      const launch = deferred<void>()
+      const completion = deferred<TaskRecord>()
+      const subscribed = deferred<void>()
+      const published = deferred<void>()
+      const escaped: unknown[] = []
+      const onUnhandled = (reason: unknown): void => { escaped.push(reason) }
+      process.on("unhandledRejection", onUnhandled)
+      let listener: ManagedChildListener | undefined
+      const taskIds = [TASK_ID, "st_spawn_facts_2"]
+      let starts = 0
+      const manager = createFakeManager({
+        start: async () => ({ kind: "started", task_id: taskIds[starts++] ?? "st_spawn_facts_extra", status: "running", name: "child", run_epoch: 1, resolved_model: PLANNED, starting: true }),
+        whenLaunched: () => launch.promise,
+        get: (taskId) => taskId === TASK_ID ? record : undefined,
+        subscribeChild: (_taskId, next) => {
+          listener = next
+          subscribed.resolve()
+          return () => {}
+        },
+        waitFor: () => completion.promise,
+      })
+      const updates: AgentToolResult<TaskToolDetails>[] = []
+      const execution = buildTaskExecute(makeDeps(manager))("spawn-facts-rejected", row.params, undefined, (update) => {
+        updates.push(update)
+        published.resolve()
+      }, CTX)
+      try {
+        await withinBudget(subscribed.promise, "the foreground spawn never subscribed to its child")
+        listener?.({ type: "tool_execution_start", toolName: "read", args: { path: "src/early.ts" } })
+        expect(updates).toHaveLength(0)
+
+        // when
+        launch.reject(new Error("launch failed"))
+        await withinBudget(published.promise, "the held partials stayed frozen after the launch rejected")
+        // Let the runtime's rejection tracking run before reading what escaped.
+        await new Promise<void>((done) => setImmediate(done))
+
+        // then
+        expect(updates.length).toBeGreaterThan(0)
+        expect(escaped).toEqual([])
+      } finally {
+        completion.resolve({ ...record, status: "completed", final_response: "done" })
+        await execution
+        process.off("unhandledRejection", onUnhandled)
       }
     })
   }

@@ -101,12 +101,12 @@ export function trackBatchProgress(input: BatchProgressInput): BatchProgressTrac
   )
   emit()
   // Every running row needs its launched facts before the batch partial is published.
-  for (const launch of launches) {
-    void launch.then(() => {
-      launching--
-      emit()
-    })
+  // A rejected launch counts as settled, so it neither freezes the batch partials nor escapes unhandled.
+  const launchSettled = (): void => {
+    launching--
+    emit()
   }
+  for (const launch of launches) void launch.then(launchSettled, launchSettled)
   return {
     settle(taskId, status) {
       settled.set(taskId, status)

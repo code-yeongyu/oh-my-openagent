@@ -193,10 +193,14 @@ export async function runSpawn(
     emit()
   }
   // Do not publish running partials with incomplete facts while the launch is still in flight.
-  if (launch !== undefined) void launch.then(() => {
-    launching = false
-    emit()
-  })
+  // whenLaunched is optional and may reject: a failed launch releases the partials too, and the wait below reports it.
+  if (launch !== undefined) {
+    const launchSettled = (): void => {
+      launching = false
+      emit()
+    }
+    void launch.then(launchSettled, launchSettled)
+  }
   const parent = deps.manager.findTaskByChildSession?.(ctx.sessionManager.getSessionId())
   const parked = parent === undefined ? undefined : deps.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
   let promoted = false
