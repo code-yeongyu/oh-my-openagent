@@ -122,10 +122,9 @@ describe("child task progress", () => {
     )
   })
 
-  test("#given a fallback event without thinking suffix #when the event carries a thinking field #then the display includes the applied level", () => {
-    // Reproduces https://github.com/code-yeongyu/oh-my-openagent/issues/7934
-    // The Senpi core event.to may not include the :thinking suffix, but a future
-    // event.thinking field should be preferred when present.
+  test("#given senpi's fallback switch #when model_changed carries the level before a bare retry_fallback_applied #then the display keeps the applied level", () => {
+    // #7934: senpi emits model_changed (source "fallback", the clamped thinkingLevel) from switchModel, then
+    // retry_fallback_applied whose `to` is the bare provider/model_id selector with no level and no thinking field.
     const progress = createChildProgress(
       "st_00000005",
       { category: "deep", resolvedModel: RESOLVED_MODEL },
@@ -133,11 +132,27 @@ describe("child task progress", () => {
       () => 2_000,
     )
 
-    // Fallback with bare selector but explicit thinking field on the event
-    progress.accept({ type: "retry_fallback_applied", to: "openai-codex/gpt-5.6-sol", thinking: "high" } as never)
+    progress.accept({ type: "model_changed", model: { provider: "openai-codex", id: "gpt-5.6-sol" }, thinkingLevel: "high", source: "fallback" })
+    progress.accept({ type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" })
 
     expect(progress.details().progress.activity).toBe(
-      "st_00000005 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · turn 0 · running",
+      "st_00000005 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · starting",
+    )
+  })
+
+  test("#given a model_changed for another model #when a bare retry_fallback_applied follows #then no stale level is attached", () => {
+    const progress = createChildProgress(
+      "st_00000007",
+      { category: "deep", resolvedModel: RESOLVED_MODEL },
+      1_000,
+      () => 2_000,
+    )
+
+    progress.accept({ type: "model_changed", model: { provider: "anthropic", id: "claude-opus-5-5" }, thinkingLevel: "max", source: "fallback" })
+    progress.accept({ type: "retry_fallback_applied", from: "kimi-coding/kimi-k3-unlocked", to: "openai-codex/gpt-5.6-sol", chainKey: "deep", reason: "hard-error" })
+
+    expect(progress.details().progress.activity).toBe(
+      "st_00000007 · category:deep(openai-codex/gpt-5.6-sol) · fallback:1 · starting",
     )
   })
 
@@ -152,7 +167,7 @@ describe("child task progress", () => {
     progress.accept({ type: "retry_fallback_applied", to: "openai-codex/gpt-5.6-sol:high" })
 
     expect(progress.details().progress.activity).toBe(
-      "st_00000006 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · turn 0 · running",
+      "st_00000006 · category:deep(openai-codex/gpt-5.6-sol:high) · fallback:1 · starting",
     )
   })
 
