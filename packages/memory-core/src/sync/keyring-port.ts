@@ -190,7 +190,7 @@ const wrapAad = (binding: WrapBinding): Uint8Array => {
 
 export { openHpkeSealedBox } from "./hpke-sealed-box"
 
-interface DeviceKeyMaterial {
+export interface DeviceKeyMaterial {
   /** PKCS#8 DER of the Ed25519 private key, base64url. */
   readonly signingPrivatePkcs8: string
   /** PKCS#8 DER of the X25519 private key, base64url. */

@@ -91,31 +91,15 @@ bun install
 bun run dev
 ```
 
-## Lint + format — Biome
+## Lint + format: oxlint + oxfmt
 
-Biome replaces ESLint + Prettier with one tool, written in Rust, ~30x faster.
+**Strongly prefer oxlint + oxfmt for new TS/JS projects**, including the local `no-em-dash-copy` and `require-suppression-reason` plugin. Keep ESLint, Prettier, or Biome only when the repository already uses them.
 
 ```bash
-bun add --dev @biomejs/biome
-bun biome init
+bun add --dev oxlint@1.89.0 oxfmt@0.74.0 oxlint-tsgolint@7.0.2005
 ```
 
-`biome.json`:
-
-```json
-{
-  "$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
-  "organizeImports": { "enabled": true },
-  "linter": { "enabled": true, "rules": { "recommended": true } },
-  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2 }
-}
-```
-
-Use ESLint only when:
-- You have an ESLint plugin Biome doesn't replicate (rare in 2026)
-- You're contributing to an existing ESLint project
-
-Never run both — pick one.
+Copy `.oxlintrc.json`, `.oxfmtrc.json`, and the plain-JS plugin with its license from [oxc-lint.md](oxc-lint.md), or run the scaffold. The reference explains product-source scoping and verified strict rules. Use `oxlint --type-aware --deny-warnings` where the companion/runtime/project supports it, plus `oxfmt --check` and `tsc --noEmit`. On unsupported targets use syntax lint and keep the compiler gate; do not claim type-aware checks ran.
 
 ## Test runner — bun test or vitest
 
@@ -166,8 +150,8 @@ NEVER Jest for a new project. Jest's CommonJS-first design fights every modern N
 mkdir my-api && cd my-api
 bun init -y
 bun add hono hono-openapi @scalar/hono-api-reference @hono/swagger-ui zod
-bun add --dev @biomejs/biome typescript
-bun biome init
+bun add --dev oxlint@1.89.0 oxfmt@0.74.0 oxlint-tsgolint@7.0.2005 typescript
+# Copy the configs and plugin from oxc-lint.md, including the plugin LICENSE.
 ```
 
 `package.json` scripts:
@@ -179,7 +163,9 @@ bun biome init
     "start": "bun run src/index.ts",
     "build": "bun build src/index.ts --target bun --outdir dist",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check --write src tests",
+    "lint": "oxlint --type-aware --deny-warnings",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "test": "bun test"
   }
 }

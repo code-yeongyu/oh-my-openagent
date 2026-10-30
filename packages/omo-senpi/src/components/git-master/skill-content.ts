@@ -1,7 +1,7 @@
 import type { OmoGitMasterSettings } from "@oh-my-opencode/omo-config-core"
 import { injectGitMasterConfig } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/git-master-template-injection"
 
-import { buildGitMasterAttributionDirective } from "./directive"
+import { COMMIT_ATTRIBUTION_OPEN_TAG, buildGitMasterAttributionDirective } from "./directive"
 
 // Senpi's bash tool always runs bash (Git Bash on Windows), whatever the user's login shell is,
 // so the prefix must be the bash form; a csh/PowerShell form would be dropped by bash.
@@ -17,7 +17,8 @@ export interface GitMasterSkillAdditions {
 function injectAfterFrontmatter(text: string, gitEnvPrefix: string): string {
   const frontmatter = FRONTMATTER_PATTERN.exec(text)?.[0] ?? ""
   const body = text.slice(frontmatter.length)
-  const config = { commit_footer: false, git_env_prefix: gitEnvPrefix }
+  // Attribution rides the separate directive, so the template rewrite must not add its own section.
+  const config = { commit_footer: false, include_co_authored_by: false, git_env_prefix: gitEnvPrefix }
   return frontmatter + injectGitMasterConfig(body, config, SENPI_COMMAND_SHELL)
 }
 
@@ -29,4 +30,8 @@ export function resolveGitMasterSkillAdditions(settings: OmoGitMasterSettings): 
     rewriteSkillText: gitEnvPrefix === "" ? (text) => text : (text) => injectAfterFrontmatter(text, gitEnvPrefix),
     directive,
   }
+}
+
+export function carriesAttributionDirective(texts: readonly string[]): boolean {
+  return texts.some((text) => text.includes(COMMIT_ATTRIBUTION_OPEN_TAG))
 }

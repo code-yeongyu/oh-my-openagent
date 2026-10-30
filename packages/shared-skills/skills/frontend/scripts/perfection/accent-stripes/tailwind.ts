@@ -43,11 +43,15 @@ const SIDE_TOUCHES: Readonly<Record<string, readonly Corner[]>> = {
 }
 const ALL: readonly Corner[] = ["tl", "tr", "br", "bl"]
 
-function wideSideCorners(util: string): readonly Corner[] {
-	const m = /^border-([tlrbsexy]|bs|be)-(\d+|\[[^\]]+\])$/.exec(util)
-	if (!m?.[1] || !m[2]) return []
-	const width = /^\d+$/.test(m[2]) ? Number.parseInt(m[2], 10) : arbitraryPx(m[2])
-	return (width ?? 0) >= MIN_STRIPE_PX ? (SIDE_TOUCHES[m[1]] ?? []) : []
+const SIDE = /^(?:[tlrbsexy]|bs|be)-/
+
+function isWide(width: string | undefined): boolean {
+	if (!width) return false
+	return ((/^\d+$/.test(width) ? Number.parseInt(width, 10) : arbitraryPx(width)) ?? 0) >= MIN_STRIPE_PX
+}
+
+function isWideSide(util: string): boolean {
+	return isWide(/^border-(?:[tlrbsexy]|bs|be)-(\d+|\[[^\]]+\])$/.exec(util)?.[1])
 }
 
 function roundedCorners(utils: readonly string[]): Set<Corner> {
@@ -65,12 +69,28 @@ function roundedCorners(utils: readonly string[]): Set<Corner> {
 	return corners
 }
 
-function borderColorIsChromatic(util: string): boolean {
-	const m = /^border(?:-(?:[tlrbsexy]|bs|be))?-(.+)$/.exec(util)
-	const fragment = m?.[1]
+function colorIsChromatic(fragment: string | undefined): boolean {
 	if (!fragment || BORDER_STYLE.has(fragment) || /^\d+$/.test(fragment)) return false
 	if (fragment.startsWith("[") && arbitraryPx(fragment) !== undefined) return false
 	return classifyUtilityColor(fragment) === "chromatic"
+}
+
+function borderColorIsChromatic(util: string): boolean {
+	return colorIsChromatic(/^border(?:-(?:[tlrbsexy]|bs|be))?-(.+)$/.exec(util)?.[1])
+}
+
+function hasOutline(utils: readonly string[]): boolean {
+	const border = utils.some((u) => isWide(/^border-(\d+|\[[^\]]+\])$/.exec(u)?.[1]))
+	const borderColor = utils.some((u) => {
+		const fragment = /^border-(.+)$/.exec(u)?.[1]
+		return fragment !== undefined && !SIDE.test(fragment) && colorIsChromatic(fragment)
+	})
+	const ring = utils.some((u) => isWide(/^ring-(\d+|\[[^\]]+\])$/.exec(u)?.[1]))
+	const ringColor = utils.some((u) => {
+		const fragment = /^ring-(.+)$/.exec(u)?.[1]
+		return fragment !== undefined && !/^(?:inset|offset-)/.test(fragment) && colorIsChromatic(fragment)
+	})
+	return (border && borderColor) || (ring && ringColor)
 }
 
 function thinBar(utils: readonly string[], axis: "w" | "h"): boolean {
@@ -93,14 +113,12 @@ function isPseudoBar(utils: readonly string[]): boolean {
 	return chromaticBg && ((thinBar(utils, "w") && longBar(utils, "h")) || (thinBar(utils, "h") && longBar(utils, "w")))
 }
 
-export function checkClassSet(tokens: readonly string[]): RuleId[] {
+export function checkClassSet(tokens: readonly string[], hostRounded = false): RuleId[] {
 	const utilities = tokens.map(toUtility).filter((u): u is Utility => u !== undefined)
 	const base = utilities.filter((u) => u.layer === "base").map((u) => u.util)
-	const corners = roundedCorners(base)
-	if (corners.size === 0) return []
 	const found: RuleId[] = []
-	const bent = base.some((u) => wideSideCorners(u).some((c) => corners.has(c)))
-	if (bent && base.some(borderColorIsChromatic)) found.push("edge-stripe")
+	if (base.some(isWideSide) && base.some(borderColorIsChromatic)) found.push("edge-stripe")
+	else if ((hostRounded || roundedCorners(base).size > 0) && hasOutline(base)) found.push("accent-outline")
 	const shadows = base.filter((u) => u.startsWith("shadow-[") && u.endsWith("]"))
 	if (shadows.some((u) => isInsetShadowStripe(u.slice("shadow-[".length, -1).replace(/_/g, " ")))) {
 		found.push("inset-shadow-stripe")
@@ -113,5 +131,5 @@ export function checkClassSet(tokens: readonly string[]): RuleId[] {
 }
 
 export function looksLikeClassList(text: string): boolean {
-	return /(?:^|\s)(?:[\w-]+:)*rounded/.test(text)
+	return /(?:^|\s)(?:[\w-]+:)*(?:rounded|border-|ring-|shadow-\[|(?:before|after):)/.test(text)
 }

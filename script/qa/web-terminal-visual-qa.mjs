@@ -9,7 +9,7 @@
 import { createRequire } from "node:module";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { captureLive } from "./xterm-live-terminal.mjs";
+import { DEFAULT_WAIT_FOR_TIMEOUT_MS, captureLive } from "./xterm-live-terminal.mjs";
 import { BUILT_IN_REDACTION_RULE_COUNT, compileRedactions, redactEvidence } from "./web-terminal-redaction.mjs";
 import { stripAnsi } from "./strip-ansi.mjs";
 
@@ -32,10 +32,13 @@ Inputs:
                          Literal text is typed; {Enter} {Tab} {Escape} {ArrowDown} {Ctrl+C} etc. are pressed as keys.
                          {WheelUp} and {WheelDown} send real browser mouse-wheel input over the xterm viewport.
                          {CtrlSlashByte} and {Ctrl7Byte} send their shared exact terminal control byte.
+                         {WaitFor:<text>} waits until the rendered terminal shows <text> (e.g. the prompt) before
+                         the next token; it fails after --wait-for-timeout-ms instead of falling through.
   --cwd <path>           Working directory for --command. Default: current directory.
   --cols <n> / --rows <n>  Terminal geometry. Default: 120 x 32.
   --dwell-ms <n>         Milliseconds to let the TUI settle after input before capture. Default: 1500.
   --key-delay-ms <n>     Pause between --input tokens. Default: 120.
+  --wait-for-timeout-ms <n>  Timeout for each {WaitFor:<text>} token. Default: 10000.
   --evidence-dir <path>  Directory for terminal.png, terminal.txt, terminal-ansi.txt, metadata.json.
   --chrome-bin <path>    Chrome/Chromium executable (else auto-detect or CHROME_BIN).
   --source-label <text>  Safe label for --command metadata. The raw command is never written to metadata.
@@ -55,7 +58,7 @@ function parsePositiveInt(name, value) {
 }
 
 function parseArgs(argv) {
-  const args = { cols: 120, rows: 32, dwellMs: 1500, keyDelayMs: 120, cwd: process.cwd(), browser: true, redactions: [], redactRegexes: [], inputs: [] };
+  const args = { cols: 120, rows: 32, dwellMs: 1500, keyDelayMs: 120, waitForTimeoutMs: DEFAULT_WAIT_FOR_TIMEOUT_MS, cwd: process.cwd(), browser: true, redactions: [], redactRegexes: [], inputs: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") return { ...args, help: true };
@@ -78,6 +81,7 @@ function parseArgs(argv) {
     else if (arg === "--rows") args.rows = parsePositiveInt(arg, next);
     else if (arg === "--dwell-ms") args.dwellMs = parsePositiveInt(arg, next);
     else if (arg === "--key-delay-ms") args.keyDelayMs = parsePositiveInt(arg, next);
+    else if (arg === "--wait-for-timeout-ms") args.waitForTimeoutMs = parsePositiveInt(arg, next);
     else throw new Error(`unknown argument: ${arg}`);
   }
   return args;

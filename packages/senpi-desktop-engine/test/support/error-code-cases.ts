@@ -7,43 +7,21 @@ export const WINDOW = "101";
 
 const ERROR_RS = path.join(REPO_ROOT, "crates", "senpi-desktop-core", "src", "error.rs");
 
-/** The variants of `enum ErrorCode` in `senpi-desktop-core/src/error.rs`, in declaration order. */
+/**
+ * The variants of `enum ErrorCode` in `senpi-desktop-core/src/error.rs`, in declaration order. The body ends at the
+ * enum's own closing line, not at the first `}`: a doc comment may hold braces (`CaptureUnavailable`'s does).
+ */
 export function declaredErrorCodes(): readonly string[] {
-	const body = readFileSync(ERROR_RS, "utf8").split("pub enum ErrorCode {")[1]?.split("}")[0];
+	const body = readFileSync(ERROR_RS, "utf8").split("pub enum ErrorCode {")[1];
 	if (body === undefined) throw new Error(`${ERROR_RS} declares no enum ErrorCode`);
-	return body
-		.split("\n")
-		.map((line) => line.trim())
+	const lines = body.split("\n").map((line) => line.trim());
+	const end = lines.indexOf("}");
+	if (end === -1) throw new Error(`${ERROR_RS} never closes enum ErrorCode`);
+	return lines
+		.slice(0, end)
 		.filter((line) => line !== "" && !line.startsWith("//") && !line.startsWith("#"))
 		.map((line) => line.replace(/,$/, ""));
 }
-
-/**
- * Every pointer, keyboard, window, and AX input method with parseable params. `clipboard.write` is absent:
- * the engine answers it `Internal` until the clipboard lands with the backends.
- */
-export const INPUT_CALLS: ReadonlyArray<readonly [string, Message]> = [
-	["click", { target: "desktop", x: 10, y: 10 }],
-	["moveMouse", { target: "desktop", x: 10, y: 10 }],
-	[
-		"drag",
-		{
-			target: "desktop",
-			path: [
-				{ x: 1, y: 1 },
-				{ x: 5, y: 5 },
-			],
-		},
-	],
-	["scroll", { target: "desktop", x: 10, y: 10, dx: 0, dy: 3 }],
-	["typeText", { target: WINDOW, text: "hi" }],
-	["keyChord", { target: WINDOW, keys: ["ctrl", "a"] }],
-	["raiseWindow", { windowId: WINDOW }],
-	["ax.perform", { ref: "e1", action: "press" }],
-	["ax.setValue", { ref: "e1", value: "hi" }],
-	["ax.focus", { ref: "e1" }],
-	["ax.click", { ref: "e1" }],
-];
 
 export interface ErrorCodeCase {
 	readonly code: string;
@@ -56,7 +34,21 @@ export interface ErrorCodeCase {
 
 const click = (engine: EngineProcess, target: string) => engine.call("click", { target, x: 10, y: 10 });
 const open = (engine: EngineProcess) => engine.call("session.open", {});
-const failNext = (method: string): Message => ({ fail_next: [{ method, code: "InputFailed" }] });
+/** The fake fails the next `method` call with `code`: the wire path of a code no fake scenario raises on its own yet. */
+const failNextWith = (method: string, code: string): Message => ({ fail_next: [{ method, code }] });
+const failNext = (method: string): Message => failNextWith(method, "InputFailed");
+
+/** A background click on the captured window. */
+async function windowClick(engine: EngineProcess): Promise<Message> {
+	await makeStopPathLive(engine);
+	await capture(engine, WINDOW);
+	return click(engine, WINDOW);
+}
+
+async function listWindows(engine: EngineProcess): Promise<Message> {
+	await open(engine);
+	return engine.call("windows", {});
+}
 
 /** A foreground click on the window, which captures and restores focus and cursor. */
 async function foregroundClick(engine: EngineProcess): Promise<Message> {
@@ -137,7 +129,7 @@ export const ERROR_CODE_CASES: readonly ErrorCodeCase[] = [
 		overlay: {},
 		drive: async (engine) => {
 			await makeStopPathLive(engine);
-			return click(engine, "desktop");
+			return click(engine, WINDOW);
 		},
 	},
 	{
@@ -230,6 +222,26 @@ export const ERROR_CODE_CASES: readonly ErrorCodeCase[] = [
 	{ code: "FocusRestoreFailed", overlay: failNext("restore_front_window"), drive: foregroundClick },
 	{ code: "TransactionFailed", overlay: failNext("front_window"), drive: foregroundClick },
 	{ code: "ControlRequired", overlay: {}, drive: ungrantedForegroundClick },
+	{
+		code: "CaptureUnavailable",
+		overlay: { fail_next: [{ method: "capture", code: "CaptureUnavailable", reason: "minimized" }] },
+		drive: async (engine) => {
+			await open(engine);
+			return engine.call("capture", { target: WINDOW });
+		},
+	},
+	{ code: "UserIntervened", overlay: failNextWith("click", "UserIntervened"), drive: windowClick },
+	{
+		code: "AxUnconfirmed",
+		overlay: failNextWith("ax_perform", "AxUnconfirmed"),
+		drive: async (engine) => {
+			await makeStopPathLive(engine);
+			const textarea = await snapshotRef(engine, WINDOW, "textarea");
+			return engine.call("ax.perform", { ref: textarea, action: "press" });
+		},
+	},
+	{ code: "SpaceUnsupported", overlay: failNextWith("windows", "SpaceUnsupported"), drive: listWindows },
+	{ code: "SpaceMoveDenied", overlay: failNextWith("windows", "SpaceMoveDenied"), drive: listWindows },
 ];
 
 /**

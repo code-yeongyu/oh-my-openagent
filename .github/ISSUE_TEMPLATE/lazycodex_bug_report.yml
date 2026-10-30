@@ -6,6 +6,11 @@ body:
   - type: markdown
     attributes:
       value: |
+        **If you hit this in the omo app, run `/bug` inside a session instead.** It lists what it includes and lets you see the exact report before you send it, then sends the redacted engine log, environment, config with secrets blanked and session transcript, plus identity lines - device name and, when telemetry is on, an install id and a session hash, and your account details (email, name, account, user and device ids, plan, device name) from the desktop app - so we can reply. This form stays open for LazyCodex and for anyone who cannot use the in-app report.
+
+  - type: markdown
+    attributes:
+      value: |
         Please file source-level LazyCodex work in [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), where `packages/omo-codex` lives.
 
   - type: textarea

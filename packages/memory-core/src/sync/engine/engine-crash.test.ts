@@ -1,4 +1,9 @@
 import { afterEach, expect, test } from "bun:test"
+import { rm, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+
+import { createNodeGitExec } from "../../git/exec"
+import { StrandedGitLockError } from "../../git/repo-lock-sweep"
 
 import { CrashInjected, INBOUND_POINTS, OUTBOUND_POINTS } from "./engine"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
@@ -84,4 +89,22 @@ test("an agent commit landing between `rendered` and `committed` does not fool r
   await b.engine.runCycle()
   expect(await b.syncCommits()).toEqual(["1-1"])
   expect([await b.read("x.md"), await b.read("agent.md")]).toEqual(["x\n", "agent\n"])
+}, GIT_TEST_TIMEOUT)
+
+test("a cycle cut short by a stranded index lock after its sync commit landed leaves a clean index once the lock is gone (omo #10637)", async () => {
+  const { server, a } = await world()
+  const b = await makeDevice(server, "b")
+  devices.push(b)
+  await a.write("one.md", "one\n")
+  await a.engine.runCycle()
+  const lock = join(b.repo.gitDir, "index.lock")
+  await writeFile(lock, "")
+  const failure = await b.engine.runCycle().then(() => null, (error: unknown) => error)
+  expect(failure).toBeInstanceOf(StrandedGitLockError)
+  await rm(lock)
+  await b.engine.runCycle()
+  const status = await createNodeGitExec().run(["status", "--porcelain"], { cwd: b.repo.root, timeoutMs: 20_000 })
+  expect(status.stdout).toBe("")
+  expect(await b.read("one.md")).toBe("one\n")
+  expect(await b.syncCommits()).toHaveLength(1)
 }, GIT_TEST_TIMEOUT)

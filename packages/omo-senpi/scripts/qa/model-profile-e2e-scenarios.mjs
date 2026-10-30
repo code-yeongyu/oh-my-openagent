@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+
 export const APPLIED_TYPE = "omo-model-profile:applied"
 export const UNKNOWN_TYPE = "omo-model-profile:unknown"
 export const UNAVAILABLE_TYPE = "omo-model-profile:unavailable"
@@ -12,6 +14,13 @@ export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-nor
 // The refresh token the fixture OAuth lane in model-profile-e2e-mock-provider.ts refuses to
 // exchange (kept literal on both sides: the mock runs inside the senpi process, this file in node).
 export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
+export const FLAKY_REFRESH_TOKEN = "flaky-refresh"
+
+// Mirrors FABLE_55_RELEASED in packages/model-core/src/fable-55-launch.ts (this file runs in plain
+// node): while it is false the Daily · Heavy 5.5 rung is absent, so 5.1 runs even when 5.5 is served.
+const FABLE_55_RELEASED = /export const FABLE_55_RELEASED = true\b/.test(
+  readFileSync(new URL("../../../model-core/src/fable-55-launch.ts", import.meta.url), "utf8"),
+)
 
 export const SCENARIOS = {
   "geeky-normal-api-sol": {
@@ -46,6 +55,18 @@ export const SCENARIOS = {
     registerProviders: ["anthropic"],
     expect: { model: "claude-fable-5-1", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
   },
+  "daily-heavy-fable55": {
+    omoConfig: { model_profile: "daily-heavy" },
+    mockModels: ["mock-1", "claude-fable-5-1", "claude-fable-5-5"],
+    registerProviders: ["anthropic", "opencode"],
+    expect: { model: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1", provider: "anthropic", notice: APPLIED_TYPE, thinking: "xhigh" },
+  },
+  "daily-heavy-fable55-gateway-unavailable": {
+    omoConfig: { model_profile: "daily-heavy" },
+    mockModels: ["mock-1", "anthropic/claude-fable-5-5"],
+    registerProviders: ["opengateway"],
+    expect: { model: "mock-1", notice: UNAVAILABLE_TYPE },
+  },
   "geeky-normal-sol": {
     omoConfig: { model_profile: "geeky-normal" },
     mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol"],
@@ -69,10 +90,10 @@ export const SCENARIOS = {
   },
   "daily-normal-kimi": {
     omoConfig: { model_profile: "daily-normal" },
-    mockModels: ["mock-1", "kimi-k3"],
+    mockModels: ["mock-1", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   "daily-normal-glm": {
     omoConfig: { model_profile: "daily-normal" },
@@ -80,6 +101,13 @@ export const SCENARIOS = {
     cliModel: undefined,
     registerProviders: ["zai"],
     expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
+  },
+  "geeky-normal-astra": {
+    omoConfig: { model_profile: "geeky-normal" },
+    mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-6-astra"],
+    cliModel: undefined,
+    registerProviders: ["chatgpt-subscription"],
+    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
   },
   "geeky-normal-gpt6-only-unavailable": {
     omoConfig: { model_profile: "geeky-normal" },
@@ -89,17 +117,17 @@ export const SCENARIOS = {
   },
   unset: {
     omoConfig: {},
-    mockModels: ["mock-1", "kimi-k3"],
+    mockModels: ["mock-1", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   "unset-skips-gateway": {
     omoConfig: {},
-    mockModels: ["mock-1", "anthropic/claude-opus-5-5", "kimi-k3"],
+    mockModels: ["mock-1", "anthropic/claude-opus-5-5", "kimi-k3.1-pro"],
     cliModel: undefined,
     registerProviders: ["opengateway", "kimi-coding"],
-    expect: { model: "kimi-k3", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
+    expect: { model: "kimi-k3.1-pro", provider: "kimi-coding", notice: APPLIED_TYPE, thinking: "max" },
   },
   // Unset starts on Daily · Normal (#10029): with GLM connected beside GPT, its GLM rung wins.
   "unset-gpt-6-1-sol": {
@@ -116,7 +144,7 @@ export const SCENARIOS = {
     registerProviders: ["github-copilot", "zai"],
     expect: { model: "glm-5.3", provider: "zai", notice: APPLIED_TYPE, thinking: "max" },
   },
-  // No Daily lane resolves on a ChatGPT-only setup: the first lane that does, Geeky · Normal, applies.
+  // No Daily lane resolves on a ChatGPT-only setup: the first lane that does, Obsessive · Normal, applies.
   "unset-chatgpt-only-geeky-normal": {
     omoConfig: {},
     mockModels: ["mock-1", "gpt-6.1-sol"],
@@ -266,6 +294,18 @@ export const SCENARIOS = {
       thinking: "max",
       authFailed: [{ provider: "anthropic", model: "claude-opus-5-5", reason: "refresh" }],
     },
+  },
+  // A ChatGPT subscription login whose refresh fails transiently at session start (the fixture
+  // answers ECONNREFUSED to every exchange until the first turn starts) beside an OpenAI API lane serving the same model (#11432): the
+  // subscription keeps the rung, and the first turn's own refresh succeeds on it. Before the fix the
+  // session moved to openai/gpt-6-astra for its lifetime.
+  "geeky-normal-transient-refresh-keeps-subscription": {
+    omoConfig: { model_profile: "geeky-normal" },
+    mockModels: ["mock-1", "gpt-6-astra"],
+    registerProviders: ["chatgpt-subscription", "openai"],
+    oauthProviders: ["chatgpt-subscription"],
+    authJson: { "chatgpt-subscription": { type: "oauth", access: "stale-access", refresh: FLAKY_REFRESH_TOKEN, expires: 0 } },
+    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium", authFailedAbsent: true },
   },
   // A credential pool whose flat (default) account is rejected but whose sibling account is valid:
   // the provider stays selected, and the engine's first turn rotates onto the sibling (the fixture

@@ -36,6 +36,7 @@ const OPENROUTER_ONLY = gateway("openrouter", [
   "openai/gpt-5.6-terra",
   "openai/gpt-6-luna",
   "moonshotai/kimi-k3",
+  "moonshotai/kimi-k3.1-pro",
   "z-ai/glm-5.3",
   "~deepseek/deepseek-flash-latest",
   "deepseek/deepseek-v4-pro",
@@ -53,6 +54,7 @@ const OPENGATEWAY_ONLY = gateway("opengateway", [
   "openai/gpt-5.6-sol",
   "openai/gpt-5.6-terra",
   "moonshotai/kimi-k3",
+  "moonshotai/kimi-k3.1-pro",
   "z-ai/glm-5.3",
   "deepseek/deepseek-flash",
   "deepseek/deepseek-v4-pro",
@@ -223,12 +225,12 @@ describe("builtin chains resolve only on their listed providers (#9146)", () => 
       const result = resolveAgent(
         "plan-consultant",
         BUILTIN_AGENTS,
-        registry([...OPENROUTER_ONLY, { provider: "moonshotai", id: "kimi-k3" }]),
+        registry([...OPENROUTER_ONLY, { provider: "moonshotai", id: "kimi-k3.1-pro" }]),
       )
 
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.model).toBe("moonshotai/kimi-k3")
+      expect(result.model).toBe("moonshotai/kimi-k3.1-pro")
     })
   })
 })

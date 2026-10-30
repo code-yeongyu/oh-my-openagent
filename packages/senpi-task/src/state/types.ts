@@ -37,6 +37,7 @@ export type IsolationRecord = TaskIsolationSpec & {
 export const TASK_STATUSES = [
   "pending",
   "running",
+  "paused",
   "completed",
   "error",
   "cancelled",
@@ -112,6 +113,9 @@ export const SUSPENSION_REASONS = [
   // The session that owns the child was resumed, but its reconcile could not revive the child yet;
   // `revival_deferred_reason` names the reconcile's deferral (omo#9498).
   "revival_deferred",
+  // The owning session QUIT while the child was parked: it stays "running" on purpose and nothing
+  // revives it until that session resumes (senpi#3493).
+  "session_quit",
   "store_index_unavailable",
 ] as const
 
@@ -165,11 +169,15 @@ export type {
   CostReportStatus,
   DurationSourceStatus,
   TaskRunStats,
+  LiveRunStats,
   TokenCoverageStatus,
 } from "./run-stats-types"
-export { isSpawnSpecV1 } from "./record-types"
+export { isSpawnSpecV1, PARENT_MODEL_FALLBACK_REASONS } from "./record-types"
 export type {
   LegacyProcessSpawnSpec,
+  ParentModelFallback,
+  ParentModelFallbackPhase,
+  ParentModelFallbackReason,
   PendingSteeringEntry,
   ReviveDeliveryUncertainty,
   SpawnSpecV1,

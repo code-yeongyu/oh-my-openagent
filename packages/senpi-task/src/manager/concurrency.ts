@@ -1,46 +1,21 @@
-export type TaskConcurrencyConfig = {
-  readonly default_concurrency?: number
-  readonly provider_concurrency?: Readonly<Record<string, number>>
-  readonly model_concurrency?: Readonly<Record<string, number>>
-  readonly global_concurrency?: number
-}
+import { TaskWaitQueue, type QueuedTaskAdmission, type TaskWaiter as Waiter } from "./concurrency-waiters"
+import { getTaskLimit, getTaskLaneKey, type TaskConcurrencyConfig } from "./concurrency-routing"
+import { ParkedLeases, type ParkedEntry, taskLeaseKey as leaseKeyOf } from "./parked-leases"
 
-type Waiter = {
-  readonly model: string
-  readonly laneKey: string
-  readonly taskId: string
-  readonly runEpoch: number
-  readonly sequence: number
-  readonly grant: () => void
-}
+export type { TaskConcurrencyConfig } from "./concurrency-routing"
 
-type Lease = {
-  readonly model: string
-  readonly laneKey: string
-  readonly taskId: string
-  readonly runEpoch: number
-}
+type Lease = QueuedTaskAdmission
 
 export type ParkedLease = Lease
-
-type ParkedEntry = {
-  readonly lease: ParkedLease
-  readonly resumed: Promise<void>
-  readonly resolve: () => void
-  resumable: boolean
-}
-
-const DEFAULT_LIMIT = 5
 
 // Synchronous lease allocator. Model/provider precedence is intentionally unchanged; global
 // capacity is independent, so even an unbounded lane consumes one global permit.
 export class TaskConcurrency {
   readonly #config: TaskConcurrencyConfig
   readonly #counts = new Map<string, number>()
-  readonly #queues = new Map<string, Waiter[]>()
+  readonly #queues = new TaskWaitQueue()
   readonly #leases = new Map<string, Lease>()
-  readonly #parked = new Map<string, Map<string, ParkedEntry>>()
-  #enqueueSequence = 0
+  readonly #parked = new ParkedLeases()
   #legacyEpoch = -1
   #granting: Waiter | undefined
   #dispatching = false
@@ -50,20 +25,11 @@ export class TaskConcurrency {
   }
 
   getLimit(model: string): number {
-    const modelLimit = ownNumber(this.#config.model_concurrency, model)
-    if (modelLimit !== undefined) return modelLimit === 0 ? Number.POSITIVE_INFINITY : modelLimit
-    const providerLimit = ownNumber(this.#config.provider_concurrency, providerOf(model)) ?? (providerOf(model) === "opengateway" ? 0 : undefined)
-    if (providerLimit !== undefined) return providerLimit === 0 ? Number.POSITIVE_INFINITY : providerLimit
-    const defaultLimit = this.#config.default_concurrency
-    if (defaultLimit !== undefined) return defaultLimit === 0 ? Number.POSITIVE_INFINITY : defaultLimit
-    return DEFAULT_LIMIT
+    return getTaskLimit(this.#config, model)
   }
 
   getKey(model: string): string {
-    if (ownNumber(this.#config.model_concurrency, model) !== undefined) return model
-    const provider = providerOf(model)
-    if (ownNumber(this.#config.provider_concurrency, provider) !== undefined) return provider
-    return model
+    return getTaskLaneKey(this.#config, model)
   }
 
   hasFreeSlot(model: string): boolean {
@@ -105,29 +71,35 @@ export class TaskConcurrency {
       grant = runEpochOrGrant
     }
     const laneKey = this.getKey(model)
-    const queue = this.#queues.get(laneKey) ?? []
-    queue.push({ model, laneKey, taskId, runEpoch, sequence: this.#enqueueSequence, grant })
-    this.#enqueueSequence += 1
-    this.#queues.set(laneKey, queue)
-    return queue.length
+    return this.#queues.enqueue({ model, laneKey, taskId, runEpoch, grant })
   }
 
   queuePosition(model: string, taskId: string): number | undefined {
-    const queue = this.#queues.get(this.getKey(model))
-    if (queue === undefined) return undefined
-    const index = queue.findIndex((waiter) => waiter.taskId === taskId)
-    return index === -1 ? undefined : index + 1
+    return this.#queues.position(this.getKey(model), taskId)
   }
 
   remove(model: string, taskId: string): boolean {
-    const laneKey = this.getKey(model)
-    const queue = this.#queues.get(laneKey)
-    if (queue === undefined) return false
-    const index = queue.findIndex((waiter) => waiter.taskId === taskId)
-    if (index === -1) return false
-    queue.splice(index, 1)
-    if (queue.length === 0) this.#queues.delete(laneKey)
-    return true
+    return this.#queues.take(this.getKey(model), taskId) !== undefined
+  }
+
+  withdraw(model: string, taskId: string, runEpoch: number): QueuedTaskAdmission | undefined {
+    return this.#queues.take(this.getKey(model), taskId, runEpoch)
+  }
+
+  requeue(admission: QueuedTaskAdmission, grant: () => void): number {
+    return this.#queues.enqueue({ ...admission, grant })
+  }
+
+  admission(taskId: string, runEpoch: number): (QueuedTaskAdmission & { readonly phase: "pre_grant" | "post_grant" | "parked" }) | undefined {
+    const key = leaseKeyOf(taskId, runEpoch)
+    const lease = this.#leases.get(key)
+    if (lease !== undefined) return { ...lease, phase: "post_grant" }
+    for (const lane of this.#parked.values()) {
+      const entry = lane.get(key)
+      if (entry !== undefined) return { ...entry.lease, phase: "parked" }
+    }
+    const queued = this.#queues.admission(taskId, runEpoch)
+    return queued === undefined ? undefined : { ...queued, phase: "pre_grant" }
   }
 
   leaseState(taskId: string, runEpoch: number): "held" | "parked" | undefined {
@@ -141,10 +113,7 @@ export class TaskConcurrency {
     const key = leaseKeyOf(taskId, runEpoch)
     const lease = this.#leases.get(key)
     if (lease === undefined) return undefined
-    const { promise, resolve } = Promise.withResolvers<void>()
-    const lane = this.#parked.get(lease.laneKey) ?? new Map<string, ParkedEntry>()
-    lane.set(key, { lease, resumed: promise, resolve, resumable: false })
-    this.#parked.set(lease.laneKey, lane)
+    this.#parked.store(lease)
     this.#dropLease(lease)
     this.#dispatch()
     return lease
@@ -167,13 +136,15 @@ export class TaskConcurrency {
     return entry.resumed.finally(() => signal?.removeEventListener("abort", abort))
   }
 
+  suspendUnpark(lease: ParkedLease): void { this.#parked.suspend(lease) }
+
   releaseLease(taskId: string, runEpoch: number): void {
     const key = leaseKeyOf(taskId, runEpoch)
     const lease = this.#leases.get(key)
     if (lease !== undefined) this.#dropLease(lease)
     for (const lane of this.#parked.values()) {
       const entry = lane.get(key)
-      if (entry !== undefined) this.#dropParked(entry)
+      if (entry !== undefined) this.#parked.remove(entry)
     }
     this.#dispatch()
   }
@@ -194,21 +165,14 @@ export class TaskConcurrency {
     const owned = [...this.#leases.values()].filter((lease) => lease.taskId === taskId)
     for (const lease of owned) this.#dropLease(lease)
     for (const lane of [...this.#parked.values()]) {
-      for (const entry of [...lane.values()]) if (entry.lease.taskId === taskId) this.#dropParked(entry)
+      for (const entry of [...lane.values()]) if (entry.lease.taskId === taskId) this.#parked.remove(entry)
     }
     this.#dispatch()
   }
 
-  #dropParked(entry: ParkedEntry): void {
-    const lane = this.#parked.get(entry.lease.laneKey)
-    lane?.delete(leaseKeyOf(entry.lease.taskId, entry.lease.runEpoch))
-    if (lane?.size === 0) this.#parked.delete(entry.lease.laneKey)
-    entry.resolve()
-  }
-
   #resume(entry: ParkedEntry): void {
     this.#recordLease(entry.lease.model, entry.lease)
-    this.#dropParked(entry)
+    this.#parked.remove(entry)
   }
 
   release(model: string): void {
@@ -274,8 +238,9 @@ export class TaskConcurrency {
     }
   }
 
-  #recordLease(model: string, lease: Omit<Lease, "model">): void {
-    this.#leases.set(leaseKeyOf(lease.taskId, lease.runEpoch), { ...lease, model })
+  #recordLease(model: string, lease: Omit<Lease, "model" | "sequence"> & { readonly sequence?: number }): void {
+    const sequence = lease.sequence ?? this.#granting?.sequence ?? this.#queues.reserveSequence()
+    this.#leases.set(leaseKeyOf(lease.taskId, lease.runEpoch), { ...lease, model, sequence })
     if (this.getLimit(model) === Number.POSITIVE_INFINITY) return
     this.#counts.set(lease.laneKey, (this.#counts.get(lease.laneKey) ?? 0) + 1)
   }
@@ -302,17 +267,4 @@ export class TaskConcurrency {
     this.#legacyEpoch -= 1
     return epoch
   }
-}
-
-function leaseKeyOf(taskId: string, runEpoch: number): string {
-  return `${taskId.length}:${taskId}:${runEpoch}`
-}
-
-function providerOf(model: string): string {
-  return model.split("/")[0] ?? model
-}
-
-function ownNumber(record: Readonly<Record<string, number>> | undefined, key: string): number | undefined {
-  if (record === undefined || !Object.hasOwn(record, key)) return undefined
-  return record[key]
 }

@@ -195,6 +195,33 @@ describe("computer-use telemetry projection", () => {
     expect(JSON.stringify(recorded.observations)).not.toContain("private typed text")
   })
 
+  test.each([
+    "The user rejected permission to use this specific tool call. Treat this as final for what the call was meant to do.",
+    "The user has specified a rule which prevents you from using this specific tool call. Denied by project permission rule bash:* = deny (project settings.json).",
+  ])("#given a refusal with guidance after its first sentence #when the tier denial is recorded #then it is a permission denial (%#)", (text) => {
+    // given
+    const recorded = recorder()
+    const telemetry = createComputerUseTelemetry({ platform: "win32", observers: recorded.observers })
+
+    // when
+    telemetry.toolExecutionStarted({
+      type: "tool_execution_start",
+      toolCallId: "call-1",
+      toolName: "computer",
+      args: { action: "run", code: "private typed text" },
+    })
+    telemetry.permissionTierDenied({
+      type: "tool_execution_end",
+      toolCallId: "call-1",
+      toolName: "computer",
+      isError: true,
+      result: { content: [{ type: "text", text }] },
+    }, context(), "win32")
+
+    // then
+    expect(recorded.observations.map((observation) => observation.kind)).toEqual(["permission_denied"])
+  })
+
   test("#given an engine spawn EACCES #when the failed result mentions permission denied #then it is not mislabeled as a tier denial", () => {
     // given
     const recorded = recorder()

@@ -42,7 +42,7 @@ export async function CognitiveLoadSection(): Promise<JSX.Element> {
               <li key={key} className="grid grid-cols-[54px_1fr] items-baseline gap-x-4 py-3">
                 <span
                   aria-hidden="true"
-                  className="text-text-faint font-mono text-sm tracking-[-0.01em] tabular-nums"
+                  className="text-text-lo font-mono text-sm tracking-[-0.01em] tabular-nums"
                 >
                   {STEP_INDEX[i]}
                 </span>

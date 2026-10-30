@@ -53,6 +53,8 @@ export function digestJson(value: Json): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex")
 }
 export function epochDelta(before: TokenSnapshot | undefined, after: TokenSnapshot | undefined) {
+  // Only a fully reported cost counts as covered: a "partial" cost is a lower bound, so a budget
+  // measured from it could under-count spend. Partial epochs report covered: false on purpose.
   const covered = after?.token_status === "complete" && after.cost_status === "reported"
     && typeof after.total_tokens === "number" && typeof after.cost_usd === "number"
   if (!covered) return { tokens: 0, cost: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, covered: false }

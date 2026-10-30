@@ -2,7 +2,7 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 import type { IsolationDetails } from "../../isolation/details"
 
 import type { TaskManager } from "../../manager"
-import type { StartQueued, EffectiveModelRecord, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus, AwaitingInputReason } from "../../state"
+import type { StartQueued, EffectiveModelRecord, ParentModelFallback, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus, AwaitingInputReason } from "../../state"
 import type { CallerSessionResolver } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "concurrency">
@@ -57,6 +57,8 @@ export type TaskSnapshot = {
   readonly model: string
   readonly resolved_model?: ResolvedModelRecord
   readonly effective_model?: EffectiveModelRecord
+  readonly parent_model?: string
+  readonly parent_model_fallback?: ParentModelFallback
   readonly agent_type?: string
   readonly category?: string
   readonly parent_session_id: string
@@ -65,6 +67,7 @@ export type TaskSnapshot = {
   readonly pid?: number
   readonly child_session_id?: string
   readonly last_seen_at?: string
+  readonly host_liveness?: import("../../state/host-liveness").HostLivenessStatus
   readonly final_response?: string
   readonly error_message?: string
   readonly run_stats?: TaskRunStats

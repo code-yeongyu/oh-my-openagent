@@ -3,6 +3,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "strict": true,
     "allowJs": true,
     "checkJs": false,
@@ -14,5 +15,5 @@
     "lib": ["ESNext"],
     "types": ["bun-types"]
   },
-  "include": ["*.ts", "test/**/*", "bin/**/*"]
+  "include": ["*.ts", "test/**/*", "bin/**/*", "keychain-helper/**/*.ts"]
 }

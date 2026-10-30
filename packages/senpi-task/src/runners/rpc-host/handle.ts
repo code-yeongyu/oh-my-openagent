@@ -15,7 +15,6 @@ import type {
   HostSessionPort,
 } from "./handle-port"
 import { startHostHeartbeat } from "./handle-heartbeat"
-import { unresponsiveMessage } from "../rpc/heartbeat"
 import { createHandleListeners } from "./handle-listeners"
 import { createHandleRecovery } from "./handle-recovery"
 import { createHandleSessionIdentity } from "./handle-session-identity"
@@ -26,8 +25,14 @@ import { createHandleWaiters } from "./handle-waiters"
 import type { HostSessionParked, HostSessionReplaced } from "./session-client"
 import { extractTerminalAssistantMessage } from "./terminal-message"
 import { createInputEffects } from "../input-effects"
+import { readHostAdmissions } from "../input-admission-read"
 import { toHostInput } from "./input-command"
 import { createInputDelivery } from "../input-delivery"
+import { createRpcRunPause } from "../rpc/native-run-pause"
+import { createTurnClaim } from "../rpc/turn-claim"
+import { createTaskParentControl, TaskParentControlError } from "../task-parent-control"
+import { HostSessionUnresponsiveError } from "./session-wire"
+import { createUnresponsiveClose } from "./unresponsive-close"
 
 /**
  * The steerable child handle over ONE daemon session: identical turn semantics to
@@ -41,11 +46,11 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   // Both move on a reattach: a recovered transport is a new port, and a reopened session a new
   // routing handle on a possibly new host generation. The session PATH is the child's identity.
   let client: HostSessionPort = options.client
-  const identity = createHandleSessionIdentity(options.session)
   let openDisposition: HostSessionOpenDisposition = options.openDisposition
   const listeners = createHandleListeners({
     onListenerError: (error) => log("senpi-task early event replay listener failed", { taskId, error: String(error) }),
   })
+  const identity = createHandleSessionIdentity(options.session, options.durableSessionId, listeners.emitDurableSessionId)
   const waiters = createHandleWaiters()
   let reachedIdle = false
   let finalText: string | undefined
@@ -59,8 +64,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   let parked = false
   let detached = false
   let tornDown = false
+  let closingUnresponsive = false
+  let confirmedUnresponsiveClose = false
+  const claims = createTurnClaim()
 
   const settleTurn = (settled: RunnerOutcome): void => {
+    if (closingUnresponsive && !confirmedUnresponsiveClose && outcome === undefined) return
     if (turnOutcome !== undefined) return
     turnOutcome = settled
     reachedIdle = true
@@ -90,11 +99,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   })
 
   const onSessionEvent = (event: Parameters<ChildEventListener>[0]): void => {
+    heartbeat.activity()
     // A run the child starts on its own after its turn settled (a monitor or background job woke it)
     // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
     if (event.type === "agent_start" && (continuationState === "awaiting_start" || turnOutcome !== undefined) && outcome === undefined) {
       beginTurn()
-      listeners.emitSelfResumed()
+      if (!claims.consume()) listeners.emitSelfResumed()
     }
     if (event.type === "message_end") {
       const terminal = extractTerminalAssistantMessage(event.message)
@@ -112,23 +122,40 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     }
   }
 
-  const stopHeartbeat = startHostHeartbeat({
+  const unresponsiveClose = createUnresponsiveClose({
+    taskId, closeGraceMs, reattach,
+    port: () => client,
+    session: () => ({ socket: client.socketPath, ...identity.current() }),
+    stopped: () => detached || outcome !== undefined,
+    adopt: (next) => {
+      client = next.client
+      identity.adopt(next.session)
+      bindHostSessionPort(client, clientBinding)
+    },
+  })
+  const heartbeat = startHostHeartbeat({
     taskId,
     intervalMs: heartbeatIntervalMs,
     paused: () => outcome !== undefined || parked || detached,
-    port: () => client,
+    probe: unresponsiveClose.probe,
     onState: (state) => {
       lastSeenAt = now()
       identity.observeDurableId(state.sessionId)
     },
-    onUnresponsive: () => {
-      settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: unresponsiveMessage(taskId) } })
-      settleExit({ kind: "crashed", facts: { pid: undefined, code: null, signal: null, stderrTail: "child-unresponsive" } })
-      void teardown.detach().catch((error: unknown) => {
-        log("senpi-task unresponsive host child detach failed", { taskId, error: String(error) })
-      })
+    onStatus: (status) => { closingUnresponsive = status.state === "terminal-pending" },
+    close: unresponsiveClose.close,
+    onGone: (closed) => {
+      if (!closed) {
+        endSession({ kind: "session_closed", reason: "unknown_session" })
+        void client.detach().catch(error => log("senpi-task absent session detach failed", { taskId, error: String(error) }))
+        return
+      }
+      confirmedUnresponsiveClose = true
+      settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: "unresponsive, closed: the host confirmed this session is absent" } })
+      settleExit({ kind: "killed", facts: { pid: undefined, code: null, signal: null, stderrTail: "unresponsive, closed" } })
     },
   })
+  const stopHeartbeat = (): void => { heartbeat.stop(); unresponsiveClose.stop() }
 
   const settleExit = (built: ChildExitOutcome): void => {
     if (outcome) return
@@ -186,6 +213,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     stopUnreached: stop.stopUnreached,
     recoveryEnded: (adopted) => {
       stop.recoveryEnded(adopted)
+      if (adopted) teardown.republishStatus()
       if (adopted) void inputEffects.reconcile().catch(error => log("senpi-task input reconciliation failed", { taskId, error: String(error) }))
     },
     continueInput: (command) => inputEffects.send(command, identified => client.send(toHostInput(identified))),
@@ -216,10 +244,16 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     acceptsLifecycleEvent: () => !parked && !detached && outcome === undefined,
     onEvent: (event: Parameters<ChildEventListener>[0]) => { onSessionEvent(event); listeners.emitEvent(event) },
     onExtensionEvent: listeners.extensionEvents.publish,
-    onParked: park,
-    onClosed: (event: { readonly reason: string | undefined }) => endSession({ kind: "session_closed", reason: event.reason }),
+    onParked: (event: HostSessionParked) => { if (!closingUnresponsive) park(event) },
+    onClosed: (event: { readonly reason: string | undefined }) => {
+      if (closingUnresponsive) return
+      endSession({ kind: "session_closed", reason: event.reason })
+    },
     onReplaced: (event: HostSessionReplaced) => listeners.emitReplaced(identity.followReplace(event)),
-    onTransportGone: recovery.onTransportGone,
+    onTransportGone: (lost: HostSessionPort) => {
+      if (heartbeat.status().state === "running") recovery.onTransportGone(lost)
+      else if (client === lost) unresponsiveClose.transportLost()
+    },
   }
 
   bindHostSessionPort(client, clientBinding)
@@ -227,11 +261,13 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const inputEffects = createInputEffects({
     taskId, store: options.inputStore,
     send: command => recovery.issue(toHostInput(command)),
+    read: ids => readHostAdmissions(client, ids),
   })
 
   const beginTurn = (): void => {
     continuationState = continuationState === "pending_delivery" ? "awaiting_start" : "none"
     if (outcome !== undefined) return
+    teardown.publishRunning()
     if (reachedIdle || turnOutcome !== undefined) {
       reachedIdle = false
       turnOutcome = undefined
@@ -248,6 +284,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
 
   const teardown = createHandleTeardown({
     taskId,
+    openedAttached: openDisposition === "attached",
     closeGraceMs,
     port: () => client,
     exited: () => outcome !== undefined,
@@ -282,8 +319,16 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     },
     getEntries: async (since) => (await recovery.currentPort()).getEntries(since),
     switchSession: async (sessionPath) => (await recovery.currentPort()).switchSession(sessionPath),
-    steer: delivery.steer,
-    followUp: (text) => delivery.runPrompt(text, "followUp"),
+    steer: (text, identity) => {
+      if (heartbeat.status().state !== "running") return Promise.reject(new HostSessionUnresponsiveError())
+      return delivery.steer(text, identity?.clientMessageId)
+    },
+    followUp: (text, identity) => {
+      if (heartbeat.status().state !== "running") return Promise.reject(new HostSessionUnresponsiveError())
+      return delivery.runPrompt(text, "followUp", identity?.clientMessageId)
+    },
+    liveness: heartbeat.status,
+    onLiveness: heartbeat.subscribe,
     // A child whose cancel is waiting on its lost connection is stopped by that cancel: an abort (a
     // parent shutting down suspends it) must not wait out the whole recovery for nothing.
     abort: () => {
@@ -313,6 +358,15 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
       return sessionIsIdle(state)
     },
     waitForOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+    runPause: createRpcRunPause({
+      taskId, claimNextTurn: claims.claim,
+      currentOutcome: () => waiters.waitForOutcome(turnOutcome, outcome, finalText),
+      control: () => {
+        const wire = client.taskParentWire?.()
+        if (wire === undefined) throw new TaskParentControlError("unsupported")
+        return createTaskParentControl(wire)
+      },
+    }),
     lastAssistantText: () => finalText,
     terminalAssistantMessage: () => terminalAssistantMessage,
     wasAbortedByUser: () => abortedByUser,
@@ -323,6 +377,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     detach: teardown.detach,
     close: teardown.close,
     terminate: teardown.terminate,
+    publishTaskStatus: teardown.publishTaskStatus,
     startInitialPrompt: (text) => delivery.runPrompt(text),
   }
 }

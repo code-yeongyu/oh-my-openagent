@@ -1,11 +1,26 @@
 import type { ResolvedModelRecord, TaskRecord } from "../state"
+import { isParentModelRung } from "./parent-model-rung"
 
 // A provider answer that no other model on the SAME provider can fix: the stored credential is
-// rejected (401, an invalid key, a lapsed subscription) or can no longer be refreshed. Every
+// rejected (401, an invalid key, a lapsed subscription), has expired with only a fresh /login to renew it
+// ("Meta session expired (status 403). Run `/login meta` ..."), or can no longer be refreshed. Every
 // remaining rung on that provider would fail the same way, so runtime fallback moves on to another
 // provider.
 const CREDENTIAL_REJECTED =
-  /\b401\b|unauthori[sz]ed|invalid_grant|oauth refresh failed|subscription is required|invalid api key|incorrect api key|authentication (?:failed|error)/i
+  /\b401\b|unauthori[sz]ed|invalid_grant|oauth refresh failed|subscription is required|invalid api key|incorrect api key|authentication (?:failed|error)|\bthe account's oauth token was rejected\b|\bsession expired\b[^.]*\.\s*run\s+\W?\/login\b/i
+// No credential at all for the provider (#10806): senpi refuses the request before it is sent ("No API key
+// found for openai.", "No API key for provider: openai") or a login-only lane says it has no account or token
+// ("no accounts: run /login cursor-cli-oauth", "Cursor access token is required"). The provider is signed out,
+// so its sibling models fail the same way. A "/login" hint alone is not enough: senpi also names /login in
+// guidance that is not about a missing credential ("No model selected", a Copilot 421 endpoint refresh, a
+// third-party billing note, a model-scoped 403).
+const CREDENTIAL_MISSING =
+  /\bno api key (?:found |provided )?for\b|\bnot logged in\b|\bno (?:[\w-]+ ){0,3}accounts?(?: configured\b|:)|\bno [\w-]+ access token\b|authentication[_ ]failed/i
+// "Cursor access token is required", "Radius authentication is required", "authentication_required": a signed-out
+// provider, unless the text scopes the requirement to a model ("Authentication required for this model", or the
+// failed model's id), which a sibling may not share. The absence phrasings above stay provider-wide even when they
+// name a model: a key or an account belongs to the provider.
+const CREDENTIAL_REQUIRED = /\b(?:access token|authentication) is required\b|authentication[_ ]required/i
 // A 403 is ambiguous: a provider also answers it for ONE model the key may not use (tier, region,
 // preview access, an organization that must be verified for that model), which a sibling model on
 // the same provider does not share. A 403 counts as a credential rejection only when it names the
@@ -20,7 +35,8 @@ const MODEL_SCOPED = /\bmodels?\b/i
 // spent, so its other rungs fail the same way and go last.
 const USAGE_LIMIT =
   /quota|usage[_ ]limit|\bhit\s+your\b[^.]*\blimit\b|\b(?:session|weekly|monthly|daily|hourly|\d+[- ]hour)\s+limit\b|limit\s+exhausted|insufficient[_ ](?:quota|credits?|balance)|credit[_ ]balance|credits?[_ ]required|billing|blocking_limit/i
-const MODEL_SCOPED_LIMIT = /\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
+// A `/model` command hint (senpi's own limit text says "Switch to another provider with /model") names no model.
+const MODEL_SCOPED_LIMIT = /(?<!\/)\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
 
 export type UsageLimitScope = "model" | "account"
 
@@ -29,11 +45,18 @@ export function usageLimitScope(message: string): UsageLimitScope | undefined {
   return MODEL_SCOPED_LIMIT.test(message) ? "model" : "account"
 }
 
+function namesModel(message: string, modelId?: string): boolean {
+  return MODEL_SCOPED.test(message) || (modelId !== undefined && message.toLowerCase().includes(modelId.toLowerCase()))
+}
+
+function isMissingCredential(message: string, modelId?: string): boolean {
+  return CREDENTIAL_MISSING.test(message) || (CREDENTIAL_REQUIRED.test(message) && !namesModel(message, modelId))
+}
+
 export function isCredentialFailure(message: string, modelId?: string): boolean {
-  if (CREDENTIAL_REJECTED.test(message)) return true
+  if (CREDENTIAL_REJECTED.test(message) || isMissingCredential(message, modelId)) return true
   if (!FORBIDDEN.test(message) || !ACCOUNT_SCOPED_403.test(message)) return false
-  if (MODEL_SCOPED.test(message)) return false
-  return modelId === undefined || !message.toLowerCase().includes(modelId.toLowerCase())
+  return !namesModel(message, modelId)
 }
 
 function providerOf(record: TaskRecord): string | undefined {
@@ -60,7 +83,11 @@ export function terminalFailureMessage(record: TaskRecord | null | undefined, fa
   const provider = record == null ? undefined : providerOf(record)
   if (provider === undefined || record == null) return failureMessage
   if (isCredentialFailure(failureMessage, modelIdOf(record))) {
-    return `${failureMessage}\nCredentials for ${provider} were rejected; re-authenticate ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or re-add its API key, or pin this category to another provider in omo.json.`
+    const missing = !CREDENTIAL_REJECTED.test(failureMessage) && isMissingCredential(failureMessage, modelIdOf(record))
+    const cause = missing
+      ? `No credentials for ${provider} were found; sign in to ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or add its API key`
+      : `Credentials for ${provider} were rejected; re-authenticate ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or re-add its API key`
+    return `${failureMessage}\n${cause}, or pin this category to another provider in omo.json.`
   }
   if (usageLimitScope(failureMessage) === undefined) return failureMessage
   const model = record.resolved_model === undefined ? record.model : `${provider}/${record.resolved_model.model_id}`
@@ -74,11 +101,24 @@ export type RuntimeFallbackCandidates = {
   readonly remaining: readonly ResolvedModelRecord[]
   readonly skipped: readonly ResolvedModelRecord[]
   readonly limit?: UsageLimitScope
+  // Not a remedy for THIS failure, but kept at the end of the chain for a later spent or signed-out rung.
+  readonly retained?: readonly ResolvedModelRecord[]
 }
 
-/** The fallback list to walk after a failed turn: a dead credential drops the failed provider's rungs, an account-wide usage limit moves them last. */
+/** The chain a hop onto `remaining[0]` leaves on the record: the rest of the walk, then the rungs kept for later. */
+export function chainAfterHop(candidates: RuntimeFallbackCandidates): readonly ResolvedModelRecord[] {
+  return [...candidates.remaining.slice(1), ...(candidates.retained ?? [])]
+}
+
+/**
+ * The fallback list to walk after a failed turn: a dead credential drops the failed provider's rungs, an
+ * account-wide usage limit moves them last. The parent session's model (#10750) is only a remedy for a
+ * spent or signed-out rung, so any other failure walks the category rungs alone.
+ */
 export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: string): RuntimeFallbackCandidates {
-  const fallbacks = record.fallback_models ?? []
+  const unusable = usageLimitScope(failureMessage) !== undefined || isCredentialFailure(failureMessage, modelIdOf(record))
+  const all = record.fallback_models ?? []
+  const fallbacks = all.filter((model) => unusable || !isParentModelRung(record, model))
   const provider = providerOf(record)
   if (provider !== undefined && isCredentialFailure(failureMessage, modelIdOf(record))) {
     return {
@@ -87,14 +127,18 @@ export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: st
     }
   }
   const limit = usageLimitScope(failureMessage)
-  if (limit === undefined) return { remaining: fallbacks, skipped: [] }
+  if (limit === undefined) {
+    const retained = all.filter((model) => isParentModelRung(record, model))
+    return { remaining: fallbacks, skipped: [], ...(retained.length === 0 ? {} : { retained }) }
+  }
   if (limit === "model" || provider === undefined) return { remaining: fallbacks, skipped: [], limit }
+  const spentParent = fallbacks.filter((model) => model.provider === provider && isParentModelRung(record, model))
   return {
     remaining: [
       ...fallbacks.filter((model) => model.provider !== provider),
-      ...fallbacks.filter((model) => model.provider === provider),
+      ...fallbacks.filter((model) => model.provider === provider && !spentParent.includes(model)),
     ],
-    skipped: [],
+    skipped: spentParent,
     limit,
   }
 }

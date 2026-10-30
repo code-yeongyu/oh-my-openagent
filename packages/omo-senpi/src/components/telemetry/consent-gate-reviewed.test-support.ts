@@ -13,16 +13,81 @@ const SESSION_START_PATH = "called only from the session_started path, after the
 const FAN_IN = "capture fan-in: reaches a transport only through the session client the gate created; opted-out hashes are dropped"
 const THROUGH_FAN_IN = "hands the event to the component fan-in, which forwards only through the gated session client"
 const NOTICE_MARKER = "claimNotice runs only after isOmoNativeTelemetryEnabled returned true"
-const CONSENTED_RECORDER = "the session-summary recorder sends only when isConsented holds"
 const GATE: GateRoute = { kind: "gate" }
 const VIA_FAN_IN: GateRoute = { kind: "fan-in" }
 const VIA_SESSION_CLIENT: GateRoute = { kind: "session-client" }
 const GATE_OWNER = "the gate's owner: every writer runs after the isOmoNativeTelemetryEnabled early return"
 const CRASH_CLAIMS = "crash claims run from the gated session_started path"
 const IDENTITY_FILES = "salt and install id are created only by a gated hash or attribution call"
-const SUMMARY_STORE = "written only by the consent-checked session-summary recorder"
+const SUMMARY_STORE = "window, pending and owner files are written only by the session-summary recorder, which exists only when consent held at registration and re-reads it before every write"
+const LEGACY_ROLLUPS = "removes the pre-#10225 rollups store, which nothing reads or sends; it deletes files and links only (never following one) and adds no data"
+const SUMMARY_REMOVAL = "deletes or rename-claims a summary file inside the state dir; it adds no data, and the opted-out purge relies on it"
+const SUMMARY_RECOVERY = "recovery re-creates a window only for a record whose consent mark is on and whose scope still consents (isRecordSendable)"
+const OWNER_LIVENESS = "owner liveness: links back an owner entry it moved aside only when that entry changed meanwhile; it re-creates existing data, never new data"
+const OPTOUT_PURGE_KEEP = "opted-out purge: links a claimed record back to its own name only when that record may still be sent (kept), never over a newer file; it re-creates existing data, never new data"
+const PROCESS_START = "reads a process start time to judge owner liveness; it sends nothing and writes nothing"
+const SUMMARY_SEND = "sends a pending session_summary only while the component's consent gate holds, the same per-event read the fan-in makes"
+const INGEST_CACHE = "the lazy sidecar calls registration only after env opt-outs and the shared consent gate pass; writeCache persists only a registration result, with a fresh consent read after the response; temporary cleanup adds no data"
 
 export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
+  {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "mkdirSync(dirname(path))", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "writeFileSync(temporary)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "renameSync(temporary)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "rmSync(temporary)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "resolveInstallIngestKey>=>",
+    guard: "unless(!input.consent())",
+    call: "fetch(`${endpoint}/v1/register`)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "invalidateInstallIngestKey",
+    guard: "if(readCache(path).key === key)",
+    call: "rmSync(path)", reason: "a collector 401 deletes only the rejected cache entry; deletion adds no telemetry data",
+  },
+  {
+    file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport",
+    guard: 'unless(!isOtlpEvent(message.event) || !allowed()) unless(explicitKey === "") unless(!ingestKey || !allowed())',
+    call: 'createOtlpTelemetryTransport({ productEnvPrefix: "OMO_SENPI", ingestKey, spoolRoot, spool)',
+    reason: "the core constructor checks every environment opt-out and this same consent callback before loading a sender or creating spool files",
+  },
+  {
+    file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport>=>>fetch", guard: "unless(rejected)",
+    call: "fetch(url)",
+    reason: "the core sender checks the same consent before every attempt; this wrapper only observes 401 to invalidate an automatic install key and stops sending after it",
+  },
+  {
+    file: "lazy-posthog.ts", fn: "withOtlpTransport>forward",
+    guard: "unless(!allowed())",
+    route: VIA_SESSION_CLIENT,
+    call: "target?.capture(message)",
+    reason: "the optional OTLP branch re-reads the same consent before forwarding buffered or live events",
+  },
+  {
+    file: "lazy-posthog.ts", fn: "withOtlpTransport>capture",
+    guard: "",
+    route: VIA_SESSION_CLIENT,
+    call: "posthog.capture(message)",
+    reason: "preserves the existing PostHog path for admitted client captures; its fetch uses the same send-time consent",
+  },
+  {
+    file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport>capture",
+    guard: "if(isOtlpEvent(value.event))",
+    route: VIA_SESSION_CLIENT,
+    call: "transport.capture(value)",
+    reason: "forwards only pinned product events to the core transport, which checks the shared consent on every append and send",
+  },
   {
     file: "lazy-posthog.ts", fn: "createLazyPostHogTransportFactory>=>>forward",
     guard: "",
@@ -61,13 +126,19 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     call: "state.capture(name)", reason: FAN_IN,
   },
   {
+    file: "omo-native-component.ts", fn: "createOmoNativeTelemetryComponent>register>captureEvent>run(=>)",
+    guard: "",
+    route: VIA_FAN_IN,
+    call: "client.captureEvent(name)", reason: THROUGH_FAN_IN,
+  },
+  {
     file: "omo-native-component.ts", fn: "installCaptureFacade",
     guard: "",
     call: "createEventTelemetryClient({ diagnostics: options.diagnostics, distinctId: template.dis)", reason: FAN_IN,
   },
   {
     file: "omo-native-component.ts", fn: "forwardValidatedCapture",
-    guard: "",
+    guard: "unless(message.event === \"session_summary\" && message.uuid !== undefined && transport.captureImmediate !== undefined)",
     route: VIA_SESSION_CLIENT,
     call: "transport.capture(message)", reason: FAN_IN,
   },
@@ -90,10 +161,10 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     call: "options.captureEvent(\"computer_use_engine_error\")", reason: THROUGH_FAN_IN,
   },
   {
-    file: "omo-native-crash.ts", fn: "captureProcessCrashes",
-    guard: "",
-    route: VIA_SESSION_CLIENT,
-    call: "input.captureEvent(\"process_crashed\")", reason: SESSION_START_PATH,
+    file: "omo-native-handoff-hint.ts", fn: "registerOmoNativeHandoffHintTelemetry>on(=>)",
+    guard: "unless(event === undefined)",
+    route: VIA_FAN_IN,
+    call: "options.captureEvent(\"handoff_hint\")", reason: THROUGH_FAN_IN,
   },
   {
     file: "omo-native-delegation.ts", fn: "createOmoNativeDelegationCapture>subscribe(=>)",
@@ -134,12 +205,6 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     guard: "unless(prompt === undefined || completed.has(inputId))",
     route: VIA_FAN_IN,
     call: "options.client.captureEvent(\"prompt_submitted\")", reason: THROUGH_FAN_IN,
-  },
-  {
-    file: "omo-native-session-summary.ts", fn: "createSessionSummaryRecorder>emit",
-    guard: "",
-    route: VIA_FAN_IN,
-    call: "options.captureEvent(\"session_summary\")", reason: CONSENTED_RECORDER,
   },
   {
     file: "omo-native-session.ts", fn: "createOmoNativeSessionComponent>register>captureSessionStart",
@@ -239,43 +304,83 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     call: "writeFileSync(path)", reason: IDENTITY_FILES,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>write",
-    guard: "",
-    call: "mkdirSync(dir)", reason: SUMMARY_STORE,
+    file: "product-identity.ts", fn: "resolveUserInstallId",
+    guard: "unless(legacy === canonical) unless(shared !== undefined) unless(adopted === undefined)",
+    call: "mkdirSync(dirname(canonical))", reason: IDENTITY_FILES,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>write",
+    file: "product-identity.ts", fn: "resolveUserInstallId",
+    guard: "unless(legacy === canonical) unless(shared !== undefined) unless(adopted === undefined)",
+    call: "writeFileSync(canonical)", reason: IDENTITY_FILES,
+  },
+  {
+    file: "session-summary-delivery.ts", fn: "publishThroughState",
+    guard: "unless(capture === undefined || state.isConsented?.() !== true)",
+    route: GATE,
+    call: "capture(\"session_summary\")", reason: SUMMARY_SEND,
+  },
+  {
+    file: "session-summary-files.ts", fn: "writeJsonAtomic",
+    guard: "",
+    call: "mkdirSync(dirname(path))", reason: SUMMARY_STORE,
+  },
+  {
+    file: "session-summary-files.ts", fn: "writeJsonAtomic",
     guard: "",
     call: "writeFileSync(temp)", reason: SUMMARY_STORE,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>write",
+    file: "session-summary-files.ts", fn: "writeJsonAtomic",
     guard: "",
     call: "renameSync(temp)", reason: SUMMARY_STORE,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>remove",
+    file: "session-summary-files.ts", fn: "removeFile",
     guard: "",
-    call: "rmSync(pathOf(sessionHash))", reason: SUMMARY_STORE,
+    call: "rmSync(path)", reason: SUMMARY_REMOVAL,
   },
+  { file: "session-summary-purge.ts", fn: "remove", guard: "", call: "unlinkSync(path)", reason: SUMMARY_REMOVAL },
+  { file: "session-summary-legacy-rollups.ts", fn: "removeLegacyRollups", guard: 'unless(start === undefined) if(start.kind === "link")', call: "unlink(dir)", reason: LEGACY_ROLLUPS },
+  { file: "session-summary-legacy-rollups.ts", fn: "removeLegacyRollups", guard: 'unless(start === undefined) unless(start.kind === "link") unless(start.kind !== "directory") unless(!isSameDirectory(identity(dir), start))', call: "unlink(join(dir, entry.name))", reason: LEGACY_ROLLUPS },
+  { file: "session-summary-legacy-rollups.ts", fn: "unlink", guard: "", call: "unlinkSync(path)", reason: LEGACY_ROLLUPS },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
-    guard: "if(leftover !== null) if(owner !== pid && !isAlive(owner))",
-    call: "rmSync(path)", reason: SUMMARY_STORE,
-  },
-  {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
-    guard: "if(rollup !== undefined && now() - rollup.updatedAt > ROLLUP_TTL_MS)",
-    call: "rmSync(path)", reason: SUMMARY_STORE,
-  },
-  {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
+    file: "session-summary-files.ts", fn: "renameIfPresent",
     guard: "",
-    call: "renameSync(path)", reason: SUMMARY_STORE,
+    call: "renameSync(from)", reason: SUMMARY_REMOVAL,
   },
   {
-    file: "session-summary-store.ts", fn: "createSummaryStore>claimOrphans",
+    file: "session-summary-liveness.ts", fn: "removeIfUnchanged",
+    guard: "unless(!renameIfPresent(path, aside)) if(readText(aside) !== judged)",
+    call: "linkSync(aside)", reason: OWNER_LIVENESS,
+  },
+  {
+    file: "session-summary-process-start.ts", fn: "psStartTime",
     guard: "",
-    call: "rmSync(claimPath)", reason: SUMMARY_STORE,
+    call: "execFileSync(\"ps\")", reason: PROCESS_START,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "mkdirSync(dir)", reason: SUMMARY_RECOVERY,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "writeFileSync(temp)", reason: SUMMARY_RECOVERY,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "linkSync(temp)", reason: SUMMARY_RECOVERY,
+  },
+  {
+    file: "session-summary-recovery-storage.ts", fn: "withRecoveryOps>createWindow",
+    guard: "",
+    call: "unlinkSync(temp)", reason: SUMMARY_REMOVAL,
+  },
+  {
+    file: "session-summary-optout-purge.ts", fn: "settleClaim",
+    guard: "if(keep)",
+    call: "linkSync(claimPath)", reason: OPTOUT_PURGE_KEEP,
   },
 ]

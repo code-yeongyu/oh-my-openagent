@@ -55,7 +55,7 @@ export function memorySecrets() {
     set: async ({ service, name, value }) => { writes.push(value); values.set(`${service}:${name}`, value) },
     delete: async ({ service, name }) => values.delete(`${service}:${name}`),
   }
-  return { api, values, writes, store: (origin: string) => createCredentialStore(origin, api) }
+  return { api, values, writes, store: (origin: string) => createCredentialStore(origin, { secrets: api, platform: process.platform, lockProbe: async () => "unlocked" }) }
 }
 
 export function clock() {

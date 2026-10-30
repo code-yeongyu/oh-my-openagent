@@ -39,7 +39,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     )
   }
 
-  const makeRun = async (mode: "graceful" | "stubborn") => {
+  const makeRun = async (mode: "graceful" | "stubborn" | "with-grandchild") => {
     const runDir = realpathSync.native(
       await mkdtemp(join(tmpdir(), "memory-run-supervisor-ic8-")),
     )
@@ -58,6 +58,7 @@ export function createMemoryRunSupervisorIc8Harness() {
         version: 1,
         runId: "run-ic8",
         kind: "reflection",
+        memoryRoot: runDir,
         command: process.execPath,
         args: [childFixture, mode, runDir],
         cwd: runDir,

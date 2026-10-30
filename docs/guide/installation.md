@@ -105,7 +105,7 @@ codex plugin add omo@sisyphuslabs
 **Bootstrap notice + restart.** The first approved session prints this status line:
 
 ```
-LazyCodex bootstrap running in background — restart the session when it completes
+LazyCodex bootstrap running in background: restart the session when it completes
 ```
 
 A detached worker finishes the install in the background (the `sg` download is the slowest part). Restart the Codex session once it completes — the next session starts fully wired and the notice no longer appears.
@@ -202,7 +202,10 @@ one is unset.
      providers     acme -> https://api.acme.example/v1, 2 models (acme-large, acme-small), key from opencode config apiKey - will be imported
      model choices default kimi-coding/k3; categories deep-low, quick; agents librarian - will be written
    ...
-   Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.
+   OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.
+   The data goes to PostHog in the United States.
+   Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
+   Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
    Import all of the above into ~/.omo? [Y/n]
    ```
 
@@ -601,7 +604,7 @@ When OpenCode Zen is the best available provider, common examples:
 | **plan-consultant**   | `opencode/claude-fable-5-1` (max)                    |
 | **plan-reviewer**     | `opencode/gpt-6-astra` (high)                        |
 | **deep** (category)   | `opencode/gpt-6-astra` (high)                        |
-| main agent (session)  | `opencode/claude-opus-5-5` or `opencode-go/kimi-k3`    |
+| main agent (session)  | `opencode/claude-opus-5-5` or `opencode-go/kimi-k3.1-pro` |
 
 Run the installer with `--opencode-zen=yes` and select "Yes" for OpenCode Zen at the prompt. If your OpenCode environment prompts for provider authentication, follow the OpenCode provider flow for `opencode/` models.
 
@@ -619,7 +622,8 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | **Claude Sonnet 5.5**    | anthropic, github-copilot, opencode | The `unspecified-low` category default (medium).                                            |
 | **Claude Sonnet 5**      | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                                              |
 | **Claude Haiku 5.5**     | anthropic, github-copilot           | Fast and cheap. Good for quick tasks.                                                       |
-| **Kimi K3**              | opencode-go, kimi-for-coding, moonshotai, opencode | Top recommended Kimi for the main agent when thinking-token cost is acceptable.              |
+| **Kimi K3.1 Pro**        | opencode-go, kimi-for-coding, moonshotai, moonshotai-cn | Top recommended Kimi for the main agent when thinking-token cost is acceptable. 1M context. |
+| **Kimi K3**              | opencode, bailian-coding-plan, firmware, ollama-cloud, aihubmix | Previous Kimi, kept on the providers that do not serve K3.1 Pro yet.                       |
 | **Kimi K2.7**            | opencode-go (manual choice)         | Restrained Kimi fallback for Claude-like orchestration paths.                               |
 | **Kimi K3 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                                                |
 | **GLM 5.2**              | zai-coding-plan, opencode-go, opencode, bailian-coding-plan | Claude-like behavior. Current OpenCode Go / Z.ai fallback entry.                            |
@@ -632,7 +636,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **GPT-6 Astra**   | openai, chatgpt-subscription, github-copilot, opencode | OpenAI's most capable model and the recommended GPT flagship. Default for the Plan Reviewer (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (high). `gpt-6-astra-fast` is the Fast-mode variant. Manual override option for the main agent and the `architect` category. |
 | **GPT-6 Sol**     | openai, chatgpt-subscription, github-copilot, opencode | The GPT-6 workhorse tier and the default for Hephaestus (medium), with GPT-5.6 Sol kept as its fallback rung. Accepts reasoning effort `none` through `max`, no temperature, 1.05M context. `gpt-6-sol-fast` is the Fast-mode variant. |
-| **GPT-6.1 Sol**   | openai, chatgpt-subscription | The `deep-low` category model (medium), then its Fast tier `gpt-6.1-sol-fast`, with GPT-5.6 Sol kept behind both. It is also the `unspecified-low` GPT rung (medium, ahead of GPT-5.6 Terra). Its Fast tier leads the Geeky · Normal model profile, with plain GPT-6.1 Sol right behind it. Accepts reasoning effort `low` through `max` (no `none` or `minimal`), no temperature, 400K context. |
+| **GPT-6.1 Sol**   | openai, chatgpt-subscription | The `deep-low` category model (medium), then its Fast tier `gpt-6.1-sol-fast`, with GPT-5.6 Sol kept behind both. It is also the `unspecified-low` GPT rung (medium, ahead of GPT-5.6 Terra). Its Fast tier is the first Sol rung on the Obsessive · Normal model profile, with plain GPT-6.1 Sol right behind it. Accepts reasoning effort `low` through `max` (no `none` or `minimal`), no temperature, 400K context. |
 | **GPT-6 Luna**    | openai, chatgpt-subscription             | The GPT-6 light tier. `gpt-6-luna-fast` (low) is the OpenAI rung for `explore`, `librarian` and the `quick` category. Same effort ladder and limits as GPT-6 Sol. |
 | **GPT-5.6 Sol**   | openai, chatgpt-subscription, github-copilot, opencode | The `deep-low` fallback under GPT-6.1 Sol (medium), and the only `deep-low` rung GitHub Copilot and OpenCode Zen serve; its Fast tier `gpt-5.6-sol-fast` is the last rung on the OpenAI lanes. Also the fallback rung under GPT-6 Sol for Hephaestus, and under GPT-6 Astra for `ultrabrain` (max). |
 | **GPT-5.6 Terra** | openai, chatgpt-subscription, github-copilot | GPT-5.6 mid-tier. No longer a default for any agent; an optional balanced override.                    |
@@ -669,7 +673,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Agent               | Role                                       | Default Chain                                                          |
 | ------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
-| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max) |
+| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max) → opencode/kimi-k3 (max) |
 | **plan-reviewer**   | High-accuracy plan review gate             | openai\|chatgpt-subscription/gpt-6-astra (xhigh) → github-copilot/gpt-6-astra (high) → openai\|chatgpt-subscription\|opencode/gpt-6-astra (high) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → … (full chain in source) |
 | **explore**         | Fast codebase grep                         | kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off) → openai\|chatgpt-subscription/gpt-6-luna-fast (low) → anthropic\|github-copilot/claude-haiku-5-5 (medium) → deepseek/deepseek-flash (max) → opencode-go\|bailian-coding-plan/qwen3.7-plus → opencode-go/minimax-m2.7 |
 | **librarian**       | Docs/code search                           | (same chain as `explore`)                                              |
@@ -968,12 +972,11 @@ Postinstall validates both platform binary resolution and OpenCode version compa
 
 ## Telemetry & Privacy
 
-Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). For both products:
+Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). Every installer (`install.sh`, `install.ps1`, `bunx oh-my-openagent install`, `lazycodex-ai install`) and `omo setup` print a short notice when they finish: what is sent, that it goes to PostHog in the United States, how to turn it off, and a link to the [privacy policy](../legal/privacy-policy.md). OmO Native shows the same notice once, on its first session. For both products:
 
 - A single event is sent **at most once per UTC day per machine**
-- Uses a SHA256-hashed installation identifier — never the raw hostname
+- Uses a SHA256 hash of a random install id created on your computer, never anything derived from the hostname or user name
 - PostHog person profiles are **not** created
-- The raw hostname is never transmitted
 
 Per product:
 
@@ -985,6 +988,11 @@ Per product:
 Opt-out:
 
 ```bash
+# Disable telemetry for every product
+export DO_NOT_TRACK=1
+# or
+export OMO_DISABLE_TELEMETRY=1
+
 # Disable the main plugin's telemetry
 export OMO_DISABLE_POSTHOG=1
 # or

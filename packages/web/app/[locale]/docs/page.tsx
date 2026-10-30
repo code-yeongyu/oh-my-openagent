@@ -15,7 +15,9 @@ export default async function DocsPage() {
   return (
     <DocsShell
       mobileHeader={t("mobileHeader")}
+      searchLabel={t("searchLabel")}
       searchPlaceholder={t("searchPlaceholder")}
+      sectionsLabel={t("sectionsLabel")}
       sections={DOC_SECTIONS.map((s) => ({ id: s.id, title: s.title }))}
     >
       {sectionsWithHtml.map((section) => (

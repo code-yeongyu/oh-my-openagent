@@ -1,0 +1,12 @@
+[
+	{
+		"before": "Collected from one cited public page [S4].",
+		"after": "Collected from a single cited public page [S4].",
+		"reason": "Smoother wording."
+	},
+	{
+		"before": "[S4] Bridge page, retrieved 2026-10-01.",
+		"after": "[S4] Bridge page, retrieved 2026-10-02.",
+		"reason": "Date typo."
+	}
+]

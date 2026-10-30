@@ -66,6 +66,14 @@ describe("task_output suspension explanation", () => {
     expect(snapshot.suspended?.explanation).toBe(recoveryPresentation(parked("host_draining"))?.text)
   })
 
+  test("#given a child parked by its session quitting #when the snapshot is built #then it names the quit, not a generic restart (senpi#3493)", () => {
+    // given / when
+    const snapshot = buildTaskSnapshot(parked("session_quit"), "/tmp/state", NOW)
+
+    // then
+    expect(snapshot.suspended?.explanation).toBe("resuming (session quit)")
+  })
+
   test("#given a parked child with no recorded suspension reason #when the snapshot is built #then the session-resume wording is unchanged", () => {
     // given / when
     const snapshot = buildTaskSnapshot(parked(), "/tmp/state", NOW)

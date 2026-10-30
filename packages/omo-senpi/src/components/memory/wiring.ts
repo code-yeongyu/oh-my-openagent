@@ -15,7 +15,11 @@ import { createConfiguredFactsApplier, publishSessionFactsApplier } from "./fact
 import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
 import { createPressureDreamAdmission } from "./pressure-dream-admission"
 import { createMemoryRecallWiring, createSharedRecallCorpusCache } from "./recall-wiring"
-import { branchEntryCount, sessionIdFrom } from "./wiring-context"
+import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
+import { memoryBlockBuild } from "./memory-block-build"
+import type { MemoryIdentityContext } from "./context"
+import { createProjectMemoryScope } from "./project-memory-nudge"
+import { readUi, branchEntryCount, sessionIdFrom } from "./wiring-context"
 import { createMemoryUserActivity } from "./user-activity"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
 import {
@@ -24,19 +28,69 @@ import {
 } from "./wiring-reflection-live"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
+import { recoverStaleReflectionHolder } from "./reflection-stale-active"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
-  const promptCache = new MemoryBlockCache()
+  // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
+  // in the lazily loaded recall-store sidecar). Keyed by the build, so an upgrade never reads an older build's bytes.
+  const blockBuild = memoryBlockBuild()
+  const promptCache = new MemoryBlockCache(blockBuild === undefined ? {} : {
+    store: loadRecallStoreRuntime,
+    build: blockBuild,
+    onStoreError: (error) => options.logger?.warn("omo-senpi persisted memory block unavailable; compiling instead", {
+      error: error instanceof Error ? error.message : String(error),
+    }),
+    onDegraded: ({ revision, reasons }) => options.logger?.warn("omo-senpi memory block compiled from incomplete git reads; used for this turn only, not persisted", {
+      revision,
+      reasons,
+    }),
+  })
+  const promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> } = {}
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
   const userActivity = createMemoryUserActivity(options.env)
   const skillsUsageTrackersRef: { current: Map<string, SkillsUsageTracker> } = { current: new Map() }
   const memoryUsageTrackersRef: { current: Map<string, MemoryUsageTracker> } = { current: new Map() }
   const reflectionLive = createMemoryReflectionLiveWiring(options, activeSession, lastEventCtx)
+  const staleLockNoticesShown = new Set<string>()
+  const staleHolderReconciles = new Set<string>()
+  // Session-start reconciliation runs once per session, so a holder that died after it would keep
+  // the reflection lock for good (#10377). Each later turn settles a provably dead holder, and shows
+  // a holder whose liveness cannot be proven once per session and run.
+  const recoverStaleHolderAfterTurn = async (sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown, signal?: AbortSignal): Promise<void> => {
+    if (!userActivity.has(sessionId) || !userActivity.hasReconciled(sessionId)) return
+    let attemptedKey: string | undefined
+    try {
+      const recovery = await recoverStaleReflectionHolder({
+        reflectionDir: identity.identityPaths.reflection,
+        reconcile: () => runtimeFor(identity).reconcile(signal),
+        // A holder that one reconciliation could not release is reported, not reconciled every turn.
+        shouldReconcile: (runId) => {
+          signal?.throwIfAborted()
+          const key = `${sessionId}:${runId}`
+          if (staleHolderReconciles.has(key)) return false
+          attemptedKey = key
+          return true
+        },
+        ...(options.reflectionHolderSeams === undefined ? {} : { seams: options.reflectionHolderSeams }),
+      })
+      signal?.throwIfAborted()
+      if (resolveContext(sessionId) !== identity) return
+      if (attemptedKey !== undefined) staleHolderReconciles.add(attemptedKey)
+      if (recovery.notice === undefined || recovery.verdict.state === "none") return
+      const key = `${sessionId}:${recovery.verdict.runId}`
+      if (staleLockNoticesShown.has(key)) return
+      staleLockNoticesShown.add(key)
+      readUi(eventCtx)?.notify(recovery.notice, "warning")
+    } catch (error) {
+      signal?.throwIfAborted()
+      options.logger?.warn("omo-senpi memory could not check the reflection lock holder", { error: error instanceof Error ? error.message : String(error) })
+    }
+  }
   const runtimeWiring = createMemoryRuntimeWiring(
     options,
     lastEventCtx,
@@ -75,11 +129,22 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // One corpus cache for both: the sidecar's read-only memory tool reads the corpus the candidates came from.
   const corpusCache = (options.createCorpusCache ?? createSharedRecallCorpusCache)(options.logger)
 
+  const projectScope = createProjectMemoryScope({
+    resolveContext,
+    switches: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory).project_scope,
+    fallbackCwd: options.cwd,
+    env: options.env,
+    corpusCache,
+    ...(options.logger === undefined ? {} : { logger: options.logger }),
+  })
+
   const recallWiring = createMemoryRecallWiring({
     resolveContext,
     resolveSettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
     env: options.env,
     corpusCache,
+    projectCorpora: projectScope.recallCorpora,
+    projectSource: projectScope.sourceFor,
     drainQueued: (sessionId, context) => deliveryRef.current?.drainForPrompt(sessionId, context) ?? [],
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
@@ -143,6 +208,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   return {
     registerStatic(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       userActivity.register(pi)
+      projectScope.register(pi)
       const applyFacts = createConfiguredFactsApplier(options, (sessionId) => resolveContext(sessionId ?? activeSession.current ?? ""))
       reflectionLive.registerRpc(pi, resolveContext, applyFacts)
       publishSessionFactsApplier(applyFacts)
@@ -153,6 +219,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         resolveContext: (sessionId) => userActivity.hasInput(sessionId) ? resolveContext(sessionId) : undefined,
         recall: recallWiring,
         corpusCache,
+        projectScope,
         ...(ctx.idleCoordinator === undefined ? {} : { coordinator: ctx.idleCoordinator }),
         sendMessage: (message, sendOptions) => pi.sendMessage(message, sendOptions),
         appendEntry: (customType, data) => pi.appendEntry?.(customType, data),
@@ -166,6 +233,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         ctx,
         options,
         promptCache,
+        promptPrebuild,
         nudgeWiring,
         noticeWiring,
         recallWiring,
@@ -188,25 +256,40 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         memoryUsageTrackersRef,
         hasUserActivity: userActivity.has,
         onReflectionLaunch: reflectionLive.onReflectionLaunched,
-        onSettled: async (sessionId, eventCtx) => {
+        onSettled: async (sessionId, eventCtx, observer) => {
           const identity = resolveContext(sessionId)
           if (identity !== undefined) {
+            observer?.phase("onSettled.reflection.staleHolder")
+            await recoverStaleHolderAfterTurn(sessionId, identity, eventCtx, observer?.signal)
+            observer?.phase("onSettled.reflection.reconcile")
             await userActivity.reconcileOnce(sessionId, async () => {
               try {
-                await runtimeFor(identity).reconcile()
+                await runtimeFor(identity).reconcile(observer?.signal)
+                observer?.signal.throwIfAborted()
               } catch (error) {
+                observer?.signal.throwIfAborted()
                 if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
               }
+              if (resolveContext(sessionId) !== identity) return
               pressureDreamAdmission.requestDeferred(sessionId)
             })
           }
-          await reflectionLive.onSettled(sessionId, eventCtx)
+          observer?.phase("onSettled.status.sync")
+          if (resolveContext(sessionId) !== identity) return
+          await reflectionLive.onSettled(sessionId, eventCtx, observer?.signal)
         },
         onMemoryWrite: reflectionLive.syncRpc,
       })
     },
 
     async afterBind(pi, sessionId, identity, eventCtx): Promise<void> {
+      // Off the prompt path: a NEW session's first prompt shares this compile of HEAD, or reads what it persisted.
+      // A resumed session is pinned to its recorded revision, which may not be HEAD; it gets no prebuild.
+      if (branchEntryCount(eventCtx) === 0) void promptPrebuild.current?.(identity).catch((error: unknown) => {
+        options.logger?.warn("omo-senpi memory block prebuild failed; the first prompt compiles it", {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      })
       activeSession.current = sessionId
       userActivity.reset(sessionId)
       pressureDreamAdmission.reset(sessionId)
@@ -247,6 +330,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await shutdownDrain.raceDetached(input, "status-settle", () => reflectionLive.settled())
       // A recall ranking saves the repository's terms into its `.git` after the prompt; let that write finish.
       await shutdownDrain.raceDetached(input, "recall-store-settle", () => corpusCache.settled())
+      await shutdownDrain.raceDetached(input, "memory-block-settle", () => promptCache.settled())
       reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
       // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
       // drain deadline: both are started and raced against it, and whichever loses keeps running
@@ -275,9 +359,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       shutdownDrain.registerEvaluator(evaluator)
     },
 
-    clearStatus(eventCtx: unknown): void {
-      reflectionLive.clearStatus(eventCtx)
-    },
+    clearStatus: reflectionLive.clearStatus,
+    onSyncStatusChanged: reflectionLive.onSyncStatusChanged,
 
     async whenIdle(): Promise<void> {
       await kibitzerRef.current?.whenIdle()

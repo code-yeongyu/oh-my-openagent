@@ -1,3 +1,55 @@
+## 2026-10-25 - Record child session spawn ancestry (#11298)
+
+Thread parent, root, and task identity through child-session creation and
+respawn paths. `runners/engine-spawned-by.ts` holds the minimum engine
+(`2026.10.24-4`, senpi#4205) and compares versions field by field. The
+standalone `--spawned-by` argument follows the version of the engine actually
+launched (`resolveSenpiLaunchTarget`: the running engine for the compiled engine
+and the rpc-entry fallback, the launched package manifest for SENPI_BIN, sibling,
+PATH and Windows shim targets), and the host path drops `open_session.spawnedBy`
+unless the host's `get_protocol_info.engineVersion` meets the same minimum. An
+absent or unparseable version sends nothing.
+
+## 2026-10-27 - Workflow category nodes keep the parent model as their last rung (#11439)
+
+A DAG run records the parent session's model at start (`DagRunRecordV1.parentModel`), and scheduler admission, node retry and crash/resume recovery pass it as `parent_model`, so `withParentModelRung` adds the same last rung a task child gets (#10750). Runs persisted before this change behave as before.
+
+## 2026-10-27 - A queued steer reaches the child under its own id; a lost acknowledgment is read before any resend (desktop #2838 step 4) (#11427)
+
+`drainPending` sends each `pending_steering` entry with `{ clientMessageId: entry.id }`, and every handle
+layer (`ManagedChildHandle` and both adapters, the in-process handle, both RPC runners, `input-delivery`)
+passes that identity to the engine; `input-effects` sends a caller's own id as it is and mints one only when
+none is given. A drain repeated after a lost acknowledgment or a parent restart therefore replays the same id
+on the child instead of delivering a second copy.
+
+An unacknowledged input is resolved through the child's `get_pending_inputs` read (senpi#3549) before
+anything is sent again: `admitted` settles it, `not_admitted` resends the same id, a failed read keeps it
+uncertain. An earlier run's uncertain input is still never sent into a later run, but it now fails as
+`superseded_by_new_run` only when the read says it was not admitted; admitted settles it and a failed read
+keeps it uncertain. The run an uncertain input was sent in is stored on it (`run_epoch`), since a queue
+entry's id carries no epoch. A child that cannot answer the read keeps the previous same-id resend.
+
+Not in this change: TTL/terminal retention of queued entries (T45/T46) and the engine's custody receipt on
+`steer`/`prompt` answers (senpi#4383).
+
+An error answer other than an unknown command, and an id the child leaves out of its answer, both count as unreadable, so nothing is sent on them.
+
+## 2026-10-26 - Keep parent Resume independent of a failed child restore (#11401)
+
+The run controller records resume-effect failures for acknowledged participants as well as participants already outside custody. A persisted acknowledgement supplies the retry cutoff when the failed child's engine is unavailable. A newer Stop still supersedes the failed old Resume.
+
+## 2026-10-25 - Keep unresponsive sessions owned until confirmed closed (#11317)
+
+Add deterministic stalled-host coverage, authoritative post-close absence checks, bounded heartbeat backoff, same-session steering recovery, and session liveness status observations. Keep probes active during streaming and release turn waiters on every exit.
+
+## 2026-10-23 - Report refused starts before teardown (#10402)
+
+First-prompt refusals settle the launch without waiting for child termination and
+disposal. Both RPC runners retain detached cleanup until it finishes, and the
+manager includes that cleanup in its existing shutdown deadline. Failed process
+resumes still await cleanup before permitting a retry against the same session.
+The `started` result with `starting: true` keeps its existing contract.
+
 ## 2026-10-19 - Retry infrastructure-failed DAG nodes before cascading skips (#10605)
 
 The shared DAG scheduler retries an infrastructure-failed node at most twice, with
@@ -21,6 +73,36 @@ exhaustion, misleading task error text, cancellation, typed host refusal, and
 budget/backoff restoration across scheduler re-entry. Manual retry after
 exhaustion still accepts a prompt override, journals the amendment before the
 retry, and rejects already-completed work before applying an amendment.
+
+## 2026-10-18 - A quit-suspended child records why it is still running (senpi#3493)
+
+Quitting the owning session parks every live child - resident RPC handles park `rpc_detached`,
+pending children park `persisted_only` - but the record keeps `status: running` by design (a
+later session can still revive it). Nothing recorded WHY it was parked, so a status check after a
+restart that never resumed that session showed a running task nothing would move, and no surface
+could explain it.
+
+`lifecycle/shutdown.ts` now stamps `suspension_reason: "session_quit"` when - and only when - the
+shutdown reason is `quit`: once per parked handle and once per parked pending record. Other
+reasons keep today's behavior: a `reload` parks the same way and the new generation revives
+through reconcile (a marker would misdescribe a suspension that resolves itself), and the
+dispose opt-out ends the run outright.
+
+`state/types.ts` adds the reason to `SuspensionReason`; `state/recovery-presentation.ts` maps it
+to "session quit", so `task_output` renders the existing "resuming (session quit)" phrase instead
+of the bare raw token. `lifecycle/host-session-record.ts` `markRevivalDeferred` now supersedes a
+stale `session_quit` marker with the deferral's own reason: the resume feeding that deferral IS
+the revival the marker was waiting for, so keeping it would promise a resume that already
+happened (the same reasoning as omo#9498).
+
+Keep the stamping on the quit path only, and keep the supersession narrow to `session_quit`: a
+more specific recorded reason (a parked host, a draining generation) still wins, and
+`clearSuspensionReason`/TTL behavior is untouched.
+
+`host-session-teardown.test.ts` pins the quit marker on both park paths and the absence of a
+marker on a `reload` shutdown; `snapshot-suspension.test.ts` pins the phrase;
+`reconcile-revival.test.ts` pins the supersession; `parked-recovery.test.ts` still pins the
+auto-resume after a parent restart - now with the marker present, the resume is unchanged.
 
 ## 2026-10-16 - Argon (high) ahead of the previous pro rung in plan-reviewer (#10180)
 

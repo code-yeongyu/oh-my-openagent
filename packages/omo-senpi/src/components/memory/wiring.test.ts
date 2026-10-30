@@ -27,6 +27,7 @@ import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./pro
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
+import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 const roots: string[] = []
 
@@ -393,6 +394,58 @@ const eventCtx = {
     getSessionId: () => "session-1",
     getEntries: () => [],
   },
+}
+
+for (const assertion of ["bounded", "attributed"] as const) {
+  test(`#given a never-resolving reflection reconcile #when the composed memory subscriber settles #then it is ${assertion}`, async () => {
+    // given: the real memory wiring reaches its injected runtime, not a substitute settle handler.
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-settle-")))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: "settle-agent",
+      identityPaths: buildIdentityPaths(root, "settle-agent"),
+      binding: { identity: "settle-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const runtime = { reconcile: () => { entered.resolve(); return release.promise } } as unknown as MemoryIdentityRuntime
+    const pi = new MemoryFakeExtensionAPI()
+    const context = componentContext()
+    await composeOmoSenpiExtension([{
+      name: "memory",
+      register(api, ctx) {
+        createMemoryWiring({
+          sessions: new Map([["session-1", { context: identity }]]),
+          loadConfig: () => loadedMemoryConfig(memorySettings()),
+          cwd: () => root,
+          env: {},
+          logger: ctx.logger,
+          createRuntime: () => runtime,
+        }).registerStatic(api, ctx)
+      },
+    }], { logger: context.logger })(pi)
+    await pi.dispatch("input", { source: "rpc", inputId: "accepted", text: "Work." }, eventCtx)
+    await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
+    const settled = pi.dispatch("agent_settled", {}, eventCtx)
+    try {
+      await withinMs(entered.promise, "memory reconciliation entered", 5_000)
+      // when: this watchdog bounds the assertion, never supplies the completion under test.
+      const completed = await withinMs(settled, "bounded memory settle", 4_000).then(() => true, () => false)
+      // then
+      if (assertion === "bounded") expect(completed).toBe(true)
+      else expect(context.logs).toContainEqual(expect.objectContaining({
+        message: "extension_handler_stalled",
+        details: expect.objectContaining({
+          component: "memory", hook: "onSettled.reflection.reconcile",
+          handlerEvent: "agent_settled", stage: "timeout", sessionId: "session-1",
+        }),
+      }))
+    } finally {
+      release.resolve()
+      await settled
+      await pi.dispatch("session_shutdown", {})
+    }
+  }, 15_000)
 }
 
 describe("memory wiring reflection completion delivery", () => {

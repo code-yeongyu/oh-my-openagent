@@ -7,12 +7,15 @@ import { resolveOmoGitMasterSettings, type OmoGitMasterSettings } from "@oh-my-o
 import { buildSkillPrepend, createFsSkillLoader, type SkillLoader } from "@oh-my-opencode/senpi-task"
 
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "../bundled-skills"
 import { loadSenpiOmoConfig } from "../config-resolution"
-import { resolveGitMasterSkillAdditions } from "../git-master/skill-content"
+import { carriesAttributionDirective, resolveGitMasterSkillAdditions } from "../git-master/skill-content"
 
 const GIT_MASTER_SKILL_NAME = "git-master"
 
 export interface TaskSkillLoaderOptions {
+  readonly env?: Record<string, string | undefined>
+  readonly logger?: BundledSkillsOverrideLogger
   readonly agentDir?: string
   readonly homeDir?: string
   readonly pluginSkillsDirs?: readonly string[]
@@ -25,11 +28,19 @@ export interface TaskSkillLoaderOptions {
  * `skills-conditional` holds credential-gated skills (x-search); it is offered to every
  * `load_skills` request unconditionally because the PARENT decides what to pass.
  */
-export function packagedSkillDirs(moduleUrl: string): readonly string[] {
+export function packagedSkillDirs(
+  moduleUrl: string,
+  env: Record<string, string | undefined> = process.env,
+  logger?: BundledSkillsOverrideLogger,
+): readonly string[] {
   const moduleDir = dirname(fileURLToPath(moduleUrl))
-  return [
+  const override = resolveBundledSkillsOverride(env, logger)
+  const bundled = override === undefined ? [
     resolve(moduleDir, "../../../plugin/skills"),
     resolve(moduleDir, "../skills"),
+  ] : [override]
+  return [
+    ...bundled,
     resolve(moduleDir, "../../../plugin/skills-conditional"),
     resolve(moduleDir, "../skills-conditional"),
   ].filter(existsSync)
@@ -52,7 +63,8 @@ function withGitMasterSettings(
     const skills = resolvedSkills.map((skill) => {
       if (skill.name !== GIT_MASTER_SKILL_NAME) return skill
       const content = additions.rewriteSkillText(skill.content)
-      return { ...skill, content: additions.directive === undefined ? content : `${content}\n\n${additions.directive}` }
+      const appendDirective = additions.directive !== undefined && !carriesAttributionDirective([skill.content])
+      return { ...skill, content: appendDirective ? `${content}\n\n${additions.directive}` : content }
     })
     return { ...resolution, skills, prepend: buildSkillPrepend(skills, "") }
   }
@@ -60,8 +72,9 @@ function withGitMasterSettings(
 
 export function createTaskSkillLoader(options: TaskSkillLoaderOptions = {}): SkillLoader {
   const homeDir = options.homeDir ?? homedir()
-  const agentDir = options.agentDir ?? resolveAgentHome({ env: process.env, homeDir })
-  const pluginSkillsDirs = options.pluginSkillsDirs ?? packagedSkillDirs(import.meta.url)
+  const env = options.env ?? process.env
+  const agentDir = options.agentDir ?? resolveAgentHome({ env, homeDir })
+  const pluginSkillsDirs = options.pluginSkillsDirs ?? packagedSkillDirs(import.meta.url, env, options.logger)
   const loadSettings = options.loadSettings ?? defaultLoadSettings
   const loader = createFsSkillLoader({
     homeDir,

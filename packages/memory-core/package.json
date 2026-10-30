@@ -28,7 +28,16 @@
     },
     "./keyring": {
       "import": "./src/sync/keyring-port.ts"
+    },
+    "./memory-hook": {
+      "import": "./src/memfs/memory-hook.ts"
+    },
+    "./external-projection": {
+      "import": "./src/compile/external-projection.ts"
     }
+  },
+  "imports": {
+    "#memory-external-projection": "./src/compile/external-projection.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",
@@ -36,6 +45,7 @@
   },
   "dependencies": {
     "loro-crdt": "1.16.4",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "zod": "^4.6.5"
   }
 }

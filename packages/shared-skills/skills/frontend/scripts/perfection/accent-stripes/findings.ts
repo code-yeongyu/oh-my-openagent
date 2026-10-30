@@ -1,4 +1,4 @@
-export type RuleId = "edge-stripe" | "pseudo-bar" | "inset-shadow-stripe" | "gradient-stripe"
+export type RuleId = "edge-stripe" | "pseudo-bar" | "inset-shadow-stripe" | "gradient-stripe" | "accent-outline"
 
 export type Finding = {
 	readonly file: string
@@ -9,14 +9,15 @@ export type Finding = {
 }
 
 export const RULE_MESSAGES: Readonly<Record<RuleId, string>> = {
-	"edge-stripe": "coloured one-side border on a rounded surface; the corners bend the stripe",
-	"pseudo-bar": "coloured ::before/::after bar on a rounded surface",
-	"inset-shadow-stripe": "inset box-shadow stripe on a rounded surface",
-	"gradient-stripe": "hard-stop gradient band along one edge of a rounded surface",
+	"edge-stripe": "coloured one-side border on a box, rounded or square",
+	"pseudo-bar": "coloured ::before/::after bar along one side of a box",
+	"inset-shadow-stripe": "inset box-shadow stripe along one side of a box",
+	"gradient-stripe": "hard-stop gradient band along one edge of a box",
+	"accent-outline": "accent-tinted full outline on a rounded card",
 }
 
 export const FIX_HINT =
-	"drop the stripe: separate with a tonal surface (one ink at a low alpha), an eyebrow or heading, a leading glyph, or spacing"
+	"drop the stripe or outline: separate with a tonal surface (one ink at a low alpha), an eyebrow or heading, a leading glyph, or spacing"
 
 export function lineLocator(text: string): (offset: number) => { line: number; column: number } {
 	const starts = [0]

@@ -1,14 +1,13 @@
 import { hostname } from "node:os"
-import { basename, dirname, join, resolve } from "node:path"
-
-import { AGENTS_DIRNAME, REPO_DIRNAME, RUNTIME_DIRNAME } from "../identity"
+import { join } from "node:path"
 
 import { lstat, readFile, readdir, unlink } from "../fs/resilient"
-import { memoryWriterLockPath, parseLockRecord } from "../locks"
+import { memoryWriterLockPath, parseLockRecord, type LockRecord } from "../locks"
 import { isLockOwnerProvenDead } from "../locks/acquire"
 import { provenDeadTakeoverFor } from "../locks/proven-dead-takeovers"
 import { isGitLockError, withGitLockRetry } from "./config-lock"
 import { GitError } from "./errors"
+import { identityLocksDirForRepo, probeGitActivityIdle } from "./git-activity-lock"
 import { PRODUCTION_LOCK_SCANS, type GitLockScans } from "./lock-scans"
 
 // Settle window between observing an idle lock candidate and re-checking it. The crash-
@@ -101,21 +100,19 @@ export async function presentLockFiles(gitDir: string): Promise<LockSnapshot> {
 }
 
 // After authorization, a lock is removable only if it kept its inode and mtime across the settle
-// window AND no process holds it open: belt and braces on top of the ownership proof.
-async function settledVerdict(candidate: string, before: { readonly ino: number; readonly mtimeMs: number }, scans: GitLockScans): Promise<KeptGitLockReason | "removable"> {
+// window AND no process holds it open: belt and braces on top of the ownership proof. An open-holder
+// scan that cannot answer is overruled only when the kernel already proved no memory-core git alive.
+async function settledVerdict(candidate: string, before: { readonly ino: number; readonly mtimeMs: number }, holders: readonly number[] | null, kernelVouches: boolean): Promise<KeptGitLockReason | "removable"> {
   const status = await lstat(candidate).catch(() => undefined)
   if (status === undefined || status.ino !== before.ino || status.mtimeMs !== before.mtimeMs) return "changed-during-settle"
-  const holders = await scans.findHolders(candidate)
-  return holders === null || holders.length > 0 ? "open-holder" : "removable"
+  if (holders === null) return kernelVouches ? "removable" : "open-holder"
+  return holders.length > 0 ? "open-holder" : "removable"
 }
 
-// The identity layout (identity/layout.ts) pins the memory-write lock next to the repo:
-// <root>/agents/<id>/repo and <root>/agents/<id>/runtime/locks. A repo outside that layout has
-// no writer lock to authorize with, so it can never be swept.
+// A repo outside the identity layout has no writer lock to authorize with, so it is never swept.
 export function writerLockPathForRepo(repoDir: string): string | null {
-  const resolved = resolve(repoDir)
-  if (basename(resolved) !== REPO_DIRNAME || basename(dirname(dirname(resolved))) !== AGENTS_DIRNAME) return null
-  return memoryWriterLockPath(join(dirname(resolved), RUNTIME_DIRNAME, "locks"))
+  const locksDir = identityLocksDirForRepo(repoDir)
+  return locksDir === null ? null : memoryWriterLockPath(locksDir)
 }
 
 // The sweep's contract changed with omo #10199 review HIGH 1: a git process killed
@@ -132,14 +129,15 @@ export function writerLockPathForRepo(repoDir: string): string | null {
 // The proof is bound to THIS acquisition: the current writer record's nonce must be the one the
 // takeover published (omo #10199 r5 MEDIUM 3), so a released takeover or another lock's proof
 // never authorizes anything.
-async function authorizedToReclaim(repoDir: string): Promise<boolean> {
+// Returns the proven-dead previous owner that authorizes this sweep, or null.
+async function authorizedPreviousOwner(repoDir: string): Promise<LockRecord | null> {
   const writerLockPath = writerLockPathForRepo(repoDir)
-  if (writerLockPath === null) return false
+  if (writerLockPath === null) return null
   const raw = await readFile(writerLockPath, "utf8").catch(() => undefined)
   const current = raw === undefined ? null : parseLockRecord(raw)
-  if (current === null || current.pid !== process.pid || current.hostname !== hostname()) return false
+  if (current === null || current.pid !== process.pid || current.hostname !== hostname()) return null
   const previous = provenDeadTakeoverFor(writerLockPath, current.nonce)
-  return previous !== undefined && (await isLockOwnerProvenDead(previous))
+  return previous !== undefined && (await isLockOwnerProvenDead(previous)) ? previous : null
 }
 
 function keepAll(present: LockSnapshot, reason: KeptGitLockReason): GitLockSweepReport {
@@ -149,33 +147,48 @@ function keepAll(present: LockSnapshot, reason: KeptGitLockReason): GitLockSweep
 export async function sweepStrandedGitLockFiles(dir: string, settleMs = GIT_LOCK_SETTLE_MS, scans: GitLockScans = PRODUCTION_LOCK_SCANS): Promise<GitLockSweepReport> {
   const present = await presentLockFiles(join(dir, ".git"))
   if (present.size === 0) return { removed: [], kept: [] }
-  if (!(await authorizedToReclaim(dir))) return keepAll(present, "owner-not-proven-dead")
+  const previous = await authorizedPreviousOwner(dir)
+  if (previous === null) return keepAll(present, "owner-not-proven-dead")
 
   await new Promise((resolveSleep) => setTimeout(resolveSleep, settleMs))
   // A live owner of a stranded lock stays alive from before the sweep until it removes the lock,
   // so one check after the settle window sees it (omo #10199 r5 HIGH 1: never break a lock while
   // ANY process - the dead owner's orphaned git child included - is working in the repository).
   const users = await scans.findRepoUsers(dir)
-  if (users === null || users.length > 0) return keepAll(present, "repo-in-use")
+  if (users !== null && users.length > 0) return keepAll(present, "repo-in-use")
+  const holders = new Map<string, readonly number[] | null>()
+  for (const candidate of present.keys()) holders.set(candidate, await scans.findHolders(candidate))
 
-  const removed: string[] = []
-  const kept: KeptGitLock[] = []
-  for (const [candidate, before] of present) {
-    const verdict = await settledVerdict(candidate, before, scans)
-    if (verdict !== "removable") {
-      kept.push({ path: candidate, reason: verdict })
-      continue
+  // omo #10322: the kernel answers what /proc cannot. Busy means a memory-core git process is alive
+  // in this repo. Idle stands in for an unanswerable scan only when the dead owner ran its git under
+  // this lock (an older writer's orphaned git would not hold it). The exclusive hold spans only the
+  // final stat and unlink, so no memory-core git can start in between.
+  const activity = await probeGitActivityIdle(dir)
+  if (activity.kind === "busy") return keepAll(present, "repo-in-use")
+  try {
+    const kernelVouches = activity.kind === "idle" && activity.vouches && previous.git_activity_lock === true
+    if (users === null && !kernelVouches) return keepAll(present, "repo-in-use")
+    const removed: string[] = []
+    const kept: KeptGitLock[] = []
+    for (const [candidate, before] of present) {
+      const verdict = await settledVerdict(candidate, before, holders.get(candidate) ?? null, kernelVouches)
+      if (verdict !== "removable") {
+        kept.push({ path: candidate, reason: verdict })
+        continue
+      }
+      try {
+        await unlink(candidate)
+        removed.push(candidate)
+      } catch {
+        // A sharing violation (Windows) or a racing remover leaves the file; the retried command
+        // fails loud, or the caller reports what is left through StrandedGitLockError.
+        kept.push({ path: candidate, reason: "unlink-failed" })
+      }
     }
-    try {
-      await unlink(candidate)
-      removed.push(candidate)
-    } catch {
-      // A sharing violation (Windows) or a racing remover leaves the file; the retried command
-      // fails loud, or the caller reports what is left through StrandedGitLockError.
-      kept.push({ path: candidate, reason: "unlink-failed" })
-    }
+    return { removed, kept }
+  } finally {
+    if (activity.kind === "idle") await activity.release()
   }
-  return { removed, kept }
 }
 
 export async function withStrandedGitLockRecovery<T>(dir: string, run: () => Promise<T>, scans: GitLockScans = PRODUCTION_LOCK_SCANS): Promise<T> {

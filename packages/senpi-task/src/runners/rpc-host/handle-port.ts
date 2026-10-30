@@ -14,6 +14,9 @@ import type { TransportRecoveryOptions } from "./transport-recovery"
 import type { CatalogModelIdentity } from "../pinned-model-equivalence"
 import type { TaskRecord } from "../../state"
 import type { HostTurnReconciliation, InputEffectStatus, ReconciledTurnNotice } from "./reconcile-turn"
+import type { TaskParentWire } from "../task-parent-control"
+import type { HostLivenessStatus } from "./handle-heartbeat"
+import type { HostPendingInputs } from "./session-transport"
 
 /**
  * What a child handle needs FROM a daemon session and what it exposes TO the manager. The seam is
@@ -39,6 +42,8 @@ export interface HostSessionPort {
   readonly socketPath: string
   readonly transportGone: Promise<unknown>
   send(command: HostSessionCommand): Promise<void>
+  // The run hold commands over this connection; absent on ports that cannot carry them.
+  taskParentWire?(): TaskParentWire
   getState(): Promise<HostSessionLiveness>
   onEvent(listener: ChildEventListener): () => void
   onExtensionEvent?(listener: ChildExtensionListener): () => void
@@ -47,8 +52,12 @@ export interface HostSessionPort {
   /** The host swapped the session under its live routing handle: the child follows the new transcript. */
   onReplaced?(listener: (event: HostSessionReplaced) => void): () => void
   getEntries(since?: string): Promise<RpcEntriesResult>
+  /** What the child holds for each input id; `undefined` from an engine client without the read (senpi#3549). */
+  getPendingInputs?(knownClientMessageIds: readonly string[]): Promise<HostPendingInputs | undefined>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
   close(): Promise<void>
+  /** Retain the route after a rejected close so a liveness stop can retry confirmation. */
+  closeConfirmed?(): Promise<void>
   detach(): Promise<void>
 }
 
@@ -74,6 +83,8 @@ export type HostSessionHandleOptions = {
   readonly inputStore?: import("../../store").TaskRecordStore
   readonly client: HostSessionPort
   readonly session: HostSessionIdentity
+  /** The durable session id the open already read; absent, the first heartbeat learns it. */
+  readonly durableSessionId?: string
   readonly taskId: string
   readonly heartbeatIntervalMs: number
   readonly now: () => number
@@ -88,6 +99,8 @@ export type HostSessionHandleOptions = {
 }
 
 export type HostSessionChildHandle = RpcChildHandle & {
+  liveness(): HostLivenessStatus
+  onLiveness(listener: (status: HostLivenessStatus) => void): () => void
   readonly kind: "host-session"
   /** False once the session was parked, closed, lost or deliberately left behind. */
   readonly attached: boolean
@@ -99,6 +112,8 @@ export type HostSessionChildHandle = RpcChildHandle & {
   /** Served by the CURRENT port, so they keep working after a reattach. */
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
+  /** Publish the task's status in the session's context (`task_status`) before a detach leaves it loaded. */
+  publishTaskStatus(status: TaskRecord["status"]): Promise<void>
   /** Drop this child's connection and leave the session running on the daemon. */
   detach(): Promise<void>
   /** End the session on the host without aborting a turn first (`clean`). */
@@ -107,6 +122,8 @@ export type HostSessionChildHandle = RpcChildHandle & {
   onParked(listener: (event: HostSessionParked) => void): () => void
   /** The host swapped the session under the live routing handle: the child follows the new transcript. */
   onReplaced(listener: (event: HostSessionReplaced) => void): () => void
+  /** A durable session id learned after spawn, because the open's own state read did not return one. */
+  onDurableSessionId(listener: (id: string) => void): () => void
   /** A reattach left a turn that was in flight at the loss running on the new port. */
   onTurnResumed(listener: () => void): () => void
   onSelfResumed(listener: () => void): () => void

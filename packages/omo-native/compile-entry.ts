@@ -15,6 +15,7 @@ import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisione
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
+import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
@@ -33,6 +34,8 @@ import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
+import { runAccountCommand } from "./account-cli"
+import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
 import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
@@ -138,6 +141,14 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     await runServiceAuthCommand(args)
     return true
   }
+  if (args[0] === "sync") {
+    await runSyncCommand(args)
+    return true
+  }
+  if (args[0] === "account") {
+    await runAccountCommand(args)
+    return true
+  }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
   migrateLegacyBunGlobalManifest(execDir)
   adoptLegacyFlatState()
@@ -162,6 +173,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   if (command === "thread") {
     process.exitCode = await runThreadCommand(args.slice(1), {
       engine,
+      reinstall: `Download this omo release again from ${RELEASES_URL}, then retry.`,
       pluginRoot: join(execDir, "plugin"),
       agentDir: canonicalAgentDir(),
       env: process.env,
@@ -267,6 +279,8 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  // The #10697 plaintext file goes before ANY command, including the answers below that return early.
+  removeLegacyServiceCredentials()
   // Before anything opens TLS, and on every start: `host ensure`, the host daemon and the
   // provisioned handoff all re-enter here (#10215). A bad value refuses to start (exit 78). Only the
   // exact argv `--version` or `--help` is answered, from static local data, before anything else runs

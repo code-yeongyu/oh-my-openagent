@@ -6,7 +6,7 @@ import { grant, memorySecrets, privateKeys } from "./test-support"
 describe("OS credential storage", () => {
   test.each(["darwin", "linux", "win32"] as const)("delegates %s storage exclusively to the in-process secret API", async platform => {
     const memory = memorySecrets()
-    const store = createCredentialStore("https://api.omo.dev", memory.api, platform)
+    const store = createCredentialStore("https://api.omo.dev", { secrets: memory.api, platform, lockProbe: async () => "unlocked" })
     const record = { ...grant, ...privateKeys }
     await store.write(record)
     expect(await store.read()).toMatchObject(record)
@@ -24,11 +24,11 @@ describe("OS credential storage", () => {
   })
 
   test("unavailable store fails without exposing native error contents", async () => {
-    const store = createCredentialStore("https://api.omo.dev", {
+    const store = createCredentialStore("https://api.omo.dev", { secrets: {
       get: async () => { throw new Error(grant.refreshToken) },
       set: async () => { throw new Error(grant.refreshToken) },
       delete: async () => { throw new Error(grant.refreshToken) },
-    }, "linux")
+    }, platform: "linux", lockProbe: async () => "unlocked" })
     for (const action of [() => store.read(), () => store.write({ ...grant, ...privateKeys }), () => store.clear()]) {
       try { await action(); throw new Error("unexpected success") } catch (error) {
         expect(String(error)).toContain("Secret Service")
@@ -38,7 +38,7 @@ describe("OS credential storage", () => {
   })
 
   test("unsupported runtimes fail closed with no file fallback", () => {
-    expect(() => createCredentialStore("https://api.omo.dev", null, "linux")).toThrow("Bun")
+    expect(() => createCredentialStore("https://api.omo.dev", { secrets: null, platform: "linux" })).toThrow("Bun")
   })
 
   test.skipIf(process.env.OMO_TEST_REAL_KEYSTORE !== "1")("opt-in real OS keystore smoke", async () => {

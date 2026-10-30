@@ -1,5 +1,6 @@
 import { GitTimeoutError } from "./errors"
 import type { GitExecResult } from "./exec"
+import { STABLE_LOG_OUTPUT } from "./stable-log-output"
 
 // A `git commit` that timed out may still have committed: the commit object and the HEAD update
 // can land before a slow hook or a loaded host pushes it past the budget (omo #10199 field
@@ -17,7 +18,7 @@ async function landedAfterTimeout(reads: CommitOutcomeReads, headBefore: string 
   const parent = await reads.result(["rev-parse", "--verify", "--quiet", `${head}^`])
   const parentSha = parent.code === 0 ? parent.stdout.trim() : null
   if (parentSha !== headBefore) return null
-  const subject = await reads.result(["log", "-1", "--format=%s", head])
+  const subject = await reads.result([...STABLE_LOG_OUTPUT, "log", "-1", "--format=%s", head])
   return subject.code === 0 && subject.stdout.trim() === (message.split("\n")[0] ?? "").trim() ? head : null
 }
 

@@ -54,7 +54,7 @@ export function formatFsyncSkipWarning(entries: FsyncSkipEntry[]): string {
     ...pathLines,
     "",
     "What this means:",
-    "  - The write+rename succeeded — the file is on disk, atomicity is preserved.",
+    "  - The write+rename succeeded: the file is on disk, atomicity is preserved.",
     durabilityLine,
     "  - No action required. Operation completed successfully.",
   ].join("\n")

@@ -14,11 +14,11 @@ use std::time::{Duration, Instant};
 
 use parking_lot::{Mutex, MutexGuard};
 use senpi_desktop_core::backend::DeliveryMode;
-use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
+use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, TccPermission};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_safety::{
-    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate, StopPolicy,
-    Supervisor,
+    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate, StopPathReason,
+    StopPolicy, Supervisor,
 };
 
 use crate::audit::audit_event;
@@ -159,6 +159,10 @@ impl Worker {
         if let Err(refused) = self.admit_control(mutation) {
             return (Err(TransactionError::Primary(refused)), None);
         }
+        let _watch = match self.admit_intervention(mutation, cancelled) {
+            Ok(watch) => watch,
+            Err(refused) => return (Err(TransactionError::Primary(refused)), None),
+        };
         let guard = match Guard::begin(self, mutation.action, mutation.delivery) {
             Ok(guard) => guard,
             Err(error) => return (Err(TransactionError::Primary(error)), None),
@@ -183,8 +187,17 @@ impl Worker {
     /// cancellation is observed first.
     fn admit(&self, cancelled: &dyn Fn() -> bool) -> CoreResult<MutexGuard<'static, ()>> {
         loop {
-            if let Some(stopped) = self.stop_observed(cancelled) {
-                return Err(stopped);
+            // Before the gate: only a stop or a cancellation ends the wait;
+            // the gate itself reports (and enriches) a stop path that is down.
+            let is_cancelled = cancelled();
+            if self.safety.supervisor.is_suspended() {
+                return Err(DesktopError::from(GateError::Suspended));
+            }
+            if is_cancelled {
+                return Err(DesktopError::new(
+                    ErrorCode::Cancelled,
+                    "the request was cancelled before any input was sent",
+                ));
             }
             if let Some(transaction) = INPUT_TRANSACTION.try_lock_for(ADMISSION_POLL) {
                 return Ok(transaction);
@@ -192,19 +205,24 @@ impl Worker {
         }
     }
 
-    /// `Suspended` before `Cancelled`: the probe runs first because a stop
-    /// may race it.
+    /// After the gate passed: `Suspended`, then a stop path that stopped
+    /// authorizing input, then `Cancelled`; the probe runs first because a
+    /// stop may race it.
     fn stop_observed(&self, cancelled: &dyn Fn() -> bool) -> Option<DesktopError> {
         let cancelled = cancelled();
-        if self.safety.supervisor.is_suspended() {
-            Some(DesktopError::from(GateError::Suspended))
-        } else if cancelled {
-            Some(DesktopError::new(
+        interruption(&self.safety.supervisor, &self.stop_policy())
+            .or_else(|| cancelled.then(|| DesktopError::new(
                 ErrorCode::Cancelled,
                 "the request was cancelled before any input was sent",
-            ))
-        } else {
-            None
+            )))
+    }
+
+    pub(crate) fn stop_policy(&self) -> StopPolicy {
+        StopPolicy {
+            allow_host_relay_only: self
+                .options
+                .as_ref()
+                .is_some_and(|options| options.allow_host_relay_only_stop),
         }
     }
 
@@ -226,12 +244,7 @@ impl Worker {
     }
 
     fn gate(&mut self, mutation: &Mutation<'_>) -> CoreResult<()> {
-        let policy = StopPolicy {
-            allow_host_relay_only: self
-                .options
-                .as_ref()
-                .is_some_and(|options| options.allow_host_relay_only_stop),
-        };
+        let policy = self.stop_policy();
         let input_granted = input_may_proceed(&self.refresh_capabilities().input_permission);
         let lock = match self.backend().and_then(|backend| backend.screen_locked()) {
             Ok(true) => LockState::Locked,
@@ -258,6 +271,25 @@ impl Worker {
     }
 }
 
+/// Why an action already under way must stop now, if it must: a stop the
+/// user latched, else a stop path that no longer authorizes input (it died,
+/// its heartbeat went stale, or it cannot hear the chord). The second never
+/// latches a stop, because nobody pressed one.
+pub(crate) fn interruption(supervisor: &Supervisor, policy: &StopPolicy) -> Option<DesktopError> {
+    let status = supervisor.status();
+    if status.suspended {
+        return Some(DesktopError::from(GateError::Suspended));
+    }
+    status.stop_path_unavailable(policy).map(|reason| {
+        DesktopError::from(match reason {
+            StopPathReason::AccessibilityDenied => GateError::PermissionDenied {
+                permission: TccPermission::Accessibility,
+            },
+            reason => GateError::StopPathUnavailable { reason },
+        })
+    })
+}
+
 /// `prompt-or-granted` (Wayland before the first input) lets the action
 /// through: the RemoteDesktop portal asks the user when the first input
 /// connects libei, and a refusal there fails the action itself.
@@ -266,12 +298,14 @@ fn input_may_proceed(input_permission: &str) -> bool {
 }
 
 #[cfg(test)]
+mod desktop_grant_tests;
+#[cfg(test)]
 mod grant_tests;
 #[cfg(test)]
 mod permission_tests;
 #[cfg(test)]
 mod stop_tests;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 #[cfg(test)]
 mod typing_tests;

@@ -86,6 +86,10 @@ export function fakeSessionPort(
       closes += 1
       return Promise.resolve()
     },
+    closeConfirmed: () => {
+      closes += 1
+      return Promise.resolve()
+    },
     detach: () => {
       detaches += 1
       return Promise.resolve()

@@ -1,0 +1,25 @@
+export const STYLE_PROPS = [
+	"display", "position", "visibility", "opacity", "z-index", "overflow-x", "overflow-y", "transform", "contain",
+	"top", "left", "right", "bottom", "width", "height", "max-width", "min-width", "max-height",
+	"color", "background-color", "background-image", "background-clip", "-webkit-background-clip", "-webkit-text-fill-color",
+	"background-size", "background-repeat", "background-position",
+	"font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing", "word-spacing",
+	"text-transform", "text-align", "text-align-last", "text-decoration-line", "text-decoration-thickness", "text-underline-offset",
+	"text-overflow", "text-wrap", "white-space", "word-break", "overflow-wrap", "hyphens", "font-variant-numeric", "font-feature-settings",
+	"-webkit-line-clamp", "overflow-clip-margin", "font-variant", "font-variant-caps", "background-blend-mode", "mix-blend-mode", "scale", "rotate", "translate", "will-change",
+	"border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+	"border-top-style", "border-right-style", "border-bottom-style", "border-left-style",
+	"border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+	"border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius",
+	"border-image-source", "outline-style", "outline-width", "outline-color", "outline-offset",
+	"box-shadow", "text-shadow", "filter", "backdrop-filter", "-webkit-backdrop-filter", "clip-path", "mask-image", "-webkit-mask-image",
+	"padding-top", "padding-right", "padding-bottom", "padding-left",
+	"margin-top", "margin-right", "margin-bottom", "margin-left",
+	"row-gap", "column-gap", "grid-template-columns", "flex-direction", "flex-wrap", "justify-content", "align-items", "column-count",
+	"animation-name", "animation-duration", "animation-iteration-count", "animation-timing-function", "animation-direction",
+	"animation-delay", "animation-fill-mode", "animation-play-state", "animation-composition",
+	"transition-property", "transition-duration", "transition-timing-function",
+	"object-fit", "caret-color", "content", "list-style-type", "cursor", "pointer-events",
+] as const
+
+export type StyleProp = (typeof STYLE_PROPS)[number]

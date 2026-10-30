@@ -2,6 +2,7 @@ import type { SessionShutdownEvent } from "@code-yeongyu/senpi"
 import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskEngine } from "./engine"
+import { ownHostedTaskId } from "./own-task-identity"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
 import type { LiveTaskContext } from "./runtime-context"
@@ -11,10 +12,12 @@ import type { TaskStatusUi } from "./status-ui"
 import { wireTaskRpcBridge, type TaskRpcBridgeDeps } from "./task-rpc-bridge"
 import { wireDagVerificationContext } from "./dag-verification-context"
 import { createOncePerSessionGuard, TASK_USAGE_GUIDANCE } from "./usage-guidance"
+import { isRunHoldChange, type EngineRunPauseBridge } from "./run-pause-bridge"
 
 export const TASK_USAGE_HINT_FLAG = "omo-task-usage-hint"
 
 type EventBridgeState = {
+  readonly runPause?: Pick<EngineRunPauseBridge, "restore" | "reconciled" | "changed">
   readonly reconcileTeamMailbox: () => Promise<void>
   readonly leadPollers: Pick<LeadPollerLifecycle, "tick" | "shutdown">
   readonly resumptionChannels: Pick<ResumptionChannelEmitter, "emitSessionStart" | "emitShutdown">
@@ -27,15 +30,19 @@ type EventBridgeDeps = {
   readonly taskRpc?: TaskRpcBridgeDeps
 }
 
-// Session start runs the durable recovery chain in strict order: flush/drop buffered completions
-// BEFORE reconcile (revived children must not double-deliver buffered terminals), revive/reattach
-// the resumed session's children (undefined session id still runs the legacy crash-orphan sweep),
-// re-observe owned-member liveness, reclaim mailbox reservations, redeliver unnotified completions,
-// await TTL cleanup (its retention predicate keeps anything with an undelivered notification, so
-// cleanup cannot delete what the previous step just queued), then poll owned leads and sync status.
+// Admission restores local pause/transition state and attaches RPC without waiting on a host.
+// Durable recovery keeps its ordering in the background; switching or shutdown retires its tail.
 
 // Below senpi's per-handler session_shutdown budget, leaving room for the suspension that follows.
 const SHUTDOWN_LAUNCH_SETTLE_MS = 5_000
+/** What the task event bridge hands to the components that must run after its reconcile. */
+export interface EventBridge {
+  /** Settles when the latest session start's task reconcile finished; false when a newer start superseded it. */
+  readonly afterSessionStartReconcile: () => Promise<boolean>
+  /** Settles when the latest session start's whole recovery chain (reconcile, liveness, mailbox, cleanup) ended. */
+  readonly sessionStartRecovered: () => Promise<void>
+}
+
 export function wireEventBridge(
   pi: SenpiExtensionAPI,
   ctx: ComponentContext,
@@ -44,21 +51,82 @@ export function wireEventBridge(
   transitions: SessionTransitionBridge,
   state: EventBridgeState,
   deps: EventBridgeDeps = {},
-): void {
+): EventBridge {
   const guidanceGuard = createOncePerSessionGuard()
+  let startup: AbortController | undefined
+  // DAG recovery and workpool reconciliation run after the session-start task reconcile
+  // (dag/recovery.ts: "a revivable child already carries a handle here"). Admission does not wait
+  // for it; those consumers wait on this ONE gate. It settles false when a newer start superseded it.
+  let reconciledGate: Promise<boolean> = Promise.resolve(true)
+  let recovered: Promise<void> = Promise.resolve()
+  const runPause = state.runPause ?? engine.runPause?.bridge
   wireDagVerificationContext(pi, engine.runtime)
   const taskRpc = wireTaskRpcBridge(pi, engine, deps.taskRpc)
   const unsubscribeTaskSnapshots = engine.onStoreMutation(() => taskRpc.sync())
   wireReloadGuard(pi, engine.manager, state.dagReloadSource)
+  if (runPause !== undefined) {
+    pi.on("session_hold_changed", (payload, eventCtx) => {
+      engine.runtime.captureFrom(asLiveContext(eventCtx))
+      const sessionId = engine.runtime.sessionId()
+      if (sessionId !== undefined && isRunHoldChange(payload)) return runPause.changed(sessionId, payload)
+      return undefined
+    })
+  }
 
   pi.on("session_start", async (_payload, eventCtx) => {
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     const sessionId = engine.runtime.sessionId()
     // A child session that has not reported its own id yet has nothing to reconcile: its records
     // belong to the parent. The role comes from the session (shared daemon), else from the env.
-    if (readSessionRole(pi) !== undefined && sessionId === undefined) return
-    transitions.onSessionStart(sessionId)
-    const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId)
+    if (readSessionRole(pi) !== undefined && sessionId === undefined) {
+      // Nothing to reconcile here, but an earlier start's reconcile must not keep running alongside it.
+      startup?.abort()
+      startup = undefined
+      reconciledGate = Promise.resolve(true)
+      return
+    }
+    startup?.abort()
+    const controller = new AbortController()
+    startup = controller
+    const active = () => !controller.signal.aborted
+    const reconciled = Promise.withResolvers<boolean>()
+    reconciledGate = reconciled.promise
+    try {
+      if (sessionId !== undefined) await runPause?.restore(sessionId)
+      if (!active()) {
+        reconciled.resolve(false)
+        return
+      }
+      transitions.onSessionStart(sessionId)
+    } catch (error) {
+      // A failed restore or transition still settles the gate, so DAG and workpool attach are never
+      // stranded behind it; they proceed as they would without the reconcile (#11335 delta review).
+      reconciled.resolve(active())
+      throw error
+    }
+    recovered = recoverSession(sessionId, controller.signal, () => reconciled.resolve(active())).catch((error: unknown) => {
+      ctx.logger.warn("omo-senpi task session recovery failed", { error: String(error) })
+      // A failed reconcile must not strand DAG recovery or the workpools: they proceed as before.
+      reconciled.resolve(active())
+    })
+    void reconciled.promise.then((current) => {
+      if (current && sessionId !== undefined) engine.manager.workpools?.attach({ sessionId })
+    })
+    statusUi.scheduleSync()
+    taskRpc.attach()
+  })
+
+  async function recoverSession(
+    sessionId: string | undefined,
+    signal: AbortSignal,
+    onReconciled: () => void,
+  ): Promise<void> {
+    const active = () => !signal.aborted
+    const reconciliation = await engine.lifecycle.reconcileOnSessionStart(sessionId, signal)
+    if (!active()) return onReconciled()
+    if (sessionId !== undefined) await runPause?.reconciled(sessionId)
+    onReconciled()
+    if (!active()) return
     const livenessRecords = new Map<string, ReturnType<typeof engine.manager.get>>()
     for (const outcome of reconciliation.outcomes) {
       const record = engine.manager.get(outcome.task_id)
@@ -74,21 +142,25 @@ export function wireEventBridge(
     }
     for (const record of livenessRecords.values()) {
       if (record !== undefined) await engine.notifyOwnedMemberLiveness(record)
+      if (!active()) return
     }
     await state.resumptionChannels.emitSessionStart()
+    if (!active()) return
     await reconcileTeamMailboxBestEffort(ctx, state)
+    if (!active()) return
     if (sessionId !== undefined) {
       engine.notifier.reconcileUnnotifiedNotifications({ sessionId, parentState: engine.runtime.parentState() })
     }
     const cleanup = await engine.lifecycle.cleanupExpiredRecords()
+    if (!active()) return
     if (cleanup.deleted.length > 0) {
       ctx.logger.info("senpi-task ttl cleanup", { deleted: cleanup.deleted.length, retained: cleanup.retained.length })
     }
     await tickLeadPollersBestEffort(ctx, state)
-    if (sessionId !== undefined) engine.manager.workpools?.attach({ sessionId, rootSessionId: sessionId, depth: 0, cwd: engine.runtime.cwd() })
+    if (!active()) return
     statusUi.scheduleSync()
-    taskRpc.attach()
-  })
+    taskRpc.sync()
+  }
 
   // A retained session outlives its clients: the first reattach fires session_resumed without
   // another session_start, so the bridge clears the dedupe fingerprint and pushes the full snapshot
@@ -98,6 +170,7 @@ export function wireEventBridge(
   })
 
   pi.on("session_before_switch", (_payload, eventCtx) => {
+    startup?.abort()
     taskRpc.detach()
     engine.runtime.captureFrom(asLiveContext(eventCtx))
     transitions.onBeforeSwitch(engine.runtime.sessionId())
@@ -116,6 +189,7 @@ export function wireEventBridge(
   })
 
   pi.on("session_shutdown", async (payload, eventCtx) => {
+    startup?.abort()
     const liveContext = asLiveContext(eventCtx)
     unsubscribeTaskSnapshots()
     taskRpc.dispose()
@@ -156,14 +230,28 @@ export function wireEventBridge(
               engine.settings.process_runner !== "child-process" && engine.settings.resume_children !== false)
           ))
         : []
-      const summary = await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId: sessionId, reason })
-      const count = continuing.filter(({ record }) =>
-        !summary.failures.some((failure) => failure.task_id === record.task_id)).length
-      if (count > 0) {
-        const notice = `${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`
+      const ownTaskId = ownHostedTaskId(pi, engine.stateDir)
+      const summary = await engine.lifecycle.suspendOnSessionShutdown(
+        ownTaskId === undefined ? { parentSessionId: sessionId, reason } : { parentSessionId: sessionId, reason, ownTaskId },
+      )
+      const notify = (notice: string, level: "info" | "warning"): void => {
         if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
-        else liveContext.ui?.notify(notice, "info")
+        else liveContext.ui?.notify(notice, level)
       }
+      // A stopped owner's session can never be resumed, so nothing kept running there to collect.
+      if (summary.stopped_owner === undefined) {
+        const count = continuing.filter(({ record }) =>
+          !summary.failures.some((failure) => failure.task_id === record.task_id)
+          && engine.manager.get(record.task_id)?.status !== "cancelled").length
+        if (count > 0) notify(`${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`, "info")
+        continue
+      }
+      // Only a child that ever started can still be running; a pending one that failed to tear down never ran.
+      const unstopped = summary.failures.filter((failure) => {
+        const record = engine.manager.get(failure.task_id)
+        return record?.started_at !== undefined && (record.status === "running" || record.status === "cancelled")
+      }).length
+      if (unstopped > 0) notify(`${unstopped} child task(s) of stopped task ${summary.stopped_owner} could not be stopped and may still be running on the task host`, "warning")
     }
   })
 
@@ -194,6 +282,7 @@ export function wireEventBridge(
     )
     return undefined
   }, { previewSafe: true })
+  return { afterSessionStartReconcile: () => reconciledGate, sessionStartRecovered: () => recovered }
 }
 
 async function reconcileTeamMailboxBestEffort(ctx: ComponentContext, state: EventBridgeState): Promise<void> {

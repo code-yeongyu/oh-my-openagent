@@ -38,8 +38,9 @@ Read the matching reference before acting: [`references/insane-search/README.md`
 **Why first**: ~10x faster than a browser, no process spin-up; handles most "fetch this blocked page" requests via curl_cffi TLS impersonation, yt-dlp (1858 sites), official public APIs, mobile URL transforms, **Phase-2.5 surrogate archives** (Wayback / archive.today snapshots, provenance-tagged — see [`references/insane-search/cache-archive.md`](references/insane-search/cache-archive.md)), a key-gated Jina Reader (`JINA_API_KEY`), and a Playwright real-Chrome fallback. The engine lives **inside this skill** at `engine/` and is invoked as a module. Surrogate results are dated COPIES: a result whose `provenance` is `snapshot` must be reported with its `snapshot_timestamp`, never presented as the live page.
 
 ```bash
-# Core command — auto-detects WAF, runs the full fetch grid (run from the skill dir):
-python3 -m engine "https://example.com/blocked-page"
+# Core command — auto-detects WAF, runs the full fetch grid (run from the skill dir).
+# Keep -B: this skill can live inside a signed app bundle, and bytecode caches written into engine/ break its signature.
+python3 -B -m engine "https://example.com/blocked-page"
 #   add --selector "<CSS>" for positive-proof validation, --device auto|desktop|mobile,
 #   --trace to inspect every attempt, --json for machine-readable output.
 
@@ -119,9 +120,9 @@ When the blocked flow needs the user's account, drive the browser they are alrea
 ```bash
 # Extract cookies to a file:
 mkdir -p ~/.local/state/omo-cookies
-python3 scripts/extract_cookies.py --browser chrome --domain youtube.com --output ~/.local/state/omo-cookies/youtube.cookies.json
+python3 -B scripts/extract_cookies.py --browser chrome --domain youtube.com --output ~/.local/state/omo-cookies/youtube.cookies.json
 # Extract and inject into the running CDP session:
-python3 scripts/extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
+python3 -B scripts/extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
 ```
 
 Cookie export files are written with owner-only `0600` permissions. Do not place live auth cookies in shared temp directories or commit them to a repo. Cookie injection sends values to CDP over stdin rather than argv. Cookies apply on next navigation — reload after injecting. Google services use fingerprint-bound tokens that may not transfer across browser profiles. Limits in [references/chrome-stealth.md](references/chrome-stealth.md).

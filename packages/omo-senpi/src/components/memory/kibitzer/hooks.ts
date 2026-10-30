@@ -103,7 +103,7 @@ export function registerKibitzerHooks(pi: SenpiExtensionAPI, options: KibitzerHo
       options.logger?.warn("omo-senpi kibitzer settle hook failed", { error: describe(error) })
     }
     return undefined
-  })
+  }, { hookLabel: "kibitzer.markSettled" })
 }
 
 function toolCallIdOf(payload: unknown): string | undefined {

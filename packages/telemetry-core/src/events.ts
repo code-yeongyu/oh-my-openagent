@@ -5,7 +5,7 @@ import {
 } from "./injected-events"
 import { createDefaultPostHogTransport } from "./posthog-transport"
 
-export type { EventPropertyAllowlist, EventTelemetryProperties, EventTelemetrySetTimeout, EventTelemetryClient } from "./injected-events"
+export type { EventPropertyAllowlist, EventTelemetryCaptureOptions, EventTelemetryProperties, EventTelemetrySetTimeout, EventTelemetryClient } from "./injected-events"
 export type CreateEventTelemetryClientInput = Omit<InjectedInput, "transportFactory"> & { readonly transportFactory?: InjectedInput["transportFactory"] }
 
 export function createEventTelemetryClient(input: CreateEventTelemetryClientInput): EventTelemetryClient {

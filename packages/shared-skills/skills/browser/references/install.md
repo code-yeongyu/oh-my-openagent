@@ -11,8 +11,7 @@ Three pieces. The onboarding script prepares all three; a human finishes exactly
 ## Inside the OmO desktop app
 
 The app installs the `bsk` CLI and starts its daemon itself, and keeps the daemon running when the app closes.
-Do not run `browser-install.mjs` there unless the doctor says the app's engine is missing; a session set to
-`OMO_BROWSER_ENGINE=builtin` or `none` never uses this skill's attached engine at all. `BSK_HOME` and `BSK_BIN`
+Do not run `browser-install.mjs` there unless the doctor says the app's engine is missing. `BSK_HOME` and `BSK_BIN`
 still decide where the CLI and daemon are found, here and everywhere else.
 
 ## Supported

@@ -1,39 +1,26 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
-
+import { PROMOTION } from "./fact-commands-meaning.mjs"
+import { writeFidelityRecord } from "./fidelity-records.mjs"
+import { PAIR_KINDS } from "./fact-pairs.mjs"
+import { VERDICT_SCHEMA } from "./meaning-check.mjs"
+import { POLISH_MARKUP_REASON } from "./polish-apply.mjs"
 import { COMMANDS, run } from "./report-tools.mjs"
+import { SCRIPT, FIXTURES, sessionDir, nodeWithoutBun, defectsFile, FIDELITY, sha256, CliRow, CliJson, nodeJson, fidelitySession, verify, codesOf, Pair, pairedSession, verdicts, calibrationRows, runLines, PolishJson, polishSession, polishApply, setField, fillTemplate, textSource, ledgerRow } from "./tests/report-tools-support"
 
-const SCRIPT = join(import.meta.dir, "report-tools.mjs")
-const FIXTURES = join(import.meta.dir, "tests", "fixtures")
 
-function sessionDir() {
-	const root = mkdtempSync(join(tmpdir(), "report-tools-cli-"))
-	onTestFinished(() => rmSync(root, { recursive: true, force: true }))
-	const dir = join(root, "20260101-120000")
-	mkdirSync(dir)
-	return dir
-}
-
-function nodeWithoutBun(args: string[]) {
-	const nodePath = Bun.which("node")
-	if (nodePath === null) throw new Error("node not found on PATH")
-	const path = (process.env.PATH ?? "").split(delimiter).filter((entry) => !entry.includes(".bun")).join(delimiter)
-	return Bun.spawnSync({ cmd: [nodePath, SCRIPT, ...args], env: { ...process.env, PATH: path } })
-}
-
-function defectsFile(dir: string, name: string, codes: string[]) {
-	const file = join(dir, name)
-	writeFileSync(file, JSON.stringify(codes.map((code) => ({ code, message: code }))))
-	return file
-}
 
 describe("help and usage", () => {
 	test("#given --help --json #when run #then it lists exactly the command matrix", async () => {
 		const result = await run(["--help", "--json"])
 		expect(result.json.commands).toEqual([...COMMANDS])
-		expect(COMMANDS).toEqual(["check", "layout-probe", "repair decide", "outcome init", "outcome set", "outcome gate", "outcome render", "outcome state", "outcome verify", "outcome finish", "outcome briefing", "format-extract"])
+		expect(result.json.usage["source snapshot"]).toContain("--raw <file>")
+		expect(result.json.usage["source snapshot"]).toContain("converted-only")
+		expect(Object.keys(result.json.usage)).toEqual(["source snapshot", "source refresh"])
+		expect(COMMANDS).toEqual(["check", "layout-probe", "repair decide", "outcome init", "outcome set", "outcome gate", "outcome render", "outcome state", "outcome verify", "outcome finish", "outcome briefing", "format-extract", "fact add", "fact quote", "fact retract", "fact export", "fact fill", "fact verify", "fact derive", "source snapshot", "source refresh", "source probe-conversion", "claims index"])
 	})
 
 	test("#given no arguments under node #when spawned #then it exits 2 with a usage line on stderr", () => {
@@ -84,6 +71,7 @@ describe("outcome", () => {
 		await run(["outcome", "set", "pdf", "delivered", "--path", pdf, "--session-dir", dir])
 		await run(["outcome", "set", "docx", "skipped", "--reason", "no editing audience", "--session-dir", dir])
 		await run(["outcome", "gate", "static", "pass", "--session-dir", dir])
+		await run(["outcome", "gate", "fidelity", "not_run", "--reason", "Fixture has no factual content", "--session-dir", dir])
 		const after = await run(["outcome", "verify", "--session-dir", dir])
 		// then
 		expect(before.exitCode).toBe(1)
@@ -185,6 +173,7 @@ describe("manifest bookkeeping", () => {
 		await run(["outcome", "init", "--session-dir", dir, "--promised", "pdf"])
 		await run(["outcome", "set", "pdf", "delivered", "--path", pdf, "--session-dir", dir])
 		writeFileSync(join(dir, "sources-ledger.md"), ["[S1] https://a.example/x", "[S2] https://b.example/y"].join("\n"))
+		await run(["outcome", "gate", "fidelity", "not_run", "--reason", "Fixture has no factual content", "--session-dir", dir])
 		const now = new Date(new Date(2026, 0, 1, 12, 0, 0).getTime() + 30 * 60_000).toISOString()
 		const result = await run(["outcome", "finish", "--session-dir", dir, "--now", now])
 		const manifest = JSON.parse(readFileSync(join(dir, "outcome.json"), "utf8"))

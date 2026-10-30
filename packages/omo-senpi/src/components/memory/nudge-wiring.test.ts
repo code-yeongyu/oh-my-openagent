@@ -327,6 +327,7 @@ describe("createMemoryNudgeWiring", () => {
         identityId: context.identity,
         repoPath: context.identityPaths.repo,
         toolCallId: "call-1",
+        claim: { source: "inferred" },
       },
     })
   }, 30_000)
@@ -363,6 +364,7 @@ describe("createMemoryNudgeWiring", () => {
       identityId: context.identity,
       repoPath: context.identityPaths.repo,
       toolCallId: "call-memory-1",
+      claim: { source: "inferred" },
     })
   }, 30_000)
 })

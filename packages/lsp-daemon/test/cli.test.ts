@@ -1,10 +1,10 @@
-import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { runBunChild } from "./bun-child.js";
 import { daemonTestPaths } from "./daemon-path-fixture.js";
 
 const directories: string[] = [];
@@ -14,24 +14,11 @@ afterEach(() => {
 	for (const dir of directories.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-async function runCli(env: NodeJS.ProcessEnv): Promise<{ code: number | null; stderr: string }> {
-	const child = spawn("bun", [cli, "daemon"], {
+function runCli(env: NodeJS.ProcessEnv) {
+	return runBunChild([cli, "daemon"], {
+		label: "daemon CLI",
 		env: { ...process.env, ...env, BUN_BE_BUN: "1" },
-		stdio: ["ignore", "ignore", "pipe"],
 	});
-	let stderr = "";
-	child.stderr.on("data", (chunk: Buffer) => {
-		stderr += chunk.toString();
-	});
-	const timer = setTimeout(() => child.kill("SIGKILL"), 10_000);
-	try {
-		return await new Promise((resolve, reject) => {
-			child.once("error", reject);
-			child.once("close", (code) => resolve({ code, stderr }));
-		});
-	} finally {
-		clearTimeout(timer);
-	}
 }
 
 describe("daemon CLI error output", () => {

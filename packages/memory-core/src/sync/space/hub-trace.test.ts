@@ -13,7 +13,7 @@ describe("parseSyncConflictName (hub worktree-merge keepSideCopy shape)", () => 
     ["x.sync-conflict-20261015-host", "x"],
     ["archive.tar.sync-conflict-20261015-mac.gz", "archive.tar.gz"],
     ["a.sync-conflict-20261015-.md", "a.md"],
-    ["people/hojin/card.sync-conflict-20260101-jobdori2.md", "people/hojin/card.md"],
+    ["people/hojin/card.sync-conflict-20260101-worker2.md", "people/hojin/card.md"],
   ]
   for (const [input, target] of hits) {
     test(`${input} targets ${target}`, () => {
@@ -109,7 +109,7 @@ describe("stripT2Blocks (hub md-merge-driver pickFrontmatter shape)", () => {
 
 describe("hub-trace folding end to end (fixture shaped like real hub output)", () => {
   const mainText =
-    "---\ntitle: Daily log\nauthor: Dori\n---\nwoke up, built the thing\n" +
+    "---\ntitle: Daily log\nauthor: Demo\n---\nwoke up, built the thing\n" +
     t2Block("2026-10-15", "notes/daily.md", "---\nreviewed: true\n---\n")
   const sideText = "---\ntitle: Daily log\nreviewed: true\n---\nshipped the cutover; reviewed the queue\n"
 
@@ -138,7 +138,7 @@ describe("hub-trace folding end to end (fixture shaped like real hub output)", (
 
     const values = fmValuesByKey(parsed.fm ?? [])
     expect(values.get("title")).toEqual({ kind: "reg", value: "Daily log" })
-    expect(values.get("author")).toEqual({ kind: "reg", value: "Dori" })
+    expect(values.get("author")).toEqual({ kind: "reg", value: "Demo" })
     expect(values.get("reviewed")).toEqual({ kind: "reg", value: "true" })
     doc.free()
   })

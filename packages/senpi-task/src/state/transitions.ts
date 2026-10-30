@@ -20,6 +20,10 @@ function transitionStatus(transition: TaskTransition, current: TaskStatus): Task
   switch (transition.type) {
     case "start":
       return "running"
+    case "pause":
+      return "paused"
+    case "unpause":
+      return "running"
     case "complete":
       return "completed"
     case "fail":
@@ -54,6 +58,8 @@ function transitionResidency(transition: TaskTransition, current: ResidencyState
     case "mark_resident":
       return "resident"
     case "start":
+    case "pause":
+    case "unpause":
     case "complete":
     case "fail":
     case "cancel":
@@ -124,6 +130,8 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "evict":
     case "dispose":
     case "mark_resident":
+    case "pause":
+    case "unpause":
       return record
     default:
       return assertNever(transition)
@@ -240,8 +248,12 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
   switch (transition.type) {
     case "start":
       return current === "pending"
+    case "pause":
+      return current === "running"
+    case "unpause":
+      return current === "paused"
     case "cancel":
-      return current === "running" || current === "pending"
+      return current === "running" || current === "pending" || current === "paused"
     case "complete":
     case "interrupt":
       return current === "running"

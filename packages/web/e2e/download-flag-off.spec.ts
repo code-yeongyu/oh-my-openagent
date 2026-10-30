@@ -4,13 +4,12 @@ import { test, expect } from "@playwright/test"
 // on the site may lead to the download page. This spec runs against such a build
 // (playwright.flag-off.config.ts); a gate removed from any entry point fails it.
 test.describe("Download page while the launch flag is off", () => {
-  test("/download is not served in any language", async ({ request }) => {
-    // Locale redirects (a NEXT_LOCALE cookie from an earlier request) may come first; whatever
-    // they lead to, the answer is a 404.
+  test("/download goes to the public beta download page in any language", async ({ request }) => {
+    // Shipped desktop builds link /download; this site's own page stays off, so it must not 404.
     for (const path of ["/download", "/ko/download", "/download?channel=beta"]) {
-      const response = await request.get(path)
-      expect(response.status(), path).toBe(404)
-      expect(new URL(response.url()).pathname, path).toMatch(/^\/(?:[a-z]{2}\/)?download$/)
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(307)
+      expect(response.headers()["location"], path).toBe("https://get.omo.dev/desktop/beta/")
     }
   })
 
@@ -19,10 +18,14 @@ test.describe("Download page while the launch flag is off", () => {
     expect(response.status()).toBe(404)
   })
 
-  test("the hero offers no desktop download", async ({ page }) => {
+  test("the hero links the public desktop beta, not this site's own page", async ({ page }) => {
     await page.goto("/")
     await expect(page.getByTestId("hero-desktop-cta")).toHaveCount(0)
     await expect(page.locator('a[href$="/download"]')).toHaveCount(0)
+    await expect(page.getByTestId("hero-desktop-beta-cta")).toHaveAttribute(
+      "href",
+      "https://get.omo.dev/desktop/beta/",
+    )
   })
 
   test("the sitemap leaves the download page out", async ({ request }) => {

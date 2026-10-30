@@ -92,7 +92,7 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
   // The runner's reattach, raced against the bound. A connection that arrives after the child stopped
   // waiting for it (the bound ran out, or a stop was asked for) is never adopted: it ends the session.
   const boundedReattach = (reattach: HostSessionReattach, bound: RecoveryBound): HostSessionReattach => async (lost) => {
-    const attempt = reattach(lost)
+    const attempt = reattach(lost, bound.isExpired)
     const winner = await Promise.race([attempt, bound.expired])
     if (winner === "expired" || bound.isExpired()) {
       void attempt.then(endLate, () => undefined)

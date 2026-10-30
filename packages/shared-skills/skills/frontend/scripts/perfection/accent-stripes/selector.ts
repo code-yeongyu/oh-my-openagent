@@ -27,9 +27,13 @@ export function parseCompound(part: string): Compound {
 	}
 }
 
+export function isExemptTag(tag: string): boolean {
+	return EXEMPT_TAGS.has(tag.toLowerCase())
+}
+
 export function isExemptSelector(part: string): boolean {
 	if (EXEMPT_STATE.test(part)) return true
-	return EXEMPT_TAGS.has(parseCompound(part).tag)
+	return isExemptTag(parseCompound(part).tag)
 }
 
 export function selectorParts(selector: string): string[] {

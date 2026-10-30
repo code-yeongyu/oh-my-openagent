@@ -26,7 +26,11 @@ describe("HostSessionClient.open", () => {
       engineVersion: "2026.9.18+1758000000.abc1234",
     })
     expect(client.sessionId).toBe("routing-1")
-    expect(host.commands.map((command) => command.type)).toEqual(["get_protocol_info", "open_session"])
+    // The probe is its own connection. Since senpi 2026.10.25-1 the engine client authenticates every new
+    // connection with a first get_protocol_info frame on macOS and Linux (senpi#3815; Windows endpoints use no
+    // per-launch key), so there the session connection sends one too.
+    const authFrame = process.platform === "win32" ? [] : ["get_protocol_info"]
+    expect(host.commands.map((command) => command.type)).toEqual(["get_protocol_info", ...authFrame, "open_session"])
     expect(host.sessions()).toEqual([
       {
         routingId: "routing-1",

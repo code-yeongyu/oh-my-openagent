@@ -7,6 +7,7 @@ import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { consumeSoulNoticeDelta, SOUL_SCAN_PAGE } from "./watermark"
 import { realpathSync } from "node:fs"
 import { removeTree } from "../../../../test-support/remove-tree"
+import { observeWatermarkPublication, withWatermarkReadFault } from "../concurrency/watermark-publication.test-support"
 
 const AUTHOR: GitCommitAuthor = {
   agentId: "agent-soul-watermark-test",
@@ -60,6 +61,39 @@ async function readWatermark(noticesDir: string): Promise<unknown> {
 const IN_BAND = "Omo-Writer: memory-tool\nOmo-Session: session-1\nOmo-Turn: 3"
 
 describe("consumeSoulNoticeDelta", () => {
+  it("#given staged publication #when the writer pauses after truncation and partial writes #then readers see old or new state and each writer owns a unique temporary", async () => {
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed\n", "seed")
+    await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const target = join(noticesDir, "soul-head.json")
+    const temporaries: string[] = []
+    for (const revision of ["first", "second"]) {
+      const head = await commit(repo, "system/persona.md", `${revision}\n`, revision)
+      temporaries.push(await observeWatermarkPublication(target, () =>
+        consumeSoulNoticeDelta(repo, { noticesDir, locksDir }),
+      ))
+      expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })
+    }
+    expect(new Set(temporaries).size).toBe(2)
+  })
+
+  it.each(["malformed", "invalid-shape", "missing", "unreadable"] as const)(
+    "#given a %s unlocked read #when consumed #then the locked reread still delivers the real soul delta",
+    async (fault) => {
+      const { repo, noticesDir, locksDir } = await fixture()
+      await commit(repo, "system/persona.md", "seed\n", "seed")
+      await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+      const head = await commit(repo, "system/persona.md", "reflection\n", "reflection")
+      await withWatermarkReadFault(join(noticesDir, "soul-head.json"), fault, async () => {
+        expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toEqual({
+          sha: head, subject: "reflection",
+        })
+      })
+      expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })
+      expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toBeUndefined()
+    },
+  )
+
   it("#given no watermark file #when consumed #then the watermark is established silently at HEAD with no notice", async () => {
     // given
     const { repo, noticesDir, locksDir } = await fixture()
@@ -74,7 +108,7 @@ describe("consumeSoulNoticeDelta", () => {
     expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })
   })
 
-  it("#given a watermark behind HEAD with an out-of-band persona commit #when consumed #then exactly one notice is emitted and the watermark advances", async () => {
+  it("#given a watermark behind HEAD with an out-of-band persona commit #when consumed concurrently #then exactly one notice is emitted and the watermark advances", async () => {
     // given
     const { repo, noticesDir, locksDir } = await fixture()
     await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
@@ -88,12 +122,49 @@ describe("consumeSoulNoticeDelta", () => {
     )
 
     // when
-    const notice = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const notices = await Promise.all([
+      consumeSoulNoticeDelta(repo, { noticesDir, locksDir }),
+      consumeSoulNoticeDelta(repo, { noticesDir, locksDir }),
+    ])
     const replay = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
 
     // then
-    expect(notice).toEqual({ sha: soulSha, subject: "chore(reflection): merge run abc" })
+    expect(notices.filter((notice) => notice !== undefined)).toEqual([
+      { sha: soulSha, subject: "chore(reflection): merge run abc" },
+    ])
     expect(replay).toBeUndefined()
+    expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: soulSha })
+  })
+
+  it("#given HEAD was read before an out-of-band soul commit landed #when consumed with that earlier HEAD #then the later commit is noticed exactly once", async () => {
+    // given: the prompt reads HEAD once and shares it; another process commits to the soul afterwards
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
+    expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toBeUndefined()
+    await commit(repo, "reference/note.md", "note\n", "note")
+    const readBefore = await repo.head()
+    const soulSha = await commit(
+      repo,
+      "system/persona.md",
+      "reflected persona\n",
+      "chore(reflection): merge run late\n\nOmo-Writer: reflection",
+    )
+    const staleHead = new Proxy(repo, {
+      get(target, property, receiver) {
+        if (property === "head") return async () => readBefore
+        const value = Reflect.get(target, property, receiver)
+        return typeof value === "function" ? value.bind(target) : value
+      },
+    })
+
+    // when
+    const duringPrompt = await consumeSoulNoticeDelta(staleHead, { noticesDir, locksDir })
+    const nextPrompt = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const after = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+
+    // then
+    const notices = [duringPrompt, nextPrompt, after].filter((notice) => notice !== undefined)
+    expect(notices).toEqual([{ sha: soulSha, subject: "chore(reflection): merge run late" }])
     expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: soulSha })
   })
 
