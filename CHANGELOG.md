@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Reopening a session after a mid-turn quit resumes its background tasks again.** Opening a session whose last run was interrupted installs an engine hold that waits for your next message; the task runtime read that hold as a user Stop, paused every child parked by the quit instead of reviving it, refused new `task` spawns as "held by your Stop", and left the widget on `resuming (session quit)` for good. Only a real Stop now pauses the run; a plain reopen revives the parked children through the session-start reconcile. ([#11856](https://github.com/code-yeongyu/oh-my-openagent/issues/11856))
-
 ## [5.1.52] - 2026-10-29
 
 **Lower memory and fewer filesystem calls.** A TypeScript LSP session now runs two processes instead of four and measured 292 MiB instead of 597 MiB on a small project; on a Bun host it also runs on that Bun instead of `node`, measured 236-245 MiB instead of 290-296 MiB ([#11766](https://github.com/code-yeongyu/oh-my-openagent/pull/11766)). On senpi 2026.10.27-2, reopening a session with many skills makes 5,320 filesystem calls instead of 11,050 (150 skills plus 122 copies) ([#11556](https://github.com/code-yeongyu/oh-my-openagent/pull/11556)).

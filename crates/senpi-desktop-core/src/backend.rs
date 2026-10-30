@@ -149,6 +149,19 @@ pub trait Backend: Send {
         Ok(())
     }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
+    /// [`Self::key_chord`] with `check_stop` before every key press, so a stop
+    /// or a cancellation lands between presses. The default checks once,
+    /// before the chord, for backends that press a chord in one call.
+    fn key_chord_interruptible(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        check_stop()?;
+        self.key_chord(target, keys, mode)
+    }
     /// Native press/release around a session-owned interruptible wait.
     /// Backends without bounded input refuse rather than synthesizing clicks.
     fn hold_keys(

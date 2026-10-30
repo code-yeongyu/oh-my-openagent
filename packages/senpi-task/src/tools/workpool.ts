@@ -67,6 +67,8 @@ export function createWorkpoolTool(deps: WorkpoolToolDeps): ToolDefinition<typeo
   return {
     name: "workpool", label: "Workpool", description: "Create and inspect engine-owned keyed work queues. Push returns durable IDs without waiting for capacity. Omitted mode uses the approved keep_alive default; fresh remains selectable. Inspect reads durable keyed data or errors; close delivers one aggregate; uncertain delivery is never retried automatically.",
     parameters: WorkpoolParams,
+    // Rarely used: searchable and activated by name on first call (#11454). The worker yield tool below stays direct.
+    exposure: "search", allowLazyActivation: true, searchKeywords: ["work queue", "keyed fan-out", "pool", "batch workers"],
     // Pool admission plans each worker synchronously, and an explicit pin reads senpi's resolver from the lazy barrel.
     execute: async (_id, params, _signal, _update, ctx) => {
       await loadSenpiBarrel()

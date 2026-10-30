@@ -206,6 +206,11 @@ async function run(options: TrustRetentionOptions, failures: TrustRetentionFailu
     }
     const fields = typeof body === "object" && body !== null ? body as Record<string, unknown> : {}
     const { v, pid, bootAtMs } = fields
+    // A newer engine's lease may encode liveness differently: it cannot be proven dead here, so it pins and stays.
+    if (typeof v === "number" && Number.isInteger(v) && v > 1) {
+      pinned.add(generation)
+      continue
+    }
     const wellFormed = v === 1 && typeof pid === "number" && Number.isSafeInteger(pid) && String(pid) === pidText
       && typeof bootAtMs === "number" && Number.isFinite(bootAtMs)
       && Math.abs(bootAtMs - options.bootAtMs) <= BOOT_INSTANT_TOLERANCE_MS

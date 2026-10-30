@@ -1,5 +1,33 @@
 import { realpathSync } from "node:fs"
+import { homedir } from "node:os"
 import { posix, win32 } from "node:path"
+
+/**
+ * macOS autofs triggers (`auto_home`, `-hosts`) in every spelling that reaches the same mount: the root symlinks and their
+ * firmlinked data-volume paths. Compared lowercase because the default APFS volume is case-insensitive (#11545).
+ */
+const DARWIN_AUTOMOUNT_TRIGGERS = ["/home", "/net", "/system/volumes/data/home", "/system/volumes/data/net"]
+
+export interface AutomountTriggerOptions {
+  readonly platform?: NodeJS.Platform
+  /** The current user's home; its own subtree has already resolved its trigger, so it stays resolvable. */
+  readonly homeDir?: string
+}
+
+/**
+ * Whether resolving `path` (realpath, lstat or stat of it or anything under it) would force a macOS automount.
+ * When the automounter is wedged that `open(2)` never returns and parks the calling thread, so no timer or
+ * promise deadline can bound it (#11545, senpi#4542/#4543). Decided from the string alone, before any syscall:
+ * true only on darwin, only for `/home`, `/net` or a path under them, and never for the user's own home subtree.
+ * Callers treat such a path as an opaque lexical string. Linux, where `/home` is a real directory, is unchanged.
+ */
+export function isDarwinAutomountTriggerPath(path: string, options: AutomountTriggerOptions = {}): boolean {
+  if ((options.platform ?? process.platform) !== "darwin") return false
+  const lexical = posix.resolve(path).toLowerCase()
+  if (!DARWIN_AUTOMOUNT_TRIGGERS.some((trigger) => lexical === trigger || lexical.startsWith(`${trigger}/`))) return false
+  const home = posix.resolve(options.homeDir ?? homedir()).toLowerCase()
+  return home === "/" || !(lexical === home || lexical.startsWith(`${home}/`))
+}
 
 export interface PathContainmentOptions {
   readonly platform?: NodeJS.Platform
