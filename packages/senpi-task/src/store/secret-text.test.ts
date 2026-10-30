@@ -49,28 +49,29 @@ const ADVERSARIAL: readonly (readonly [label: string, build: (size: number) => s
   ["names past the length bound", (size) => fill(size, `${"a".repeat(129)}_api_key: x `)],
 ]
 
-// Linearity is the contract, not a wall-clock budget: a fixed ms bound fails on a slow or loaded runner. Each 10x step
-// in input size must cost well under the 100x a quadratic scan pays (same shape as senpi#4283's scaling test).
-const SIZES = [MB / 100, MB / 10, MB] as const
-const MAX_GROWTH_PER_STEP = 30
-const NOISE_FLOOR_MS = 1
+// Linearity is the contract, not a wall-clock budget. CPU time, not elapsed time: on a loaded runner the elapsed time
+// mostly measures how long the process waited for a core. A 16x larger input costs 16x on a linear scan and 256x on a
+// quadratic one; 64x sits between the two with room for cache effects (measured worst under load: about 28x).
+const SMALL = MB / 8
+const LARGE = 2 * MB
+const MAX_GROWTH = 64
+const NOISE_FLOOR_MS = 2
 
-function bestOf3Ms(text: string): number {
+function bestCpuMs(text: string): number {
   let best = Number.POSITIVE_INFINITY
   for (let attempt = 0; attempt < 3; attempt++) {
-    const start = performance.now()
+    const start = process.cpuUsage()
     redactSecretText(text)
-    best = Math.min(best, performance.now() - start)
+    const spent = process.cpuUsage(start)
+    best = Math.min(best, (spent.user + spent.system) / 1000)
   }
   return best
 }
 
 describe("redactSecretText stays linear (#11355, senpi#4283)", () => {
-  test.each(ADVERSARIAL)("#given up to 1 MB of %s #when redacted at 10x larger sizes #then time grows linearly", (_label, build) => {
-    const times = SIZES.map((size) => bestOf3Ms(build(size)))
-    for (let step = 1; step < times.length; step++) {
-      const growth = times[step] / Math.max(times[step - 1], NOISE_FLOOR_MS)
-      expect(growth).toBeLessThan(MAX_GROWTH_PER_STEP)
-    }
+  test.each(ADVERSARIAL)("#given %s #when the input grows 16x #then the CPU time grows linearly, not quadratically", (_label, build) => {
+    const growth = bestCpuMs(build(LARGE)) / Math.max(bestCpuMs(build(SMALL)), NOISE_FLOOR_MS)
+
+    expect(growth).toBeLessThan(MAX_GROWTH)
   })
 })
