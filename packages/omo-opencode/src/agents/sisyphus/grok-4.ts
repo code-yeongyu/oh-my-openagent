@@ -1,5 +1,5 @@
 /**
- * Shared Grok 4.5 / Grok 4.6 Sisyphus prompt.
+ * Shared Grok 4.5 / Grok 4.6 / Grok 4.7 Sisyphus prompt.
  *
  * Tuned from field experience with Grok 4.6 (Eric Zakariasson's launch field
  * guide): phrasing intensity ("work very hard") changes nothing, and the
@@ -37,10 +37,12 @@ import {
   buildNonClaudePlannerSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
-import { isGrok46Model } from "../types";
+import { isGrok46Model, isGrok47Model } from "../types";
 
 function getGrokPromptIdentity(model: string): string {
-  return isGrok46Model(model) ? "Grok 4.6" : "Grok 4.5";
+  if (isGrok47Model(model)) return "Grok 4.7";
+  if (isGrok46Model(model)) return "Grok 4.6";
+  return "Grok 4.5";
 }
 
 function buildGrok4TasksSection(useTaskSystem: boolean): string {

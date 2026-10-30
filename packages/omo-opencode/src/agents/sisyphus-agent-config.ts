@@ -50,7 +50,7 @@ export function buildGlmSisyphusAgentConfig(
 }
 
 /**
- * Grok 4.5/4.6 are xAI reasoning models: they take a reasoning effort
+ * Grok 4.5/4.6/4.7 are xAI reasoning models: they take a reasoning effort
  * (grok family caps allow low/medium/high) and reject Anthropic-style
  * thinking blocks, so this is the base config plus effort only.
  */
