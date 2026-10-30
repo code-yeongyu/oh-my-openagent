@@ -19,7 +19,7 @@ pub(super) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
     match action {
         MutatingAction::Click => click_window(&frame, None),
         MutatingAction::MoveMouse => Op::MoveMouse(PointParams {
-            target, x: 10.0, y: 10.0, frame_id, opts: None,
+            target, x: 10.0, y: 10.0, frame_id, opts: None, menu: None,
         }),
         MutatingAction::Drag => Op::Drag(DragParams {
             target, path: vec![point(10.0, 10.0), point(40.0, 40.0)], frame_id, opts: None,
@@ -51,13 +51,13 @@ pub(super) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
         }),
         MutatingAction::RaiseWindow => Op::RaiseWindow(RaiseWindowParams { window_id: target }),
         MutatingAction::AxPerform => Op::AxPerform(AxPerformParams {
-            ref_: reference, action: "focus".to_owned(),
+            ref_: reference, action: "focus".to_owned(), menu: None,
         }),
         MutatingAction::AxSetValue => Op::AxSetValue(AxSetValueParams {
             ref_: reference, value: "hello".to_owned(),
         }),
         MutatingAction::AxFocus => Op::AxFocus(AxRefParams { ref_: reference }),
-        MutatingAction::AxClick => Op::AxClick(AxClickParams { ref_: reference, opts: None }),
+        MutatingAction::AxClick => Op::AxClick(AxClickParams { ref_: reference, opts: None, menu: None }),
         MutatingAction::ClipboardWrite => Op::ClipboardWrite(ClipboardText { text: "hello".to_owned() }),
         MutatingAction::MenuSelect => Op::MenusSelect(MenuSelectParams {
             window_id: target, path: vec!["File".to_owned(), "Save".to_owned()], delivery_mode: None,

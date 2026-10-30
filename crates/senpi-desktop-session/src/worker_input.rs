@@ -1,16 +1,17 @@
 //! Pointer and keyboard requests. Coordinates are pixels of the target's
 //! latest capture and map through its frame to global logical points.
 
-use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
+use senpi_desktop_core::backend::{DeliveryMode, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::parse_keys;
+use senpi_desktop_core::menus::validate_path;
 use senpi_desktop_core::protocol_params::{
     DragParams, KeyChordParams, PointParams, ScrollParams, TypeTextParams,
 };
 use senpi_desktop_core::types::{DesktopWindow, PointerOptions, Target};
 
-use senpi_desktop_safety::MutatingAction;
+use senpi_desktop_safety::{MutatingAction, StopPolicy, Supervisor};
 
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
@@ -58,8 +59,13 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
+            if let Some(path) = &params.menu {
+                validate_path(path, false)?;
+            }
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
             let event = PointerEvent::Click {
@@ -69,7 +75,13 @@ impl Worker {
                 count: options.count,
                 modifiers: options.modifiers,
             };
-            worker.pointer(&target, event, &frame, options.mode)
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
+            let choice = MenuChoice {
+                path: params.menu.as_deref(),
+                check_stop: &check_stop,
+            };
+            let report = worker.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
+            Ok(Response::MenuOutcome(report))
         })
     }
 
@@ -105,6 +117,8 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
@@ -118,7 +132,15 @@ impl Worker {
                 button: options.button,
                 modifiers: options.modifiers,
             };
-            worker.pointer(&target, event, &frame, options.mode)
+            // A drag that starts on a menu control is one press that opens the
+            // menu (D1): the backend lists and closes it.
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "dragging");
+            let choice = MenuChoice {
+                path: None,
+                check_stop: &check_stop,
+            };
+            let report = worker.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
+            Ok(Response::MenuOutcome(report))
         })
     }
 
@@ -168,18 +190,7 @@ impl Worker {
         let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let mode = delivery(params.opts.as_ref())?;
-            let check_stop = || {
-                let is_cancelled = cancelled();
-                if supervisor.is_suspended() {
-                    Err(DesktopError::new(ErrorCode::Suspended, "input was suspended while typing"))
-                } else if let Some(stopped) = crate::mutate::interruption(&supervisor, &policy) {
-                    Err(stopped)
-                } else if is_cancelled {
-                    Err(DesktopError::new(ErrorCode::Cancelled, "the request was cancelled while typing"))
-                } else {
-                    Ok(())
-                }
-            };
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "typing");
             worker.backend()?.type_text_interruptible(
                 &target,
                 &params.text,
@@ -205,10 +216,13 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
-            worker.backend()?.key_chord(&target, &keys, mode)?;
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "pressing keys");
+            worker.backend()?.key_chord_interruptible(&target, &keys, mode, &check_stop)?;
             Ok(Response::Unit)
         })
     }
@@ -229,6 +243,27 @@ impl Worker {
             worker.backend()?.raise_window(window_id)?;
             Ok(Response::Unit)
         })
+    }
+}
+
+/// The check an interruptible input call runs before each press: a
+/// suspension, then a stop path that stopped authorizing input, then a
+/// cancellation; `doing` names the input in the error.
+pub(crate) fn interrupted(
+    supervisor: &Supervisor,
+    policy: &StopPolicy,
+    cancelled: &dyn Fn() -> bool,
+    doing: &str,
+) -> CoreResult<()> {
+    let is_cancelled = cancelled();
+    if supervisor.is_suspended() {
+        Err(DesktopError::new(ErrorCode::Suspended, format!("input was suspended while {doing}")))
+    } else if let Some(stopped) = crate::mutate::interruption(supervisor, policy) {
+        Err(stopped)
+    } else if is_cancelled {
+        Err(DesktopError::new(ErrorCode::Cancelled, format!("the request was cancelled while {doing}")))
+    } else {
+        Ok(())
     }
 }
 

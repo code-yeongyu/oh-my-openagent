@@ -170,7 +170,7 @@ impl Worker {
             Op::AxAttributes(params) => self.ax_attributes(&params.ref_),
             Op::AxChildren(params) => self.ax_children(&params.ref_),
             Op::AxParent(params) => self.ax_parent(&params.ref_),
-            Op::AxPerform(params) => served(self.ax_perform(&params.ref_, &params.action, cancelled)),
+            Op::AxPerform(params) => served(self.ax_perform(&params, cancelled)),
             Op::AxSetValue(params) => served(self.ax_set_value(&params.ref_, &params.value, cancelled)),
             Op::AxFocus(params) => served(self.ax_focus(&params.ref_, cancelled)),
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),

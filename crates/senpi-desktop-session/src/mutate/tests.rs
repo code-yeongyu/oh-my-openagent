@@ -158,6 +158,7 @@ fn cursor_warp_failure_maps_through_execute_input() {
         y: 10.0,
         frame_id: Some(frame_id),
         opts: None,
+        menu: None,
     });
     // When
     let reply = harness.process(op);

@@ -8,9 +8,10 @@ use core_graphics::event::{CGEventFlags, CGEventTapLocation};
 use core_graphics::event_source::CGEventSource;
 use senpi_desktop_core::backend::Modifiers;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::intervention::check_press;
 use senpi_desktop_core::keys::KeyName;
 
-use super::cgevent::{keyboard_event, modifier_flags};
+use super::cgevent::keyboard_event;
 use super::held::{Held, HeldKey, KeyRoute};
 
 /// The key code for a chord key, as the fixed macOS virtual-key table gives it.
@@ -136,9 +137,9 @@ pub(crate) const fn update_modifier(modifiers: &mut Modifiers, key: KeyName, dow
     }
 }
 
-/// Builds, routes, and records one key event. Held state is recorded before a
-/// down post and cleared after a successful up post, so a failed release stays
-/// replayable by `release_all`.
+/// Builds, routes, and records one key event. A down post runs the press check
+/// first; held state is recorded before a down post and cleared after a
+/// successful up post, so a failed release stays replayable by `release_all`.
 pub(super) fn post_key(
     source: &CGEventSource,
     held: &mut Held,
@@ -149,6 +150,7 @@ pub(super) fn post_key(
     route: KeyRoute,
 ) -> CoreResult<()> {
     if down {
+        check_press()?;
         held.key_down(HeldKey {
             route,
             code,
@@ -212,37 +214,4 @@ pub(super) fn type_text_interruptible(
         delivered();
     }
     Ok(())
-}
-
-/// Presses `keys` in order and releases them in reverse, keeping the running
-/// modifier flags faithful; the first release failure is reported after all
-/// releases ran.
-pub(super) fn chord(
-    source: &CGEventSource,
-    held: &mut Held,
-    keys: &[KeyName],
-    route: KeyRoute,
-) -> CoreResult<()> {
-    if keys.is_empty() {
-        return Err(DesktopError::invalid_key("key chord must not be empty"));
-    }
-    let mut active = Modifiers::default();
-    for &key in keys {
-        update_modifier(&mut active, key, true);
-        let code = key_code(key)?;
-        post_key(source, held, code, None, true, modifier_flags(active), route)?;
-        thread::sleep(Duration::from_millis(8));
-    }
-    let mut first_error = None;
-    for &key in keys.iter().rev() {
-        update_modifier(&mut active, key, false);
-        if let Err(error) = (|| {
-            let code = key_code(key)?;
-            post_key(source, held, code, None, false, modifier_flags(active), route)
-        })() {
-            first_error.get_or_insert(error);
-        }
-        thread::sleep(Duration::from_millis(8));
-    }
-    first_error.map_or(Ok(()), Err)
 }

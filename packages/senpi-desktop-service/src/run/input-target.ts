@@ -1,6 +1,6 @@
 import type { EngineMethod } from "@oh-my-opencode/senpi-desktop-protocol";
 import { ComputerRunError, type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from "./context";
-import type { CaptureRegion } from "./engine-results";
+import { type CaptureRegion, expectResult, isMenuReport, type MenuReport, optional } from "./engine-results";
 import { callHold } from "./hold-call";
 import { captureScreenshot, type ScreenshotOptions, type ScreenshotResult } from "./screenshot";
 
@@ -9,7 +9,16 @@ export interface DeliveryOptions {
 	readonly delivery?: string;
 }
 
-export interface ClickOptions extends DeliveryOptions {
+/**
+ * The path of item labels to choose in the menu a press opens (a context menu, or a menu button's or popup
+ * button's menu); the menu is closed before the call returns, chosen or not. Labels match like
+ * `win.menu.select`: case-insensitively, a trailing ellipsis ignored, each label naming exactly one item.
+ */
+export interface MenuOptions {
+	readonly menu?: readonly string[];
+}
+
+export interface ClickOptions extends DeliveryOptions, MenuOptions {
 	readonly button?: string;
 	readonly count?: number;
 	readonly modifiers?: readonly string[];
@@ -43,6 +52,11 @@ export function pointerOptions(options: ClickOptions = {}): object {
 	return { button, count, modifiers, deliveryMode: delivery };
 }
 
+/** The engine `menu` param of a press that opens a menu; absent when no path was given. */
+export function menuParam(options: MenuOptions = {}): { readonly menu?: readonly string[] } {
+	return options.menu === undefined ? {} : { menu: [...options.menu] };
+}
+
 function chordKeys(chord: string | readonly string[]): readonly string[] {
 	if (typeof chord !== "string") return chord;
 	return chord
@@ -56,6 +70,18 @@ export function send(method: FacadeMethod, name: string, engineMethod: EngineMet
 	return method(name, async ({ call }) => {
 		await call(engineMethod, params);
 	});
+}
+
+/** Facade `method` sending one press that may open a menu; the engine answers with the menu's items or null. */
+function sendPress(
+	method: FacadeMethod,
+	name: string,
+	engineMethod: EngineMethod,
+	params: object,
+): Promise<MenuReport | null> {
+	return method(name, async ({ call }) =>
+		expectResult(engineMethod, (await call(engineMethod, params)) ?? null, optional(isMenuReport)),
+	);
 }
 
 /**
@@ -82,22 +108,24 @@ export class InputTarget {
 		return this.#method("zoom", (scope) => captureScreenshot(scope, this.#target, options, region));
 	}
 
-	click(x: number, y: number, options?: ClickOptions): Promise<void> {
-		return send(this.#method, "click", "click", { target: this.#target, x, y, opts: pointerOptions(options) });
+	click(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
+		const params = { target: this.#target, x, y, opts: pointerOptions(options), ...menuParam(options) };
+		return sendPress(this.#method, "click", "click", params);
 	}
 
-	doubleClick(x: number, y: number, options?: ClickOptions): Promise<void> {
+	doubleClick(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
 		const opts = pointerOptions({ ...options, count: 2 });
-		return send(this.#method, "doubleClick", "click", { target: this.#target, x, y, opts });
+		const params = { target: this.#target, x, y, opts, ...menuParam(options) };
+		return sendPress(this.#method, "doubleClick", "click", params);
 	}
 
 	move(x: number, y: number): Promise<void> {
 		return send(this.#method, "move", "moveMouse", { target: this.#target, x, y });
 	}
 
-	drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<void> {
+	drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<MenuReport | null> {
 		const path = points.map(([x, y]) => ({ x, y }));
-		return send(this.#method, "drag", "drag", { target: this.#target, path, opts: pointerOptions(options) });
+		return sendPress(this.#method, "drag", "drag", { target: this.#target, path, opts: pointerOptions(options) });
 	}
 
 	scroll(x: number, y: number, options: ScrollOptions = {}): Promise<void> {

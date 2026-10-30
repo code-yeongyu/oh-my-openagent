@@ -66,6 +66,18 @@ pub struct StopPathStatus {
     pub reason: Option<String>,
 }
 
+/// What a press that opens a menu did with it (#11459): the items of the
+/// menu it opened and closed with nothing chosen, as a listing the next call
+/// can pick from with `menu:`. A press that chose its item, or opened no
+/// menu, reports `null`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuReport {
+    /// The menu's items in menu order, disabled ones marked, enabled
+    /// submenus followed by their items in brackets.
+    pub items: String,
+}
+
 /// The `audit` notification: one per mutating request, success or failure.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

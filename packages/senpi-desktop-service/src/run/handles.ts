@@ -4,7 +4,9 @@ import {
 	type AxNode,
 	type DesktopWindow,
 	type MenuItem,
+	type MenuReport,
 	expectResult,
+	isMenuReport,
 	isAttributePairs,
 	isAxNode,
 	isMenuItem,
@@ -12,9 +14,15 @@ import {
 	listOf,
 	optional,
 } from "./engine-results";
-import { type DeliveryOptions, InputTarget, pointerOptions, send } from "./input-target";
+import { type ClickOptions, InputTarget, type MenuOptions, menuParam, pointerOptions, send } from "./input-target";
 import { observeWindow, type ObserveOptions, type ObservationResult } from "./observe";
-export { type ClickOptions, type DeliveryOptions, InputTarget, type ScrollOptions } from "./input-target";
+export {
+	type ClickOptions,
+	type DeliveryOptions,
+	InputTarget,
+	type MenuOptions,
+	type ScrollOptions,
+} from "./input-target";
 
 export interface AxOptions {
 	readonly all?: boolean;
@@ -135,6 +143,12 @@ export class ElementHandle {
 		});
 	}
 
+	#sendPress(method: string, params: object): Promise<MenuReport | null> {
+		return this.#method(method, async ({ call }) =>
+			expectResult("ax.perform", (await call("ax.perform", { ref: this.ref, ...params })) ?? null, optional(isMenuReport)),
+		);
+	}
+
 	#node<T>(method: string, project: (node: AxNode) => T): Promise<T> {
 		return this.#method(method, async ({ call }) =>
 			project(expectResult("ax.node", await call("ax.node", { ref: this.ref }), isAxNode)),
@@ -168,16 +182,22 @@ export class ElementHandle {
 		return this.#node("actions", (node) => node.actions ?? []);
 	}
 
-	perform(action: string): Promise<void> {
-		return this.#send("perform", "ax.perform", { action });
+	perform(action: string, options?: MenuOptions): Promise<MenuReport | null> {
+		return this.#sendPress("perform", { action, ...menuParam(options) });
 	}
 
-	press(): Promise<void> {
-		return this.#send("press", "ax.perform", { action: "press" });
+	press(options?: MenuOptions): Promise<MenuReport | null> {
+		return this.#sendPress("press", { action: "press", ...menuParam(options) });
 	}
 
-	click(options?: DeliveryOptions): Promise<void> {
-		return this.#send("click", "ax.click", { opts: pointerOptions(options) });
+	click(options?: ClickOptions): Promise<MenuReport | null> {
+		return this.#method("click", async ({ call }) =>
+			expectResult(
+				"ax.click",
+				(await call("ax.click", { ref: this.ref, opts: pointerOptions(options), ...menuParam(options) })) ?? null,
+				optional(isMenuReport),
+			),
+		);
 	}
 
 	focus(): Promise<void> {

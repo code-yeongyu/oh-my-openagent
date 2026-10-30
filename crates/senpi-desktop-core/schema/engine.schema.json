@@ -150,7 +150,14 @@
         "$ref": "#/definitions/PointParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/MenuReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "moveMouse": {
@@ -172,7 +179,14 @@
         "$ref": "#/definitions/DragParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/MenuReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "scroll": {
@@ -424,7 +438,14 @@
         "$ref": "#/definitions/AxPerformParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/MenuReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "ax.setValue": {
@@ -457,7 +478,14 @@
         "$ref": "#/definitions/AxClickParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/MenuReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "stopPath.start": {
@@ -1521,6 +1549,16 @@
               "type": "null"
             }
           ]
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "`click` only: the path of item labels to choose in the menu the click\nopens (a context menu, or a menu button's or popup button's menu);\nthe menu is closed before the call returns (#11459)."
         }
       },
       "required": [
@@ -1568,6 +1606,20 @@
           "default": null
         }
       },
+      "additionalProperties": false
+    },
+    "MenuReport": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "string",
+          "description": "The menu's items in menu order, disabled ones marked, enabled\nsubmenus followed by their items in brackets."
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "description": "What a press that opens a menu did with it (#11459): the items of the\nmenu it opened and closed with nothing chosen, as a listing the next call\ncan pick from with `menu:`. A press that chose its item, or opened no\nmenu, reports `null`.",
       "additionalProperties": false
     },
     "DragParams": {
@@ -2160,6 +2212,16 @@
         },
         "action": {
           "type": "string"
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The path of item labels to choose in the menu the action opens\n(`AXShowMenu`, or `AXPress` on a menu button or popup button); the\nmenu is closed before the call returns (#11459)."
         }
       },
       "required": [
@@ -2199,6 +2261,16 @@
               "type": "null"
             }
           ]
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The path of item labels to choose in the menu the click opens; the\nmenu is closed before the call returns (#11459)."
         }
       },
       "required": [

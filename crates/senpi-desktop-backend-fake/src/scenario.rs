@@ -27,6 +27,10 @@ pub struct FakeScenario {
     pub ax: BTreeMap<String, FakeAxNode>,
     /// Menu-bar children per window id; absent means the backend has no menus.
     pub menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    /// Per window id, the menu a secondary press, a press on a menu button or
+    /// popup button, or `AXShowMenu` opens there; absent means no press of
+    /// that window opens a menu.
+    pub context_menus: BTreeMap<String, Vec<FakeMenuNode>>,
     /// Reports every AX element's owner as unknown, like a backend that
     /// cannot map an element to its native window.
     pub ax_owner_unknown: bool,
@@ -54,6 +58,7 @@ impl Default for FakeScenario {
             capabilities: fake_capabilities(0),
             ax: BTreeMap::new(),
             menus: BTreeMap::new(),
+            context_menus: BTreeMap::new(),
             ax_owner_unknown: false,
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
@@ -221,6 +226,8 @@ struct RawScenario {
     #[serde(default)]
     menus: BTreeMap<String, Vec<FakeMenuNode>>,
     #[serde(default)]
+    context_menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    #[serde(default)]
     ax_owner_unknown: bool,
     #[serde(default = "default_cursor")]
     cursor: Option<DesktopPoint>,
@@ -247,6 +254,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             .ax
             .keys()
             .chain(raw.menus.keys())
+            .chain(raw.context_menus.keys())
             .chain(raw.resize_window.iter().map(|resize| &resize.id));
         if let Some(unknown) = referenced.find(|id| !known(id)) {
             return Err(ScenarioError::UnknownWindow(unknown.clone()));
@@ -259,6 +267,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             capabilities,
             ax: raw.ax,
             menus: raw.menus,
+            context_menus: raw.context_menus,
             ax_owner_unknown: raw.ax_owner_unknown,
             cursor: raw.cursor,
             capture_color: raw.capture_color,

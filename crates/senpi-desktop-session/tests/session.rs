@@ -69,6 +69,7 @@ fn click_desktop() -> Op {
         y: 10.0,
         frame_id: None,
         opts: None,
+        menu: None,
     })
 }
 
@@ -153,7 +154,7 @@ async fn capture_returns_a_frame_that_later_clicks_map_through() {
     assert_eq!((capture.source_width, capture.source_height), (4800, 1800));
     assert!(capture.data.is_some_and(|data| data.starts_with("iVBORw0KGgo")));
     grant(&session).await;
-    assert_eq!(session.submit(click_desktop()).wait().await, Ok(Response::Unit));
+    assert_eq!(session.submit(click_desktop()).wait().await, Ok(Response::MenuOutcome(None)));
 }
 
 #[tokio::test]

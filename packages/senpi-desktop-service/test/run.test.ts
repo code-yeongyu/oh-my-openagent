@@ -255,6 +255,25 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(error).toHaveProperty("data.code", "InvalidCoordinateFrame");
 	});
 
+	it("forwards a click's menu path as the top-level menu param, never inside opts (#11459)", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+		const code = `
+			const editor = await desktop.window({ app: "Code" });
+			await editor.screenshot({ silent: true });
+			await editor.click(3, 4, { button: "right", menu: ["Add to", "Serif…"] });
+			await editor.click(3, 4, { button: "right" });
+		`;
+
+		// When
+		await run(service, code);
+
+		// Then
+		const clicks = log.requests.filter((request) => request.method === "click").map((request) => request.params);
+		expect(clicks[0]).toEqual({ target: "101", x: 3, y: 4, opts: { button: "right" }, menu: ["Add to", "Serif…"] });
+		expect(clicks[1]).toEqual({ target: "101", x: 3, y: 4, opts: { button: "right" } });
+	});
+
 	it("drives a window handle by its id and reports the engine's audit events for the run", async () => {
 		// Given
 		const { service, log } = await openDesktop();

@@ -11,7 +11,7 @@ mod render;
 mod roles;
 mod walk;
 
-pub use ops::{ax_press, element_at_node, query, register_node};
+pub use ops::{ax_press, element_at_node, native_action_name, query, register_node};
 pub use registry::AxRegistry;
 pub use render::snapshot;
 pub use roles::{normalize_role_atspi, normalize_role_macos, normalize_role_uia};

@@ -17,7 +17,7 @@ use crate::protocol_params::{
     StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{
-    AuditEvent, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
+    AuditEvent, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus, MenuReport,
 };
 use crate::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
@@ -97,9 +97,9 @@ method_table! {
     Capture = "capture", Read, Public, CaptureParams => CaptureResult;
     CaptureRegion = "captureRegion", Read, Public, CaptureRegionParams => CaptureResult;
     Observe = "observe", Read, Public, ObserveParams => ObserveResult;
-    Click = "click", Exec, Public, PointParams => ();
+    Click = "click", Exec, Public, PointParams => Option<MenuReport>;
     MoveMouse = "moveMouse", Exec, Public, PointParams => ();
-    Drag = "drag", Exec, Public, DragParams => ();
+    Drag = "drag", Exec, Public, DragParams => Option<MenuReport>;
     Scroll = "scroll", Exec, Public, ScrollParams => ();
     TypeText = "typeText", Exec, Public, TypeTextParams => ();
     KeyChord = "keyChord", Exec, Public, KeyChordParams => ();
@@ -118,10 +118,10 @@ method_table! {
     AxAttributes = "ax.attributes", Read, Public, AxRefParams => Vec<(String, String)>;
     AxChildren = "ax.children", Read, Public, AxRefParams => Vec<AxNode>;
     AxParent = "ax.parent", Read, Public, AxRefParams => Option<AxNode>;
-    AxPerform = "ax.perform", Exec, Public, AxPerformParams => ();
+    AxPerform = "ax.perform", Exec, Public, AxPerformParams => Option<MenuReport>;
     AxSetValue = "ax.setValue", Exec, Public, AxSetValueParams => ();
     AxFocus = "ax.focus", Exec, Public, AxRefParams => ();
-    AxClick = "ax.click", Exec, Public, AxClickParams => ();
+    AxClick = "ax.click", Exec, Public, AxClickParams => Option<MenuReport>;
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();

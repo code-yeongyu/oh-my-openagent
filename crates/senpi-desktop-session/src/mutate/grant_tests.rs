@@ -137,6 +137,7 @@ fn ax_click_foreground_needs_the_grant() {
     let click = crate::request::Op::AxClick(senpi_desktop_core::protocol_params::AxClickParams {
         ref_: reference,
         opts: delivery("foreground"),
+        menu: None,
     });
     // When
     let reply = harness.process(click);

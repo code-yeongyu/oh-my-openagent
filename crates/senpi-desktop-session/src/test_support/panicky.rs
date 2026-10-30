@@ -8,11 +8,12 @@ use image::RgbaImage;
 use parking_lot::Mutex;
 use senpi_desktop_backend_fake::{FakeBackend, FakeMethod};
 use senpi_desktop_core::ax::AxBackend;
-use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::backend::{Backend, DeliveryMode, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, PermissionDeniedData, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::menus::MenuItem;
+use senpi_desktop_core::protocol_results::MenuReport;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
@@ -78,6 +79,16 @@ impl Backend for PanickyFake {
         mode: DeliveryMode,
     ) -> CoreResult<()> {
         self.inner.pointer(target, ev, frame, mode)
+    }
+    fn pointer_menu(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<Option<MenuReport>> {
+        self.inner.pointer_menu(target, ev, frame, mode, choice)
     }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.inner.type_text(target, text, mode)

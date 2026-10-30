@@ -8,11 +8,13 @@ mod ax_tree;
 mod clock;
 mod desktop_impl;
 mod fake;
+mod fake_menus;
 mod faults;
 mod frames_impl;
 mod holds_impl;
 mod menus_impl;
 mod method;
+mod open_menu_impl;
 mod scenario;
 mod sink;
 

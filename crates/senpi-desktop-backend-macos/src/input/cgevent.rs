@@ -116,6 +116,19 @@ pub(super) const fn button_types(
     }
 }
 
+/// Whether a pointer event presses or moves, so the user-intervention check
+/// runs before it. A button release or a drag step always follows the press it
+/// belongs to, so a refusal never leaves a button down.
+pub(super) const fn is_press(event_type: CGEventType) -> bool {
+    matches!(
+        event_type,
+        CGEventType::LeftMouseDown
+            | CGEventType::RightMouseDown
+            | CGEventType::OtherMouseDown
+            | CGEventType::MouseMoved
+    )
+}
+
 pub(super) fn point(x: f64, y: f64) -> CoreResult<CGPoint> {
     Ok(CGPoint::new(
         f64::from(finite_i32(x, "x coordinate")?),
@@ -258,6 +271,17 @@ mod tests {
         assert!(finite_i32(f64::NAN, "x").is_err());
         assert!(finite_i32(1e12, "x").is_err());
         assert_eq!(finite_i32(3.6, "x"), Ok(4));
+    }
+
+    #[test]
+    fn only_presses_and_moves_run_the_press_check() {
+        for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
+            let (_, down, up, dragged, _) = button_types(button);
+            assert!(is_press(down));
+            assert!(!is_press(up));
+            assert!(!is_press(dragged));
+        }
+        assert!(is_press(CGEventType::MouseMoved));
     }
 
     #[test]

@@ -22,9 +22,9 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `capture` | read | no | no | `CaptureParams` | `CaptureResult` | `ErrorCode` |
 | `captureRegion` | read | no | no | `CaptureRegionParams` | `CaptureResult` | `ErrorCode` |
 | `observe` | read | no | no | `ObserveParams` | `ObserveResult` | `ErrorCode` |
-| `click` | exec | no | no | `PointParams` | `null` | `ErrorCode` |
+| `click` | exec | no | no | `PointParams` | `Option<MenuReport>` | `ErrorCode` |
 | `moveMouse` | exec | no | no | `PointParams` | `null` | `ErrorCode` |
-| `drag` | exec | no | no | `DragParams` | `null` | `ErrorCode` |
+| `drag` | exec | no | no | `DragParams` | `Option<MenuReport>` | `ErrorCode` |
 | `scroll` | exec | no | no | `ScrollParams` | `null` | `ErrorCode` |
 | `typeText` | exec | no | no | `TypeTextParams` | `null` | `ErrorCode` |
 | `keyChord` | exec | no | no | `KeyChordParams` | `null` | `ErrorCode` |
@@ -43,10 +43,10 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `ax.attributes` | read | no | no | `AxRefParams` | `Vec<(String, String)>` | `ErrorCode` |
 | `ax.children` | read | no | no | `AxRefParams` | `Vec<AxNode>` | `ErrorCode` |
 | `ax.parent` | read | no | no | `AxRefParams` | `Option<AxNode>` | `ErrorCode` |
-| `ax.perform` | exec | no | no | `AxPerformParams` | `null` | `ErrorCode` |
+| `ax.perform` | exec | no | no | `AxPerformParams` | `Option<MenuReport>` | `ErrorCode` |
 | `ax.setValue` | exec | no | no | `AxSetValueParams` | `null` | `ErrorCode` |
 | `ax.focus` | exec | no | no | `AxRefParams` | `null` | `ErrorCode` |
-| `ax.click` | exec | no | no | `AxClickParams` | `null` | `ErrorCode` |
+| `ax.click` | exec | no | no | `AxClickParams` | `Option<MenuReport>` | `ErrorCode` |
 | `stopPath.start` | exec | yes | no | `StopPathStartParams` | `StopPathStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.status` | read | no | no | `EmptyParams` | `StopPathStatus` | `ErrorCode` |
 | `stopPath.heartbeat` | read | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
