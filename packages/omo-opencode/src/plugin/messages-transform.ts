@@ -37,6 +37,7 @@ type MessagesTransformHooks = {
   toolPairValidator?: CreatedHooks["toolPairValidator"]
   monitorStatusInjector?: CreatedHooks["monitorStatusInjector"]
   categorySkillReminder?: CreatedHooks["categorySkillReminder"]
+  agentUsageReminder?: CreatedHooks["agentUsageReminder"]
 }
 type MessagesTransformHookKey = keyof MessagesTransformHooks
 type MessagesTransformHookEntry = {
@@ -62,6 +63,7 @@ const MESSAGES_TRANSFORM_HOOKS = [
   { key: "toolPairValidator", name: "toolPairValidator" },
   { key: "monitorStatusInjector", name: "monitorStatusInjector" },
   { key: "categorySkillReminder", name: "categorySkillReminder" },
+  { key: "agentUsageReminder", name: "agentUsageReminder" },
 ] satisfies readonly MessagesTransformHookEntry[]
 
 function getSessionID(message: MessageWithParts): string | undefined {
