@@ -11,9 +11,14 @@ use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 use crate::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
+    ScreenState, Target,
 };
 use crate::user_input::{UserInputFeed, UserPresses};
+
+/// Keeps the display awake until dropped (macOS: a
+/// `PreventUserIdleDisplaySleep` power assertion).
+pub type DisplayAwakeHold = Box<dyn Send>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeliveryMode {
@@ -255,11 +260,31 @@ pub trait Backend: Send {
         UserPresses::default()
     }
 
+    /// Starts keeping the display awake while the agent operates. `None` when
+    /// the platform has no such hold or refused it; the display then sleeps
+    /// as it would without the agent, and failures say so.
+    fn hold_display_awake(&mut self) -> Option<DisplayAwakeHold> {
+        None
+    }
+
+    /// Lock and display-sleep reads that need no backend borrow, so a waiter
+    /// can explain its timeout while the backend is busy.
+    fn screen_probe(&self) -> Option<std::sync::Arc<dyn ScreenProbe>> {
+        None
+    }
+
     /// The watch's shared feed, once `watch_user_input` ran; `None` while
     /// nothing is watched. The session reads it between and inside requests.
     fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
         None
     }
+}
+
+/// Live lock and display-sleep state, safe to read from any thread.
+pub trait ScreenProbe: Send + Sync {
+    /// `display` names the display a request aims at; `None` means every
+    /// display of the session.
+    fn screen_state(&self, display: Option<&DisplaySelector>) -> ScreenState;
 }
 
 /// Replays only tracked downs. Must not wait for the backend's input scope.

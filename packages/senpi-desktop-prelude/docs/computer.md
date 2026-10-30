@@ -51,8 +51,8 @@ computer.control.release() → None
 computer.control.state() → { active, reason?, grantedAt? }
 computer.run(fnOrCode, { args?, read_only?, timeout? }?) → value
     One multi-step JS run in the persistent desktop session. Functions receive `{ desktop, wait, assert }` (`desktop` = same helpers) and cannot capture cell closures; `args` pass JSON data, functions, RegExp. Python passes a JS code string only. `read_only: true` needs `computer:read` and blocks mutation; `timeout` is seconds. Not sandboxed.
-computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, … }
-    `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor.
+computer.capabilities() → { backend, capture, input, ax, backgroundWindowInput, cursorOverlay, deliveryModes, *Permission, stopPath, stopReason?, focusGuard, screenLocked, displayAsleep, … }
+    `stopPath` is `global` when the user's stop chord is armed; with `none`, input is refused. `focusGuard` says whether foreground delivery restores the previous front window and cursor. `displayAsleep` (macOS) is true when every display of the session sleeps; the engine keeps the display awake while you act, and a failure that ends `(the screen is locked)` or `(the display is asleep)` needs the user to unlock or wake the Mac, not a retry.
 computer.close() → None
     Ends the desktop session; later calls fail.
 Rules:
