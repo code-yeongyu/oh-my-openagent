@@ -149,8 +149,9 @@ describe("cleanUpReloadRun", () => {
       killWaitMs: 3_000,
     }), 5_000)
 
-    // then
-    expect((outcome.error as Error | undefined)?.message).toBe("supervisor did not finish graceful shutdown within 200ms")
+    // then - Windows delivers SIGTERM as TerminateProcess, which a process cannot ignore, so it exits inside the grace
+    const expectedError = process.platform === "win32" ? undefined : "supervisor did not finish graceful shutdown within 200ms"
+    expect((outcome.error as Error | undefined)?.message).toBe(expectedError)
     expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
     expect(() => process.kill(child.pid ?? -1, 0)).toThrow()
     expect(existsSync(root)).toBe(false)
