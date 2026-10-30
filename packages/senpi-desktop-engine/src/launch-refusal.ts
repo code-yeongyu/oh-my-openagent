@@ -1,3 +1,5 @@
+import type { UserFacingErrorInfo } from "./user-facing";
+
 /** Startup diagnostics from the actual engine child, never an admission credential. */
 export type DesktopLaunchRefusalReason = "self-responsible" | "unresolved";
 
@@ -6,25 +8,29 @@ const MAX_RECORD_BYTES = 512;
 const LEGACY_SELF = /^senpi-desktop-engine: refusing to run as its own responsible process \(pid [1-9]\d*\): spawn the engine as a child of the app, terminal or host that holds the computer-use grants, without the responsibility-disclaim attribute and not as a launchd job or through a shell exec$/;
 const LEGACY_UNRESOLVED = /^senpi-desktop-engine: refusing to run: the responsible process of engine pid [1-9]\d* cannot be resolved$/;
 
+const LAUNCH_CONTEXT_CODE = "COMPUTER_LAUNCH_CONTEXT_REQUIRED";
+const LAUNCH_CONTEXT_PROBLEM = "Computer use cannot start safely from this host's current macOS launch context.";
+const LAUNCH_CONTEXT_UNRESOLVED = " macOS responsibility could not be resolved.";
+const LAUNCH_CONTEXT_FIX =
+	"Restart this host from a local terminal and keep that terminal app running, or use the OmO desktop app (Settings > Restart engine).";
+const LAUNCH_CONTEXT_NOT_A_FIX = "Opening a new terminal or reconnecting to this same host does not repair its launch context.";
+
 export class DesktopLaunchContextError extends Error {
 	readonly code = "launch-context-unavailable";
 	readonly reason: DesktopLaunchRefusalReason;
 	readonly diagnostic: string;
+	readonly userFacing: UserFacingErrorInfo;
 
 	constructor(
 		reason: DesktopLaunchRefusalReason,
 		diagnostic: string,
 	) {
-		const detail = reason === "unresolved" ? " macOS responsibility could not be resolved." : "";
-		super(
-			"COMPUTER_LAUNCH_CONTEXT_REQUIRED: Computer use cannot start safely from this host's current macOS launch context." +
-			detail +
-			" Restart this host from a local terminal and keep that terminal app running, or use the OmO desktop app (Settings > Restart engine)." +
-			" Opening a new terminal or reconnecting to this same host does not repair its launch context.",
-		);
+		const problem = LAUNCH_CONTEXT_PROBLEM + (reason === "unresolved" ? LAUNCH_CONTEXT_UNRESOLVED : "");
+		super(`${LAUNCH_CONTEXT_CODE}: ${problem} ${LAUNCH_CONTEXT_FIX} ${LAUNCH_CONTEXT_NOT_A_FIX}`);
 		this.name = "DesktopLaunchContextError";
 		this.reason = reason;
 		this.diagnostic = diagnostic;
+		this.userFacing = { code: LAUNCH_CONTEXT_CODE, message: problem, action: `${LAUNCH_CONTEXT_FIX} ${LAUNCH_CONTEXT_NOT_A_FIX}` };
 	}
 }
 

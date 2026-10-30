@@ -3,6 +3,7 @@ export {
 	DesktopLaunchRefusal,
 	type DesktopLaunchRefusalReason,
 } from "./launch-refusal";
+export type { UserFacingErrorInfo } from "./user-facing";
 export {
 	DesktopEngineAbiMismatchError,
 	DesktopEngineHandshakeError,

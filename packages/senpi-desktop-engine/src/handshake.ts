@@ -2,6 +2,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { ENGINE_ABI, PROTOCOL_VERSION } from "@oh-my-opencode/senpi-desktop-protocol";
 import { DesktopLaunchRefusal } from "./launch-refusal";
+import type { UserFacingErrorInfo } from "./user-facing";
 
 /** The `engine.hello` reply of an engine this package accepts. */
 export interface EngineHello {
@@ -35,6 +36,11 @@ export class DesktopEngineAbiMismatchError extends Error {
 	readonly enginePath: string;
 	readonly expected: EngineContract;
 	readonly actual: EngineContract;
+	readonly userFacing: UserFacingErrorInfo = {
+		code: "COMPUTER_ENGINE_VERSION_MISMATCH",
+		message: "The computer-use engine does not match this OmO version.",
+		action: "Update OmO with `omo update` (or reinstall it), then restart this host.",
+	};
 
 	constructor(enginePath: string, actual: EngineContract) {
 		const expected = { abi: ENGINE_ABI, protocolVersion: PROTOCOL_VERSION };
@@ -52,6 +58,11 @@ export class DesktopEngineAbiMismatchError extends Error {
 export class DesktopEngineHandshakeError extends Error {
 	readonly code = "handshake-failed";
 	readonly enginePath: string;
+	readonly userFacing: UserFacingErrorInfo = {
+		code: "COMPUTER_ENGINE_START_FAILED",
+		message: "The computer-use engine did not start correctly.",
+		action: "Restart this host and try again; if it keeps failing, run `omo doctor`.",
+	};
 
 	constructor(enginePath: string, reason: string) {
 		super(`desktop engine handshake failed at ${enginePath}: ${reason}`);

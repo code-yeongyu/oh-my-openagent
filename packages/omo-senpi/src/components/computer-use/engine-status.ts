@@ -1,4 +1,8 @@
-import { DesktopEngineAbiMismatchError, DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-engine"
+import {
+  DesktopEngineAbiMismatchError,
+  DesktopLaunchContextError,
+  type UserFacingErrorInfo,
+} from "@oh-my-opencode/senpi-desktop-engine"
 import type { EngineMethod, PermissionDeniedData, StopPathStatus } from "@oh-my-opencode/senpi-desktop-protocol"
 import {
   type CallOptions,
@@ -22,13 +26,40 @@ export interface TrackedDesktopServiceOptions extends DesktopServiceOptions {
   readonly onPermissionRequired?: (permission: Pick<PermissionDeniedData, "permission" | "app">) => void
 }
 
+const SEE_STATUS = "`/computer status` shows the details."
+
+function userFacingUnavailable(diagnostic: EngineDiagnostic, cause: Error): UserFacingErrorInfo {
+  if (cause instanceof DesktopEngineAbiMismatchError || cause instanceof DesktopLaunchContextError) return cause.userFacing
+  if (diagnostic === "quarantined") {
+    return {
+      code: "COMPUTER_ENGINE_QUARANTINED",
+      message: "macOS Gatekeeper is blocking the computer-use engine that ships with OmO.",
+      action: `Reinstall OmO with \`omo update\`, then try again. ${SEE_STATUS}`,
+    }
+  }
+  if (cause instanceof DesktopEngineUnavailableError && cause.diagnostic.reason === "no-release-asset") {
+    return {
+      code: "COMPUTER_UNSUPPORTED_PLATFORM",
+      message: `Computer use is not available on this platform (${cause.diagnostic.host}).`,
+      action: `Use computer use from a platform OmO ships the engine for. ${SEE_STATUS}`,
+    }
+  }
+  return {
+    code: "COMPUTER_ENGINE_UNAVAILABLE",
+    message: "The computer-use engine is missing from this OmO install.",
+    action: `Reinstall OmO with \`omo update\`, then try again. ${SEE_STATUS}`,
+  }
+}
+
 export class ComputerEngineUnavailableError extends Error {
   readonly diagnostic: EngineDiagnostic
+  readonly userFacing: UserFacingErrorInfo
 
   constructor(diagnostic: EngineDiagnostic, cause: Error) {
     super(`Desktop engine unavailable (${diagnostic}): ${cause.message}`, { cause })
     this.name = "ComputerEngineUnavailableError"
     this.diagnostic = diagnostic
+    this.userFacing = userFacingUnavailable(diagnostic, cause)
   }
 }
 
