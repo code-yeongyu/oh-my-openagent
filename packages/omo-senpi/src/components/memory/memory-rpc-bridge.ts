@@ -1,4 +1,4 @@
-import type { GitTreeSizedEntry } from "@oh-my-opencode/memory-core"
+import { isCanonicalEntry, projectTranscriptEntries, type GitTreeSizedEntry, type TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
@@ -76,6 +76,7 @@ export interface MemoryRpcSnapshot {
   }
   readonly journal: {
     readonly sessionId: string
+    /** Completed answers observed in the session or its durable journal; not a journal fsync fence. */
     readonly totalSteps: number
     readonly reflectedSteps: number
   }
@@ -102,8 +103,10 @@ export interface MemoryRpcBridgeDeps {
 export interface MemoryRpcBridge {
   /** Binds the bridge to a session; a later attach replaces the binding and clears the dedupe. */
   attach(sessionId: string): void
-  /** Publishes the current snapshot unless it is byte-identical to the last published one. */
+  /** Publishes in request order within the binding, unless byte-identical to the last publication. */
   sync(signal?: AbortSignal): Promise<void>
+  /** Observes completed branch steps without acquiring the journal's writer lock. */
+  syncJournal(entries: readonly TranscriptProjection[]): Promise<void>
   /** Unbinds the session so later syncs publish nothing. */
   detach(): void
   /** Retires the bridge; every later call is a no-op. */
@@ -128,6 +131,8 @@ export function createMemoryRpcBridge(
   let lastSnapshot: string | undefined
   let disposed = false
   let bindingGeneration = 0
+  let publication = Promise.resolve()
+  let observedSteps = new Set<string>()
 
   function repoFor(context: MemoryIdentityContext): MemoryRpcGitRepo {
     const cached = repos.get(context.identityPaths.repo)
@@ -147,6 +152,7 @@ export function createMemoryRpcBridge(
       activeRun: deps.activeRun,
       tokenEstimates,
       treeStats,
+      observedSteps,
       ...(deps.syncStatus === undefined ? {} : { syncStatus: deps.syncStatus }),
     })
   }
@@ -176,15 +182,20 @@ export function createMemoryRpcBridge(
     })
   }
 
-  async function publishSnapshot(signal?: AbortSignal): Promise<void> {
-    if (disposed || signal?.aborted || pi.rpc?.emit === undefined) return
+  function publishSnapshot(signal?: AbortSignal): Promise<void> {
     const generation = bindingGeneration
-    const snapshot = await buildSnapshot()
-    if (snapshot === undefined || signal?.aborted || disposed || generation !== bindingGeneration) return
-    const fingerprint = JSON.stringify(snapshot)
-    if (fingerprint === lastSnapshot) return
-    lastSnapshot = fingerprint
-    pi.rpc.emit(MEMORY_UPDATED_RPC_EVENT, snapshot)
+    const current = publication.then(async () => {
+      if (disposed || signal?.aborted || generation !== bindingGeneration || pi.rpc?.emit === undefined) return
+      const snapshot = await buildSnapshot()
+      if (snapshot === undefined || signal?.aborted || disposed || generation !== bindingGeneration) return
+      const fingerprint = JSON.stringify(snapshot)
+      if (fingerprint === lastSnapshot) return
+      lastSnapshot = fingerprint
+      pi.rpc.emit(MEMORY_UPDATED_RPC_EVENT, snapshot)
+    })
+    // Keep failures visible to their caller without poisoning the next publication.
+    publication = current.catch(() => {})
+    return current
   }
 
   return {
@@ -193,14 +204,26 @@ export function createMemoryRpcBridge(
       sessionId = nextSessionId
       bindingGeneration++
       lastSnapshot = undefined
+      publication = Promise.resolve()
+      observedSteps = new Set()
     },
 
     sync: publishSnapshot,
+
+    syncJournal(entries) {
+      if (disposed || sessionId === undefined) return Promise.resolve()
+      for (const entry of entries.flatMap((message) => projectTranscriptEntries(message, ""))) {
+        if (entry.kind === "assistant" && isCanonicalEntry(entry)) observedSteps.add(entry.source_line_id)
+      }
+      return publishSnapshot()
+    },
 
     detach() {
       bindingGeneration++
       sessionId = undefined
       lastSnapshot = undefined
+      publication = Promise.resolve()
+      observedSteps = new Set()
     },
 
     dispose() {

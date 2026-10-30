@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
-import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, TranscriptJournal, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -111,6 +111,107 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
+  test("#given persisted and observed branch steps #when replay, reflection and rebinding occur #then counters count each canonical answer once", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(),
+    })
+    const journal = new TranscriptJournal({ journalDir: join(context.identityPaths.transcripts, "session-1") })
+    const first = { kind: "assistant", messageId: "first", textBlocks: ["One."] } as const
+    const second = { kind: "assistant", messageId: "second", textBlocks: ["Two."] } as const
+    const toolOnly = { kind: "assistant", messageId: "tool", toolCalls: [{ callId: "call", name: "read" }] } as const
+    await journal.reconcile([first])
+    bridge.attach("session-1")
+    await bridge.syncJournal([first, second, toolOnly])
+    await bridge.syncJournal([first, second, toolOnly])
+    expect(host.emits).toHaveLength(1)
+    expect(host.emits[0]?.data).toMatchObject({
+      journal: { totalSteps: 2, reflectedSteps: 0 }, reflection: { backlogSteps: 2 },
+    })
+    // A completed reflection may advance the cursor while the new answer is not journaled yet.
+    await writeTranscriptState(context, "session-1", {
+      total_completed_steps: 1, reflected_completed_steps: 1, steps_since_last_successful_reflection: 0,
+    })
+    await bridge.sync()
+    expect(host.emits.at(-1)?.data).toMatchObject({
+      journal: { totalSteps: 2, reflectedSteps: 1 }, reflection: { backlogSteps: 1 },
+    })
+    // A branch that omits the already observed answer cannot rewind the session's step count.
+    await bridge.syncJournal([first])
+    expect(host.emits).toHaveLength(2)
+    bridge.attach("session-2")
+    await bridge.syncJournal([toolOnly])
+    expect(host.emits.at(-1)?.data).toMatchObject({
+      journal: { sessionId: "session-2", totalSteps: 0 }, reflection: { backlogSteps: 0 },
+    })
+  })
+
+  test("#given an old binding with queued snapshots #when a new session attaches #then its delivery does not wait for or reuse the retired queue", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<string>()
+    let builds = 0
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined,
+      createGitRepo: () => stubRepo({
+        head: () => {
+          if (++builds !== 1) return Promise.resolve("new")
+          entered.resolve()
+          return release.promise
+        },
+      }),
+    })
+    bridge.attach("old")
+    const first = bridge.sync()
+    await entered.promise
+    const queued = bridge.sync()
+    bridge.attach("new")
+    try {
+      await bridge.sync()
+      expect(host.emits.map(({ data }) => (data as MemoryRpcSnapshot).journal.sessionId)).toEqual(["new"])
+    } finally {
+      release.resolve("old")
+      await Promise.all([first, queued])
+    }
+    expect(builds).toBe(2)
+    expect(host.emits).toHaveLength(1)
+  })
+
+  test("#given overlapping publications #when the first snapshot is held #then the next build waits for its publication", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<string>()
+    let builds = 0
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () => stubRepo({
+        head: () => {
+          builds += 1
+          if (builds === 1) {
+            entered.resolve()
+            return release.promise
+          }
+          return Promise.resolve("newer")
+        },
+      }),
+    })
+    bridge.attach("session-1")
+    const first = bridge.sync()
+    await entered.promise
+    const second = bridge.sync()
+    try {
+      expect(builds).toBe(1)
+    } finally {
+      release.resolve("older")
+      await Promise.all([first, second])
+    }
+    expect(host.emits.map(({ data }) => (data as MemoryRpcSnapshot).repo.headSha)).toEqual(["older", "newer"])
+  })
+
   test.each(["cancel", "attach", "detach"] as const)(
     "#given a pending status snapshot #when %s retires its observer #then it cannot publish into the next binding",
     async (retire) => {
