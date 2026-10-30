@@ -2647,6 +2647,7 @@
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
         "src/sync/item/test-support.ts",
+        "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",
         "src/sync/space/test-support.ts",
       ],
