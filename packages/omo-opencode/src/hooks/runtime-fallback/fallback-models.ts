@@ -1,8 +1,9 @@
 import type { OhMyOpenCodeConfig } from "../../config"
-import type { FallbackModelObject } from "../../config/schema/fallback-models"
+import { FallbackModelObjectSchema, type FallbackModelObject } from "../../config/schema/fallback-models"
 import { agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
+import { getSessionFallbackSnapshot } from "../../shared/session-fallback-snapshot"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 
@@ -16,9 +17,7 @@ export function getFallbackModelsForSession(
   agent: string | undefined,
   pluginConfig: OhMyOpenCodeConfig | undefined
 ): string[] {
-  if (!pluginConfig) return []
-
-  const raw = getRawFallbackModelsForSession(sessionID, agent, pluginConfig)
+  const raw = getRawFallbackModels(sessionID, agent, pluginConfig)
   return flattenToFallbackModelStrings(raw) ?? []
 }
 
@@ -32,6 +31,17 @@ export function getRawFallbackModels(
   agent: string | undefined,
   pluginConfig: OhMyOpenCodeConfig | undefined,
 ): (string | FallbackModelObject)[] | undefined {
+  const snapshot = getSessionFallbackSnapshot(sessionID)
+  if (snapshot !== undefined) {
+    return snapshot.flatMap(({ providers, model, reasoningEffort, ...settings }) => {
+      const effort = FallbackModelObjectSchema.shape.reasoningEffort.safeParse(reasoningEffort)
+      return providers.map((provider) => ({
+        model: `${provider}/${model}`,
+        ...settings,
+        ...(effort.success && effort.data ? { reasoningEffort: effort.data } : {}),
+      }))
+    })
+  }
   if (!pluginConfig) return undefined
   return getRawFallbackModelsForSession(sessionID, agent, pluginConfig)
 }

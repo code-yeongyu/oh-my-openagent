@@ -5,6 +5,7 @@ export interface RunOptions {
   message: string
   agent?: string
   model?: string
+  profile?: string
   timestamp?: boolean
   verbose?: boolean
   directory?: string

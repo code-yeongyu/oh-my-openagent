@@ -81,6 +81,8 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       const isContentFilterError = extractErrorName(error)?.toLowerCase().replace(/[_-]/g, "") === "contentfiltererror"
       const shouldOverrideRetry = Boolean(retrySignal && timeoutEnabled) || isContentFilterError
       let state = sessionStates.get(sessionID)
+      const observedAttemptCount = state?.attemptCount
+      const observedModel = state?.currentModel
       const pendingFallbackModel = state?.pendingFallbackModel
       const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
       if (
@@ -152,6 +154,17 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+      // Context lookup yields to the other error surfaces. Do not replace or
+      // prepare a generation another event/request started while it was pending.
+      if (
+        sessionStates.get(sessionID) !== state
+        || sessionRetryInFlight.has(sessionID)
+        || state?.attemptCount !== observedAttemptCount
+        || state?.currentModel !== observedModel
+      ) {
+        log(`[${HOOK_NAME}] message.updated fallback skipped - retry generation changed during context lookup`, { sessionID })
+        return
+      }
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {

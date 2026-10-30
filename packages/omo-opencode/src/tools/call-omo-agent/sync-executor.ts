@@ -11,6 +11,8 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { deleteSessionTools, setSessionTools } from "../../shared/session-tools-store"
+import { setCallOmoAgentSessionConfig } from "../../shared/call-omo-agent-session-config"
+import { registerSyncChildPromptExecution } from "../../shared/sync-child-prompt-hold"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
@@ -89,6 +91,7 @@ export async function executeSync(
   let sessionID: string | undefined
   let createdSessionForExecution = false
   let appliedFallbackChain = false
+  let unregisterPromptExecution: ((completed?: boolean) => void) | undefined
 
   try {
     const session = await deps.createOrGetSession(args, toolContext, ctx, model)
@@ -100,6 +103,7 @@ export async function executeSync(
 
     if (session.isNew) {
       spawnReservation?.commit()
+      setCallOmoAgentSessionConfig(sessionID, { model, fallbackChain })
     }
 
     if (fallbackChain && fallbackChain.length > 0) {
@@ -107,7 +111,9 @@ export async function executeSync(
       appliedFallbackChain = true
     }
 
-    applySessionPromptParams(sessionID, model)
+    if (!args.session_id) {
+      applySessionPromptParams(sessionID, model)
+    }
 
     await Promise.resolve(
       toolContext.metadata?.({
@@ -135,6 +141,18 @@ export async function executeSync(
         return `Error: Failed to send prompt: prompt is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
       }
 
+      const promptInput = {
+        path: { id: sessionID },
+        body: {
+          agent: promptAgent,
+          tools: promptTools,
+          parts: [{ type: "text" as const, text: args.prompt }],
+          ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
+          ...(model?.variant ? { variant: model.variant } : {}),
+          ...buildPromptGenerationParams(model),
+        },
+      }
+      unregisterPromptExecution = registerSyncChildPromptExecution(sessionID, toolContext.abort, promptInput)
       const promptResult = await dispatchInternalPrompt({
         mode: "sync",
         client: ctx.client,
@@ -142,17 +160,7 @@ export async function executeSync(
         source: "call-omo-agent:sync",
         settleMs: 0,
         queueBehavior: "defer",
-        input: {
-          path: { id: sessionID },
-          body: {
-            agent: promptAgent,
-            tools: promptTools,
-            parts: [{ type: "text", text: args.prompt }],
-            ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
-            ...(model?.variant ? { variant: model.variant } : {}),
-            ...buildPromptGenerationParams(model),
-          },
-        },
+        input: promptInput,
       })
       const promptMayHaveBeenAccepted = promptResult.status === "failed"
         && isAmbiguousPostDispatchPromptFailure(promptResult)
@@ -181,12 +189,14 @@ export async function executeSync(
     await deps.waitForCompletion(sessionID, toolContext, ctx)
 
     const responseText = await deps.processMessages(sessionID, ctx)
+    unregisterPromptExecution?.(true)
 
     return responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
   } catch (error) {
     spawnReservation?.rollback()
     throw error
   } finally {
+    unregisterPromptExecution?.()
     if (sessionID && appliedFallbackChain) {
       deps.clearSessionFallbackChain(sessionID)
     }

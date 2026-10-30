@@ -5,6 +5,7 @@ import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared/runtime-fallback
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+import { createRequestSnapshotStore } from "../../plugin/request-snapshots"
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
@@ -59,6 +60,35 @@ function createDeps(promptCalls: { count: number }): HookDeps {
 }
 
 describe("createAutoRetryHelpers", () => {
+  test("a queued retry acquires the exact user snapshot before asynchronous metadata lookup", async () => {
+    const store = createRequestSnapshotStore<string>()
+    const sessionID = "snapshot-queued-runtime"
+    store.set(sessionID, "original-user", "original-profile")
+    const deps = createDeps({ count: 0 })
+    deps.requestSnapshotRecovery = (id) => store.capture(id, "runtime")
+    let resolveMessages!: (value: unknown) => void
+    let response: unknown
+    deps.ctx.client.session.messages = async () => response ?? await new Promise((resolve) => {
+      resolveMessages = (value) => { response = value; resolve(value) }
+    })
+    deps.sessionStates.set(sessionID, createFallbackState("openai/primary"))
+    const helpers = createAutoRetryHelpers(deps)
+    const pending = helpers.autoRetryWithFallback(sessionID, "openai/backup", "explore", "session.error")
+    const event = store.capture(sessionID)
+    event.complete({ parentID: "original-user", error: { name: "APIError" }, time: { completed: 1 } }); event.release()
+    store.set(sessionID, "later-user", "later-profile")
+    expect(store.get(sessionID, "original-user")).toBe("original-profile")
+    resolveMessages({ data: [{ info: { id: "original-user", role: "user" }, parts: [{ type: "text", text: "original prompt" }] }] })
+    const outcome = await pending
+    expect(outcome.accepted).toBe(true)
+    expect(store.get(sessionID, "original-user")).toBe("original-profile")
+    store.resume(sessionID, "original-user")
+    const final = store.capture(sessionID)
+    final.complete({ parentID: "original-user", finish: "stop", time: { completed: 2 } }); final.release()
+    expect(store.get(sessionID, "original-user")).toBeUndefined()
+    expect(store.get(sessionID, "later-user")).toBe("later-profile")
+  })
+
   test("#given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted", async () => {
     // given
     const promptCalls = { count: 0 }

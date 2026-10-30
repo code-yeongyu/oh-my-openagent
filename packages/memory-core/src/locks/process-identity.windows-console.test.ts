@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
 
-// The lock protocol re-probes process start identity on every memory write and on every recorded
-// run pid it revalidates. On win32 the in-process kernel32 reader answers first, but it reaches
-// kernel32 through bun:ffi - under a Node runtime that import throws, the reader caches null and
-// the PowerShell fallback below becomes the STEADY-STATE path. powershell.exe is a console
-// binary, so without windowsHide each of those probes flashes a console and steals focus (#8501).
+// Namespace spies hide unused exports from Knip. Module mocks survive mock.restore(). Run the
+// fallback probe in its own test process so neither source coverage nor later native probes change.
+const CHILD_PROBE_ENV = "OMO_PROCESS_IDENTITY_CONSOLE_PROBE"
+const POWERSHELL_INSTANT = "2026-09-19T15:04:05.0000000Z"
+
+afterEach(() => {
+  mock.restore()
+})
 
 interface CapturedExecFile {
   readonly command: string
@@ -12,9 +15,7 @@ interface CapturedExecFile {
   readonly options: Record<string, unknown>
 }
 
-const POWERSHELL_INSTANT = "2026-09-19T15:04:05.0000000Z"
-
-function captureExecFile(): CapturedExecFile[] {
+async function probeConsoleFallback(): Promise<void> {
   const captured: CapturedExecFile[] = []
   mock.module("node:child_process", () => ({
     execFile: (
@@ -28,40 +29,47 @@ function captureExecFile(): CapturedExecFile[] {
       return {}
     },
   }))
-  return captured
-}
-
-function forceStartTimeFastPathUnavailable(): void {
   mock.module("./process-start-time", () => ({
     readDarwinProcessStartSeconds: async () => null,
     readWin32ProcessCreationFiletime: async () => null,
   }))
+  const realPlatform = process.platform
+  try {
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true })
+    const { getPidLiveness, getProcessStartIdentity } = await import("./process-identity")
+    const livePid = process.ppid
+    expect(getPidLiveness(livePid)).not.toBe("dead")
+    const identity = await getProcessStartIdentity(livePid)
+    expect(captured).toHaveLength(1)
+    expect(captured[0]?.command).toBe("powershell.exe")
+    expect(captured[0]?.options.windowsHide).toBe(true)
+    expect(identity).toBe(`win32-creation-date:${POWERSHELL_INSTANT}`)
+  } finally {
+    Object.defineProperty(process, "platform", { value: realPlatform, configurable: true })
+  }
 }
 
 describe("process start identity win32 console suppression", () => {
-  const realPlatform = process.platform
-
-  afterEach(() => {
-    Object.defineProperty(process, "platform", { value: realPlatform, configurable: true })
-    mock.restore()
-  })
-
   describe("#given a win32 host whose in-process start-time reader cannot answer", () => {
     describe("#when the lock protocol probes a live pid", () => {
       test("#then the powershell fallback is spawned with windowsHide: true", async () => {
-        const captured = captureExecFile()
-        forceStartTimeFastPathUnavailable()
-        Object.defineProperty(process, "platform", { value: "win32", configurable: true })
-        const { getPidLiveness, getProcessStartIdentity } = await import("./process-identity")
-        const livePid = process.ppid
-        expect(getPidLiveness(livePid)).not.toBe("dead")
-
-        const identity = await getProcessStartIdentity(livePid)
-
-        expect(captured).toHaveLength(1)
-        expect(captured[0]?.command).toBe("powershell.exe")
-        expect(captured[0]?.options.windowsHide).toBe(true)
-        expect(identity).toBe(`win32-creation-date:${POWERSHELL_INSTANT}`)
+        if (process.env[CHILD_PROBE_ENV] === "1") {
+          await probeConsoleFallback()
+          return
+        }
+        const child = Bun.spawn([process.execPath, "test", import.meta.path], {
+          env: { ...process.env, [CHILD_PROBE_ENV]: "1" },
+          stdout: "pipe",
+          stderr: "pipe",
+        })
+        const [stdout, stderr, exitCode] = await Promise.all([
+          new Response(child.stdout).text(),
+          new Response(child.stderr).text(),
+          child.exited,
+        ])
+        expect({ exitCode, output: exitCode === 0 ? "" : stdout + stderr }).toEqual({ exitCode: 0, output: "" })
+        expect(stderr).toContain("1 pass")
+        expect(stderr).toContain("5 expect() calls")
       })
     })
   })

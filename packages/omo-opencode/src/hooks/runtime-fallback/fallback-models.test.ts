@@ -1,13 +1,56 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { getFallbackModelsForSession } from "./fallback-models"
+import { getFallbackModelsForSession, getRawFallbackModels } from "./fallback-models"
 import { detectAgentFromSession, resolveAgentForSession } from "./agent-resolver"
+import { setSessionFallbackSnapshot, clearSessionFallbackSnapshot } from "../../shared/session-fallback-snapshot"
+import { registerDelegatedChildSessionBootstrap, clearAllDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
+import { createModelFallbackStateController } from "../model-fallback/fallback-state-controller"
+import { applyUserConfiguredFallbackChain } from "../../plugin/event-model-fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 describe("runtime-fallback fallback-models", () => {
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    clearAllDelegatedChildSessionBootstrap()
+  })
+
+  test("both error fallback systems use the delegated dispatch snapshot instead of startup agent/category config", () => {
+    const sessionID = "ses_hot_reload_snapshot"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    const pluginConfig = { agents: { explore: { fallback_models: ["premium/startup"] } }, categories: { quick: { fallback_models: ["premium/category"] } } }
+    registerDelegatedChildSessionBootstrap({
+      sessionID,
+      promptText: "delegated work",
+      fallbackChain: [{ providers: ["budget"], model: "backup", variant: "low", temperature: 0.2 }],
+    })
+    expect(getRawFallbackModels(sessionID, "explore", pluginConfig)).toEqual([{ model: "budget/backup", variant: "low", temperature: 0.2 }])
+    expect(getFallbackModelsForSession(sessionID, "explore", pluginConfig)).toEqual(["budget/backup(low)"])
+    const controller = createModelFallbackStateController({ pendingModelFallbacks: new Map(), lastToastKey: new Map(), sessionFallbackChains: new Map() })
+    applyUserConfiguredFallbackChain(controller, sessionID, "explore", "budget", pluginConfig)
+    expect(controller.getSessionFallbackChain(sessionID)).toMatchObject([{ providers: ["budget"], model: "backup", variant: "low", temperature: 0.2 }])
+  })
+
+  test("a delegated snapshot without fallbacks suppresses startup fallback inheritance", () => {
+    const sessionID = "ses_hot_reload_empty"
+    const pluginConfig = { agents: { explore: { fallback_models: ["premium/startup"] } } }
+    registerDelegatedChildSessionBootstrap({ sessionID, promptText: "pinned delegated work", fallbackChain: undefined })
+    expect(getFallbackModelsForSession(sessionID, "explore", pluginConfig)).toEqual([])
+    const controller = createModelFallbackStateController({ pendingModelFallbacks: new Map(), lastToastKey: new Map(), sessionFallbackChains: new Map() })
+    applyUserConfiguredFallbackChain(controller, sessionID, "explore", "budget", pluginConfig)
+    expect(controller.getSessionFallbackChain(sessionID)).toEqual([])
+    expect(controller.setPendingModelFallback(sessionID, "explore", "budget", "pinned")).toBe(false)
+  })
+
+  test("a primary session can register a selected profile chain without a delegated bootstrap", () => {
+    const pluginConfig = { agents: { sisyphus: { fallback_models: ["premium/startup"] } } }
+    setSessionFallbackSnapshot("parent", [{ providers: ["budget", "backup-provider"], model: "profile-backup" }])
+    expect(getFallbackModelsForSession("parent", "sisyphus", pluginConfig)).toEqual(["budget/profile-backup", "backup-provider/profile-backup"])
+    const controller = createModelFallbackStateController({ pendingModelFallbacks: new Map(), lastToastKey: new Map(), sessionFallbackChains: new Map() })
+    applyUserConfiguredFallbackChain(controller, "parent", "sisyphus", "budget", pluginConfig)
+    expect(controller.getSessionFallbackChain("parent")).toEqual([{ providers: ["budget", "backup-provider"], model: "profile-backup" }])
+    clearSessionFallbackSnapshot("parent")
+    expect(getFallbackModelsForSession("parent", "sisyphus", pluginConfig)).toEqual(["premium/startup"])
   })
 
   test("uses category fallback_models when session category is registered", () => {

@@ -1,3 +1,4 @@
+import type { SessionModelProfiles } from "./plugin/session-model-profiles"
 import type { AvailableCategory, AvailableSkill } from "./agents/dynamic-agent-prompt-builder"
 import type { OhMyOpenCodeConfig } from "./config"
 import type { BrowserAutomationProvider } from "./config/schema/browser-automation"
@@ -22,6 +23,7 @@ type CreateToolsResult = {
 export async function createTools(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
+  sessionModelProfiles?: SessionModelProfiles
   managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor" | "monitorManager">
 }): Promise<CreateToolsResult> {
   const { ctx, pluginConfig, managers } = args
@@ -36,6 +38,7 @@ export async function createTools(args: {
   const { filteredTools, taskSystemEnabled } = createToolRegistry({
     ctx,
     pluginConfig,
+    sessionModelProfiles: args.sessionModelProfiles,
     managers,
     skillContext,
     availableCategories,

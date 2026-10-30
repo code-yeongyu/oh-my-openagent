@@ -155,4 +155,26 @@ describe("applyOmoConfigEdit", () => {
     // then
     expect(next).toBe(expected)
   })
+
+  test.each([
+    ['{ "agents": {"oracle": {"model":"p/a",}},}', ["agents", "oracle", "model"], { agents: { oracle: {} } }],
+    ['{"agents":{"oracle":{"models":["p/a","p/b"],}},"task":{"default_concurrency":2}}', ["agents", "oracle", "models"], { agents: { oracle: {} }, task: { default_concurrency: 2 } }],
+    ['{"[opencode]":{"default_run_agent":"oracle",},"other":true}', ["[opencode]", "default_run_agent"], { "[opencode]": {}, other: true }],
+  ])("#given compact sole trailing-comma member in %p #when removed #then parent and outside siblings survive", (content, path, expected) => {
+    const next = applyOmoConfigEdit(content, { path, value: undefined })
+    expect(parsed(next)).toEqual(expected)
+  })
+
+  test("#given a compact sole member surrounded by comments #when removed #then surrounding comments stay byte-identical", () => {
+    const content = '{"agents":{"oracle":{/* before */ "model":"p/a" /* after value */, /* after comma */}},"other":true}'
+    const next = applyOmoConfigEdit(content, { path: ["agents", "oracle", "model"], value: undefined })
+    expect(next).toBe('{"agents":{"oracle":{/* before */  /* after value */ /* after comma */}},"other":true}')
+    expect(parsed(next)).toEqual({ agents: { oracle: {} }, other: true })
+  })
+
+  test("#given several compact members and trailing commas #when last removed #then other members survive", () => {
+    const content = '{"agents":{"oracle":{"model":"p/a","temperature":0.5,}},"other":true}'
+    const next = applyOmoConfigEdit(content, { path: ["agents", "oracle", "temperature"], value: undefined })
+    expect(parsed(next)).toEqual({ agents: { oracle: { model: "p/a" } }, other: true })
+  })
 })

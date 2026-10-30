@@ -14,7 +14,9 @@ import {
 } from "../shared/background-output-consumption";
 import { resetMessageCursor } from "../shared";
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
+import { clearSessionFallbackSnapshot } from "../shared/session-fallback-snapshot";
 import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
+import { clearCallOmoAgentSessionFallbackChain } from "../shared/call-omo-agent-session-config";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id";
@@ -144,6 +146,8 @@ export async function handleSessionDeletedEvent(args: {
   args.firstMessageVariantGate.clear(sessionID);
   clearSessionModel(sessionID);
   clearSessionPromptParams(sessionID);
+  clearSessionFallbackSnapshot(sessionID);
+  clearCallOmoAgentSessionFallbackChain(sessionID);
   syncSubagentSessions.delete(sessionID);
   if (!isBtwSideSession) {
     await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });

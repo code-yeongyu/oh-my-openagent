@@ -41,6 +41,7 @@ export function createModelFallbackEventHandler(args: {
   isRuntimeFallbackEnabled: boolean;
   shouldAutoRetrySession: (sessionID: string) => boolean;
   isSessionStopped: (sessionID: string) => boolean;
+  isSessionProfileSelected?: (sessionID: string) => boolean;
 }) {
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
@@ -57,9 +58,14 @@ export function createModelFallbackEventHandler(args: {
   const continuation = createModelFallbackContinuationController({
     pluginConfig: args.pluginConfig,
     pluginContext: args.pluginContext,
+    resolveSelectedProfileFallback: (sessionID) => args.isSessionProfileSelected?.(sessionID)
+      ? args.modelFallback?.getNextFallback(sessionID) ?? null
+      : undefined,
     lastKnownModelBySession,
     continuationsInFlight,
     lastDispatchedContinuationKeys,
+    isSessionStopped: args.isSessionStopped,
+    resolveSyncChildFallback: (sessionID) => args.modelFallback?.getNextFallback(sessionID) ?? null,
   });
 
   const clearSession = (sessionID: string): void => {

@@ -1,7 +1,9 @@
+import type { SessionModelProfiles } from "./plugin/session-model-profiles"
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { OhMyOpenCodeConfig } from "./config"
 
 import { applyAgentVariant } from "./shared/agent-variant"
+import { isSyntheticOrInternalOnlyTextParts } from "./shared"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
@@ -21,6 +23,7 @@ import type { Managers } from "./create-managers"
 export function createPluginInterface(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
+  sessionModelProfiles?: SessionModelProfiles
   firstMessageVariantGate: {
     shouldOverride: (sessionID: string) => boolean
     markApplied: (sessionID: string) => void
@@ -39,9 +42,10 @@ export function createPluginInterface(args: {
 
     "chat.params": async (input: unknown, output: unknown) => {
       const chatParamsInput = input as {
+        sessionID?: string
         agent?: string | { name?: string }
         model?: { providerID?: unknown; modelID?: unknown; id?: unknown }
-        message?: { variant?: string }
+        message?: { variant?: string; id?: string }
       }
       const agentName =
         typeof chatParamsInput.agent === "string"
@@ -51,7 +55,8 @@ export function createPluginInterface(args: {
       const rawModelID = chatParamsInput.model?.modelID ?? chatParamsInput.model?.id
       const modelID = typeof rawModelID === "string" ? rawModelID : undefined
       if (chatParamsInput.message && typeof providerID === "string" && modelID !== undefined) {
-        applyAgentVariant(pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
+        const modelConfig = chatParamsInput.sessionID ? args.sessionModelProfiles?.primaryConfig(chatParamsInput.sessionID, chatParamsInput.message?.id) : undefined
+        applyAgentVariant(modelConfig ? { ...pluginConfig, ...modelConfig } : pluginConfig, agentName, chatParamsInput.message, { providerID, modelID })
       }
       const handler = createChatParamsHandler({
         client: ctx.client,
@@ -63,17 +68,26 @@ export function createPluginInterface(args: {
 
     "command.execute.before": createCommandExecuteBeforeHandler({
       directory: ctx.directory,
+      sessionModelProfiles: args.sessionModelProfiles,
       hooks,
       mcpManager: managers.skillMcpManager,
       notify: (message) => showSkillSecurityNotice(ctx, message),
+      notifyProfile: (message, variant) => {
+        void ctx.client.tui?.showToast?.({ body: { title: "Session model profile", message, variant, duration: 8000 } })?.catch(() => {})
+      },
     }),
 
-    "chat.message": createChatMessageHandler({
-      ctx,
-      pluginConfig,
-      firstMessageVariantGate,
-      hooks,
-    }),
+    "chat.message": async (input, output) => {
+      const selected = !isSyntheticOrInternalOnlyTextParts(output.parts)
+        ? await args.sessionModelProfiles?.applyPrimary(input.sessionID, input.agent ?? (typeof output.message.agent === "string" ? output.message.agent : undefined), output.message)
+        : args.sessionModelProfiles?.resumeRequest(input.sessionID, output.message.id)
+      await createChatMessageHandler({
+        ctx,
+        pluginConfig: selected ? { ...pluginConfig, ...selected } : pluginConfig,
+        firstMessageVariantGate,
+        hooks,
+      })(selected && output.message.model ? { ...input, model: output.message.model as { providerID: string; modelID: string } } : input, output)
+    },
 
     "experimental.chat.messages.transform": createMessagesTransformHandler({
       hooks,
@@ -88,6 +102,7 @@ export function createPluginInterface(args: {
     config: managers.configHandler,
 
     event: createEventHandler({
+      sessionModelProfiles: args.sessionModelProfiles,
       ctx,
       pluginConfig,
       firstMessageVariantGate,

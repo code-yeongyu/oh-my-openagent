@@ -10,6 +10,8 @@ import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
 import { configureRuntimeCommands } from "./runtime-commands"
 import { runConfigMigrate } from "./config-migrate"
+import { runConfigEditor, type ConfigEditorOptions } from "./config-editor"
+import { runConfigModels, type ConfigModelsOptions } from "./config-models"
 import { availableInstallPlatforms } from "./native-dev-platform-flag"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
@@ -108,6 +110,7 @@ program
   .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-m, --model <provider/model>", "Model override (e.g., anthropic/claude-sonnet-4)")
+  .option("--profile <name>", "Named OMO configuration profile (requires a new server)")
   .option("-d, --directory <path>", "Working directory")
   .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
   .option("--attach <url>", "Attach to existing opencode server URL")
@@ -150,6 +153,7 @@ Unlike 'opencode run', this command waits until:
       message,
       agent: options.agent,
       model: options.model,
+      profile: options.profile,
       directory: options.directory,
       port: options.port,
       attach: options.attach,
@@ -216,9 +220,20 @@ Examples:
     process.exit(exitCode)
   })
 
-program
+const configCommand = program
   .command("config")
   .description("Manage unified OMO configuration")
+
+configCommand
+  .command("models")
+  .description("Map declared OpenCode agent/category models by config source and section (read-only)")
+  .option("-d, --directory <path>", "Working directory to load configuration from")
+  .option("--json", "Print machine-readable model declarations and diagnostics")
+  .action((options: ConfigModelsOptions) => {
+    process.exit(runConfigModels(options))
+  })
+
+configCommand
   .command("migrate")
   .description("Migrate legacy OMO configuration into ~/.omo/omo.jsonc")
   .option("--dry-run", "Print the transform, backup move plan, and conflicts without new migration writes")
@@ -226,6 +241,15 @@ program
   .action((options: ConfigMigrateCommandOptions) => {
     const exitCode = runConfigMigrate({ dryRun: options.dryRun ?? false, json: options.json ?? false })
     process.exit(exitCode)
+  })
+
+configCommand
+  .command("edit")
+  .description("Interactively edit unified OMO configuration with backups and validation")
+  .option("-d, --directory <path>", "Project directory for configuration discovery")
+  .option("-f, --file <path>", "Edit an explicit omo.json or omo.jsonc file")
+  .action(async (options: ConfigEditorOptions) => {
+    process.exit(await runConfigEditor(options))
   })
 
 configureRuntimeCommands(program)

@@ -19,6 +19,7 @@ import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failur
 import { resolveOriginalUserRetryMetadata } from "./auto-retry-metadata"
 import { stringifyRuntimeModelWithVariant } from "./fallback-state"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
+import { captureSyncChildPromptHold } from "../../shared/sync-child-prompt-hold"
 
 export function createAutoRetryDispatcher(
   deps: HookDeps,
@@ -71,6 +72,7 @@ export function createAutoRetryDispatcher(
       return { accepted: false, status: "blocked", reason: "stale fallback generation" }
     }
     const previousCurrentModel = fallbackState?.currentModel
+    const syncHold = captureSyncChildPromptHold(sessionID)
     const previousPendingFallbackModel = fallbackState?.pendingFallbackModel
     const previousPendingFallbackPromptMayHaveBeenAccepted = fallbackState?.pendingFallbackPromptMayHaveBeenAccepted
     const effectiveRetryModel = stringifyRuntimeModelWithVariant(
@@ -84,6 +86,7 @@ export function createAutoRetryDispatcher(
     sessionRetryInFlight.add(sessionID)
     let retryDispatched = false
     let retryMayHaveBeenAccepted = false
+    const snapshotLease = deps.requestSnapshotRecovery?.(sessionID)
     let acceptedStatus: AutoRetryDispatchOutcome["status"] = "dispatched"
     try {
       const messagesResp = await ctx.client.session.messages({
@@ -91,6 +94,11 @@ export function createAutoRetryDispatcher(
         query: { directory: ctx.directory },
       })
       if (!isCurrentFallbackGeneration()) return staleGenerationOutcome()
+      if (syncHold) {
+        if (!syncHold.isTerminalFailure(messagesResp)) return staleGenerationOutcome()
+        const outcome = syncHold.release(`runtime-fallback:${source}:completed-sync`)
+        if (outcome === "superseded" || outcome === "unsettled") return staleGenerationOutcome()
+      }
 
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
       const originalRetryMetadata = resolveOriginalUserRetryMetadata(messagesResp)
@@ -118,6 +126,7 @@ export function createAutoRetryDispatcher(
               return [createRuntimeFallbackRetryTextPart("continue")]
             })()
       const retryMessageID = usingFetchedUserParts ? originalRetryMetadata.messageID : undefined
+      snapshotLease?.bind(retryMessageID)
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
         sessionID,
         model: newModel,
@@ -145,17 +154,28 @@ export function createAutoRetryDispatcher(
       // Our own abort leaves a dangling assistant turn with no terminal error, which
       // the gate's assistant-active check would treat as blocking forever. Skip it.
       const wasInternallyAborted = internallyAbortedSessions.has(sessionID)
-      const dispatchRetryPrompt = (retrySource: string, queueBehavior?: "defer") => dispatchInternalPrompt({
-        mode: "async",
-        client: ctx.client,
-        sessionID,
-        source: retrySource,
-        settleMs: 0,
-        ...(queueBehavior ? { queueBehavior } : {}),
-        ...(wasInternallyAborted ? { checkToolState: false } : {}),
-        shouldDispatch: isCurrentFallbackGeneration,
-        input: retryPromptInput,
-      })
+      const dispatchRetryPrompt = async (retrySource: string, queueBehavior?: "defer") => {
+        let confirmRecoveryHold: (() => void) | undefined
+        const result = await dispatchInternalPrompt({
+          mode: "async",
+          client: ctx.client,
+          sessionID,
+          source: retrySource,
+          settleMs: 0,
+          ...(queueBehavior ? { queueBehavior } : {}),
+          ...(wasInternallyAborted ? { checkToolState: false } : {}),
+          // getLastUserRetryPayload consumes bootstrap data after the hold release;
+          // the live invocation/abort identity must still survive until dispatch.
+          shouldDispatch: () => {
+            if (!isCurrentFallbackGeneration() || syncHold && !syncHold.isExecutionCurrent()) return false
+            confirmRecoveryHold = syncHold?.captureRecoveryHold(retrySource, retryPromptInput)
+            return true
+          },
+          input: retryPromptInput,
+        })
+        if (result.status === "dispatched") confirmRecoveryHold?.()
+        return result
+      }
 
       if (!isCurrentFallbackGeneration()) return staleGenerationOutcome()
       let promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}`, "defer")
@@ -246,6 +266,8 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
       return { accepted: false, status: "failed", reason: retryError.message }
     } finally {
+      if (retryDispatched || retryMayHaveBeenAccepted) snapshotLease?.commit()
+      else snapshotLease?.release()
       const ownsFallbackGeneration = isCurrentFallbackGeneration()
       if (ownsFallbackGeneration) {
         sessionRetryInFlight.delete(sessionID)

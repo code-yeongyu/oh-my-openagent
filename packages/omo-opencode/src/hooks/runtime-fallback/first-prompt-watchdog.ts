@@ -142,6 +142,8 @@ export function createFirstPromptWatchdog(
       return
     }
 
+    const snapshotLease = deps.requestSnapshotRecovery?.(sessionID)
+    try {
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
 
@@ -191,6 +193,9 @@ export function createFirstPromptWatchdog(
       resolvedAgent,
       source: SOURCE,
     })
+    } finally {
+      snapshotLease?.release()
+    }
   }
 
   return {

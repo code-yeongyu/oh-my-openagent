@@ -1,4 +1,5 @@
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
+import type { RequestSnapshotLease } from "../../plugin/request-snapshots"
 
 export interface RuntimeFallbackInterval {
   unref: () => void
@@ -72,12 +73,14 @@ export interface RuntimeFallbackOptions {
 }
 
 export interface RuntimeFallbackHook {
+  setRequestSnapshotRecovery?: (begin: (sessionID: string) => RequestSnapshotLease) => void
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
   "chat.message"?: (input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string }; variant?: string }, output: { message: { model?: { providerID: string; modelID: string }; variant?: string }; parts?: Array<{ type: string; text?: string }> }) => Promise<void>
   dispose?: () => void
 }
 
 export interface HookDeps {
+  requestSnapshotRecovery?: (sessionID: string) => RequestSnapshotLease
   ctx: RuntimeFallbackPluginInput
   config: Required<RuntimeFallbackConfig>
   options: RuntimeFallbackOptions | undefined

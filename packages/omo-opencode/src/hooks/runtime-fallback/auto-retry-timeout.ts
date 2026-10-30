@@ -63,6 +63,8 @@ export function createFallbackTimeoutHelpers(
         return
       }
       const state = fallbackState
+      const snapshotLease = deps.requestSnapshotRecovery?.(sessionID)
+      try {
 
       if (sessionRetryInFlight.has(sessionID)) {
         log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
@@ -106,6 +108,9 @@ export function createFallbackTimeoutHelpers(
             reason: dispatchOutcome.reason,
           })
         }
+      }
+      } finally {
+        snapshotLease?.release()
       }
     }, timeoutMs)
 
