@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "loro-crdt": "1.16.4",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "zod": "^4.6.5"
   }
 }
