@@ -309,5 +309,8 @@ test("#given a link out of own memory, an unresolvable segment and dot-dot #when
     expect(result).toBeUndefined()
     return
   }
-  expect(result?.block).toBe(true)
+  expect(result).toEqual({
+    block: true,
+    reason: `cross-identity memory access denied: vendor_read to ${raw} belongs to another memory identity`,
+  })
 })
