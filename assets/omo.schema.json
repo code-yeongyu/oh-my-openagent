@@ -1621,6 +1621,30 @@
     "model_profile": {
       "type": "string"
     },
+    "model_pad": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "object",
+          "properties": {
+            "daily": {
+              "type": "string"
+            },
+            "geeky": {
+              "type": "string"
+            },
+            "normal": {
+              "type": "string"
+            },
+            "heavy": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "memory": {
       "type": "object",
       "properties": {
@@ -2031,19 +2055,19 @@
         },
         "projection": {
           "default": {
-            "max_entries_per_directory": 40,
-            "max_bytes": 24576
+            "max_entries_per_directory": 0,
+            "max_bytes": 40960
           },
           "type": "object",
           "properties": {
             "max_entries_per_directory": {
-              "default": 40,
+              "default": 0,
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
             },
             "max_bytes": {
-              "default": 24576,
+              "default": 40960,
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
@@ -4105,6 +4129,30 @@
         },
         "model_profile": {
           "type": "string"
+        },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         },
         "memory": {
           "type": "object",
@@ -6436,6 +6484,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -8765,6 +8837,30 @@
         },
         "model_profile": {
           "type": "string"
+        },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         },
         "memory": {
           "type": "object",
@@ -11102,6 +11198,30 @@
           "model_profile": {
             "type": "string"
           },
+          "model_pad": {
+            "type": "object",
+            "properties": {
+              "labels": {
+                "type": "object",
+                "properties": {
+                  "daily": {
+                    "type": "string"
+                  },
+                  "geeky": {
+                    "type": "string"
+                  },
+                  "normal": {
+                    "type": "string"
+                  },
+                  "heavy": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "memory": {
             "type": "object",
             "properties": {
@@ -13431,6 +13551,30 @@
               },
               "model_profile": {
                 "type": "string"
+              },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               },
               "memory": {
                 "type": "object",
@@ -15762,6 +15906,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -18091,6 +18259,30 @@
               },
               "model_profile": {
                 "type": "string"
+              },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               },
               "memory": {
                 "type": "object",

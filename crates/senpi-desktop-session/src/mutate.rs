@@ -159,7 +159,7 @@ impl Worker {
         if let Err(refused) = self.admit_control(mutation) {
             return (Err(TransactionError::Primary(refused)), None);
         }
-        let _watch = match crate::intervention::admit(&mutation.target) {
+        let _watch = match self.admit_intervention(mutation, cancelled) {
             Ok(watch) => watch,
             Err(refused) => return (Err(TransactionError::Primary(refused)), None),
         };
@@ -306,6 +306,6 @@ mod permission_tests;
 #[cfg(test)]
 mod stop_tests;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 #[cfg(test)]
 mod typing_tests;

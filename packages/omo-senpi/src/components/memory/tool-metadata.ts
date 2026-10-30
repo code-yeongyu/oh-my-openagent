@@ -7,5 +7,6 @@ export const MEMORY_TOOL_DESCRIPTION = [
   "apply_patch accepts Codex-style multi-file or multi-hunk patches through the input field.",
   "",
   "Memory files are markdown documents with YAML frontmatter. Paths must remain inside the memory repo.",
+  "Time-boxed content: its own system/ file with frontmatter expires: <UTC date or ISO instant with Z/offset>, written via apply_patch; it stops being projected then.",
   "read_only blocks cannot be modified. Commits are authored with the bound omo memory identity; the harness will sync after the turn.",
 ].join("\n")
