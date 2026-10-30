@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:7a5e393fe4cf6b3a971dbfe7c1af2f9fbec82e24e0166624f70e68744045976d:605cb96deaac62579ee8022f48aa14faabfd60f1af06599851601bd355b5f102
+// omo-codex-install:23b9e706cb7dc3988d98544ea7dd9f8b4cb8494ee279f6232d25db1e83c7161c:85763fda0af759cd27c9e0e68c39f8a7bee28c86eb8e19161f6aa30f398e07ed
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19647,6 +19647,7 @@ var OmoAgentDefInputSchema = object({
   prompt: string2().optional(),
   model: string2().optional(),
   models: array(OmoAgentModelEntrySchema).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   variant: string2().optional(),
   reasoningEffort: OmoReasoningEffortSchema.optional(),
@@ -19673,6 +19674,7 @@ var OmoCategoryConfigObjectSchema = object({
   description: string2().optional(),
   model: string2().optional(),
   models: array(union([string2(), OmoFallbackModelObjectSchema])).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   temperature: number2().min(0).max(2).optional(),
   top_p: number2().min(0).max(1).optional(),
