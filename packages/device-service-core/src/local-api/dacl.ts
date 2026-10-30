@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+
 import type { SecureFile } from "./access.ts";
 import { LocalApiError } from "./errors.ts";
 
@@ -12,24 +14,19 @@ export type PowerShellRunner = (
 
 export const runPowerShell: PowerShellRunner = async (script, env) => {
   const encoded = Buffer.from(script, "utf16le").toString("base64");
-  const proc = Bun.spawn(
-    [
-      "powershell.exe",
-      "-NoProfile",
-      "-NonInteractive",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-EncodedCommand",
-      encoded,
-    ],
-    { env: { ...process.env, ...env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+  const proc = spawn(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
+    { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
   );
-  const [out, , code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  return { code, out };
+  const chunks: Buffer[] = [];
+  proc.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+  proc.stderr.resume();
+  const code = await new Promise<number>((resolve, reject) => {
+    proc.once("error", reject);
+    proc.once("close", (exitCode) => resolve(exitCode ?? -1));
+  });
+  return { code, out: Buffer.concat(chunks).toString("utf8") };
 };
 
 const APPLY = String.raw`
