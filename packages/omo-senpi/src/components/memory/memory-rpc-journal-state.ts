@@ -5,7 +5,7 @@ import { TranscriptJournal, isCanonicalEntry } from "@oh-my-opencode/memory-core
 
 import type { MemoryIdentityContext } from "./context"
 
-export interface MemoryRpcJournalState {
+interface MemoryRpcJournalState {
   readonly backlogSteps: number
   readonly pendingCompaction: boolean
   readonly totalSteps: number

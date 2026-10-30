@@ -5,7 +5,7 @@ import type { MemoryIdentityContext } from "./context"
 import { projectSessionEntries, readBranchSurface } from "./journal-wiring"
 import { sessionIdFrom } from "./wiring-context"
 
-export interface JournalSettleDeliveryInput {
+interface JournalSettleDeliveryInput {
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
   readonly lastEventCtx: { current?: unknown }
   readonly activeSession: { current?: string }

@@ -3,6 +3,7 @@ import { isCanonicalEntry, projectTranscriptEntries, type GitTreeSizedEntry, typ
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { MEMORY_FACTS_APPLY_RPC_METHOD, type MemoryFactsApplier } from "./facts-apply-rpc"
+import { readMemoryRpcJournalState } from "./memory-rpc-journal-state"
 import { MEMORY_REFLECTIONS_RPC_METHOD, readMemoryReflections } from "./memory-rpc-reflections"
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 import type { SyncStatusReader } from "./sync-status-surface"
@@ -129,6 +130,7 @@ export function createMemoryRpcBridge(
   const treeStats = new Map<string, MemoryTreeStats>()
   let sessionId: string | undefined
   let lastSnapshot: string | undefined
+  let lastPublished: MemoryRpcSnapshot | undefined
   let disposed = false
   let bindingGeneration = 0
   let publication = Promise.resolve()
@@ -157,6 +159,22 @@ export function createMemoryRpcBridge(
     })
   }
 
+  // The settle-time delivery is awaited by the host with no budget, so it refreshes only the
+  // journal fields from local files; repo, health and sync fields come from the last full build.
+  async function buildJournalSnapshot(): Promise<MemoryRpcSnapshot | undefined> {
+    const previous = lastPublished
+    const boundSession = sessionId
+    if (previous === undefined || boundSession === undefined || disposed) return buildSnapshot()
+    const context = deps.resolveContext(boundSession)
+    if (context === undefined) return undefined
+    const journal = await readMemoryRpcJournalState(context, boundSession, observedSteps)
+    return {
+      ...previous,
+      reflection: { ...previous.reflection, backlogSteps: journal.backlogSteps, pendingCompaction: journal.pendingCompaction },
+      journal: { ...previous.journal, totalSteps: journal.totalSteps, reflectedSteps: journal.reflectedSteps },
+    }
+  }
+
   registerStatusHandler(pi, buildSnapshot)
   pi.rpc?.handle?.(MEMORY_REFLECTIONS_RPC_METHOD, async (request) => {
     const boundSession = sessionId
@@ -182,15 +200,16 @@ export function createMemoryRpcBridge(
     })
   }
 
-  function publishSnapshot(signal?: AbortSignal): Promise<void> {
+  function publishSnapshot(signal?: AbortSignal, build = buildSnapshot): Promise<void> {
     const generation = bindingGeneration
     const current = publication.then(async () => {
       if (disposed || signal?.aborted || generation !== bindingGeneration || pi.rpc?.emit === undefined) return
-      const snapshot = await buildSnapshot()
+      const snapshot = await build()
       if (snapshot === undefined || signal?.aborted || disposed || generation !== bindingGeneration) return
       const fingerprint = JSON.stringify(snapshot)
       if (fingerprint === lastSnapshot) return
       lastSnapshot = fingerprint
+      lastPublished = snapshot
       pi.rpc.emit(MEMORY_UPDATED_RPC_EVENT, snapshot)
     })
     // Keep failures visible to their caller without poisoning the next publication.
@@ -204,24 +223,26 @@ export function createMemoryRpcBridge(
       sessionId = nextSessionId
       bindingGeneration++
       lastSnapshot = undefined
+      lastPublished = undefined
       publication = Promise.resolve()
       observedSteps = new Set()
     },
 
-    sync: publishSnapshot,
+    sync: (signal) => publishSnapshot(signal),
 
     syncJournal(entries) {
       if (disposed || sessionId === undefined) return Promise.resolve()
       for (const entry of entries.flatMap((message) => projectTranscriptEntries(message, ""))) {
         if (entry.kind === "assistant" && isCanonicalEntry(entry)) observedSteps.add(entry.source_line_id)
       }
-      return publishSnapshot()
+      return publishSnapshot(undefined, buildJournalSnapshot)
     },
 
     detach() {
       bindingGeneration++
       sessionId = undefined
       lastSnapshot = undefined
+      lastPublished = undefined
       publication = Promise.resolve()
       observedSteps = new Set()
     },
@@ -231,6 +252,7 @@ export function createMemoryRpcBridge(
       disposed = true
       sessionId = undefined
       lastSnapshot = undefined
+      lastPublished = undefined
     },
   }
 }

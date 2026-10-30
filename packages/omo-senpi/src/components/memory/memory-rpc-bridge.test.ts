@@ -147,6 +147,41 @@ describe("memory rpc bridge", () => {
     })
   })
 
+  test("#given a published snapshot and stalled git reads #when settle delivers journal steps #then the update is published without any git read", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const stalled = Promise.withResolvers<string>()
+    const gitEntered = Promise.withResolvers<void>()
+    let gitReads = 0
+    let stall = false
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined,
+      createGitRepo: () => stubRepo({
+        head: () => {
+          gitReads += 1
+          if (stall) gitEntered.resolve()
+          return stall ? stalled.promise : Promise.resolve("0123456789abcdef0123456789abcdef01234567")
+        },
+      }),
+    })
+    bridge.attach("session-1")
+    await bridge.sync()
+    stall = true
+    const readsBefore = gitReads
+    const delivery = bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+    try {
+      await Promise.race([delivery, gitEntered.promise])
+      expect(gitReads).toBe(readsBefore)
+      expect(host.emits.map(({ data }) => (data as MemoryRpcSnapshot).journal.totalSteps)).toEqual([0, 1])
+      expect(host.emits.at(-1)?.data).toMatchObject({
+        repo: { headSha: "0123456789abcdef0123456789abcdef01234567" }, reflection: { backlogSteps: 1 },
+      })
+    } finally {
+      stalled.resolve("0123456789abcdef0123456789abcdef01234567")
+      await delivery
+    }
+  })
+
   test("#given an old binding with queued snapshots #when a new session attaches #then its delivery does not wait for or reuse the retired queue", async () => {
     const context = await contextFixture()
     const host = rpcHost()
