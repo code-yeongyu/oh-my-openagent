@@ -1498,6 +1498,7 @@
     "packages/senpi-desktop-service/src/run/context.ts",
     "packages/senpi-desktop-service/src/run/engine-results.ts",
     "packages/senpi-desktop-service/src/run/facade.ts",
+    "packages/senpi-desktop-service/src/run/foreground-rerun.ts",
     "packages/senpi-desktop-service/src/run/handles.ts",
     "packages/senpi-desktop-service/src/run/hold-call.ts",
     "packages/senpi-desktop-service/src/run/input-target.ts",

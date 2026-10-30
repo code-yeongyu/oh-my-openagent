@@ -1,5 +1,6 @@
 use image::RgbaImage;
-use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::ax::AxHandle;
+use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
@@ -7,6 +8,7 @@ use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
 
+use crate::drag_guard_impl::Guarded;
 use crate::fake::FakeBackend;
 use crate::method::FakeMethod;
 use crate::sink::{RecordedPointer, SinkOp};
@@ -75,6 +77,10 @@ impl Backend for FakeBackend {
         };
         self.begin(method)?;
         self.input_gate(target, mode)?;
+        let (ev, picked_up) = match self.guard_drag(target, ev, mode)? {
+            Guarded::Deliver(ev) => (ev, None),
+            Guarded::PickedUp { recorded, error } => (recorded, Some(error)),
+        };
         let event = RecordedPointer::from(ev);
         if matches!(target, Target::Desktop | Target::Display(_)) || mode == DeliveryMode::Foreground {
             self.cursor = self.cursor.and(event.end_point());
@@ -85,7 +91,7 @@ impl Backend for FakeBackend {
             event,
             mode,
         });
-        Ok(())
+        picked_up.map_or(Ok(()), Err)
     }
 
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
@@ -139,6 +145,27 @@ impl Backend for FakeBackend {
             start = end;
         }
         Ok(())
+    }
+
+    fn ax_type_text(
+        &mut self,
+        h: &AxHandle,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        crate::element_input_impl::ax_type_text(self, h, text, mode, check_stop, delivered)
+    }
+
+    fn ax_key_chord(
+        &mut self,
+        h: &AxHandle,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        crate::element_input_impl::ax_key_chord(self, h, keys, mode, check_stop)
     }
 
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {

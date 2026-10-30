@@ -460,6 +460,39 @@
         "type": "null"
       }
     },
+    "ax.typeText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxTypeTextParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxInputResult"
+      }
+    },
+    "ax.selectText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxSelectTextParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxTextSelection"
+      }
+    },
+    "ax.keyChord": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxKeyChordParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
     "stopPath.start": {
       "effect": "exec",
       "hostOnly": true,
@@ -2206,6 +2239,155 @@
       ],
       "additionalProperties": false
     },
+    "AxTypeTextParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
+      "additionalProperties": false
+    },
+    "AxInputResult": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/AxInputMethod"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "description": "`ax.typeText` reply.",
+      "additionalProperties": false
+    },
+    "AxInputMethod": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "inserted",
+          "description": "Written through the element's own selection (`AXSelectedText` on\nmacOS) and read back exactly; no key was sent and no focus moved."
+        },
+        {
+          "type": "string",
+          "const": "keys",
+          "description": "Sent as keystrokes once the element held its application's keyboard\nfocus."
+        }
+      ],
+      "description": "How `ax.typeText` delivered its text."
+    },
+    "AxSelectTextParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "suffix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "select": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "description": "`ax.selectText`: selects `text` inside the value of the element `ref`\nnames, disambiguated by the `prefix` and `suffix` around it; `select` is\n`text` (the match), `start` or `end` (a caret before or after it).",
+      "additionalProperties": false
+    },
+    "AxTextSelection": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "length": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        },
+        "focused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "start",
+        "length",
+        "text",
+        "focused"
+      ],
+      "description": "`ax.selectText` reply: the selection that was applied, in UTF-16 code\nunits of the element's value, with the text it covers and whether the\nelement holds its application's focus.",
+      "additionalProperties": false
+    },
+    "AxKeyChordParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "keys"
+      ],
+      "description": "`ax.keyChord`: presses the chord `keys` in the element `ref` names, as\nkeys once the element holds its application's keyboard focus (never\nunconfirmed). Only `opts.deliveryMode` is read: an omitted delivery is\nbackground (no focus change for the user); `foreground` raises the\nelement's window under the control grant, like `ax.typeText`.",
+      "additionalProperties": false
+    },
     "StopPathStartParams": {
       "type": "object",
       "properties": {
@@ -2461,6 +2643,9 @@
         "ax.setValue",
         "ax.focus",
         "ax.click",
+        "ax.typeText",
+        "ax.selectText",
+        "ax.keyChord",
         "stopPath.start",
         "stopPath.status",
         "stopPath.heartbeat",

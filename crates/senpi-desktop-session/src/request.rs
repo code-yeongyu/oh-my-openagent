@@ -2,11 +2,11 @@
 
 use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
-    CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
+    AxClickParams, AxElementAtParams, AxKeyChordParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
+    AxSelectTextParams, AxTypeTextParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
     HoldKeysParams, HoldMouseParams, ObserveParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
-use senpi_desktop_core::protocol_results::ControlStateResult;
+use senpi_desktop_core::protocol_results::{AxInputResult, AxTextSelection, ControlStateResult};
 use senpi_desktop_core::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow, ObserveResult,
 };
@@ -42,6 +42,9 @@ pub enum Op {
     AxSetValue(AxSetValueParams),
     AxFocus(AxRefParams),
     AxClick(AxClickParams),
+    AxTypeText(AxTypeTextParams),
+    AxSelectText(AxSelectTextParams),
+    AxKeyChord(AxKeyChordParams),
     ClipboardRead,
     ClipboardWrite(ClipboardText),
     ControlGrant(ControlGrantParams),
@@ -67,6 +70,8 @@ pub enum Response {
     MaybeNode(Option<AxNode>),
     Nodes(Vec<AxNode>),
     Attributes(Vec<(String, String)>),
+    AxInput(AxInputResult),
+    TextSelection(AxTextSelection),
     Clipboard(ClipboardText),
     ControlState(ControlStateResult),
     MenuItems(Vec<MenuItem>),

@@ -43,6 +43,37 @@ pub struct ControlStateResult {
     pub granted_at: Option<String>,
 }
 
+/// How `ax.typeText` delivered its text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum AxInputMethod {
+    /// Written through the element's own selection (`AXSelectedText` on
+    /// macOS) and read back exactly; no key was sent and no focus moved.
+    Inserted,
+    /// Sent as keystrokes once the element held its application's keyboard
+    /// focus.
+    Keys,
+}
+
+/// `ax.selectText` reply: the selection that was applied, in UTF-16 code
+/// units of the element's value, with the text it covers and whether the
+/// element holds its application's focus.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AxTextSelection {
+    pub start: u32,
+    pub length: u32,
+    pub text: String,
+    pub focused: bool,
+}
+
+/// `ax.typeText` reply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AxInputResult {
+    pub method: AxInputMethod,
+}
+
 /// Which stop path currently guards input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]

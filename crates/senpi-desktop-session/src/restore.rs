@@ -95,7 +95,9 @@ impl Guard {
             MutatingAction::RaiseWindow | MutatingAction::AxFocus => GuardKind::Untouched,
             MutatingAction::TypeText | MutatingAction::KeyChord | MutatingAction::HoldKeys
             | MutatingAction::HoldMouse
-            | MutatingAction::MenuSelect => GuardKind::Keys,
+            | MutatingAction::MenuSelect
+            | MutatingAction::AxTypeText
+            | MutatingAction::AxKeyChord => GuardKind::Keys,
             MutatingAction::Click
             | MutatingAction::MoveMouse
             | MutatingAction::Drag
@@ -103,6 +105,7 @@ impl Guard {
             | MutatingAction::AxPerform
             | MutatingAction::AxSetValue
             | MutatingAction::AxClick
+            | MutatingAction::AxSelectText
             | MutatingAction::ClipboardWrite => GuardKind::Delivery,
         }
     }

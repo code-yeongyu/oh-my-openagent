@@ -30,7 +30,7 @@ if (!process.argv.includes("--stdio")) {
 }
 
 const capabilities = {
-	backend: "fake",
+	backend: process.env.FAKE_ENGINE_BACKEND ?? "fake",
 	displayServer: null,
 	capture: true,
 	input: true,
@@ -49,11 +49,24 @@ const capabilities = {
 	screenLocked: false,
 };
 let suspended = false;
+// FAKE_ENGINE_BACKGROUND_GATE=1 models the macOS engine for todo 24 (#11464): input aimed at a window in
+// background delivery is refused BackgroundUnavailable before anything is sent; foreground delivery and
+// raiseWindow need the control grant (ControlRequired at admission); ax.perform/setValue/focus never rerun.
 // The foreground control grant this fake holds (B5); FAKE_ENGINE_CONTROL_BUSY=1 refuses grants InputBusy.
 // A stop drops it, as the engine's stop epoch does. FAKE_ENGINE_GLOBAL_INPUT_GATE=1 refuses input on the
 // desktop or a display target without it, ControlRequired before any input (#10788).
 let control = { active: false };
 const GLOBAL_INPUT = new Set(["click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse"]);
+const WINDOW_INPUT = new Set([...GLOBAL_INPUT, "ax.click", "ax.typeText", "ax.keyChord"]);
+const backgroundGate = (method, params) => {
+	if (process.env.FAKE_ENGINE_BACKGROUND_GATE !== "1") return undefined;
+	const foreground = params?.opts?.deliveryMode === "foreground";
+	if (method === "raiseWindow") return control.active ? undefined : "ControlRequired";
+	if (!WINDOW_INPUT.has(method)) return undefined;
+	if (typeof params?.target === "string" && (params.target === "desktop" || params.target.startsWith("display:"))) return undefined;
+	if (!foreground) return "BackgroundUnavailable";
+	return control.active ? undefined : "ControlRequired";
+};
 const refusesGlobalInput = (method, params) =>
 	process.env.FAKE_ENGINE_GLOBAL_INPUT_GATE === "1" &&
 	GLOBAL_INPUT.has(method) &&
@@ -140,6 +153,13 @@ function handle(request) {
 		}
 		if (refusesGlobalInput(method, params)) {
 			return refused("ControlRequired", "desktop input needs the control grant", -32022);
+		}
+		const gated = backgroundGate(method, params);
+		if (gated === "BackgroundUnavailable") {
+			return refused("BackgroundUnavailable", "the window has no key view; nothing was sent", -32012);
+		}
+		if (gated === "ControlRequired") {
+			return refused("ControlRequired", "foreground delivery needs the control grant", -32022);
 		}
 		const outcome = desktop(method, params);
 		if (outcome !== undefined) {

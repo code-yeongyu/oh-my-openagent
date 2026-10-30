@@ -9,6 +9,7 @@ mod audit;
 mod budget;
 mod cancel_on_drop;
 mod grant;
+mod intervention;
 mod mutate;
 mod pointer;
 mod request;
@@ -28,6 +29,8 @@ mod worker_clipboard;
 mod worker_input;
 mod worker_holds;
 mod worker_menus;
+#[cfg(test)]
+mod worker_drag_guard_tests;
 
 pub use grant::ControlSlot;
 pub use mutate::SessionSafety;

@@ -37,6 +37,9 @@
 		"desktop.ax.setValue",
 		"desktop.ax.focus",
 		"desktop.ax.click",
+		"desktop.ax.typeText",
+		"desktop.ax.selectText",
+		"desktop.ax.keyChord",
 		"desktop.stopPath.status",
 		"desktop.stop"
 	],
@@ -74,6 +77,9 @@
 		"desktop.ax.setValue": "mutate",
 		"desktop.ax.focus": "mutate",
 		"desktop.ax.click": "mutate",
+		"desktop.ax.typeText": "mutate",
+		"desktop.ax.selectText": "mutate",
+		"desktop.ax.keyChord": "mutate",
 		"desktop.stopPath.status": "read",
 		"desktop.stop": "read"
 	},
@@ -1366,6 +1372,180 @@
 			"required": [
 				"ref"
 			],
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.ax.typeText": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"text"
+			],
+			"description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.ax.selectText": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"prefix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"suffix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"select": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"text"
+			],
+			"description": "`ax.selectText`: selects `text` inside the value of the element `ref`\nnames, disambiguated by the `prefix` and `suffix` around it; `select` is\n`text` (the match), `start` or `end` (a caret before or after it).",
+			"additionalProperties": false
+		},
+		"desktop.ax.keyChord": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"keys": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"keys"
+			],
+			"description": "`ax.keyChord`: presses the chord `keys` in the element `ref` names, as\nkeys once the element holds its application's keyboard focus (never\nunconfirmed). Only `opts.deliveryMode` is read: an omitted delivery is\nbackground (no focus change for the user); `foreground` raises the\nelement's window under the control grant, like `ax.typeText`.",
 			"additionalProperties": false,
 			"definitions": {
 				"PointerOptions": {

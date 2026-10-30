@@ -30,6 +30,13 @@ pub struct FakeScenario {
     /// Reports every AX element's owner as unknown, like a backend that
     /// cannot map an element to its native window.
     pub ax_owner_unknown: bool,
+    /// Guards background left-button drags and mouse holds like macOS: a
+    /// start point whose scripted native role is not a drag-tracking control
+    /// is refused before anything is recorded.
+    pub drag_guard: bool,
+    /// Windows whose drags begin a drag-and-drop session as the first dragged
+    /// event lands: the stroke goes back to its start and is released there.
+    pub drag_picks_up: Vec<String>,
     /// Global cursor position; `None` models a backend without cursor access.
     pub cursor: Option<DesktopPoint>,
     /// RGBA fill of every captured image.
@@ -55,6 +62,8 @@ impl Default for FakeScenario {
             ax: BTreeMap::new(),
             menus: BTreeMap::new(),
             ax_owner_unknown: false,
+            drag_guard: false,
+            drag_picks_up: Vec::new(),
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
             delay_ms: DelayMs::default(),
@@ -222,6 +231,10 @@ struct RawScenario {
     menus: BTreeMap<String, Vec<FakeMenuNode>>,
     #[serde(default)]
     ax_owner_unknown: bool,
+    #[serde(default)]
+    drag_guard: bool,
+    #[serde(default)]
+    drag_picks_up: Vec<String>,
     #[serde(default = "default_cursor")]
     cursor: Option<DesktopPoint>,
     #[serde(default = "default_capture_color")]
@@ -260,6 +273,8 @@ impl TryFrom<RawScenario> for FakeScenario {
             ax: raw.ax,
             menus: raw.menus,
             ax_owner_unknown: raw.ax_owner_unknown,
+            drag_guard: raw.drag_guard,
+            drag_picks_up: raw.drag_picks_up,
             cursor: raw.cursor,
             capture_color: raw.capture_color,
             delay_ms: raw.delay_ms,

@@ -48,6 +48,19 @@ describe("isReadOnlyComputerCall", () => {
 		expect(isReadOnlyComputerCall([{ method: "ref" }, { method: "press" }])).toBe(false);
 	});
 
+	it("requires exec for selecting text in an element", () => {
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "selectText", args: ["beta"] }])).toBe(false);
+	});
+
+	it("requires exec for an element chord press and double-click", () => {
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "press", args: ["cmd+a"] }])).toBe(false);
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "doubleClick", args: [] }])).toBe(false);
+	});
+
+	it("requires exec for typing into an element", () => {
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "type", args: ["hello"] }])).toBe(false);
+	});
+
 	it("throws tooLong when a call chain is longer than two steps", () => {
 		expect(rejectionReason([{ method: "window" }, { method: "screenshot" }, { method: "click" }])).toBe("tooLong");
 	});

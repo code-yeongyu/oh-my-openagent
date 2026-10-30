@@ -47,7 +47,7 @@ const BUTTON = {
 };
 
 const POINTER_METHODS = new Set(["click", "moveMouse", "drag", "scroll", "holdMouse"]);
-const NULL_METHODS = new Set(["typeText", "keyChord", "holdKeys", "raiseWindow", "menus.select", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
+const NULL_METHODS = new Set(["typeText", "keyChord", "holdKeys", "raiseWindow", "menus.select", "ax.perform", "ax.setValue", "ax.focus", "ax.click", "ax.keyChord"]);
 
 const MENU_TREE = [
 	{ title: "File", path: ["File"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },
@@ -210,6 +210,10 @@ export function createDesktop() {
 				return { result: null };
 			case "ax.attributes":
 				return { result: [["AXRole", "AXButton"]] };
+			case "ax.typeText":
+				return { result: { method: "inserted" } };
+			case "ax.selectText":
+				return { result: { start: 10, length: 0, text: "", focused: true } };
 			default:
 				return undefined;
 		}

@@ -20,6 +20,9 @@ export function closedService(): ComputerService {
 		close: () => Promise.resolve(),
 		revokeControl: () => Promise.resolve(),
 		reportError: () => undefined,
+		foregroundAllowed: () => false,
+		possiblyLive: () => false,
+		grantForFullAccess: unreachable,
 	};
 }
 

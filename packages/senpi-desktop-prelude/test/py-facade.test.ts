@@ -166,6 +166,59 @@ describe("Python computer facade", () => {
 		]);
 	});
 
+	it("sends el.type as a ref-hopped chain and returns how the text was delivered", () => {
+		// When
+		const run = runPythonFacade("el = computer.ref('e1')\nout = el.type('hello', delivery='foreground')", {
+			type: JSON.stringify({ text: "", details: { value: { method: "inserted" } }, images: [], hasError: false }),
+		});
+
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.out).toEqual({ method: "inserted" });
+		expect(run.calls).toEqual([
+			{ action: "call", chain: [{ method: "ref", args: ["e1"] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "ref", args: ["e1"] },
+					{ method: "type", args: ["hello", { delivery: "foreground" }] },
+				],
+			},
+		]);
+	});
+
+	it("sends el.press(chord) and el.doubleClick as ref-hopped chains with their arguments", () => {
+		// When
+		const run = runPythonFacade("el = computer.ref('e1')\nel.press('cmd+a')\nel.press()\nel.doubleClick(delivery='foreground')");
+
+		// Then
+		expect(run.error).toBeNull();
+		const hops = run.calls.slice(1).map((call) => (call.chain as { method: string; args: unknown[] }[])[1]);
+		expect(hops).toEqual([
+			{ method: "press", args: ["cmd+a"] },
+			{ method: "press", args: [] },
+			{ method: "doubleClick", args: [{ delivery: "foreground" }] },
+		]);
+	});
+
+	it("sends el.selectText as a ref-hopped chain and returns the selection", () => {
+		// When
+		const run = runPythonFacade("el = computer.ref('e1')\nout = el.selectText('beta', prefix='alpha ')", {
+			selectText: JSON.stringify({ text: "", details: { value: { start: 6, length: 4, text: "beta", focused: true } }, images: [], hasError: false }),
+		});
+
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.out).toEqual({ start: 6, length: 4, text: "beta", focused: true });
+		expect(run.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "ref", args: ["e1"] },
+				{ method: "selectText", args: ["beta", { prefix: "alpha " }] },
+			],
+		});
+	});
+
 	it("sends control helpers as one-step call chains (#9651 B5b)", () => {
 		// When
 		const run = runPythonFacade(

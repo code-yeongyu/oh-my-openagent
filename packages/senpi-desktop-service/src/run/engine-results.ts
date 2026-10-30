@@ -195,6 +195,27 @@ export const isObserveResult: Guard<ObserveResult> = (value): value is ObserveRe
 	isCaptureResult(value) && typeof value.coordinateWidth === "number" && typeof value.coordinateHeight === "number" &&
 	matches(value, { ax: "string", nodeCount: "number", truncated: "boolean" });
 
+/** `ax.selectText` reply: the applied selection in UTF-16 units of the element's value. */
+export interface AxTextSelection {
+	readonly start: number;
+	readonly length: number;
+	readonly text: string;
+	readonly focused: boolean;
+}
+
+const TEXT_SELECTION: FieldSpec = { start: "number", length: "number", text: "string", focused: "boolean" };
+
+export const isAxTextSelection: Guard<AxTextSelection> = (value): value is AxTextSelection =>
+	matches(value, TEXT_SELECTION);
+
+/** `ax.typeText` reply: how the text reached the element. */
+export interface AxInputResult {
+	readonly method: "inserted" | "keys";
+}
+
+export const isAxInputResult: Guard<AxInputResult> = (value): value is AxInputResult =>
+	typeof value === "object" && value !== null && ((value as { method?: unknown }).method === "inserted" || (value as { method?: unknown }).method === "keys");
+
 export const isText: Guard<{ readonly text: string }> = (value): value is { readonly text: string } =>
 	isRecord(value) && typeof value.text === "string";
 

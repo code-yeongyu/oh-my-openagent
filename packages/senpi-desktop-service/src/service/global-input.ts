@@ -31,13 +31,15 @@ export function isGlobalInput(method: EngineMethod, params: unknown): boolean {
 	return typeof target === "string" && isGlobalTarget(target);
 }
 
+/** The engine's error code of a refusal, if `error` is one. */
+export function engineErrorCode(error: unknown): string | undefined {
+	if (!(error instanceof DesktopEngineRpcError) || error.data === null || !("code" in error.data)) return undefined;
+	const code: unknown = error.data.code;
+	return typeof code === "string" ? code : undefined;
+}
+
 function isControlRequired(error: unknown): boolean {
-	return (
-		error instanceof DesktopEngineRpcError &&
-		error.data !== null &&
-		"code" in error.data &&
-		error.data.code === "ControlRequired"
-	);
+	return engineErrorCode(error) === "ControlRequired";
 }
 
 function throwIfCancelled(method: EngineMethod, options: CallOptions): void {
@@ -98,6 +100,18 @@ export class FullAccessConsent {
 
 	#revoke(connection: Connection): Promise<unknown> {
 		return this.#grants.revoke(() => connection.rpc.request("control.revoke", {}, { timeoutMs: REVOKE_TIMEOUT_MS }));
+	}
+
+	/**
+	 * The automatic grant for a foreground rerun (D2, #11464 todo 24): the same full-access grant `send` takes
+	 * for desktop input, recorded automatic so `fence` revokes it when full access ends. Returns false, granting
+	 * nothing, when the session is no longer in full access by the time the grant would be written.
+	 */
+	async grantForFullAccess(connection: Connection, options: CallOptions): Promise<boolean> {
+		throwIfCancelled("control.grant", options);
+		if (!this.#fullAccess()) return false;
+		await this.#grant(connection, options);
+		return true;
 	}
 
 	async #grant(connection: Connection, options: CallOptions): Promise<void> {

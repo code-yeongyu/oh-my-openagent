@@ -17,6 +17,9 @@ export type ComputerService = Pick<
 	| "close"
 	| "revokeControl"
 	| "reportError"
+	| "foregroundAllowed"
+	| "possiblyLive"
+	| "grantForFullAccess"
 >;
 
 export interface ComputerHandleOptions {

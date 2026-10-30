@@ -1,6 +1,6 @@
 //! Locating text inside an element's value for AX text selection.
 //!
-//! Ported from oh-my-pi's `pi-natives/src/desktop/text_range.rs` (MIT).
+//! Ported from oh-my-pi's `pi-natives/src/desktop/text_range.rs` (MIT, oh-my-pi 0838d2ab44).
 //!
 //! Accessibility text ranges count UTF-16 code units, so every offset here is
 //! in UTF-16 units, never UTF-8 bytes or Unicode scalars.
@@ -380,6 +380,7 @@ mod tests {
         assert_eq!(utf16_slice("a😀b", range(2, 1)), None);
         assert_eq!(utf16_slice("a😀b", range(3, 5)), None);
     }
+
     #[test]
     fn replacing_a_selection_works_in_utf16_units() {
         let value = "a😀b";

@@ -43,7 +43,7 @@ export function pointerOptions(options: ClickOptions = {}): object {
 	return { button, count, modifiers, deliveryMode: delivery };
 }
 
-function chordKeys(chord: string | readonly string[]): readonly string[] {
+export function chordKeys(chord: string | readonly string[]): readonly string[] {
 	if (typeof chord !== "string") return chord;
 	return chord
 		.split("+")
