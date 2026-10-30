@@ -13,6 +13,10 @@ const taskComponent: OmoSenpiComponent = {
 }
 
 describe("createOmoSenpiComponents", () => {
+  test("#given production composition #when Kimi Todo compatibility is looked up #then it is registered exactly once", () => {
+    const components = createOmoSenpiComponents(taskComponent)
+    expect(components.filter(component => component.name === "kimi-todo-first-turn")).toHaveLength(1)
+  })
   test("#given the production registration array #when x-search is looked up #then it is present exactly once", () => {
     // given
     const names = createOmoSenpiComponents(taskComponent).map(({ name }) => name)

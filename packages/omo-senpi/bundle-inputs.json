@@ -782,6 +782,7 @@
     "packages/omo-senpi/src/components/init-deep-advisor/proposed-data.ts",
     "packages/omo-senpi/src/components/init-deep-advisor/runtime.ts",
     "packages/omo-senpi/src/components/init-deep-advisor/state.ts",
+    "packages/omo-senpi/src/components/kimi-todo-first-turn/index.ts",
     "packages/omo-senpi/src/components/lsp/adapter/descriptors.ts",
     "packages/omo-senpi/src/components/lsp/adapter/language-mappings.ts",
     "packages/omo-senpi/src/components/lsp/adapter/migration-notices.ts",
