@@ -51,7 +51,7 @@ export interface MemoryIdentityRuntime {
   readonly reservationPort: ReflectionReservationPort
   readonly runner: SenpiSubprocessRunner
   launch(run: ReservedRun): Promise<void>
-  reconcile(): Promise<void>
+  reconcile(signal?: AbortSignal): Promise<void>
   /** Resolves once every launch started in this process has returned (a detached child may still be running). */
   settled(): Promise<void>
 }
@@ -168,6 +168,7 @@ export function createIdentityRuntime(
     return tracked
   }
 
+  let reconciliation: { readonly promise: Promise<void>; readonly signal: AbortSignal | undefined } | undefined
   const runtime: MemoryIdentityRuntime = {
     identity,
     store,
@@ -177,13 +178,30 @@ export function createIdentityRuntime(
     async settled(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
-    async reconcile(): Promise<void> {
-      await reconcileReflectionRuns({
-        identity: asMemoryIdentity(identity),
-        reservation: store,
-        launch,
-        deferOnSchedulerContention: true,
-      })
+    async reconcile(signal?: AbortSignal): Promise<void> {
+      // One identity-wide pass, including any already-admitted durable transition. Its first
+      // observer owns cancellation; an independent caller retries a foreign abort once.
+      // Never clear the flight on timeout alone: a committed transition may still be finishing.
+      for (let attempt = 0; ; attempt += 1) {
+        signal?.throwIfAborted()
+        const flight = reconciliation ??= {
+          signal,
+          promise: reconcileReflectionRuns({
+            identity: asMemoryIdentity(identity), reservation: store, launch,
+            deferOnSchedulerContention: true,
+            ...(signal === undefined ? {} : { signal }),
+          }).then(() => undefined).finally(() => { reconciliation = undefined }),
+        }
+        try {
+          await flight.promise
+        } catch (error) {
+          if (signal !== flight.signal) signal?.throwIfAborted()
+          if (attempt !== 0 || flight.signal === signal || !flight.signal?.aborted || error !== flight.signal.reason) throw error
+          continue
+        }
+        signal?.throwIfAborted()
+        return
+      }
     },
   }
   return runtime

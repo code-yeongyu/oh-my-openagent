@@ -45,3 +45,24 @@ pub enum FakeMethod {
     MenuItems,
     MenuSelect,
 }
+
+/// The AX writes a scenario can leave unanswered (`ax_cannot_complete`):
+/// the write lands, but the call reports `AxUnconfirmed`, like a macOS app
+/// that got the request and replied `kAXErrorCannotComplete`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AxWrite {
+    AxPerform,
+    AxSetValue,
+    AxFocus,
+}
+
+impl AxWrite {
+    pub const fn method(self) -> FakeMethod {
+        match self {
+            Self::AxPerform => FakeMethod::AxPerform,
+            Self::AxSetValue => FakeMethod::AxSetValue,
+            Self::AxFocus => FakeMethod::AxFocus,
+        }
+    }
+}

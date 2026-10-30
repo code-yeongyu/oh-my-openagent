@@ -14,6 +14,7 @@ import type { DeviceSync, EngineStatus, OpenDeviceSyncOptions, SyncSession } fro
 
 import type { ComponentLogger } from "../../extension/types"
 import { isSyncConfigError, SYNC_CONFIG_INVALID } from "./sync-config-error"
+import { isSyncSessionDeferred, SYNC_SESSION_DEFERRED } from "./sync-session-deferred"
 
 /** The one line a runner logs when this device has no session to sync with (no network, no state). */
 export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
@@ -21,6 +22,11 @@ export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
 /** The error code a runner logs when a previous engine for the repo did not close within the bound. */
 export const SYNC_CLOSE_WAIT_EXCEEDED = "sync-close-wait-exceeded"
 const CLOSE_WAIT_MS = 10_000
+// Deferred passes join any native read still parked behind the dialog; retries back off to five minutes.
+const DEFERRED_RETRY_MS = 15_000
+const DEFERRED_RETRY_MAX_MS = 300_000
+const DEFERRED_RETRY_MIN_MS = 1_000
+const DEFERRED_STILL_WAITING_MS = 900_000
 
 /** The status of a repo whose sync engine could not be loaded (the packaged sidecar is missing or broken). */
 export const SYNC_UNAVAILABLE = "sync-unavailable"
@@ -115,6 +121,8 @@ export interface SyncRunnerOptions {
   readonly onStatusChange?: (repo: string) => void
   /** How long an acquire waits for the repo's previous engine to close; default 10 s. */
   readonly closeWaitMs?: number
+  /** Initial retry delay for a deferred credential read; default 15 s, doubling to a five-minute cap. */
+  readonly deferredRetryMs?: number
 }
 
 interface Running {
@@ -162,11 +170,20 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     logger.info(SYNC_IDLE_NO_DEVICE_SESSION, { identity })
   }
 
-  const start = async (identity: string, paths: MemoryIdentityPaths, space: SyncSpaceInputs): Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null> => {
+  const start = async (
+    identity: string,
+    paths: MemoryIdentityPaths,
+    space: SyncSpaceInputs,
+    onDeferred: (message: string) => void,
+  ): Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null> => {
     let resolved: SyncSessionResolution
     try {
       resolved = await resolveSession({ identity, paths, space })
     } catch (error) {
+      if (isSyncSessionDeferred(error)) {
+        onDeferred(error.message)
+        return null
+      }
       if (isSyncConfigError(error)) {
         logger.error(`memory sync is off: ${error.message}`, { identity, code: SYNC_CONFIG_INVALID, variable: error.variable })
         return { kind: SYNC_CONFIG_INVALID, variable: error.variable, reason: error.message }
@@ -216,6 +233,45 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     return { device, unwatch }
   }
 
+  // A deferred pass is replaced by a fresh one after the retry delay while the repo is still held by the same sessions.
+  const launch = (
+    identity: string,
+    paths: MemoryIdentityPaths,
+    space: SyncSpaceInputs,
+    users: number,
+    retryMs = Math.max(Math.min(options.deferredRetryMs ?? DEFERRED_RETRY_MS, DEFERRED_RETRY_MAX_MS), DEFERRED_RETRY_MIN_MS),
+    previousRetryMs = 0,
+    quietMs = 0,
+  ): Held => {
+    let deferred = false
+    let nextQuietMs = 0
+    const ready = start(identity, paths, space, message => {
+      deferred = true
+      if (retryMs !== previousRetryMs) {
+        logger.warn(`memory sync is waiting: ${message} Sync retries on its own.`, { identity, code: SYNC_SESSION_DEFERRED, retryMs })
+        return
+      }
+      // At the cap every pass is silent; one reminder per 15 minutes says the keychain is still unanswered.
+      nextQuietMs = quietMs + retryMs
+      if (nextQuietMs >= DEFERRED_STILL_WAITING_MS) {
+        nextQuietMs = 0
+        logger.warn("memory sync is still waiting for keychain approval.", { identity, code: SYNC_SESSION_DEFERRED, retryMs })
+      }
+    }).catch((error: unknown) => {
+      logger.error("memory sync failed to start", { identity, error: String(error) })
+      return null
+    })
+    const held: Held = { users, ready }
+    void ready.then(() => {
+      if (!deferred) return
+      const retry = setTimeout(() => {
+        if (repos.get(paths.repo) === held) repos.set(paths.repo, launch(identity, paths, space, held.users, Math.min(retryMs * 2, DEFERRED_RETRY_MAX_MS), retryMs, nextQuietMs))
+      }, retryMs)
+      retry.unref?.()
+    })
+    return held
+  }
+
   return {
     async acquire(identity, paths, settings, space) {
       if (!settings.enabled) return
@@ -241,12 +297,9 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
         held.users += 1
         return
       }
-      const ready = start(identity, paths, space ?? { profile: null, projectDir: paths.repo }).catch((error: unknown) => {
-        logger.error("memory sync failed to start", { identity, error: String(error) })
-        return null
-      })
-      repos.set(paths.repo, { users: 1, ready })
-      await ready
+      const launched = launch(identity, paths, space ?? { profile: null, projectDir: paths.repo }, 1)
+      repos.set(paths.repo, launched)
+      await launched.ready
     },
     async release(repo) {
       const held = repos.get(repo)

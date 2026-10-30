@@ -39,7 +39,7 @@ export interface MemoryReflectionLiveWiring {
   ): Promise<void>
   onReflectionLaunched(identity: string, run: ReservedRun): Promise<void>
   onLiveReflectionCompleted(identity: string, runId: string): Promise<void>
-  onSettled(sessionId: string, eventCtx: unknown): Promise<void>
+  onSettled(sessionId: string, eventCtx: unknown, signal?: AbortSignal): Promise<void>
   syncRpc(): Promise<void>
   shutdown(identity?: string): void
   /** Resolves once every status refresh started by bind or settle has finished (each one runs git in the identity dir). */
@@ -160,9 +160,16 @@ export function createMemoryReflectionLiveWiring(
     },
     onReflectionLaunched,
     onLiveReflectionCompleted,
-    async onSettled(sessionId, eventCtx): Promise<void> {
-      track(footerLive.refresh(sessionId, readUi(eventCtx)))
-      await rpcBridge.current?.sync()
+    async onSettled(sessionId, eventCtx, signal): Promise<void> {
+      signal?.throwIfAborted()
+      const ui = readUi(eventCtx)
+      const identity = options.sessions.get(sessionId)?.context
+      track(footerLive.refresh(sessionId, ui === undefined ? undefined : {
+        setStatus(key, text) {
+          if (!signal?.aborted && options.sessions.get(sessionId)?.context === identity) ui.setStatus(key, text)
+        },
+      }))
+      await rpcBridge.current?.sync(signal)
     },
     async syncRpc(): Promise<void> {
       await rpcBridge.current?.sync()

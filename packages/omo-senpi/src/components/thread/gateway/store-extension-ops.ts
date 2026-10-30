@@ -6,7 +6,7 @@ import type { GatewayEngineOptions, GatewayResolve } from "./engine"
 import { isLockWaitExceeded } from "./lock-wait"
 import { GatewaySchemaVersionError } from "./schema"
 import { transaction, type StoreContext } from "./store-ops"
-import { TOOLKIT_REPLAY_RETENTION_MS, type StoreExtensionOperation, type StoreExtensionRefusal, type StoreExtensionRegistration, type StoreExtensionResult, type ToolkitReplayRequest } from "./store-extensions"
+import type { StoreExtensionOperation, StoreExtensionRefusal, StoreExtensionRegistration, StoreExtensionResult } from "./store-extensions"
 
 type Registered = {
   readonly descriptor: StoreExtensionRegistration
@@ -32,8 +32,6 @@ export type ExtensionRun = {
   readonly op: string
   readonly args: () => unknown
   readonly effects?: readonly (() => void)[]
-  /** A layer-2 toolkit call's replay identity: its receipt is committed with the op, atomically with the op's own effect. */
-  readonly replay?: ToolkitReplayRequest
 }
 
 export class StoreExtensions {
@@ -156,17 +154,9 @@ export class StoreExtensions {
     const effects: (() => void)[] = []
     const compensations: (() => void)[] = []
     let value: unknown
-    let replayOutcome: { readonly replayed: unknown } | { readonly stop: StoreExtensionRefusal } | undefined
     try {
       const version = await this.ensure(request.descriptor, now)
       value = await transaction(this.ctx, "extension_call", async () => {
-        if (request.replay !== undefined) {
-          const replayed = replayedCall(this.ctx, request.replay)
-          if (replayed !== undefined) {
-            replayOutcome = replayed
-            return "replayed" in replayed ? replayed.replayed : undefined
-          }
-        }
         // Re-check under the call's own lock: a newer binary may have migrated the extension since.
         const row = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
         const locked = Number(row?.version ?? 0)
@@ -192,7 +182,6 @@ export class StoreExtensions {
           checkExtensionSchema(this.ctx.sql, name, before, extensionSchema(this.ctx.sql))
           // Refuse uncloneable results before commit, not in the worker's response writer afterwards.
           const cloned = structuredClone(result)
-          if (request.replay !== undefined) recordReplayReceipt(this.ctx, request.replay, cloned, now)
           effects.push(...(request.effects ?? []))
           return cloned
         } finally {
@@ -213,7 +202,6 @@ export class StoreExtensions {
       }
       return fromError(error)
     }
-    if (replayOutcome !== undefined && "stop" in replayOutcome) return replayOutcome.stop
     // Past COMMIT: a failure here never rolls back, so no compensation may run - exactly as a core
     // enqueue reports a post-commit failure without undoing its marker.
     await this.ctx.hook("afterDbCommit")
@@ -226,20 +214,4 @@ export class StoreExtensions {
     }
     return { kind: "ok", value }
   }
-}
-
-/** The committed outcome of a replayed key, if the store still holds one: the recorded result, or a divergence stop. */
-function replayedCall(ctx: StoreContext, replay: ToolkitReplayRequest): { readonly replayed: unknown } | { readonly stop: StoreExtensionRefusal } | undefined {
-  ctx.sql.run("DELETE FROM toolkit_replay_receipts WHERE turn_at < ?", [Date.now() - TOOLKIT_REPLAY_RETENTION_MS])
-  const row = ctx.sql.one(["op", "args_sha256", "result_json"], "SELECT op, args_sha256, result_json FROM toolkit_replay_receipts WHERE replay_key = ?", [replay.key])
-  if (row === undefined) return undefined
-  if (row.op !== replay.op || row.args_sha256 !== replay.args_sha256) {
-    const differs = [row.op !== replay.op ? "op" : undefined, row.args_sha256 !== replay.args_sha256 ? "args" : undefined].filter((part): part is "op" | "args" => part !== undefined)
-    return { stop: { kind: "refused", code: "toolkit_replay_divergence", message: `Replayed call ${replay.key} differs from what its key recorded; it was not run again. replay_differs=${differs.join(",")} recorded_op=${String(row.op)} attempted_op=${replay.op}` } }
-  }
-  return { replayed: JSON.parse(String(row.result_json)) as unknown }
-}
-
-function recordReplayReceipt(ctx: StoreContext, replay: ToolkitReplayRequest, result: unknown, now: number): void {
-  ctx.sql.run("INSERT OR REPLACE INTO toolkit_replay_receipts (replay_key, op, args_sha256, result_json, turn_at, created_at) VALUES (?, ?, ?, ?, ?, ?)", [replay.key, replay.op, replay.args_sha256, JSON.stringify(result ?? null), replay.turn_at, now])
 }

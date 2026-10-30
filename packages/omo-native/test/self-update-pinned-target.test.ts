@@ -53,6 +53,7 @@ describe("omo update against the channel dist-tag", () => {
     distTags: Record<string, string> | null
     versions: string[]
     status?: number
+    engine?: string
     resolveUpdate?: (targetVersion?: string) => ReturnType<typeof updateTarget>
   }) {
     const spawned: Array<{ command: string; args: string[]; env: NodeJS.ProcessEnv }> = []
@@ -70,7 +71,7 @@ describe("omo update against the channel dist-tag", () => {
         readInstalled: () => {
           const omo = options.versions[Math.min(reads, options.versions.length - 1)] ?? "unknown"
           reads += 1
-          return { omo, engine: "2026.9.29" }
+          return { omo, engine: options.engine ?? "2026.9.29" }
         },
         run: async (command: string, args: string[], runOptions: { env?: NodeJS.ProcessEnv } = {}) => {
           spawned.push({ command, args, env: runOptions.env ?? {} })
@@ -124,6 +125,14 @@ describe("omo update against the channel dist-tag", () => {
     expect(h.spawned).toEqual([])
     expect(h.lines).toEqual(["omo 5.1.2 is up to date (omo-ai@latest is 5.1.2)"])
     expect(h.errors).toEqual([])
+  })
+
+  test("#given the installed version equals the dist-tag but the engine tree cannot be resolved #then it exits non-zero naming the reinstall command and runs no install", async () => {
+    const h = harness({ distTags: { latest: "5.1.2" }, versions: ["5.1.2"], engine: "unknown" })
+    const code = await runSelfUpdate(["update"], h.options)
+    expect(code).toBe(1)
+    expect(h.spawned).toEqual([])
+    expect(h.errors.join("\n")).toContain("bun add -g omo-ai@5.1.2")
   })
 
   test("#given a beta install #then it follows the beta dist-tag", async () => {

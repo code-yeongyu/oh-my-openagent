@@ -37,6 +37,7 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
   return {
     task_id: record.task_id,
     status: record.status,
+    ...(record.host_liveness === undefined ? {} : { host_liveness: record.host_liveness }),
     residency_state: record.residency_state,
     ...(recovery === undefined ? {} : { suspended: { explanation: recovery.text } }),
     ...(awaitingInput === undefined ? {} : { awaiting_input: awaitingInput }),

@@ -27,6 +27,7 @@ export type SpawnMembersInput = {
   readonly teamRunId: string
   readonly manager: TeamRuntimeManagerPort
   readonly leadSessionId: string
+  readonly rootSessionId?: string
   readonly spawnDepth: number
   readonly maxParallel: number
   readonly deadlineAt: number
@@ -103,6 +104,7 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
     ? undefined
     : assembleMemberExtensions(launch.entryPath, await resolveInheritedExtensionList(launch.inheritedExtensions))
   const result = await input.manager.start(buildMemberStartSpec(input, member, extensions))
+  if (result.kind === "held") return { taskId: result.task_id, status: "pending" }
   if (result.kind !== "started") {
     throw new SenpiTeamRuntimeError(
       `member '${member.name}' failed to start: ${describeStartResult(result)}`,
@@ -141,7 +143,7 @@ function buildMemberStartSpec(
   return {
     prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
-    root_session_id: input.leadSessionId,
+    root_session_id: input.rootSessionId ?? input.leadSessionId,
     depth: input.spawnDepth,
     name: memberTaskName(input.teamRunId, member.name),
     execution_mode: "process",
@@ -192,6 +194,8 @@ function describePlanError(error: PlanResolutionError): string {
 
 function describeStartResult(result: Exclude<StartResult, { kind: "started" }>): string {
   switch (result.kind) {
+    case "held":
+      return `held by user Stop at pause sequence ${result.pauseSeq}`
     case "depth_denied":
       return result.reason
     case "plan_unresolved":

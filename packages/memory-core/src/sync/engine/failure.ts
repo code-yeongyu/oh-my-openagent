@@ -16,7 +16,7 @@ export type SyncFailureKind = SyncFailure["kind"]
 const AUTH_EXPIRED: SyncFailure = {
   kind: "auth_expired",
   reason: "This device's OmO sign-in has expired or was refused, so memory sync cannot reach your account.",
-  action: "Sign in to OmO again.",
+  action: "Sign in to OmO again from the OmO desktop app on this computer.",
 }
 
 const OFFLINE: SyncFailure = {

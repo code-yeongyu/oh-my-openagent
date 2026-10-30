@@ -33,6 +33,9 @@ export function buildCompletionDetails(record: TaskRecord, options: BuildDetails
   const runStats = record.run_stats
   const tokens = options.tokens ?? runStats?.total_tokens
   const base: CompletionDetails = {
+    runRef: record.owner?.kind === "dag" ? { kind: "dag", id: record.owner.runId }
+      : record.team_run_id !== undefined ? { kind: "team", id: record.team_run_id }
+        : { kind: "task", id: record.task_id },
     task_id: record.task_id,
     name: record.name ?? record.task_id,
     status: record.status,

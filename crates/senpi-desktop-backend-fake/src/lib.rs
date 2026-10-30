@@ -14,14 +14,17 @@ mod holds_impl;
 mod menus_impl;
 mod method;
 mod scenario;
+mod scenario_nodes;
 mod sink;
+mod user_input_impl;
 
 pub use clock::FakeClock;
 pub use fake::FakeBackend;
 pub use faults::Faults;
-pub use method::FakeMethod;
+pub use method::{AxWrite, FakeMethod};
 pub use scenario::{
     fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeMenuNode, FakeScenario, ResizeWindow,
     ScenarioError, ScriptedFailure,
 };
 pub use sink::{RecordedPointer, RecordingSink, SinkOp};
+pub use user_input_impl::{FakeUserInput, ScriptedPressKind, ScriptedUserPress};

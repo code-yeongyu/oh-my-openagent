@@ -1,4 +1,5 @@
-import { expect, spyOn, test } from "bun:test"
+import { expect, test } from "bun:test"
+import { fakeClock } from "../rpc/__fixtures__/clock"
 import { runDetachedProbe } from "./detached-probe.test-support"
 import { createHostSessionHandle } from "./handle"
 import { FAKE_SESSION, fakeSessionPort } from "./handle.test-support"
@@ -29,16 +30,14 @@ for (const scenario of ["site-1", "site-1-rejection", "site-3", "site-3-close"])
 }
 
 test("#given site-1 close is pending #when close detaches the client #then its heartbeat was already stopped", async () => {
-  // given: observe the real interval's cancellation at the exact point close drops the connection.
-  const intervals = spyOn(globalThis, "setInterval")
-  const clears = spyOn(globalThis, "clearInterval")
+  // given: observe timer cancellation at the exact point close drops the connection.
+  const clock = fakeClock()
   const release = Promise.withResolvers<void>()
   let stoppedBeforeClose = false
   const port = {
     ...fakeSessionPort(),
     close: () => {
-      const timer = intervals.mock.results[0]?.value
-      stoppedBeforeClose = timer !== undefined && clears.mock.calls.some(([id]) => id === timer)
+      stoppedBeforeClose = clock.pending() === 0
       return release.promise
     },
   }
@@ -57,7 +56,6 @@ test("#given site-1 close is pending #when close detaches the client #then its h
     release.resolve()
     await closing
     await handle.dispose()
-    intervals.mockRestore()
-    clears.mockRestore()
+    clock.restore()
   }
 })

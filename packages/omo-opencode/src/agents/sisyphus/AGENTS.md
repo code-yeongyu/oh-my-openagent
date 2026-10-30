@@ -34,6 +34,7 @@ Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyp
 ## VARIANT SELECTION
 
 `sisyphus-agent-factory.ts` selects variant by model name:
+- Kimi K3.1 -> `kimi-k3-1.ts` (its own copy of `kimi-k3.ts`, checked before K3)
 - Kimi K3 -> `kimi-k3.ts`
 - Kimi K2.7 -> `kimi-k2-7.ts`
 - Kimi K2 family -> `kimi-k2-6.ts`

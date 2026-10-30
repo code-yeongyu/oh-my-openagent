@@ -68,6 +68,7 @@ export async function createTeam(
     teamRunId,
     manager: deps.manager,
     leadSessionId: deps.leadSessionId,
+    rootSessionId: deps.rootSessionId ?? deps.leadSessionId,
     spawnDepth: deps.spawnDepth,
     maxParallel: deps.taskSettings.team.max_parallel_members,
     deadlineAt: now() + deps.taskSettings.team.max_wall_clock_minutes * MS_PER_MINUTE,

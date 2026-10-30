@@ -31,6 +31,7 @@ export type InProcessSessionContextProvider = ((spec: ManagedStartSpec) => InPro
 
 export type InProcessRunnerLike = {
   start(spec: ChildSpec): Promise<InProcessChildHandle>
+  startStaged?(spec: ChildSpec): Promise<{ readonly handle: InProcessChildHandle; readonly promptText: string; begin(): void }>
   resume?(spec: ChildSpec, sessionPath: string): Promise<InProcessChildHandle>
 }
 
@@ -43,11 +44,26 @@ export function createInProcessManagedRunner(
   runner: InProcessRunnerLike,
   context: InProcessSessionContextProvider = () => ({}),
 ): ManagedRunner {
+  const startStaged = runner.startStaged?.bind(runner)
   return {
     async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
       const childSpec = toChildSpec(spec, context(spec))
       return adaptInProcessHandle(await runner.start(childSpec))
     },
+    ...(startStaged === undefined ? {} : {
+      async startStaged(spec: ManagedStartSpec) {
+        const staged = await startStaged(toChildSpec(spec, context(spec)))
+        const child = adaptInProcessHandle(staged.handle)
+        return {
+          child,
+          firstPrompt: staged.promptText,
+          begin: () => {
+            staged.begin()
+            return { turnId: "initial", outcome: child.waitForOutcome() }
+          },
+        }
+      },
+    }),
     async resume(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle> {
       const resolved = context.resolveResumeContext?.(spec)
       if (resolved !== undefined && !resolved.ok) {
@@ -80,6 +96,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         ...(spec.extensions !== undefined ? { extensions: spec.extensions } : {}),
         ...(spec.memberEnv !== undefined ? { memberEnv: spec.memberEnv } : {}),
         depth: spec.depth,
+        parent_session_id: spec.parentSessionId,
         root_session_id: spec.rootSessionId,
         ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
       }

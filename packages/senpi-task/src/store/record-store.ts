@@ -41,7 +41,19 @@ type CacheEntry = {
   readonly warnings: readonly string[]
 }
 
-export function createTaskRecordStore(config: StateDirConfig, options: TaskRecordStoreOptions = {}): TaskRecordStore {
+/** What the store keeps resident, read by the on-demand memory report (oh-my-openagent#9442). */
+export type TaskRecordStoreResidentFigures = {
+  readonly cachedRecords: number
+  /** On-disk size of the cached records' files. */
+  readonly cachedRecordBytes: number
+  readonly openEventLogs: number
+}
+
+export type ResidentTaskRecordStore = TaskRecordStore & {
+  residentFigures(): TaskRecordStoreResidentFigures
+}
+
+export function createTaskRecordStore(config: StateDirConfig, options: TaskRecordStoreOptions = {}): ResidentTaskRecordStore {
   const stateDir = resolveStateDir(config)
   const platform = options.platform ?? process.platform
   const cache = new Map<string, CacheEntry>()
@@ -57,6 +69,11 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
 
   return {
     stateDir,
+    residentFigures() {
+      let cachedRecordBytes = 0
+      for (const entry of cache.values()) cachedRecordBytes += entry.size
+      return { cachedRecords: cache.size, cachedRecordBytes, openEventLogs: appendFds.size }
+    },
     save(record) {
       const path = taskPath(stateDir, parseTaskId(record.task_id))
       writeRecord(path, record, "create", platform)

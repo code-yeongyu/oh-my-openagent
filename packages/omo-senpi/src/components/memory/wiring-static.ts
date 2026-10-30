@@ -3,7 +3,7 @@ import { join } from "node:path"
 
 import type { MemoryBlockCache, ReservedRun } from "@oh-my-opencode/memory-core"
 
-import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
+import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import { registerMemoryCommands } from "./commands/register"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
@@ -68,7 +68,7 @@ export function registerMemoryStatic(input: {
   /** Fires at the manual reflection launch site so the footer animates while the run is in flight. */
   readonly onReflectionLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
   /** Fires after each settle so the footer can refresh its segments behind the fingerprint gate. */
-  readonly onSettled?: (sessionId: string, eventCtx: unknown) => void | Promise<void>
+  readonly onSettled?: (sessionId: string, eventCtx: unknown, observer?: SettleObserver) => void | Promise<void>
   /** Fires after every successful memory write, independent of the once-only footer latch. */
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
@@ -94,6 +94,7 @@ export function registerMemoryStatic(input: {
     resolveContext,
     loadSettings: () => loadCommandSettings().settings,
     ...(entryApi === undefined ? {} : { appendEntry: (customType, data) => entryApi.appendEntry(customType, data) }),
+    onWarn: (message, detail) => options.logger?.warn(message, detail),
   })
   const promptHandler = createPromptHandler({
     resolveContext,
@@ -130,7 +131,7 @@ export function registerMemoryStatic(input: {
   pi.on("session_start", (_payload, eventCtx) => {
     if (eventCtx !== undefined) lastEventCtx.current = eventCtx
   })
-  pi.on("agent_settled", async (_payload, eventCtx) => {
+  pi.on("agent_settled", async (_payload, eventCtx, observer) => {
     lastEventCtx.current = eventCtx
     const sessionId = sessionIdFrom(eventCtx)
     if (sessionId === undefined) return undefined
@@ -138,18 +139,26 @@ export function registerMemoryStatic(input: {
     if (identity === undefined) return undefined
     activeSession.current = sessionId
     if (branchEntryCount(eventCtx) === 0) {
-      await onSettled?.(sessionId, eventCtx)
+      await onSettled?.(sessionId, eventCtx, observer)
       return undefined
     }
     // Read host getters while this event context is live, before journal or queue I/O.
     const selection = input.hasUserActivity(sessionId) ? {
       registry: resolveMemoryModelRegistry(eventCtx), sessionModel: resolveMemorySessionModel(eventCtx),
     } : undefined
-    const result = await journalWiringFor(identity).reconcileSession(eventCtx)
-    if (input.hasUserActivity(sessionId)) await factsWiringFor(identity).onSettled(sessionId, selection)
-    await onSettled?.(sessionId, eventCtx)
+    observer?.phase("onSettled.journal.reconcileSession")
+    const result = await journalWiringFor(identity).reconcileSession(eventCtx, observer?.signal)
+    observer?.signal.throwIfAborted()
+    if (resolveContext(sessionId) !== identity) return result
+    if (input.hasUserActivity(sessionId)) {
+      observer?.phase("onSettled.facts.enqueue")
+      await factsWiringFor(identity).onSettled(sessionId, selection, observer?.signal)
+    }
+    observer?.signal.throwIfAborted()
+    if (resolveContext(sessionId) !== identity) return result
+    await onSettled?.(sessionId, eventCtx, observer)
     return result
-  })
+  }, { hookLabel: "onSettled" })
   registerMemoryWriteListener(pi, options, onMemoryWrite)
   registerMemoryToolSurface(pi, () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)), {
     onCommit: (commit) => {

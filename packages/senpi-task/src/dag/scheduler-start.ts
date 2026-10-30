@@ -26,6 +26,7 @@ export function startSpec(context: SchedulerContext, nodeId: DagNodeId): Manager
     ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
     parent_session_id: record.parentSessionId,
     root_session_id: record.rootSessionId,
+    ...(record.parentModel === undefined ? {} : { parent_model: record.parentModel }),
     depth: (context.ancestry?.depth ?? 0) + 1,
     ...dagNodeExecutionMode(context, node.route),
     ...(node.route.kind === "category"

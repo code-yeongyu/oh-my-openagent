@@ -1,4 +1,4 @@
-import { closeSync, mkdirSync, openSync, truncateSync, writeSync } from "node:fs"
+import { closeSync, mkdirSync, openSync, truncateSync, writeFileSync, writeSync } from "node:fs"
 import { join } from "node:path"
 
 import { toBinary } from "@bufbuild/protobuf"
@@ -11,6 +11,7 @@ import { LogRecordSchema } from "./otlp-proto/opentelemetry/proto/logs/v1/logs_p
 import { SpanSchema } from "./otlp-proto/opentelemetry/proto/trace/v1/trace_pb.js"
 import { activeName, batchName, deleteFile, publishBatch } from "./otlp-spool-dir"
 import { frame, type Signal } from "./otlp-spool-file"
+import { ownerName, ownersDir } from "./otlp-spool-names"
 
 export type SpoolWriterInput = {
   readonly dir: string
@@ -39,6 +40,7 @@ export class SpoolWriter {
   readonly #input: SpoolWriterInput
   readonly name: string
   #fd: number | null = null
+  #owned = false
   records = 0
   bytes = 0
 
@@ -113,6 +115,7 @@ export class SpoolWriter {
       mkdirSync(this.#input.dir, { recursive: true, mode: 0o700 })
       fd = openSync(path, "a", 0o600)
     }
+    this.#markOwner()
     const header = frame(this.#input.header)
     try {
       this.#writeAll(fd, header)
@@ -124,6 +127,22 @@ export class SpoolWriter {
     this.#fd = fd
     this.bytes = header.byteLength
     return fd
+  }
+
+  /**
+   * Marks this process as a live writer for as long as it runs: once sealed, its batches have no active file,
+   * and an opt-out purge in another process must still leave them alone (`purgeIdleOtlpSpool`). Best effort:
+   * a failed marker costs no record.
+   */
+  #markOwner(): void {
+    if (this.#owned) return
+    try {
+      mkdirSync(ownersDir(this.#input.dir), { recursive: true, mode: 0o700 })
+      writeFileSync(join(ownersDir(this.#input.dir), ownerName(this.#input.signal, this.#input.pid, this.#input.bootId)), "", { mode: 0o600, flag: "a" })
+      this.#owned = true
+    } catch (error) {
+      this.#input.onError(error, 0)
+    }
   }
 
   #close(): void {
@@ -149,6 +168,9 @@ export class SpoolWriter {
 
   close(): void {
     this.#close()
+    if (!this.#owned) return
+    this.#owned = false
+    deleteFile(ownersDir(this.#input.dir), ownerName(this.#input.signal, this.#input.pid, this.#input.bootId))
   }
 }
 

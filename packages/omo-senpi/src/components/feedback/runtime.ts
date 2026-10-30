@@ -3,6 +3,8 @@
 // command and RPC shells; collection, draft building, the draft store, the upload and the TUI command flow live here.
 
 import { randomUUID } from "node:crypto"
+import { createCredentialStore, type CredentialStore, quietNotice, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
+import type { ComponentLogger } from "../../extension/types"
 
 import { collectHostSections, type HostSessionView } from "./collect-host"
 import { buildDraft, type CollectedSection, type FeedbackDraft, type FeedbackKind, type UploadRedactor } from "./draft"
@@ -10,6 +12,25 @@ import { feedbackUploadsDisabled, submitReport, type ReportClient, type ReportTr
 
 const DRAFT_TTL_MS = 30 * 60 * 1000
 const MAX_DRAFTS = 8
+
+const SIGNED_OUT_SEND = "Your OmO sign-in could not be used, so this report is sent without your account."
+
+/**
+ * The stored access token while it is still valid, else null (an anonymous send). It never refreshes: a refresh
+ * spends the single-use refresh token, and a report is worth more than its attribution. `fellBack` is a stored
+ * sign-in that could not be used.
+ */
+async function cliAccessToken(api: string, env: Readonly<Record<string, string | undefined>>, store?: CredentialStore): Promise<{ readonly token: string | null; readonly fellBack: boolean }> {
+  if (feedbackUploadsDisabled(env)) return { token: null, fellBack: false }
+  try {
+    const current = await (store ?? createCredentialStore(api, { notice: quietNotice })).read()
+    if (current === null) return { token: null, fellBack: false }
+    const valid = current.refreshState !== "uncertain" && Date.parse(current.accessTokenExpiresAt) > Date.now() + 30_000
+    return valid ? { token: current.accessToken, fellBack: false } : { token: null, fellBack: true }
+  } catch (error) {
+    return { token: null, fellBack: !(error instanceof SignInError) }
+  }
+}
 
 export interface FeedbackSessionLike {
   readonly cwd?: unknown
@@ -19,10 +40,11 @@ export interface FeedbackSessionLike {
 
 export interface FeedbackCoreConfig {
   readonly env: Readonly<Record<string, string | undefined>>
-  readonly now: () => Date
+  readonly now?: () => Date
   readonly omoVersion: string
   readonly senpiVersion: string
-  readonly channel: string
+  readonly channel?: string
+  readonly logger?: Pick<ComponentLogger, "warn">
   readonly stateDir: () => string
   readonly apiOrigin: () => string
   readonly transport: ReportTransport
@@ -125,7 +147,9 @@ const mergeSections = (host: readonly CollectedSection[], client: readonly Colle
 }
 
 export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
-  const { env, now, omoVersion, senpiVersion, channel } = config
+  const { env, omoVersion, senpiVersion } = config
+  const now = config.now ?? (() => new Date())
+  const channel = config.channel ?? (omoVersion.includes("-") ? "beta" : "latest")
   const drafts = new Map<string, StoredDraft>()
 
   const prepare = (session: FeedbackSessionLike | undefined, input: unknown, redact: UploadRedactor): FeedbackDraft => {
@@ -184,6 +208,7 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
       ...(stored.sessionHash === undefined ? {} : { sessionHash: stored.sessionHash }),
       ...(typeof idempotencyKey === "string" ? { idempotencyKey } : {}),
     })
+    if (result.kind === "refused" && (result.reason === "service-rejected" || result.reason === "service-unavailable")) config.logger?.warn("feedback.report_rejected", { code: result.code, requestId: result.requestId })
     if (result.kind !== "refused" || result.reason === "secret-detected" || result.reason === "too-large") drafts.delete(stored.draft.draftId)
     return result
   }
@@ -201,12 +226,14 @@ export interface FeedbackCommand {
   readonly kind: FeedbackKind
   readonly args: string
   readonly ui: FeedbackCommandUi
+  readonly env: Readonly<Record<string, string | undefined>>
+  readonly credentialStore?: CredentialStore
   readonly prepare: () => Promise<FeedbackDraft>
   readonly submit: (input: unknown) => Promise<SubmitResult>
 }
 
 /** The TUI flow behind /feedback and /bug: describe, see the notice, optionally see exactly what is sent, then Send. */
-export async function runFeedbackCommand({ kind, args, ui, prepare, submit }: FeedbackCommand): Promise<void> {
+export async function runFeedbackCommand({ kind, args, ui, env, credentialStore, prepare, submit }: FeedbackCommand): Promise<void> {
   let prepared: FeedbackDraft
   try {
     prepared = await prepare()
@@ -226,7 +253,9 @@ export async function runFeedbackCommand({ kind, args, ui, prepare, submit }: Fe
     if (choice !== "Send report") return
     break
   }
-  const result = await submit({ draftId: prepared.draftId, kind, description })
+  const { token, fellBack } = await cliAccessToken(env.OMO_SERVICE_API_URL ?? "https://api.omo.dev", env, credentialStore)
+  if (fellBack) ui.notify(SIGNED_OUT_SEND, "warning")
+  const result = await submit({ draftId: prepared.draftId, kind, description, accessToken: token })
   ui.notify(resultMessage(result), result.kind === "refused" ? "error" : "info")
 }
 
@@ -259,7 +288,14 @@ export function resultMessage(result: SubmitResult): string {
     case "already-sent":
       return "Your earlier report already reached the OmO team, so it was not sent again."
     case "refused":
+      if (result.reason === "service-rejected" || result.reason === "service-unavailable") {
+        const request = result.requestId === undefined ? "" : ` Request ID: ${result.requestId}.`
+        return result.reason === "service-rejected"
+          ? `The report was rejected by the service (${result.code}).${request} Update OmO and try again.`
+          : `The OmO service could not take the report right now (${result.code}).${request} Try again later.`
+      }
       return {
+        "sign-in-required": "Sign in to send a report: run omo login",
         "secret-detected": "The report still looked like it contained a password or key, so nothing was sent. Remove it from the description and try again.",
         "too-large": "The report is too large to send. Try again from a shorter conversation.",
         "rate-limited": "Too many reports in a short time. Try again in a few minutes.",

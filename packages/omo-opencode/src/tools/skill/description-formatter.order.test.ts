@@ -2,14 +2,15 @@ import { describe, expect, it } from "bun:test"
 import { formatCombinedDescription } from "./description-formatter"
 import type { CommandInfo } from "../slashcommand/types"
 import type { SkillInfo } from "./types"
-import { localSkill, makeCommand, makeSkill, opencodeNativeSkill } from "./description-formatter.test-support"
+import { makeCommand, makeSkill, opencodeNativeSkill } from "./description-formatter.test-support"
 
+// Locations OpenCode core does not scan, so these skills stay in <available_items> (#8108 drops core-listed ones).
 function discoveredSkills(): SkillInfo[] {
   return [
-    opencodeNativeSkill("deploy-model/preset", "preset desc", "/home/.agents/skills/pack/models/deploy-model/preset/SKILL.md"),
-    opencodeNativeSkill("deploy-model/capacity", "capacity desc", "/home/.agents/skills/pack/models/deploy-model/capacity/SKILL.md"),
-    localSkill("review-work"),
-    opencodeNativeSkill("deploy-model/customize", "customize desc", "/home/.agents/skills/pack/models/deploy-model/customize/SKILL.md"),
+    opencodeNativeSkill("deploy-model/preset", "preset desc", "/home/pack/models/deploy-model/preset/SKILL.md"),
+    opencodeNativeSkill("deploy-model/capacity", "capacity desc", "/home/pack/models/deploy-model/capacity/SKILL.md"),
+    makeSkill("review-work", "local desc", { scope: "project", location: "/repo/custom-skills/review-work/SKILL.md" }),
+    opencodeNativeSkill("deploy-model/customize", "customize desc", "/home/pack/models/deploy-model/customize/SKILL.md"),
     makeSkill("Zeta-upper"),
     makeSkill("alpha-lower"),
   ]

@@ -1,35 +1,14 @@
+/// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { exportRows, valueChecks } from "./fidelity-values.mjs"
-import { buildContext } from "./gates-static.mjs"
-import { parseHtml } from "./html-lite.mjs"
+import { exportRows } from "./fidelity-values.mjs"
 import { similarity } from "./text-similarity.mjs"
+import { LEDGER, SOURCES, ledgerWith, run, type Defect, type Row } from "./tests/fidelity-values-support"
 
-type Defect = { code: string; severity: string; selector: string; line: number; message: string; hint: string }
-type Row = Record<string, unknown> & { fact_id: string }
-type Ledger = { schemaVersion: number; rows: Row[]; events: unknown[] }
-type Options = { ledger?: Ledger; fillMap?: unknown[] | null; sourcesDir?: string | null; baseDir?: string; recompute?: (ledger: Ledger, row: Row) => { ok: boolean }; asOf?: string }
-
-const FIX = join(import.meta.dir, "tests", "fixtures", "fidelity")
-const SOURCES = join(FIX, "sources")
-const LEDGER: Ledger = JSON.parse(readFileSync(join(FIX, "ledger-verify.json"), "utf8"))
 const FULL = "we estimate completion no earlier than 2027"
-
-function ledgerWith(id: string, patch: Record<string, unknown>): Ledger {
-	const copy = structuredClone(LEDGER)
-	copy.rows = copy.rows.map((row) => (row.fact_id === id ? { ...row, ...patch } : row))
-	return copy
-}
-
-function run(body: string, options: Options = {}): Defect[] {
-	const html = /<h2/.test(body) ? body : `<h2>Findings</h2>\n${body}`
-	const ctx = buildContext(parseHtml(html), { baseDir: options.baseDir ?? FIX })
-	const sourcesDir = options.sourcesDir === undefined ? SOURCES : options.sourcesDir
-	return valueChecks(ctx, options.ledger ?? LEDGER, options.fillMap ?? null, sourcesDir, options) as Defect[]
-}
 
 const codes = (defects: Defect[]) => defects.map((defect) => defect.code)
 const fact = (id: string, text: string, unit = "") => `<data class="fact" data-fact="${id}"${unit ? ` data-unit="${unit}"` : ""}>${text}</data>`
@@ -53,8 +32,8 @@ describe("untraceable numbers", () => {
 		expect(codes(run("<h2>Appendix</h2><p>Revenue grew 12% [S4].</p>"))).toEqual(["untraceable_number"])
 	})
 
-	test("#given the same sentence under Sources #when checked #then it is out of scope", () => {
-		expect(run("<h2>Sources</h2><p>Revenue grew 12% [S4].</p>")).toEqual([])
+	test("#given the same sentence under Sources #when checked #then prose still needs a ledger row", () => {
+		expect(codes(run("<h2>Sources</h2><p>Revenue grew 12% [S4].</p>"))).toEqual(["untraceable_number"])
 	})
 
 	test("#given a date in prose #when checked #then dates are in scope", () => {
@@ -218,14 +197,14 @@ describe("verification claims are structural (data-claim-kind)", () => {
 		`<p>The bridge, which ran across the river, spans ${fact("F1", "up to 320 m", "m")} [S4].</p>`,
 		`<p>The span is ${fact("F1", "up to 320 m", "m")}, as confirmed with the annual inspection report [S4].</p>`,
 		`<p>Clinical tests confirmed the span of ${fact("F1", "up to 320 m", "m")} [S4].</p>`,
-		`<p>확인된 길이는 ${fact("F1", "최대 320 m", "m")} [S4].</p>`,
+		`<p>\uD655\uC778\uB41C \uAE38\uC774\uB294 ${fact("F1", "\uCD5C\uB300 320 m", "m")} [S4].</p>`,
 	]
 	for (const body of quiet) {
 		test(`#given findings prose ${JSON.stringify(body.replace(/<[^>]+>/g, ""))} #when checked #then no warning and no major`, () => expect(run(body)).toEqual([]))
 	}
 
 	test("#given an UNMARKED Korean run-and-check sentence #when checked #then verification_claim_unmarked minor only", () => {
-		expect(severities(run(`<p>우리가 실행해 확인한 길이는 ${fact("F1", "최대 320 m", "m")} [S4].</p>`))).toEqual(["verification_claim_unmarked:minor"])
+		expect(severities(run(`<p>\uC6B0\uB9AC\uAC00 \uC2E4\uD589\uD574 \uD655\uC778\uD55C \uAE38\uC774\uB294 ${fact("F1", "\uCD5C\uB300 320 m", "m")} [S4].</p>`))).toEqual(["verification_claim_unmarked:minor"])
 	})
 
 	test("#given the same run-and-check sentence MARKED verified on a command row #when checked #then no warning", () => {

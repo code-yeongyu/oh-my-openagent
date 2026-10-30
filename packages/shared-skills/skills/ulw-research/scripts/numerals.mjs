@@ -6,9 +6,12 @@
 // English number words one to twelve, an adjacent currency symbol or unit, and an adjacent bounding
 // qualifier. No numeral is ever passed through Number(). Plain Node ESM, sibling imports only.
 
+import { groupedNumberSource } from "./number-grammar.mjs"
 import { add, fromDecimal, mul, toDecimal } from "./rational.mjs"
 import { normalizeUnit } from "./units.mjs"
 
+/** European digit grouping ("1.234.567"): two or more dot groups of three digits, never a version. */
+export const DOT_GROUPED = "\\d{1,3}(?:\\.\\d{3}){2,}"
 const MONTH = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?"
 /** Stripped before claim detection: dates, versions, figure refs, times, bare years. */
 export const NOT_CLAIMS = [
@@ -19,7 +22,7 @@ export const NOT_CLAIMS = [
 	/(?:19|20)\d{2}\s*\uB144/g,
 	new RegExp(`\\b${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?`, "gi"),
 	new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH}(?:\\s+\\d{4})?`, "gi"),
-	/\bv\d+(?:\.\d+)*\b|\b\d+(?:\.\d+){2,}\b/gi,
+	new RegExp(`\\bv\\d+(?:\\.\\d+)*\\b|\\b(?!${DOT_GROUPED}(?![\\d,]|\\.\\d))\\d+(?:\\.\\d+){2,}\\b`, "gi"),
 	/\b(?:version|ver\.?|release)\s*\d+(?:\.\d+)*/gi,
 	/\b(?:fig(?:ure)?\.?|table|chart|section|step|phase|wave|part)\s*\d+(?:\.\d+)*/gi,
 	/(?:\uADF8\uB9BC|\uB3C4\uD45C|\uD45C|\uBC84\uC804)\s*\d+(?:\.\d+)*/g,
@@ -45,8 +48,8 @@ const BIG = new Map([["\uB9CC", 10000n], ["\uC5B5", 100000000n], ["\uC870", 1000
 /** A scale word that starts a longer word is not a scale: jogak (pieces), mankeum (as much as). */
 const KO_GROUP = /^(\s?)(?:(\uCC9C)?([\uB9CC\uC5B5\uC870])|(\uCC9C))(?![\uAC01\uD07C])/
 const KO_NEXT = new RegExp(`^\\s?(${NUM})(\uCC9C)?([\uB9CC\uC5B5\uC870])?`, "u")
-const LATIN_SCALE = /^(?:(k|K|M|bn|B)|\s(thousand|million|billion|trillion|bn))(?![\p{L}\d])/u
-const LATIN_FACTOR = { k: 1000n, K: 1000n, M: 1000000n, bn: 1000000000n, B: 1000000000n, thousand: 1000n, million: 1000000n, billion: 1000000000n, trillion: 1000000000000n }
+const LATIN_SCALE = /^(?:(k|K|M|mn|bn|B)|\s(thousand|million|billion|trillion|mn|bn))(?![\p{L}\d])/u
+const LATIN_FACTOR = { k: 1000n, K: 1000n, M: 1000000n, mn: 1000000n, bn: 1000000000n, B: 1000000000n, thousand: 1000n, million: 1000000n, billion: 1000000000n, trillion: 1000000000000n }
 const CURRENCY = "$\u20AC\u00A3\u00A5\u20A9"
 const SYMBOL_UNIT = /^\s?(%p|%|\u2030|\u00D7|\u00B0C|\u00B0F|\u2103|\u2109)/
 const LATIN_UNIT = /^\s?([A-Za-z]+)(?![\p{L}\d])/u
@@ -60,14 +63,22 @@ const RANGE_SEP = /^(?:\s?[-\u2013~]\s?|\sto\s)/
 const SIGN = "-\u2212"
 /** Bounding qualifiers: before the value (Korean and English) and right after it (Korean). */
 const QUALIFIERS_BEFORE = ["up to", "at least", "at most", "more than", "less than", "about", "approximately", "nearly", "over", "under", "\uCD5C\uB300", "\uCD5C\uC18C", "\uC57D"]
-const QUALIFIER_AFTER = /^\s?(\uC774\uC0C1|\uC774\uD558|\uBBF8\uB9CC|\uCD08\uACFC|\uB0B4\uC678|\uAE4C\uC9C0)/
+/** Korean bounding qualifiers written right after a value (isang, iha, miman, chogwa, naeoe, kkaji). */
+export const QUALIFIERS_AFTER = Object.freeze(["\uC774\uC0C1", "\uC774\uD558", "\uBBF8\uB9CC", "\uCD08\uACFC", "\uB0B4\uC678", "\uAE4C\uC9C0"])
+const QUALIFIER_AFTER = new RegExp(`^\\s?(${QUALIFIERS_AFTER.join("|")})`)
 
-/** "1,237" -> "1237"; a malformed group ("1,23") keeps only the leading plain number. */
+/** Comma grouping from the one grouped-number grammar (number-grammar.mjs). */
+const COMMA_GROUPED = new RegExp(`^${groupedNumberSource([","])}$`)
+
+/** "1,237" -> "1237"; a malformed group ("1,23", "12,3451") keeps only the leading plain number. */
 function cleanDigits(raw) {
-	if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(raw)) return { digits: raw.replace(/,/g, ""), length: raw.length }
+	if (COMMA_GROUPED.test(raw)) return { digits: raw.replace(/,/g, ""), length: raw.length }
 	const plain = /^\d+(?:\.\d+)?/.exec(raw)[0]
 	return { digits: plain, length: plain.length }
 }
+
+/** A numeral's digits, reading a European period grouping ("1.234.567") as one integer. */
+const digitsOf = (raw) => (new RegExp(`^${DOT_GROUPED}$`).test(raw) ? { digits: raw.replace(/\./g, ""), length: raw.length } : cleanDigits(raw))
 
 /** The bare-year and four-digit-date patterns: a numeral they cover can still be a value. */
 const YEAR_SHAPED = new Set([NOT_CLAIMS[0], NOT_CLAIMS[12]])
@@ -95,7 +106,7 @@ function findStart(text, from, ranges) {
 	let digit = null
 	for (const match of text.slice(from).matchAll(new RegExp(NUM, "gu"))) {
 		const at = from + match.index
-		const candidate = { at, ...cleanDigits(match[0]) }
+		const candidate = { at, ...digitsOf(match[0]) }
 		const end = at + candidate.length
 		const cover = covering(at)
 		const lifted = cover.every(([s, e, yearShaped]) => yearShaped && s === at && e <= end)

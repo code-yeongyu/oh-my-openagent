@@ -61,7 +61,7 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ### Prerequisites
 
-- **Bun** 1.4.3 (CI-pinned) - The only package manager for the workspace itself
+- **Bun** 1.4.4 (CI-pinned) - The only package manager for the workspace itself
 - **Node** 24 - Required for vendored packages (lsp-tools-mcp, lsp-daemon, git-bash-mcp) and the Codex plugin build via npm
 - **git** - Version control
 - **tmux** (optional) - Enables the `interactive_bash` tool and Team Mode visualization
@@ -133,7 +133,7 @@ All harnesses delegate to these scripts:
 
 | Harness | Wiring |
 | ------- | ------ |
-| GitHub Codespaces / VS Code Dev Containers | `.devcontainer/devcontainer.json` runs `postCreateCommand: script/agent/setup.sh` on `.devcontainer/Dockerfile` (Node 24 + Bun 1.4.3 + tmux) |
+| GitHub Codespaces / VS Code Dev Containers | `.devcontainer/devcontainer.json` runs `postCreateCommand: script/agent/setup.sh` on `.devcontainer/Dockerfile` (Node 24 + Bun 1.4.4 + tmux) |
 | Plain Docker | `script/agent/docker-dev.sh` builds the Dockerfile and opens a shell |
 | Cursor cloud agents | `.cursor/environment.json` `install` runs setup on environment creation |
 | Claude Code | `.claude/settings.json` `SessionStart` hook runs setup; `SessionEnd` hook launches cleanup |

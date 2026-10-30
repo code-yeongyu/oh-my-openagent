@@ -111,6 +111,8 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   // Absent by default, like a host that predates senpi#3684; a test installs the engine's limit store.
   getSubscriptionLimits?: SenpiExtensionAPI["getSubscriptionLimits"]
   onSubscriptionLimits?: SenpiExtensionAPI["onSubscriptionLimits"]
+  // Absent by default, like a host that predates senpi#3864; a test installs a recorder for run completions.
+  lifecycle?: SenpiExtensionAPI["lifecycle"]
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 

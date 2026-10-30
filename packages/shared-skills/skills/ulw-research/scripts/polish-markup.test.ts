@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { markupParts, skeletonChange } from "./html-markup.mjs"
-import { applyEdits, POLISH_MARKUP_REASON, textOf } from "./polish-apply.mjs"
+import { applyEdits, POLISH_MARKUP_REASON, POLISH_REFERENCE_REASON, textOf } from "./polish-apply.mjs"
 import { diffPolish } from "./polish-diff.mjs"
 
 const LEDGER = { rows: [{ fact_id: "F1", quote: "Revenue may reach 320 m." }] }
@@ -147,6 +147,20 @@ describe("polish edits never carry markup characters", () => {
 const AMPD = "<p>We fund R&amp;D labs here.</p>"
 const TOM = "<p>Tom & Jerry ran.</p>"
 describe("polish keeps character references intact", () => {
+	test.each(["style", "p"])("#given a quoted greater-than in a %s end tag #when its quote changes #then diff blocks", (tag: string) => {
+		const before = `<${tag}>p{}</${tag} a='>'> trailing prose`
+		const after = before.replace(">'", ">x")
+		expect(diffPolish(before, after, LEDGER).map((item: { code: string }) => item.code)).toContain("polish_diff_fail")
+	})
+
+	test.each(["&amp.", `&${"a".repeat(24)}.`])("#given %s immediately before an edit #when extended #then the reference reason is actionable", (reference: string) => {
+		const html = `<p>${reference} next</p>`
+		const result = applyEdits(html, [{ before: " next", after: "later" }], LEDGER)
+		expect(result.rejected[0]?.reason).toContain(POLISH_REFERENCE_REASON)
+		expect(result.out).toBe(html)
+		expect(diffPolish(html, html.replace(" next", "later"), LEDGER).map((item: { code: string }) => item.code)).toContain("polish_diff_fail")
+	})
+
 	test.each([
 		["an edit starting inside an entity", AMPD, "amp;D labs", "lt;D labs"],
 		["an edit starting right after a bare ampersand", TOM, " Jerry ran", "lt; ran"],

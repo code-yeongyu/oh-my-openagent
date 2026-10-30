@@ -88,6 +88,10 @@ export const ERROR_CODES = [
 	"InputBusy",
 	"ControlRequired",
 	"CaptureUnavailable",
+	"UserIntervened",
+	"AxUnconfirmed",
+	"SpaceUnsupported",
+	"SpaceMoveDenied",
 ] as const;
 
 export type EngineMethod = (typeof ENGINE_METHODS)[number];

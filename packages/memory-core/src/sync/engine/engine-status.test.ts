@@ -108,7 +108,7 @@ test.each([
     kind: "failing",
     since: b.clock.now(),
     attempts: 1,
-    failure: { kind: "auth_expired", reason: expect.any(String), action: "Sign in to OmO again." },
+    failure: { kind: "auth_expired", reason: expect.any(String), action: expect.any(String) },
   })
   load.mockRestore()
   await b.engine.runCycle()

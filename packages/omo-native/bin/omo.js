@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./lib/private-fds.js"
 import { fileURLToPath } from "node:url"
 import { ensureBunBinShim } from "./lib/bun-bin-shim.js"
 import { maybeReexecUnderBun } from "./lib/bun-runtime.js"

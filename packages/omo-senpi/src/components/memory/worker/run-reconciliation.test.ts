@@ -26,6 +26,55 @@ import {
 afterEach(cleanupReconciliationFixtures)
 
 describe("reflection and dream run reconciliation", () => {
+  test.each(["alive", "unknown", "dead-before-term", "dead-before-kill"] as const)(
+    "#given a %s supervisor wait #when its observer is cancelled #then no new terminal claim or child signal occurs",
+    async (branch) => {
+      const item = await fixture()
+      await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
+        ...item.ledger, pid: 222, processStart: "supervisor",
+        childPid: 333, childProcessStart: "child",
+      })
+      const initial = await item.store.readState()
+      const entered = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<void>()
+      const controller = new AbortController()
+      const reason = new Error("settle observer cancelled")
+      const signals: NodeJS.Signals[] = []
+      let waits = 0
+      const pass = reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        signal: controller.signal,
+        getPidLiveness: (pid) => pid === 333 ? "alive" : branch.startsWith("dead") ? "dead" : branch === "unknown" ? "unknown" : "alive",
+        getProcessStartIdentity: async (pid) => pid === 222 ? "supervisor" : "child",
+        waitForOutcome: async () => { entered.resolve(); await release.promise; return "timeout" },
+        waitUntil: async () => {
+          waits += 1
+          if (branch === "dead-before-kill" && waits === 1) return
+          entered.resolve()
+          await release.promise
+        },
+        signalProcessGroup: (_pid, signal) => { signals.push(signal) },
+      }).then(() => undefined, (error: unknown) => error)
+      await withinPhase("observer entered wait", () => entered.promise)
+      controller.abort(reason)
+      release.resolve()
+      expect(await withinPhase("cancelled pass", () => pass)).toBe(reason)
+      expect(signals).toEqual(branch === "dead-before-kill" ? ["SIGTERM"] : [])
+      expect(await item.store.readState()).toEqual(initial)
+      for (const name of ["terminal-claim.json", "abandoned.json", "final.json"]) {
+        expect(existsSync(join(item.runDir, name))).toBe(false)
+      }
+      expect(existsSync(item.worktree.dir)).toBe(true)
+      // A later uncancelled observer still owns recovery; cancellation did not consume the run.
+      const recovered = await reconcileReflectionRuns({
+        identity: item.identity, reservation: item.store, getPidLiveness: () => "dead",
+      })
+      expect(recovered).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    },
+    30_000,
+  )
+
   test("#given the scheduler owner is unreadable on Windows #when reconciliation defers #then reservation state is not mutated", async () => {
     const item = await fixture()
     const initialState = await item.store.readState()

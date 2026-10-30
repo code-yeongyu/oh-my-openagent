@@ -138,7 +138,7 @@ describe("telemetry schema artifacts", () => {
       "log.record.uid", "session.id", "omo.session.role", "omo.provider", "gen_ai.provider.name", "omo.model_id",
       "gen_ai.usage.input_tokens", "gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cache_creation.input_tokens",
       "gen_ai.usage.output_tokens", "gen_ai.usage.reasoning.output_tokens", "omo.usage.total_tokens", "omo.cost.usd_1e4",
-      "omo.turn.index", "omo.sample_rate", "omo.machine_hash", "gen_ai.request.model", "gen_ai.response.model",
+      "omo.turn.index", "omo.sample_rate", "gen_ai.request.model", "gen_ai.response.model",
     ]))
     expect(turn).not.toHaveProperty(["omo.cost_usd"])
     expect(SENPI.derived_properties["omo.turn_completed"]).toEqual({ cost_usd: { from: "omo.cost.usd_1e4", divide_by: 10_000 } })
@@ -170,7 +170,7 @@ describe("telemetry schema artifacts", () => {
   test("#then turn_completed requires every attribute but the optional GenAI model ids, and session.id is required everywhere except sessionless events", () => {
     const turn = SENPI.events["omo.turn_completed"] ?? {}
     const optional = Object.entries(turn).filter(([, spec]) => !spec.required).map(([key]) => key).sort()
-    expect(optional).toEqual(["gen_ai.request.model", "gen_ai.response.model", "omo.machine_hash", "omo.session.role"])
+    expect(optional).toEqual(["gen_ai.request.model", "gen_ai.response.model", "omo.session.role"])
     for (const [event, attributes] of Object.entries(SENPI.events)) {
       expect(attributes["log.record.uid"]?.required).toBe(true)
       if (attributes["session.id"] !== undefined) {

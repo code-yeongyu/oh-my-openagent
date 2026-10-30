@@ -111,6 +111,31 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
+  test.each(["cancel", "attach", "detach"] as const)(
+    "#given a pending status snapshot #when %s retires its observer #then it cannot publish into the next binding",
+    async (retire) => {
+      const context = await contextFixture()
+      const host = rpcHost()
+      const entered = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<string | null>()
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: () => stubRepo({ head: () => { entered.resolve(); return release.promise } }),
+      })
+      const controller = new AbortController()
+      bridge.attach("session-1")
+      const pending = bridge.sync(controller.signal)
+      await entered.promise
+      if (retire === "cancel") controller.abort()
+      else if (retire === "attach") bridge.attach("session-2")
+      else bridge.detach()
+      release.resolve("0123456789abcdef0123456789abcdef01234567")
+      await pending
+      expect(host.emits).toEqual([])
+    },
+  )
+
   test("#given a never-written identity #when backfill reads #then no runtime directories are created", async () => {
     const root = await mkdtemp(join(tmpdir(), "recap-read-only-"))
     roots.push(root)

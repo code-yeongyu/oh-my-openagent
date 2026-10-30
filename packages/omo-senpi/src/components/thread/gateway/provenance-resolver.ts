@@ -19,7 +19,7 @@ export type ProvenanceRuntime = {
   readonly loadWorkspaces?: (cwd: string, env: Readonly<Record<string, string | undefined>>) => ProvenanceWorkspaces
   /** Where a degraded classification is reported (git or the config table failed); the send itself goes on. */
   readonly onWarning?: (message: string) => void
-  /** A runtime IO seam, not an agent/tool argument. */
+  /** A runtime IO seam, not an agent/tool argument. When given, it replaces the whole git probe, so `execGit` and `readGitFile` are not used. */
   readonly gitRemote?: (cwd: string) => Promise<string | undefined>
   /** Runtime IO seams for the git probe, so every failure class is exercised the same way on every platform. */
   readonly execGit?: ExecGit
@@ -31,6 +31,8 @@ export type GitRun =
   | { readonly ok: true; readonly stdout: string }
   | { readonly ok: false; readonly code: number | string | null; readonly killed: boolean; readonly stderr: string; readonly message: string }
 export type ExecGit = (args: readonly string[], options: { readonly cwd: string; readonly env: Readonly<Record<string, string | undefined>>; readonly timeoutMs: number }) => Promise<GitRun>
+
+const GIT_ORIGIN_TIMEOUT_MS = 1_000
 
 const execGitFile: ExecGit = (args, options) => new Promise((done) => {
   execFile("git", [...args], { cwd: options.cwd, env: options.env, encoding: "utf8", windowsHide: true, timeout: options.timeoutMs }, (error, stdout, stderr) => {
@@ -73,10 +75,10 @@ function insideRepository(cwd: string, env: Readonly<Record<string, string | und
 // classified without git: it never fails the send.
 async function originRemote(cwd: string, env: Readonly<Record<string, string | undefined>>, warn: (message: string) => void, runtime: ProvenanceRuntime): Promise<string | undefined> {
   if (!insideRepository(cwd, env, warn, runtime.readGitFile ?? ((path) => readFileSync(path, "utf8")))) return undefined
-  const run = await (runtime.execGit ?? execGitFile)(["remote", "get-url", "origin"], { cwd, env, timeoutMs: 1_000 })
+  const run = await (runtime.execGit ?? execGitFile)(["remote", "get-url", "origin"], { cwd, env, timeoutMs: GIT_ORIGIN_TIMEOUT_MS })
   if (run.ok) return run.stdout.trim()
   if (run.code === "ENOENT") warn("git is not installed for the sender, so git does not classify this send")
-  else if (run.killed) warn("reading the sender's git origin failed, so git does not classify this send: git did not answer within 1000 ms")
+  else if (run.killed) warn(`reading the sender's git origin failed, so git does not classify this send: git did not answer within ${GIT_ORIGIN_TIMEOUT_MS} ms`)
   else if (run.code !== 2) warn(`reading the sender's git origin failed, so git does not classify this send: ${run.stderr.trim() || run.message}`)
   return undefined
 }

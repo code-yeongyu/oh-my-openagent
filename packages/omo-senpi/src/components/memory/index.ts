@@ -17,6 +17,7 @@ import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
 import { sweepTransientMemoryRuns, type TransientSweep } from "./transient-sweep"
+import { registerRecallMemoryReporter } from "./memory-reporter"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 
 const GLOBAL_DISABLED_FLAG = "omo-senpi-disabled"
@@ -145,6 +146,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         logger: ctx.logger,
       })
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
+      registerRecallMemoryReporter(pi)
       const unsubscribeReload = pi.events?.on(CONFIG_WATCH_RELOADED, (payload) => {
         if (!isOmoConfigReload(payload)) return
         const enabled = isEnabled(resolveMemoryConfig(loadConfig({ cwd })), ctx, env)

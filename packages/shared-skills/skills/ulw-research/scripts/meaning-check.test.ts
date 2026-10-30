@@ -211,6 +211,15 @@ describe("ingestVerdicts: unreadable verdict files", () => {
 	})
 })
 
+describe("ingestVerdicts: malformed pairs input", () => {
+	test("#given a missing or malformed pairs input #when ingested #then it refuses instead of reporting a clean result", () => {
+		for (const bad of [undefined, null, {}, { pairs: "P1" }, "pairs.json", 7]) {
+			expect(() => ingestVerdicts(bad as never, []), JSON.stringify(bad)).toThrow(TypeError)
+		}
+		expect(ingestVerdicts({ pairs: [] }, []).unverified).toEqual([])
+	})
+})
+
 describe("ingestVerdicts: the no-model contract", () => {
 	test("#given the module source #when read #then it never fetches or imports a network or model client", () => {
 		const text = readFileSync(join(import.meta.dir, "meaning-check.mjs"), "utf8")

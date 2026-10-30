@@ -10,7 +10,7 @@ use senpi_desktop_core::protocol_params::{
 };
 use senpi_desktop_core::types::{DesktopWindow, PointerOptions, Target};
 
-use senpi_desktop_safety::MutatingAction;
+use senpi_desktop_safety::{MutatingAction, StopPolicy, Supervisor};
 
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
@@ -168,18 +168,7 @@ impl Worker {
         let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let mode = delivery(params.opts.as_ref())?;
-            let check_stop = || {
-                let is_cancelled = cancelled();
-                if supervisor.is_suspended() {
-                    Err(DesktopError::new(ErrorCode::Suspended, "input was suspended while typing"))
-                } else if let Some(stopped) = crate::mutate::interruption(&supervisor, &policy) {
-                    Err(stopped)
-                } else if is_cancelled {
-                    Err(DesktopError::new(ErrorCode::Cancelled, "the request was cancelled while typing"))
-                } else {
-                    Ok(())
-                }
-            };
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "typing");
             worker.backend()?.type_text_interruptible(
                 &target,
                 &params.text,
@@ -205,10 +194,13 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
-            worker.backend()?.key_chord(&target, &keys, mode)?;
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "pressing keys");
+            worker.backend()?.key_chord_interruptible(&target, &keys, mode, &check_stop)?;
             Ok(Response::Unit)
         })
     }
@@ -229,6 +221,27 @@ impl Worker {
             worker.backend()?.raise_window(window_id)?;
             Ok(Response::Unit)
         })
+    }
+}
+
+/// The check an interruptible input call runs before each press: a
+/// suspension, then a stop path that stopped authorizing input, then a
+/// cancellation; `doing` names the input in the error.
+fn interrupted(
+    supervisor: &Supervisor,
+    policy: &StopPolicy,
+    cancelled: &dyn Fn() -> bool,
+    doing: &str,
+) -> CoreResult<()> {
+    let is_cancelled = cancelled();
+    if supervisor.is_suspended() {
+        Err(DesktopError::new(ErrorCode::Suspended, format!("input was suspended while {doing}")))
+    } else if let Some(stopped) = crate::mutate::interruption(supervisor, policy) {
+        Err(stopped)
+    } else if is_cancelled {
+        Err(DesktopError::new(ErrorCode::Cancelled, format!("the request was cancelled while {doing}")))
+    } else {
+        Ok(())
     }
 }
 

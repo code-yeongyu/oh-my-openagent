@@ -16,7 +16,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel, isGeminiModel, isKimiK2CodeModel, isKimiK2Model, isKimiK3Model, buildClaudeThinkingConfig } from "../types"
+import { isGlmModel, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel, isGeminiModel, isKimiK2CodeModel, isKimiK2Model, isKimiK3Model, isKimiK31Model, buildClaudeThinkingConfig } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -24,10 +24,13 @@ import {
   type PermissionValue,
 } from "../../shared/permission-compat"
 
+import { withRefusalRule } from "../refusal-rule"
+import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
 import { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
 import { buildKimiK27SisyphusJuniorPrompt } from "./kimi-k2-7"
 import { buildKimiK3SisyphusJuniorPrompt } from "./kimi-k3"
+import { buildKimiK31SisyphusJuniorPrompt } from "./kimi-k3-1"
 import { buildGptSisyphusJuniorPrompt } from "./gpt"
 import { buildGpt54SisyphusJuniorPrompt } from "./gpt-5-4"
 import { buildGpt55SisyphusJuniorPrompt } from "./gpt-5-5"
@@ -50,6 +53,7 @@ export type SisyphusJuniorPromptSource =
   | "kimi-k2"
   | "kimi-k2-7"
   | "kimi-k3"
+  | "kimi-k3-1"
   | "gpt"
   | "gpt-5-5"
   | "gpt-5-4"
@@ -57,6 +61,7 @@ export type SisyphusJuniorPromptSource =
   | "glm-5-2"
 
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
+  if (model && isKimiK31Model(model)) return "kimi-k3-1"
   if (model && isKimiK3Model(model)) return "kimi-k3"
   if (model && isKimiK2CodeModel(model)) return "kimi-k2-7"
   if (model && isKimiK2Model(model)) return "kimi-k2"
@@ -81,9 +86,22 @@ export function buildSisyphusJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
 ): string {
+  // The rule goes after the model's base prompt and before the user's prompt_append, which stays last.
+  const prompt = withRefusalRule(buildSisyphusJuniorPromptBody(model, useTaskSystem))
+  if (!promptAppend) return prompt
+  return prompt + "\n\n" + resolvePromptAppend(promptAppend)
+}
+
+function buildSisyphusJuniorPromptBody(
+  model: string | undefined,
+  useTaskSystem: boolean,
+  promptAppend?: string
+): string {
   const source = getSisyphusJuniorPromptSource(model)
 
   switch (source) {
+    case "kimi-k3-1":
+      return buildKimiK31SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "kimi-k3":
       return buildKimiK3SisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "kimi-k2-7":

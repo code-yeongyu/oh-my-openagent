@@ -194,7 +194,7 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "CREATE TABLE extension_objects (type TEXT NOT NULL, name TEXT NOT NULL, owner TEXT, PRIMARY KEY (type, name))",
     "INSERT INTO extension_objects (type, name, owner) SELECT type, name, NULL FROM sqlite_schema",
   ],
-  // v7: `whatsapp` is a binding platform (the omo-gateway WhatsApp channel binds its chats here).
+  // v7: `whatsapp` is a binding platform (a WhatsApp connector binds its chats here).
   // SQLite cannot widen a CHECK in place, so `bindings` is rebuilt with the widened list; every
   // column is carried over verbatim and the two indexes are recreated before the old table drops.
   // This step runs with foreign_keys OFF (set in migrate()): a table drop would otherwise fire
@@ -259,11 +259,7 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
      WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
   ],
 
-  // v10 (#10458 review T1): durable receipts of the agent toolkit's layer-2 calls. Written INSIDE the
-  // op's own transaction, so a committed effect and its recorded result are one unit: a retry whose
-  // response was lost returns the recorded result instead of running the effect again. Like v9 it replays
-  // v8 and creates only what is missing: a store the old branch numbering left at v9 has this table but
-  // no provenance trigger.
+  // v10: a receipts table (kept for existing stores; no longer written).
   [
     ...PROVENANCE_MIGRATION,
     `CREATE TABLE IF NOT EXISTS toolkit_replay_receipts (

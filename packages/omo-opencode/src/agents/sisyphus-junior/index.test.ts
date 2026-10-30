@@ -463,15 +463,10 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("kimi-k3")
   })
 
-  test("returns 'kimi-k3' for k3p1 shorthand", () => {
-    // given
-    const model = "kimi-for-coding/k3p1"
-
-    // when
-    const source = getSisyphusJuniorPromptSource(model)
-
-    // then
-    expect(source).toBe("kimi-k3")
+  test("returns 'kimi-k3-1' for the K3.1 ids and the k3p1 shorthand", () => {
+    for (const model of ["kimi-for-coding/k3p1", "kimi-coding/k3.1-pro", "moonshotai/kimi-k3.1-pro"]) {
+      expect({ model, source: getSisyphusJuniorPromptSource(model) }).toEqual({ model, source: "kimi-k3-1" })
+    }
   })
 
   test("returns 'kimi-k2-7' for kimi-k2.7 model, not 'kimi-k2'", () => {

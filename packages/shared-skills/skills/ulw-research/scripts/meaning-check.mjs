@@ -20,8 +20,16 @@ export const DRIFT_KINDS = Object.freeze([
 	"direction_flipped", "population_changed", "evidence_grade_raised", "other",
 ])
 export const MODEL_TIERS = Object.freeze(["cheap", "strong"])
-const VERDICTS = new Set(["drift", "ok"])
-const DRIFT_SET = new Set(DRIFT_KINDS)
+export const VERDICTS = Object.freeze(["drift", "ok"])
+export const isDriftKind = (kind) => DRIFT_KINDS.includes(kind)
+/** The machine-read verdict contract a reader lane receives with pairs.json; built from the registries above. */
+export const VERDICT_SCHEMA = Object.freeze({
+	model_tier: MODEL_TIERS,
+	verdict: VERDICTS,
+	drift_kind: DRIFT_KINDS,
+	required: Object.freeze(["pair_id", "verdict"]),
+	drift_required: Object.freeze(["drift_kind", "fragment", "source_fragment"]),
+})
 
 /** NFC, every whitespace run collapsed to one space, trimmed. */
 const squash = (text) => String(text ?? "").normalize("NFC").replace(/\s+/gu, " ").trim()
@@ -54,10 +62,10 @@ function verdictsOf(input) {
 function dropReason(verdict, pair) {
 	if (verdict === null || typeof verdict !== "object") return "malformed_verdict"
 	if (!pair) return "unknown_pair"
-	if (!VERDICTS.has(verdict.verdict)) return "invalid_verdict"
+	if (!VERDICTS.includes(verdict.verdict)) return "invalid_verdict"
 	if (!MODEL_TIERS.includes(verdict.model_tier)) return "invalid_model_tier"
 	if (verdict.verdict === "ok") return null
-	if (!DRIFT_SET.has(verdict.drift_kind)) return "unknown_drift_kind"
+	if (!isDriftKind(verdict.drift_kind)) return "unknown_drift_kind"
 	const [fragment, sourceFragment] = [squash(verdict.fragment), squash(verdict.source_fragment)]
 	if (fragment === "" || sourceFragment === "") return "empty_fragment"
 	if (!squash(pair.sentence).includes(fragment)) return "fragment_not_found"
@@ -86,6 +94,22 @@ function defect(code, pair, driftKind, tiers, verdicts) {
 		message: `${pair.pair_id}: ${tiers.join(" and ")} reader${tiers.length > 1 ? "s" : ""} found ${driftKind} at "${squash(first.fragment)}"`,
 		hint: entry.hint,
 	}
+}
+
+/** One meaning_unverified defect per coverage gap, so blocksDelivery sees an unread pair through the registry. */
+export function unverifiedDefects(unverified) {
+	const entry = DEFECT_CODES.meaning_unverified
+	return unverified.map((gap) => ({
+		code: "meaning_unverified",
+		severity: entry.severity,
+		integrity: entry.integrity,
+		pair_id: gap.pair_id,
+		reason: gap.reason,
+		selector: null,
+		line: null,
+		message: `${gap.pair_id}: ${gap.reason === "no_strong_verdict" ? "no strong reader judged this force_strong pair" : "no reader judged this pair"}`,
+		hint: entry.hint,
+	}))
 }
 
 /** Pairs with no accepted verdict, and force_strong pairs with no accepted strong verdict, in pair order. */
@@ -131,9 +155,12 @@ function agreedKind(tiers) {
  *   force_strong pair no strong reader judged (`no_strong_verdict`); a verdict that was dropped
  *   does not count as read. A consumer MUST treat a non-empty list as blocking: the pairs were
  *   never checked, so an empty `defects` list does not mean the report is clean.
+ * @throws {TypeError} when pairs is neither an array nor `{ pairs: [...] }` (fail closed: a missing
+ *   pairs input never reads as a fully verified report)
  */
 export function ingestVerdicts(pairs, verdictFiles, options = {}) {
-	const list = Array.isArray(pairs) ? pairs : (pairs?.pairs ?? [])
+	const list = Array.isArray(pairs) ? pairs : pairs?.pairs
+	if (!Array.isArray(list)) throw new TypeError("pairs: expected an array of pairs or { pairs: [...] }")
 	const byId = new Map(list.map((pair) => [pair.pair_id, pair]))
 	const accepted = []
 	const dropped = []

@@ -127,7 +127,7 @@ describe("design-check regressions", () => {
 	test("#given the assumed row F9 unmarked or marked fact #then both refuse it, and the unmarked message names the A mark", () => {
 		expect(codes(prose(value(F9)))).toEqual(["claim_kind_mismatch"])
 		expect(codes(prose(value(F9, "fact")))).toEqual(["claim_kind_mismatch"])
-		expect(JSON.stringify(claims(prose(value(F9))))).toContain("{{A:F9}}")
+		expect(JSON.stringify(claims(prose(value(F9))))).toContain("{{A:F9:growth_rate}}")
 	})
 
 	test("#given the assumed row F9 marked {{A:F9}} (data-claim-kind=assumed) #then no claim defect", () => {
@@ -155,6 +155,21 @@ describe("unmarked phrases", () => {
 		"우리 팀이 벤치마크를 돌려 얻은 값",
 		"그래서 우리는 스크립트를 실행했다",
 		"직접 실행한 결과",
+		"우리는 결과를 확인했다",
+		"We confirmed the result.",
+		"We verified the span against the field log.",
+		"We double-checked the totals.",
+		"We cross-checked the values.",
+		"We\u2019ve confirmed the result.",
+		"We confirmed that the recorded span is up to 320 m.",
+		"We measured 42 ms.",
+		"저희는 측정값 320 m를 검증했다",
+		"We measured a latency of 40 ms, as this report shows.",
+		"We verified the value on page 3.",
+		"We checked the totals, which the filing also lists.",
+		"우리는 결과를 확인하였다",
+		"우리는 실행 결과를 검증하였다",
+		"우리는 지연 시간 40 ms를 측정했고, 보고서도 같은 값을 적었다",
 	]
 	const quiet = [
 		"The tests showed a 12 % drop.",
@@ -169,10 +184,30 @@ describe("unmarked phrases", () => {
 		"우리나라에서 실행된 정책은 320개다",
 		"우리 정부가 실행한 예산",
 		"우리가 의뢰한 업체가 테스트를 돌렸다",
-		"우리는 결과를 확인했다",
+		"We checked the box to opt in.",
+		"As we observed in Section 2, demand is seasonal.",
+		"The values we observed were higher than the 2023 baseline.",
+		"We checked into the hotel.",
+		"We checked in at the hotel.",
+		"In Phase I observed values rose.",
+		"We confirmed the figure against the 2024 annual report.",
+		"We use confirmed values, validated inputs, checked references, observed events, and measured responses.",
+		"The authors confirmed that the value was measured.",
+		"우리는 보고서의 수치를 확인했다",
+		"우리는 일정을 확인했다",
+		"우리는 공시 자료의 수치를 확인하였다",
+		"We measured the latency in the published report.",
 	]
 	for (const text of fires) test(`#given "${text}" #then verified`, () => expect(unmarkedKinds(text)).toEqual(["verified"]))
 	for (const text of quiet) test(`#given "${text}" #then nothing`, () => expect(unmarkedKinds(text)).toEqual([]))
+})
+
+describe("references/report-gates.md lists the shipped cue rule", () => {
+	test("the verification_claim_unmarked glossary row carries CLAIM_KINDS.verified.unmarked.rule verbatim", () => {
+		const glossary = readFileSync(join(import.meta.dir, "..", "references", "report-gates.md"), "utf8")
+		const row = glossary.split("\n").find((line) => line.startsWith("| `verification_claim_unmarked` |")) ?? ""
+		expect(row).toContain(CLAIM_KINDS.verified.unmarked?.rule ?? "missing rule")
+	})
 })
 
 describe("references/fidelity-claim-kinds.md is rendered from CLAIM_KINDS", () => {

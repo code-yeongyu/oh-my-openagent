@@ -147,10 +147,13 @@ describe("submitReport", () => {
   })
 
   test.each([
-    [413, "too-large"],
-    [429, "rate-limited"],
-    [503, "unavailable"],
-  ] as const)("#given the service answers %i #when the report is submitted #then it is refused as %s", async (status, reason) => {
+    [401, { kind: "refused", reason: "sign-in-required" }],
+    [403, { kind: "refused", reason: "sign-in-required" }],
+    [413, { kind: "refused", reason: "too-large" }],
+    [429, { kind: "refused", reason: "rate-limited" }],
+    [418, { kind: "refused", reason: "service-rejected", code: "unknown" }],
+    [503, { kind: "refused", reason: "service-unavailable", code: "unknown" }],
+  ] as const)("#given an answer %i without a known error code #when the report is submitted #then it is refused as %o", async (status, refusal) => {
     const { transport } = recordingTransport(status, { error: { code: "x" } })
 
     const result = await submitReport({
@@ -166,7 +169,7 @@ describe("submitReport", () => {
       transport,
     })
 
-    expect(result).toEqual({ kind: "refused", reason })
+    expect(result).toEqual(refusal)
   })
 
   test("#given the report folder cannot be created #when uploads are off and the report is saved #then the user gets a refusal instead of a crash", async () => {
@@ -268,7 +271,7 @@ describe("submitReport", () => {
       transport,
     })
 
-    expect(result).toEqual({ kind: "refused", reason: "unavailable" })
+    expect(result).toEqual({ kind: "refused", reason: "service-rejected", code: "conflict" })
   })
 })
 

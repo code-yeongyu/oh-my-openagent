@@ -1,5 +1,6 @@
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+import { FABLE_55_LAUNCH, launchRungs } from "@oh-my-opencode/model-core"
 
 /**
  * A model profile is a named, ordered model chain a human picks by lane
@@ -97,7 +98,10 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     tier: "heavy",
     displayName: "Daily · Heavy",
     description: "Gets any task done, after thinking it over from more sides.",
-    models: [{ providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "xhigh" }],
+    models: launchRungs([
+      { providers: [...CLAUDE_PROVIDERS], model: FABLE_55_LAUNCH.id, variant: "xhigh" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "xhigh" },
+    ]),
   },
   "geeky-normal": {
     family: "geeky",

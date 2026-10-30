@@ -93,6 +93,11 @@ export async function runSelfUpdate(args, options = {}) {
     return 0
   }
   if (target !== undefined && target === before.omo) {
+    // Already on the target, the update installs nothing, so a broken engine tree needs the reinstall named.
+    if (before.engine === "unknown") {
+      error(`omo ${before.omo} is up to date, but its engine files are missing or incomplete; reinstall with: ${update.command}`)
+      return 1
+    }
     log(`omo ${before.omo} is up to date (omo-ai@${channel} is ${target})`)
     return 0
   }

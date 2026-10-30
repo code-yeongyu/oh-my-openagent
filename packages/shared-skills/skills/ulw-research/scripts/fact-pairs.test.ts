@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { indexClaims } from "./claims-index.mjs"
-import { extractPairs, hasHedge } from "./fact-pairs.mjs"
+import { extractPairs, hasHedge, PAIR_KINDS } from "./fact-pairs.mjs"
 import { fill } from "./fact-fill.mjs"
 
 type Row = Record<string, unknown> & { fact_id: string }
@@ -39,8 +39,8 @@ function filled(): { out: string; fillMap: { fact_id: string }[] } {
 }
 
 function pairs(): Pair[] {
-	const { out, fillMap } = filled()
-	return extractPairs(out, LEDGER, CLAIMS, fillMap) as Pair[]
+	const { out } = filled()
+	return extractPairs(out, LEDGER, CLAIMS) as Pair[]
 }
 
 describe("extractPairs: a filled report", () => {
@@ -54,6 +54,11 @@ describe("extractPairs: a filled report", () => {
 			["P5", "translation"],
 			["P6", "claim"],
 		])
+	})
+
+	test("#given the fixture that produces every pair kind #when extracted #then the kinds are exactly PAIR_KINDS", () => {
+		expect([...new Set(pairs().map((pair) => pair.kind))].sort()).toEqual([...PAIR_KINDS].sort())
+		expect(Object.isFrozen(PAIR_KINDS)).toBe(true)
 	})
 
 	test("#given two facts sharing one source quote #when extracted #then one quote pair names both", () => {
@@ -105,14 +110,7 @@ describe("extractPairs: a filled report", () => {
 		expect(sentences.some((text) => text.includes("Bridge authority"))).toBe(false)
 	})
 
-	test("#given a fill map that omits a fact #when extracted #then that hand-typed fact yields no pair", () => {
-		const { out, fillMap } = filled()
-		const kept = fillMap.filter((entry) => entry.fact_id !== "F13")
-		const result = extractPairs(out, LEDGER, CLAIMS, kept) as Pair[]
-		expect(result.some((pair) => Array.isArray(pair.fact_ids) && (pair.fact_ids as string[]).includes("F13"))).toBe(false)
-	})
-
-	test("#given no fill map #when extracted #then every data-fact element counts as filled", () => {
+	test("#given the filled fixture #when extracted #then every data-fact element yields its pair", () => {
 		const { out } = filled()
 		expect((extractPairs(out, LEDGER, CLAIMS) as Pair[]).length).toBe(6)
 	})
@@ -120,17 +118,8 @@ describe("extractPairs: a filled report", () => {
 	test("#given a Hangul quote #when extracted #then source_lang is ko", () => {
 		const html = "<html><body><h2>Findings</h2><p>HBM revenue reached {{F21:hbm_rev}} [S5].</p></body></html>"
 		const result = fill(html, LEDGER, { format: "html" }) as { out: string; fillMap: { fact_id: string }[] }
-		const [pair] = extractPairs(result.out, LEDGER, CLAIMS, result.fillMap) as Pair[]
+		const [pair] = extractPairs(result.out, LEDGER, CLAIMS) as Pair[]
 		expect(pair).toMatchObject({ fact_ids: ["F21"], source_lang: "ko", report_lang: "en" })
-	})
-})
-
-describe("extractPairs: a fill map over translations", () => {
-	test("#given a fill map that omits the translated fact #when extracted #then no translation pair is emitted", () => {
-		const { out, fillMap } = filled()
-		const kept = fillMap.filter((entry) => entry.fact_id !== "Q7")
-		const result = extractPairs(out, LEDGER, CLAIMS, kept) as Pair[]
-		expect(result.some((pair) => pair.kind === "translation")).toBe(false)
 	})
 })
 
@@ -147,9 +136,9 @@ describe("hasHedge: a month is not a hedge", () => {
 
 describe("extractPairs: determinism", () => {
 	test("#given the same filled report twice #when extracted #then both results are byte-for-byte equal", () => {
-		const { out, fillMap } = filled()
-		const first = JSON.stringify(extractPairs(out, LEDGER, CLAIMS, fillMap))
-		const second = JSON.stringify(extractPairs(out, LEDGER, CLAIMS, fillMap))
+		const { out } = filled()
+		const first = JSON.stringify(extractPairs(out, LEDGER, CLAIMS))
+		const second = JSON.stringify(extractPairs(out, LEDGER, CLAIMS))
 		expect(second).toBe(first)
 	})
 })

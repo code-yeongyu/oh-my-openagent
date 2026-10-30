@@ -96,15 +96,20 @@ export async function suspendOnSessionShutdown(
 // ownership before teardown settles the turn, so no cancelled/error terminal can land on the
 // suspended record), then local resources are torn down and the record is parked at its suspended
 // residency. The pre-dispose steps are best-effort so dispose ALWAYS runs.
-export async function suspendHandle(context: LifecycleContext, handle: ResidentHandle, reason: string): Promise<void> {
-  context.registry.forget(handle.task_id, { path: "park" })
+export async function suspendHandle(
+  context: LifecycleContext,
+  handle: ResidentHandle,
+  reason: string,
+  owns: () => boolean = () => true,
+): Promise<void> {
+  if (owns()) context.registry.forget(handle.task_id, { path: "park" })
   const target = { taskId: handle.task_id, pid: handle.pid }
   if (handle.kind !== "host-session") {
     await bestEffort(handle.task_id, "abort", () => withinTeardownBudget(context.teardownStepDeadline, target, "abort", () => handle.abort()))
   }
   // A finished child's session stays loaded on the daemon after the detach: its terminal status goes
   // out first, over the attachment, so a successor host drops the park instead of reopening it (omo#10778).
-  const status = context.store.load(handle.task_id)?.status
+  const status = owns() ? context.store.load(handle.task_id)?.status : undefined
   const publish = handle.publishTaskStatus?.bind(handle)
   if (status !== undefined && TERMINAL_STATUSES.has(status) && publish !== undefined) {
     await bestEffort(handle.task_id, "publish_task_status", () =>
@@ -114,9 +119,10 @@ export async function suspendHandle(context: LifecycleContext, handle: ResidentH
   try {
     await withinTeardownBudget(context.teardownStepDeadline, target, "dispose", () => handle.dispose())
   } catch (error) {
-    context.failedTeardowns.add(handle.task_id)
+    if (owns()) context.failedTeardowns.add(handle.task_id)
     throw error
   }
+  if (!owns()) return
   context.failedTeardowns.delete(handle.task_id)
   context.store.transition(handle.task_id, {
     type: handle.kind === "in-process" ? "persist_only" : "detach_rpc",

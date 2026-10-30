@@ -3,6 +3,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
+import { privateFdHandoff } from "./private-fds.js"
 import { doctorCoverageLines } from "./category-coverage.js"
 import { runDoctorModels } from "./model-chains.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
@@ -52,7 +53,8 @@ async function spawnSenpi(args, withExtension) {
     : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
-  if (process.platform !== "win32" && typeof process.execve === "function") {
+  const handoff = privateFdHandoff(env)
+  if (handoff === undefined && process.platform !== "win32" && typeof process.execve === "function") {
     try {
       process.execve(process.execPath, [process.execPath, senpi.cliPath, ...finalArgs], env)
       return
@@ -60,7 +62,7 @@ async function spawnSenpi(args, withExtension) {
       // A failed replacement still uses the signal-aware child path below.
     }
   }
-  await spawnNode(senpi.cliPath, finalArgs, { env })
+  await spawnNode(senpi.cliPath, finalArgs, handoff ?? { env })
 }
 
 // Routine launch notices go straight to stderr: Bun renders every console.error line red on a
@@ -146,6 +148,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
   if (command === "thread") {
     process.exitCode = await runThreadCommand(args.slice(1), {
       engine: { run: engineHostCall },
+      reinstall: `Reinstall omo with: ${updateTarget().command}, then retry.`,
       pluginRoot: join(packageRoot, "plugin"),
       agentDir: canonicalAgentDir(),
       env: process.env,
@@ -185,13 +188,12 @@ export async function runLauncher(args = process.argv.slice(2)) {
       process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
       return
     }
-    const [categoryCoverage, computerUse, configDiagnostics, dori, reflectionLock] = args[1] === "--reap"
-      ? [[], [], [], [], []]
+    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock] = args[1] === "--reap"
+      ? [[], [], [], []]
       : await Promise.all([
           doctorCoverageLines({ agentDir: canonicalAgentDir() }),
           doctorComputerUseLines(),
           doctorConfigLines(),
-          import("./dori.js").then((hook) => hook.doriDoctorLines()),
           reflectionLockReport(),
         ])
     runDoctor(await detectHarnesses(), args.slice(1), {
@@ -199,15 +201,8 @@ export async function runLauncher(args = process.argv.slice(2)) {
       categoryCoverage,
       computerUse,
       configDiagnostics,
-      dori,
       reflectionLock,
     })
-    return
-  }
-  if (command === "dori" || command === "gateway") {
-    if (command === "gateway") process.stderr.write("omo gateway is deprecated; use omo dori instead\n")
-    const { runDoriCommand } = await import("./dori.js")
-    process.exitCode = await runDoriCommand(args.slice(1))
     return
   }
   if (command === "setup") {

@@ -21,7 +21,7 @@ const DISK = [
 const NETWORK = ["fetch", "request", "get", "connect", "createConnection", "sendBeacon", "udpSocket"]
 const PROCESS = ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"]
 const TRANSPORT = [
-  "createEventTelemetryClient", "createTelemetryClient", "createDefaultPostHogTransport",
+  "createEventTelemetryClient", "createTelemetryClient", "createDefaultPostHogTransport", "createOtlpTelemetryTransport",
   "recordDailyActive", "recordSenpiDailyActive", "getDailyActiveCaptureState",
   "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "captureEvent", "capture",
 ]

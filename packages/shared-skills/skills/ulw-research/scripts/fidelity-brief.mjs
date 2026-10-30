@@ -109,6 +109,11 @@ export function isLocked(parsed) {
 	return FIDELITY_FIELDS.every((field) => Object.hasOwn(parsed.fields, field) && LOCKED_ANSWERED_BY.has(parsed.answered_by[field]))
 }
 
+/** The brief's `meaning check` field turns the meaning verifier off only when it reads "off". */
+export function meaningCheckEnabled(parsed) {
+	return !/^off\b/iu.test(parsed?.fields?.["meaning check"] ?? "")
+}
+
 function incompleteDefect(briefPath, parsed) {
 	const reasons = []
 	if (!parsed.present) reasons.push("no ## Fidelity block")

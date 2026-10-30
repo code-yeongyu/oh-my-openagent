@@ -34,7 +34,8 @@ description: Developer reference for the Atlas todo-list orchestrator agent -- m
 Parent `agent.ts` calls `resolveVariant()` from `@oh-my-opencode/prompts-core` against `atlasPromptVariants`:
 - GPT family -> `gpt.md`
 - Gemini family -> `gemini.md`
-- Kimi K3 -> `kimi-k3.md` (checked first among Kimi)
+- Kimi K3.1 -> `kimi-k3-1.md` (its own copy of `kimi-k3.md`, checked before K3)
+- Kimi K3 -> `kimi-k3.md` (checked first among the rest of Kimi)
 - Kimi K2.7 -> `kimi-k2-7.md`
 - Kimi K2.x family -> `kimi.md`
 - GLM family -> `glm.md`

@@ -17,6 +17,7 @@ const MODEL_IDENTITY_FILES = new Map<string, string>([
   ["packages/model-core/src/model-capability-heuristics.ts", "per-model capability family names"],
   ["packages/model-core/src/provider-model-id-transform.ts", "per-model provider spellings"],
   ["packages/omo-senpi/src/components/telemetry/model-vocabulary.ts", "every known id, old and new"],
+  ["packages/omo-senpi/src/components/telemetry/pinned-model-ids.ts", "a frozen copy of the collector pin's model enum"],
   ["packages/omo-codex/src/install/managed-agent-model-defaults.ts", "models LazyCodex once bundled"],
   ["packages/utils/src/migration/agent-category.ts", "each known id's migration category"],
   ["packages/prompts-core/src/atlas-prompts.ts", "prompts written for one model"],

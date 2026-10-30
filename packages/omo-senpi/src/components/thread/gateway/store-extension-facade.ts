@@ -5,7 +5,7 @@ import { awaitSessionRequest } from "./extension-session-await"
 import { AWAIT_REQUEST_ID } from "./extension-registrations"
 import { gatewayDatabasePath } from "./paths"
 import type { SessionCallReply, SessionCallRequest } from "./store-extension-session-ops"
-import type { SessionCaller, StoreExtensionApi, StoreExtensionRefusal, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionSessionApi, ToolkitReplayRequest } from "./store-extensions"
+import type { SessionCaller, StoreExtensionApi, StoreExtensionRefusal, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionSessionApi } from "./store-extensions"
 
 /** The worker's registration reply: the caller's result, and whether calls for that name now use this registration. */
 export type ExtensionRegisterReply = { readonly result: StoreExtensionResult<{ readonly version: number }>; readonly retained: boolean }
@@ -58,10 +58,10 @@ export function createExtensionFacade(deps: FacadeDeps): ExtensionFacade {
     }
   }
 
-  async function sessionRequest(name: string, op: string, phase: SessionCallRequest["phase"], args: unknown, caller: SessionCaller, replay?: ToolkitReplayRequest): Promise<SessionCallReply> {
+  async function sessionRequest(name: string, op: string, phase: SessionCallRequest["phase"], args: unknown, caller: SessionCaller): Promise<SessionCallReply> {
     const cloned = cloneArgs(args)
     if (!cloned.ok) return { result: cloned.refusal }
-    const request: SessionCallRequest = { name, op, phase, args: cloned.value, caller: caller.callerDurableId, now: now(), ...(replay === undefined ? {} : { replay }) }
+    const request: SessionCallRequest = { name, op, phase, args: cloned.value, caller: caller.callerDurableId, now: now() }
     try {
       return await call<SessionCallReply>("extension_session_call", request)
     } catch (error) {
@@ -88,7 +88,7 @@ export function createExtensionFacade(deps: FacadeDeps): ExtensionFacade {
     // No store yet means no declarations: answered without opening (and so creating) the store.
     sessionCallableOps: async () => (existsSync(gatewayDatabasePath(deps.agentDir)) ? await call("session_callable_ops") : []),
     extensionSessionAwait: async <T>(name: string, op: string, args: unknown, caller: SessionCaller) => {
-      const reply = await sessionRequest(name, op, "op", args, caller, caller.replay)
+      const reply = await sessionRequest(name, op, "op", args, caller)
       const { result } = reply
       if (result.kind !== "ok" || reply.await === undefined) return result as StoreExtensionResult<T>
       const value = result.value as { readonly await_request_id?: unknown } | null

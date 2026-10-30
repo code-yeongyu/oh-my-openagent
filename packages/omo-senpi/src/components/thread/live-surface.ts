@@ -367,24 +367,45 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   }
 
   /**
+   * The routing id of an rpc_host session. A multi-session host refuses every session command that names
+   * no session (`missing_session_id`), so an endpoint known only by its durable id (a session read from
+   * disk, `thread locate`) is looked up in that host's own listing; null when no live session holds it.
+   * A listing that fails throws, as the command itself would have.
+   */
+  const routingIdOf = async (endpoint: GatewayEndpointRef): Promise<string | null> => {
+    if (endpoint.routing_id !== null) return endpoint.routing_id
+    const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: {} })
+    if (listed.failure !== undefined) throw listed.failure
+    return listed.sessions.find((session) => session.durableSessionId === endpoint.durable_session_id && session.status !== "closed")?.sessionId ?? null
+  }
+
+  /**
    * The gateway's sender port. A delivery is announced with `wake` only - never `prompt`: on a host
-   * the session is named by its routing id, a terminal holds exactly one session. `release_session`
-   * exists on hosts only.
+   * the session is named by its routing id (resolved by durable id when the endpoint has none), a
+   * terminal holds exactly one session and takes a session-less wake. `release_session` exists on
+   * hosts only. A host session no live listing holds answers each command's typed not-routable result.
    */
   const gateway: GatewayEndpointPort = {
     wake: async (endpoint, deliveryIds) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
-      const target = endpoint.kind === "rpc_host" && endpoint.routing_id !== null ? { sessionId: endpoint.routing_id } : {}
+      const sessionId = endpoint.kind === "rpc_host" ? await routingIdOf(endpoint) : undefined
+      if (sessionId === null) return { admitted: [], unroutable: "no_live_session" }
+      const target = sessionId === undefined ? {} : { sessionId }
       return wakeReply(await callOn<{ admitted?: unknown }>(endpoint.socket, "wake", { ...target, delivery_ids: [...deliveryIds] }, undefined, endpoint.durable_session_id))
     },
     releaseSession: async (endpoint, request) => {
-      if (endpoint.kind !== "rpc_host" || endpoint.routing_id === null) throw new Error("unsupported:release_session")
-      return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId: endpoint.routing_id, ...request }, undefined, endpoint.durable_session_id))
+      if (endpoint.kind !== "rpc_host") throw new Error("unsupported:release_session")
+      kinds.set(resolve(endpoint.socket), endpoint.kind)
+      const sessionId = await routingIdOf(endpoint)
+      if (sessionId === null) return { success: false, error: "unknown_session" }
+      return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId, ...request }, undefined, endpoint.durable_session_id))
     },
     classifyLiveness: liveness,
     respondUi: async (endpoint, answer) => {
       kinds.set(resolve(endpoint.socket), endpoint.kind)
-      return await answerUiRequest((socket, type, data) => callFrame(socket, type, data, undefined, endpoint.durable_session_id), endpoint, answer)
+      const sessionId = endpoint.kind === "rpc_host" ? await routingIdOf(endpoint) : endpoint.routing_id
+      if (sessionId === null && endpoint.kind === "rpc_host") return { delivered: false, error: "unknown_session" }
+      return await answerUiRequest((socket, type, data) => callFrame(socket, type, data, undefined, endpoint.durable_session_id), { ...endpoint, routing_id: sessionId }, answer)
     },
   }
 

@@ -31,6 +31,7 @@ description: Developer reference for the Sisyphus-Junior category-spawned execut
 ## VARIANT SELECTION
 
 Parent `agent.ts` selects prompt variant by model name:
+- Kimi K3.1 -> `kimi-k3-1.ts` (its own copy of `kimi-k3.ts`, checked before K3)
 - Kimi K3 -> `kimi-k3.ts`
 - Kimi K2.7 -> `kimi-k2-7.ts`
 - Contains "kimi-k2" -> `kimi-k2-6.ts`

@@ -94,6 +94,9 @@ export async function runSpawn(
       reason: started.error.message,
     })
   }
+  if (started.kind === "held") return result("Task admission is held by your Stop. Resume the run to continue.", {
+    task_id: started.task_id, status: "paused", mode: "spawn", pause_seq: started.pauseSeq,
+  })
   if (started.kind === "depth_denied") {
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
   }

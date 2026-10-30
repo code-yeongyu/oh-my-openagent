@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
+import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
   test("writing only activates when one of its own chain models is available", () => {
@@ -95,6 +96,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         model: "gemini-4-argon",
         variant: "low",
       },
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -106,7 +112,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
       }
@@ -243,7 +254,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
       }
@@ -259,6 +275,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(chain).toEqual([
+      ...(FABLE_55_RELEASED ? [{
+        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+        model: "claude-fable-5-5",
+        variant: "max",
+      }] : []),
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -270,7 +291,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        model: "kimi-k3.1-pro",
+        variant: "max",
+      },
+      {
+        providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
       }

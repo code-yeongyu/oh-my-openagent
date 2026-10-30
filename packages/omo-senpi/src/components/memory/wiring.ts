@@ -61,27 +61,33 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // Session-start reconciliation runs once per session, so a holder that died after it would keep
   // the reflection lock for good (#10377). Each later turn settles a provably dead holder, and shows
   // a holder whose liveness cannot be proven once per session and run.
-  const recoverStaleHolderAfterTurn = async (sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void> => {
+  const recoverStaleHolderAfterTurn = async (sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown, signal?: AbortSignal): Promise<void> => {
     if (!userActivity.has(sessionId) || !userActivity.hasReconciled(sessionId)) return
+    let attemptedKey: string | undefined
     try {
       const recovery = await recoverStaleReflectionHolder({
         reflectionDir: identity.identityPaths.reflection,
-        reconcile: () => runtimeFor(identity).reconcile(),
+        reconcile: () => runtimeFor(identity).reconcile(signal),
         // A holder that one reconciliation could not release is reported, not reconciled every turn.
         shouldReconcile: (runId) => {
+          signal?.throwIfAborted()
           const key = `${sessionId}:${runId}`
           if (staleHolderReconciles.has(key)) return false
-          staleHolderReconciles.add(key)
+          attemptedKey = key
           return true
         },
         ...(options.reflectionHolderSeams === undefined ? {} : { seams: options.reflectionHolderSeams }),
       })
+      signal?.throwIfAborted()
+      if (resolveContext(sessionId) !== identity) return
+      if (attemptedKey !== undefined) staleHolderReconciles.add(attemptedKey)
       if (recovery.notice === undefined || recovery.verdict.state === "none") return
       const key = `${sessionId}:${recovery.verdict.runId}`
       if (staleLockNoticesShown.has(key)) return
       staleLockNoticesShown.add(key)
       readUi(eventCtx)?.notify(recovery.notice, "warning")
     } catch (error) {
+      signal?.throwIfAborted()
       options.logger?.warn("omo-senpi memory could not check the reflection lock holder", { error: error instanceof Error ? error.message : String(error) })
     }
   }
@@ -250,20 +256,27 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         memoryUsageTrackersRef,
         hasUserActivity: userActivity.has,
         onReflectionLaunch: reflectionLive.onReflectionLaunched,
-        onSettled: async (sessionId, eventCtx) => {
+        onSettled: async (sessionId, eventCtx, observer) => {
           const identity = resolveContext(sessionId)
           if (identity !== undefined) {
-            await recoverStaleHolderAfterTurn(sessionId, identity, eventCtx)
+            observer?.phase("onSettled.reflection.staleHolder")
+            await recoverStaleHolderAfterTurn(sessionId, identity, eventCtx, observer?.signal)
+            observer?.phase("onSettled.reflection.reconcile")
             await userActivity.reconcileOnce(sessionId, async () => {
               try {
-                await runtimeFor(identity).reconcile()
+                await runtimeFor(identity).reconcile(observer?.signal)
+                observer?.signal.throwIfAborted()
               } catch (error) {
+                observer?.signal.throwIfAborted()
                 if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
               }
+              if (resolveContext(sessionId) !== identity) return
               pressureDreamAdmission.requestDeferred(sessionId)
             })
           }
-          await reflectionLive.onSettled(sessionId, eventCtx)
+          observer?.phase("onSettled.status.sync")
+          if (resolveContext(sessionId) !== identity) return
+          await reflectionLive.onSettled(sessionId, eventCtx, observer?.signal)
         },
         onMemoryWrite: reflectionLive.syncRpc,
       })

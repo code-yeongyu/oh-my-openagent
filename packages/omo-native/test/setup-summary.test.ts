@@ -10,7 +10,7 @@ import { teardownRoots } from "./teardown.test-support"
 // The real launcher: the model-choice stage reads the engine's model catalog through the installed senpi.
 const LAUNCHER = resolve(fileURLToPath(new URL("../bin/omo.js", import.meta.url)))
 const TTY_DRIVER = resolve(fileURLToPath(new URL("tty-driver.py", import.meta.url)))
-const TELEMETRY_ENV = "OMO_SEND_ANONYMOUS_TELEMETRY=0"
+const TELEMETRY_ENV = "DO_NOT_TRACK=1"
 const PLAN_PROMPT = "[Y/n]"
 const STAGE_PROMPT = "[y/N]"
 const NOT_IMPORTED = "Non-interactive setup did not import"

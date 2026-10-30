@@ -102,6 +102,15 @@ describe("the OTLP runtime refuses to start while telemetry is off, whoever call
 
   test("#given the package manifest #when its exports are read #then ./otlp is the only OTLP subpath", async () => {
     const manifest = JSON.parse(await Bun.file(join(import.meta.dir, "..", "package.json")).text())
-    expect(Object.keys(manifest.exports).filter((key) => key.includes("otlp"))).toEqual(["./otlp"])
+    // ./otlp-opt-out is the one deliberate exception (#11431): it carries only the opt-out purges, so a lazy adapter can
+    // delete a spool without loading the sender; nothing in it starts a transport.
+    expect(Object.keys(manifest.exports).filter((key) => key.includes("otlp")).sort()).toEqual(["./otlp", "./otlp-opt-out"])
+    // The export names are read from the source, not with Object.keys on the imported namespace: knip counts every export of
+    // a module whose namespace is enumerated as used, so an unused export added to this entry would pass knip:check.
+    const optOutSource = await Bun.file(join(import.meta.dir, "..", manifest.exports["./otlp-opt-out"].import)).text()
+    const optOutExports = new Bun.Transpiler({ loader: "ts" }).scan(optOutSource).exports
+    expect(optOutExports.filter((name) => !name.startsWith("purge"))).toEqual([])
+    const { purgeIdleOtlpSpool } = await import("@oh-my-opencode/telemetry-core/otlp-opt-out")
+    expect(purgeIdleOtlpSpool).toBeInstanceOf(Function)
   })
 })

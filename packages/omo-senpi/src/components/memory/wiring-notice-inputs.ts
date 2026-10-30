@@ -21,16 +21,19 @@ export function createMemoryNoticeInputs(input: {
   readonly resolveContext: (sessionId: string) => MemoryIdentityContext | undefined
   readonly loadSettings: () => OmoMemorySettings
   readonly appendEntry?: (customType: string, data: AgreementFlaggedRecord) => void
+  /** Receives memory-core's non-fatal watermark warnings; the host wires its component logger here. */
+  readonly onWarn?: (message: string, detail?: unknown) => void
 }): MemoryNoticeInputs {
   const bound = (sessionId: string, identity: string): MemoryIdentityContext | undefined => {
     const context = input.resolveContext(sessionId)
     return context === undefined || context.identity !== identity ? undefined : context
   }
+  const warnSink = input.onWarn === undefined ? {} : { onWarn: input.onWarn }
   return {
     resolveSoulNotice: async (repo, sessionId, identity) => {
       const context = bound(sessionId, identity)
       if (context === undefined) return undefined
-      return consumeSoulNoticeDelta(repo, { noticesDir: context.identityPaths.notices, locksDir: context.identityPaths.locks })
+      return consumeSoulNoticeDelta(repo, { noticesDir: context.identityPaths.notices, locksDir: context.identityPaths.locks, ...warnSink })
     },
     resolveAgreementsNotice: async (repo, sessionId, identity) => {
       const context = bound(sessionId, identity)
@@ -38,6 +41,7 @@ export function createMemoryNoticeInputs(input: {
       const flagged = await consumeAgreementsNoticeDelta(repo, {
         noticesDir: context.identityPaths.notices,
         locksDir: context.identityPaths.locks,
+        ...warnSink,
       })
       for (const item of flagged) {
         input.appendEntry?.(AGREEMENT_FLAGGED_ENTRY_TYPE, { id: item.id, text: item.text, n: item.n, by: item.by })

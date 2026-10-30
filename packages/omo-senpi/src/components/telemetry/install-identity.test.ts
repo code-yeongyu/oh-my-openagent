@@ -36,7 +36,7 @@ function flatLayout(homeDir: string): void {
   writeFileSync(join(homeDir, ".omo", "settings.json"), "{}")
 }
 
-const attribution = (env: Record<string, string>) => getOmoNativeAttribution({ env, now: new Date(Date.UTC(2027, 0, 1)) })
+const attribution = (env: Record<string, string>) => getOmoNativeAttribution({ env })
 
 describe("one anonymous install id per user, independent of the agent home (#10934)", () => {
   it("#given the Desktop's canonical id and a CLI resolving the flat ~/.omo home #then both report ONE install_hash", () => {
@@ -120,6 +120,37 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
     expect(automatedRunReason({ HOME: "/var/folders/ab/T/fake-home" }, posixDeps("/var/folders/ab/T"))).toBe("ephemeral_home")
   })
 
+  it("#given a darwin HOME outside /Users #when the automation check runs #then it never resolves an automount trigger (/home, /net), which blocks the host loop when wedged (#11545)", () => {
+    const triggers = (p: string) => ["/home", "/net"].some((t) => p === t || p.startsWith(`${t}/`))
+    const cases: ReadonlyArray<{ readonly home: string; readonly tmp: string; readonly verdict: "ephemeral_home" | undefined }> = [
+      { home: "/Users/Shared/app-home", tmp: "/var/folders/ab/T", verdict: undefined },
+      { home: "/opt/app/home", tmp: "/var/folders/ab/T", verdict: undefined },
+      { home: "/Volumes/ext/home", tmp: "/var/folders/ab/T", verdict: undefined },
+      { home: "/var/folders/ab/T/omo-x", tmp: "/var/folders/ab/T", verdict: "ephemeral_home" },
+      { home: "/Users/Shared/app-home", tmp: "/home/tmp", verdict: undefined },
+      { home: "/Users/Shared/app-home", tmp: "/net/host/tmp", verdict: undefined },
+      { home: "/Users/someone", tmp: "/var/folders/ab/T", verdict: undefined },
+    ]
+    for (const { home: h, tmp, verdict } of cases) {
+      const resolved: string[] = []
+      const deps = { platform: "darwin" as const, realpath: (p: string) => (resolved.push(p), p), tmpdir: () => tmp, posixTempRoots: [] }
+      expect({ home: h, tmp, verdict: automatedRunReason({ HOME: h }, deps) }).toEqual({ home: h, tmp, verdict })
+      expect({ home: h, tmp, triggers: resolved.filter(triggers) }).toEqual({ home: h, tmp, triggers: [] })
+    }
+  })
+
+  it("#given a darwin HOME inside a temp dir under an automount trigger #then only that HOME itself is resolved and the run still counts as ephemeral", () => {
+    const resolved: string[] = []
+    const deps = { platform: "darwin" as const, realpath: (p: string) => (resolved.push(p), p), tmpdir: () => "/home/tmp", posixTempRoots: [] }
+    expect(automatedRunReason({ HOME: "/home/tmp/run-1" }, deps)).toBe("ephemeral_home")
+    expect(new Set(resolved.filter((p) => p === "/home" || p.startsWith("/home/")))).toEqual(new Set(["/home/tmp/run-1"]))
+  })
+
+  it("#given linux, where /home is a real directory #then the users-dir candidates are still resolved (a /home symlink keeps counting as the users dir)", () => {
+    const deps = { platform: "linux" as const, realpath: (p: string) => (p === "/home" ? "/var/home" : p), tmpdir: () => "/var/home", posixTempRoots: [] }
+    expect(automatedRunReason({ HOME: "/var/home/someone" }, deps)).toBeUndefined()
+  })
+
   it("#given the automation check throws (os.userInfo with no passwd entry) #then the consent gate never throws and telemetry is OFF for that run", () => {
     const spy = spyOn(os, "tmpdir").mockImplementation(() => {
       throw new Error("ENOENT: no such file or directory, uv_os_tmpdir")
@@ -196,5 +227,36 @@ describe("temp-home detection is path-correct on every platform (#10935)", () =>
     // Control: the same home reached without the escaping link IS inside.
     mkdirSync(join(root, "inner"))
     expect(automatedRunReason({ HOME: join(root, "inner") }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
+  })
+
+  it.skipIf(process.platform === "win32")("#given a missing lexical HOME whose raw path links outside temp #then it is ephemeral, never telemetry ON", () => {
+    const base = home()
+    const root = join(base, "temp")
+    const outside = join(base, "outside")
+    mkdirSync(root, { recursive: true })
+    mkdirSync(join(outside, "subdir"), { recursive: true })
+    mkdirSync(join(outside, "onlyout"))
+    symlinkSync(join(outside, "subdir"), join(root, "jump"))
+    const rawHome = `${root}/jump/../onlyout`
+
+    // path.join collapses `jump/..` lexically: the id would be written in <root>/onlyout, which does not exist and is inside temp.
+    expect(join(rawHome, ".omo")).toBe(join(root, "onlyout", ".omo"))
+    expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
+  })
+
+  it.skipIf(process.platform === "win32")("#given literal dot-dot after a symlink in HOME #then temp detection agrees with where the id is written", () => {
+    const base = home()
+    const root = join(base, "temp")
+    const outside = join(base, "outside")
+    mkdirSync(join(root, "home"), { recursive: true })
+    mkdirSync(join(outside, "subdir"), { recursive: true })
+    mkdirSync(join(outside, "home"))
+    symlinkSync(join(outside, "subdir"), join(root, "jump"))
+    const rawHome = `${root}/jump/../home`
+
+    // path.join(rawHome, ".omo") collapses `jump/..` lexically, so the id would land in <root>/home: inside temp.
+    expect(join(rawHome, ".omo")).toBe(join(root, "home", ".omo"))
+    expect(automatedRunReason({ HOME: rawHome }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
+    expect(automatedRunReason({ HOME: join(root, "home") }, { tmpdir: () => root, posixTempRoots: [] })).toBe("ephemeral_home")
   })
 })

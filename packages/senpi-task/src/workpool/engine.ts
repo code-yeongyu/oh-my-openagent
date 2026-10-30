@@ -11,6 +11,8 @@ import { createWorkpoolYieldCapability } from "./worker-capability"
 import { createWorkpoolStore } from "./store"
 import { deliverAggregate, poolWorkIsFinished, type WorkpoolAggregatePort } from "./aggregate"
 import { WORKPOOL_DEFAULT_MODE } from "./default-mode"
+import { createPoolRunPause } from "./run-pause"
+import type { ResumeCredential } from "../pause/admission-barrier"
 import { WorkpoolError, type WorkpoolAgent, type WorkpoolCaller, type WorkpoolCreate, type WorkpoolEvent, type WorkpoolInput, type WorkpoolItem, type PoolId, type ItemId } from "./types"
 
 export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmission, kernelToolBindings?: KernelToolBindingRegistry) {
@@ -38,6 +40,7 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
   }
   function flushAggregate(poolId: PoolId): void {
     const pool = store.load(poolId)
+    if (pool.hold !== undefined || admission.deliveryHeld?.(pool.root_session_id) === true) return
     // Close-completion: the last worker of a closed pool is gone and no item is outstanding.
     if (poolWorkIsFinished(pool)) releaseKernelTools(pool.pool_id)
     const key = `${pool.pool_id}:${pool.generation}`
@@ -56,7 +59,7 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     if (verdict.kind === "deny") throw new WorkpoolError("policy_denied", verdict.message)
   }
   const dispatcher = createWorkpoolDispatcher({ store, admission, emit, authorize: pool => checkPolicy(pool.agent, pool.parent_session_id) })
-  function assertParent(caller: WorkpoolCaller): void {
+  function assertParent(caller: Pick<WorkpoolCaller, "sessionId">): void {
     if (caller.sessionId.trim().length === 0) throw new WorkpoolError("scope_denied", "A host session identity is required.")
     for (const pool of store.list()) {
       const bindings = [...pool.workers, ...pool.items.flatMap(item => item.binding === undefined ? [] : [item.binding])]
@@ -105,7 +108,7 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     dispatcher.schedule(pool.pool_id)
     return pool
   }
-  function inspect(caller: WorkpoolCaller, poolId: string) { assertParent(caller); return store.owned(caller, poolId) }
+  function inspect(caller: Pick<WorkpoolCaller, "sessionId">, poolId: string) { assertParent(caller); return store.owned(caller, poolId) }
   function push(caller: WorkpoolCaller, poolId: string, values: readonly WorkpoolInput[]) {
     const owned = inspect(caller, poolId)
     const inputs = parseInput(WorkpoolItemsSchema, values)
@@ -134,7 +137,7 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     flushAggregate(owned.pool_id)
     return closed
   }
-  function cancel(caller: WorkpoolCaller, poolId: string) {
+  function cancel(caller: Pick<WorkpoolCaller, "sessionId">, poolId: string) {
     const owned = inspect(caller, poolId)
     const cancelled = store.mutate(owned.pool_id, pool => pool.status === "cancelled" ? pool : {
       ...pool, status: "cancelled", generation: pool.generation + 1,
@@ -162,6 +165,7 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     })
   }
   return { create, resolveKernelTools, inspect, push, close, cancel, yieldResults, waitForEvent,
+    ...createPoolRunPause({ store, admission, stop: dispatcher.cancel, attach: dispatcher.attach }),
     setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string) => void) => { checkPolicy = policy },
     ownsTask: (taskId: string) => store.list().some(pool => pool.workers.some(worker => worker.task_id === taskId) || pool.items.some(item => item.binding?.task_id === taskId)),
     // One store read for every task a pool owns, for callers that classify many records at once (#10782).
@@ -170,10 +174,10 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
       ...pool.items.flatMap(item => item.binding?.task_id === undefined ? [] : [item.binding.task_id]),
     ])),
     subscribe: (listener: (event: WorkpoolEvent) => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
-    attach: (caller: WorkpoolCaller) => {
+    attach: (caller: Pick<WorkpoolCaller, "sessionId">, credential?: ResumeCredential) => {
       assertParent(caller)
       for (const pool of store.list()) if (pool.parent_session_id === caller.sessionId) {
-        dispatcher.attach(pool.pool_id)
+        dispatcher.attach(pool.pool_id, credential)
         const key = `${pool.pool_id}:${pool.generation}`
         if (pool.aggregate?.accepted === true && pool.aggregate.delivered !== true && pool.aggregate.generation === pool.generation && !awaitingAck.has(key)) {
           persistAggregate(pool.pool_id, pool.generation, { delivered: false, accepted: false })

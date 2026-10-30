@@ -59,6 +59,11 @@ fn main() -> ExitCode {
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--cursor-overlay")) {
         return cursor_overlay();
     }
+    // The private release helper (#11466): an input request's copy of this
+    // engine that releases its held input if the engine dies.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--release-helper")) {
+        return release_helper();
+    }
     match Cli::parse().mode() {
         Mode::XpcAgent { .. } => fail("--xpc-agent must be the first argument"),
         Mode::Schema => print_schema(),
@@ -160,6 +165,19 @@ fn cursor_overlay() -> ExitCode {
 #[cfg(not(target_os = "macos"))]
 fn cursor_overlay() -> ExitCode {
     fail("cursor overlay is unavailable on this platform")
+}
+
+#[cfg(target_os = "macos")]
+fn release_helper() -> ExitCode {
+    match senpi_desktop_backend_macos::run_release_helper() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => fail(&format!("release helper: {error}")),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn release_helper() -> ExitCode {
+    fail("the input release helper is unavailable on this platform")
 }
 
 fn print_schema() -> ExitCode {

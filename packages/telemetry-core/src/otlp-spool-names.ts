@@ -16,9 +16,11 @@ export type SpoolEntry =
     readonly leaseExpiresMs: number
   }
   | { readonly kind: "lock"; readonly name: string; readonly target: string }
+  | { readonly kind: "owner"; readonly name: string; readonly signal: Signal; readonly pid: number; readonly bootId: string }
   | { readonly kind: "other"; readonly name: string }
 
 const ACTIVE = /^active-(logs|traces)-([0-9]+)-([0-9a-f]{32})\.otlp$/
+const OWNER = /^owner-(logs|traces)-([0-9]+)-([0-9a-f]{32})$/
 const BATCH = /^batch-(logs|traces)-([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12})\.otlp$/
 const SENDING =
   /^batch-(logs|traces)-([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12})\.sending-([0-9a-f]{32})-([0-9]+)$/
@@ -33,6 +35,10 @@ export function parseSpoolName(name: string): SpoolEntry {
   const active = ACTIVE.exec(name)
   if (active !== null) {
     return { kind: "active", name, signal: signalOf(active[1]), pid: Number(active[2]), bootId: active[3] ?? "" }
+  }
+  const owner = OWNER.exec(name)
+  if (owner !== null) {
+    return { kind: "owner", name, signal: signalOf(owner[1]), pid: Number(owner[2]), bootId: owner[3] ?? "" }
   }
   const batch = BATCH.exec(name)
   if (batch !== null) return { kind: "batch", name, signal: signalOf(batch[1]), batchId: batch[2] ?? "" }
@@ -60,6 +66,12 @@ export const isSpoolFileName = (name: string): boolean => parseSpoolName(name).k
 
 export const activeName = (signal: Signal, pid: number, bootId: string): string =>
   `active-${signal}-${pid}-${bootId}.otlp`
+/**
+ * A writer's process marker: present from its first append until it closes, sealed batches or not. Markers live
+ * in a sibling directory, so the spool directory itself still holds only queued telemetry.
+ */
+export const ownersDir = (spoolDir: string): string => `${spoolDir}.owners`
+export const ownerName = (signal: Signal, pid: number, bootId: string): string => `owner-${signal}-${pid}-${bootId}`
 export const batchName = (signal: Signal, batchId: string): string => `batch-${signal}-${batchId}.otlp`
 export const sendingName = (signal: Signal, batchId: string, bootId: string, leaseExpiresMs: number): string =>
   `batch-${signal}-${batchId}.sending-${bootId}-${leaseExpiresMs}`

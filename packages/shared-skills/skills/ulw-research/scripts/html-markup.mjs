@@ -61,10 +61,10 @@ function scriptEnd(src, from) {
 function closeOf(src, from, name) {
 	if (name === "script") return scriptEnd(src, from)
 	if (RAW.has(name)) {
-		const close = new RegExp(`</${name}(?=[\\s/>])[^>]*>`, "gi")
+		const close = new RegExp(`</${name}(?=[\\s/>])`, "gi")
 		close.lastIndex = from
 		const match = close.exec(src)
-		return match ? match.index + match[0].length : src.length
+		return match ? readTag(src, match.index + 2).end : src.length
 	}
 	let depth = 0
 	let stop = src.length

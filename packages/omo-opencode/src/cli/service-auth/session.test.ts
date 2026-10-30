@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createSession } from "./session"
+import { createSession, SessionEnded } from "./session"
 import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
 
 describe("credential lifecycle", () => {
@@ -46,7 +46,9 @@ describe("credential lifecycle", () => {
       const store = secrets.store(api)
       await store.write({ ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" })
       const session = createSession({ api, store, home: await temporaryHome() })
-      await expect(session.accessToken()).rejects.toThrow(code === "reauth_required" ? "session was ended" : "Sign in again")
+      const error = await session.accessToken().catch(error => error)
+      expect(error).toBeInstanceOf(SessionEnded)
+      expect(error).toMatchObject({ code, deviceRevoked: code !== "unauthorized" })
       expect(await store.read()).toBeNull()
     })
   }

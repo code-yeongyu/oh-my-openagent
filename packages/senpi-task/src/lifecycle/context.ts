@@ -24,6 +24,8 @@ const DEFAULT_ORPHAN_KILL_DELAY_MS = 5_000
 const DEFAULT_HOST_CLOSE_TIMEOUT_MS = 10_000
 
 export type LifecycleContext = {
+  // Captures one startup generation; shutdown or its caller's abort permanently invalidates it.
+  readonly reconcileActive?: () => boolean
   readonly deferUnresumable?: boolean
   readonly revivePolicy?: LifecycleDeps["revivePolicy"]
   readonly store: TaskRecordStore
@@ -54,6 +56,10 @@ export type LifecycleContext = {
   readonly hostCloseTimeoutMs: number
   readonly isolation: IsolationRuntime | undefined
   readonly isolationProbe: OwnerProbe | undefined
+}
+
+export function reconciliationActive(context: LifecycleContext): boolean {
+  return context.reconcileActive?.() !== false
 }
 
 // The sole default OS-process signaller: process.kill lives here (audited-in via src/lifecycle) so

@@ -13,6 +13,8 @@
 *.yaml text eol=lf
 *.py text eol=lf
 *.sh text eol=lf
+# script/build-brand-logo.ts embeds .github/assets/omo-icon-light.svg in SENPI_BRAND; a CRLF checkout must not change it.
+*.svg text eol=lf
 
 # The vendored sync-format copy and its fixtures are checked byte for byte against a hash manifest
 # (memory-core sync/crypto/vendor-integrity.test.ts): no line-ending conversion on any platform.

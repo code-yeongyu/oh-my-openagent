@@ -21,6 +21,8 @@ export function itemError(
 
 export function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult, skills?: TaskSkillSummary): TaskToolItemDetail {
   switch (start.kind) {
+    case "held":
+      return { task_id: start.task_id, status: "paused" }
     case "plan_unresolved": {
       return itemError(item, "", start.error.message + categoryListSuffix(start.error), skills)
     }

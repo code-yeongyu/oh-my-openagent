@@ -36,3 +36,4 @@ export { buildGlm52SisyphusPrompt } from "./glm-5-2";
 export { buildKimiK26SisyphusPrompt } from "./kimi-k2-6";
 export { buildKimiK27SisyphusPrompt } from "./kimi-k2-7";
 export { buildKimiK3SisyphusPrompt } from "./kimi-k3";
+export { buildKimiK31SisyphusPrompt } from "./kimi-k3-1";

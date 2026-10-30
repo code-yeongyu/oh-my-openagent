@@ -579,7 +579,11 @@
     "TransactionFailed": -32020,
     "InputBusy": -32021,
     "ControlRequired": -32022,
-    "CaptureUnavailable": -32023
+    "CaptureUnavailable": -32023,
+    "UserIntervened": -32024,
+    "AxUnconfirmed": -32025,
+    "SpaceUnsupported": -32026,
+    "SpaceMoveDenied": -32027
   },
   "standardErrors": {
     "parseError": -32700,
@@ -848,6 +852,17 @@
         "legacyCapture": {
           "type": "boolean",
           "description": "Captures run through the legacy `screencapture` path, not the\nScreenCaptureKit worker (B9: macOS < 14, helper missing, or the\nhelper failed to start)."
+        },
+        "interventionWatch": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InterventionWatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The watch of the user's own key presses and clicks in the apps the\nsession works in; absent on backends without one."
         }
       },
       "required": [
@@ -868,6 +883,26 @@
       ],
       "description": "Runtime truth about what this host's backend can do right now.\n\nSchema-backed field set; additions update Rust, generated schema and TS together.",
       "additionalProperties": false
+    },
+    "InterventionWatch": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "on",
+          "description": "Watching: every key press and click the user makes is recorded."
+        },
+        {
+          "type": "string",
+          "const": "off",
+          "description": "The system refused the watch: nothing is watched, and background\ninput is not held back for it."
+        },
+        {
+          "type": "string",
+          "const": "not_started",
+          "description": "No request has read or acted on an app yet."
+        }
+      ],
+      "description": "The state of the backend's watch of the user's own input (macOS: a\nlisten-only event tap). It starts with the session's first request that\nreads or acts on an app."
     },
     "ControlGrantParams": {
       "type": "object",
@@ -2482,9 +2517,29 @@
           "type": "string",
           "const": "CaptureUnavailable",
           "description": "The capture target exists but cannot be captured right now; `data`\nsays why (e.g. `{ \"reason\": \"minimized\" }`)."
+        },
+        {
+          "type": "string",
+          "const": "UserIntervened",
+          "description": "The user was using the target app, or brought another window to the\nfront, before or during the action, so the action stopped; the message\nsays whether any input was sent. Read the window again once the user\npauses; never repeat the action blindly."
+        },
+        {
+          "type": "string",
+          "const": "AxUnconfirmed",
+          "description": "An accessibility request was made, but the app did not confirm its\noutcome (it did not reply in time or messaging failed, e.g. while the\naction opened a modal dialog). It may already have taken effect: read\nthe element back before any retry."
+        },
+        {
+          "type": "string",
+          "const": "SpaceUnsupported",
+          "description": "Moving a window between Spaces is not available on this backend or OS\nversion."
+        },
+        {
+          "type": "string",
+          "const": "SpaceMoveDenied",
+          "description": "The window server refused the Space move, or the move could not be\nverified."
         }
       ],
-      "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."
+      "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it.\nThe enum is append-only: a new code takes the next ordinal, so no existing\nnumeric code moves. Amendment 1 (macOS shared-screen parity, #11459 /\n#11461) appended `UserIntervened`, `AxUnconfirmed`, `SpaceUnsupported` and\n`SpaceMoveDenied` (-32024..-32027) without a protocol version change."
     },
     "EngineLog": {
       "type": "object",

@@ -33,6 +33,7 @@ it("packs and installs omo-ai, then resolves its shipped PostHog sidecar and rec
   // Given production omo-ai metadata and the canonical plugin payload, packed without dependency installs.
   const plugin = join(repoRoot, "packages/omo-senpi/plugin")
   expect(existsSync(join(plugin, "extensions/omo-telemetry-posthog.js"))).toBe(true)
+  expect(existsSync(join(plugin, "extensions/omo-telemetry-otlp.js"))).toBe(true)
   const root = await mkdtemp(join(tmpdir(), "posthog-packed-"))
   const posted: unknown[] = []
   const server = Bun.serve({
@@ -67,6 +68,7 @@ it("packs and installs omo-ai, then resolves its shipped PostHog sidecar and rec
     const extensionDir = join(installed, "node_modules/omo-ai/plugin/extensions")
     const manifest = JSON.parse(await readFile(join(extensionDir, "../package.json"), "utf8"))
     expect(manifest.imports["#omo-telemetry-posthog-runtime"]).toBe("./extensions/omo-telemetry-posthog.js")
+    expect(manifest.imports["#omo-telemetry-otlp-runtime"]).toBe("./extensions/omo-telemetry-otlp.js")
     const probe = join(extensionDir, "posthog-packed-probe.mjs")
     await writeFile(probe, `
 const { createDefaultPostHogTransport } = await import("#omo-telemetry-posthog-runtime")
@@ -78,10 +80,14 @@ const transport = createDefaultPostHogTransport("synthetic-local-only", {
 transport.capture({ distinctId: "synthetic", event: "packed_sidecar_probe", properties: { ordinal: 1 } })
 await transport.shutdown()
 console.log("PACKED_POSTHOG_EVENT_SENT=1")
+const { createSenpiOtlpTransport } = await import("#omo-telemetry-otlp-runtime")
+if (typeof createSenpiOtlpTransport !== "function") throw new Error("OTLP sidecar export missing")
+console.log("PACKED_OTLP_MODULE_LOADED=1")
 `)
     const output = await run(["node", probe], root)
     // Then a real SDK loaded from the installed package sends exactly one original event.
     expect(output).toContain("PACKED_POSTHOG_EVENT_SENT=1")
+    expect(output).toContain("PACKED_OTLP_MODULE_LOADED=1")
     expect(posted).toEqual([expect.objectContaining({
       batch: [expect.objectContaining({
         distinct_id: "synthetic", event: "packed_sidecar_probe",

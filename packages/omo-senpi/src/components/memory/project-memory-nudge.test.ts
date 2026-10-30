@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, realpathSync } from "node:fs"
 import { lstat, readFile, readdir, realpath, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -49,7 +49,7 @@ interface World {
   readonly switchReads: () => number
 }
 
-function world(childNotes: Record<string, string> = { "reference/deploy.md": "how the child deploys" }, fs?: ProjectScopeFs): World {
+function world(childNotes: Record<string, string> = { "reference/deploy.md": "how the child deploys" }, fs?: ProjectScopeFs, corpusCache = createSharedRecallCorpusCache(undefined)): World {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "project-memory-nudge-")))
   roots.push(root)
   const workspace = join(root, "workspace")
@@ -76,7 +76,7 @@ function world(childNotes: Record<string, string> = { "reference/deploy.md": "ho
       return switches.current
     },
     fallbackCwd: () => workspace,
-    corpusCache: createSharedRecallCorpusCache(undefined),
+    corpusCache,
     env,
     ...(fs === undefined ? {} : { fs }),
   }).register(pi)
@@ -102,6 +102,31 @@ function countingFs(): { readonly fs: ProjectScopeFs; readonly calls: () => numb
 }
 
 const ctx = (w: World) => ({ cwd: w.workspace, sessionManager: { getSessionId: () => "session-1" } })
+
+function holdCorpusReads(cache: ReturnType<typeof createSharedRecallCorpusCache>, failFirst = false) {
+  const firstEntered = Promise.withResolvers<void>()
+  const nextEntered = Promise.withResolvers<void>()
+  const thirdEntered = Promise.withResolvers<void>()
+  const firstRelease = Promise.withResolvers<void>()
+  const nextRelease = Promise.withResolvers<void>()
+  const load = cache.load.bind(cache)
+  let calls = 0
+  const spy = spyOn(cache, "load").mockImplementation(async (repo) => {
+    const first = ++calls === 1
+    if (calls === 3) thirdEntered.resolve()
+    const entered = first ? firstEntered : nextEntered
+    entered.resolve()
+    await (first ? firstRelease : nextRelease).promise
+    if (first && failFirst) throw new Error("project notes temporarily unavailable")
+    return await load(repo)
+  })
+  return {
+    spy, firstEntered: firstEntered.promise, nextEntered: nextEntered.promise, thirdEntered: thirdEntered.promise,
+    releaseFirst: () => firstRelease.resolve(),
+    releaseNext: () => nextRelease.resolve(),
+    release: () => { firstRelease.resolve(); nextRelease.resolve() },
+  }
+}
 
 async function readResult(w: World, path: string, toolName = "read"): Promise<string> {
   const original = [{ type: "text", text: "file body" }]
@@ -152,6 +177,89 @@ describe("project memory nudge (#10044)", () => {
     // then
     expect(again).toBe("")
     expect(second).toContain(w.other)
+  })
+
+  test("#given a project corpus read is pending #when another tool result touches it #then only the reserved read appends a nudge", async () => {
+    const cache = createSharedRecallCorpusCache(undefined)
+    const w = world(undefined, undefined, cache)
+    const held = holdCorpusReads(cache)
+    const first = readResult(w, join(w.child, "a.ts"))
+    await held.firstEntered
+    const second = readResult(w, join(w.child, "b.ts"), "edit")
+    try {
+      await Promise.race([second, held.nextEntered])
+      held.release()
+      const nudges = await Promise.all([first, second])
+      expect(nudges[0]).toContain("reference/deploy.md")
+      expect(nudges[1]).toBe("")
+      expect(held.spy).toHaveBeenCalledTimes(1)
+    } finally {
+      held.release()
+      await Promise.allSettled([first, second])
+      held.spy.mockRestore()
+    }
+  })
+
+  test("#given a project corpus read fails #when another touch retries #then the failed reservation does not suppress its nudge", async () => {
+    const cache = createSharedRecallCorpusCache(undefined)
+    const w = world(undefined, undefined, cache)
+    const held = holdCorpusReads(cache, true)
+    const first = readResult(w, join(w.child, "a.ts"))
+    try {
+      await held.firstEntered
+      held.release()
+      expect(await first).toBe("")
+      expect(await readResult(w, join(w.child, "b.ts"))).toContain("reference/deploy.md")
+      expect(held.spy).toHaveBeenCalledTimes(2)
+    } finally {
+      held.release()
+      await first
+      held.spy.mockRestore()
+    }
+  })
+
+  test.each([{ failFirst: false }, { failFirst: true }])("#given a corpus read crosses compaction (fails=$failFirst) #when a new reservation starts #then the old completion neither nudges nor removes it", async ({ failFirst }) => {
+    const cache = createSharedRecallCorpusCache(undefined)
+    const w = world(undefined, undefined, cache)
+    const held = holdCorpusReads(cache, failFirst)
+    const first = readResult(w, join(w.child, "a.ts"))
+    await held.firstEntered
+    await w.pi.dispatch("session_compact", { type: "session_compact", accepted: true }, ctx(w))
+    const second = readResult(w, join(w.child, "b.ts"))
+    try {
+      await held.nextEntered
+      held.releaseFirst()
+      expect(await first).toBe("")
+      const third = readResult(w, join(w.child, "c.ts"))
+      const thirdResult = await Promise.race([third, held.thirdEntered.then(() => undefined)])
+      held.releaseNext()
+      await third
+      expect(thirdResult).toBe("")
+      expect(held.spy).toHaveBeenCalledTimes(2)
+      expect(await second).toContain("reference/deploy.md")
+    } finally {
+      held.release()
+      await Promise.allSettled([first, second])
+      held.spy.mockRestore()
+    }
+  })
+
+  test("#given a project corpus read is pending #when its session shuts down #then completion leaves the tool result unchanged", async () => {
+    const cache = createSharedRecallCorpusCache(undefined)
+    const w = world(undefined, undefined, cache)
+    const held = holdCorpusReads(cache)
+    const first = readResult(w, join(w.child, "a.ts"))
+    try {
+      await held.firstEntered
+      await w.pi.dispatch("session_shutdown", { type: "session_shutdown" }, ctx(w))
+      held.release()
+      expect(await first).toBe("")
+      expect(isGrantedProjectMemoryRead(w.own, join(w.childRepo, "reference", "deploy.md"))).toBe(false)
+    } finally {
+      held.release()
+      await first
+      held.spy.mockRestore()
+    }
   })
 
   test("#given more notes than the cap #when nudged #then the list stops at the cap with a count of the rest", async () => {

@@ -102,13 +102,31 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
     })
   })
 
-  test("#given an rpc_host endpoint with no routing id #when wake is sent to an attach-capable host #then no attachment is attempted and the session-less wake goes through", async () => {
-    await withContractHost({ auth: true }, async (host) => {
-      const reply = await surface(host).gateway.wake({ ...endpoint(host), routing_id: null }, ["delivery"])
-      expect(reply).toEqual({ admitted: [] })
-      expect(host.mutations.map((frame) => frame.type)).toEqual(["wake"])
-      expect(host.mutations[0]).not.toHaveProperty("sessionId")
-      expect(host.frames.some(({ frame }) => frame.type === "attach_session" || frame.type === "release_attachment")).toBe(false)
+  // A real multi-session host refuses every session-less command missing_session_id (omo#11185): an endpoint known
+  // only by its durable id is routed by that host's own listing, never sent without a session.
+  const unroutedCalls: readonly [string, (client: LiveThreadSurface, host: ContractHost) => Promise<unknown>, Record<string, unknown>][] = [
+    ["wake", (client, host) => client.gateway.wake({ ...endpoint(host), routing_id: null }, ["delivery"]), { admitted: [] }],
+    ["release_session", async (client, host) => await client.gateway.releaseSession?.({ ...endpoint(host), routing_id: null }, { reason: "takeover" }), { success: true }],
+    ["extension_ui_response", async (client, host) => await client.gateway.respondUi?.({ ...endpoint(host), routing_id: null }, { ui_request_id: "question", fields: { value: "yes" } }), { delivered: true }],
+  ]
+  const hostShapes = [["an attach-capable host", { auth: true }], ["an older host", { legacy: true }]] as const
+  test.each(unroutedCalls.flatMap(([command, run, expected]) => hostShapes.map(([shape, options]) => [command, shape, options, run, expected] as const)))("#given an rpc_host endpoint with no routing id #when %s runs on %s #then it is routed to the session listed under the durable id", async (command, _shape, options, run, expected) => {
+    await withContractHost(options, async (host) => {
+      expect(await run(surface(host), host)).toMatchObject(expected)
+      expect(host.mutations.map((frame) => [frame.type, frame.sessionId])).toEqual([[command, "rpc-1"]])
+      expect(host.frames.some(({ frame }) => frame.type === "list_sessions" && frame.observe === true)).toBe(true)
+    })
+  })
+
+  test("#given an rpc_host endpoint with no routing id whose durable id no live session holds #when wake, release and a UI answer run #then each answers its typed not-routable result and nothing is sent without a session", async () => {
+    await withContractHost({ auth: true, durableId: "dur-replacement" }, async (host) => {
+      const unrouted = { ...endpoint(host), routing_id: null }
+      const client = surface(host)
+      expect(await client.gateway.wake(unrouted, ["delivery"])).toEqual({ admitted: [], unroutable: "no_live_session" })
+      expect(await client.gateway.releaseSession?.(unrouted, { reason: "takeover" })).toEqual({ success: false, error: "unknown_session" })
+      expect(await client.gateway.respondUi?.(unrouted, { ui_request_id: "question", fields: { value: "yes" } })).toEqual({ delivered: false, error: "unknown_session" })
+      expect(host.frames.filter(({ frame }) => frame.type !== "get_protocol_info" && frame.type !== "authenticate").map(({ frame }) => frame.type))
+        .toEqual(["list_sessions", "list_sessions", "list_sessions"])
     })
   })
 
