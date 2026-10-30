@@ -23,6 +23,20 @@ export class SessionHeldElsewhereError extends Error {
   }
 }
 
+/**
+ * An `open_failed` refusal whose cause is the REQUESTED MODEL, so another model may serve: the host
+ * could not resolve it, or its context window misses the engine's start minimum (senpi
+ * `ModelUsabilityBudgetError`, relayed as text; the numbers are parsed integers, never child text).
+ */
+export type HostModelRefusal =
+  | { readonly kind: "model_unavailable" }
+  | {
+    readonly kind: "context_too_small"
+    readonly contextWindow: number
+    readonly requiredTokens: number
+    readonly shortfallTokens: number
+  }
+
 /** Any other typed refusal of `open_session` (`invalid_launch_profile`, `open_failed`, ...). */
 export class HostSessionOpenError extends Error {
   override readonly name = "HostSessionOpenError"
@@ -30,12 +44,14 @@ export class HostSessionOpenError extends Error {
   readonly sessionPath: string
   /** The host's retry hint (`errorData.retry_after_ms`) when the refusal is temporary. */
   readonly retryAfterMs: number | undefined
+  readonly modelRefusal: HostModelRefusal | undefined
 
-  constructor(code: string, sessionPath: string, detail: string, retryAfterMs?: number) {
+  constructor(code: string, sessionPath: string, detail: string, retryAfterMs?: number, modelRefusal?: HostModelRefusal) {
     super(`open_session for ${sessionPath} was refused (${code}): ${detail}`)
     this.code = code
     this.sessionPath = sessionPath
     this.retryAfterMs = retryAfterMs
+    this.modelRefusal = modelRefusal
   }
 }
 
@@ -131,10 +147,29 @@ export function toOpenFailure(error: unknown, sessionPath: string): unknown {
   const code = readErrorCode(error)
   if (code === undefined) return error
   if (code === "session_path_in_use") return new SessionHeldElsewhereError(sessionPath, readHold(error), error.message)
-  return new HostSessionOpenError(code, sessionPath, error.message, readHold(error).retryAfterMs)
+  const modelRefusal = code === "open_failed" ? readModelRefusal(error) : undefined
+  return new HostSessionOpenError(code, sessionPath, error.message, readHold(error).retryAfterMs, modelRefusal)
 }
 
 const ERROR_CODE = /^[a-z][a-z0-9_]*$/
+
+// senpi ModelUsabilityBudgetError's start wording: `Model "<ref>" cannot start: context window <n>
+// tokens is <n> tokens short of the <n>-token minimum (...)`.
+const START_BUDGET = /\bcannot start: context window (\d+) tokens is (\d+) tokens short of the (\d+)-token minimum\b/
+
+function readModelRefusal(error: Error): HostModelRefusal | undefined {
+  const data = "errorData" in error ? error.errorData : undefined
+  const reason = typeof data === "object" && data !== null && "reason" in data ? data.reason : undefined
+  if (reason === "model_unavailable" || /^open_failed: model_unavailable\b/.test(error.message)) return { kind: "model_unavailable" }
+  const budget = START_BUDGET.exec(error.message)
+  if (budget === null) return undefined
+  return {
+    kind: "context_too_small",
+    contextWindow: Number(budget[1]),
+    shortfallTokens: Number(budget[2]),
+    requiredTokens: Number(budget[3]),
+  }
+}
 
 function readErrorCode(error: Error): string | undefined {
   if ("errorCode" in error && typeof error.errorCode === "string" && ERROR_CODE.test(error.errorCode)) {

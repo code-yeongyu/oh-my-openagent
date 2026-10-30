@@ -22,6 +22,8 @@ export interface FakeHostOpenFailure {
   readonly code: string
   readonly detail?: string
   readonly data?: unknown
+  /** Refuse only the opens that request this model id; every other open succeeds. */
+  readonly modelId?: string
 }
 
 /**
@@ -143,7 +145,9 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
 
 function openSession(ports: FakeHostWirePorts, socket: Socket, payload: Readonly<Record<string, unknown>>): void {
   const configured = ports.openFailure()
-  if (configured !== undefined) return refuse(socket, payload, configured)
+  if (configured !== undefined && (configured.modelId === undefined || configured.modelId === payload.modelId)) {
+    return refuse(socket, payload, configured)
+  }
   const sessionPath = typeof payload.sessionPath === "string" ? payload.sessionPath : "unnamed-session"
   if (ports.enforceSessionDir && isAbsolute(sessionPath) && !existsSync(dirname(sessionPath))) {
     // The real host lstat()s the session directory before it opens the JSONL; the client owns that

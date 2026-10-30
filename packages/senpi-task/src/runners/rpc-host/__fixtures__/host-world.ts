@@ -11,7 +11,7 @@ import { defaultHostSessionProbe } from "../../../lifecycle/host-session-default
 import { createTaskManager } from "../../../manager/manager"
 import { launchSettled } from "../../../manager/__fixtures__/manager-fakes"
 import { createRpcManagedRunner } from "../../../manager/runner"
-import type { StartResult } from "../../../manager/types"
+import type { ChildPlanner, StartResult } from "../../../manager/types"
 import type { TaskRecord } from "../../../state"
 import { createTaskRecordStore, type TaskRecordStore } from "../../../store"
 import { RpcHostRunner } from "../../rpc-host"
@@ -60,6 +60,8 @@ export interface ParentOptions {
   readonly hostCloseTimeoutMs?: number
   /** Observe every child's transport recoveries, as the parent's crash notice does. */
   readonly shardEvents?: HostShardEvents
+  /** Plan children with this planner instead of the suite's single-model one (e.g. a fallback chain). */
+  readonly planner?: ChildPlanner
 }
 
 export interface ParentSession {
@@ -200,7 +202,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
     rpcRespawnRunner: launch,
     ...(recovery === undefined ? {} : { now: recovery.now }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
-    planner: () => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } }),
+    planner: input.options.planner ?? (() => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } })),
     destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
   })

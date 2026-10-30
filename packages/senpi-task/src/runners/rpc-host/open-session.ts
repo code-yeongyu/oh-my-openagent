@@ -52,6 +52,25 @@ export async function openTaskHostSession(input: {
     })
   } catch (error) {
     if (error instanceof HostUnavailableError) throw error
+    // A refusal of the requested model is the one open failure another chain model can remedy.
+    if (error instanceof HostSessionOpenError && error.modelRefusal !== undefined) {
+      const refusal = error.modelRefusal
+      throw new RunnerError({
+        kind: "model_unavailable",
+        message: error.message,
+        ...(refusal.kind === "context_too_small"
+          ? {
+            reason: "model_context_too_small" as const,
+            model_budget: {
+              context_window: refusal.contextWindow,
+              start_minimum: refusal.requiredTokens,
+              shortfall: refusal.shortfallTokens,
+            },
+          }
+          : {}),
+        cause: error,
+      })
+    }
     const reason = sessionFailureReason(error)
     throw new RunnerError({
       kind: "session_unavailable",

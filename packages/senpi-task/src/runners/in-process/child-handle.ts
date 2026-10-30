@@ -63,6 +63,12 @@ export type RunnerFailure = {
   // Set only with `launch_spec_insecure`: the refused spec path omo resolved itself, never child
   // output, so the public start failure may name the file and its fix (#9208).
   readonly launch_spec_path?: string
+  // Set only with `model_context_too_small`: integers the host parsed out of its own refusal (#10879).
+  readonly model_budget?: {
+    readonly context_window: number
+    readonly start_minimum: number
+    readonly shortfall: number
+  }
   /**
    * Structured exit facts for the internal event log, when the child actually reached a process exit.
    *

@@ -20,6 +20,8 @@ const REASON_MESSAGES: Readonly<Partial<Record<TaskStartFailureReason, string>>>
   catalog_probe_timed_out:
     "The task child could not confirm this model in time: its model catalog probe timed out.",
   catalog_probe_failed: "The task child cannot serve this model: its model catalog probe failed.",
+  model_context_too_small:
+    "The task child cannot serve this model: its context window is below the start minimum.",
   host_unreachable: "The task host is unreachable (host_unreachable).",
   ensure_failed: "The task host could not be ensured (ensure_failed).",
   ensure_timed_out:
@@ -53,6 +55,7 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
   const failureKind = error.failure.kind
   const reason = isTaskStartFailureReason(error.failure.reason) ? error.failure.reason : undefined
   const { rejected_while: rejectedWhile, exit, launch_spec_path: specPath } = error.failure
+  const budget = reason === "model_context_too_small" ? error.failure.model_budget : undefined
   const namedSpec = reason === "launch_spec_insecure" && specPath !== undefined ? homeRelative(specPath) : undefined
   // A reason that is present but outside the closed enum marks the failure as untrusted: nothing
   // beyond the stable classification is derived from it, including its cause.
@@ -63,6 +66,8 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
     ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect task_output; run it again with task.`
     : namedSpec !== undefined
     ? launchSpecInsecureMessage(namedSpec)
+    : budget !== undefined
+    ? `The task child cannot serve this model: its context window of ${budget.context_window} tokens is ${budget.shortfall} tokens short of the ${budget.start_minimum}-token start minimum.`
     : cause !== undefined
       ? causedMessage(failureKind, cause)
       : exited !== undefined && failureKind === "child-prompt-failed"
@@ -76,6 +81,7 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
       failure_kind: failureKind,
       ...(reason === undefined ? {} : { failure_reason: reason }),
       ...(namedSpec === undefined ? {} : { launch_spec_path: namedSpec }),
+      ...(budget ?? {}),
       ...(rejectedWhile === undefined ? {} : { rejected_while: rejectedWhile }),
       ...(exit === undefined
         ? {}

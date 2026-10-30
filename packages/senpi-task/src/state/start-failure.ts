@@ -19,6 +19,8 @@ export const MODEL_START_FAILURE_REASONS = [
   // earlier versions (and the rollback contract) still parse.
   "catalog_probe_timed_out",
   "catalog_probe_failed",
+  // The host refused the open: the model's context window misses the engine's start minimum (#10879).
+  "model_context_too_small",
 ] as const
 
 export const HOST_START_FAILURE_REASONS = [
