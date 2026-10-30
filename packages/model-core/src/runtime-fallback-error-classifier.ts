@@ -6,7 +6,6 @@ export { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "./runtime-fallback-re
 export {
   getRuntimeFallbackErrorMessage,
   getRuntimeFallbackErrorName,
-  getRuntimeFallbackProviderID,
   getRuntimeFallbackRetryableSignal,
   getRuntimeFallbackStatusCode,
 } from "./runtime-fallback-error-shape"
