@@ -4,7 +4,6 @@ import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import type { CodexInstallPlatform } from "./types"
 
 const GIT_BASH_ENV_KEY = "OMO_CODEX_GIT_BASH_PATH"
-const CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"])
 
 export async function stampGitBashMcpEnv(input: {
   readonly pluginRoot: string
@@ -16,7 +15,7 @@ export async function stampGitBashMcpEnv(input: {
   const parsed: unknown = JSON.parse(await readFile(manifestPath, "utf8"))
   if (!isPlainRecord(parsed) || !isPlainRecord(parsed["mcpServers"])) return false
 
-  let changed = stampCodegraphMcpPath(parsed["mcpServers"], input.pluginRoot)
+  let changed = false
 
   if (input.platform === "win32") {
     const rawOverride = input.env?.[GIT_BASH_ENV_KEY]
@@ -34,17 +33,5 @@ export async function stampGitBashMcpEnv(input: {
 
   if (!changed) return false
   await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`)
-  return true
-}
-
-function stampCodegraphMcpPath(mcpServers: Record<string, unknown>, pluginRoot: string): boolean {
-  const codegraphServer = mcpServers["codegraph"]
-  if (!isPlainRecord(codegraphServer) || !Array.isArray(codegraphServer["args"])) return false
-
-  const args = codegraphServer["args"]
-  const entrypoint = args[0]
-  if (typeof entrypoint !== "string" || !CODEGRAPH_RELATIVE_ARGS.has(entrypoint)) return false
-
-  codegraphServer["args"] = [join(pluginRoot, "components", "codegraph", "dist", "serve.js"), ...args.slice(1)]
   return true
 }

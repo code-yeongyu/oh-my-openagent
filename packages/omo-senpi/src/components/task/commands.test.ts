@@ -132,6 +132,47 @@ describe("registerTaskCommands", () => {
     expect(printed).toContain("st_other")
   })
 
+  it("#given tasks only in other sessions #when /tasks runs #then the empty answer names /tasks --all and the count elsewhere", async () => {
+    // given
+    const otherB = record({ task_id: "st_b", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })
+    const otherC = record({ task_id: "st_c", status: "completed", parent_session_id: "session-c", root_session_id: "session-c" })
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, fakeManager([otherB, otherC]))
+    const { ctx, ui } = commandCtx("session-a", "tui")
+
+    // when
+    await invoke(pi, "tasks", "", ctx)
+
+    // then
+    expect(ui.notifications).toEqual(["No tasks in this session. /tasks --all lists every session's tasks (2 in other sessions)."])
+  })
+
+  it("#given no tasks anywhere #when /tasks runs #then the empty answer still names /tasks --all without a count", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, fakeManager([]))
+    const { ctx, ui } = commandCtx("session-a", "tui")
+
+    // when
+    await invoke(pi, "tasks", "", ctx)
+
+    // then
+    expect(ui.notifications).toEqual(["No tasks in this session. /tasks --all lists every session's tasks."])
+  })
+
+  it("#given no tasks anywhere #when /tasks --all runs #then it reports the empty store without a hint", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, fakeManager([]))
+    const { ctx, ui } = commandCtx("session-a", "tui")
+
+    // when
+    await invoke(pi, "tasks", "--all", ctx)
+
+    // then
+    expect(ui.notifications).toEqual(["No tasks in all sessions."])
+  })
+
   it("#given a cancellable task #when /task-kill selects it and confirms #then cancelTask runs for that id", async () => {
     // given
     const running = record({ task_id: "st_kill", status: "running" })

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile, readFile, readdir } from "node:fs/promises"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -17,6 +17,10 @@ import {
   type MemoryRpcSnapshot,
 } from "./memory-rpc-bridge"
 import { createMemoryRpcGitRepo } from "./memory-rpc-snapshot-state"
+import { recapFixture } from "./worker/reflection-recap.test-support"
+import { readMemoryReflections } from "./memory-rpc-reflections"
+import type { MemoryRpcSync } from "./memory-rpc-sync"
+import type { SyncStatusReader } from "./sync-status-surface"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -107,6 +111,83 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
+  test.each(["cancel", "attach", "detach"] as const)(
+    "#given a pending status snapshot #when %s retires its observer #then it cannot publish into the next binding",
+    async (retire) => {
+      const context = await contextFixture()
+      const host = rpcHost()
+      const entered = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<string | null>()
+      const bridge = createMemoryRpcBridge(host.pi, {
+        resolveContext: () => context,
+        activeRun: () => undefined,
+        createGitRepo: () => stubRepo({ head: () => { entered.resolve(); return release.promise } }),
+      })
+      const controller = new AbortController()
+      bridge.attach("session-1")
+      const pending = bridge.sync(controller.signal)
+      await entered.promise
+      if (retire === "cancel") controller.abort()
+      else if (retire === "attach") bridge.attach("session-2")
+      else bridge.detach()
+      release.resolve("0123456789abcdef0123456789abcdef01234567")
+      await pending
+      expect(host.emits).toEqual([])
+    },
+  )
+
+  test("#given a never-written identity #when backfill reads #then no runtime directories are created", async () => {
+    const root = await mkdtemp(join(tmpdir(), "recap-read-only-"))
+    roots.push(root)
+    const context = createMemoryIdentityContext({ identity: "agent-test", identityPaths: buildIdentityPaths(root, "agent-test"),
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 } })
+    expect((await readMemoryReflections(context, "session-1", {})).entries).toEqual([])
+    expect(await readdir(root)).toEqual([])
+  })
+  test("#given equal timestamps and consumed records #when paging #then keys advance and completion bytes stay unchanged", async () => {
+    const root = await mkdtemp(join(tmpdir(), "recap-paging-"))
+    roots.push(root)
+    const first = await recapFixture(root, { runId: "run-a", delivery: { status: "consumed", sessionId: "recipient" } })
+    await recapFixture(root, { runId: "run-b", delivery: { status: "consumed", sessionId: "recipient" } })
+    const path = join(first.completionsDir, "run-a.json")
+    const before = await readFile(path, "utf8")
+    const page = await readMemoryReflections(first.context, "recipient", { limit: 1 })
+    const next = await readMemoryReflections(first.context, "recipient", { limit: 1, cursor: page.nextCursor })
+    expect(page.entries.map((entry) => entry.runId)).toEqual(["run-b"])
+    expect(next.entries.map((entry) => entry.runId)).toEqual(["run-a"])
+    expect(next.nextCursor).toBeUndefined()
+    expect(await readFile(path, "utf8")).toBe(before)
+    expect((await readMemoryReflections(first.context, "conversation-b", {})).entries).toHaveLength(2)
+    expect((await readMemoryReflections(first.context, "unrelated", {})).entries).toHaveLength(0)
+  })
+
+  test.each([{ limit: 0 }, { limit: 101 }, { limit: 1.5 }, { cursor: "../secret" }, { cursor: "e30" }, { directory: "/tmp" }])(
+    "#given malformed request %j #when paging #then it is rejected", async (request) => {
+      const context = await contextFixture()
+      await expect(readMemoryReflections(context, "session-1", request)).rejects.toThrow()
+    },
+  )
+
+  test.each(["attach", "detach", "dispose"] as const)("#given an in-flight page #when %s changes binding #then the stale result is discarded", async (operation) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined })
+    bridge.attach("session-1")
+    const result = host.handlers.get("omo.memory.reflections")?.({})
+    if (operation === "attach") bridge.attach("session-1")
+    else bridge[operation]()
+    expect(await result).toMatchObject({ kind: "unavailable" })
+  })
+  test("#given a bound session #when reflections are requested #then a read-only page is returned", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined })
+    bridge.attach("session-1")
+    expect(await host.handlers.get("omo.memory.reflections")?.({ limit: 1 })).toEqual({
+      schemaVersion: 1, identity: context.identity, sessionId: "session-1", entries: [],
+    })
+    expect(host.emits).toEqual([])
+  })
   describe("#given a bound memory session and an rpc-capable host", () => {
     test("#when the bridge syncs #then it emits one snapshot describing repo, reflection, and journal state", async () => {
       const context = await contextFixture()
@@ -407,3 +488,64 @@ describe("memory rpc bridge", () => {
 function minutesAgoISO(minutes: number): string {
   return new Date(Date.now() - minutes * 60_000).toISOString()
 }
+
+describe("memory rpc bridge sync field (omo #10637)", () => {
+  test("#given this device's sync is failing on a stranded lock #when the status is pulled #then the snapshot carries the same kind, reason, action and paths the TUI shows", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const repos: string[] = []
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () => stubRepo(),
+      syncStatus: async (repo) => {
+        repos.push(repo)
+        return {
+          kind: "failing",
+          since: Date.parse("2026-10-22T10:00:00.000Z"),
+          attempts: 2,
+          failure: { kind: "stranded_lock", paths: ["/m/.git/index.lock"], reason: "A git lock blocks sync.", action: "Run /memory unlock /m/.git/index.lock." },
+        }
+      },
+    })
+    bridge.attach("session-1")
+
+    const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
+
+    expect(repos).toEqual([context.identityPaths.repo])
+    expect(snapshot.sync).toEqual({
+      state: "failing",
+      failure: {
+        kind: "stranded_lock",
+        reason: "A git lock blocks sync.",
+        action: "Run /memory unlock /m/.git/index.lock.",
+        sinceISO: "2026-10-22T10:00:00.000Z",
+        attempts: 2,
+        paths: ["/m/.git/index.lock"],
+      },
+    })
+    bridge.dispose()
+  })
+
+  const cases: ReadonlyArray<readonly [string, SyncStatusReader, MemoryRpcSync | undefined]> = [
+    ["synced", async () => ({ kind: "synced", at: Date.parse("2026-10-22T10:00:00.000Z"), updatedWhileOffline: 0 }), { state: "synced", lastSyncedAtISO: "2026-10-22T10:00:00.000Z" }],
+    ["never synced", async () => ({ kind: "never_synced" }), { state: "never_synced" }],
+    ["paused at a refused entry", async () => ({ kind: "paused", seq: 1, code: "signature" }), { state: "paused" }],
+    ["unavailable on this device", async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }), { state: "unavailable" }],
+    ["off because its configuration is invalid", async () => ({ kind: "sync-config-invalid", variable: "OMO_SERVICE_API_URL", reason: "OMO_SERVICE_API_URL is not a valid service URL" }), { state: "unavailable" }],
+    ["not syncing on this device", async () => null, undefined],
+    ["a reader that throws", async () => Promise.reject(new Error("runner gone")), undefined],
+  ]
+  test.each(cases)("#given sync %s #when the status is pulled #then the sync field matches", async (_name, syncStatus, expected) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, { resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(), syncStatus })
+    bridge.attach("session-1")
+
+    const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
+
+    expect(snapshot.sync).toEqual(expected)
+    expect("sync" in snapshot).toBe(expected !== undefined)
+    bridge.dispose()
+  })
+})

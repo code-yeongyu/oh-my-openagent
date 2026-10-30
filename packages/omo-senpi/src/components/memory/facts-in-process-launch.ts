@@ -1,0 +1,193 @@
+import { chmod, writeFile } from "@oh-my-opencode/memory-core/fs"
+import { getProcessStartIdentity, loadFactsPersona, serializeFactsPayload, type FactsPayload } from "@oh-my-opencode/memory-core"
+import { join } from "node:path"
+
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { runInProcessMemoryChild, type InProcessMemoryChildState, type MemoryChildResult, type StartChildInput } from "./in-process-memory-child"
+import { createFactsRecordTool, FACTS_RECORD_TOOL_NAME, payloadExchanges } from "./facts-record-tool"
+import { createFactsAgreementTool, FACTS_AGREEMENT_TOOL_NAME, type FactsAgreementTool } from "./facts-agreement-tool"
+import { FACTS_AGREEMENTS_FILENAME } from "./facts-agreements"
+import type { FactsQueuedKey } from "./facts-failure-recording"
+import { type ReflectionModelCandidate, type ReflectionModelResolution } from "./worker/resolve-model"
+import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
+import { childModelChainSpec } from "./memory-child-model-chain"
+import { updateRunLedger, writeRunJsonAtomic, type RunOutcome } from "./worker/run-artifacts"
+import type { FactsExtractorRunnerOptions } from "./facts-runner-types"
+import { admitOversizedFacts, FACTS_RECORD_BYTES, FACTS_RECORD_LIMIT, factsPrompt } from "./facts-oversized-budget"
+import { createOversizedFactsGuard } from "./facts-oversized-child"
+
+type ResolvedChildModel = NonNullable<StartChildInput["model"]>
+
+type FactsInProcessLaunchInput = {
+  readonly runId: string
+  readonly runDir: string
+  /** A conversation batch, or text that is already the extractor's input (onboarding's session digests). */
+  readonly payload: FactsPayload | string
+  readonly oversized?: boolean
+  /** Caps on this run's `record_fact` tool calls; `onCall` sees every call. */
+  readonly recordLimits?: { readonly maxCalls: number; readonly onCall: () => void }
+  readonly resolution: Extract<ReflectionModelResolution, { readonly kind: "resolved" }>
+  readonly modelRegistry?: ReturnType<FactsExtractorRunnerOptions["resolveModelRegistry"]>
+  readonly options: Pick<FactsExtractorRunnerOptions, "createRunner" | "createSession" | "logger">
+  readonly env: NodeJS.ProcessEnv
+  readonly configSources: readonly { readonly path: string; readonly exists: boolean }[]
+  readonly batchId: string
+  readonly queued: readonly FactsQueuedKey[]
+  readonly launchedAt: number
+  readonly deadlineMs: number
+  readonly onState?: (state: InProcessMemoryChildState) => void
+}
+
+export async function launchFactsInProcess(input: FactsInProcessLaunchInput): Promise<boolean> {
+  const candidates: readonly [ReflectionModelCandidate, ...ReflectionModelCandidate[]] = [
+    { model: input.resolution.model, ...(input.resolution.thinking === undefined ? {} : { thinking: input.resolution.thinking }) },
+    ...(input.oversized === true ? [] : input.resolution.fallbacks),
+  ]
+  const registry = input.modelRegistry
+  const taskRuntime = await import("#omo-task-runtime")
+  const tried: string[] = []
+  for (const [index, candidate] of candidates.entries()) {
+    const attempt = index + 1
+    tried.push(candidate.model)
+    const model = registry === undefined || !isModelFinder(registry)
+      ? undefined
+      : taskRuntime.findModelReference<ResolvedChildModel>(registry, candidate.model)
+    if (registry === undefined || model === undefined || model === null) {
+      input.options.logger?.warn("facts model candidate skipped because it is not visible in the live registry", {
+        model: candidate.model,
+        attempt,
+      })
+      continue
+    }
+    const result = await launchCandidate(input, candidate, model, attempt, candidates.slice(index + 1))
+    if (result.status === "completed") return false
+    if (result.cause === "cancelled") return true
+    if (result.cause !== "session_create_failed") return false
+  }
+  throw new Error(`No facts model candidate launched; tried: ${tried.length === 0 ? candidates.map((candidate) => candidate.model).join(", ") : tried.join(", ")}`)
+}
+
+async function launchCandidate(
+  input: FactsInProcessLaunchInput,
+  candidate: ReflectionModelCandidate,
+  model: ResolvedChildModel,
+  attempt: number,
+  fallbacks: readonly ReflectionModelCandidate[],
+): Promise<MemoryChildResult> {
+  const payload = typeof input.payload === "string" ? input.payload : { ...input.payload, agreementEventVersion: 1 as const }
+  const payloadText = typeof payload === "string" ? payload : serializeFactsPayload(payload)
+  const payloadPath = join(input.runDir, "facts-payload.json")
+  const extractionPath = join(input.runDir, "extraction.jsonl")
+  const agreementsPath = join(input.runDir, FACTS_AGREEMENTS_FILENAME)
+  const state: InProcessMemoryChildState = { cancelled: false }
+  if (input.oversized === true && (typeof input.payload === "string" || !admitOversizedFacts(input.payload, model))) {
+    throw new Error("oversized facts input does not fit the pinned model budget")
+  }
+  const guard = input.oversized !== true ? undefined : createOversizedFactsGuard({
+    model,
+    ...(input.options.createSession === undefined ? {} : { createSession: input.options.createSession }),
+    onFailure: (reason) => {
+      tool.deactivate()
+      input.options.logger?.warn("oversized facts run refused", { runId: input.runId, reason })
+    },
+  })
+  const tool = createFactsRecordTool({
+    extractionPath, state,
+    // A text payload (onboarding session digests) has no proposal and reply turns, so it can never carry consent.
+    exchanges: typeof input.payload === "string" ? [] : payloadExchanges(input.payload),
+    ...(guard === undefined ? {} : { maxBytes: FACTS_RECORD_BYTES, maxRecords: FACTS_RECORD_LIMIT, onFailure: guard.fail }),
+    ...(input.recordLimits === undefined ? {} : input.recordLimits),
+  })
+  const known = typeof input.payload === "string" ? undefined : input.payload.agreements
+  const agreementTool = known === undefined || typeof payload === "string" ? undefined : createFactsAgreementTool({
+    extractionPath: agreementsPath, state, knownIds: new Set(known.map((item) => item.id)),
+    payload,
+    ...(guard === undefined ? {} : { onFailure: guard.fail }),
+  })
+  const createSession = guard?.createSession ?? input.options.createSession
+  input.onState?.(state)
+  let result = await runInProcessMemoryChild({
+    runId: input.runId,
+    deadlineMs: input.deadlineMs,
+    state,
+    logger: input.options.logger,
+    ...(input.options.createRunner === undefined ? {} : { createRunner: input.options.createRunner }),
+    ...(createSession === undefined ? {} : { createSession }),
+    setup: async () => {
+      await chmod(payloadPath, 0o600).catch((error: unknown) => {
+        if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error
+      })
+      await writeFile(payloadPath, payloadText, { encoding: "utf8", mode: 0o600 })
+      await chmod(payloadPath, 0o400)
+      await writeFile(extractionPath, "", { encoding: "utf8", mode: 0o600 })
+      if (agreementTool !== undefined) await writeFile(agreementsPath, "", { encoding: "utf8", mode: 0o600 })
+      await updateRunLedger(join(input.runDir, "ledger.json"), {
+        attempt,
+        model: candidate.model,
+        ...(candidate.thinking === undefined ? {} : { thinking: candidate.thinking }),
+        pid: process.pid,
+        processStart: await getProcessStartIdentity(process.pid),
+        // childPid is intentionally absent: this run is owned by the parent process. Reconciliation
+        // therefore treats a missing child identity as unknown liveness and abandons, not fails.
+      })
+    },
+    buildStart: () => buildStart(input, candidate, model, fallbacks, payloadText, tool, agreementTool),
+    onHandle: () => undefined,
+    ...(input.onState === undefined ? {} : { onState: input.onState }),
+  })
+  if (result.status === "failed" && result.cause === "cancelled") {
+    tool.deactivate()
+    agreementTool?.deactivate()
+    return result
+  }
+  if (result.status === "completed" && guard !== undefined && !guard.succeeded()) result = { status: "failed", cause: "child_failed" }
+  const timedOut = result.status === "failed" && result.cause === "deadline"
+  const outcome: RunOutcome = timedOut
+    ? { version: 1, runId: input.runId, attempt, finishedAt: new Date().toISOString(), childExit: { code: null, signal: null }, timedOut: true }
+    : { version: 1, runId: input.runId, attempt, finishedAt: new Date().toISOString(), childExit: { code: result.status === "completed" ? 0 : 1, signal: null }, timedOut: false }
+  await writeRunJsonAtomic(join(input.runDir, "outcome.json"), outcome)
+  tool.deactivate()
+  agreementTool?.deactivate()
+  return result
+}
+
+function buildStart(
+  input: FactsInProcessLaunchInput,
+  candidate: ReflectionModelCandidate,
+  model: ResolvedChildModel,
+  fallbacks: readonly ReflectionModelCandidate[],
+  payloadText: string,
+  tool: ReturnType<typeof createFactsRecordTool>,
+  agreementTool: FactsAgreementTool | undefined,
+): StartChildInput {
+  const childRegistry = isChildModelRegistry(input.modelRegistry) ? input.modelRegistry : undefined
+  return {
+    taskId: `facts-${input.runId}`,
+    cwd: input.runDir,
+    sessionDir: input.runDir,
+    agentDir: resolveAgentHome({ env: input.env }),
+    modelRegistry: childRegistry,
+    model,
+    ...childModelChainSpec({ model: candidate.model, fallbacks }),
+    ...(input.oversized === true ? { retry: { maxRetries: 0 } } : {}),
+    ...(candidate.thinking === undefined ? {} : { thinkingLevel: candidate.thinking }),
+    toolAllowlist: agreementTool === undefined ? [FACTS_RECORD_TOOL_NAME] : [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME],
+    memberScopedTools: agreementTool === undefined ? [tool] : [tool, agreementTool],
+    depth: 1,
+    parentSessionId: `facts-${input.runId}`,
+    rootSessionId: `facts-${input.runId}`,
+    systemPrompt: loadFactsPersona(),
+    promptEnvelope: "bare",
+    completion: "turn",
+    prompt: factsPrompt(payloadText),
+  }
+}
+
+function isModelFinder(value: unknown): value is { readonly find: (provider: string, modelId: string) => ResolvedChildModel | undefined } {
+  return value !== null && typeof value === "object" && "find" in value && typeof value.find === "function"
+}
+
+function isChildModelRegistry(value: unknown): value is ChildModelRegistry {
+  return value !== null && typeof value === "object" && "getProviderAuth" in value
+    && typeof value.getProviderAuth === "function"
+}

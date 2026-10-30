@@ -43,13 +43,15 @@ async function classifyRecord(
     readonly excludePrefixes: readonly string[]
     readonly home: string
     readonly now: number
+    readonly currentWorktree?: string
   },
 ): Promise<WorktreeClassification> {
   const pathExists = existsSync(record.path)
   const external = isExcludedPath(record.path, options.excludePrefixes, options.home)
+  const current = options.currentWorktree !== undefined && record.path === options.currentWorktree
 
   // Short-circuit: protected or vanished trees need no git interrogation.
-  if (record.locked || !pathExists || external) {
+  if (record.locked || !pathExists || external || current) {
     return classifyWorktree({
       record,
       pathExists,
@@ -57,6 +59,7 @@ async function classifyRecord(
       agedOut: false,
       dirty: false,
       external,
+      current,
     })
   }
 
@@ -81,16 +84,23 @@ async function sweepRepo(
 ): Promise<WorktreeSweepRepoReport> {
   // git reports forward-separator roots even on Windows; normalize so the
   // report's repo identity matches platform-native consumer paths.
-  const root = normalize((await resolveRepoRoot(repo)) ?? repo)
-  const defaultBranch = await detectDefaultBranch(root)
+  const toplevel = normalize((await resolveRepoRoot(repo)) ?? repo)
+  const defaultBranch = await detectDefaultBranch(toplevel)
   if (defaultBranch === undefined) {
-    throw new Error(`Could not determine the default branch for ${root}`)
+    throw new Error(`Could not determine the default branch for ${toplevel}`)
   }
 
-  const records = linkedWorktrees(parseWorktreeList(await listWorktreesPorcelain(root)))
+  const allRecords = parseWorktreeList(await listWorktreesPorcelain(toplevel))
+  const records = linkedWorktrees(allRecords)
+  // Inside a linked worktree `--show-toplevel` is that worktree, so run git from the
+  // main worktree (first record) and keep the current one instead of removing it.
+  const startedInLinked = records.some((record) => record.path === toplevel)
+  const mainWorktree = allRecords[0]?.path
+  const root = startedInLinked && mainWorktree !== undefined && existsSync(mainWorktree) ? mainWorktree : toplevel
+  const currentWorktree = startedInLinked ? toplevel : undefined
   const classifications: WorktreeClassification[] = []
   for (const record of records) {
-    classifications.push(await classifyRecord(root, record, defaultBranch, options))
+    classifications.push(await classifyRecord(root, record, defaultBranch, { ...options, currentWorktree }))
   }
 
   const removed: string[] = []

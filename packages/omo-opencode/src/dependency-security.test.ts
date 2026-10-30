@@ -18,6 +18,7 @@ type BunLock = {
   workspaces?: {
     ""?: {
       dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
     }
   }
   packages?: Record<string, [string, ...unknown[]]>
@@ -60,15 +61,17 @@ function extractLockedVersion(packageReference: string): string {
 }
 
 async function findFirstPartyEffectImports(): Promise<string[]> {
+  // POSIX ERE, not PCRE: `git grep -P` needs a git built with USE_LIBPCRE and
+  // exits 128 without it (#10735). Every git supports -E.
   const importPattern =
-    String.raw`(?:from\s+["']effect(?:/[^"']*)?["']|import\(\s*["']effect(?:/[^"']*)?["']|require\(\s*["']effect(?:/[^"']*)?["'])`
+    String.raw`(from[[:space:]]+|import\([[:space:]]*|require\([[:space:]]*)["']effect(/[^"']*)?["']`
   const result = Bun.spawnSync(
     [
       "git",
       "grep",
       "-l",
       "-I",
-      "-P",
+      "-E",
       importPattern,
       "--",
       ...FIRST_PARTY_SOURCE_PATHS,
@@ -77,7 +80,7 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
       ":(exclude)**/node_modules/**",
       ":(exclude)**/dist/**",
     ],
-    // Bound the spawn so a slow `git grep -P` on a loaded Windows runner fails
+    // Bound the spawn so a slow `git grep -E` on a loaded Windows runner fails
     // deterministically instead of hanging past the test timeout (the observed flake).
     { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe", timeout: 60_000 },
   )
@@ -94,12 +97,12 @@ async function findFirstPartyEffectImports(): Promise<string[]> {
 }
 
 describe("dependency security", () => {
-  it("#given picomatch is a runtime dependency #when dependencies are locked #then it uses the patched ReDoS-safe release", () => {
+  it("#given picomatch is bundled into the published dist #when dependencies are locked #then it uses the patched ReDoS-safe release", () => {
     const packageJson = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf-8")) as {
-      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
     }
     const bunLock = parse(readFileSync(join(REPO_ROOT, "bun.lock"), "utf-8")) as BunLock
-    const dependencyRange = packageJson.dependencies?.picomatch
+    const dependencyRange = packageJson.devDependencies?.picomatch
     const lockedReference = bunLock.packages?.picomatch?.[0]
 
     expect(dependencyRange).toBe(`^${MINIMUM_SAFE_PICOMATCH_VERSION}`)
@@ -107,7 +110,7 @@ describe("dependency security", () => {
 
     const lockedVersion = extractLockedVersion(lockedReference ?? "")
     expect(compareVersions(lockedVersion, MINIMUM_SAFE_PICOMATCH_VERSION)).toBeGreaterThanOrEqual(0)
-    expect(bunLock.workspaces?.[""]?.dependencies?.picomatch).toBe(`^${MINIMUM_SAFE_PICOMATCH_VERSION}`)
+    expect(bunLock.workspaces?.[""]?.devDependencies?.picomatch).toBe(`^${MINIMUM_SAFE_PICOMATCH_VERSION}`)
   })
 
   it("#given effect is only needed by OpenCode internals #when root dependencies are locked #then the root package does not depend on effect directly", () => {
@@ -125,7 +128,7 @@ describe("dependency security", () => {
     expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.83")
   })
 
-  // The scan spawns `git grep -P` over every first-party source and already bounds that spawn at
+  // The scan spawns `git grep -E` over every first-party source and already bounds that spawn at
   // 60s so a stalled grep fails deterministically. The case therefore has to outlive its own
   // guard: on the 5s default the test died before the spawn budget could ever apply, which is the
   // Windows failure. The assertion is unchanged - only the ceiling now exceeds what it wraps.

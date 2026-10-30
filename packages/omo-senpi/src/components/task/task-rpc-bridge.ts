@@ -1,4 +1,5 @@
 import {
+  awaitingInputDetails,
   createChildProgress,
   runTaskCancel,
   runTaskOutput,
@@ -14,6 +15,7 @@ import {
   invalidArguments,
   liveProgressSnapshot,
   parseTaskCancel,
+  parseTaskList,
   parseTaskOutput,
   parseTaskSend,
   taskSnapshot,
@@ -22,10 +24,41 @@ import {
 
 const TASK_UPDATED_EVENT = "omo.task.updated"
 const MAX_TASK_SNAPSHOTS = 256
+// Trailing-edge window for progress-driven snapshot pushes. Every accepted child progress event of
+// every live task used to emit a full session snapshot (up to 256 records), so a burst of distinct
+// ticks pushed hundreds of snapshots back-to-back and overflowed the desktop RPC socket queue
+// (senpi#1438; the 4 MiB cap and teardown-on-overflow on the consumer side are intentional). 150ms
+// is below a UI flicker threshold yet collapses a whole burst into one push of the freshest state;
+// lifecycle-driven attach/sync still emit immediately, so only progress tail latency is affected.
+const PROGRESS_COALESCE_MS = 150
+
+type TimerHandle = ReturnType<typeof setTimeout> | number
+
+// Injectable timer seam so the coalescing window is deterministic under test; defaults to global
+// timers, unref'd so a queued flush never holds the host process open.
+export interface TaskRpcTimers {
+  set(callback: () => void, ms: number): TimerHandle
+  clear(handle: TimerHandle): void
+}
+
+export interface TaskRpcBridgeDeps {
+  readonly timers?: TaskRpcTimers
+  readonly coalesceMs?: number
+}
+
+const globalTimers: TaskRpcTimers = {
+  set: (callback, ms) => {
+    const handle = setTimeout(callback, ms)
+    handle.unref?.()
+    return handle
+  },
+  clear: (handle) => clearTimeout(handle),
+}
 
 export interface TaskRpcBridge {
   attach(): void
   sync(): void
+  resend(): void
   detach(): void
   dispose(): void
 }
@@ -33,12 +66,22 @@ export interface TaskRpcBridge {
 export function wireTaskRpcBridge(
   pi: SenpiExtensionAPI,
   engine: TaskEngine,
+  deps: TaskRpcBridgeDeps = {},
 ): TaskRpcBridge {
+  const timers = deps.timers ?? globalTimers
+  const coalesceMs = deps.coalesceMs ?? PROGRESS_COALESCE_MS
   const subscriptions = new Map<string, () => void>()
   const liveProgress = new Map<string, TaskLiveProgressSnapshot>()
   let activeSessionId: string | undefined
   let lastSnapshot: string | undefined
   let disposed = false
+  let pendingFlush: TimerHandle | undefined
+
+  const cancelPendingFlush = (): void => {
+    if (pendingFlush === undefined) return
+    timers.clear(pendingFlush)
+    pendingFlush = undefined
+  }
 
   const recordsForSession = (sessionId: string) => {
     const all = engine.manager.list({ scope: "parent-session", session_id: sessionId }).map((entry) => entry.record)
@@ -55,25 +98,38 @@ export function wireTaskRpcBridge(
     }
   }
 
-  const emit = (selection = activeSessionId === undefined ? undefined : recordsForSession(activeSessionId)): void => {
-    const sessionId = activeSessionId
-    if (disposed || sessionId === undefined || pi.rpc?.emit === undefined) return
-    if (selection === undefined) return
-    const data = {
-      parent_session_id: sessionId,
-      tasks: selection.records.map((record) =>
-        taskSnapshot(
-          record,
-          isLive(record) ? engine.manager.runStatsSnapshot?.(record.task_id) : undefined,
-          liveProgress.get(record.task_id),
-        ),
+  // ONE builder feeds both the pushed snapshot (omo.task.updated) and the pull request
+  // (omo.task.list), so a re-attached client reads exactly what a live subscriber sees.
+  const snapshotData = (sessionId: string, selection = recordsForSession(sessionId)) => ({
+    parent_session_id: sessionId,
+    tasks: selection.records.map((record) =>
+      taskSnapshot(
+        record,
+        isLive(record) ? engine.manager.runStatsSnapshot?.(record.task_id) : undefined,
+        liveProgress.get(record.task_id),
       ),
-      ...(selection.truncatedTasks === 0 ? {} : { truncated_tasks: selection.truncatedTasks }),
-    }
+    ),
+    ...(selection.truncatedTasks === 0 ? {} : { truncated_tasks: selection.truncatedTasks }),
+  })
+
+  const emit = (data = activeSessionId === undefined ? undefined : snapshotData(activeSessionId)): void => {
+    if (disposed || activeSessionId === undefined || pi.rpc?.emit === undefined) return
+    if (data === undefined) return
     const fingerprint = JSON.stringify(data)
     if (fingerprint === lastSnapshot) return
     lastSnapshot = fingerprint
     pi.rpc.emit(TASK_UPDATED_EVENT, data)
+  }
+
+  const scheduleProgressFlush = (): void => {
+    if (disposed || activeSessionId === undefined) return
+    // Trailing edge, latest-wins: the first tick opens the window, later ticks only mean the
+    // flush re-reads the store, so a burst costs exactly one snapshot push.
+    if (pendingFlush !== undefined) return
+    pendingFlush = timers.set(() => {
+      pendingFlush = undefined
+      emit()
+    }, coalesceMs)
   }
 
   const removeSubscription = (taskId: string): void => {
@@ -105,17 +161,20 @@ export function wireTaskRpcBridge(
           model: record.model,
         },
         Date.parse(record.created_at),
+        Date.now,
+        { awaitingInput: awaitingInputDetails(record) !== undefined },
       )
       const unsubscribe = engine.manager.subscribeChild(record.task_id, (event: ManagedChildEvent) => {
         if (!progress.accept(event)) return
         liveProgress.set(record.task_id, liveProgressSnapshot(progress.details()))
-        emit()
+        scheduleProgressFlush()
       })
       subscriptions.set(record.task_id, unsubscribe)
     }
   }
 
   const detach = (): void => {
+    cancelPendingFlush()
     for (const taskId of [...subscriptions.keys()]) removeSubscription(taskId)
     activeSessionId = undefined
     lastSnapshot = undefined
@@ -124,12 +183,15 @@ export function wireTaskRpcBridge(
   const sync = (): void => {
     const sessionId = activeSessionId
     if (sessionId === undefined || pi.rpc?.emit === undefined) return
+    // Emit immediately and drop any queued progress flush so ordering stays monotonic: the
+    // lifecycle snapshot below is at least as fresh as anything the flush would have sent.
+    cancelPendingFlush()
     const selection = recordsForSession(sessionId)
     syncSubscriptions(selection.records)
-    emit(selection)
+    emit(snapshotData(sessionId, selection))
   }
 
-  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId))
+  registerTaskHandlers(pi, engine, () => (disposed ? undefined : activeSessionId), snapshotData)
 
   return {
     attach() {
@@ -139,6 +201,12 @@ export function wireTaskRpcBridge(
       sync()
     },
     sync,
+    /** Push the full current snapshot again without touching child subscriptions or their live progress. */
+    resend() {
+      if (disposed || activeSessionId === undefined) return
+      lastSnapshot = undefined
+      sync()
+    },
     detach,
     dispose() {
       if (disposed) return
@@ -152,9 +220,22 @@ function registerTaskHandlers(
   pi: SenpiExtensionAPI,
   engine: TaskEngine,
   currentSessionId: () => string | undefined,
+  snapshot: (sessionId: string) => {
+    readonly parent_session_id: string
+    readonly tasks: readonly unknown[]
+    readonly truncated_tasks?: number
+  },
 ): void {
   const handle = pi.rpc?.handle
   if (handle === undefined) return
+  handle("omo.task.list", async (data) => {
+    const sessionId = currentSessionId()
+    if (sessionId === undefined) return unavailable()
+    const input = parseTaskList(data)
+    if ("error" in input) return invalidArguments(input.error)
+    if (input.value.parent_session_id !== sessionId) return { kind: "not_found", reason: "No such parent session on this connection." } as const
+    return snapshot(sessionId)
+  })
   handle("omo.task.send", async (data) => {
     const sessionId = currentSessionId()
     if (sessionId === undefined) return unavailable()

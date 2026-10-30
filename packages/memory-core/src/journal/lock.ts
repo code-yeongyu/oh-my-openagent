@@ -142,9 +142,11 @@ const queueTails = new Map<string, Promise<void>>()
 
 export const withLocalJournalLock: JournalLock = (lockPath, task, signal) => {
   const previous = queueTails.get(lockPath) ?? Promise.resolve()
+  let queued = true
   const run = previous
     .catch(() => undefined)
     .then(() => {
+      queued = false
       signal?.throwIfAborted()
       return acquireAndRun(lockPath, task, signal)
     })
@@ -156,5 +158,15 @@ export const withLocalJournalLock: JournalLock = (lockPath, task, signal) => {
   void tail.then(() => {
     if (queueTails.get(lockPath) === tail) queueTails.delete(lockPath)
   })
-  return run
+  if (signal === undefined) return run
+  // Cancelling a queued caller must release its wait, not the FIFO barrier: later callers
+  // still wait for the actual holder, and this entry checks cancellation before acquisition.
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      if (queued) reject(signal.reason)
+    }
+    if (signal.aborted) onAbort()
+    else signal.addEventListener("abort", onAbort, { once: true })
+    void run.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort))
+  })
 }

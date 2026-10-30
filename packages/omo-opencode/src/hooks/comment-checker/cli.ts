@@ -7,6 +7,7 @@ import { tmpdir } from "os"
 import {
   resolveCommentCheckerBinary,
   runCommentChecker as runCommentCheckerCore,
+  sendAndCloseStdin,
   type CheckResult,
   type HookInput,
 } from "@oh-my-opencode/comment-checker-core"
@@ -146,12 +147,20 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
       { hookInput: input, binaryPath, customPrompt },
       {
         existsSync,
-        spawn: (args: readonly string[]) =>
-          spawn([...args], {
+        spawn: (args: readonly string[]) => {
+          const subprocess = spawn([...args], {
             stdin: "pipe",
             stdout: "pipe",
             stderr: "pipe",
-          }),
+          })
+          return {
+            stdin: { send: (hookInput: string) => sendAndCloseStdin(subprocess.stdin, hookInput) },
+            stdout: subprocess.stdout,
+            stderr: subprocess.stderr,
+            exited: subprocess.exited,
+            kill: (signal) => subprocess.kill(signal),
+          }
+        },
       },
     )
     return result

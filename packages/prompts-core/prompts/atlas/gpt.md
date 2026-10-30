@@ -79,7 +79,7 @@ Use `task()` with EITHER category OR agent (mutually exclusive):
 task(
   category="[category-name]",
   load_skills=["skill-1", "skill-2"],
-  run_in_background=false,
+  run_in_background=true,
   prompt="..."
 )
 
@@ -87,7 +87,7 @@ task(
 task(
   subagent_type="[agent-name]",
   load_skills=[],
-  run_in_background=false,
+  run_in_background=true,
   prompt="..."
 )
 ```
@@ -117,8 +117,7 @@ Every `task()` prompt MUST include ALL 6 sections:
 
 ## 3. REQUIRED TOOLS
 - [tool]: [what to search/check]
-- codegraph_explore (PRIMARY): One capped call returns source + callers/callees/impact. Use FIRST when codegraph_* tools are available. If no codegraph_* tools present, CodeGraph reports inactive/uninitialized, or first cold-start window, continue immediately with Read/Grep/Glob/LSP and the ast-grep skill.
-- codegraph_search, codegraph_node, codegraph_callers, codegraph_callees, codegraph_impact, codegraph_files, codegraph_status: Supporting CodeGraph tools for targeted queries.
+- lsp_* (PRIMARY for symbols): lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics for definitions, callers, and impact. Fall back to Read/Grep/Glob only for plain text.
 - context7: Look up [library] docs
 - ast-grep skill: Load the ast-grep skill for structural code search/rewrite. Use `sg --pattern '[pattern]' --lang [lang]` or `python3 scripts/ast_grep_helper.py search`.
 
@@ -185,10 +184,10 @@ Anything else → fire ALL of them in the SAME response, IN PARALLEL. One messag
 
 ```typescript
 // CORRECT: 4 independent tasks → 4 task() calls in ONE response
-task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
-task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
-task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
-task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+task(category="quick", load_skills=[], run_in_background=true, prompt="...task A...")
+task(category="quick", load_skills=[], run_in_background=true, prompt="...task B...")
+task(category="quick", load_skills=[], run_in_background=true, prompt="...task C...")
+task(category="quick", load_skills=[], run_in_background=true, prompt="...task D...")
 
 // WRONG: same 4 tasks dispatched one per turn
 // You are wasting wall-clock time and parallel capacity.
@@ -202,7 +201,7 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="...task 
 
 **Background vs foreground:**
 - **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
-- **Task execution** (`category="..."`): `run_in_background=false` — blocks for verification
+- **Task execution** (`category="..."`): `run_in_background=true` — the completion notification wakes you to verify; `false` only for a short child whose result gates your very next call
 
 **Background management:**
 - Collect with background task IDs (`bg_...`): `background_output(task_id="bg_...")`
@@ -263,9 +262,9 @@ Extract wisdom → include in EVERY dispatched prompt under "Inherited Wisdom".
 ### 3.3 Invoke task() — Fan Out in One Response
 
 ```typescript
-task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
-task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
-task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
 ```
 
 3 independent tasks → 3 calls in this response.

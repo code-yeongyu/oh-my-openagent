@@ -4,7 +4,7 @@ import type { ThemeColor } from "@code-yeongyu/senpi"
 
 import { rendererVisibleWidth } from "../task/renderers"
 import { toolResult } from "../control"
-import { renderTaskOutputCall, renderTaskOutputResult, type OutputRenderTheme } from "./renderers"
+import { renderTaskOutputCall, renderTaskOutputResult, taskOutputModelText, type OutputRenderTheme } from "./renderers"
 import type { TaskOutputDetails, TaskSnapshot } from "./types"
 
 const TEST_THEME: OutputRenderTheme = {
@@ -39,6 +39,84 @@ function snapshot(overrides: Partial<TaskSnapshot> = {}): TaskSnapshot {
     ...overrides,
   }
 }
+
+describe("task_output model text (#9722)", () => {
+  test("#given a child that moved onto its parent's model #when rendered #then the text names the parent model, the model that gave out, and the interrupted call (#10750)", () => {
+    const text = taskOutputModelText(snapshot({
+      parent_model: "chatgpt-subscription/gpt-6.1-sol",
+      parent_model_fallback: {
+        from_model: "anthropic-subscription/claude-opus-5-5",
+        reason: "usage_limit",
+        resets: "3:20am",
+        interrupted_tools: ["bash"],
+        at: "2026-10-21T01:00:00.000Z",
+      },
+    }))
+
+    for (const fact of ["chatgpt-subscription/gpt-6.1-sol", "anthropic-subscription/claude-opus-5-5", "3:20am", "bash"]) {
+      expect(text).toContain(fact)
+    }
+    expect(taskOutputModelText(snapshot())).not.toContain("chatgpt-subscription/gpt-6.1-sol")
+  })
+
+  test("#given an honoured pin whose resolved display carries the suffix #when rendered #then it shows one model, never a false mismatch", () => {
+    // given: the plan's display is the raw pin; the child's effective model is its canonical base
+    const snap = snapshot({
+      resolved_model: {
+        provider: "vendor-a",
+        model_id: "pinned",
+        display: "vendor-a/pinned:medium",
+        reasoning: "medium",
+        source: "explicit",
+      },
+      effective_model: {
+        provider: "vendor-a",
+        model_id: "pinned",
+        display: "vendor-a/pinned",
+        source: "explicit",
+      },
+    })
+
+    // when / then
+    expect(taskOutputModelText(snap)).toBe("model vendor-a/pinned:medium (reasoning medium)")
+  })
+
+  test("#given a child whose effective model differs from the plan #when rendered #then it names the effective route and the plan (#9722)", () => {
+    // given
+    const snap = snapshot({
+      resolved_model: {
+        provider: "vendor-a",
+        model_id: "planned-model",
+        display: "vendor-a/planned-model",
+        source: "explicit",
+      },
+      effective_model: {
+        provider: "vendor-b",
+        model_id: "actual-model",
+        display: "vendor-b/actual-model",
+        source: "explicit",
+      },
+    })
+
+    // when / then
+    expect(taskOutputModelText(snap)).toBe("model vendor-b/actual-model (planned vendor-a/planned-model)")
+  })
+
+  test("#given no effective model #when rendered #then it shows the plan as before", () => {
+    // given
+    const snap = snapshot({
+      resolved_model: {
+        provider: "vendor-a",
+        model_id: "planned-model",
+        display: "vendor-a/planned-model",
+        source: "explicit",
+      },
+    })
+
+    // when / then
+    expect(taskOutputModelText(snap)).toBe("model vendor-a/planned-model")
+  })
+})
 
 describe("task_output renderers", () => {
   test("#given task_output arguments #when rendering calls #then rows show target mode peek and only relevant tail lines", () => {

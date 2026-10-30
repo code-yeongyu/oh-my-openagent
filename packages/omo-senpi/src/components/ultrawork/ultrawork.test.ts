@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { FORBIDDEN_DIRECTIVE_TOKENS, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import { FORBIDDEN_DIRECTIVE_TOKENS, SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 import { classifyUltraworkInput, isUltraworkInput } from "./index"
 import {
   dispatchInput,
@@ -14,11 +14,116 @@ import {
   expectNoInjection,
   markerCount,
   registerIsolatedUltrawork,
+  sessionEventCtx,
 } from "./ultrawork.test-support"
 
 const generatedDirectivePath = resolve("packages/omo-senpi/src/components/ultrawork/generated-directive.ts")
 
 describe("omo-senpi ultrawork component", () => {
+  it("#given a task child role #when a brief carrying the keyword is classified #then reports a suppressed child session", () => {
+    expect(classifyUltraworkInput(
+      { text: "ulw: implement the unit; evidence goes in .omo/ulw-execute/ledger.jsonl", source: "rpc", sessionRole: "child" },
+      { wasArmed: true, compactRearmPending: true },
+    )).toMatchObject({ matchedUlw: true, effective: false, stage: "none", route: "none", suppressionReason: "child_session" })
+  })
+
+  it("#given the generated directives #when read #then the baseline carries no variant marker and the Astra variant swaps only the marked blocks", () => {
+    // The markers are authoring scaffolding in SKILL.md; the shipped directives must not leak them,
+    // and the Astra variant must be a strict rewrite of the baseline (shorter, same sentinel).
+    expect(SENPI_ULTRAWORK_DIRECTIVE).not.toMatch(/omo-ultrawork-astra/)
+    expect(SENPI_ASTRA_ULTRAWORK_DIRECTIVE).not.toMatch(/omo-ultrawork-astra/)
+    expect(SENPI_ASTRA_ULTRAWORK_DIRECTIVE).not.toBe(SENPI_ULTRAWORK_DIRECTIVE)
+    expect(SENPI_ASTRA_ULTRAWORK_DIRECTIVE.length).toBeLessThan(SENPI_ULTRAWORK_DIRECTIVE.length)
+    expect(markerCount(SENPI_ASTRA_ULTRAWORK_DIRECTIVE)).toBe(1)
+    for (const shared of ["create_goal", "`todo`", "team_create", "tool.monitor(", "# Stop rules"]) {
+      expect(SENPI_ASTRA_ULTRAWORK_DIRECTIVE).toContain(shared)
+    }
+  })
+
+  it("#given receiving model variants #when idle or queued input arms #then delivers only that model's generated directive", async () => {
+    // Generated-to-delivered equality guards routing and the atomic queue contract,
+    // not the wording of either prompt. Identifier details belong to model-core.
+    const cases = [
+      { id: "gpt-6-astra", directive: SENPI_ASTRA_ULTRAWORK_DIRECTIVE },
+      { id: "openai/gpt-6-astra-fast", directive: SENPI_ASTRA_ULTRAWORK_DIRECTIVE },
+      { id: "openai-gateway/openai/gpt-6-astra:high", directive: SENPI_ASTRA_ULTRAWORK_DIRECTIVE },
+      { id: "gpt-6-sol", directive: SENPI_ULTRAWORK_DIRECTIVE },
+      { id: "gpt-6.1-sol", directive: SENPI_ULTRAWORK_DIRECTIVE },
+      { id: "gpt-6-luna", directive: SENPI_ULTRAWORK_DIRECTIVE },
+      { id: "claude-fable-5", directive: SENPI_ULTRAWORK_DIRECTIVE },
+      { id: "unknown-astra", directive: SENPI_ULTRAWORK_DIRECTIVE },
+      { id: undefined, directive: SENPI_ULTRAWORK_DIRECTIVE },
+    ]
+    for (const { id, directive } of cases) {
+      for (const streamingBehavior of [undefined, "steer", "followUp"]) {
+        const pi = new FakeExtensionAPI()
+        await registerIsolatedUltrawork(pi)
+        const result = await dispatchInput(pi, "ulw do it", "rpc", streamingBehavior, { model: { id } })
+        if (streamingBehavior === undefined) {
+          expect(result).toEqual({ action: "continue" })
+          expect(pi.messages).toHaveLength(1)
+          expect(pi.messages[0]?.message).toEqual({ customType: "omo-ultrawork:directive", content: directive, display: false })
+        } else {
+          expect(result).toEqual({ action: "transform", text: `ulw do it\n${directive}` })
+          expect(pi.messages).toHaveLength(0)
+        }
+      }
+    }
+  })
+
+  it("#given a queued directive #when receiver switches or falls back #then context replaces the full block and rementions stay deduplicated", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+    const eventCtx = sessionEventCtx("switching-receiver")
+    const queued = await dispatchInput(pi, "ulw first", "interactive", "followUp", { ...eventCtx, model: { id: "gpt-6-sol" } })
+    if (queued.action !== "transform") throw new Error("expected atomic queued prompt")
+    const messages = [{ role: "user", content: [{ type: "text", text: queued.text }, { type: "image", data: "opaque" }] }]
+    for (const [id, directive] of [
+      ["gpt-6-astra", SENPI_ASTRA_ULTRAWORK_DIRECTIVE],
+      ["gpt-6-sol", SENPI_ULTRAWORK_DIRECTIVE],
+      [undefined, SENPI_ULTRAWORK_DIRECTIVE],
+    ] as const) {
+      const [result] = await pi.dispatch("context", { type: "context", messages }, { ...eventCtx, model: { id } })
+      expect(result).toEqual({ messages: [{ role: "user", content: [{ type: "text", text: `ulw first\n${directive}` }, { type: "image", data: "opaque" }] }] })
+      const reminder = await dispatchInput(pi, "ulw continue", "rpc", "steer", { ...eventCtx, model: { id } })
+      if (reminder.action !== "transform") throw new Error("expected atomic reminder")
+      expect(markerCount(reminder.text)).toBe(0)
+      expect(pi.messages).toHaveLength(0)
+    }
+    expect(messages[0]?.content[0]).toEqual({ type: "text", text: queued.text })
+  })
+
+  it("#given native skill expansion #when context reaches Astra #then selects one canonical body while preserving skill metadata and arguments", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+    expect(await dispatchInput(pi, "/skill:ultrawork fix it", "interactive", undefined, { model: { id: "gpt-6-astra" } })).toEqual({ action: "continue" })
+    expect(pi.messages).toHaveLength(0)
+    const source = readFileSync("packages/omo-senpi/skills/ultrawork/SKILL.md", "utf8").replace(/\r\n/g, "\n")
+    const body = source.replace(/^---\n[\s\S]*?\n---\n+/, "").trim()
+    const messages = [{ role: "user", content: [{ type: "text", text: `<skill name="ultrawork">\n${body}\n</skill>\nfix it` }] }]
+    const [result] = await pi.dispatch("context", { type: "context", messages }, { model: { id: "gpt-6-astra" } })
+    expect(result).toEqual({ messages: [{ role: "user", content: [{ type: "text", text: `<skill name="ultrawork">\n${SENPI_ASTRA_ULTRAWORK_DIRECTIVE.trimEnd()}\n</skill>\nfix it` }] }] })
+  })
+
+  it("#given both canonical variants in one context message #when either model receives it #then all blocks select the same policy", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+    const messages = [{ role: "custom", customType: "omo-ultrawork:directive", content: `${SENPI_ULTRAWORK_DIRECTIVE}\n${SENPI_ASTRA_ULTRAWORK_DIRECTIVE}`, display: false }]
+    for (const [id, directive] of [["gpt-6-astra", SENPI_ASTRA_ULTRAWORK_DIRECTIVE], ["gpt-6-sol", SENPI_ULTRAWORK_DIRECTIVE]] as const) {
+      const [result] = await pi.dispatch("context", { type: "context", messages }, { model: { id } })
+      expect(result).toEqual({ messages: [{ ...messages[0], content: `${directive}\n${directive}` }] })
+    }
+  })
+
+  it("#given custom directive prose and ordinary context #when model changes #then context leaves them untouched", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+    const messages = [{ role: "user", content: [{ type: "text", text: "<ultrawork-mode>user's rules</ultrawork-mode> ulw" }] }]
+    const [result] = await pi.dispatch("context", { type: "context", messages }, { model: { id: "gpt-6-astra" } })
+    expect(result).toBeUndefined()
+    expect(messages[0]?.content[0]?.text).toBe("<ultrawork-mode>user's rules</ultrawork-mode> ulw")
+  })
+
   it("#given a fixed prompt corpus #when pure classification runs #then keyword matching stays in parity with the shipped detector", () => {
     const corpus = [
       "",
@@ -39,7 +144,7 @@ describe("omo-senpi ultrawork component", () => {
       "/skill:frontend ulw polish",
       "/skill:myulw run it",
       "(ulw) [ultrawork] {ulw}",
-      ".*+?^${}()|[]\\ ulw",
+      [".*+?^", String.fromCharCode(36), "{}()|[]\\ ulw"].join(""),
       "울트라워크",
       "nulw-plan",
       "ulw--plan",
@@ -61,7 +166,7 @@ describe("omo-senpi ultrawork component", () => {
 
   it("#given overlapping and repeated variants #when classified #then one shipped global pattern determines variants and occurrence count", () => {
     const cases = [
-      { text: "ulwultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 2 },
+      { text: "ulwultrawork", matchedUlw: false, matchedUltrawork: false, occurrenceCount: 0 },
       { text: "ULW ulw Ultrawork", matchedUlw: true, matchedUltrawork: true, occurrenceCount: 3 },
       { text: "ulw-plan", matchedUlw: true, matchedUltrawork: false, occurrenceCount: 1 },
     ] as const
@@ -96,7 +201,7 @@ describe("omo-senpi ultrawork component", () => {
         input: { text: "/skill:myulw run it", source: "interactive" as const },
         effective: false,
         route: "none",
-        suppressionReason: "skill_name_only",
+        suppressionReason: "no_keyword",
         stage: "none",
       },
       {
@@ -140,7 +245,7 @@ describe("omo-senpi ultrawork component", () => {
 
   it("#given trigger words #when user input dispatches #then arms via one hidden custom message", async () => {
     // given
-    const prompts = ["please ultrawork this", "하이ulw", "refactor ulw_helper.ts"] as const
+    const prompts = ["please ultrawork this", "\uD558\uC774ulw", "refactor the ulw-loop helper"] as const
 
     for (const prompt of prompts) {
       const pi = new FakeExtensionAPI()
@@ -234,6 +339,33 @@ describe("omo-senpi ultrawork component", () => {
     expect(result).toMatchObject({ action: "transform" })
   })
 
+  it("#given a word embedded trigger #when user input dispatches #then injects nothing", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    const result = await dispatchInput(pi, "ulwfoo should not arm")
+
+    expectNoInjection(pi, result)
+  })
+
+  it("#given a trigger inside inline code #when user input dispatches #then injects nothing", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    const result = await dispatchInput(pi, "explain `ulw` without running it")
+
+    expectNoInjection(pi, result)
+  })
+
+  it("#given a spaced trigger #when user input dispatches #then arms ultrawork", async () => {
+    const pi = new FakeExtensionAPI()
+    await registerIsolatedUltrawork(pi)
+
+    const result = await dispatchInput(pi, "run ulw loop")
+
+    expectHiddenInjection(pi, result)
+  })
+
   it("#given non-trigger input #when user input dispatches #then injects nothing", async () => {
     // given
     const pi = new FakeExtensionAPI()
@@ -310,7 +442,7 @@ describe("omo-senpi ultrawork component", () => {
     // given
     const prompts = [
       "ulw-plan 스킬 좀 검토해줘",
-      "omo-agent-toolkit ulw-loop status --json 확인",
+      "ulw-loop 상태를 agentToolkit.status()로 확인",
     ] as const
 
     for (const prompt of prompts) {
@@ -431,6 +563,18 @@ describe("omo-senpi ultrawork component", () => {
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("create_goal")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("`todo`")
     expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("team_create")
+  })
+
+  it("#given an eval session #when the shipped directive is inspected #then it names the subscription form the session can call", () => {
+    // then: bash and monitor leave the direct tool list whenever eval exists, so the
+    // only callable form of a subscription is tool.monitor(...) inside a cell.
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toContain("tool.monitor(")
+  })
+
+  it("#given the eval guidance #when the shipped directive is inspected #then it defers Bun skill availability to the runtime signal", () => {
+    expect(SENPI_ULTRAWORK_DIRECTIVE).not.toContain("kernel is Bun 1.4")
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/If the\s+eval tool reports a Bun kernel/)
+    expect(SENPI_ULTRAWORK_DIRECTIVE).toMatch(/the `bun-1-4` skill is listed/)
   })
 
   it("#given generated directive #when embed script runs check #then passes without drift", () => {

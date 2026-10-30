@@ -250,7 +250,10 @@ describe("steerUlwLoop", () => {
 		const repoRoot = await repoWithPlan(seed);
 		const result = await steerUlwLoop(repoRoot, steering({ kind: "annotate_ledger" }));
 		expect(result.plan.goals).toEqual(seed.goals);
-		expect(await readFile(ulwLoopGoalsPath(repoRoot), "utf8")).toBe(`${JSON.stringify(seed, null, 2)}\n`);
+		expect(JSON.parse(await readFile(ulwLoopGoalsPath(repoRoot), "utf8"))).toEqual({
+			...seed,
+			revision: (seed.revision ?? 0) + 1,
+		});
 	});
 
 	it("mark_blocked_superseded with children: supersede + replace", async () => {

@@ -3,6 +3,8 @@ import { isAbsolute, resolve } from "node:path"
 import { reportToolHookStatus } from "../../extension/tool-hook-status"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { COMMENT_CHECKER_FEEDBACK_HEADER } from "./constants"
+import { downloadSenpiCommentCheckerBinary } from "./downloader"
+import { reportCommentCheckerFailure } from "./failure-notice"
 import { parseToolResultContext, parseToolResultEvent, toApplyPatchHookInputs, toHookInput } from "./hook-input"
 import { resolveSenpiCommentCheckerBinary } from "./resolver"
 import { defaultRunCommentChecker } from "./runner"
@@ -11,8 +13,10 @@ import { getString, normalizeFeedbackText } from "./utils"
 
 export function createCommentCheckerComponent(options: CommentCheckerComponentOptions = {}): OmoSenpiComponent {
   const resolveBinary = options.resolveBinary ?? defaultResolveBinary
+  const downloadBinary = options.downloadBinary ?? defaultDownloadBinary
   const check = options.runCommentChecker ?? defaultRunCommentChecker
   let binaryPath: string | null | undefined
+  let ensuring: Promise<string | null> | undefined
   let inertForSession = false
   let missingBinaryNoticeLogged = false
   const reportedFilesThisTurn = new Set<string>()
@@ -40,7 +44,7 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
         const uniquePaths = paths.filter((path, index) => paths.indexOf(path) === index).filter((path) => !reportedFilesThisTurn.has(path))
         if (uniquePaths.length === 0) return undefined
 
-        const resolvedBinaryPath = ensureBinaryPath(resolveBinary, {
+        ensuring ??= ensureBinaryPath(resolveBinary, downloadBinary, {
           logger: ctx.logger,
           get cachedBinaryPath() {
             return binaryPath
@@ -61,7 +65,8 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
             missingBinaryNoticeLogged = value
           },
         })
-        if (resolvedBinaryPath === null) {
+        const resolvedBinaryPath = await ensuring
+        if (resolvedBinaryPath === null || inertForSession) {
           return undefined
         }
 
@@ -72,6 +77,12 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
           const path = hookInput.tool_input.file_path
           if (typeof path !== "string" || !uniquePaths.includes(path)) continue
           const result = await check({ binaryPath: resolvedBinaryPath, hookInput })
+          if (result.failure !== undefined) {
+            // A checker that cannot start fails the same way on every edit; stop re-running it (#8850).
+            inertForSession = true
+            reportCommentCheckerFailure(ctx.logger, eventContext, resolvedBinaryPath, result.failure)
+            break
+          }
           const message = normalizeFeedbackText(result.message)
           if (result.hasComments && message.length > 0) {
             reportedFilesThisTurn.add(path)
@@ -85,7 +96,11 @@ export function createCommentCheckerComponent(options: CommentCheckerComponentOp
   }
 }
 
-function ensureBinaryPath(resolveBinary: () => string | null, state: BinaryResolutionState): string | null {
+async function ensureBinaryPath(
+  resolveBinary: () => string | null,
+  downloadBinary: NonNullable<CommentCheckerComponentOptions["downloadBinary"]>,
+  state: BinaryResolutionState,
+): Promise<string | null> {
   if (state.inertForSession) {
     return null
   }
@@ -95,7 +110,7 @@ function ensureBinaryPath(resolveBinary: () => string | null, state: BinaryResol
 
   let nextBinaryPath: string | null
   try {
-    nextBinaryPath = resolveBinary()
+    nextBinaryPath = resolveBinary() ?? (await downloadBinary(state.logger))
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error
@@ -121,4 +136,8 @@ function isMutationToolName(toolName: string): toolName is "edit" | "write" | "a
 
 function defaultResolveBinary(): string | null {
   return resolveSenpiCommentCheckerBinary()
+}
+
+function defaultDownloadBinary(logger: BinaryResolutionState["logger"]): Promise<string | null> {
+  return downloadSenpiCommentCheckerBinary({ logger })
 }

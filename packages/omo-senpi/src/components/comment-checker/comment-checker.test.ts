@@ -213,4 +213,60 @@ describe("omo-senpi comment-checker component", () => {
     expect(missingPath).toEqual([undefined])
     expect(badPayload).toEqual([undefined])
   })
+it("#given no local checker #when the pinned release downloads #then one download serves every later result in the session", async () => {
+    // given
+    const cwd = createTempCwd()
+    const logger = createRecordingLogger()
+    let downloads = 0
+    const { pi, calls } = await registerWithFakeRunner({
+      logger,
+      resolveBinary: () => null,
+      downloadBinary: async () => {
+        downloads += 1
+        return "/tmp/downloaded-comment-checker"
+      },
+    })
+
+    // when
+    await pi.dispatch("tool_result", createToolResultEvent(), createContext(cwd))
+    await pi.dispatch(
+      "tool_result",
+      createToolResultEvent({ toolCallId: "tool-2", input: { path: "src/other.ts", edits: [] } }),
+      createContext(cwd),
+    )
+
+    // then
+    expect(downloads).toBe(1)
+    expect(calls.map((call) => call.binaryPath)).toEqual(["/tmp/downloaded-comment-checker", "/tmp/downloaded-comment-checker"])
+    expect(logger.entries).toEqual([])
+  })
+
+  it("#given no local checker #when two results arrive before the download settles #then the download still runs once", async () => {
+    // given
+    const cwd = createTempCwd()
+    let downloads = 0
+    let release: ((path: string | null) => void) | undefined
+    const { pi, calls } = await registerWithFakeRunner({
+      resolveBinary: () => null,
+      downloadBinary: () =>
+        new Promise<string | null>((resolve) => {
+          downloads += 1
+          release = resolve
+        }),
+    })
+
+    // when
+    const first = pi.dispatch("tool_result", createToolResultEvent(), createContext(cwd))
+    const second = pi.dispatch(
+      "tool_result",
+      createToolResultEvent({ toolCallId: "tool-2", input: { path: "src/other.ts", edits: [] } }),
+      createContext(cwd),
+    )
+    release?.("/tmp/downloaded-comment-checker")
+    await Promise.all([first, second])
+
+    // then
+    expect(downloads).toBe(1)
+    expect(calls).toHaveLength(2)
+  })
 })

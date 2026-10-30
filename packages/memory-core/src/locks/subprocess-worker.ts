@@ -43,8 +43,24 @@ if (mode === "gated-increment") {
   await increment()
   await releaseLock(lockPath, record)
 } else if (mode === "hold") {
-  process.stdin.resume()
-  await new Promise<never>(() => {})
+  // Hold the lock for as long as the parent lives, then exit WITHOUT releasing so the marker is
+  // left behind exactly like a crashed owner (the recovery tests depend on that). The parent must
+  // spawn this worker with a piped stdin it keeps open: EOF/close/error on that pipe - including
+  // the kernel closing it on abrupt parent death - is the only exit path. Never park on a bare
+  // unsettled promise here: Bun does not exit on an unsettled top-level await, it busy-polls a
+  // handle-less event loop at one full core, which is how orphaned holders spun forever (#7335).
+  await new Promise<void>((resolve) => {
+    const done = (): void => {
+      // A still-open stdin would keep the loop alive after the wait resolves; drop it so exit is
+      // unconditional on every ownership-loss path.
+      process.stdin.destroy()
+      resolve()
+    }
+    process.stdin.once("end", done)
+    process.stdin.once("close", done)
+    process.stdin.once("error", done)
+    process.stdin.resume()
+  })
 } else {
   await releaseLock(lockPath, record)
   throw new Error(`unknown subprocess worker mode: ${mode}`)

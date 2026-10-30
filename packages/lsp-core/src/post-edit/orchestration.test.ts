@@ -30,9 +30,9 @@ describe("collectPostEditDiagnostics", () => {
 
 		expect(calls).toBe(2);
 		expect(first.blocks).toEqual([
-			{ filePath: "a.foo", diagnostics: "No LSP server configured for extension: .foo\n\nordinary text from a renderer" },
+			{ filePath: "a.foo", diagnostics: "No LSP server configured for extension: .foo\n\nordinary text from a renderer", blocking: true },
 		]);
-		expect(second.blocks).toEqual([{ filePath: "b.foo", diagnostics: "diagnostic for b.foo" }]);
+		expect(second.blocks).toEqual([{ filePath: "b.foo", diagnostics: "diagnostic for b.foo", blocking: true }]);
 		expect([...cache.notConfiguredExtensions]).toEqual([]);
 	});
 
@@ -49,8 +49,8 @@ describe("collectPostEditDiagnostics", () => {
 
 		expect(calls).toEqual(["a.ts", "b.ts", "c.ts"]);
 		expect(result.blocks).toEqual([
-			{ filePath: "a.ts", diagnostics: "diagnostic for a.ts" },
-			{ filePath: "c.ts", diagnostics: "diagnostic for c.ts" },
+			{ filePath: "a.ts", diagnostics: "diagnostic for a.ts", blocking: true },
+			{ filePath: "c.ts", diagnostics: "diagnostic for c.ts", blocking: true },
 		]);
 	});
 
@@ -72,11 +72,11 @@ describe("collectPostEditDiagnostics", () => {
 
 		expect(maxActive).toBe(4);
 		expect(result.blocks).toEqual([
-			{ filePath: "a.ts", diagnostics: "diagnostic for a.ts" },
-			{ filePath: "b.ts", diagnostics: "diagnostic for b.ts" },
-			{ filePath: "c.ts", diagnostics: "server exploded" },
-			{ filePath: "d.ts", diagnostics: "diagnostic for d.ts" },
-			{ filePath: "f.ts", diagnostics: "diagnostic for f.ts" },
+			{ filePath: "a.ts", diagnostics: "diagnostic for a.ts", blocking: true },
+			{ filePath: "b.ts", diagnostics: "diagnostic for b.ts", blocking: true },
+			{ filePath: "c.ts", diagnostics: "server exploded", blocking: true },
+			{ filePath: "d.ts", diagnostics: "diagnostic for d.ts", blocking: true },
+			{ filePath: "f.ts", diagnostics: "diagnostic for f.ts", blocking: true },
 		]);
 	});
 
@@ -99,7 +99,7 @@ describe("collectPostEditDiagnostics", () => {
 		});
 
 		expect(calls).toEqual(["a.foo", "c.bar"]);
-		expect(first.blocks).toEqual([{ filePath: "c.bar", diagnostics: "LSP server 'bar' for .bar is NOT INSTALLED." }]);
+		expect(first.blocks).toEqual([{ filePath: "c.bar", diagnostics: "LSP server 'bar' for .bar is NOT INSTALLED.", blocking: true }]);
 
 		const cached = await collectPostEditDiagnostics({
 			filePaths: ["b.foo"],
@@ -124,7 +124,7 @@ describe("collectPostEditDiagnostics", () => {
 			},
 		});
 
-		expect(second.blocks).toEqual([{ filePath: "b.foo", diagnostics: "diagnostic should be skipped" }]);
+		expect(second.blocks).toEqual([{ filePath: "b.foo", diagnostics: "diagnostic should be skipped", blocking: true }]);
 		expect(calls).toEqual(["a.foo", "c.bar", "a.foo", "b.foo"]);
 	});
 
@@ -150,8 +150,8 @@ describe("collectPostEditDiagnostics", () => {
 		});
 
 		expect(calls).toBe(2);
-		expect(first.blocks).toEqual([{ filePath: "a.foo", diagnostics: "LSP server 'foo' for .foo is NOT INSTALLED." }]);
-		expect(second.blocks).toEqual([{ filePath: "b.foo", diagnostics: "daemon unavailable" }]);
+		expect(first.blocks).toEqual([{ filePath: "a.foo", diagnostics: "LSP server 'foo' for .foo is NOT INSTALLED.", blocking: true }]);
+		expect(second.blocks).toEqual([{ filePath: "b.foo", diagnostics: "daemon unavailable", blocking: true }]);
 		expect([...cache.notConfiguredExtensions]).toEqual([]);
 	});
 });

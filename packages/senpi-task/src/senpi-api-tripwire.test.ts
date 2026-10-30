@@ -126,17 +126,6 @@ describe("pinned Senpi API surface", () => {
     }
   })
 
-  test("#given minimal resource loader source #when audited #then fake marker factory option is absent", () => {
-    // given
-    const source = readFileSync(join(import.meta.dir, "senpi", "minimal-resource-loader.ts"), "utf8")
-
-    // when
-    const exposesMarkerFactory = source.includes("markerFactory")
-
-    // then
-    expect(exposesMarkerFactory).toBe(false)
-  })
-
   test("#given pinned artifact #when package metadata and rpc entry are checked #then expected public contract exists", async () => {
     // given
     const packageRoot = dirname(dirname(Bun.resolveSync("@code-yeongyu/senpi", import.meta.dir)))

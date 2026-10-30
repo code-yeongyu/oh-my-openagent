@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
 
 import { shouldDisablePostHog } from "./env-flags"
 
@@ -15,8 +16,14 @@ function clearTelemetryEnv(): void {
   }
 }
 
+let restoreTelemetryEnv: () => void
+
+beforeEach(() => {
+  restoreTelemetryEnv = isolateTelemetryEnv()
+})
+
 afterEach(() => {
-  clearTelemetryEnv()
+  restoreTelemetryEnv()
 })
 
 describe("shouldDisablePostHog", () => {

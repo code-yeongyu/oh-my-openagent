@@ -5,7 +5,7 @@ import { isAbsolute, join, relative } from "node:path"
 import { AGENTS_DIRNAME, MEMORY_ROOT_ENV_VAR } from "./layout"
 import { MAX_SLUG_LENGTH, resolveMemoryIdentity } from "./resolve"
 
-const SAFE_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/
+const SAFE_ID_PATTERN = /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N}-]*$/u
 const MAX_ID_LENGTH = MAX_SLUG_LENGTH + 1 + 8
 const OVERRIDE_ROOT = join(tmpdir(), "qa-memory-home")
 const env = { [MEMORY_ROOT_ENV_VAR]: OVERRIDE_ROOT }
@@ -50,7 +50,7 @@ describe("resolveMemoryIdentity sanitization confinement", () => {
       const identity = resolveMemoryIdentity(input, "/repo/alpha", env)
       // then
       expect(identity.id).toMatch(SAFE_ID_PATTERN)
-      expect(identity.id.length).toBeLessThanOrEqual(MAX_ID_LENGTH)
+      expect(Array.from(identity.id).length).toBeLessThanOrEqual(MAX_ID_LENGTH)
       expect(identity.id).not.toContain("..")
       expect(identity.id).not.toContain("/")
       expect(identity.id).not.toContain("\\")

@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // Lane-private helpers for team-e2e.mjs (todo 28): JSON event parsing, tool-result extraction,
-// team-core mailbox/runtime path math (mirrors senpi-task store/state-dir + team-registry/paths), and
+// team-core mailbox/runtime path math (senpi-task's own state-dir resolver + team-registry/paths), and
 // the crash-reservation fixture the durability path reclaims. Kept separate so the driver stays under
 // the logic-file LOC ceiling. NEVER edits the shared scripts/qa files.
 import { createHash, randomUUID } from "node:crypto"
 import { existsSync, readdirSync, readFileSync, mkdirSync, utimesSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { sandboxStateDir } from "./sandbox-child-env.mjs"
+
 const RESERVED_PREFIX = ".delivering-"
 
-// The Metis #7/#8 credential-isolation guarantee: these four files in the real ~/.senpi/agent must be
+// The plan-consultant #7/#8 credential-isolation guarantee: these four files in the real ~/.senpi/agent must be
 // byte-unchanged across a QA run. The whole-dir digest is informational only (a live dev machine writes
 // senpi-debug.log + concurrent session JSONL), so allPass gates on THIS scoped digest, never the dir.
 export { credentialDigest } from "./drive.mjs"
@@ -49,71 +51,73 @@ export function findResults(events, toolName) {
   return toolResults(events).filter((result) => result.toolName === toolName)
 }
 
-// baseDir = <cwd>/.omo/senpi-task/teams (resolveStateDir default + teamStorageBaseDir).
-export function teamBaseDir(cwd) {
-  return join(cwd, ".omo", "senpi-task", "teams")
+// baseDir = <task state dir>/teams (resolveStateDir default + teamStorageBaseDir). A sandbox is
+// `{ cwd, agentDir }`: the lead and every member run on isolatedChildEnv(…, sandbox.agentDir), so the
+// engine resolves the task state dir from that agent dir, never from the project alone.
+export function teamBaseDir(sandbox) {
+  return join(taskStateDir(sandbox), "teams")
 }
 
-export function runtimeRootDir(cwd) {
-  return join(teamBaseDir(cwd), "runtime")
+export function runtimeRootDir(sandbox) {
+  return join(teamBaseDir(sandbox), "runtime")
 }
 
-export function runtimeDir(cwd, teamRunId) {
-  return join(runtimeRootDir(cwd), teamRunId)
+export function runtimeDir(sandbox, teamRunId) {
+  return join(runtimeRootDir(sandbox), teamRunId)
 }
 
-export function taskStateDir(cwd) {
-  return join(cwd, ".omo", "senpi-task")
+export function taskStateDir(sandbox) {
+  return sandboxStateDir(sandbox)
 }
 
-export function memberInboxDir(cwd, teamRunId, memberName) {
-  return join(runtimeRootDir(cwd), teamRunId, "inboxes", memberName)
+export function memberInboxDir(sandbox, teamRunId, memberName) {
+  return join(runtimeRootDir(sandbox), teamRunId, "inboxes", memberName)
 }
 
-export function memberTaskId(cwd, teamRunId, memberName) {
-  const map = readJsonIfPresent(join(runtimeDir(cwd, teamRunId), "senpi-task-members.json"))
+export function memberTaskId(sandbox, teamRunId, memberName) {
+  const map = readJsonIfPresent(join(runtimeDir(sandbox, teamRunId), "senpi-task-members.json"))
   const taskId = map?.[memberName]
   return typeof taskId === "string" ? taskId : undefined
 }
 
-export function taskRecord(cwd, taskId) {
-  return readJsonIfPresent(join(taskStateDir(cwd), "tasks", `${taskId}.json`))
+export function taskRecord(sandbox, taskId) {
+  return readJsonIfPresent(join(taskStateDir(sandbox), "tasks", `${taskId}.json`))
 }
 
-export function taskEventText(cwd, taskId) {
-  return readText(join(taskStateDir(cwd), "logs", `${taskId}.jsonl`)) ?? ""
+export function taskEventText(sandbox, taskId) {
+  return readText(join(taskStateDir(sandbox), "logs", `${taskId}.jsonl`)) ?? ""
 }
 
-export function unreadMessagePath(cwd, teamRunId, recipient, messageId) {
-  return join(memberInboxDir(cwd, teamRunId, recipient), `${messageId}.json`)
+export function unreadMessagePath(sandbox, teamRunId, recipient, messageId) {
+  return join(memberInboxDir(sandbox, teamRunId, recipient), `${messageId}.json`)
 }
 
-export function reservedMessagePath(cwd, teamRunId, recipient, messageId) {
-  return join(memberInboxDir(cwd, teamRunId, recipient), `${RESERVED_PREFIX}${messageId}.json`)
+export function reservedMessagePath(sandbox, teamRunId, recipient, messageId) {
+  return join(memberInboxDir(sandbox, teamRunId, recipient), `${RESERVED_PREFIX}${messageId}.json`)
 }
 
-export function processedMessagePath(cwd, teamRunId, recipient, messageId) {
-  return join(memberInboxDir(cwd, teamRunId, recipient), "processed", `${messageId}.json`)
+export function processedMessagePath(sandbox, teamRunId, recipient, messageId) {
+  return join(memberInboxDir(sandbox, teamRunId, recipient), "processed", `${messageId}.json`)
 }
 
-export function memberSessionDir(cwd, taskId) {
-  return join(taskStateDir(cwd), "children", taskId, "sessions", taskId)
+export function memberSessionDir(sandbox, taskId) {
+  return join(taskStateDir(sandbox), "children", taskId, "sessions", taskId)
 }
 
-export function sessionEnvelopeCount(cwd, taskId, messageId) {
+export function sessionEnvelopeCount(sandbox, taskId, messageId) {
   const marker = `messageId=\"${messageId}\"`
-  return sessionStringValues(cwd, taskId)
+  return sessionStringValues(sandbox, taskId)
     .filter((value) => value.includes("<peer_message ") && value.includes(marker))
     .length
 }
 
-export function sessionContainsText(cwd, taskId, needle) {
-  return sessionStringValues(cwd, taskId).some((value) => value.includes(needle))
+export function sessionContainsText(sandbox, taskId, needle) {
+  return sessionStringValues(sandbox, taskId).some((value) => value.includes(needle))
 }
 
-export function deliveredEventCount(cwd, taskId, messageId) {
+export function deliveredEventCount(sandbox, taskId, messageId) {
   let count = 0
-  for (const line of taskEventText(cwd, taskId).split(/\r?\n/)) {
+  for (const line of taskEventText(sandbox, taskId).split(/\r?\n/)) {
     if (line.trim().length === 0) continue
     let event
     try {
@@ -128,8 +132,8 @@ export function deliveredEventCount(cwd, taskId, messageId) {
 }
 
 // The teamRunId directories team-core minted under this run's runtime root (usually exactly one).
-export function discoverRunIds(cwd) {
-  const root = runtimeRootDir(cwd)
+export function discoverRunIds(sandbox) {
+  const root = runtimeRootDir(sandbox)
   if (!existsSync(root)) return []
   return readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -180,8 +184,8 @@ export function readJsonIfPresent(path) {
   return text === undefined ? undefined : JSON.parse(text)
 }
 
-function sessionStringValues(cwd, taskId) {
-  const sessionDir = memberSessionDir(cwd, taskId)
+function sessionStringValues(sandbox, taskId) {
+  const sessionDir = memberSessionDir(sandbox, taskId)
   if (!existsSync(sessionDir)) return []
   const values = []
   for (const entry of readdirSync(sessionDir)) {

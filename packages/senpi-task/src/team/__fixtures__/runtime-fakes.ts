@@ -47,6 +47,8 @@ export type FakeTeamManagerOptions = {
   readonly behaviors?: readonly StartBehavior[]
   readonly defaultBehavior?: StartBehavior
   readonly beforeCancelReturn?: (taskId: string) => Promise<void>
+  // Mirrors the real engine releasing a finished resident on cancel (omo#9785): parks it and reports `released`.
+  readonly releaseFinishedResidentOnCancel?: boolean
 }
 
 function buildRecord(taskId: string, spec: ManagerStartSpec, status: TaskStatus, resolvedModel?: ResolvedModelRecord): TaskRecord {
@@ -122,6 +124,10 @@ export class FakeTeamManager {
     const record = this.#records.get(idOrName)
     if (record === undefined) return { kind: "not_found", reason: `no task ${idOrName}` }
     if (record.status !== "pending" && record.status !== "running") {
+      if (this.#options.releaseFinishedResidentOnCancel === true && record.residency_state === "resident") {
+        this.#records.set(idOrName, { ...record, residency_state: "persisted_only" })
+        return { kind: "released", task_id: idOrName, status: record.status }
+      }
       return {
         kind: "noop",
         task_id: idOrName,

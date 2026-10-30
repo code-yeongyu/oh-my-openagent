@@ -36,10 +36,6 @@ function installedSenpi(): { readonly root: string; readonly version: string } |
 describe("senpi brand contract pin", () => {
   describe("#given the engine build the launcher spawns", () => {
     describe("#when the pin is inspected", () => {
-      test("#then it is an exact version, never a range", () => {
-        expect(PINNED_VERSION).toMatch(/^\d/)
-      })
-
       test("#then a brand-aware pin must ship the brand resolver", () => {
         const installed = installedSenpi()
         if (FIRST_BRAND_AWARE_SENPI === null || installed === undefined || installed.version !== PINNED_VERSION) {

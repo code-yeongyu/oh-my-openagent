@@ -1,254 +1,218 @@
 #!/usr/bin/env python3
-"""Real-surface QA: SIGTERM the omo launcher on a pty and watch the engine.
+"""Drive the real launcher on a PTY, SIGTERM its PID, and prove graceful engine exit.
 
 Usage: pty-signal-qa.py <launcher-js> <transcript-path> [agent-dir]
 
-Boots the real launcher chain on a real pty (so the engine renders its TUI exactly as it does for a
-user) inside a session that OUTLIVES the launcher, then sends SIGTERM to the LAUNCHER only.
-
-The session layout matters. If the launcher itself were the session leader, killing it would make
-the kernel SIGHUP the foreground process group, and the engine would die from that instead of from
-anything the launcher did - the bug would be invisible. So a "shell" process owns the session and
-stays alive, exactly like the user's real terminal:
-
-    shell (session leader, owns the pty)
-      └── launcher  (node bin/omo.js)          <- the only process this harness signals
-            └── engine (senpi interactive TUI)
-
-Reported:
-  ENGINE_PID / ENGINE_PPID_AFTER / ENGINE_ALIVE_AFTER / ENGINE_EXITED_AFTER_SECONDS / ORPHANED
-
-Pre-fix chain: the launcher blocks in spawnSync, dies instantly on SIGTERM, and the engine is
-reparented to pid 1 and keeps running -> ORPHANED: True, RESULT: FAIL.
-Post-fix chain: the launcher forwards SIGTERM, the engine runs its own graceful shutdown, and
-nothing is left behind -> ORPHANED: False, RESULT: PASS.
-
-The harness only ever signals processes it started itself.
+A separate session leader owns the PTY and outlives the launcher. The kernel therefore cannot
+hide an orphaning bug by sending SIGHUP when the launcher exits. With execve, the launcher PID
+becomes the engine PID; legitimate engine children are not mistaken for the engine.
+QA_EXPECT_EXECVE=0 permits the older spawn shape for explicit fallback comparisons.
 """
 import fcntl
 import json
 import os
 import pty
 import select
+import shutil
 import signal
+import struct
 import subprocess
 import sys
+import tempfile
 import termios
 import time
+from pathlib import Path
+from typing import TypedDict
 
-LAUNCHER = sys.argv[1]
-TRANSCRIPT = sys.argv[2]
-AGENT_DIR = sys.argv[3] if len(sys.argv) > 3 else "/tmp/omo-pty-signal-qa-agent"
+LAUNCHER = str(Path(sys.argv[1]).resolve())
+TRANSCRIPT = Path(sys.argv[2]).resolve()
+TRANSCRIPT.parent.mkdir(parents=True, exist_ok=True)
+ROOT = Path(tempfile.mkdtemp(prefix="pty-signal-", dir=TRANSCRIPT.parent))
+AGENT_DIR = Path(sys.argv[3]).resolve() if len(sys.argv) > 3 else ROOT / "agent"
+HOME = ROOT / "home"
+PROJECT = ROOT / "project"
+for directory in (AGENT_DIR, HOME, PROJECT):
+    directory.mkdir(parents=True, exist_ok=True)
+if len(sys.argv) <= 3:
+    (AGENT_DIR / "settings.json").write_text(json.dumps({"changelogSeen": True, "lastChangelogVersion": "999.0.0"}))
+    (AGENT_DIR / "trust.json").write_text(json.dumps({str(PROJECT): True}))
+    marker = AGENT_DIR / "omo-senpi/omo-native/onboarding-completed"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text('{"completedAt":"1970-01-01T00:00:00.000Z","version":1}')
 
-BOOT_SECONDS = float(os.environ.get("QA_BOOT_SECONDS", "15"))
+BOOT_SECONDS = float(os.environ.get("QA_BOOT_SECONDS", "90"))
 GRACE_SECONDS = float(os.environ.get("QA_GRACE_SECONDS", "20"))
-TRUST_MARKER = b"Trust project folder?"
-
-env = dict(os.environ)
-for stale in ("OMO_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"):
-    env.pop(stale, None)
-env.update(
-    {
-        "SENPI_CODING_AGENT_DIR": AGENT_DIR,
-        "PI_OFFLINE": "1",
-        "TERM": "xterm-256color",
-        "NO_COLOR": "1",
-    }
-)
-
-
-def children_of(pid):
-    listed = subprocess.run(["pgrep", "-P", str(pid)], capture_output=True, text=True)
-    return [int(line) for line in listed.stdout.split() if line.strip()]
+EXPECT_EXECVE = os.environ.get("QA_EXPECT_EXECVE", "1") != "0"
+env = {key: value for key, value in os.environ.items()
+       if not key.startswith(("OMO_", "SENPI_", "PI_", "NODE_OPTIONS", "NODE_COMPILE_CACHE"))}
+env.update({
+    "HOME": str(HOME), "USERPROFILE": str(HOME),
+    "XDG_CONFIG_HOME": str(ROOT / "config"), "XDG_DATA_HOME": str(ROOT / "data"),
+    "XDG_CACHE_HOME": str(ROOT / "cache"), "XDG_STATE_HOME": str(ROOT / "state"),
+    "SENPI_CODING_AGENT_DIR": str(AGENT_DIR), "OMO_CODING_AGENT_DIR": str(AGENT_DIR),
+    "PI_OFFLINE": "1", "OMO_DISABLE_TELEMETRY": "1", "DO_NOT_TRACK": "1",
+    "TERM": "xterm-256color", "COLORTERM": "truecolor",
+})
+if "OMO_RUNTIME" in os.environ:
+    env["OMO_RUNTIME"] = os.environ["OMO_RUNTIME"]
 
 
-def descendants(root):
-    """Every descendant of a pid, deepest last.
+class ProcessInfo(TypedDict):
+    ppid: int
+    stat: str
+    args: str
 
-    Matching on the cmdline is not available for the engine: it renames its own process title to
-    the brand ("OmO") under node, so the descendant relationship is the reliable identity. Each
-    level of the chain spawns exactly one child, so the deepest descendant is the engine.
-    """
-    found = []
+
+def children_of(pid: int) -> list[int]:
+    listed = subprocess.run(["pgrep", "-P", str(pid)], capture_output=True, text=True, check=False)
+    return [int(line) for line in listed.stdout.split()]
+
+
+def descendants(root: int) -> list[int]:
+    found: list[int] = []
     level = [root]
     seen = {root}
     while level:
-        nxt = []
+        following = []
         for pid in level:
             for child in children_of(pid):
-                if child in seen:
-                    continue
-                seen.add(child)
-                nxt.append(child)
-        found.extend(nxt)
-        level = nxt
+                if child not in seen:
+                    seen.add(child)
+                    following.append(child)
+        found.extend(following)
+        level = following
     return found
 
 
-def process_info(pid):
-    listed = subprocess.run(
-        ["ps", "-o", "ppid=,stat=,args=", "-p", str(pid)], capture_output=True, text=True
-    )
-    line = listed.stdout.strip()
-    if not line:
+def process_info(pid: int) -> ProcessInfo | None:
+    listed = subprocess.run(["ps", "-o", "ppid=,stat=,args=", "-p", str(pid)],
+                            capture_output=True, text=True, check=False)
+    if not listed.stdout.strip():
         return None
-    ppid, stat, args = line.split(None, 2)
+    ppid, stat, args = listed.stdout.strip().split(None, 2)
     return {"ppid": int(ppid), "stat": stat, "args": args}
 
 
-master, slave = pty.openpty()
-report_read, report_write = os.pipe()
+def is_engine(pid: int) -> bool:
+    info = process_info(pid)
+    return info is not None and (
+        info["args"].split()[0] in ("OmO", "omo", "senpi")
+        or "/senpi/dist/cli.js" in info["args"]
+        or "/senpi/dist/bundle/cli.js" in info["args"]
+    )
 
+
+master, slave = pty.openpty()
+fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 32, 120, 0, 0))
+report_read, report_write = os.pipe()
 shell_pid = os.fork()
 if shell_pid == 0:
-    # ---- "shell": session leader owning the pty; it outlives the launcher ----
     os.close(master)
     os.close(report_read)
     os.setsid()
     fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
-
     launcher_pid = os.fork()
     if launcher_pid == 0:
         os.close(report_write)
-        os.dup2(slave, 0)
-        os.dup2(slave, 1)
-        os.dup2(slave, 2)
+        os.chdir(PROJECT)
+        for fd in (0, 1, 2):
+            os.dup2(slave, fd)
         os.execvpe("node", ["node", LAUNCHER], env)
-
     os.write(report_write, (json.dumps({"launcher": launcher_pid}) + "\n").encode())
-    # Reap the launcher and hand its real wait status back to the harness.
     _, status = os.waitpid(launcher_pid, 0)
     os.write(report_write, (json.dumps({"status": status}) + "\n").encode())
     os.close(report_write)
-    # Stay alive so the session (and therefore the engine's controlling terminal) survives the
-    # launcher's death; the harness kills this process at the end.
-    time.sleep(3600)
+    signal.pause()
     os._exit(0)
 
 os.close(slave)
 os.close(report_write)
 reports = os.fdopen(report_read)
 launcher_pid = json.loads(reports.readline())["launcher"]
-
 output = bytearray()
+shutdown_output = bytearray()
+engine_pid = None
+chain: list[int] = []
+launcher_status = None
 trusted = False
-boot_deadline = time.time() + BOOT_SECONDS
-chain = []
-while time.time() < boot_deadline:
-    ready, _, _ = select.select([master], [], [], 0.2)
-    if ready:
-        try:
-            chunk = os.read(master, 65536)
-        except OSError:
-            chunk = b""
-        if chunk:
-            output += chunk
-    if not trusted and TRUST_MARKER in bytes(output):
-        time.sleep(0.5)
-        os.write(master, b"\r")
-        trusted = True
-    found = descendants(launcher_pid)
-    if len(found) > len(chain):
-        chain = found
+passed = False
+try:
+    deadline = time.monotonic() + BOOT_SECONDS
+    while time.monotonic() < deadline:
+        ready, _, _ = select.select([master, report_read], [], [], max(0, deadline - time.monotonic()))
+        if report_read in ready:
+            report = reports.readline()
+            if report:
+                launcher_status = json.loads(report)["status"]
+            break
+        if master in ready:
+            output += os.read(master, 65536)
+            if not trusted and b"Trust project folder?" in output:
+                os.write(master, b"\r")
+                trusted = True
+            # DECSET 2026 frame-end proves the TUI painted, not just enabled its input mode.
+            # Check identity on that event; startup helpers are not engine candidates.
+            if b"\x1b[?2004h" in output and b"\x1b[?2026l" in output:
+                chain = descendants(launcher_pid)
+                engine_pid = next((pid for pid in [launcher_pid, *chain] if is_engine(pid)), None)
+                if engine_pid is not None:
+                    break
 
-# Under a bun global install the chain is three deep (node launcher -> bun launcher -> engine), so
-# the engine is the DEEPEST descendant and every level in between has to disappear too.
-engine_pid = chain[-1] if chain else None
-before = process_info(engine_pid) if engine_pid else None
-print(f"TRUST_PROMPT_ANSWERED: {trusted}", flush=True)
-print(f"SHELL_PID: {shell_pid}", flush=True)
-print(f"LAUNCHER_PID: {launcher_pid}", flush=True)
-print(f"LAUNCHER_DESCENDANTS: {chain}", flush=True)
-print(f"ENGINE_PID: {engine_pid}", flush=True)
-print(f"ENGINE_PPID_BEFORE: {before['ppid'] if before else None}", flush=True)
-
-
-def cleanup(extra_pids=()):
-    for pid in [*extra_pids, shell_pid]:
-        if pid is None:
-            continue
+    print(f"TRUST_PROMPT_ANSWERED: {trusted}", flush=True)
+    print(f"SHELL_PID: {shell_pid}", flush=True)
+    print(f"LAUNCHER_PID: {launcher_pid}", flush=True)
+    print(f"LAUNCHER_DESCENDANTS: {chain}", flush=True)
+    print(f"ENGINE_PID: {engine_pid}", flush=True)
+    print(f"ENGINE_PID == LAUNCHER_PID: {engine_pid == launcher_pid}", flush=True)
+    print(f"PROCESS_TREE: {json.dumps({pid: process_info(pid) for pid in [launcher_pid, *chain]})}", flush=True)
+    Path(str(TRANSCRIPT) + ".before.ansi").write_bytes(output)
+    if engine_pid is None or (EXPECT_EXECVE and engine_pid != launcher_pid):
+        print("RESULT: FAIL engine never booted or launcher PID was not replaced", flush=True)
+    else:
+        owned = [launcher_pid, *chain]
+        os.kill(launcher_pid, signal.SIGTERM)
+        deadline = time.monotonic() + GRACE_SECONDS
+        # The shell's waitpid report is the completion signal; register its pipe before SIGTERM.
+        while time.monotonic() < deadline:
+            readers = [master] if launcher_status is not None else [master, report_read]
+            ready, _, _ = select.select(readers, [], [], max(0, deadline - time.monotonic()))
+            if master in ready:
+                chunk = os.read(master, 65536)
+                output += chunk
+                shutdown_output += chunk
+            if report_read in ready:
+                report = reports.readline()
+                if report:
+                    launcher_status = json.loads(report)["status"]
+                    # Child-reaping grace is itself the acceptance criterion, not a boot sleep.
+                    deadline = min(deadline, time.monotonic() + 2)
+            if not ready:
+                break
+        survivors = {pid: info for pid in owned if (info := process_info(pid)) is not None}
+        restored = b"\x1b[?25h" in shutdown_output and b"\x1b[?2004l" in shutdown_output
+        print(f"SURVIVING_PIDS_AFTER: {list(survivors)}", flush=True)
+        print(f"ENGINE_ALIVE_AFTER: {engine_pid in survivors}", flush=True)
+        print(f"ORPHANED: {any(info['ppid'] == 1 for info in survivors.values())}", flush=True)
+        print(f"ENGINE_TERMINAL_RESTORED: {restored}", flush=True)
+        print(f"LAUNCHER_STATUS: {launcher_status}", flush=True)
+        passed = not survivors and restored and launcher_status is not None
+        print(f"RESULT: {'PASS' if passed else 'FAIL'} engine shutdown and process cleanup", flush=True)
+finally:
+    TRANSCRIPT.write_bytes(output)
+    owned = list(dict.fromkeys([*chain, *descendants(launcher_pid), launcher_pid, shell_pid]))
+    for pid in reversed(owned):
         try:
             os.kill(pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+        except ProcessLookupError:
             pass
-
-
-if engine_pid is None or before is None:
-    with open(TRANSCRIPT, "w") as fh:
-        fh.write(output.decode("utf8", "replace"))
-    print("RESULT: engine never booted; QA inconclusive", flush=True)
-    cleanup([launcher_pid])
-    sys.exit(2)
-
-# The launcher only. Signaling the process group would reach the engine directly, which is exactly
-# the delivery path this QA must not rely on.
-os.kill(launcher_pid, signal.SIGTERM)
-signaled_at = time.time()
-
-engine_gone_at = None
-shutdown_output = bytearray()
-deadline = signaled_at + GRACE_SECONDS
-while time.time() < deadline:
-    ready, _, _ = select.select([master], [], [], 0.2)
-    if ready:
-        try:
-            chunk = os.read(master, 65536)
-        except OSError:
-            chunk = b""
-        if chunk:
-            output += chunk
-            shutdown_output += chunk
-    if engine_gone_at is None and all(process_info(pid) is None for pid in chain):
-        engine_gone_at = time.time()
-        # Keep draining briefly: the last writes of the engine's terminal restore can still be in
-        # the pty buffer when the process itself is already gone.
-        deadline = min(deadline, engine_gone_at + 1.0)
-
-survivors = {pid: process_info(pid) for pid in chain}
-survivors = {pid: info for pid, info in survivors.items() if info is not None}
-after = survivors.get(engine_pid)
-alive_after = len(survivors) > 0
-orphaned = any(info["ppid"] == 1 for info in survivors.values())
-
-launcher_status = None
-reports_line = None
-ready, _, _ = select.select([report_read], [], [], 1.0)
-if ready:
-    reports_line = reports.readline()
-if reports_line:
-    launcher_status = json.loads(reports_line)["status"]
-
-with open(TRANSCRIPT, "w") as fh:
-    fh.write(output.decode("utf8", "replace"))
-
-print(f"SURVIVING_PIDS_AFTER: {sorted(survivors)}", flush=True)
-print(f"ENGINE_ALIVE_AFTER: {alive_after}", flush=True)
-print(f"ENGINE_PPID_AFTER: {after['ppid'] if after else None}", flush=True)
-print(
-    f"ENGINE_EXITED_AFTER_SECONDS: {round(engine_gone_at - signaled_at, 2) if engine_gone_at else None}",
-    flush=True,
-)
-# The engine's graceful signal path restores the terminal on its way out (cursor back on, bracketed
-# paste off). A killed or orphaned engine never writes these, so their presence is what proves the
-# engine ran ITS OWN shutdown rather than merely disappearing.
-restored = b"\x1b[?25h" in bytes(shutdown_output) and b"\x1b[?2004l" in bytes(shutdown_output)
-print(f"ORPHANED: {orphaned}", flush=True)
-print(f"ENGINE_TERMINAL_RESTORED: {restored}", flush=True)
-if launcher_status is None:
-    print("LAUNCHER_STATUS: still-running", flush=True)
-elif os.WIFEXITED(launcher_status):
-    print(f"LAUNCHER_STATUS: exit={os.WEXITSTATUS(launcher_status)}", flush=True)
-elif os.WIFSIGNALED(launcher_status):
-    print(f"LAUNCHER_STATUS: signal={os.WTERMSIG(launcher_status)}", flush=True)
-print(f"TRANSCRIPT: {TRANSCRIPT}", flush=True)
-if alive_after:
-    verdict = f"FAIL {len(survivors)} process(es) survive launcher SIGTERM: {sorted(survivors)}"
-elif not restored:
-    verdict = "FAIL engine vanished without running its own graceful shutdown"
-else:
-    verdict = "PASS engine ran its own graceful shutdown and left nothing behind"
-print(f"RESULT: {verdict}", flush=True)
-
-# Never leave anything behind, whichever way the assertion went: this harness owns these pids.
-cleanup(sorted(survivors))
-sys.exit(0 if verdict.startswith("PASS") else 1)
+    os.waitpid(shell_pid, 0)
+    reports.close()
+    os.close(master)
+    shutil.rmtree(ROOT)
+    receipt = subprocess.run(["ps", "-o", "pid=,ppid=,stat=,args=", "-p", ",".join(map(str, owned))],
+                             capture_output=True, text=True, check=False).stdout.strip()
+    print(f"CLEANUP_PS: {receipt or 'no owned pids'}", flush=True)
+    print(f"CLEANUP: removed {ROOT}; closed PTY/pipes; reaped shell {shell_pid}", flush=True)
+    if receipt:
+        passed = False
+sys.exit(0 if passed else 1)

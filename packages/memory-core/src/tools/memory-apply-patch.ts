@@ -1,12 +1,17 @@
 import { access, mkdir, readFile, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
 
-import { NoEffectiveChangesError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import { NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
+import { claimReceiptTrailers, type ClaimReceipt } from "../provenance"
+import { hasLegacyUserHeader, provenanceStrippedTrailers, restampContent } from "./claim-frontmatter"
+import type { AppliedPatch } from "./patch-apply"
 import type { MemoryToolCommit, MemoryToolProvenance } from "./memory"
-import { parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
+import { isMissingFrontmatterError, parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
+import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
 import type { LockDomain } from "../locks"
+import { refuseAgreementsViolation } from "./agreements-write-guard"
 import {
   applyMemoryPatchHunk,
   MemoryPatchHunkError,
@@ -62,10 +67,13 @@ export async function runMemoryApplyPatch(
 
     return await lock("memory-write", async () => {
       await repo.cleanCheck()
-      const paths = await applyOperations(repo.dir, parseMemoryPatch(params.input))
+      const applied = await applyOperations(repo.dir, parseMemoryPatch(params.input), params.provenance?.claim)
+      const paths = applied.affectedPaths
+      const violation = await refuseAgreementsViolation(repo, paths)
+      if (violation !== undefined) throw new MemoryApplyPatchError(violation)
       let result
       try {
-        result = await repo.commitWrite(paths, memoryCommitMessage(reason, params.provenance), params.author)
+        result = await repo.commitWrite(paths, memoryCommitMessage(reason, params.provenance, provenanceStrippedTrailers(applied.strippedPaths)), params.author)
       } catch (error) {
         if (error instanceof NoEffectiveChangesError) {
           throw new MemoryApplyPatchError(
@@ -73,6 +81,10 @@ export async function runMemoryApplyPatch(
             "The patched content matched what was already on disk.",
             { cause: error },
           )
+        }
+        if (error instanceof MemorySecretError) {
+          await repo.restorePaths(paths)
+          throw new MemoryApplyPatchError(error.message, { cause: error })
         }
         throw error
       }
@@ -101,10 +113,13 @@ export async function runMemoryApplyPatch(
   }
 }
 
-async function applyOperations(root: string, operations: readonly PatchOperation[]): Promise<string[]> {
+async function applyOperations(root: string, operations: readonly PatchOperation[], claim: ClaimReceipt | undefined): Promise<AppliedPatch> {
   const pendingWrites = new Map<string, string>()
   const pendingDeletes = new Set<string>()
   const affectedPaths = new Set<string>()
+  // Per file (lead ruling on #10498): the paths whose legacy user header this patch dropped, decided from that file's own
+  // content before and after, never from the batch shape.
+  const strippedPaths: string[] = []
 
   const resolvePath = (input: string, fieldName: string): { absolute: string; relative: string } => {
     try {
@@ -142,7 +157,7 @@ async function applyOperations(root: string, operations: readonly PatchOperation
         throw new Error(`memory_apply_patch: cannot add existing memory file: ${target.relative}`)
       }
       const rawContent = operation.contentLines.join("\n")
-      pendingWrites.set(target.absolute, normalizeAddedContent(target.relative.slice(0, -3), rawContent))
+      pendingWrites.set(target.absolute, restampContent(undefined, normalizeAddedContent(target.relative.slice(0, -3), rawContent), claim))
       pendingDeletes.delete(target.absolute)
       affectedPaths.add(target.relative)
       continue
@@ -165,11 +180,20 @@ async function applyOperations(root: string, operations: readonly PatchOperation
 
     let next = current
     for (const hunk of operation.hunks) next = applyMemoryPatchHunk(next, hunk, source.relative)
-    if (parseForTool(next).frontmatter.read_only === "true") {
+    const patched = parseForTool(next)
+    if (patched.frontmatter.read_only === "true") {
       throw new Error(`memory_apply_patch: ${target.relative} cannot be written with read_only=true`)
     }
+    assertDescriptionAcceptable(patched.frontmatter.description, target.relative)
 
-    pendingWrites.set(target.absolute, next)
+    const written = restampContent(current, renderMemoryFile(patched.frontmatter, patched.body), claim)
+    if (hasLegacyUserHeader(current) && !hasLegacyUserHeader(written)) strippedPaths.push(source.relative)
+    // The destination's content before this move overwrites it: what this patch already wrote there, nothing when an earlier
+    // op freed the path (that op handled its own note), else the file on disk read leniently (only its header is looked at).
+    const overwritten = pendingWrites.get(target.absolute)
+      ?? (pendingDeletes.has(target.absolute) || !(await exists(target.absolute)) ? undefined : await readFile(target.absolute, "utf8"))
+    if (source.absolute !== target.absolute && hasLegacyUserHeader(overwritten)) strippedPaths.push(target.relative)
+    pendingWrites.set(target.absolute, written)
     pendingDeletes.delete(target.absolute)
     affectedPaths.add(target.relative)
     if (source.absolute !== target.absolute) {
@@ -184,26 +208,39 @@ async function applyOperations(root: string, operations: readonly PatchOperation
     await writeFile(path, Buffer.from(content, "utf8"))
   }
   for (const path of pendingDeletes) {
-    if (!pendingWrites.has(path) && await exists(path)) await unlink(path)
+    if (!pendingWrites.has(path)) {
+      if (await exists(path)) await unlink(path)
+      else affectedPaths.delete(relative(root, path).replace(/\\/g, "/"))
+    }
   }
-  return [...affectedPaths]
+  return { affectedPaths: [...affectedPaths], strippedPaths }
 }
 
 function parseForTool(content: string): ReturnType<typeof parseMemoryFile> {
   try {
     return parseMemoryFile(content)
   } catch (error) {
+    if (isMissingFrontmatterError(error)) {
+      throw new Error("memory_apply_patch: target file is missing required frontmatter; add frontmatter with update_description")
+    }
     throw new Error(`memory_apply_patch: ${errorMessage(error).replace(/^frontmatter: /, "")}`)
   }
 }
 
 function normalizeAddedContent(label: string, rawContent: string): string {
+  let parsed: ReturnType<typeof parseMemoryFile>
   try {
-    const parsed = parseMemoryFile(rawContent)
-    return renderMemoryFile(parsed.frontmatter, parsed.body)
+    parsed = parseMemoryFile(rawContent)
   } catch {
     return renderMemoryFile({ description: `Memory block ${label}` }, rawContent)
   }
+  assertDescriptionAcceptable(parsed.frontmatter.description, label)
+  return renderMemoryFile(parsed.frontmatter, parsed.body)
+}
+
+function assertDescriptionAcceptable(description: string, path: string): void {
+  const violation = describeDescriptionViolation(description)
+  if (violation !== null) throw new Error(`memory_apply_patch: ${path}: ${violation}`)
 }
 
 function assertEditable(readOnly: string | undefined, path: string): void {
@@ -239,14 +276,16 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-function memoryCommitMessage(reason: string, provenance: MemoryToolProvenance | undefined): string {
-  if (provenance === undefined) return reason
+function memoryCommitMessage(reason: string, provenance: MemoryToolProvenance | undefined, stripped: readonly string[]): string {
+  if (provenance === undefined) return stripped.length === 0 ? reason : [reason, "", ...stripped].join("\n")
   return [
     reason,
     "",
     "Omo-Writer: memory-tool",
     `Omo-Session: ${provenance.sessionId}`,
     `Omo-Turn: ${provenance.userTurns}`,
+    ...(provenance.claim === undefined ? [] : claimReceiptTrailers(provenance.claim)),
+    ...stripped,
   ].join("\n")
 }
 

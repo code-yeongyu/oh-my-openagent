@@ -1,6 +1,5 @@
 export {
   createServerHealthState,
-  createServerHealthStateForTesting,
   isServerRunning,
   markServerRunningInProcess,
   resetServerCheck,

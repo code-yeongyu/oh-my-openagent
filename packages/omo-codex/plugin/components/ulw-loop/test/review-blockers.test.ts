@@ -157,15 +157,17 @@ describe("recordFinalReviewBlockers error cases", () => {
 			"ulw_loop_not_final_story",
 		);
 	});
+});
 
-	it("throws ulw_loop_codex_snapshot_mismatch when objective mismatches", async () => {
+describe("recordFinalReviewBlockers advisory results", () => {
+	it("returns objective-difference warning and resume action for a limited snapshot", async () => {
 		const repo = await bootstrapRepo(finalPlan());
-		const codexGoalJson = JSON.stringify({ goal: { objective: "wrong", status: "active" } });
-
-		await expectUlwLoopCode(
-			() => recordFinalReviewBlockers(repo, { ...validArgs, codexGoalJson }),
-			"ulw_loop_codex_snapshot_mismatch",
-		);
+		const result = await recordFinalReviewBlockers(repo, {
+			...validArgs,
+			codexGoalJson: JSON.stringify({ goal: { objective: "different", status: "budget_limited" } }),
+		});
+		expect(result.nextActions).toContain("/goal resume or raise the budget");
+		expect(result.warnings.some((warning) => warning.startsWith("driver_objective_differs"))).toBe(true);
 	});
 });
 

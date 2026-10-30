@@ -94,13 +94,28 @@ describe("omo-senpi lsp component", () => {
     for (const legacyTool of LEGACY_TOOL_DESCRIPTORS) {
       const registered = pi.tools.find((tool) => tool["name"] === legacyTool.name)
       expect(registered).toBeDefined()
-      const registeredDescriptor = descriptorWithoutExecute(registered)
+      const { exposure: _exposure, allowLazyActivation: _lazy, searchGroup: _group, searchKeywords: _keywords, ...registeredDescriptor } =
+        descriptorWithoutExecute(registered)
       const legacyDescriptor = descriptorWithoutExecute(legacyTool)
       expect(registeredDescriptor).toEqual(legacyDescriptor)
       expect(registered?.["execute"]).not.toBe(legacyTool.execute)
     }
     const rename = pi.tools.find((tool) => tool["name"] === "lsp_rename")
     expect(rename?.["executionMode"]).toBe("sequential")
+  })
+
+  it("#given the lsp component #when it registers #then every LSP tool is search-exposed and lazily activatable (#11454)", () => {
+    // given / when
+    const { pi } = registerLsp()
+
+    // then
+    for (const name of EXPECTED_TOOL_NAMES) {
+      const registered = pi.tools.find((tool) => tool["name"] === name)
+      expect(registered?.["exposure"]).toBe("search")
+      expect(registered?.["allowLazyActivation"]).toBe(true)
+      expect(registered?.["searchGroup"]).toBe("lsp")
+      expect((registered?.["searchKeywords"] as readonly string[] | undefined)?.length ?? 0).toBeGreaterThan(0)
+    }
   })
 
   it("#given an installed language server #when the component registers #then the exact six LSP tools are exposed", () => {

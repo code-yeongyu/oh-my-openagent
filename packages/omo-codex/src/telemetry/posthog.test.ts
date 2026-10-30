@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { DEFAULT_POSTHOG_API_KEY as TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY } from "@oh-my-opencode/telemetry-core"
+import {
+  DEFAULT_POSTHOG_API_KEY as TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY,
+  TELEMETRY_INSTALL_ID_FILE_NAME,
+} from "@oh-my-opencode/telemetry-core"
 
 import { CACHE_DIR_NAME } from "./product-identity"
 
@@ -20,12 +24,22 @@ async function importPostHogModule(): Promise<PostHogModule> {
 
 const originalXdgDataHome = process.env.XDG_DATA_HOME
 const tempPaths: string[] = []
+let restoreTelemetryEnv: () => void
 
 function createDataHomePath(): string {
   const tempPath = mkdtempSync(join(tmpdir(), "omo-codex-posthog-"))
   mkdirSync(join(tempPath, CACHE_DIR_NAME), { recursive: true })
   tempPaths.push(tempPath)
   return tempPath
+}
+
+// Privacy-notice contract (#11583): the install id file exists only once telemetry is on.
+function installIdFileCount(): number {
+  const dataHome = process.env.XDG_DATA_HOME
+  if (dataHome === undefined) throw new Error("XDG_DATA_HOME is not isolated")
+  return readdirSync(dataHome, { recursive: true }).filter(
+    (entry) => String(entry).split(/[\\/]/).at(-1) === TELEMETRY_INSTALL_ID_FILE_NAME,
+  ).length
 }
 
 function clearTelemetryEnv(): void {
@@ -65,6 +79,7 @@ function setMatrix(
 
 describe("omo-codex posthog telemetry", () => {
   beforeEach(() => {
+    restoreTelemetryEnv = isolateTelemetryEnv()
     mock.restore()
     clearTelemetryEnv()
     process.env.XDG_DATA_HOME = createDataHomePath()
@@ -83,6 +98,7 @@ describe("omo-codex posthog telemetry", () => {
     for (const tempPath of tempPaths.splice(0)) {
       rmSync(tempPath, { recursive: true, force: true })
     }
+    restoreTelemetryEnv()
   })
 
   it("matrix row 1 disabled when OMO_DISABLE_POSTHOG=1", async () => {
@@ -96,10 +112,11 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 2 disabled when OMO_SEND_ANONYMOUS_TELEMETRY=0", async () => {
@@ -113,10 +130,11 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 3 disabled when OMO_CODEX_DISABLE_POSTHOG=1", async () => {
@@ -130,10 +148,11 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 4 disabled when OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0", async () => {
@@ -147,10 +166,11 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 5 enabled when all vars unset", async () => {
@@ -164,10 +184,11 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(1)
+    expect(installIdFileCount()).toBe(1)
   })
 
   it("captures omo_codex_daily_active with omo-codex platform", async () => {
@@ -180,7 +201,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages[0]?.event).toBe("omo_codex_daily_active")
@@ -197,7 +218,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: false }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)
@@ -213,7 +234,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createInstallPostHog().trackActive("distinct", "install_started")
+    posthog.createInstallPostHog().trackActive("install_started")
 
     // then
     expect(capturedMessages[0]?.properties?.source).toBe("install")
@@ -229,7 +250,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages[0]?.properties?.source).toBe("cli")
@@ -245,7 +266,7 @@ describe("omo-codex posthog telemetry", () => {
     posthog.__setActivityStateProviderForTesting(() => ({ dayUTC: "2026-05-25", captureDaily: true }))
 
     // when
-    posthog.createCliPostHog().trackActive("distinct", "cli_run")
+    posthog.createCliPostHog().trackActive("cli_run")
 
     // then
     expect(capturedMessages).toHaveLength(0)

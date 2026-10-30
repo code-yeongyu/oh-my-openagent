@@ -51,6 +51,21 @@ FORBIDDEN:
 
 Cross-test contamination = **state leak**. Find the leak. Reset in `beforeEach`, add the reset to `test-setup.ts` if it is shared, or mock at the module boundary (`mock.module`) instead of mutating globals other tests will read.
 
+## AUTHORING GATE
+
+Before adding or changing a test, answer all four. A missing answer means do not add it yet:
+
+1. What observable behavior, invariant, or independent contract does it protect?
+2. What credible regression makes it fail?
+3. Why does existing coverage not already catch that failure? Each contract has one primary test owner at the strongest boundary; extend its table case or shared fixture instead of adding a near-duplicate.
+4. Does it need a production seam (export, flag, wrapper, injection hook) no production caller needs? If yes, test at the real boundary instead.
+
+**Junk patterns** (reject unless the retention bar applies): assertion-free probes; self-comparisons and identity copiers; copied fixtures, inventories, manifests or export lists; exact source, import or string greps; private call-shape tests duplicated at a real boundary; duplicate invocations of one contract; replays of a shared helper through a wrapper; tests that exist to keep a test-only export or wrapper alive; production code whose only callers are tests; expected values produced by the code under test; mocks that implement the asserted behavior; fixture-supplied receipts or postconditions the code under test should produce; assertions against a store nothing writes; capability or flag restatements without a delivery proof; negative controls that pass for an unrelated reason; names that promise more than the input exercises.
+
+**Retention bar:** keep a pattern match only when it independently guards a public API, protocol, config, migration, storage, security, platform, default, prompt-byte, generated or cross-language, package, release, or architecture contract, and say which one in the test. The repo's meta-audits (AGENTS.md "Test discipline meta-audits") stay under the architecture exception. Static or slow is never a deletion reason. A retained test that fails on the base is a product bug to fix at its owner, never a test to delete.
+
+**Bug regressions:** the regression must fail on the pre-fix code for the intended reason. An existing owner test that already fails on the pre-fix code may be that proof; extend it instead of writing a second reproduction.
+
 ## PROMPT TESTS - ASSERT BEHAVIOR, NOT TEXT
 
 A prompt, skill (`SKILL.md`), rule, or any markdown/instruction file is PROSE. Its wording is not a contract; the model reads it, a human edits it, it changes every sprint. **DO NOT write a test that asserts what the prose SAYS.**
@@ -72,7 +87,7 @@ The wording changes, the test fails, and the next engineer edits the assertion t
 
 - **A machine consumes a value in it** (a parser reads a frontmatter field, a hook greps a sentinel token, a validator runs the doc's JSON sample, a runtime dispatches on a tool name the prose documents) -> test THAT: parse the field and assert the value, or run the real consumer over the file. Not the surrounding prose.
 - **The file is shipped in two copies that must stay identical** (shared source + packaged copy) -> guard drift with ONE equality between the two real artifacts (`expect(packaged).toBe(source)`), never a list of phrase greps.
-- **The change is PURE PROSE with no machine consumer** (rewording guidance, tightening an instruction, adding an example) -> there is NO behavioral seam, so write NO automated test. The guard is review + QA-by-read, not a grep. A green text-pin here is pretend-coverage; skipping the test is the correct, honest outcome. This is the ONE place "every change needs a RED test" does not apply — say so in the PR instead of manufacturing a pin.
+- **The change is PURE PROSE with no machine consumer** (rewording guidance, tightening an instruction, adding an example) -> there is NO behavioral seam, so write NO automated test. The guard is review + QA-by-read, not a grep. A green text-pin here is pretend-coverage; skipping the test is the correct, honest outcome. The authoring gate's first question has no answer here, so no test is added; say so in the PR instead of manufacturing a pin.
 
 **REQUIRED when a behavioral seam exists - assert the conditional the code enforces:**
 

@@ -1,6 +1,6 @@
 ---
 name: coding-agent-sessions
-description: "MUST USE when asked to find, read, list, search, inspect, fetch, export, or reconstruct coding-agent sessions across Codex, Claude Code/Desktop, OpenCode, OMO/Senpi/pi, oh-my-pi (omp), gajae-code (gjc), OpenClaw, Factory Droid, Amp, Gemini/Kimi/Qwen CLIs, Codebuff, Roo/Kilo/Cline, Kodu, Cursor CLI, Aider, Aside browser-agent sessions, or unknown local agent logs. Covers transcripts, session IDs, rollout JSONL, state SQLite, Claude projects/pre-compact histories, OpenCode messages/parts, child/subagent linkage, cwd/model/time/token filters, archives, and cost clues. Expands fuzzy recall into parallel query lanes and first probes known stores so absent platforms are skipped cheaply. Triggers: coding agent sessions, Codex/Claude/OpenCode/OMO/Senpi/pi/oh-my-pi/omp/gajae-code/gjc/OpenClaw/Droid/Amp/Kodu/Cursor/Aider/Aside sessions, transcript search, session history, session ID, read transcript, token usage, subagent sessions, what did I do yesterday, did we already do this."
+description: "Finds, reads, and reconstructs coding-agent sessions across Codex, Claude, OpenCode, OMO/Senpi, and other local agent logs. Use when asked to find or search past sessions, transcripts, or subagent runs, or to recover what an earlier session did."
 ---
 
 # Coding Agent Sessions
@@ -26,16 +26,16 @@ Find local coding-agent sessions across agent products before answering from mem
 When the user remembers a task vaguely ("that OpenCode bug", "the dashboard PR", "when did we fix X"), derive 3-6 short query lanes before searching: product/tool aliases, repo/package names, exact error text, issue/PR/session IDs, English/Korean phrasing, and likely verbs such as `fix`, `review`, `plan`, `deploy`, or `merge`. Run the lanes together with repeated `--query` so `match_reasons` shows which wording found the hit.
 
 ```bash
-python3 scripts/find-agent-sessions.py list --limit 20
-python3 scripts/find-agent-sessions.py find "commit" --from 7d --platform senpi --platform opencode
-python3 scripts/find-agent-sessions.py find "proxy" --platform openclaw --platform droid --platform amp
-python3 scripts/find-agent-sessions.py find "refactor" --platform oh-my-pi --platform gajae-code
-python3 scripts/find-agent-sessions.py find --query "deploy" --query "token usage" --workers 64
-python3 scripts/find-agent-sessions.py find --query "opencode bug" --query "fix opencode" --query "OpenCode parent session" --include-subagents --workers 64
-python3 scripts/find-agent-sessions.py read <session-id>
+python3 -B scripts/find-agent-sessions.py list --limit 20
+python3 -B scripts/find-agent-sessions.py find "commit" --from 7d --platform senpi --platform opencode
+python3 -B scripts/find-agent-sessions.py find "proxy" --platform openclaw --platform droid --platform amp
+python3 -B scripts/find-agent-sessions.py find "refactor" --platform oh-my-pi --platform gajae-code
+python3 -B scripts/find-agent-sessions.py find --query "deploy" --query "token usage" --workers 64
+python3 -B scripts/find-agent-sessions.py find --query "opencode bug" --query "fix opencode" --query "OpenCode parent session" --include-subagents --workers 64
+python3 -B scripts/find-agent-sessions.py read <session-id>
 ```
 
-Use `python` instead of `python3` on systems where that is the available executable.
+Use `python` instead of `python3` on systems where that is the available executable. Keep `-B`: the skill can live inside a signed app bundle, and Python bytecode caches written next to the scripts break its signature.
 
 3. **Use explorer-style parallel lanes when one query batch is not enough.**
 
@@ -66,7 +66,7 @@ The finder prints JSON for stdout and `jq`. Every result includes:
 | `detail_hint` | Ready-to-run `read` command for detailed inspection |
 | `match_reasons` | Search-only array explaining which field/content matched each query |
 
-Each `match_reasons` entry includes `query`, `platform`, `field`, and `snippet`, so you can tell which platform matched and what content caused the hit without opening every transcript.
+Each `match_reasons` entry includes `query`, `platform`, `field`, and `snippet`, so you can tell which platform matched and what content caused the hit without opening every transcript. `field` is `user_message` when the query matched a user prompt that the `first_user_message`/`last_user_message` previews do not cover, such as a prompt in the middle of the session.
 
 ## Filters
 
@@ -107,9 +107,9 @@ When the user asks whether some specific work was ever done, search with `--incl
 For Codex sessions, use the same broad finder. It reads `state_*.sqlite`, rollout JSONL, and archived rollout files:
 
 ```bash
-python3 scripts/find-agent-sessions.py list --platform codex --from 7d
-python3 scripts/find-agent-sessions.py find "deploy" --platform codex
-python3 scripts/find-agent-sessions.py read <session-id> --platform codex
+python3 -B scripts/find-agent-sessions.py list --platform codex --from 7d
+python3 -B scripts/find-agent-sessions.py find "deploy" --platform codex
+python3 -B scripts/find-agent-sessions.py read <session-id> --platform codex
 ```
 
 Use `references/codex.md` for Codex storage details.

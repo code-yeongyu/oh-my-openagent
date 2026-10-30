@@ -1,8 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { resolveAgentSessionsDirectory } from "@oh-my-opencode/omo-senpi/agent-home"
+import { resolveHomeDir } from "@oh-my-opencode/omo-config-core"
 import {
   readBoulderState,
   findPrometheusPlans,
   normalizeSessionId,
+  reconcileStaleWorks,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import {
@@ -181,6 +184,15 @@ export function createUlwExecuteHook(ctx: PluginInput) {
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
       output.message["agent"] = resolveRegisteredAgentName(activeAgent) ?? activeAgent
+    }
+
+    // Repair before the read: a work whose session died abnormally is still `active` on disk, and
+    // this is the first place a new session in the project looks at the record (#8413).
+    const reconciled = reconcileStaleWorks(ctx.directory, {
+      sessionsDirectory: resolveAgentSessionsDirectory({ env: process.env, homeDir: resolveHomeDir(process.env) }),
+    })
+    if (reconciled.demoted.length > 0) {
+      log(`[${HOOK_NAME}] Paused stale works`, { sessionID: input.sessionID, demoted: reconciled.demoted })
     }
 
     const existingState = readBoulderState(ctx.directory)

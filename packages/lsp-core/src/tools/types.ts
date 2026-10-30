@@ -51,6 +51,7 @@ export interface LspDiagnosticsDetails {
 	error?: string;
 	errorKind?: "freshness_timeout" | "missing_dependency" | "no_files" | "invalid_path";
 	fileFailures?: Array<{ file: string; error: string }>;
+	projectCommands?: string[];
 }
 
 export interface LspGotoDefinitionDetails {

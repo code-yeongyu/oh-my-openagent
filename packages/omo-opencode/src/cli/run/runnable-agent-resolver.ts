@@ -1,3 +1,4 @@
+import { BuiltinCategoryNameSchema } from "../../config/schema/categories"
 import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
@@ -36,14 +37,34 @@ export async function resolveRunnableRunAgent(
     })?.name
     if (configuredAgent) return configuredAgent
 
-    return agents.find((agent) => {
+    const matched = agents.find((agent) => {
       if (!agent.name) return false
       return getAgentConfigKey(agent.name) === resolvedConfigKey
-    })?.name ?? resolvedAgent
+    })?.name
+    if (matched) return matched
+
+    const registered = agents.map((agent) => agent.name).filter((name): name is string => Boolean(name))
+    const parsedCategory = BuiltinCategoryNameSchema.safeParse(resolvedConfigKey)
+    if (parsedCategory.success) {
+      throw new UnknownRunAgentError(
+        `"${resolvedAgent}" is a task() category, not a CLI agent. Categories: ${BuiltinCategoryNameSchema.options.join(", ")}. Runnable agents: ${registered.join(", ") || "(none)"}.`,
+      )
+    }
+    if (registered.length > 0) {
+      throw new UnknownRunAgentError(
+        `Unknown agent "${resolvedAgent}". Runnable agents: ${registered.join(", ")}.`,
+      )
+    }
+    return resolvedAgent
   } catch (error) {
+    if (error instanceof UnknownRunAgentError) throw error
     if (!(error instanceof Error)) {
       throw error
     }
     return resolvedAgent
   }
+}
+
+export class UnknownRunAgentError extends Error {
+  override readonly name = "UnknownRunAgentError"
 }

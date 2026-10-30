@@ -68,6 +68,7 @@ export async function createTeam(
     teamRunId,
     manager: deps.manager,
     leadSessionId: deps.leadSessionId,
+    rootSessionId: deps.rootSessionId ?? deps.leadSessionId,
     spawnDepth: deps.spawnDepth,
     maxParallel: deps.taskSettings.team.max_parallel_members,
     deadlineAt: now() + deps.taskSettings.team.max_wall_clock_minutes * MS_PER_MINUTE,
@@ -237,6 +238,11 @@ async function cancelMemberTasks(teamRunId: string, runtimeDir: string, deps: De
     const outcome = await deps.manager.cancelTask(taskId, `delete team ${teamRunId}`)
     if (outcome.kind === "cancelled") {
       cancelled.push(taskId)
+      continue
+    }
+    // Cancel parked a finished resident member (omo#9785); team deletion still ends it for good.
+    if (outcome.kind === "released") {
+      await deps.destruction.destroyResidentTask(taskId, "cancel")
       continue
     }
     // Terminal cancellation is an intentional noop (completed residents stay revivable), but team

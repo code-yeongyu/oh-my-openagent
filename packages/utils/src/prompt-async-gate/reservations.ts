@@ -1,5 +1,5 @@
 import { log } from "../logger"
-import type { PromptAsyncReservation, PromptAsyncReservationReleaseOptions } from "./types"
+import type { InternalPromptDispatchResult, PromptAsyncReservation, PromptAsyncReservationReleaseOptions } from "./types"
 
 const promptAsyncReservations = new Map<string, PromptAsyncReservation>()
 let expiredReservationHandler: ((sessionID: string) => void) | undefined
@@ -32,6 +32,13 @@ function pruneExpiredReservations(now = Date.now()): void {
 export function getActiveReservation(sessionID: string): PromptAsyncReservation | undefined {
   pruneExpiredReservations()
   return promptAsyncReservations.get(sessionID)
+}
+
+// Carry the hold expiry so a caller can retry exactly when the reservation lapses.
+export function reservedDispatchResult(reservation: PromptAsyncReservation): InternalPromptDispatchResult {
+  return reservation.expiresAt === undefined
+    ? { status: "reserved", reservedBy: reservation.source }
+    : { status: "reserved", reservedBy: reservation.source, expiresAt: reservation.expiresAt }
 }
 
 export function getPromptReservation(sessionID: string): PromptAsyncReservation | undefined {

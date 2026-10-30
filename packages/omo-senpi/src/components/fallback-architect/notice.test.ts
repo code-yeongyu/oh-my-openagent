@@ -118,6 +118,8 @@ describe("fallback-architect notice", () => {
     describe("#when friendly names are derived", () => {
       it("#then known models map to display names and unknown ones keep their id", () => {
         expect(friendlyModelName("apitopia/kimi-k3-unlocked")).toBe("Kimi K3 (max)")
+        expect(friendlyModelName("moonshotai/kimi-k3.1-pro")).toBe("Kimi K3.1 Pro (max)")
+        expect(friendlyModelName("kimi-coding/k3.1-pro")).toBe("Kimi K3.1 Pro (max)")
         expect(friendlyModelName("anthropic/claude-fable-5")).toBe("Fable 5")
         expect(friendlyModelName("omo-mock/mock-weak")).toBe("mock-weak")
       })

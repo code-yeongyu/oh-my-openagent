@@ -1,0 +1,97 @@
+{
+  "displays": [
+    {
+      "id": "1",
+      "name": "Built-in Display",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.0,
+      "pixelX": 0,
+      "pixelY": 0,
+      "pixelWidth": 1920,
+      "pixelHeight": 1080,
+      "isPrimary": true
+    },
+    {
+      "id": "2",
+      "name": "External Display",
+      "x": 1920,
+      "y": 0,
+      "width": 1440,
+      "height": 900,
+      "scale": 2.0,
+      "pixelX": 1920,
+      "pixelY": 0,
+      "pixelWidth": 2880,
+      "pixelHeight": 1800,
+      "isPrimary": false
+    }
+  ],
+  "windows": [
+    {
+      "id": "101",
+      "title": "Untitled - Notes",
+      "app": "Notes",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": true,
+      "elevated": null
+    }
+  ],
+  "ax": {
+    "101": {
+      "role": "window",
+      "native_role": "AXWindow",
+      "title": "Untitled - Notes",
+      "bounds": {
+        "x": 100,
+        "y": 120,
+        "width": 800,
+        "height": 600
+      },
+      "children": [
+        {
+          "role": "textarea",
+          "native_role": "AXTextArea",
+          "value": "",
+          "focused": true,
+          "bounds": {
+            "x": 110,
+            "y": 160,
+            "width": 780,
+            "height": 500
+          },
+          "actions": [
+            "focus"
+          ]
+        },
+        {
+          "role": "button",
+          "native_role": "AXButton",
+          "title": "Save",
+          "bounds": {
+            "x": 800,
+            "y": 680,
+            "width": 80,
+            "height": 30
+          },
+          "actions": [
+            "press"
+          ]
+        }
+      ]
+    }
+  },
+  "cursor": {
+    "x": 960,
+    "y": 540
+  },
+  "delay_ms": {
+    "capture": 5000
+  }
+}

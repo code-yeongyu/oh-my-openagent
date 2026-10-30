@@ -76,6 +76,8 @@ describe.each(cleanupStages)("TaskManager respawn %s cleanup", (cleanupStage) =>
       rpcRespawnRunner: { start: async () => handle },
     })
 
+    store.save(record)
+
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
 
@@ -141,6 +143,8 @@ describe("TaskManager respawn launch trust boundary", () => {
         },
       },
     })
+
+    store.save(maliciousRecord)
 
     // when
     const result = await manager.respawn(maliciousRecord, "/tmp/session.jsonl")
@@ -211,6 +215,7 @@ describe("TaskManager team-member respawn", () => {
       trustedRespawnLaunch: async () => trustedLaunch,
     }
     const manager = createTaskManager(options)
+    store.save(record)
 
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
@@ -272,6 +277,8 @@ describe("TaskManager respawn variant", () => {
         },
       },
     })
+
+    store.save(record)
 
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
@@ -379,6 +386,8 @@ describe("TaskManager in-process respawn", () => {
       cwd: project,
     })
 
+    store.save(record)
+
     // when
     const result = await manager.respawn(record, "/tmp/session.jsonl")
 
@@ -482,9 +491,40 @@ describe("TaskManager guarded reattach", () => {
     expect(store.load(record.task_id)).toMatchObject({
       status: "running",
       notification: { run_epoch: 5, notified_epoch: 3 },
+      child_session_id: `sess-${record.task_id}`,
     })
     expect(store.load(record.task_id)?.error_message).toBeUndefined()
     expect(store.load(record.task_id)?.final_response).toBeUndefined()
+  })
+
+  test("#given a pid-less record revived onto a daemon session #when reattached #then the record names that session", async () => {
+    // given
+    const project = tempProject()
+    const store = createTaskRecordStore({ project_dir: project })
+    store.list()
+    const { pid: _pid, ...withoutPid } = respawnRecord()
+    const record: TaskRecord = { ...withoutPid, host_pid: 7001 }
+    store.replace(record)
+    const manager = createTaskManager({
+      store,
+      runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
+      planner: categoryPlanner(),
+      config: settings(),
+      cwd: project,
+      hostPid: 7001,
+    })
+    const hostSession = { socket: "/tmp/dh-fake/rpc.sock", routingId: "routing-revived", sessionPath: "/tmp/dh-fake/sessions/revived.jsonl", instanceId: "instance-2" }
+    const handle = Object.assign(makeHandle(record.task_id).handle, { kind: "host-session" as const, hostSession })
+
+    // when
+    const result = await manager.reattach(record, handle)
+
+    // then
+    expect(result).toEqual({ ok: true })
+    expect(store.load(record.task_id)).toMatchObject({
+      runner_kind: "host-session",
+      host_session: { socket: hostSession.socket, routing_id: "routing-revived", session_path: hostSession.sessionPath, instance_id: "instance-2" },
+    })
   })
 
   test("#given a claimed terminal record #when reattached #then run_epoch is unchanged", async () => {
@@ -560,6 +600,7 @@ describe("TaskManager respawn continuation", () => {
       cwd: project,
       rpcRespawnRunner: { start: async () => handle },
     })
+    store.save(respawnRecord())
     return { manager, followUpCalls }
   }
 

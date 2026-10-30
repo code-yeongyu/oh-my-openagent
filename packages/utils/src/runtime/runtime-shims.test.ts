@@ -69,6 +69,26 @@ describe("runtime shims", () => {
     expect(stderr).toBe("")
   })
 
+  // #11259: Bun.spawn without an env option hands the child the environment the process STARTED with, not the
+  // current process.env, while Node's child_process uses the current one. The test preload points TEMP/TMP/TMPDIR and
+  // HOME at per-process roots at runtime, so an env-less Bun child ran against a stale TEMP (on Windows a removed run
+  // root: Git Bash then prints "could not find /tmp"). Both runtimes must hand children the current process.env.
+  test("#given process.env changed at runtime #when spawning without env #then the child sees the current value", async () => {
+    // given
+    process.env.OMO_SPAWN_ENV_PROBE = "set-at-runtime"
+    const command = [process.execPath, "-e", "process.stdout.write(process.env.OMO_SPAWN_ENV_PROBE ?? '<unset>')"]
+
+    // when
+    const child = spawn(command, { stdout: "pipe", stderr: "pipe" })
+    const asyncOutput = await readProcessStream(child.stdout)
+    await child.exited
+    const syncOutput = spawnSync(command, { stdout: "pipe", stderr: "pipe" }).stdout?.toString() ?? ""
+
+    // then
+    expect(asyncOutput).toBe("set-at-runtime")
+    expect(syncOutput).toBe("set-at-runtime")
+  })
+
   test("#given spawnSync command #when process exits nonzero #then stderr and exit code are preserved", () => {
     const result = spawnSync(["bun", "--eval", "console.error('sync-err'); process.exit(7)"], {
       stdout: "pipe",

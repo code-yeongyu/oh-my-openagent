@@ -1,16 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { buildIdentityPaths, type MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createReflectionRunIdFactory } from "./reflection-run-id"
+import { removeTree } from "../../../../../test-support/remove-tree"
 
 const roots: string[] = []
 afterEach(async () =>
-  Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))),
+  Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))),
 )
 
 async function fixture(): Promise<MemoryIdentityPaths> {

@@ -37,8 +37,6 @@ const defaultDeps: SystemCheckDeps = {
   parseConfigContent: (content) => parseJsonc<Record<string, unknown>>(content),
 }
 
-const BUN_POSTINSTALL_HELPER_PACKAGE_NAME = "@code-yeongyu/comment-checker"
-
 function isConfigValid(configPath: string | null, deps: SystemCheckDeps): boolean {
   if (!configPath) return true
   if (!deps.configExists(configPath)) return false
@@ -179,7 +177,7 @@ export async function checkSystem(deps: SystemCheckDeps = defaultDeps): Promise<
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
       fix: `Update: cd "${loadedInfo.cacheDir}" && bun add ${loadedPackageName}@${installTag}\n` +
         `If Bun reports blocked postinstalls, inspect them: cd "${loadedInfo.cacheDir}" && bun pm untrusted\n` +
-        `Then trust only OMO-related packages from that list: cd "${loadedInfo.cacheDir}" && bun pm trust ${loadedPackageName} ${BUN_POSTINSTALL_HELPER_PACKAGE_NAME}`,
+        `Then trust only OMO-related packages from that list: cd "${loadedInfo.cacheDir}" && bun pm trust ${loadedPackageName}`,
       severity: "warning",
       affects: ["plugin features"],
     })

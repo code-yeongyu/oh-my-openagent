@@ -9,6 +9,7 @@ import type { PluginComponents } from "./plugin-components-loader"
 import * as providerConfigHandler from "./provider-config-handler"
 import * as shared from "../shared"
 import * as toolConfigHandler from "./tool-config-handler"
+import { openCodeShellTypeResolver } from "../shared/opencode-shell"
 
 let logSpy: ReturnType<typeof spyOn>
 let loadPluginComponentsSpy: ReturnType<typeof spyOn>
@@ -97,6 +98,22 @@ afterEach(() => {
 })
 
 describe("createConfigHandler formatter pass-through", () => {
+  test("records OpenCode's configured shell before assembling config", async () => {
+    const setShell = spyOn(openCodeShellTypeResolver, "setConfiguredShell").mockImplementation(() => {})
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig: createPluginConfig(),
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    await handler({ shell: "/bin/tcsh" })
+
+    expect(setShell).toHaveBeenCalledWith("/bin/tcsh")
+  })
+
   test("preserves formatter object configured in opencode config", async () => {
     // given
     const pluginConfig = createPluginConfig()

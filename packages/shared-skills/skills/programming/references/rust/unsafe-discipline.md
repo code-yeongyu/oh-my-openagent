@@ -146,7 +146,7 @@ impl Arena {
         // bump. `aligned` is aligned to `layout.align()` by `align_up`. No
         // other writer can have observed this offset because the CAS above
         // returned `Ok`.
-        let ptr = unsafe { self.map.as_mut_ptr().add(aligned) as *mut T };
+        let ptr = unsafe { self.map.as_mut_ptr().add(aligned) }.cast::<T>();
         // SAFETY: `ptr` is non-null (mmap base + offset), aligned (above),
         // exclusively owned (CAS), and we are about to initialize it.
         unsafe { ptr::write(ptr, value) };
@@ -187,7 +187,35 @@ What miri catches that the borrow checker cannot:
 - Stacked borrows / Tree borrows aliasing violations
 - Data races (single-threaded model, but catches concurrent access through `UnsafeCell` misuse)
 - Atomic ordering bugs in some patterns
-- Memory leaks (with `-Zmiri-track-pointer-tag`)
+- Memory leaks (reported by default at exit; `-Zmiri-ignore-leaks` turns it off)
+
+## FFI Declarations (Rust 2024)
+
+The 2024 edition makes the unsafety of FFI items visible at the declaration:
+
+```rust
+use core::ffi::{c_char, c_int};
+
+// SAFETY: these signatures match <string.h>/<stdlib.h> for every target we build.
+unsafe extern "C" {
+    /// No preconditions: callable from safe code.
+    pub safe fn abs(x: c_int) -> c_int;
+    /// Caller must pass a valid NUL-terminated string.
+    pub unsafe fn strlen(s: *const c_char) -> usize;
+}
+
+// Exported symbol: the attribute itself is unsafe because a name clash is UB.
+#[unsafe(no_mangle)]
+pub extern "C" fn mylib_version() -> u32 { 3 }
+```
+
+- A bare `extern "C" { ... }` block is a hard error in the 2024 edition; write `unsafe extern` and mark each item `safe fn` (no caller obligations) or `unsafe fn`. Marking an item `safe` is a promise you make for every caller; when in doubt, it is `unsafe`.
+- `#[no_mangle]`, `#[export_name]`, and `#[link_section]` are written `#[unsafe(...)]`.
+- A panic that unwinds out of an `extern "C"` function aborts the process (1.81+). Catch it with `std::panic::catch_unwind` at the boundary and return an error code; use `extern "C-unwind"` only when the foreign side is built to unwind.
+
+## Uninitialized Memory
+
+`MaybeUninit<T>` is the only way to hold memory that is not yet a valid `T`. `mem::uninitialized()` is always wrong, and `mem::zeroed()` is UB for any type whose all-zero bit pattern is invalid (references, `NonZero*`, `bool`-bearing enums, most `repr(Rust)` structs). An uninitialized array is `[const { MaybeUninit::<T>::uninit() }; N]`; write every element through `MaybeUninit::write`, then convert once, with a SAFETY comment stating that all `N` elements were written.
 
 ## When Miri Cannot Run
 
@@ -218,8 +246,8 @@ mod tests {
     fn concurrent_push_pop() {
         loom::model(|| {
             let queue = std::sync::Arc::new(MyQueue::new());
-            let q1 = queue.clone();
-            let q2 = queue.clone();
+            let q1 = std::sync::Arc::clone(&queue);
+            let q2 = std::sync::Arc::clone(&queue);
             let h1 = loom::thread::spawn(move || q1.push(1));
             let h2 = loom::thread::spawn(move || q2.pop());
             h1.join().unwrap();
@@ -229,7 +257,7 @@ mod tests {
 }
 ```
 
-Run: `RUSTFLAGS="--cfg loom" cargo test --release`. Loom exhaustively explores thread interleavings for the test scope. Combined with miri on the single-thread paths, you have machine-checked soundness over the full state space.
+Run: `RUSTFLAGS="--cfg loom" cargo test --release`. Loom systematically explores the interleavings its bounded model allows for the test scope; combined with miri on the single-thread paths, that is strong machine-checked evidence, not a proof over every execution.
 
 ## The Forbidden List
 
@@ -241,7 +269,7 @@ Reject in code review, automatic CI fail:
 - `std::mem::transmute` for anything but lifetime extension on the same layout (and that should usually be `core::mem::transmute_copy` or `bytemuck::cast` if the relayout is well-defined).
 - `std::ptr::read_unaligned` / `write_unaligned` without a comment explaining why aligned access is impossible.
 - `from_raw_parts` / `from_raw_parts_mut` without proving the source pointer's provenance covers the entire slice.
-- `Arc::get_mut_unchecked`, `Box::leak` to bypass ownership, `MaybeUninit::assume_init` on partially-initialized data.
+- `Arc::get_mut_unchecked`, `Box::leak` to bypass ownership, `MaybeUninit::assume_init` on partially-initialized data, `mem::uninitialized`, `mem::zeroed` for a type whose all-zero pattern is not valid.
 - `unsafe impl Send`, `unsafe impl Sync` on types containing raw pointers, without a comment naming exactly which interior-mutability rule is upheld.
 - Any `unsafe` block whose justification depends on "in practice this never happens".
 

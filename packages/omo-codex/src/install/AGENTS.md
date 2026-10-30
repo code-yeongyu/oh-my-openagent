@@ -17,7 +17,7 @@ Everything the `lazycodex` install/upgrade surface does: plugin cache install, `
 | `lazycodex-*` (5) | Manual update flow, CLI args, delegated commands, version stamping, bun global paths |
 | `codex-marketplace*`, `codex-model-catalog`, `codex-multi-agent*` | Snapshot/manifest plumbing, model catalog, MultiAgent guards |
 | `link-cached-plugin-agents` + `preserved-agent-settings` + `retired-managed-agent-purge` + `managed-agent-reasoning-defaults` | Agent TOML linking, preservation, purging |
-| `git-bash*`, `codex-git-bash-*`, `codex-hook-*`, `lsp-daemon-reaper`, `codex-process`, `omo-sot-migration`, `codex-install*` | Preflight, hook trust/targets, daemon reaping, telemetry, detection |
+| `git-bash*`, `codex-git-bash-*`, `codex-hook-*`, `lsp-daemon-reaper`, `codex-process`, `codex-install*` | Preflight, hook trust/targets, daemon reaping, telemetry, detection |
 
 ## WHERE TO LOOK
 

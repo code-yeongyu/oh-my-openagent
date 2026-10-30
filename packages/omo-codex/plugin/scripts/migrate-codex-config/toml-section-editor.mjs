@@ -128,7 +128,7 @@ export function removeTomlSectionSetting(config, section, keyPath, expectedValue
 				const lineBody = line.endsWith("\n") ? line.slice(0, -1) : line;
 				const commentIndex = findUnquotedComment(lineBody, assignmentIndex + 1);
 				const valueEnd = commentIndex === -1 ? lineBody.length : commentIndex;
-				if (lineBody.slice(assignmentIndex + 1, valueEnd).trim() !== expectedValue) return config;
+				if (expectedValue !== undefined && lineBody.slice(assignmentIndex + 1, valueEnd).trim() !== expectedValue) return config;
 				const patched = section.text.slice(0, offset) + section.text.slice(offset + line.length);
 				return config.slice(0, section.start) + patched + config.slice(section.end);
 			}

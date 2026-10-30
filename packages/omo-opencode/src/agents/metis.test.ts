@@ -18,6 +18,18 @@ describe("createMetisAgent K2.7 native prompt", () => {
     expect(agent.prompt).toBe(METIS_K2_7_SYSTEM_PROMPT)
   })
 
+  test("#given a Kimi K2.8 model or a Kimi Code rolling id #then uses the same K2.7 Metis prompt", () => {
+    // given
+    const k28 = createMetisAgent("moonshotai/kimi-k2.8")
+    const kimiCode = createMetisAgent("kimi-for-coding/kimi-for-coding")
+    const kimiCodeHighspeed = createMetisAgent("kimi-for-coding/kimi-for-coding-highspeed")
+
+    // then
+    expect(k28.prompt).toBe(METIS_K2_7_SYSTEM_PROMPT)
+    expect(kimiCode.prompt).toBe(METIS_K2_7_SYSTEM_PROMPT)
+    expect(kimiCodeHighspeed.prompt).toBe(METIS_K2_7_SYSTEM_PROMPT)
+  })
+
   test("#given a non-K2.7 model #then uses the base prompt", () => {
     // given
     const k26 = createMetisAgent("opencode-go/kimi-k2.6")

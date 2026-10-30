@@ -2,9 +2,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { reviewerRolesFor, type UlwLoopToolkitSurface } from "../../src/surface.js";
+import { CLI_TEST_SESSION_ID } from "./cli-session.js";
 
 // v2 evidence layout: artifacts must live inside the goal's current attempt dir
-export function qaDirFor(goalId: string, attempt = 1, sessionId = "session"): string {
+export function qaDirFor(goalId: string, attempt = 1, sessionId = CLI_TEST_SESSION_ID): string {
 	return `.omo/evidence/ulw/${sessionId}/${goalId}/a${attempt}`;
 }
 

@@ -62,7 +62,7 @@ describe("resolveRoster", () => {
       // then
       expect(rows.length).toBeGreaterThan(0)
       expect(rows.some((row) => row.label === "sisyphus")).toBe(true)
-      expect(rows.some((row) => row.label === "deep")).toBe(true)
+      expect(rows.some((row) => row.label === "deep-low")).toBe(true)
     })
   })
 
@@ -76,7 +76,7 @@ describe("resolveRoster", () => {
             sisyphus: { model: "provider/family/model-leaf" },
           },
           categories: {
-            deep: { model: "simple-model" },
+            "deep-low": { model: "simple-model" },
           },
         },
       })
@@ -87,7 +87,44 @@ describe("resolveRoster", () => {
       // then
       expect(rows).toEqual([...rows].sort((left, right) => left.label.localeCompare(right.label)))
       expect(rows).toContainEqual({ label: "sisyphus", model: "model-leaf" })
-      expect(rows).toContainEqual({ label: "deep", model: "simple-model" })
+      expect(rows).toContainEqual({ label: "deep-low", model: "simple-model" })
+    })
+  })
+
+  it("#given disabled_agents config #when resolving roster #then it excludes disabled builtin agents", () => {
+    withIsolatedConfig("disabled-agents", (root) => {
+      // given
+      const project = join(root, "project")
+      writeJson(join(project, ".omo", "omo.jsonc"), {
+        "[opencode]": {
+          disabled_agents: ["hephaestus"],
+        },
+      })
+
+      // when
+      const rows = resolveRoster(project)
+
+      // then
+      expect(rows.some((row) => row.label === "hephaestus")).toBe(false)
+      expect(rows.some((row) => row.label === "sisyphus")).toBe(true)
+    })
+  })
+
+  it("#given legacy alias in disabled_agents #when resolving roster #then it excludes the canonical agent", () => {
+    withIsolatedConfig("disabled-agents-alias", (root) => {
+      // given
+      const project = join(root, "project")
+      writeJson(join(project, ".omo", "omo.jsonc"), {
+        "[opencode]": {
+          disabled_agents: ["Hephaestus (Deep Agent)"],
+        },
+      })
+
+      // when
+      const rows = resolveRoster(project)
+
+      // then
+      expect(rows.some((row) => row.label === "hephaestus")).toBe(false)
     })
   })
 

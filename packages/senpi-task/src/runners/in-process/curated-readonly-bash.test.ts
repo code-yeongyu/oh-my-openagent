@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, type ExtensionContext } from "@code-yeongyu/senpi"
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, type ExtensionToolContext } from "@code-yeongyu/senpi"
 
 import {
   createCuratedReadonlyBashTool,
@@ -22,7 +22,7 @@ async function executeFakeGitHub(endpoint: "bytes" | "error" | "lines" | "small"
     { program: "gh", args: ["api", endpoint] },
     undefined,
     undefined,
-    {} as unknown as ExtensionContext,
+    {} as unknown as ExtensionToolContext,
   )
   const [part] = result.content
   if (part?.type !== "text") throw new Error("expected a text tool result")

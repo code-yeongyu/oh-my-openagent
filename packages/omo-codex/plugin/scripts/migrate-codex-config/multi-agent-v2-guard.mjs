@@ -6,7 +6,7 @@
  * spawn_agent parameters on models that were not configured for encrypted
  * tool use. OpenAI closed that as NOT_PLANNED (V2 under development).
  *
- * GPT-5.6 models that declare `multi_agent_version: "v2"` in the Codex model
+ * GPT-5.6 and GPT-6 models that declare `multi_agent_version: "v2"` in the Codex model
  * catalog invert that failure mode: forcing `enabled = false` makes every
  * turn 400 with a reserved `collaboration.spawn_agent` schema mismatch
  * (lazycodex#118 / oh-my-openagent#6002 / openai/codex#31097), and
@@ -100,13 +100,13 @@ export function forceDisableMultiAgentV2(config, options = {}) {
 
 /**
  * True when the effective model should run MultiAgentV2: the catalog says
- * "v2", or the catalog is unavailable but the model is a GPT-5.6 family
+ * "v2", or the catalog is unavailable but the model is a GPT-5.6 or GPT-6 family
  * model (which reserves the collaboration.spawn_agent schema).
  * @param {"v1" | "v2" | null | undefined} multiAgentVersion
  * @param {string | null | undefined} sessionModel
  */
 export function prefersMultiAgentV2(multiAgentVersion, sessionModel) {
-	return multiAgentVersion === "v2" || (multiAgentVersion == null && isGpt56Family(normalizeModel(sessionModel)));
+	return multiAgentVersion === "v2" || (multiAgentVersion == null && (isGpt56Family(normalizeModel(sessionModel)) || isGpt6Family(normalizeModel(sessionModel))));
 }
 
 /**
@@ -123,7 +123,7 @@ export function resolveMultiAgentVersionFromConfig(config, options = {}) {
 		...options,
 		modelsCachePath: options.modelsCachePath?.trim() || resolveModelCatalogPath(readRootModelCatalogPath(config), options) || undefined,
 	});
-	return version ?? (isGpt56Family(model) ? "v2" : null);
+	return version ?? (isGpt56Family(model) || isGpt6Family(model) ? "v2" : null);
 }
 
 /**
@@ -183,6 +183,10 @@ function normalizeModel(value) {
 
 function isGpt56Family(model) {
 	return typeof model === "string" && /^gpt-5\.6\b/i.test(model);
+}
+
+function isGpt6Family(model) {
+	return typeof model === "string" && /^gpt-6\b/i.test(model);
 }
 
 function clearMultiAgentV2DisableForReservedSchema(config) {

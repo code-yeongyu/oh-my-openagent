@@ -12,16 +12,16 @@ This module provides a bidirectional integration system: **outbound** session ev
 ```
 OpenCode session event → dispatchOpenClawEvent()
   → runtime-dispatch.ts: map event to OpenClaw event
-  → dispatcher.ts: execute gateway (HTTP POST or shell command)
-  → session-registry.ts: record message ID ↔ sessionID ↔ tmux pane
+  → openclaw-core dispatcher.ts: execute gateway (HTTP POST or shell command)
+  → openclaw-core session-registry.ts: record message ID ↔ sessionID ↔ tmux pane
 ```
 
 ### Inbound (External → OpenCode)
 ```
 Discord/Telegram API → reply-listener daemon (separate Bun process)
   → reply-listener-{discord,telegram}.ts: poll every 3s
-  → session-registry.ts: look up target tmux session from message ID
-  → reply-listener-injection.ts: send-keys into tmux pane (rate limited)
+  → openclaw-core session-registry.ts: look up target tmux session from message ID
+  → openclaw-core reply-listener-injection.ts: send-keys into tmux pane (rate limited)
 ```
 
 ## KEY FILES
@@ -30,17 +30,14 @@ Discord/Telegram API → reply-listener daemon (separate Bun process)
 |------|---------|
 | `index.ts` | `wakeOpenClaw()`, `initializeOpenClaw()` — main entry |
 | `types.ts` | `OpenClawConfig`, `OpenClawPayload`, `WakeResult` types |
-| `config.ts` | Gateway resolution + URL validation (HTTPS required, localhost exception) |
-| `dispatcher.ts` | HTTP POST + shell command execution with variable interpolation |
 | `runtime-dispatch.ts` | Maps OpenCode events → OpenClaw events, orchestrates dispatch |
-| `session-registry.ts` | JSONL registry correlating message IDs ↔ sessions ↔ panes (file-locked) |
 | `reply-listener.ts` | Daemon lifecycle: start/stop, poll loop, state persistence |
 | `reply-listener-discord.ts` | Discord API polling |
 | `reply-listener-telegram.ts` | Telegram API polling |
-| `reply-listener-injection.ts` | Inject received reply into tmux pane (rate limiting + user filtering) |
 | `reply-listener-state.ts` | Daemon state: PID, config signature, poll tracking |
 | `daemon.ts` | Daemon entry point (runs as detached Bun process) |
-| `tmux.ts` | `capturePane()`, `sendToPane()` utilities |
+
+Gateway resolution + URL validation (`config.ts`), HTTP/shell dispatch (`dispatcher.ts`), the session registry (`session-registry.ts`), reply injection (`reply-listener-injection.ts`), and the tmux helpers (`tmux.ts`) live only in `packages/openclaw-core/src/`; import them from `@oh-my-opencode/openclaw-core/*`.
 
 ## GATEWAY TYPES
 
@@ -72,7 +69,7 @@ initializeOpenClaw(config)
 
 ## SECURITY
 
-- **URL validation**: HTTPS required except localhost (config.ts)
+- **URL validation**: HTTPS required except localhost (openclaw-core `config.ts`)
 - **Authorized users**: Inbound replies filtered by allowed user ID list
 - **Token redaction**: Secrets masked in logs and error messages
 - **Rate limiting**: Reply injection throttled per pane

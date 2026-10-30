@@ -116,12 +116,97 @@ describe("dream idle timer matrix", () => {
 
   test("#given a timer armed from a context without idle probes #when it fires #then no dream is requested", async () => {
     const f = await fixture()
-    await settle(f, {})
+    await settle(f, { sessionManager: { getSessionId: () => CONVERSATION } })
     await fireTimer(f)
     expect(f.launches).toHaveLength(0)
     expect(await f.store.readState()).toEqual({})
   })
+
+  test("#given an armed timer whose context is retired by session replacement #when it fires #then the tick retires silently", async () => {
+    const f = await fixture()
+    const context = retirableContext(
+      "This extension ctx is stale after session replacement or reload. Do not use a captured pi or command ctx after ctx.newSession(), ctx.fork(), ctx.switchSession(), or ctx.reload().",
+    )
+    await settle(f, context.ctx)
+    context.retire()
+    await fireTimer(f)
+    expect(f.launches).toHaveLength(0)
+    expect(await f.store.readState()).toEqual({})
+    expect(f.warnings).toEqual([])
+  })
+
+  test("#given an armed timer whose context is retired by a runtime reload #when it fires #then the tick retires silently", async () => {
+    const f = await fixture()
+    const context = retirableContext("stale extension generation after reload")
+    await settle(f, context.ctx)
+    context.retire()
+    await fireTimer(f)
+    expect(f.launches).toHaveLength(0)
+    expect(await f.store.readState()).toEqual({})
+    expect(f.warnings).toEqual([])
+  })
+
+  test("#given a timer armed on a context whose idle probe fails for another reason #when it fires #then the error still propagates", async () => {
+    const f = await fixture()
+    await settle(f, {
+      sessionManager: { getSessionId: () => CONVERSATION },
+      isIdle: () => {
+        throw new Error("probe exploded")
+      },
+      hasPendingMessages: () => false,
+    })
+    expect(() => f.scheduler.latest().fire()).toThrow("probe exploded")
+    expect(f.launches).toHaveLength(0)
+    expect(await f.store.readState()).toEqual({})
+    expect(f.warnings).toEqual([])
+  })
+
+  test("#given a timer whose session resolution hits the retired context #when it fires #then the tick retires silently", async () => {
+    const f = await fixture()
+    await settle(f, {
+      sessionManager: {
+        getSessionId: onceThenRetired(CONVERSATION, "stale extension generation after reload"),
+      },
+      isIdle: () => true,
+      hasPendingMessages: () => false,
+    })
+    await fireTimer(f)
+    expect(f.launches).toHaveLength(0)
+    expect(await f.store.readState()).toEqual({})
+    expect(f.warnings).toEqual([])
+  })
 })
+
+/** Live while the timer is armed; after retire() every probe throws the runner's stale message, as the host's retired ctx does. */
+function retirableContext(message: string): { readonly ctx: unknown; readonly retire: () => void } {
+  let retired = false
+  const probe = <T>(read: () => T) => (): T => {
+    if (retired) throw new Error(message)
+    return read()
+  }
+  return {
+    ctx: {
+      sessionManager: { getSessionId: probe(() => CONVERSATION) },
+      isIdle: probe(() => true),
+      hasPendingMessages: probe(() => false),
+    },
+    retire: () => {
+      retired = true
+    },
+  }
+}
+
+/** Live while the timer is armed, retired by the time the tick resolves the session. */
+function onceThenRetired(sessionId: string, message: string): () => string {
+  let live = true
+  return () => {
+    if (live) {
+      live = false
+      return sessionId
+    }
+    throw new Error(message)
+  }
+}
 
 describe("automatic dream gates", () => {
   test("#given dream disabled #when the idle timer fires #then no reservation is made", async () => {

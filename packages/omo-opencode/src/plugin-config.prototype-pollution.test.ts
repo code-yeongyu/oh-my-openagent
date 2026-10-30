@@ -33,7 +33,7 @@ describe("plugin config prototype pollution guards", () => {
     const result = mergeConfigs(base, override)
 
     expect(result.agents?.oracle).toMatchObject({ model: "base/model", temperature: 0.4 })
-    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(Reflect.get({}, "polluted")).toBeUndefined()
     expect(hasOwnKey(result.agents ?? {}, "__proto__")).toBe(false)
   })
 
@@ -52,8 +52,10 @@ describe("plugin config prototype pollution guards", () => {
     const result = validatePluginConfig(project)
 
     expect(result.valid).toBe(false)
-    expect(result.config.agents?.oracle).toBeUndefined()
-    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(result.config.agents?.oracle?.model).toBe("safe/model")
+    expect(result.messages).toHaveLength(1)
+    expect(result.messages[0]).toContain("__proto__")
+    expect(Reflect.get({}, "polluted")).toBeUndefined()
     expect(hasOwnKey(result.config, "__proto__")).toBe(false)
   })
 })

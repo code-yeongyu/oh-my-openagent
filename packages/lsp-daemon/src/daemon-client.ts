@@ -1,6 +1,7 @@
 import { connect } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { type LspRequestContext, parseLspRequestContext } from "@oh-my-opencode/lsp-core/request-context";
 import type { ToolExecutionResult } from "@oh-my-opencode/lsp-core/tools";
 import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
@@ -12,13 +13,14 @@ import {
 	DaemonRequestError,
 	DaemonRequestTimedOutError,
 } from "./daemon-request-error.js";
-import { ensureDaemonRunning } from "./ensure-daemon.js";
+import { DaemonUnreachableError, ensureDaemonRunning, probeDaemon } from "./ensure-daemon.js";
 import { authEnvelope, isAuthErrorResponse, readAuthToken } from "./ipc-protocol.js";
 import { type DaemonPaths, daemonPaths } from "./paths.js";
 import { CONTEXT_KEY } from "./request-routing.js";
 import { createLineDecoder, encodeJsonLine } from "./socket-jsonrpc.js";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const STARTUP_BACKOFF_MS = [0, 100, 300] as const;
 let nextProxyRequestId = 1;
 
 export type DaemonToolContext = LspRequestContext;
@@ -29,6 +31,8 @@ export interface CallToolOptions {
 	requestTimeoutMs?: number;
 	signal?: AbortSignal;
 	ensure?: (paths: DaemonPaths, signal?: AbortSignal) => Promise<void>;
+	probe?: (paths: DaemonPaths, signal?: AbortSignal) => Promise<boolean>;
+	sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 type EnsureDaemon = NonNullable<CallToolOptions["ensure"]>;
@@ -46,17 +50,30 @@ export async function callToolViaDaemon(
 			ensureDaemonRunning(ensurePaths, undefined, signal === undefined ? {} : { signal }));
 	const timeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
 	const requestArgs = withContext(args, context);
+	const probe =
+		options.probe ?? ((probePaths: DaemonPaths, signal?: AbortSignal) => probeDaemon(probePaths, undefined, signal));
+	const sleep = options.sleep ?? ((ms: number, signal?: AbortSignal) => delay(ms, undefined, { signal }));
 
 	let lastError: unknown;
 	let authRefreshUsed = false;
-	for (let attempt = 0; attempt < 3; attempt += 1) {
+	for (const [attempt, backoffMs] of STARTUP_BACKOFF_MS.entries()) {
 		try {
-			await ensureDaemonAvailable(paths, ensure, options.signal);
+			if (backoffMs > 0) await sleep(backoffMs, options.signal);
+			if (options.signal?.aborted) throw new DaemonRequestCancelledError(false);
+			if (attempt === 0) {
+				await ensureDaemonAvailable(paths, ensure, options.signal);
+			} else if (!(await probe(paths, options.signal))) {
+				throw new DaemonUnreachableError(paths.socket);
+			}
 			const token = readAuthToken(paths);
 			if (!token) throw new DaemonRequestError("daemon auth token missing", false);
 			const sendOptions = options.signal === undefined ? { timeoutMs } : { timeoutMs, signal: options.signal };
 			return await sendToolCall(paths, token, name, requestArgs, sendOptions);
 		} catch (error) {
+			if (options.signal?.aborted) {
+				lastError = new DaemonRequestCancelledError(false);
+				break;
+			}
 			lastError = error;
 			if (error instanceof DaemonAuthenticationRejectedError && !authRefreshUsed) {
 				authRefreshUsed = true;

@@ -21,6 +21,9 @@ export type StopHookOutput = {
 
 export type FileStat = {
 	readonly size: number;
+	readonly mtimeMs?: number;
+	readonly birthtimeMs?: number;
+	readonly ctimeMs?: number;
 	readonly isFile?: () => boolean;
 	readonly isSymbolicLink?: () => boolean;
 };

@@ -21,12 +21,11 @@ describe("sanitizeToSlug", () => {
     expect(sanitizeToSlug("a1")).toBe("a1")
   })
 
-  it("#given unicode input #when sanitized #then it folds to ascii or dashes", () => {
+  it("#given Latin input with diacritics or width variants #when sanitized #then it folds to ascii or dashes", () => {
     // given / when / then
     expect(sanitizeToSlug("élan")).toBe("elan")
     expect(sanitizeToSlug("ＥＶＩＬ")).toBe("evil")
     expect(sanitizeToSlug("e\u202Evil")).toBe("e-vil")
-    expect(sanitizeToSlug("漢字")).toBe(FALLBACK_SLUG)
   })
 
   it("#given separator-heavy input #when sanitized #then dashes collapse and trim", () => {
@@ -46,5 +45,74 @@ describe("sanitizeToSlug", () => {
     expect(slug.length).toBeLessThanOrEqual(MAX_SLUG_LENGTH)
     expect(slug.endsWith("-")).toBe(false)
     expect(slug).toBe("a".repeat(39))
+  })
+
+  it("#given the ASCII and Latin corpus #when sanitized #then every output matches the legacy slug byte for byte", () => {
+    // given (characterization table: outputs of the pre-Unicode slugifier, pinned so
+    // existing agents/people directories never move)
+    const table: ReadonlyArray<readonly [string, string]> = [
+      ["backend-lead", "backend-lead"],
+      ["Backend Lead!", "backend-lead"],
+      ["Yeongyu Park", "yeongyu-park"],
+      ["  spaced  ", "spaced"],
+      ["Hello!@#World", "hello-world"],
+      ["C++ & Rust_2026", "c-rust-2026"],
+      ["MiXeD_Case.Name", "mixed-case-name"],
+      ["über-cool", "uber-cool"],
+      ["../evil", "evil"],
+      ["~/escape", "escape"],
+      ["a".repeat(50), "a".repeat(MAX_SLUG_LENGTH)],
+      ["", FALLBACK_SLUG],
+      ["---", FALLBACK_SLUG],
+      ["!!!", FALLBACK_SLUG],
+    ]
+    // when / then
+    for (const [input, expected] of table) {
+      expect(sanitizeToSlug(input)).toBe(expected)
+    }
+  })
+
+  it("#given non-Latin letters #when sanitized #then the script is preserved instead of collapsing to the fallback", () => {
+    // given / when / then
+    expect(sanitizeToSlug("漢字")).toBe("漢字")
+    expect(sanitizeToSlug("홍길동")).toBe("홍길동")
+    expect(sanitizeToSlug("Иван")).toBe("иван")
+    expect(sanitizeToSlug("Ærøskøbing")).toBe("ærøskøbing")
+  })
+
+  it("#given Korean display names #when sanitized #then distinct names yield distinct readable slugs", () => {
+    // given / when
+    const hong = sanitizeToSlug("홍길동")
+    const kim = sanitizeToSlug("김철수")
+    // then
+    expect(hong).not.toBe(FALLBACK_SLUG)
+    expect(kim).not.toBe(FALLBACK_SLUG)
+    expect(hong).not.toBe(kim)
+  })
+
+  it("#given mixed Korean and Latin #when sanitized #then both scripts survive with dash separators", () => {
+    // given / when / then
+    expect(sanitizeToSlug("OmO 길동")).toBe("omo-길동")
+    expect(sanitizeToSlug("팀장 Backend Lead")).toBe("팀장-backend-lead")
+  })
+
+  it("#given decomposed Hangul jamo #when sanitized #then the slug is the composed (NFC) syllables", () => {
+    // given (NFD input as produced by some macOS filesystems)
+    const decomposed = "홍길동".normalize("NFD")
+    // when
+    const slug = sanitizeToSlug(decomposed)
+    // then
+    expect(slug).toBe("홍길동")
+    expect(slug).toBe(slug.normalize("NFC"))
+  })
+
+  it("#given overlong astral-plane letters #when capped #then the slug never splits a surrogate pair", () => {
+    // given (U+2000B is a CJK Extension B letter: two UTF-16 code units each)
+    const input = "\u{2000B}".repeat(MAX_SLUG_LENGTH + 5)
+    // when
+    const slug = sanitizeToSlug(input)
+    // then
+    expect(slug.isWellFormed()).toBe(true)
+    expect(Array.from(slug).length).toBe(MAX_SLUG_LENGTH)
   })
 })

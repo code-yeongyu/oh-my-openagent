@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { join } from "node:path"
 
 import type { TaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
+import type { TaskRecordStore } from "../store"
 import {
   baseSpec,
   cleanupProjects,
   flush,
   makeManager,
+  tempProject,
 } from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
@@ -46,7 +49,7 @@ describe("TaskManager outcome guards", () => {
     })
 
     // when - suspension order: forget the handle, persist the record, THEN the abort settles
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     store.transition(taskId, { type: "persist_only", timestamp: iso() })
     inProcess.handles.get(taskId)?.settle({ status: "cancelled" })
     await flush()
@@ -65,7 +68,7 @@ describe("TaskManager outcome guards", () => {
     const started = await manager.start(baseSpec())
     if (started.kind !== "started") throw new Error("expected started")
     const taskId = started.task_id
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     store.transition(taskId, { type: "persist_only", timestamp: iso() })
 
     // when
@@ -88,7 +91,7 @@ describe("TaskManager outcome guards", () => {
     const started = await manager.start(baseSpec())
     if (started.kind !== "started") throw new Error("expected started")
     const taskId = started.task_id
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     store.transition(taskId, { type: "persist_only", timestamp: iso() })
 
     // when
@@ -102,6 +105,25 @@ describe("TaskManager outcome guards", () => {
     expect(record?.final_response).toBeUndefined()
   })
 
+  test("#given a running child aborted by another client #when the runner settles interrupted with the partial text #then the record ends interrupted with no failure", async () => {
+    // given
+    const { manager, store, inProcess } = makeManager({})
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const taskId = started.task_id
+
+    // when - a foreign user abort: agent_end { aborted: true, abortSource: "user" } with no local abort
+    inProcess.handles.get(taskId)?.settle({ status: "interrupted", finalResponse: "partial work before the abort" })
+    await flush()
+
+    // then
+    const record = store.load(taskId)
+    expect(record?.status).toBe("interrupted")
+    expect(record?.final_response).toBe("partial work before the abort")
+    expect(record?.error_message).toBeUndefined()
+    expect(await manager.waitFor(taskId)).toMatchObject({ status: "interrupted" })
+  })
+
   test("#given a running child #when its outcome settles in the gap after forget but before persist_only lands #then the record is still untouched", async () => {
     // given
     const { manager, store, inProcess } = makeManager({})
@@ -110,7 +132,7 @@ describe("TaskManager outcome guards", () => {
     const taskId = started.task_id
 
     // when - the tightest abort-during-suspend race: ownership is gone, residency not yet updated
-    manager.forget(taskId)
+    manager.forget(taskId, { path: "park" })
     inProcess.handles.get(taskId)?.settle({ status: "cancelled" })
     await flush()
 
@@ -176,6 +198,48 @@ describe("TaskManager outcome guards", () => {
     expect(record.status).toBe("completed")
     expect(record.final_response).toBe("done")
     expect(store.load(taskId)?.status).toBe("completed")
+  })
+
+  test("#given a completed child #when the terminal record write keeps failing #then waitFor still settles with an error naming the persistence failure and the task is no longer resident", async () => {
+    // given - the Windows EPERM class (#8050): every terminal transition is refused, so the on-disk
+    // record is pinned at running and nothing re-reading the store can ever see a terminal.
+    const project = tempProject()
+    const disk = createTaskRecordStore({ project_dir: project })
+    const refusal = Object.assign(new Error("EPERM: operation not permitted, rename"), {
+      code: "EPERM",
+      syscall: "rename",
+      path: join(disk.stateDir, "tasks", "st_x.json.tmp"),
+    })
+    const store: TaskRecordStore = {
+      ...disk,
+      transition: (taskId, transition) => {
+        if (transition.type === "complete" || transition.type === "fail" || transition.type === "cancel") throw refusal
+        return disk.transition(taskId, transition)
+      },
+    }
+    const { manager, inProcess } = makeManager({ project, store })
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error("expected started")
+    const taskId = started.task_id
+    const bound = new AbortController()
+    const settled = Promise.race([
+      manager.waitFor(taskId),
+      new Promise<never>((_, reject) => {
+        bound.signal.addEventListener("abort", () => reject(bound.signal.reason), { once: true })
+      }),
+    ])
+
+    // when
+    inProcess.handles.get(taskId)?.settle({ status: "completed", finalResponse: "done" })
+    await flush()
+    bound.abort(new Error("waitFor never settled after the terminal record write failed"))
+
+    // then
+    const record = await settled
+    expect(record.status).toBe("error")
+    expect(record.error_message).toContain("EPERM: operation not permitted, rename")
+    expect(manager.residentTaskIds()).not.toContain(taskId)
+    expect(disk.load(taskId)?.status).toBe("running")
   })
 })
 

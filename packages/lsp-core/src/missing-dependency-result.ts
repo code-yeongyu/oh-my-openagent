@@ -1,4 +1,5 @@
 import { LspServerLookupError } from "./lsp/errors.js";
+import { type InstallDecision, loadInstallDecision } from "./lsp/server-install-state.js";
 import { handleMissingDependencyError } from "./lsp/startup-failure.js";
 import { lspRequestContext } from "./request-context.js";
 import type { ToolExecutionResult } from "./tools.js";
@@ -20,6 +21,7 @@ export type MissingDependencyAvailability =
 			readonly installHint: string;
 			readonly installDecisionTool: boolean;
 			readonly installDecisionsPath: string;
+			readonly decision: InstallDecision | null;
 	  };
 
 export function missingDependencyResult<TDetails extends object>(
@@ -67,6 +69,7 @@ function missingDependencyAvailability(error: unknown): MissingDependencyAvailab
 				installHint: error.lookup.installHint,
 				installDecisionTool: context.capabilities.installDecisionTool,
 				installDecisionsPath: context.installDecisionsPath,
+				decision: loadInstallDecision(error.lookup.server.id)?.decision ?? null,
 			};
 		default: {
 			const exhaustive: never = error.lookup;

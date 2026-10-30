@@ -6,6 +6,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { truncateDescription } from "../../shared/truncate-description"
 export {
   BUILTIN_CATEGORY_REQUIRES_MODEL,
+  builtinCategoryGateModels,
   CATEGORY_DESCRIPTIONS,
   CATEGORY_PROMPT_APPENDS,
   CATEGORY_PROMPT_APPEND_RESOLVERS,
@@ -242,13 +243,13 @@ YOU MUST END YOUR RESPONSE WITH THIS SECTION.
 
 1. **Wave 1**: Fire these tasks IN PARALLEL (no dependencies)
    \`\`\`
-   task(category="...", load_skills=[...], run_in_background=false, prompt="Task 1: ...")
-   task(category="...", load_skills=[...], run_in_background=false, prompt="Task N: ...")
+   task(category="...", load_skills=[...], run_in_background=true, prompt="Task 1: ...")
+   task(category="...", load_skills=[...], run_in_background=true, prompt="Task N: ...")
    \`\`\`
 
 2. **Wave 2**: After Wave 1 completes, fire next wave IN PARALLEL
    \`\`\`
-   task(category="...", load_skills=[...], run_in_background=false, prompt="Task 2: ...")
+   task(category="...", load_skills=[...], run_in_background=true, prompt="Task 2: ...")
    \`\`\`
 
 3. Continue until all waves complete
@@ -268,8 +269,8 @@ WHY THIS FORMAT IS MANDATORY:
 █ MANDATORY: WRAP YOUR ENTIRE PLAN IN A <plan> ENVELOPE           █
 ═══════════════════════════════════════════════════════════════════
 
-Your FINAL message MUST wrap the ENTIRE plan — from the title line
-through the closing TODO list — inside a single pair of tags:
+Your FINAL message MUST wrap the ENTIRE plan (from the title line
+through the closing TODO list) inside a single pair of tags:
 
 <plan>
 # [Plan Title]
@@ -281,7 +282,7 @@ RULES:
 - Open with <plan> on its own line BEFORE the title; close with </plan>
   on its own line AFTER the TODO list. Everything the caller needs goes inside.
 - Do NOT emit <plan> while still gathering context. Progress messages,
-  clarifying questions, and "exploring..." turns MUST NOT contain it — the
+  clarifying questions, and "exploring..." turns MUST NOT contain it: the
   envelope is how the caller tells your real deliverable apart from those turns.
 - The caller extracts the contents of this envelope verbatim. Anything emitted
   outside the envelope may be discarded.

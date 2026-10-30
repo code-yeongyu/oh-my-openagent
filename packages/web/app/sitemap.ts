@@ -1,12 +1,27 @@
 import type { MetadataRoute } from "next"
 
+import { locales } from "@/i18n/config"
+import { desktopDownloadEnabled } from "@/lib/desktop-download"
+import { DOC_GUIDE_PAGES } from "@/lib/docs-sections"
+
 const BASE_URL = "https://omo.dev"
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const routes = ["", "/docs", "/manifesto"]
-  const locales = ["en", "ko", "ja", "zh"]
+/**
+ * Public, localized routes only. The primitive showcase `/design` (rendered only when
+ * OMO_WEB_SHOWCASE=1, see app/design/page.tsx) is intentionally not listed here.
+ */
+const PUBLIC_ROUTES = [
+  "",
+  "/docs",
+  "/docs/install",
+  ...(desktopDownloadEnabled() ? ["/download"] : []),
+  ...DOC_GUIDE_PAGES.map(({ slug }) => `/docs/${slug}`),
+  "/manifesto",
+  "/manifesto/2026-01",
+]
 
-  return routes.flatMap((route) =>
+export default function sitemap(): MetadataRoute.Sitemap {
+  return PUBLIC_ROUTES.flatMap((route) =>
     locales.map((locale) => ({
       url: `${BASE_URL}/${locale}${route}`,
       lastModified: new Date(),

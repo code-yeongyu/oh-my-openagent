@@ -1752,7 +1752,7 @@ rewrite_codex_mcp_config() {
 import { readFileSync, writeFileSync } from "node:fs";
 const path = process.argv[2];
 let text = readFileSync(path, "utf8");
-for (const name of ["context7", "codegraph"]) {
+for (const name of ["context7"]) {
   const header = `[plugins."omo@sisyphuslabs".mcp_servers.${name}]`;
   const start = text.indexOf(header);
   if (start < 0) throw new Error(`missing ${header}`);
@@ -1790,7 +1790,6 @@ const path = process.argv[2];
 const disabled = new Set([
   "session-start-checking-auto-update.json",
   "session-start-checking-bootstrap-provisioning.json",
-  "session-start-checking-codegraph-bootstrap.json",
 ]);
 const manifest = JSON.parse(readFileSync(path, "utf8"));
 if (!Array.isArray(manifest.hooks)) throw new Error("installed plugin hook list is missing");
@@ -2635,7 +2634,6 @@ const result = {
   disabledSideEffectHooks: [
     "session-start-checking-auto-update.json",
     "session-start-checking-bootstrap-provisioning.json",
-    "session-start-checking-codegraph-bootstrap.json",
   ],
   hookStarted: app.hookStarted === true,
   hookCompleted: app.hookCompleted === true,

@@ -105,7 +105,7 @@ describe("buildCodexGoalInstruction aggregate mode", () => {
 
 		expectTextToContainAll(text, [
 			"main-session",
-			'category: "deep"',
+			'category: "deep-high"',
 			"unspecified-high",
 			"unspecified-low",
 			"gateReview.by",

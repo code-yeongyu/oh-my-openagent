@@ -21,6 +21,7 @@ type SessionMessage = {
     }
     providerID?: string
     modelID?: string
+    variant?: string
     tools?: StoredMessage["tools"]
   }
   parts?: Array<{ type?: string }>
@@ -51,6 +52,7 @@ function convertSessionMessageToStoredMessage(message: SessionMessage): StoredMe
 
   const providerID = info.model?.providerID ?? info.providerID
   const modelID = info.model?.modelID ?? info.modelID
+  const variant = info.model?.variant ?? info.variant
 
   return {
     ...(info.agent ? { agent: info.agent } : {}),
@@ -59,7 +61,7 @@ function convertSessionMessageToStoredMessage(message: SessionMessage): StoredMe
           model: {
             providerID,
             modelID,
-            ...(info.model?.variant ? { variant: info.model.variant } : {}),
+            ...(variant ? { variant } : {}),
           },
         }
       : {}),
@@ -90,11 +92,22 @@ function mergeStoredMessages(
       }
     }
 
+    if (
+      merged.model?.providerID &&
+      merged.model.modelID &&
+      !merged.model.variant &&
+      message.model?.providerID === merged.model.providerID &&
+      message.model.modelID === merged.model.modelID &&
+      message.model.variant
+    ) {
+      merged.model.variant = message.model.variant
+    }
+
     if (!merged.tools && message.tools) {
       merged.tools = message.tools
     }
 
-    if (hasFullAgentAndModel(merged) && merged.tools) {
+    if (hasFullAgentAndModel(merged) && merged.tools && merged.model?.variant) {
       break
     }
   }
@@ -111,6 +124,7 @@ function mergeStoredMessages(
     merged.model = {
       providerID: checkpoint.model.providerID,
       modelID: checkpoint.model.modelID,
+      ...(checkpoint.model.variant ? { variant: checkpoint.model.variant } : {}),
     }
   }
 

@@ -90,6 +90,9 @@ export class ParentWakePendingQueue {
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
+      if (latestWake.gateHoldExpiresAt !== undefined) {
+        pendingWake.gateHoldExpiresAt = latestWake.gateHoldExpiresAt
+      }
       const noAssistantOutputRetryCount = Math.max(
         pendingWake.noAssistantOutputRetryCount ?? 0,
         latestWake.noAssistantOutputRetryCount ?? 0,

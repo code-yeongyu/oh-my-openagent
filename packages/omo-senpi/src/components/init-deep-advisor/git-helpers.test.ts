@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
 import { realpathSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve, sep } from "node:path"
+import { pathToFileURL } from "node:url"
 
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
@@ -21,6 +22,7 @@ import {
   gitHead,
   gitIsRepo,
   gitObjectType,
+  gitToplevel,
   gitTotalLoc,
   gitTouchedFilesSince,
   gitTrackedFileCount,
@@ -57,6 +59,54 @@ describe("gitIsRepo", () => {
 
     // when / then
     expect(gitIsRepo(dir)).toBe(false)
+  })
+
+  test("#given a plain directory #when checking from a child process #then stderr is empty, gitIsRepo is false, and gitToplevel is null", async () => {
+    // given
+    const dir = makeTempDir("omo-git-nonrepo-child-")
+    const helpersUrl = pathToFileURL(join(import.meta.dir, "git-helpers.ts")).href
+    writeFileAt(
+      dir,
+      "probe.ts",
+      `import { gitIsRepo, gitToplevel } from ${JSON.stringify(helpersUrl)}
+const dir = ${JSON.stringify(dir)}
+process.stdout.write(JSON.stringify({ isRepo: gitIsRepo(dir), toplevel: gitToplevel(dir) }))
+`,
+    )
+
+    // when
+    const child = Bun.spawn({
+      cmd: [process.execPath, join(dir, "probe.ts")],
+      cwd: dir,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ])
+
+    // then
+    expect(exitCode).toBe(0)
+    expect(stderr).toBe("")
+    expect(JSON.parse(stdout)).toEqual({ isRepo: false, toplevel: null })
+  })
+})
+
+describe("gitToplevel", () => {
+  test("#given a git repo #when resolving toplevel #then it returns the repo root", () => {
+    // given
+    const { root } = repoWithCommit()
+
+    // when
+    const toplevel = gitToplevel(root)
+
+    // then
+    expect(toplevel).toBe(realpathSync(root))
+    // git prints forward slashes on every platform; the helper hands back a native path.
+    expect(toplevel).toBe(resolve(toplevel ?? ""))
+    if (sep === "\\") expect(toplevel).not.toContain("/")
   })
 })
 

@@ -36,14 +36,14 @@ describe("createNativeBadgeComponent", () => {
 
     test("#when session_start fires #then the cat badge is published to the footer", () => {
       const { handlers, statuses, pi, ctx, eventCtx } = harness()
-      createNativeBadgeComponent().register(pi as never, ctx as never)
+      createNativeBadgeComponent({ env: {} }).register(pi as never, ctx as never)
       for (const handler of handlers.get("session_start") ?? []) handler({}, eventCtx)
       expect(statuses).toContainEqual({ key: NATIVE_BADGE_STATUS_KEY, text: NATIVE_BADGE_TEXT })
     })
 
     test("#when a later turn settles #then the badge is republished so it survives status churn", () => {
       const { handlers, statuses, pi, ctx, eventCtx } = harness()
-      createNativeBadgeComponent().register(pi as never, ctx as never)
+      createNativeBadgeComponent({ env: {} }).register(pi as never, ctx as never)
       for (const handler of handlers.get("agent_settled") ?? []) handler({}, eventCtx)
       expect(statuses).toContainEqual({ key: NATIVE_BADGE_STATUS_KEY, text: NATIVE_BADGE_TEXT })
     })
@@ -52,7 +52,7 @@ describe("createNativeBadgeComponent", () => {
   describe("#given a host that exposes no ui surface", () => {
     test("#when events fire #then registration and dispatch stay silent", () => {
       const { handlers, pi, ctx } = harness()
-      createNativeBadgeComponent().register(pi as never, ctx as never)
+      createNativeBadgeComponent({ env: {} }).register(pi as never, ctx as never)
       for (const [, list] of handlers) for (const handler of list) expect(() => handler({}, {})).not.toThrow()
     })
   })

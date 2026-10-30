@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
+import { IdleInjectionCoordinator, IdleInjectionRetiredError } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createParentNotifier } from "./parent-notifier"
 
@@ -28,14 +28,16 @@ function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[]; readonly 
   }
 }
 
-type Delivered = { content: string; deliverAs: "steer" | "followUp" }
+type Delivered = { content: string; deliverAs: "steer" | "followUp"; runRefs: readonly unknown[] }
 
 // A manually-driven flush scheduler stands in for the production batch-window timer so the tests
 // control exactly when the deferred flush runs (everything enqueued before it batches together).
 function coordinatorWithManualFlush(delivered: Delivered[]): { coordinator: IdleInjectionCoordinator; runFlush: () => void } {
   let pending: (() => void) | undefined
   const coordinator = new IdleInjectionCoordinator(
-    (message, options) => delivered.push({ content: message.content, deliverAs: options.deliverAs }),
+    (_message, options) => { delivered.push({
+      content: options.items.map(item => item.content).join("\n\n"), deliverAs: options.deliverAs, runRefs: options.items.map(item => item.runRef),
+    }) },
     { scheduleFlush: (flush) => { pending = flush } },
   )
   return {
@@ -52,7 +54,7 @@ const completionDetails = [
     task_id: "st_1",
     name: "worker",
     status: "completed" as const,
-    model: "openai-codex/gpt-5.6-luna-fast",
+    model: "chatgpt-subscription/gpt-5.6-luna-fast",
     duration_ms: 10,
     final_response: "ok",
     continuation_hint: "continue",
@@ -75,6 +77,7 @@ describe("createParentNotifier batched injection delivery", () => {
     const coordinator = {
       enqueue: (injection: unknown) => {
         enqueued.push(injection)
+        return true
       },
       scheduleFlush: () => undefined,
     } as unknown as IdleInjectionCoordinator
@@ -86,12 +89,48 @@ describe("createParentNotifier batched injection delivery", () => {
       {
         key: "task-completion:st_1",
         source: "task-completion",
+        runRef: { kind: "task", id: "st_1" },
         customType: "senpi-task.completion",
         content: "st_1 completed",
         display: false,
         details: [{ ...completionDetails[0], task_id: "st_1" }],
+        onDeliveryFailed: expect.any(Function),
       },
     ])
+  })
+
+  test("#given a completion accepted inside the batch window #when the coordinator retires before the flush #then the engine is told delivery failed", () => {
+    // given a streaming parent, so the completion sits in the batch window
+    const delivered: Delivered[] = []
+    const failures: Array<{ taskIds: readonly string[]; error: unknown }> = []
+    const { coordinator } = coordinatorWithManualFlush(delivered)
+    const notifier = createParentNotifier(fakePi(), coordinator, () => true, (taskIds, error) => {
+      failures.push({ taskIds, error })
+    })
+    notifier.enqueue(completionMessage("st_1"))
+
+    // when the session shuts down (/reload) before the batch window closes
+    coordinator.retire()
+
+    // then the completion is reported undelivered - the receipt senpi-task needs to roll notified_epoch
+    // back so the post-reload reconcile redelivers it
+    expect(delivered).toHaveLength(0)
+    expect(failures).toHaveLength(1)
+    expect(failures[0]?.taskIds).toEqual(["st_1"])
+    expect(failures[0]?.error).toBeInstanceOf(IdleInjectionRetiredError)
+  })
+
+  test("#given a retired coordinator #when a completion enqueues #then it throws instead of reporting a phantom delivery", () => {
+    // given
+    const delivered: Delivered[] = []
+    const { coordinator } = coordinatorWithManualFlush(delivered)
+    const notifier = createParentNotifier(fakePi(), coordinator, () => true)
+    coordinator.retire()
+
+    // when / then: the engine's only synchronous failure signal is a throw; swallowing it here is what
+    // persists notified_epoch for a completion the parent never saw
+    expect(() => notifier.enqueue(completionMessage("st_1"))).toThrow(IdleInjectionRetiredError)
+    expect(delivered).toHaveLength(0)
   })
 
   test("#given one completion #when enqueued #then it defers through the coordinator and flushes as ONE steer", () => {
@@ -118,7 +157,7 @@ describe("createParentNotifier batched injection delivery", () => {
     expect(pi.userSent).toHaveLength(0)
   })
 
-  test("#given two near-simultaneous completions #when the batch window closes #then BOTH arrive in ONE steer injection", () => {
+  test("#given completions from different runs #when the batch window closes #then one admission carries each completion with its own reference", () => {
     // given
     const delivered: Delivered[] = []
     const { coordinator, runFlush } = coordinatorWithManualFlush(delivered)
@@ -130,11 +169,11 @@ describe("createParentNotifier batched injection delivery", () => {
     notifier.enqueue(completionMessage("st_2"))
     runFlush()
 
-    // then the parent receives exactly ONE steer carrying both notifications
+    // then one admission carries both, each item tagged with its own run
     expect(delivered).toHaveLength(1)
     expect(delivered[0]?.deliverAs).toBe("steer")
-    expect(delivered[0]?.content).toContain("st_1 completed")
-    expect(delivered[0]?.content).toContain("st_2 completed")
+    expect(delivered[0]?.content).toMatch(/st_1 completed[\s\S]*st_2 completed/)
+    expect(delivered[0]?.runRefs).toEqual([{ kind: "task", id: "st_1" }, { kind: "task", id: "st_2" }])
   })
 
   test("#given a re-enqueue of the same completion #when the batch window closes #then the key dedupes to one entry", () => {
@@ -157,7 +196,9 @@ describe("createParentNotifier batched injection delivery", () => {
     // given: no manual scheduler - the idle path flushes itself on the next microtask
   const delivered: Delivered[] = []
   const coordinator = new IdleInjectionCoordinator(
-    (message, options) => delivered.push({ content: message.content, deliverAs: options.deliverAs }),
+    (_message, options) => { delivered.push({
+      content: options.items.map(item => item.content).join("\n\n"), deliverAs: options.deliverAs, runRefs: options.items.map(item => item.runRef),
+    }) },
     )
     const notifier = createParentNotifier(fakePi(), coordinator, () => false)
 
@@ -170,8 +211,7 @@ describe("createParentNotifier batched injection delivery", () => {
     // then delivery is immediate (no exit race in print mode) and still batched into ONE steer
     expect(delivered).toHaveLength(1)
     expect(delivered[0]?.deliverAs).toBe("steer")
-    expect(delivered[0]?.content).toContain("st_1 completed")
-    expect(delivered[0]?.content).toContain("st_2 completed")
+    expect(delivered[0]?.content).toMatch(/st_1 completed[\s\S]*st_2 completed/)
   })
 
   test("#given no coordinator is wired #when a completion enqueues #then it falls back to a direct steer on the renderer channel", () => {

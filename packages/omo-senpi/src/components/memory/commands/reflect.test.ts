@@ -1,14 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { rm } from "node:fs/promises"
-
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke, tempIdentity, TEST_IDENTITY } from "./commands.test-support"
 import { registerReflectCommand } from "./reflect"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function harness(overrides: Parameters<typeof fakeDeps>[1] = {}) {
@@ -118,7 +117,7 @@ describe("/reflect", () => {
     const { deps, pi, ctx } = await harness({
       loadSettings: () => ({
         settings: memorySettings({
-          reflection: { enabled: false, trigger: { step_count: 25, on_compaction: true }, merge: "auto", category: "quick", timeout_minutes: 15, sandbox: "auto" },
+          reflection: { enabled: false, trigger: { step_count: 25, on_compaction: true }, merge: "auto", category: "quick", timeout_minutes: 15, max_concurrent_runs: 1, sandbox: "auto" },
         }),
         configPath: "/tmp/omo.jsonc",
       }),
