@@ -1,7 +1,7 @@
 import type { ChildProcess } from "node:child_process"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { RunnerError } from "../runners/in-process"
 import { CTX, createFakeManager, makeDeps } from "../tools/task/__fixtures__/task-tool-fakes"
@@ -10,6 +10,7 @@ import { stopFakeChild } from "../runners/rpc/__fixtures__/stop-fake-child"
 import { FakeRunner, cleanupProjects, launchSettled, makeManager } from "./__fixtures__/manager-fakes"
 import { refusingProcessRunner, taskEvents } from "./__fixtures__/refusing-process-runner"
 import { createRpcManagedRunner } from "./runner"
+import { START_REPORT_WINDOW_MS } from "./manager"
 import type { ChildPlanner } from "./types"
 
 const SECRET = "ENOENT /Users/alice/.config/senpi/credentials.json api_key=sk-live-secret"
@@ -98,39 +99,76 @@ describe("task start failure cause", () => {
     expect(eventLog).not.toContain("sk-live-secret")
   })
 
-  test.each([
-    ["no error code (an engine that predates typed refusals)", { error: "No API key found for openai." }, "the prompt was refused (host_refused)", {}],
-    ["a non-credential error code", { error: "busy", errorCode: "host_memory_pressure" }, "the prompt was refused (host_refused: host_memory_pressure)", { cause_code: "host_memory_pressure" }],
-  ])("#given a real process child refuses its first prompt with %s #when the task starts #then it fails on its own model with that refusal named and no chain walk", async (_label, refusal, cause, code) => {
-    // given: protocol contract - the wire's typed errorCode reaches the start-failure record unchanged
-    const primary = { provider: "openai", model_id: "gpt-5.6-sol", display: "openai/gpt-5.6-sol", source: "category" } as const
-    const next = { provider: "kimi-coding", model_id: "kimi-k3", display: "kimi-coding/kimi-k3", source: "category" } as const
-    const planner: ChildPlanner = () => ({ kind: "resolved", plan: { model: primary.display, resolved_model: primary, category: "quick", fallback_models: [next] } })
-    const { runner, launched } = refusingProcessRunner({ [primary.display]: refusal }, spawned)
-    const { manager, store } = makeManager({ planner, process: createRpcManagedRunner(runner) })
+  for (const reportFirst of [false, true]) {
+    test.each([
+      ["no error code (an engine that predates typed refusals)", { error: "No API key found for openai." }, "the prompt was refused (host_refused)", {}],
+      ["a non-credential error code", { error: "busy", errorCode: "host_memory_pressure" }, "the prompt was refused (host_refused: host_memory_pressure)", { cause_code: "host_memory_pressure" }],
+    ])(`#given a real process child refuses its first prompt with %s #when ${reportFirst ? "the start report precedes the refusal" : "the refusal precedes the start report"} #then it fails on its own model with that refusal named and no chain walk`, async (_label, refusal, cause, code) => {
+      // given: protocol contract - the wire's typed errorCode reaches the start-failure record unchanged
+      const primary = { provider: "openai", model_id: "gpt-5.6-sol", display: "openai/gpt-5.6-sol", source: "category" } as const
+      const next = { provider: "kimi-coding", model_id: "kimi-k3", display: "kimi-coding/kimi-k3", source: "category" } as const
+      const planner: ChildPlanner = () => ({ kind: "resolved", plan: { model: primary.display, resolved_model: primary, category: "quick", fallback_models: [next] } })
+      const { runner, launched } = refusingProcessRunner({ [primary.display]: refusal }, spawned)
+      const { manager, store } = makeManager({ planner, process: createRpcManagedRunner(runner) })
+      const release = Promise.withResolvers<void>()
+      const start = runner.start.bind(runner)
+      const held = spyOn(runner, "start").mockImplementation(async (spec) => {
+        await release.promise
+        return start(spec)
+      })
+      const reportWindow = Promise.withResolvers<() => void>()
+      const schedule = globalThis.setTimeout
+      const timer = spyOn(globalThis, "setTimeout").mockImplementation(Object.assign((...args: Parameters<typeof setTimeout>) => {
+        if (args[1] !== START_REPORT_WINDOW_MS) return schedule(...args)
+        reportWindow.resolve(() => args[0]())
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }, schedule))
 
-    // when
-    const result = await manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "quick", execution_mode: "process" })
+      // when
+      try {
+        const starting = manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "quick", execution_mode: "process" })
+        const report = await reportWindow.promise
+        timer.mockRestore()
+        if (reportFirst) {
+          report()
+          await starting
+        }
+        release.resolve()
+        const result = await starting
 
-    // then
-    expect(result.kind).toBe("start_failed")
-    if (result.kind !== "start_failed") return
-    expect(await launchSettled(manager, result)).toBe("start_failed")
-    const message = `Child prompt failed to start: ${cause}.`
-    expect(result.error_message).toBe(message)
-    expect(launched).toEqual([primary.display])
-    const log = taskEvents(store.stateDir, result.task_id)
-    expect(log.filter((event) => event.type === "task_model_fallback")).toEqual([])
-    expect(log.find((event) => event.type === "task_start_failed")?.payload).toEqual({
-      error_message: message,
-      failure_kind: "child-prompt-failed",
-      rejected_while: "alive",
-      cause_class: "host_refused",
-      ...code,
+        // then
+        // #10042: started/starting is a bounded report, not the child's acceptance.
+        // The latched launch promise settles after refusal even when the report wins.
+        if (reportFirst) {
+          expect(result).toMatchObject({ kind: "started", starting: true })
+          expect(await launchSettled(manager, result)).toBe("error")
+        } else {
+          expect(result.kind).toBe("start_failed")
+          expect(await launchSettled(manager, result)).toBe("start_failed")
+        }
+        if (result.kind !== "started" && result.kind !== "start_failed") throw new Error(`unexpected start result: ${result.kind}`)
+        const message = `Child prompt failed to start: ${cause}.`
+        if (result.kind === "start_failed") expect(result.error_message).toBe(message)
+        expect(launched).toEqual([primary.display])
+        const log = taskEvents(store.stateDir, result.task_id)
+        expect(log.filter((event) => event.type === "task_model_fallback")).toEqual([])
+        expect(log.find((event) => event.type === "task_start_failed")?.payload).toEqual({
+          error_message: message,
+          failure_kind: "child-prompt-failed",
+          rejected_while: "alive",
+          cause_class: "host_refused",
+          ...code,
+        })
+        expect(store.load(result.task_id)).toMatchObject({ model: primary.display, status: "error", error_message: message })
+      } finally {
+        timer.mockRestore()
+        held.mockRestore()
+        release.resolve()
+        await manager.settleLaunchesForShutdown?.(2_000)
+      }
+      await runner.settleTeardowns()
     })
-    expect(store.load(result.task_id)).toMatchObject({ model: primary.display, status: "error" })
-    await runner.settleTeardowns()
-  })
+  }
 
   test("#given the host connection is lost while the first prompt waits #when the start failure is recorded #then a lost transport is named", async () => {
     // when
