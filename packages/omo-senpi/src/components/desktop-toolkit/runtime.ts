@@ -3,7 +3,8 @@ import { isAbsolute } from "node:path"
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { DESKTOP_TOOLKIT_TOOL_NAME, TOOLKIT_REQUEST_EVENT, TOOLKIT_GRANT_RPC, TOOLKITS_CONTEXT_KEY, type ToolkitGrant } from "./index"
-import { callThreadTool, HOST_TOOL_ROUTE_CHANNEL, listThreadTools } from "./thread-tools"
+import { callThreadTool, listThreadTools } from "./thread-tools"
+import { callingSessionId, createHostToolRoutes } from "./host-tool-routes"
 import { type LoadSdk, registerHostToolExecution } from "./host-tool-execution"
 
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 15_000
@@ -77,14 +78,6 @@ function isPreviewEvent(event: unknown): boolean {
   return typeof event === "object" && event !== null && "preview" in event && event.preview === true
 }
 
-function callingSessionId(context: unknown): string | undefined {
-  if (typeof context !== "object" || context === null || !("sessionManager" in context)) return undefined
-  const manager = context.sessionManager
-  if (typeof manager !== "object" || manager === null || !("getSessionId" in manager) || typeof manager.getSessionId !== "function") return undefined
-  const id: unknown = manager.getSessionId()
-  return typeof id === "string" && id.length > 0 ? id : undefined
-}
-
 /** Asks the app for a toolkit it hosts for this session's thread; only toolkits listed in `omo_toolkits` are requested. */
 export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: number; readonly loadSdk?: LoadSdk } = {}): OmoSenpiComponent {
   const timeoutMs = options.timeoutMs ?? DEFAULT_ACQUIRE_TIMEOUT_MS
@@ -102,9 +95,13 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
         : new Set<string>()
 
       registerHostToolExecution(pi, hostNames, options.loadSdk)
-      // senpi registers each host tool once and serves it standalone; a route only redirects its calls to the host.
-      const setRoute = (name: string, execute?: unknown) =>
-        pi.events?.emit(HOST_TOOL_ROUTE_CHANNEL, execute === undefined ? { name } : { name, execute })
+      const routes = createHostToolRoutes(pi, {
+        grants, timeoutMs,
+        onLost(sessionId) {
+          const state = sessions.get(`host:${sessionId}`)
+          if (state !== undefined) failAttempt(state)
+        },
+      })
 
       async function acquire(toolkit: string, signal?: AbortSignal): Promise<Settled> {
         if (signal?.aborted) return { ok: false, reason: "cancelled" }
@@ -192,18 +189,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
             const attachment = tool.attachment
             if (state.toolkit === "host") {
               if (attachment === undefined || !hostNames.has(attachment.name)) continue
-              const key = `host:${sessionId}`
-              setRoute(attachment.name, async (_id: string, args: Record<string, unknown>, signal?: AbortSignal, _onUpdate?: unknown, callCtx?: unknown) => {
-                const caller = callingSessionId(callCtx)
-                const grant = caller === undefined ? undefined : grants.get(`host:${caller}`)
-                try {
-                  return await callThreadTool(grant, tool.name, args, timeoutMs, signal, true)
-                } catch (error) {
-                  // The host is gone for this session: the call runs standalone, and later turns re-confirm the grant.
-                  if (caller === sessionId && grants.delete(key)) failAttempt(state)
-                  throw error
-                }
-              })
+              routes.set(attachment.name, tool.name, sessionId)
               continue
             }
             if (attachment !== undefined) continue
@@ -281,7 +267,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
           sessions.delete(key)
           grants.delete(key)
         }
-        for (const name of hostNames) setRoute(name)
+        routes.clear(sessionId)
       })
     },
   }
