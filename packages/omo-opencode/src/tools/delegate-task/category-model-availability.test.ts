@@ -3,6 +3,13 @@ import type { CategoryConfig } from "../../config/schema"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { resolveCategoryExecution } from "./category-resolver"
+import { resolveSubagentModel } from "./subagent-model-resolution"
+import {
+  clearAllDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
+import { getFallbackModelsForSession } from "../../hooks/runtime-fallback/fallback-models"
+import { createFallbackState, prepareFallback } from "../../hooks/runtime-fallback/fallback-state"
 import type { ExecutorContext } from "./executor-types"
 import type { DelegateTaskArgs } from "./types"
 
@@ -20,6 +27,7 @@ const args: DelegateTaskArgs = {
 const cacheSpies: Array<{ mockRestore: () => void }> = []
 
 afterEach(() => {
+  clearAllDelegatedChildSessionBootstrap()
   for (const cacheSpy of cacheSpies.splice(0)) {
     cacheSpy.mockRestore()
   }
@@ -50,6 +58,123 @@ function createExecutorContext(
 }
 
 describe("category canonical model availability", () => {
+  test("reactive fallback consumes the spawn snapshot and exhausts without wrapping twice", async () => {
+    const category = {
+      models: ["test-provider/a", "test-provider/b", "test-provider/c"],
+      models_distribution: "round_robin",
+    } satisfies CategoryConfig
+    const executorContext = createExecutorContext(category, ["a", "b", "c"])
+    executorContext.userCategories = { "reactive-distribution": category }
+    await resolveCategoryExecution(
+      { ...args, category: "reactive-distribution" }, executorContext, undefined, undefined,
+    )
+    const result = await resolveCategoryExecution(
+      { ...args, category: "reactive-distribution" }, executorContext, undefined, undefined,
+    )
+    registerDelegatedChildSessionBootstrap({
+      sessionID: "distribution-reactive",
+      promptText: "fixture",
+      category: "reactive-distribution",
+      fallbackChain: result.fallbackChain,
+    })
+    const chain = getFallbackModelsForSession("distribution-reactive", undefined, {
+      categories: executorContext.userCategories,
+    })
+    expect(chain).toEqual(["test-provider/c", "test-provider/a"])
+    const state = createFallbackState("test-provider/b")
+    const retryConfig = {
+      enabled: true, retry_on_errors: [429], max_fallback_attempts: 8,
+      cooldown_seconds: 60, timeout_seconds: 30, notify_on_fallback: false,
+      restore_primary_after_cooldown: false,
+    }
+    expect(prepareFallback("distribution-reactive", state, chain, retryConfig).newModel).toBe("test-provider/c")
+    expect(prepareFallback("distribution-reactive", state, chain, retryConfig).newModel).toBe("test-provider/a")
+    expect(prepareFallback("distribution-reactive", state, chain, retryConfig).success).toBe(false)
+  })
+
+  test("round robin allocates concurrent spawns once and wraps the fallback order", async () => {
+    const executorContext = createExecutorContext(
+      {
+        models: ["test-provider/a", { model: "test-provider/b", variant: "high" }, "test-provider/c"],
+        models_distribution: "round_robin",
+      },
+      ["a", "b", "c"],
+    )
+    const results = await Promise.all(Array.from({ length: 4 }, () =>
+      resolveCategoryExecution(args, executorContext, undefined, undefined)))
+    expect(results.map((result) => result.actualModel)).toEqual([
+      "test-provider/a", "test-provider/b", "test-provider/c", "test-provider/a",
+    ])
+    expect(results[1].categoryModel?.variant).toBe("high")
+    expect(results.map((result) => result.fallbackChain?.map((entry) => entry.model))).toEqual([
+      ["b", "c"], ["c", "a"], ["a", "b"], ["b", "c"],
+    ])
+    expect(executorContext.userCategories?.[CATEGORY_NAME]?.models?.[0]).toBe("test-provider/a")
+  })
+
+  test("agent round robin rotates canonical models and keeps per-entry tuning", async () => {
+    const executorContext = createExecutorContext({}, ["a", "b", "c"])
+    executorContext.agentOverrides = {
+      Distributor: {
+        models: ["test-provider/a", { model: "test-provider/b", variant: "high" }, "test-provider/c"],
+        models_distribution: "round_robin",
+      },
+    }
+    const results = await Promise.all(Array.from({ length: 4 }, () =>
+      resolveSubagentModel("distributor", { name: "distributor", mode: "subagent" }, executorContext)))
+    expect(results.map((result) => result.categoryModel?.modelID)).toEqual(["a", "b", "c", "a"])
+    expect(results[1].categoryModel?.variant).toBe("high")
+    expect(results.map((result) => result.fallbackChain?.map((entry) => entry.model))).toEqual([
+      ["b", "c"], ["c", "a"], ["a", "b"], ["b", "c"],
+    ])
+    registerDelegatedChildSessionBootstrap({
+      sessionID: "distribution-agent",
+      promptText: "fixture",
+      fallbackChain: results[1].fallbackChain,
+    })
+    expect(getFallbackModelsForSession("distribution-agent", "distributor", {
+      agents: executorContext.agentOverrides,
+    })).toEqual(["test-provider/c", "test-provider/a"])
+  })
+
+  test("sequential and omitted policies retain the primary for every spawn", async () => {
+    for (const policy of [undefined, "sequential"] as const) {
+      const executorContext = createExecutorContext(
+        {
+          models: ["test-provider/a", "test-provider/b"],
+          ...(policy === undefined ? {} : { models_distribution: policy }),
+        },
+        ["a", "b"],
+      )
+      const results = await Promise.all(Array.from({ length: 3 }, () =>
+        resolveCategoryExecution(args, executorContext, undefined, undefined)))
+      expect(results.map((result) => result.actualModel)).toEqual(Array(3).fill("test-provider/a"))
+      expect(results[0].fallbackChain?.map((entry) => entry.model)).toEqual(["b"])
+    }
+  })
+
+  test("rotation skips unavailable entries without repeating a model or sharing target cursors", async () => {
+    const executorContext = createExecutorContext({}, ["a", "b"])
+    executorContext.userCategories = {
+      "rotation-availability": {
+        models: ["test-provider/missing", "test-provider/a", "test-provider/a", "test-provider/b"],
+        models_distribution: "round_robin",
+      },
+      "rotation-independent": {
+        models: ["test-provider/a", "test-provider/b"],
+        models_distribution: "round_robin",
+      },
+    }
+    const spawn = (category: string) =>
+      resolveCategoryExecution({ ...args, category }, executorContext, undefined, undefined)
+    const results = await Promise.all(Array.from({ length: 3 }, () => spawn("rotation-availability")))
+    expect(results.map((result) => result.actualModel)).toEqual([
+      "test-provider/a", "test-provider/a", "test-provider/b",
+    ])
+    expect(results[2].fallbackChain?.map((entry) => entry.model)).toEqual(["a"])
+    expect((await spawn("rotation-independent")).actualModel).toBe("test-provider/a")
+  })
+
   test("advances past unavailable entries while preserving the configured order", async () => {
     // given
     const executorContext = createExecutorContext(
