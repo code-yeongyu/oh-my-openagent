@@ -6,7 +6,7 @@ import { getPrometheusPrompt } from "./system-prompt"
 const MODEL_IDS = [
   undefined,
   "anthropic/claude-opus-4-8",
-  "anthropic/claude-fable-5",
+  "anthropic/claude-fable-5-1",
   "gpt-5.5",
   "gemini-3.1-pro",
   "opencode-go/kimi-k2.7",

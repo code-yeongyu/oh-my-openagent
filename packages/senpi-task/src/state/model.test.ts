@@ -10,6 +10,13 @@ import {
 import type { Messageability, ResidencyState, TaskStatus } from "../index"
 
 const expectedMessageability: Record<TaskStatus, Record<ResidencyState, Messageability>> = {
+  paused: {
+    resident: "not-continuable",
+    evicted: "not-continuable",
+    disposed: "not-continuable",
+    persisted_only: "not-continuable",
+    rpc_detached: "not-continuable",
+  },
   pending: {
     resident: "steer",
     evicted: "not-continuable",
@@ -71,7 +78,7 @@ describe("messageability", () => {
     // when
     const actual = pairs.map(({ status, residency }) => ({
       key: `${status}/${residency}`,
-      value: messageability(status, residency),
+      value: messageability(status, residency, "in-process"),
     }))
 
     // then
@@ -80,7 +87,7 @@ describe("messageability", () => {
     for (const status of TASK_STATUSES) {
       expect(Object.keys(expectedMessageability[status])).toHaveLength(RESIDENCY_STATES.length)
       for (const residency of RESIDENCY_STATES) {
-        expect(messageability(status, residency)).toBe(expectedMessageability[status][residency])
+        expect(messageability(status, residency, "in-process")).toBe(expectedMessageability[status][residency])
       }
     }
   })
@@ -95,7 +102,7 @@ describe("messageability suspended residencies", () => {
     const actual = Object.fromEntries(
       TASK_STATUSES.flatMap((status) =>
         suspendedResidencies.map(
-          (residency) => [`${status}/${residency}`, messageability(status, residency)] as const,
+          (residency) => [`${status}/${residency}`, messageability(status, residency, "in-process")] as const,
         ),
       ),
     )
@@ -107,6 +114,17 @@ describe("messageability suspended residencies", () => {
       ),
     )
     expect(actual).toEqual(expected)
+  })
+})
+
+describe("process-mode messageability", () => {
+  test("#given process-mode records #when classified #then only terminal detached records revive", () => {
+    expect(messageability("completed", "rpc_detached", "process")).toBe("revive")
+    expect(messageability("error", "rpc_detached", "process")).toBe("revive")
+    expect(messageability("interrupted", "rpc_detached", "process")).toBe("revive")
+    expect(messageability("running", "rpc_detached", "process")).toBe("not-continuable")
+    expect(messageability("completed", "persisted_only", "process")).toBe("not-continuable")
+    expect(messageability("completed", "rpc_detached", "process", true)).toBe("not-continuable")
   })
 })
 

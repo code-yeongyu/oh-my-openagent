@@ -298,6 +298,47 @@ describe("createTeamRun", () => {
     expect(await pathExists(path.resolve(baseDir, "./worktrees/member-2"))).toBe(false)
   })
 
+  test("passes the resolved worktree path as cwd to launch", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-worktree-cwd-"))
+    temporaryDirectories.push(baseDir)
+    let launchCount = 0
+    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const spec = createSpec(2, true)
+
+    // when
+    await createTeamRun(spec, "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    expect(launchMock).toHaveBeenCalledTimes(2)
+    const launchInputs = launchMock.mock.calls.map((call) => call[0] as LaunchInput)
+    for (const member of spec.members) {
+      const expectedWorktree = path.resolve(baseDir, member.worktreePath!)
+      const launchInput = launchInputs.find((input) => input.description.endsWith(`/${member.name}`))
+      expect(launchInput?.cwd).toBe(expectedWorktree)
+      expect(launchInput?.prompt).toContain(`Worktree: ${expectedWorktree}`)
+    }
+  })
+
+  test("omits cwd when the member has no worktree", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-no-worktree-cwd-"))
+    temporaryDirectories.push(baseDir)
+    let launchCount = 0
+    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const spec = createSpec(2, false)
+
+    // when
+    await createTeamRun(spec, "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    expect(launchMock).toHaveBeenCalledTimes(2)
+    for (const call of launchMock.mock.calls) {
+      const launchInput = call[0] as LaunchInput
+      expect("cwd" in launchInput).toBe(false)
+    }
+  })
+
   test("returns the existing runtime on repeated calls with the same spec and lead session", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-idempotent-"))

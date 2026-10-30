@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import", "oxc"],
+  "jsPlugins": [{ "name": "programming", "specifier": "./lint/oxlint-plugin/index.js" }],
+  "categories": { "correctness": "error", "suspicious": "error" },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/ban-ts-comment": [
+      "error",
+      { "ts-expect-error": true, "ts-ignore": true, "ts-nocheck": true, "ts-check": false }
+    ],
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "import/no-default-export": "error",
+    "no-param-reassign": "error",
+    "no-unused-vars": "error",
+    "no-empty": "error",
+    "no-fallthrough": "error",
+    "prefer-const": "error",
+    "programming/require-suppression-reason": "error"
+  },
+  "ignorePatterns": ["node_modules/**", "dist/**", "build/**", "coverage/**", "vendor/**"],
+  "overrides": [
+    {
+      "files": ["src/**/*", "apps/*/src/**/*", "packages/*/src/**/*"],
+      "rules": { "programming/no-em-dash-copy": "error" }
+    },
+    {
+      "files": [
+        "**/*.{test,spec}.*",
+        "**/{test,tests,__tests__,fixtures,__fixtures__,_generated,vendor,vendored}/**",
+        "**/*.{gen,generated}.*"
+      ],
+      "rules": { "programming/no-em-dash-copy": "off" }
+    },
+    {
+      "files": ["src/index.ts", "lint/oxlint-plugin/*.js"],
+      "rules": { "import/no-default-export": "off" }
+    }
+  ]
+}

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { realpathSync } from "node:fs"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import { existsSync, realpathSync, statSync } from "node:fs"
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -9,6 +9,7 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { createMemoryIdentityContext } from "./context"
 import { createIdentityRuntime } from "./identity-runtime"
+import { currentLaunchScope, withLaunchScope, type LaunchScope } from "./launch-facts"
 import { componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import type { ReflectionSandbox, ReflectionSpawnArgs } from "./worker"
 
@@ -16,6 +17,51 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory identity runtime", () => {
+  test.each(["manual", "different", "aborted", "shared", "success", "failure"] as const)("#given overlapping identity observers (%s) #when the owner settles #then cancellation belongs to each caller", async (kind) => {
+    const root = await mkdtemp(join(tmpdir(), "omo-reconcile-flight-"))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: "agent-test", identityPaths: buildIdentityPaths(root, "agent-test"),
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()), cwd: () => root,
+      resolveModelRegistry: () => undefined,
+    })
+    const state = await runtime.store.readState()
+    const readState = runtime.store.readState.bind(runtime.store)
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<typeof state>()
+    const probe = spyOn(runtime.store, "readState").mockImplementationOnce(() => {
+      entered.resolve()
+      return release.promise
+    }).mockImplementation(readState)
+    const controller = new AbortController()
+    const joiner = new AbortController()
+    const reason = new DOMException("Settle observer budget exhausted", "TimeoutError")
+    const ownReason = new Error("joining observer retired")
+    const failure = new Error("reservation read failed")
+    const first = runtime.reconcile(controller.signal).catch((error: unknown) => error)
+    const second = runtime.reconcile(kind === "manual" ? undefined : kind === "shared" ? controller.signal : joiner.signal).catch((error: unknown) => error)
+    try {
+      await entered.promise
+      expect(probe).toHaveBeenCalledTimes(1)
+      if (kind === "aborted") joiner.abort(ownReason)
+      if (kind !== "success") controller.abort(reason)
+      if (kind === "failure") release.reject(failure)
+      else release.resolve(state)
+      expect(await first).toBe(kind === "success" ? undefined : kind === "failure" ? failure : reason)
+      expect(await second).toBe(kind === "shared" ? reason : kind === "aborted" ? ownReason : kind === "failure" ? failure : undefined)
+      expect(probe).toHaveBeenCalledTimes(kind === "manual" || kind === "different" ? 3 : kind === "success" ? 2 : 1)
+      probe.mockRestore()
+      await runtime.reconcile()
+    } finally {
+      release.resolve(state)
+      await Promise.all([first, second])
+      probe.mockRestore()
+    }
+  })
+
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     "#given an unresolved reflection child command #when the real lazy sandbox is constructed #then the unsandboxed escape reaches the injected logger",
     async () => {
@@ -103,7 +149,13 @@ describe("memory identity runtime", () => {
 async function renderReflectionSandboxAgentDir(envShape: {
   readonly omo?: string
   readonly senpi?: string
-}): Promise<{ readonly fakeHome: string; readonly renderedArgs: readonly string[] }> {
+  /** Environment the reflection child would inherit before the runtime transforms it. */
+  readonly inheritedChildEnv?: NodeJS.ProcessEnv
+}): Promise<{
+  readonly fakeHome: string
+  readonly renderedArgs: readonly string[]
+  readonly childEnv: NodeJS.ProcessEnv
+}> {
   // given: an isolated identity root, a fake sandbox-exec/bwrap on PATH so the seatbelt profile or
   // bwrap args render, and a fake absolute inner command so the sandbox does not degrade.
   const root = await mkdtemp(join(tmpdir(), "omo-memory-agent-dir-"))
@@ -167,7 +219,7 @@ async function renderReflectionSandboxAgentDir(envShape: {
       command: join(binDir, "senpi-fake"),
       args: [],
       cwd: paths.worktrees,
-      env: { PATH: "" },
+      env: { PATH: "", ...(envShape.inheritedChildEnv ?? {}) },
       detached: true,
       paths: {
         sessionDir: paths.reflectionSessions,
@@ -178,7 +230,7 @@ async function renderReflectionSandboxAgentDir(envShape: {
         prompt: join(paths.reflectionSessions, "prompt.md"),
       },
     })
-    return { fakeHome, renderedArgs: transformed.args }
+    return { fakeHome, renderedArgs: transformed.args, childEnv: transformed.env }
   } finally {
     for (const [key, value] of Object.entries(snapshot)) {
       if (value === undefined) delete process.env[key]
@@ -199,6 +251,110 @@ function sandboxGrantsAgentDir(renderedArgs: readonly string[], agentDirReal: st
   }
   return false
 }
+
+describe("memory identity runtime backfills runtime dirs of existing identities (#7012)", () => {
+  // From the WSL2 report on #7012: identities created before newer layout entries existed have
+  // some runtime dirs but not reflection-sessions/viewers/push-queue, and nothing backfilled them,
+  // so bwrap's writable bind of runtime/reflection-sessions died with "Can't find source path".
+  // Approach ported from #7236 by @AceRothstein71: ensure every runtime dir before each launch.
+  test("#given an identity that predates the layout #when a reserved reflection run launches #then every missing runtime dir exists before the runner builds the sandbox", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-predates-layout-"))
+    roots.push(root)
+    const paths = buildIdentityPaths(root, "agent-old")
+    await mkdir(paths.transcripts, { recursive: true })
+    await mkdir(paths.locks, { recursive: true })
+    await mkdir(paths.reflection, { recursive: true })
+    expect(existsSync(paths.reflectionSessions)).toBe(false)
+    expect(existsSync(paths.viewers)).toBe(false)
+    expect(existsSync(paths.pushQueue)).toBe(false)
+    const identity = createMemoryIdentityContext({
+      identity: "agent-old",
+      identityPaths: paths,
+      binding: { identity: "agent-old", repoPathHash: "hash", boundAt: 1 },
+    })
+    const ctx = componentContext()
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      logger: ctx.logger,
+    })
+    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+
+    // when
+    await runtime.launch(reserved.run)
+
+    // then
+    expect(existsSync(paths.reflectionSessions)).toBe(true)
+    expect(existsSync(paths.viewers)).toBe(true)
+    expect(existsSync(paths.pushQueue)).toBe(true)
+  }, 30_000)
+
+  test("#given the backfill failed once #when the blocker is gone and a later run launches #then the backfill is retried instead of the failure being cached", async () => {
+    // given: a plain file where runtime/reflection-sessions belongs makes the first backfill fail
+    const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-backfill-retry-"))
+    roots.push(root)
+    const paths = buildIdentityPaths(root, "agent-retry")
+    await mkdir(join(paths.reflectionSessions, ".."), { recursive: true })
+    await writeFile(paths.reflectionSessions, "not a directory")
+    const identity = createMemoryIdentityContext({
+      identity: "agent-retry",
+      identityPaths: paths,
+      binding: { identity: "agent-retry", repoPathHash: "hash", boundAt: 1 },
+    })
+    const ctx = componentContext()
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      logger: ctx.logger,
+    })
+    const first = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    if (first.status !== "active") throw new Error("expected an active manual reservation")
+    await runtime.launch(first.run)
+    const warning = ctx.logs.find((log) => log.level === "warn" && log.message.includes("could not create its runtime directories"))
+    expect(warning?.message).toContain("retries on the next run")
+    expect(existsSync(paths.viewers)).toBe(true)
+
+    // when: the blocker is removed and the next launch runs in the same runtime
+    await rm(paths.reflectionSessions)
+    await runtime.launch(first.run)
+
+    // then
+    expect(statSync(paths.reflectionSessions).isDirectory()).toBe(true)
+  }, 30_000)
+
+  test.skipIf(process.platform === "win32")("#given a fresh identity #when the backfill creates its runtime dirs #then they are owner-only (0700)", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-backfill-mode-"))
+    roots.push(root)
+    const paths = buildIdentityPaths(root, "agent-mode")
+    const identity = createMemoryIdentityContext({
+      identity: "agent-mode",
+      identityPaths: paths,
+      binding: { identity: "agent-mode", repoPathHash: "hash", boundAt: 1 },
+    })
+    const ctx = componentContext()
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      logger: ctx.logger,
+    })
+    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+
+    // when
+    await runtime.launch(reserved.run)
+
+    // then
+    for (const dir of [paths.reflectionSessions, paths.viewers, paths.pushQueue]) {
+      expect(statSync(dir).mode & 0o777).toBe(0o700)
+    }
+  }, 30_000)
+})
 
 describe("memory identity runtime agent-dir resolution", () => {
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
@@ -243,4 +399,116 @@ describe("memory identity runtime agent-dir resolution", () => {
     },
     30_000,
   )
+
+  test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
+    "#given a rendered reflection sandbox #when the child environment is transformed #then every agent-dir variable pins the granted directory",
+    async () => {
+      // given
+      const omoAgentDir = await mkdtemp(join(tmpdir(), "omo-pinned-agent-dir-"))
+      roots.push(omoAgentDir)
+
+      // when
+      const { renderedArgs, childEnv } = await renderReflectionSandboxAgentDir({ omo: omoAgentDir })
+
+      // then: the child cannot re-resolve its agent dir from the reflection worktree cwd, and the
+      // pin names the SAME directory the sandbox granted - a pin outside the grant is the EPERM
+      // the credential lock reported.
+      expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(omoAgentDir))).toBe(true)
+      expect(childEnv.OMO_CODING_AGENT_DIR).toBe(omoAgentDir)
+      expect(childEnv.SENPI_CODING_AGENT_DIR).toBe(omoAgentDir)
+      expect(childEnv.PI_CODING_AGENT_DIR).toBe(omoAgentDir)
+    },
+    30_000,
+  )
+
+  test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
+    "#given an inherited agent-dir variable pointing elsewhere #when the reflection child environment is built #then the pin wins and no second home is granted",
+    async () => {
+      // given: the parent leaked an agent dir the sandbox never granted (the engine reads the first
+      // DEFINED name across OMO_/SENPI_/PI_, so a stale value would otherwise beat the pin).
+      const grantedAgentDir = await mkdtemp(join(tmpdir(), "omo-granted-agent-dir-"))
+      const staleAgentDir = await mkdtemp(join(tmpdir(), "omo-stale-agent-dir-"))
+      roots.push(grantedAgentDir, staleAgentDir)
+
+      // when
+      const { renderedArgs, childEnv } = await renderReflectionSandboxAgentDir({
+        omo: grantedAgentDir,
+        inheritedChildEnv: {
+          OMO_CODING_AGENT_DIR: staleAgentDir,
+          SENPI_CODING_AGENT_DIR: staleAgentDir,
+          PI_CODING_AGENT_DIR: staleAgentDir,
+        },
+      })
+
+      // then
+      expect(childEnv.OMO_CODING_AGENT_DIR).toBe(grantedAgentDir)
+      expect(childEnv.SENPI_CODING_AGENT_DIR).toBe(grantedAgentDir)
+      expect(childEnv.PI_CODING_AGENT_DIR).toBe(grantedAgentDir)
+      expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(grantedAgentDir))).toBe(true)
+      expect(sandboxGrantsAgentDir(renderedArgs, realpathSync(staleAgentDir))).toBe(false)
+    },
+    30_000,
+  )
+})
+
+describe("memory identity runtime binds every launch to its own run (#10339)", () => {
+  async function runtimeSeeingScopes(name: string): Promise<{ runtime: ReturnType<typeof createIdentityRuntime>; seen: (LaunchScope | undefined)[] }> {
+    const root = await mkdtemp(join(tmpdir(), `omo-memory-identity-runtime-scope-${name}-`))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: name,
+      identityPaths: buildIdentityPaths(root, name),
+      binding: { identity: name, repoPathHash: "hash", boundAt: 1 },
+    })
+    const seen: (LaunchScope | undefined)[] = []
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+      // The runner resolves the session model at the start of every launch: record the scope it runs in.
+      resolveSessionModel: () => {
+        seen.push(currentLaunchScope())
+        return undefined
+      },
+      logger: componentContext().logger,
+    })
+    return { runtime, seen }
+  }
+
+  test("#given a reconcile-style launch with no trigger snapshot #when the runner resolves its facts #then it runs in a scope of its own run's conversations", async () => {
+    // given
+    const { runtime, seen } = await runtimeSeeingScopes("agent-scope-plain")
+    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+
+    // when
+    await runtime.launch(reserved.run)
+
+    // then
+    expect(seen).toEqual([{ conversationIds: ["conversation-a"] }])
+  }, 30_000)
+
+  test("#given a launch for conversation A started inside session B's trigger scope #when the runner resolves its facts #then it never sees B's snapshot", async () => {
+    // given: B's trigger scope carries B's snapshot (a queued follow-up for A is launched from inside it)
+    const { runtime, seen } = await runtimeSeeingScopes("agent-scope-nested")
+    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+    const sessionB = {
+      conversationIds: ["conversation-b"],
+      snapshot: {
+        modelRegistry: undefined,
+        sessionModel: { provider: "b", id: "b-model" },
+        parentContextTokens: 9,
+        parentSessionFile: "/B.jsonl",
+        parentCacheReusable: true,
+        agentDir: "/B",
+      },
+    }
+
+    // when
+    await withLaunchScope(sessionB, () => runtime.launch(reserved.run))
+
+    // then
+    expect(seen).toEqual([{ conversationIds: ["conversation-a"] }])
+  }, 30_000)
 })

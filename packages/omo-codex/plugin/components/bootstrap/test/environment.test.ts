@@ -373,4 +373,7 @@ async function writeSyncSourceFixture(sourceRoot: string): Promise<void> {
 	await writeExecutableStub(join(sourceRoot, "packages", "git-bash-mcp", "dist", "cli.js"));
 	await writeExecutableStub(join(sourceRoot, "packages", "lsp-tools-mcp", "dist", "cli.js"));
 	await writeExecutableStub(join(sourceRoot, "packages", "lsp-daemon", "dist", "cli.js"));
+	// The sync bundles the root CLI and its node fallback too (script/lazycodex-runtime-dists.ts).
+	await writeExecutableStub(join(sourceRoot, "dist", "cli", "index.js"));
+	await writeExecutableStub(join(sourceRoot, "dist", "cli-node", "index.js"));
 }

@@ -3,6 +3,8 @@
 import { $ } from "bun"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { resolveLatestFlag } from "./release-latest-flag"
+import { resolveReleaseVersion } from "./release-version.mjs"
 
 const PACKAGE_NAME = "oh-my-opencode"
 const bump = process.env.BUMP as "major" | "minor" | "patch" | undefined
@@ -382,7 +384,9 @@ async function gitTagAndRelease(newVersion: string, notes: string[]): Promise<vo
   const releaseNotes = notes.length > 0 ? notes.join("\n") : "No notable changes"
   const releaseExists = await $`gh release view v${newVersion}`.nothrow()
   if (releaseExists.exitCode !== 0) {
-    await $`gh release create v${newVersion} --title "v${newVersion}" --notes ${releaseNotes}`
+    const publishedTags = await $`gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName'`.text()
+    const latestFlag = resolveLatestFlag(newVersion, publishedTags.split("\n").filter(Boolean))
+    await $`gh release create v${newVersion} ${latestFlag} --title "v${newVersion}" --notes ${releaseNotes}`
   } else {
     console.log(`Release v${newVersion} already exists`)
   }
@@ -398,6 +402,8 @@ async function checkVersionExists(version: string): Promise<boolean> {
 }
 
 async function main() {
+  // The local preparation/publish entrypoint must respect the same reserved namespace.
+  if (versionOverride) resolveReleaseVersion(versionOverride, false)
   const previous = await fetchPreviousVersion()
   const newVersion = versionOverride || (bump ? bumpVersion(previous, bump) : bumpVersion(previous, "patch"))
   console.log(`New version: ${newVersion}\n`)

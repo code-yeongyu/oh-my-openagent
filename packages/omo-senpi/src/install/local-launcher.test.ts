@@ -1,13 +1,18 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { installLocalLauncher, localLauncherPath, renderLocalLauncher, uninstallLocalLauncher } from "./local-launcher"
 
 function makeHome(): string {
   return mkdtempSync(join(tmpdir(), "omo-local-launcher-"))
 }
+
+// Compared over LF: a Windows checkout may hand the asset back with CRLF.
+const ICON = readFileSync(resolve(fileURLToPath(new URL("../../../..", import.meta.url)), ".github/assets/omo-icon-light.svg"), "utf8").replaceAll("\r\n", "\n")
+const LOGO_PREFIX = "data:image/svg+xml;base64,"
 
 const BASE = { pluginPath: "/repo/packages/omo-senpi/plugin", senpiCliPath: "/repo/senpi/dist/cli.js", version: "9.9.9" }
 
@@ -18,8 +23,13 @@ describe("local omo launcher", () => {
         const source = renderLocalLauncher(BASE)
         const brand = JSON.parse(source.match(/const brand = (\{.*\})/)?.[1] ?? "{}")
 
+        // The provider sign-in result page shows this mark (senpi#4432).
+        expect(typeof brand.logo).toBe("string")
+        expect(brand.logo.startsWith(LOGO_PREFIX)).toBe(true)
+        expect(Buffer.from(brand.logo.slice(LOGO_PREFIX.length), "base64").toString("utf8")).toBe(ICON)
         expect(brand).toEqual({
           name: "OmO",
+          logo: brand.logo,
           command: "omo",
           displayVersion: "9.9.9",
           configDir: ".omo",
@@ -27,19 +37,35 @@ describe("local omo launcher", () => {
           envPrefix: "OMO",
           userAgent: "omo",
           originator: "omo",
+          // A local sibling-store install points at the repo plugin dir and deliberately carries
+          // no version: without one the engine treats the source as read-only and renders no
+          // startup notes, which is what a dev install should do.
+          changelog: {
+            path: "/repo/packages/omo-senpi/plugin/CHANGELOG.md",
+          },
           update: {
             packageName: "omo-ai",
-            distTag: "beta",
-            command: "npm i -g omo-ai@beta",
+            distTag: "latest",
+            command: "bun add -g omo-ai",
             changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
           },
         })
+        expect(source).toContain("omo is updated via bun: bun add -g omo-ai")
+        expect(source).not.toContain("omo-ai@beta")
         expect(source).toContain("--extension")
         expect(source).toContain("OMO_SENPI_CLI_PATH")
         expect(source).toContain("OMO_PLUGIN_ROOT")
         expect(source).toContain("OMO_CODING_AGENT_DIR")
         expect(source).toContain("SENPI_CODING_AGENT_DIR")
         expect(source).toContain('join(homedir(), ".omo", "agent")')
+      })
+
+      test("#then a prerelease build stays on the beta channel", () => {
+        const source = renderLocalLauncher({ ...BASE, version: "5.0.0-beta.90" })
+        const brand = JSON.parse(source.match(/const brand = (\{.*\})/)?.[1] ?? "{}")
+
+        expect(brand.update).toMatchObject({ distTag: "beta", command: "bun add -g omo-ai@beta" })
+        expect(source).toContain("omo is updated via bun: bun add -g omo-ai@beta")
       })
     })
 

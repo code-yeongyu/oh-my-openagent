@@ -21,7 +21,7 @@ function registry(models: readonly FakeModel[]): TaskModelRegistry {
 const CONFIG: OmoConfig = {
   categories: {
     quick: { model: "kimi-coding/kimi-for-coding-highspeed-unlocked", reasoningEffort: "minimal" },
-    deep: { model: "anthropic/claude-opus-5", reasoningEffort: "high" },
+    "deep-low": { model: "anthropic/claude-opus-5-5", reasoningEffort: "high" },
   },
 }
 
@@ -46,14 +46,14 @@ describe("category config generations at the planner seam", () => {
     // given
     const models: FakeModel[] = [
       { provider: "kimi-coding", id: "kimi-for-coding-highspeed-unlocked" },
-      { provider: "anthropic", id: "claude-opus-5" },
+      { provider: "anthropic", id: "claude-opus-5-5" },
     ]
     const { generations, planner } = harness(() => models)
 
     // when
     const first = plan(planner, "quick")
     const firstGeneration = generations.current()?.generation
-    const second = plan(planner, "deep")
+    const second = plan(planner, "deep-low")
 
     // then
     expect(first.kind).toBe("resolved")
@@ -66,7 +66,7 @@ describe("category config generations at the planner seam", () => {
     // given
     const models: FakeModel[] = [
       { provider: "kimi-coding", id: "kimi-for-coding-highspeed-unlocked" },
-      { provider: "anthropic", id: "claude-opus-5" },
+      { provider: "anthropic", id: "claude-opus-5-5" },
     ]
     const { generations, planner } = harness(() => models)
     plan(planner, "quick")
@@ -74,7 +74,7 @@ describe("category config generations at the planner seam", () => {
 
     // when
     models.splice(0, 1)
-    plan(planner, "deep")
+    plan(planner, "deep-low")
 
     // then
     expect(before).toBe(0)
@@ -86,7 +86,7 @@ describe("category config generations at the planner seam", () => {
     const config: OmoConfig = {
       categories: {
         quick: { model: "kimi-coding/kimi-for-coding-highspeed-unlocked" },
-        deep: { disable: true },
+        "deep-low": { disable: true },
       },
     }
     const generations = createCategoryConfigGenerations()
@@ -97,37 +97,37 @@ describe("category config generations at the planner seam", () => {
 
     // then
     expect(snapshot.categories["quick"]).toBe("unavailable")
-    expect(snapshot.categories["deep"]).toBe("disabled")
+    expect(snapshot.categories["deep-low"]).toBe("disabled")
   })
 
   test("#given a resolved category #when canonicalized #then the value encodes provider, model and reasoning", () => {
     // given
     const generations = createCategoryConfigGenerations()
-    const models: readonly FakeModel[] = [{ provider: "anthropic", id: "claude-opus-5" }]
+    const models: readonly FakeModel[] = [{ provider: "anthropic", id: "claude-opus-5-5" }]
 
     // when
     const snapshot = generations.observe({
-      omoConfig: { categories: { deep: { model: "anthropic/claude-opus-5", reasoningEffort: "high" } } },
+      omoConfig: { categories: { "deep-low": { model: "anthropic/claude-opus-5-5", reasoningEffort: "high" } } },
       registry: registry(models),
     })
 
     // then
-    expect(snapshot.categories["deep"]).toBe("anthropic/claude-opus-5/high")
+    expect(snapshot.categories["deep-low"]).toBe("anthropic/claude-opus-5-5/high")
   })
 
   test("#given an injected masking function #when a category resolves to an unknown provider #then the canonical value is masked", () => {
     // given
     const generations = createCategoryConfigGenerations(() => ({ provider: "custom", model_id: "custom" }))
-    const models: readonly FakeModel[] = [{ provider: "anthropic", id: "claude-opus-5" }]
+    const models: readonly FakeModel[] = [{ provider: "anthropic", id: "claude-opus-5-5" }]
 
     // when
     const snapshot = generations.observe({
-      omoConfig: { categories: { deep: { model: "anthropic/claude-opus-5", reasoningEffort: "high" } } },
+      omoConfig: { categories: { "deep-low": { model: "anthropic/claude-opus-5-5", reasoningEffort: "high" } } },
       registry: registry(models),
     })
 
     // then
-    expect(snapshot.categories["deep"]).toBe("custom/custom/high")
+    expect(snapshot.categories["deep-low"]).toBe("custom/custom/high")
   })
 
   test("#given an unresolvable target #when planned #then the planner error passes through untouched and no generation is recorded", () => {

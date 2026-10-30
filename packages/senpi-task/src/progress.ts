@@ -1,4 +1,5 @@
 import type { ManagedChildEvent } from "./manager/child-handle"
+import { HOST_TURN_RESUMED_EVENT, TASK_AWAITING_INPUT_EVENT } from "./manager/host-turn-resumed"
 import { createRunStatsTracker } from "./run-stats"
 import type { ResolvedModelRecord } from "./state"
 import { composeStatusLine, formatStatusTarget, taskIdentityLabel } from "./status-line"
@@ -12,6 +13,7 @@ export type ToolProgressDetails = {
   readonly currentTool?: string
   readonly lastAssistantLine?: string
   readonly turns: number
+  readonly failedTurns?: number
   readonly toolCalls?: number
   readonly tokens?: number
   readonly outputTokens?: number
@@ -42,6 +44,7 @@ export function createChildProgress(
   target: ChildProgressTarget,
   startedAt: number,
   now: () => number = Date.now,
+  options?: { readonly awaitingInput?: boolean },
 ): ChildProgress {
   const tracker = createRunStatsTracker(startedAt, now)
   let currentTool: string | undefined
@@ -50,6 +53,8 @@ export function createChildProgress(
   let resolvedModel = target.resolvedModel
   let model = target.model
   let fallbackCount = 0
+  let turnResumed = false
+  let awaitingInput = options?.awaitingInput === true
 
   const activity = (stats: ReturnType<typeof tracker.snapshot>): string =>
     composeStatusLine({
@@ -62,12 +67,20 @@ export function createChildProgress(
         fallbackCount,
       }),
       stats,
-      verb: currentTool === undefined ? "running" : `running ${currentTool}`,
+      verb: selectLiveActivityVerb({ tool: currentTool, turns: stats.turns, failedTurns: stats.failed_turns, turnResumed, awaitingInput }),
     })
 
   return {
     accept(event): boolean {
       const statsChanged = tracker.accept(event)
+      if (event.type === HOST_TURN_RESUMED_EVENT) {
+        turnResumed = true
+        return true
+      }
+      if (event.type === TASK_AWAITING_INPUT_EVENT) {
+        awaitingInput = true
+        return true
+      }
       if (event.type === "retry_fallback_applied" && event.to !== undefined) {
         resolvedModel = undefined
         model = event.to
@@ -98,6 +111,7 @@ export function createChildProgress(
         ...(currentTool === undefined ? {} : { currentTool }),
         ...(lastAssistantLine === undefined ? {} : { lastAssistantLine }),
         turns: stats.turns,
+        ...((stats.failed_turns ?? 0) > 0 ? { failedTurns: stats.failed_turns } : {}),
         toolCalls: stats.tool_calls,
         ...(lastTotalTokens === undefined ? {} : { tokens: lastTotalTokens }),
         ...(stats.output_tokens === undefined ? {} : { outputTokens: stats.output_tokens }),
@@ -110,13 +124,34 @@ export function createChildProgress(
   }
 }
 
+// The live-row verb for a child that has not settled: a tool in flight always leads ("running
+// <tool>"), and before the first successful assistant turn the row must not claim motion - it
+// reads "starting", or "retrying" once a failed assistant turn proved the child is alive. Only a
+// successful turn - or a turn a host reattach found in flight and resumed - earns the plain "running".
+// A reattach that flagged the resumed session waiting (senpi#3266) overrides the idle verbs: the
+// child cannot move on its own, so the row reads "resumed, waiting for input" until real motion
+// (a tool start, an assistant message) proves the waiting is over.
+export function selectLiveActivityVerb(input: {
+  readonly tool?: string
+  readonly turns: number
+  readonly failedTurns?: number
+  readonly turnResumed?: boolean
+  readonly awaitingInput?: boolean
+}): string {
+  if (input.tool !== undefined) return `running ${input.tool}`
+  if (input.turns > 0 || input.turnResumed === true) return "running"
+  if (input.awaitingInput === true) return "resumed, waiting for input"
+  if ((input.failedTurns ?? 0) > 0) return "retrying"
+  return "starting"
+}
+
 export function readToolProgressDetails(value: unknown): ToolProgressDetails | undefined {
   if (!isRecord(value) || !isRecord(value.progress)) return undefined
   if (typeof value.progress.activity !== "string" || typeof value.progress.startedAt !== "number") return undefined
   if (typeof value.childId !== "string" || typeof value.turns !== "number") return undefined
   if (value.currentTool !== undefined && typeof value.currentTool !== "string") return undefined
   if (value.lastAssistantLine !== undefined && typeof value.lastAssistantLine !== "string") return undefined
-  const optionalNumbers = [value.toolCalls, value.tokens, value.outputTokens, value.tokensPerSecond]
+  const optionalNumbers = [value.toolCalls, value.tokens, value.outputTokens, value.tokensPerSecond, value.failedTurns]
   if (optionalNumbers.some((entry) => entry !== undefined && typeof entry !== "number")) return undefined
   return value as ToolProgressDetails
 }

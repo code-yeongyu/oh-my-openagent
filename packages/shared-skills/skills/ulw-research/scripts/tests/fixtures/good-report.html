@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Static gate fixture: passing report</title>
+<style>
+:root { --bg: #f7f5f0; --fg: #1f1d1a; --accent: #2f6f4f; --rule: #d9d4c7; --mute: #6b665c; --ff: Pretendard, "Apple SD Gothic Neo", sans-serif; }
+@media (prefers-color-scheme: dark) { :root { --bg: #121110; --fg: #e8e4dc; --accent: #7fbf9f; } }
+body { background: var(--bg); color: var(--fg); font-family: var(--ff); word-break: keep-all; overflow-wrap: anywhere; }
+th, td { border-bottom: 1px solid var(--rule); }
+figcaption { color: var(--mute); }
+.card { background: #fff; }
+</style>
+</head>
+<body>
+<header><h1>소규모 팀의 배포 속도 비교</h1></header>
+<main>
+<section id="speed">
+<h2>배포 주기가 짧아진 이유 <svg class="mark" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12" stroke="#1f1d1a"/></svg></h2>
+<p>매출이 12.5% 증가했다 [S1]. 같은 기간 팀 규모는 그대로였어요.</p>
+<p>2019–2024 구간을 기준으로 비교했습니다.</p>
+<p>배포는 한 달에 48건이었어요 MEASURED.</p>
+<p data-lineage="DERIVED">평균 리드 타임은 3.2일로 계산했어요.</p>
+<p>리뷰 대기 시간은 40% 줄었습니다 <a href="#s3">[3]</a>.</p>
+<figure>
+<img src="assets/figure-1.svg" alt="월별 배포 건수" width="640" height="360">
+<figcaption>그림 1. 월별 배포 건수 [S1]</figcaption>
+</figure>
+<figure class="chart">
+<svg width="640" height="320" viewBox="0 0 640 320" role="img"><title>Monthly deploys</title><rect x="40" y="100" width="60" height="200" fill="#2f6f4f"/><text x="4" y="300" font-size="12">0</text><text x="4" y="200" font-size="12">25</text><text x="4" y="100" font-size="12">50</text><text x="300" y="316" font-size="12">Deploys per month</text></svg>
+<figcaption>월별 배포 추이 [S2]</figcaption>
+</figure>
+<table>
+<thead><tr><th>항목</th><th>상태</th></tr></thead>
+<tbody><tr><td>자동 배포</td><td>✓</td></tr><tr><td>수동 승인</td><td>—</td></tr></tbody>
+</table>
+</section>
+<section id="review">
+<h2>Review load moved to the author</h2>
+<p>Authors now merge their own changes after a green build, which the team describes as the main reason reviews stopped queueing behind one maintainer [S2].</p>
+</section>
+<section id="method">
+<h2>How this report was made</h2>
+<p>We read the public changelog and counted 147 entries by hand, then checked the totals against the team handbook.</p>
+</section>
+<section id="sources">
+<h2>Sources</h2>
+<ol>
+<li id="s1">Quarterly engineering review — internal summary, 2024</li>
+<li id="s2">Team handbook, deploy chapter</li>
+<li id="s3">Review queue dashboard export</li>
+</ol>
+</section>
+</main>
+<footer><p>Fixture for the static gate tests.</p></footer>
+</body>
+</html>

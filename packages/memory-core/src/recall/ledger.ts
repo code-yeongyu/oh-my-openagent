@@ -4,7 +4,7 @@
 // set) and writes are atomic .tmp -> rename at mode 0o600, following the
 // facts/soul durability conventions.
 
-import { mkdir, readFile, rename, writeFile } from "../fs/resilient"
+import { mkdir, readFile, rename, stat, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 export const RECALL_LEDGER_VERSION = 1
@@ -39,6 +39,39 @@ export function sanitizeSessionFilename(sessionId: string): string {
 
 const EMPTY_LEDGER: RecallLedgerFile = { version: RECALL_LEDGER_VERSION, surfaced: {} }
 
+/**
+ * Stat-gated parse cache keyed by session file path. Recall asks for the surfaced set on every
+ * prompt and every tool call (#8335), while the writers (kibitzer delivery, recall drain) live in
+ * this process and update the entry as they write. A cross-process writer is still observed: the
+ * cached (mtimeMs,size) is compared against a fresh stat before the parsed value is reused, and the
+ * cache is keyed by path so instances sharing a ledger directory share the entry.
+ */
+interface LedgerCacheEntry {
+  readonly mtimeMs: number
+  readonly size: number
+  readonly file: RecallLedgerFile
+}
+
+const LEDGER_CACHE = new Map<string, LedgerCacheEntry>()
+const MAX_CACHED_LEDGERS = 32
+
+let ledgerDiskReads = 0
+
+/** Diagnostic: session-ledger files parsed from disk since process start (asserted in tests). */
+export function recallLedgerDiskReads(): number {
+  return ledgerDiskReads
+}
+
+function rememberLedger(path: string, mtimeMs: number, size: number, file: RecallLedgerFile): void {
+  LEDGER_CACHE.delete(path)
+  LEDGER_CACHE.set(path, { mtimeMs, size, file })
+  while (LEDGER_CACHE.size > MAX_CACHED_LEDGERS) {
+    const oldest = LEDGER_CACHE.keys().next()
+    if (oldest.done === true) break
+    LEDGER_CACHE.delete(oldest.value)
+  }
+}
+
 export class RecallLedger {
   private readonly dir: string
 
@@ -64,12 +97,16 @@ export class RecallLedger {
     const target = this.sessionFilePath(sessionId)
     await mkdir(this.dir, { recursive: true, mode: 0o700 })
     const temporary = `${target}.tmp-${process.pid}`
-    await writeFile(
-      temporary,
-      `${JSON.stringify({ version: RECALL_LEDGER_VERSION, surfaced }, null, 2)}\n`,
-      { encoding: "utf8", mode: 0o600 },
-    )
+    const written: RecallLedgerFile = { version: RECALL_LEDGER_VERSION, surfaced }
+    await writeFile(temporary, `${JSON.stringify(written, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
     await rename(temporary, target)
+    // Own write: adopt the value just persisted so the next read skips the file entirely.
+    try {
+      const info = await stat(target)
+      rememberLedger(target, info.mtimeMs, info.size, written)
+    } catch {
+      LEDGER_CACHE.delete(target)
+    }
   }
 
   private sessionFilePath(sessionId: string): string {
@@ -77,19 +114,42 @@ export class RecallLedger {
   }
 
   private async read(sessionId: string): Promise<RecallLedgerFile> {
+    const target = this.sessionFilePath(sessionId)
+    let mtimeMs: number
+    let size: number
+    try {
+      const info = await stat(target)
+      mtimeMs = info.mtimeMs
+      size = info.size
+    } catch {
+      LEDGER_CACHE.delete(target)
+      return EMPTY_LEDGER
+    }
+    const cached = LEDGER_CACHE.get(target)
+    if (cached !== undefined && cached.mtimeMs === mtimeMs && cached.size === size) return cached.file
+
+    // The stat is taken BEFORE the read: a write landing in between yields content newer than the
+    // recorded stat, which the next stat comparison re-reads. The reverse order would cache stale
+    // content under the new stat and never notice.
     let raw: string
     try {
-      raw = await readFile(this.sessionFilePath(sessionId), "utf8")
+      ledgerDiskReads += 1
+      raw = await readFile(target, "utf8")
     } catch {
+      LEDGER_CACHE.delete(target)
       return EMPTY_LEDGER
     }
     let parsed: unknown
     try {
       parsed = JSON.parse(raw)
     } catch {
-      return EMPTY_LEDGER
+      const empty = EMPTY_LEDGER
+      rememberLedger(target, mtimeMs, size, empty)
+      return empty
     }
-    return parseLedgerFile(parsed) ?? EMPTY_LEDGER
+    const file = parseLedgerFile(parsed) ?? EMPTY_LEDGER
+    rememberLedger(target, mtimeMs, size, file)
+    return file
   }
 }
 

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Tool Guard tier hook. Runs after `write`/`edit` tools to detect AI-generated comment patterns in code and block them before they land. Backed by `@code-yeongyu/comment-checker` binary (trusted dependency).
+Tool Guard tier hook. Runs after `write`/`edit` tools to detect AI-generated comment patterns in code and block them before they land. Backed by the comment-checker binary downloaded from the pinned GitHub release on first use; no npm dependency or lifecycle-script trust is required.
 
 ## WHAT IT BLOCKS
 
@@ -37,7 +37,7 @@ tool.execute.after (same callID, or apply_patch)
 | `hook.ts` | `createCommentCheckerHooks()`: main factory. `tool.execute.before` registers pending calls; `tool.execute.after` runs the CLI check. Accepts an optional `cliRunner` for dependency injection (defaults to `cli-runner.ts` exports) |
 | `cli-runner.ts` | CLI orchestration: resolve path, `processWithCli` / `processApplyPatchEditsWithCli`, per-session dedup, run lock |
 | `cli.ts` | Resolve `comment-checker` binary path (node_modules / PATH / cached download), spawn `runCommentChecker` |
-| `downloader.ts` | Download + cache the binary (`getCachedBinaryPath`, `ensureCommentCheckerBinary`) |
+| `downloader.ts` | Own `COMMENT_CHECKER_VERSION`; download + cache the matching host-platform release (`getCachedBinaryPath`, `ensureCommentCheckerBinary`) |
 | `initialization-gate.ts` | `ensureCommentCheckerInitialization()`: run CLI init once |
 | `pending-calls.ts` | Pending-call registry between `tool.execute.before` and `after` (TTL cleanup) |
 | `types.ts` | `PendingCall` and config types |
@@ -63,4 +63,4 @@ Prefix with `// @allow` or mark file scope with `// comment-checker-disable-file
 ## RELATED
 
 - Doctor check: `src/cli/doctor/checks/tools.ts` verifies `comment-checker` binary availability
-- Postinstall: `postinstall.mjs` downloads binary if missing
+- Lazy initialization: first tool hook invocation downloads the binary if missing; unavailable downloads preserve graceful disabling for that process.

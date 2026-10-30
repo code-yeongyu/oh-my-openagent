@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -21,7 +21,7 @@ import * as taskComponentModule from "./index"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
-const TASK_TOOL_NAMES = ["task", "task_send", "task_cancel", "task_output", "workflow"]
+const TASK_TOOL_NAMES = ["task", "task_send", "task_cancel", "task_output", "workflow", "workpool"]
 const TEAM_TOOL_NAMES = [
   "team_create",
   "team_delete",
@@ -32,8 +32,11 @@ const TEAM_TOOL_NAMES = [
 ]
 const ALL_TOOL_NAMES = [...TASK_TOOL_NAMES, ...TEAM_TOOL_NAMES]
 const TASK_EVENTS = [
+  "context",
   "session_start",
+  "session_hold_changed",
   "session_before_reload",
+  "session_resumed",
   "session_before_switch",
   "session_before_compact",
   "session_compact",
@@ -42,8 +45,8 @@ const TASK_EVENTS = [
   "before_agent_start",
   "agent_end",
 ]
-const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_shutdown"]
-const DAG_LIFECYCLE_EVENTS = ["session_start", "session_before_switch", "session_shutdown", "session_shutdown"]
+const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_start", "session_shutdown"]
+const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "session_shutdown"]
 const TASK_COMMANDS = ["dag", "task-kill", "tasks"]
 
 interface RecordedLog {
@@ -91,7 +94,7 @@ function fakeUi(): CapturedUi {
   }
 }
 
-const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, dispose: () => {} }
+const noopStatusUi = { scheduleSync: () => {}, syncNow: () => {}, observeRecord: () => {}, dispose: () => {} }
 const noopResumptionChannels = {
   emitSessionStart: () => Promise.resolve(),
   emitShutdown: () => Promise.resolve(),
@@ -99,7 +102,7 @@ const noopResumptionChannels = {
 
 // Build the real engine and wire its event bridge over a fake ExtensionAPI so tests can drive the
 // registered handlers and observe the captured-ui bridge (todo 18: cleared on switch/shutdown).
-function wiredBridge(): {
+function wiredBridge(onRecovered: () => void = () => {}): {
   pi: FakeExtensionAPI
   engine: ReturnType<typeof composeTaskEngine>
   reconcileCalls: { count: number }
@@ -120,6 +123,7 @@ function wiredBridge(): {
     leadPollers: {
       tick: () => {
         leadCalls.ticks += 1
+        onRecovered()
         return Promise.resolve()
       },
       shutdown: () => { leadCalls.shutdowns += 1 },
@@ -169,6 +173,18 @@ function toolNames(pi: FakeExtensionAPI): string[] {
 }
 
 describe("omo-senpi task component wiring", () => {
+  it("#given an empty project #when the task component registers and the session starts without task activity #then no state directory is created", async () => {
+    const project = tempProject()
+    const pi = new FakeExtensionAPI()
+    const logger = createLogger()
+
+    await createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+    expect(readdirSync(project)).toEqual([])
+
+    await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, {})
+    expect(readdirSync(project)).toEqual([])
+  })
+
   it("#given an explicit team member process #when the task component registers #then no lead task surface is wired", async () => {
     // given
     const previousMember = process.env.SENPI_TASK_MEMBER
@@ -211,9 +227,14 @@ describe("omo-senpi task component wiring", () => {
     ])
     // exactly the task event handlers (session lifecycle + transition-buffer edges), the
     // skill-invocation tracker subscriptions feeding the plan-gated agent gate, plus the
-    // unconditional T16 hygiene sweep handler, which registers its own session_start listener
+    // unconditional T16 hygiene sweep handler, which registers its own session_start listener,
+    // plus the workpool aggregate attach-recovery listener (registerWorkpoolTool session_start
+    // → workpools.attach, which rolls back accepted-without-ack and flushes on boot), plus the
+    // host pre-warm's session_start (revival) plus its default `first-turn` edges (input, before_agent_start);
+    // the pre-warm registers nothing on win32, where task children never use a host
+    const prewarmEvents = process.platform === "win32" ? [] : ["session_start", "input", "before_agent_start"]
     expect(pi.handlers.map((handler) => handler.event).sort()).toEqual(
-      [...TASK_EVENTS, ...SKILL_INVOCATION_TRACKER_EVENTS, ...DAG_LIFECYCLE_EVENTS, "session_start"].sort(),
+      [...TASK_EVENTS, ...SKILL_INVOCATION_TRACKER_EVENTS, ...DAG_LIFECYCLE_EVENTS, "session_start", "session_shutdown", "session_start", ...prewarmEvents].sort(),
     )
   })
 
@@ -224,18 +245,22 @@ describe("omo-senpi task component wiring", () => {
     const wireDagLifecycle = Reflect.get(taskComponentModule, "wireDagLifecycle")
     expect(typeof wireDagLifecycle).toBe("function")
     if (typeof wireDagLifecycle !== "function") return
-    wireDagLifecycle(pi, {
+    const wired = wireDagLifecycle(pi, {
       attach: async () => { order.push("dag-resume") },
-      detach: () => undefined,
-      pauseForShutdown: () => { order.push("dag-pause") },
+      detach: () => { order.push("dag-detach") },
+      pauseForShutdown: async () => { order.push("dag-pause") },
       dispose: () => { order.push("dag-dispose") },
     }, () => {
       pi.on("session_start", () => { order.push("task-reconcile") })
       pi.on("session_shutdown", () => { order.push("task-suspend") })
+      return { afterSessionStartReconcile: () => Promise.resolve(true) }
     })
 
     // when
     await pi.dispatch("session_start", {})
+    await wired.lastAttach()
+    await pi.dispatch("session_before_switch", { reason: "resume" })
+    expect(order).toEqual(["task-reconcile", "dag-resume"])
     await pi.dispatch("session_shutdown", {})
 
     // then
@@ -243,6 +268,7 @@ describe("omo-senpi task component wiring", () => {
       "task-reconcile",
       "dag-resume",
       "dag-pause",
+      "dag-detach",
       "task-suspend",
       "dag-dispose",
     ])
@@ -315,12 +341,16 @@ describe("omo-senpi task component wiring", () => {
 
   it("#given a wired bridge #when session_start fires repeatedly #then the team mailbox is reconciled on every start", async () => {
     // given
-    const { pi, reconcileCalls, leadCalls } = wiredBridge()
+    const [first, second] = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+    let completed = 0
+    const { pi, reconcileCalls, leadCalls } = wiredBridge(() => [first, second][completed++]?.resolve())
     const liveCtx = { ui: fakeUi(), mode: "tui", sessionManager: { getSessionId: () => "session-a" } }
 
     // when the session starts twice
     await pi.dispatch("session_start", {}, liveCtx)
+    await first.promise
     await pi.dispatch("session_start", {}, liveCtx)
+    await second.promise
 
     // then
     expect(reconcileCalls.count).toBe(2)
@@ -334,6 +364,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
     const base = composeTaskEngine({ pi, omoConfig: loadOmoConfig({ cwd }).config, cwd, sharedParentTools: () => [] })
     const order: string[] = []
+    const recovered = Promise.withResolvers<void>()
     const engine: TaskEngine = {
       ...base,
       lifecycle: {
@@ -361,6 +392,7 @@ describe("omo-senpi task component wiring", () => {
       leadPollers: {
         tick: () => {
           order.push("poll")
+          recovered.resolve()
           return Promise.resolve()
         },
         shutdown: () => undefined,
@@ -374,12 +406,14 @@ describe("omo-senpi task component wiring", () => {
       mode: "tui",
       sessionManager: { getSessionId: () => "session-a" },
     })
+    await recovered.promise
 
     // then
     expect(order).toEqual(["reattach:session-a", "reclaim", "notify", "cleanup", "poll"])
   })
 
   it("#given a terminal member owned by lead A #when lead B reconciles then lead A reconciles #then only the owning lead receives replay", async () => {
+    let recovered = Promise.withResolvers<void>()
     const cwd = tempProject()
     const teamRunId = await seedTeamRuntime(cwd, "lead-a")
     const terminal = terminalRecord(teamRunId)
@@ -402,23 +436,27 @@ describe("omo-senpi task component wiring", () => {
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
     wireEventBridge(pi, ctxFor(pi, logger), engine, noopStatusUi, transitions, {
       reconcileTeamMailbox: () => Promise.resolve(),
-      leadPollers: { tick: () => Promise.resolve(), shutdown: () => undefined },
+      leadPollers: { tick: async () => { recovered.resolve() }, shutdown: () => undefined },
       resumptionChannels: noopResumptionChannels,
     })
 
     await pi.dispatch("session_start", {}, {
       sessionManager: { getSessionId: () => "lead-b" },
     })
+    await recovered.promise
     expect(pi.messages).toEqual([])
 
+    recovered = Promise.withResolvers<void>()
     await pi.dispatch("session_start", {}, {
       sessionManager: { getSessionId: () => "lead-a" },
     })
+    await recovered.promise
     expect(pi.messages).toHaveLength(1)
     expect(pi.messages[0]?.message.customType).toBe("senpi-task.team-member-liveness")
   })
 
   it("#given a liveness send before host persistence #when the process crashes and restarts #then no early ack suppresses replay and agent_end later commits the exact persisted marker", async () => {
+    const recovered = Promise.withResolvers<void>()
     const cwd = tempProject()
     const teamRunId = await seedTeamRuntime(cwd, "lead-session")
     const terminal = terminalRecord(teamRunId)
@@ -461,7 +499,7 @@ describe("omo-senpi task component wiring", () => {
     const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
     wireEventBridge(replayPi, ctxFor(replayPi, logger), engine, noopStatusUi, transitions, {
       reconcileTeamMailbox: () => Promise.resolve(),
-      leadPollers: { tick: () => Promise.resolve(), shutdown: () => undefined },
+      leadPollers: { tick: async () => { recovered.resolve() }, shutdown: () => undefined },
       resumptionChannels: noopResumptionChannels,
     })
     const sessionFile = join(cwd, "lead-session.jsonl")
@@ -473,6 +511,7 @@ describe("omo-senpi task component wiring", () => {
     }
 
     await replayPi.dispatch("session_start", {}, liveContext)
+    await recovered.promise
     expect(replayPi.messages).toHaveLength(1)
     expect(store.load(terminal.task_id)?.notification.liveness_notified_epoch).toBeUndefined()
 

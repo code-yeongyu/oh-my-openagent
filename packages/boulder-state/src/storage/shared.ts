@@ -17,6 +17,23 @@ export function normalizeSessionId(sessionId: string, platform: SessionPlatform 
   return `${platform}:${sessionId}`
 }
 
+export function stripSessionPlatform(sessionId: string): string {
+  return sessionId.replace(SESSION_ID_PREFIX_PATTERN, "")
+}
+
+/**
+ * A work the stale reconcile demoted returns to `active` the moment a session resumes it; a work
+ * paused any other way (no `stale_since`) keeps its status.
+ */
+export function restoreDemotedWork(work: BoulderWorkState): BoulderWorkState {
+  if (work.status !== "paused" || work.stale_since === undefined) {
+    return work
+  }
+
+  const { stale_since: _staleSince, ...restored } = work
+  return { ...restored, status: "active" }
+}
+
 export function nowIsoString(): string {
   return new Date().toISOString()
 }

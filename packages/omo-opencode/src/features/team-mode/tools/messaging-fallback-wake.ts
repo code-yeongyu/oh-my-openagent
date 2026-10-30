@@ -10,6 +10,7 @@ import { readUnreadMessageById } from "@oh-my-opencode/team-core/team-mailbox/in
 import { loadRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
 import type { RuntimeState } from "@oh-my-opencode/team-core/types"
 import type { LiveDeliveryClient } from "./messaging-live-delivery-client"
+import type { TeamSendMessageDispatchTiming } from "./messaging-runtime"
 
 type RuntimeMember = RuntimeState["members"][number]
 
@@ -22,6 +23,7 @@ export async function enqueueFallbackMailboxWake(input: {
   readonly recipientName: string
   readonly messageId: string
   readonly config: TeamModeConfig
+  readonly dispatchTiming?: TeamSendMessageDispatchTiming
 }): Promise<void> {
   const promptResult = await dispatchInternalPrompt({
     mode: "async",
@@ -31,6 +33,9 @@ export async function enqueueFallbackMailboxWake(input: {
     dedupeKey: `team-live-delivery-fallback:${input.messageId}`,
     queueBehavior: "enqueue",
     durableRetry: true,
+    settleMs: input.dispatchTiming?.fallbackWakeSettleMs,
+    postDispatchHoldMs: input.dispatchTiming?.postDispatchHoldMs,
+    queueRetryMs: input.dispatchTiming?.queueRetryMs,
     shouldDispatch: () => shouldDispatchFallbackMailboxWake(input),
     retryDispatchFailure: isPreSendConnectionFailure,
     input: {

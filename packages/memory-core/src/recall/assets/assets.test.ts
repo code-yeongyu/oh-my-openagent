@@ -2,16 +2,16 @@ import { describe, expect, it } from "bun:test"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { loadMemorianPersona } from "./assets"
+import { loadKibitzerPersona } from "./assets"
 
-describe("memorian persona asset", () => {
+describe("kibitzer persona asset", () => {
   it("#given the source asset #when loaded through assets.ts #then it equals the real file and is non-empty", () => {
     // given
     const here = dirname(fileURLToPath(import.meta.url))
-    const source = readFileSync(join(here, "memorian-persona.md"), "utf8")
+    const source = readFileSync(join(here, "kibitzer-persona.md"), "utf8")
 
     // when
-    const loaded = loadMemorianPersona()
+    const loaded = loadKibitzerPersona()
 
     // then
     expect(loaded).toBe(source)

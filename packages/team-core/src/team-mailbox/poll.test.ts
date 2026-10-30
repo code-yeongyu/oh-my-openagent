@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { rmSync } from "node:fs"
 import { readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -20,6 +21,7 @@ function createConfig(baseDir: string) {
 
 async function setupRuntime(memberNames: string[]): Promise<{ teamRunId: string; config: ReturnType<typeof createConfig> }> {
   const baseDir = path.join(tmpdir(), `team-mailbox-poll-${randomUUID()}`)
+  onTestFinished(() => rmSync(baseDir, { recursive: true, force: true }))
   const config = createConfig(baseDir)
   const spec = {
     version: 1,

@@ -1,35 +1,45 @@
 import type { OmoGitMasterSettings } from "@oh-my-opencode/omo-config-core"
-
-export const SISYPHUS_CO_AUTHOR_TRAILER =
-  "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+import {
+  CO_AUTHOR_TRAILER_INSTRUCTION,
+  NO_CO_AUTHOR_INSTRUCTION,
+  buildAttributedCommitExample,
+} from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/git-master-template-injection"
 
 export const DEFAULT_COMMIT_FOOTER =
   "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)"
 
-export function buildGitMasterAttributionDirective(settings: OmoGitMasterSettings): string | undefined {
+export const COMMIT_ATTRIBUTION_OPEN_TAG = "<commit_attribution>"
+
+/**
+ * Commit attribution: the `Co-authored-by: sisyphus-dev-ai` trailer is on by default
+ * (`include_co_authored_by`) and the body footer is opt-in (`commit_footer`). Author and
+ * committer stay the operator's own git identity. Returns `undefined` when both are off.
+ */
+export function buildGitMasterAttributionDirective(
+  settings: OmoGitMasterSettings,
+  gitCommandPrefix = "",
+): string | undefined {
   const footerText = resolveFooterText(settings.commit_footer)
   const includeCoAuthor = settings.include_co_authored_by
   if (footerText === undefined && !includeCoAuthor) return undefined
 
-  const attributions: string[] = []
-  if (footerText !== undefined) attributions.push(`**Footer in the commit body:** ${footerText}`)
-  if (includeCoAuthor) attributions.push(`**Co-authored-by trailer:** ${SISYPHUS_CO_AUTHOR_TRAILER}`)
-
-  const exampleParts = [`git commit -m "{Commit Message}"`]
-  if (footerText !== undefined) exampleParts.push(`-m "${footerText}"`)
-  if (includeCoAuthor) exampleParts.push(`-m "${SISYPHUS_CO_AUTHOR_TRAILER}"`)
+  const footerStep = footerText === undefined ? [] : [`1. **Footer in the commit body:** ${footerText}`, ""]
+  const coAuthorStep = includeCoAuthor
+    ? `${footerText === undefined ? 1 : 2}. ${CO_AUTHOR_TRAILER_INSTRUCTION}`
+    : NO_CO_AUTHOR_INSTRUCTION
 
   return [
-    "<commit_attribution>",
-    "## Commit Footer & Co-Author (MANDATORY)",
+    COMMIT_ATTRIBUTION_OPEN_TAG,
+    "## Commit Attribution (MANDATORY)",
     "",
     "Add omo attribution to EVERY commit you create:",
     "",
-    ...attributions.map((attribution, index) => `${index + 1}. ${attribution}`),
+    ...footerStep,
+    coAuthorStep,
     "",
     "**Example:**",
     "```bash",
-    exampleParts.join(" "),
+    buildAttributedCommitExample(gitCommandPrefix, footerText, includeCoAuthor),
     "```",
     "</commit_attribution>",
   ].join("\n")

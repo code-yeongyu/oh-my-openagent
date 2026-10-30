@@ -18,14 +18,13 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	// when
 	const lspServer = mcp.mcpServers.lsp;
 	const gitBashServer = mcp.mcpServers.git_bash;
-	const codegraphServer = mcp.mcpServers.codegraph;
 	const codeMcpNames = Object.keys(mcp.mcpServers)
-		.filter((name) => name === "lsp" || name === "git_bash" || name === "codegraph")
+		.filter((name) => name === "lsp" || name === "git_bash")
 		.sort();
 	const componentLocalMcpSources = lspSources.filter((name) => name.startsWith("lazy-mcp") || name === "lazy-lsp-mcp.ts");
 
 	// then
-	assert.deepEqual(codeMcpNames, ["codegraph", "git_bash", "lsp"]);
+	assert.deepEqual(codeMcpNames, ["git_bash", "lsp"]);
 	assert.equal(packageJson.workspaces.includes("components/lsp/packages/lsp-tools-mcp"), false);
 	assert.deepEqual(packageJson.dependencies, { "@oh-my-opencode/shared-skills": "file:../../shared-skills" });
 	assert.doesNotMatch(bundledMcpBuildScript, new RegExp(["ast", "grep", "mcp"].join("-")));
@@ -38,10 +37,6 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	assert.equal(gitBashServer.command, "node");
 	assert.deepEqual(gitBashServer.args, ["../../git-bash-mcp/dist/cli.js", "mcp"]);
 	assert.equal(gitBashServer.cwd, ".");
-	assert.equal(codegraphServer.command, "node");
-	assert.deepEqual(codegraphServer.args, ["components/codegraph/dist/serve.js"]);
-	assert.equal(codegraphServer.cwd, ".");
-	assert.equal(codegraphServer.required, false);
 	assert.deepEqual(componentLocalMcpSources, []);
 });
 

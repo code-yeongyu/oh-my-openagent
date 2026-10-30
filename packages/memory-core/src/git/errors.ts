@@ -23,6 +23,12 @@ export class GitTimeoutError extends GitError {
   }
 }
 
+export class GitAbortedError extends GitError {
+  constructor(readonly argv: readonly string[]) {
+    super(`git ${argv.join(" ")} was cancelled`)
+  }
+}
+
 export class GitNotFoundError extends GitError {
   constructor(options?: ErrorOptions) {
     super("Git is required for memory storage but was not found on PATH.", options)

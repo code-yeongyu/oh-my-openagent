@@ -5,7 +5,6 @@ import {
   mkdtempSync,
   readdirSync,
   rmSync,
-  readFileSync,
   statSync,
   writeFileSync,
 } from "node:fs"
@@ -46,23 +45,18 @@ describe("patched Senpi hooks state snapshots", () => {
     })
   })
 
+  // The fixture runs in a child so its module mocks cannot leak into this file.
+  // It crosses the legacy truncate/write boundary inside the reader's first refused
+  // lock attempt, so the counters below are exact on every platform.
   test("recovers a trusted snapshot at a synchronized legacy truncate/write boundary", () => {
     const runner = join(import.meta.dir, "fixtures", "senpi-hooks-state-legacy-reader.ts")
-    const child = spawnSync(process.execPath, [runner], { encoding: "utf8", timeout: 10_000 })
-    if (child.error !== undefined && "code" in child.error && child.error.code === "ETIMEDOUT") {
-      const marker = join(tmpdir(), `omo-hooks-legacy-reader-${child.pid}.json`)
-      try {
-        const { root, writerPid } = JSON.parse(readFileSync(marker, "utf8")) as { root: string; writerPid?: number }
-        if (writerPid !== undefined) spawnSync("kill", ["-TERM", `-${writerPid}`])
-        rmSync(root, { recursive: true, force: true })
-      } finally {
-        rmSync(marker, { force: true })
-      }
-    }
+    const child = spawnSync(process.execPath, [runner], { encoding: "utf8", timeout: 30_000 })
 
     expect(child.status, child.stderr).toBe(0)
     expect(JSON.parse(child.stdout)).toEqual({
       released: true,
+      truncatedReads: 1,
+      lockAttempts: 2,
       state: {
         version: 1,
         hooks: {

@@ -21,16 +21,20 @@ describe("public client package surface", () => {
 		expect(packageJson.exports?.["./dist/cli.js"]).toBeUndefined();
 	});
 
-	it("#given the client source #when reviewing public exports #then server proxy ownership and lock internals stay private", () => {
-		expect(clientSource).toContain("callToolViaDaemon");
-		expect(clientSource).toContain("callDiagnosticsViaDaemon");
-		expect(clientSource).toContain("callFormatViaDaemon");
-		expect(clientSource).toContain("OMO_LSP_DAEMON_CLI");
-		expect(clientSource).not.toContain("runMcpStdioProxy");
-		expect(clientSource).not.toContain("startDaemonServer");
-		expect(clientSource).not.toContain("ensureDaemonRunning");
-		expect(clientSource).not.toContain("daemonPaths");
-		expect(clientSource).not.toContain("disposeDefaultLspManager");
+	it("#given the client module #when its runtime exports are listed #then server proxy ownership and lock internals stay private", async () => {
+		const exported = Object.keys(await import("../src/client.js")).sort();
+		expect(exported).toEqual([
+			"InvalidRuntimeOverrideError",
+			"OMO_LSP_DAEMON_CLI",
+			"OMO_LSP_DAEMON_DIR",
+			"OMO_LSP_DAEMON_VERSION",
+			"callDiagnosticsViaDaemon",
+			"callFormatViaDaemon",
+			"callToolViaDaemon",
+			"currentRequestContext",
+			"resolveDaemonRuntime",
+			"validateDaemonVersion",
+		]);
 	});
 
 	it("#given the public format entry point #when a caller omits context #then rejection happens before daemon dispatch", async () => {

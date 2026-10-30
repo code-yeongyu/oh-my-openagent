@@ -17,7 +17,7 @@ describe("memory tool execution", () => {
     // given
     const fixture = await boundFixture()
     await seedFile(fixture, "system/human/prefs/coding.md", "Use broad abstractions")
-    const [, applyPatchTool] = createMemoryTools(() => fixture.context)
+    const [applyPatchTool] = createMemoryTools(() => fixture.context)
     const input = [
       "*** Begin Patch",
       "*** Update File: system/human/prefs/coding.md",
@@ -28,11 +28,11 @@ describe("memory tool execution", () => {
     ].join("\n")
 
     // when
-    const result = await applyPatchTool.execute("call-1", { reason: "Refine coding preferences", input })
+    const result = await applyPatchTool.execute("call-1", { command: "apply_patch", reason: "Refine coding preferences", input })
 
     // then
     expect(result.isError).toBeUndefined()
-    expect(textOf(result)).toMatch(/^memory_apply_patch committed locally \([0-9a-f]{7}\)\.$/)
+    expect(textOf(result)).toMatch(/^Memory apply_patch committed locally \([0-9a-f]{7}\)\.$/)
     const written = parseMemoryFile(await readFile(join(fixture.repo.dir, "system/human/prefs/coding.md"), "utf8"))
     expect(written.body).toContain("Prefer small focused helpers")
     expect(await git(fixture.repo, ["log", "-1", "--format=%s"])).toBe("Refine coding preferences")
@@ -40,14 +40,14 @@ describe("memory tool execution", () => {
   test("#given a bound identity #when memory_apply_patch receives a malformed patch #then the parse error maps to an error result", async () => {
     // given
     const fixture = await boundFixture()
-    const [, applyPatchTool] = createMemoryTools(() => fixture.context)
+    const [applyPatchTool] = createMemoryTools(() => fixture.context)
 
     // when
-    const result = await applyPatchTool.execute("call-1", { reason: "Broken", input: "definitely not a patch" })
+    const result = await applyPatchTool.execute("call-1", { command: "apply_patch", reason: "Broken", input: "definitely not a patch" })
 
     // then
     expect(result.isError).toBe(true)
-    expect(textOf(result)).toContain("memory_apply_patch:")
+    expect(textOf(result)).toContain("memory: memory apply_patch:")
   })
 })
 
@@ -57,7 +57,7 @@ describe("memory tool onCommit seam", () => {
     const fixture = await boundFixture()
     await seedFile(fixture, "system/identity.md", "- Name: Ada")
     const commits: Array<{ sha: string; subject: string; affectedPaths: readonly string[] }> = []
-    const [, applyPatchTool] = createMemoryTools(() => fixture.context, {
+    const [applyPatchTool] = createMemoryTools(() => fixture.context, {
       onCommit: (commit) => commits.push(commit),
     })
     const input = [
@@ -70,7 +70,7 @@ describe("memory tool onCommit seam", () => {
     ].join("\n")
 
     // when
-    const result = await applyPatchTool.execute("call-2", { reason: "rename", input })
+    const result = await applyPatchTool.execute("call-2", { command: "apply_patch", reason: "rename", input })
 
     // then
     expect(result.isError).toBeUndefined()

@@ -1,0 +1,33 @@
+[package]
+name = "senpi-desktop-backend-macos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics.workspace = true
+foreign-types.workspace = true
+image.workspace = true
+libc.workspace = true
+objc2.workspace = true
+objc2-app-kit.workspace = true
+objc2-application-services.workspace = true
+objc2-core-foundation.workspace = true
+objc2-core-graphics.workspace = true
+objc2-foundation.workspace = true
+objc2-screen-capture-kit.workspace = true
+block2.workspace = true
+parking_lot.workspace = true
+senpi-desktop-core = { path = "../senpi-desktop-core", features = ["system-clipboard"] }
+senpi-desktop-safety = { path = "../senpi-desktop-safety" }
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+xcap.workspace = true
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+# Tests inject a recording fatal exit; only dev builds enable this feature.
+senpi-desktop-safety = { path = "../senpi-desktop-safety", features = ["test-support"] }

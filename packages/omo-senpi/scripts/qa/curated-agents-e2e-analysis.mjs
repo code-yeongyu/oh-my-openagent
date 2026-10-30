@@ -76,7 +76,7 @@ export function analyzeCuratedAgentRun(input) {
 		),
 		unknown_target_agents: verdict(
 			parentOutput.includes(
-				"Available agents: explore, librarian, metis, momus.",
+				"Available agents: explore, librarian, omo-native-code-reviewer, omo-native-gate-reviewer, omo-native-qa-executor, plan-consultant, plan-reviewer.",
 			),
 		),
 		unknown_target_categories: verdict(

@@ -35,6 +35,10 @@ let val = map.get("key").unwrap();
 let val = map.get("key").context("missing 'key' in config")?;
 ```
 
+The one exception is a failure that can only mean a bug in this crate (a proven invariant): `.expect("<the invariant>")` behind `#[expect(clippy::expect_used, reason = "<why it cannot fail>")]` on that statement. Clippy's `expect_used` deny and `scripts/rust/check-no-excuse-rules.sh` both honor exactly that form.
+
+**Discarding is handling too.** `let _ = fallible();` and `.ok();` that drop an error are forbidden (`let_underscore_must_use`). A best-effort call (cleanup in `Drop`, a rollback on an error path) logs the error it cannot return.
+
 Typed errors for libraries ([thiserror](https://docs.rs/thiserror)), ad-hoc errors for binaries ([anyhow](https://docs.rs/anyhow) / [color-eyre](https://docs.rs/color-eyre)). Full stack → [libraries.md](libraries.md).
 
 ### 2. No `unsafe` Without Miri Proof
@@ -73,30 +77,31 @@ fn process(input: &str) -> Cow<'_, str> { ... }
 fn process(input: &[u8], output: &mut [u8]) -> usize { ... }
 ```
 
-### 4. Compile-Time First — const fn Everything Const-Eligible
+### 4. Compile-Time First — Compute What Is Known at Build Time
 
-If a function CAN be `const fn`, it MUST be `const fn`. Full recipes → [zero-cost-safety.md §2](zero-cost-safety.md).
+Lookup tables, size assertions, and buffer sizes are computed at compile time. A function is `const fn` when a `const` context needs it or it is trivially const-eligible; never contort runtime logic to be const. Full recipes → [zero-cost-safety.md §2](zero-cost-safety.md).
 
 ```rust
 // Lookup tables computed at compile time — zero runtime cost
+#[expect(clippy::indexing_slicing, reason = "const evaluation: an out-of-bounds index is a compile error")]
 const CRC_TABLE: [u32; 256] = {
     let mut table = [0u32; 256];
-    let mut i = 0;
+    let mut i: u32 = 0;
     while i < 256 {
-        let mut crc = i as u32;
+        let mut crc = i;
         let mut j = 0;
         while j < 8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB88320 } else { crc >> 1 };
+            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
             j += 1;
         }
-        table[i] = crc;
+        table[i as usize] = crc; // u32 -> usize widens: the one cast `const` allows
         i += 1;
     }
     table
 };
 
 // Compile-time assertions — catch violations at build time, not runtime
-const { assert!(std::mem::size_of::<Header>() == 12, "Header must be 12 bytes") };
+const _: () = assert!(std::mem::size_of::<Header>() == 12, "Header must be 12 bytes");
 ```
 
 Use `const generics` for stack-allocated buffers with compile-time size:
@@ -119,7 +124,11 @@ use scopeguard::guard;
 fn deploy(artifact: &Path) -> Result<(), DeployError> {
     let backup = snapshot_current()?;
     // errdefer: restore on failure
-    let rollback = guard(backup, |b| { let _ = restore(&b); });
+    let rollback = guard(backup, |b| {
+        if let Err(error) = restore(&b) {
+            tracing::error!(%error, "rollback failed");
+        }
+    });
 
     upload(artifact)?;
     health_check()?;
@@ -185,6 +194,21 @@ impl Order<Validated> {
 // Order<Draft> has no .pay() method. Compiler enforces the workflow.
 ```
 
+### 9. Numbers State What Overflow and Conversion Mean
+
+`+` panics in debug and wraps in release: it states nothing. Pick the operation that says what the domain wants, and convert through the trait that says whether it can fail.
+
+```rust
+let total = a.checked_add(b).ok_or(Error::Overflow)?; // overflow is an error
+let level = volume.saturating_add(step);              // clamp at the bound
+let slot = seq.wrapping_add(1) % RING;                // modular by design
+let wide = u64::from(small);                          // lossless: From
+let port = u16::try_from(raw).map_err(|_| Error::Port(raw))?; // lossy: TryFrom
+scores.sort_by(f64::total_cmp);                        // NaN-safe total order
+```
+
+Never `as` for numeric conversion (the only exception is a lossless widening inside `const`, where `From` is unavailable; see [zero-cost-safety.md §2](zero-cost-safety.md)). Compare floats with an explicit tolerance chosen by the domain, never `==`. A value that can never be zero is `NonZeroU32` (and `Option<NonZeroU32>` costs no extra space).
+
 ---
 
 ## Standard Library Defaults
@@ -217,7 +241,7 @@ Every new project gets the strict lint config from [cargo-strict.md](cargo-stric
 ```bash
 cargo fmt --all -- --check && \
 cargo clippy --all-targets --all-features -- -D warnings && \
-cargo nextest run && \
+cargo nextest run && cargo test --doc && \
 cargo +nightly miri nextest run  # when unsafe is involved
 ```
 
@@ -231,19 +255,21 @@ Run through this list after writing any Rust code. Every item links to its recip
 |---|---|---|
 | 1 | Every function signature prefers `&[T]`/`&str`/`Cow` over owned types | [zero-cost-safety.md §3](zero-cost-safety.md) |
 | 2 | Hot-path allocations use arena (`bumpalo`) not scattered `Box`/`Vec` | [zero-cost-safety.md §1](zero-cost-safety.md) |
-| 3 | Const-eligible functions are `const fn` | [zero-cost-safety.md §2](zero-cost-safety.md) |
-| 4 | Lookup tables / config constants computed at compile time | [zero-cost-safety.md §2](zero-cost-safety.md) |
+| 3 | Values known at build time (tables, size asserts, buffer sizes) are computed at compile time | [zero-cost-safety.md §2](zero-cost-safety.md) |
+| 4 | Arithmetic states its overflow intent; numeric conversions use `From`/`TryFrom` | This file §9 |
 | 5 | Binary format parsing uses `zerocopy`, not `transmute` | [zero-cost-safety.md §4](zero-cost-safety.md) |
 | 6 | Cleanup logic uses `scopeguard` or `Drop`, never manual `if err` cleanup | [zero-cost-safety.md §5](zero-cost-safety.md) |
 | 7 | Distinct semantic units are newtypes, not primitive aliases | [type-state.md](type-state.md) |
 | 8 | State machines use type-state, not runtime `if state ==` | [type-state.md](type-state.md) |
-| 9 | No `unwrap()`/`expect()` outside `#[cfg(test)]` | [libraries.md](libraries.md) |
+| 9 | No `unwrap()`/`expect()` outside tests (invariant `expect` only behind `#[expect(clippy::expect_used, reason)]`); no discarded `Result` | This file §1 |
 | 10 | Every `unsafe` has SAFETY comment + miri test | [unsafe-discipline.md](unsafe-discipline.md), [../rust-ub/](../rust-ub/) |
 | 11 | Match on owned enums is exhaustive (no `_ =>`) | This file §7 |
 | 12 | Clippy pedantic passes with zero warnings | [cargo-strict.md](cargo-strict.md) |
 | 13 | Property tests exist for any function with a nontrivial domain | [proptest-insta.md](proptest-insta.md) |
 | 14 | Concurrency uses channels first, locks second, atomics last | [concurrency.md](concurrency.md) |
-| 15 | Async code uses `JoinSet` for structured concurrency | [async-tokio.md](async-tokio.md) |
+| 15 | Async code uses `JoinSet` for structured concurrency; no lock guard, `watch` borrow, or entered span held across `.await` | [async-tokio.md](async-tokio.md) |
+| 16 | Public API follows the naming, conversion, and trait rules; `From` never bypasses a newtype invariant | [api-design.md](api-design.md) |
+| 17 | A performance-motivated change carries its before/after measurement | [libraries.md](libraries.md) (criterion) |
 
 ---
 
@@ -274,7 +300,9 @@ zerocopy = { version = "0.8", features = ["derive"] }
 | File | When to Load |
 |---|---|
 | [zero-cost-safety.md](zero-cost-safety.md) | Arena, allocator, const fn, comptime, zero-alloc, bitfield, repr, scopeguard, errdefer, Zig-like patterns |
-| [type-state.md](type-state.md) | Newtype wrappers, type-state machines, branded IDs, phantom types |
+| [type-state.md](type-state.md) | Newtype wrappers, validated construction, type-state machines, branded IDs, phantom types |
+| [api-design.md](api-design.md) | Public API: naming, conversions, trait design, `#[must_use]`, `#[non_exhaustive]`, visibility, rustdoc sections |
+| [macros.md](macros.md) | `macro_rules!` hygiene, proc-macro crates (`syn`/`quote`), spanned compile errors |
 | [unsafe-discipline.md](unsafe-discipline.md) | Any `unsafe` block — SAFETY comments, safe wrappers, miri proof |
 | [libraries.md](libraries.md) | Library selection, crate decision tree, dependency audit |
 | [cargo-strict.md](cargo-strict.md) | Project bootstrap, lint config, CI gate commands |
@@ -297,7 +325,7 @@ zerocopy = { version = "0.8", features = ["derive"] }
 ///
 /// # Errors
 /// Returns `FooError::Bar` when the input is invalid.
-const fn frobnicate<'a>(
+fn frobnicate<'a>(
     arena: &'a Bump,        // explicit allocator when arena is in play
     input: &[u8],           // borrow, not owned
     output: &mut [u8],      // caller-provided buffer

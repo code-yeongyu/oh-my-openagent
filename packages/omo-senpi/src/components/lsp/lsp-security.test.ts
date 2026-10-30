@@ -9,6 +9,7 @@ import { runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { getConfigNotices } from "./adapter/migration-notices"
+import { userLspConfigPath } from "./config-paths"
 import { createLspComponent } from "./index"
 
 describe("omo-senpi lsp project config trust", () => {
@@ -118,7 +119,7 @@ describe("omo-senpi lsp project config trust", () => {
           kind: "untrusted_project_lsp_command",
           serverIds: ["trusted-project-server"],
           configPath: join(process.cwd(), ".pi", "lsp-client.json"),
-          userConfigPath: join(process.env.HOME ?? "", ".pi", "lsp-client.json"),
+          userConfigPath: userLspConfigPath(process.env.HOME ?? ""),
         },
       ])
     } finally {
@@ -243,7 +244,7 @@ describe("omo-senpi lsp project config trust", () => {
             kind: "untrusted_project_lsp_command",
             serverIds: ["alpha", "beta"],
             configPath: join(process.cwd(), ".pi", "lsp-client.json"),
-            userConfigPath: join(process.env.HOME ?? "", ".pi", "lsp-client.json"),
+            userConfigPath: userLspConfigPath(process.env.HOME ?? ""),
           },
         },
       ])

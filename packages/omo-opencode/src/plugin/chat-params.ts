@@ -14,6 +14,7 @@ export type ChatParamsInput = {
 
 type ChatParamsHookInput = ChatParamsInput & {
   rawMessage?: Record<string, unknown>
+  runtimeModel?: Record<string, unknown>
 }
 
 export type ChatParamsOutput = {
@@ -57,7 +58,7 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     : typeof model.id === "string"
       ? model.id
       : undefined
-  const providerId = provider.id
+  const providerId = isRecord(provider.info) ? provider.info.id : provider.id
   if (typeof providerID !== "string") return null
   if (typeof modelID !== "string") return null
   if (typeof providerId !== "string") return null
@@ -69,6 +70,7 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
     provider: { id: providerId },
     message,
     rawMessage: message,
+    runtimeModel: isRecord(model.capabilities) ? model : undefined,
   }
 }
 
@@ -113,6 +115,7 @@ export function createChatParamsHandler(_args: {
     const capabilities = getModelCapabilities({
       providerID: normalizedInput.model.providerID,
       modelID: normalizedInput.model.modelID,
+      runtimeModel: normalizedInput.runtimeModel,
     })
 
     const compatibility = resolveCompatibleModelSettings({

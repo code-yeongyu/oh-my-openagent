@@ -121,7 +121,13 @@ describe("createResumptionChannelEmitter", () => {
         name: "wake_source_state",
         data: {
           source: "senpi-task",
+          kind: "children",
           activeCount: 1,
+          items: [{
+            id: "st_00000001",
+            description: "Inspect continuation timing",
+            startedAtMs: Date.parse("2026-08-08T01:02:03.000Z"),
+          }],
           channels: [{
             id: "st_00000001",
             description: "Inspect continuation timing",
@@ -131,7 +137,7 @@ describe("createResumptionChannelEmitter", () => {
       },
       {
         name: "wake_source_state",
-        data: { source: "senpi-task", activeCount: 0, channels: [] },
+        data: { source: "senpi-task", kind: "children", activeCount: 0, items: [], channels: [] },
       },
     ])
   })
@@ -155,7 +161,13 @@ describe("createResumptionChannelEmitter", () => {
       name: "wake_source_state",
       data: {
         source: "senpi-task",
+        kind: "children",
         activeCount: 1,
+        items: [{
+          id: member.task_id,
+          description: "Review the implementation",
+          startedAtMs: Date.parse(member.created_at),
+        }],
         channels: [{
           id: member.task_id,
           description: "Review the implementation",
@@ -206,7 +218,13 @@ describe("createResumptionChannelEmitter", () => {
       name: "wake_source_state",
       data: {
         source: "senpi-task",
+        kind: "children",
         activeCount: 1,
+        items: [{
+          id: member.task_id,
+          description: "Review the implementation",
+          startedAtMs: Date.parse(member.created_at),
+        }],
         channels: [{
           id: member.task_id,
           description: "Review the implementation",

@@ -12,6 +12,8 @@ import {
 } from "@oh-my-opencode/memory-core"
 import { readdir } from "@oh-my-opencode/memory-core/fs"
 
+import { childFailureCause } from "../worker/failure-detail"
+
 /** How many failing conversations the status view lists, newest failure first. */
 const MAX_LISTED_CONVERSATIONS = 5
 const MINUTE_MS = 60_000
@@ -46,11 +48,6 @@ function formatWait(deltaMs: number): string {
   if (deltaMs < MINUTE_MS) return "now"
   if (deltaMs < HOUR_MS) return `${Math.round(deltaMs / MINUTE_MS)}m`
   return `${Math.round(deltaMs / HOUR_MS)}h`
-}
-
-function firstLine(detail: string | undefined): string | undefined {
-  const line = detail?.split("\n")[0]?.trim()
-  return line === undefined || line.length === 0 ? undefined : line
 }
 
 /** One bounded advisory line, or nothing when the ledger is clean. */
@@ -108,7 +105,7 @@ export function formatFactsStatus(identity: string, state: FactsOverview): strin
     (left, right) => Date.parse(right.lastFailureAt) - Date.parse(left.lastFailureAt),
   )
   for (const record of newestFirst.slice(0, MAX_LISTED_CONVERSATIONS)) {
-    const detail = firstLine(record.lastDetail)
+    const detail = childFailureCause(record.lastDetail)
     lines.push(
       `- ${record.conversationId}: ${record.state} after ${record.streak} (${record.lastReason})${detail === undefined ? "" : ` - ${detail}`}`,
     )

@@ -22,6 +22,7 @@ const mockRunOpenCodeStartupMigration = mock(() => ({
   reloadRequired: false,
   results: [],
   skippedConflictCount: 0,
+  targetBackupPaths: [] as string[],
 }))
 const mockIsTmuxIntegrationEnabled = mock(
   (pluginConfig: { tmux?: { enabled?: boolean } | undefined }) => pluginConfig.tmux?.enabled ?? false,

@@ -13,6 +13,7 @@ import { readFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
+import { stampReceipt } from "../tools/claim-frontmatter"
 import {
   parsePeopleCard,
   resolveSlugCollision,
@@ -22,6 +23,7 @@ import {
   type ObservationSection,
   type PeopleLimits,
 } from "../people"
+import { factDisplayText, stripReceiptSuffix } from "./display"
 import type { FactsExtractionRecord, FactsPersonReference } from "./extraction"
 import { readFactsPeopleIndex, type FactsPeopleIndexEntry } from "./person-index"
 
@@ -170,19 +172,23 @@ async function renderExplicitObservations(
     groups.unshift(explicit)
   }
   for (const record of records) {
-    const normalized = normalizeObservationText(record.text)
+    const content = factDisplayText(record)
+    const normalized = normalizeObservationText(stripReceiptSuffix(record.text))
     const at = explicit.entries.findIndex(
-      (entry) => normalizeObservationText(entry.content) === normalized,
+      (entry) => normalizeObservationText(stripReceiptSuffix(entry.content)) === normalized,
     )
     if (at === -1) {
-      explicit.entries.push({ date: record.date, content: record.text })
+      explicit.entries.push({ date: record.date, content })
       continue
     }
     const found = explicit.entries[at]!
-    explicit.entries[at] = { ...found, date: record.date, n: (found.n ?? 1) + 1 }
+    const refreshed = record.receipt === undefined ? found.content : content
+    explicit.entries[at] = { ...found, content: refreshed, date: record.date, n: (found.n ?? 1) + 1 }
   }
-  const body = serializePeopleCard({ entries: card.entries, observations: groups }, limits)
-  return renderMemoryFile(parsed.frontmatter, `${body}\n`)
+  const body = `${serializePeopleCard({ entries: card.entries, observations: groups }, limits)}\n`
+  // Same header rule as every writer and the commit hook: a legacy user header is dropped, a user record becomes mixed.
+  const frontmatter = existing === undefined ? parsed.frontmatter : stampReceipt(parsed, parsed.frontmatter, body, undefined)
+  return renderMemoryFile(frontmatter, body)
 }
 
 function resolvePersonSlug(

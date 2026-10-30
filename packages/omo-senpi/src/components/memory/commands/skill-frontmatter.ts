@@ -22,6 +22,12 @@ interface SkillNameFrontmatterContentRepairResult {
   readonly reason?: string
 }
 
+export interface SkillFrontmatterFieldWriteResult {
+  readonly content: string
+  readonly changed: boolean
+  readonly reason?: string
+}
+
 const FRONTMATTER_REGEX = /^(---\r?\n)([\s\S]*?)(\r?\n---(?:\r?\n|$))/
 
 async function pathExists(path: string): Promise<boolean> {
@@ -90,6 +96,77 @@ export function repairSkillNameFrontmatterContent(
   }
 
   const nextContent = `${opening}${lines.join(newline)}${closing}${content.slice(match[0].length)}`
+  return { content: nextContent, changed: true }
+}
+
+/**
+ * Sets one frontmatter field, leaving the body BYTE-IDENTICAL.
+ *
+ * Use this for every programmatic frontmatter edit. Writing your own regex is how
+ * the 2026-09-04 skill wipe happened: a description rewrite matched through to the
+ * CLOSING `---` and rebuilt the file from that match, so 38 SKILL.md files under
+ * ~/.agents/skills lost their entire body (47 of them symlinks, which propagated
+ * the damage into their оpenclaw originals). Nothing was under version control, so
+ * five skills were never recovered.
+ *
+ * The body is never part of the replacement here: only the frontmatter block is
+ * rebuilt, and `content.slice(match[0].length)` is re-appended untouched.
+ */
+export function setSkillFrontmatterField(
+  content: string,
+  field: string,
+  value: string,
+): SkillFrontmatterFieldWriteResult {
+  if (!field.trim()) {
+    return { content, changed: false, reason: "field name is empty" }
+  }
+
+  const match = content.match(FRONTMATTER_REGEX)
+  if (!match) {
+    return { content, changed: false, reason: "missing YAML frontmatter" }
+  }
+
+  const opening = match[1] ?? ""
+  const frontmatter = match[2] ?? ""
+  const closing = match[3] ?? ""
+  const body = content.slice(match[0].length)
+  const newline = opening.includes("\r\n") ? "\r\n" : "\n"
+
+  const lines = frontmatter.replace(/\r\n/g, "\n").split("\n")
+  const keyPattern = new RegExp(`^\\s*${field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`)
+  const index = lines.findIndex((line) => keyPattern.test(line))
+
+  // An existing value already equal to `value` is a no-op, whichever YAML quoting
+  // style it was written in: re-serializing it would report a spurious change and
+  // rewrite a file that did not need touching.
+  if (index >= 0) {
+    const current = (lines[index] ?? "").replace(keyPattern, "").trim()
+    const unquoted =
+      (current.startsWith('"') && current.endsWith('"') && current.length >= 2) ||
+      (current.startsWith("'") && current.endsWith("'") && current.length >= 2)
+        ? current.slice(1, -1)
+        : current
+    if (unquoted === value) {
+      return { content, changed: false }
+    }
+  }
+
+  const nextLine = `${field}: ${formatYamlScalar(value)}`
+
+  if (index < 0) {
+    const nextFrontmatter = [...lines, nextLine].join(newline)
+    return { content: `${opening}${nextFrontmatter}${closing}${body}`, changed: true }
+  }
+
+  // A YAML scalar may fold onto following indented lines; they belong to this key.
+  let end = index + 1
+  while (end < lines.length && /^\s+\S/.test(lines[end] ?? "")) end += 1
+
+  const replaced = [...lines.slice(0, index), nextLine, ...lines.slice(end)]
+  const nextContent = `${opening}${replaced.join(newline)}${closing}${body}`
+  if (nextContent === content) {
+    return { content, changed: false }
+  }
   return { content: nextContent, changed: true }
 }
 

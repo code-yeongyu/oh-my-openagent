@@ -5,7 +5,7 @@ import { CONVERSATION, compact, fixture, successfulSettle, agentEnd, settle } fr
 
 describe("reflection trigger wiring compaction observers", () => {
   test("#given an accepted compaction #when the event fires #then the observer is told which conversation was rewritten", async () => {
-    // given: the memorian gate drops that session's pending nudges here - they judged a
+    // given: the kibitzer gate drops that session's pending nudges here - they judged a
     // transcript the compaction has just replaced
     const observed: string[] = []
     const { pi } = await fixture({ stepCount: 0, onCompactionAccepted: (conversationId) => observed.push(conversationId) })

@@ -127,33 +127,27 @@ describe("checkpointUlwLoop reconciliation (status=complete)", () => {
 		).resolves.toMatchObject({ goal: { status: "complete" } });
 	});
 
-	it("throws on mismatched objective", async () => {
+	it("warns when objective mismatches", async () => {
 		const repo = await repoWith(plan([passGoal("G001"), goal({ id: "G002", status: "pending" })]));
 
-		await expectCode(
-			() =>
-				checkpointUlwLoop(repo, {
-					goalId: "G001",
-					status: "complete",
-					evidence: "work complete and validation passed",
-					codexGoalJson: snapshot("active", "wrong objective"),
-				}),
-			"ulw_loop_codex_snapshot_mismatch",
-		);
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G001",
+			status: "complete",
+			evidence: "work complete and validation passed",
+			codexGoalJson: snapshot("active", "wrong objective"),
+		});
+		expect(result.warnings.join(" ")).toContain("driver_objective_differs");
 	});
 
-	it("throws on mismatched status (snapshot complete when expected active)", async () => {
+	it("advises create_goal when the driver closed early", async () => {
 		const repo = await repoWith(plan([passGoal("G001"), goal({ id: "G002", status: "pending" })]));
 
-		await expectCode(
-			() =>
-				checkpointUlwLoop(repo, {
-					goalId: "G001",
-					status: "complete",
-					evidence: "work complete and validation passed",
-					codexGoalJson: snapshot("complete"),
-				}),
-			"ulw_loop_codex_snapshot_mismatch",
-		);
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G001",
+			status: "complete",
+			evidence: "work complete and validation passed",
+			codexGoalJson: snapshot("complete"),
+		});
+		expect(result.nextActions.join(" ")).toContain("create_goal");
 	});
 });

@@ -26,15 +26,15 @@ Before starting, verify:
 
 Each member is a `kind: "category"` team member. They route through `sisyphus-junior` with the category's model and prompt-append shaping their behavior. The `prompt` field below is the **system prompt** that establishes their adversarial identity.
 
-Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep` only when that category is enabled; if `deep` is disabled or unavailable, retry without only the researcher member and state the degraded roster.
+Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep-low` only when that category is enabled; if `deep-low` is disabled or unavailable, retry without only the researcher member and state the degraded roster.
 
 ### CATEGORY CHARACTERISTICS REFERENCE
 
 | Category | Model | Native Mindset | Why This Adversarial Role Fits |
 |----------|-------|----------------|--------------------------------|
 | `unspecified-low` | gpt-5.6-luna xhigh | Mid-tier, simplicity-leaning, structure-demanding | Pragmatist Skeptic — model bias toward simplicity makes it the natural enemy of over-engineering |
-| `unspecified-high` | kimi-k3 max -> claude-opus-5 xhigh -> gpt-5.6-sol high | High-effort, broad-impact, coordination-aware | Integration Tester — max-tier broad-scope thinking exposes cross-module fragility |
-| `deep` | gpt-5.6-sol medium | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
+| `unspecified-high` | claude-opus-5-5 medium -> glm-5.3 max -> kimi-k3 max | High-effort, broad-impact, coordination-aware | Integration Tester — broad-scope thinking exposes cross-module fragility |
+| `deep-low` | gpt-5.6-sol medium | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
 | `ultrabrain` | gpt-5.6-sol xhigh | Hard-logic, simplicity-biased, strategic advisor | Architect Strategist — xhigh reasoning sees structural flaws others miss |
 | `artistry` | claude-fable-5 xhigh | Unconventional, pattern-breaking, lateral | Creative Challenger — pattern-breaking bias attacks orthodox thinking |
 
@@ -95,7 +95,7 @@ When you receive others' findings, default position: assume they missed somethin
 Output format: numbered findings/critiques, each ≤3 sentences. Cite specific edge cases and integration points. No prose.
 ```
 
-### MEMBER 3: `researcher` (category: `deep`)
+### MEMBER 3: `researcher` (category: `deep-low`)
 
 **Role**: The Autonomous Researcher.
 **Position**: Enemy of unfounded claims. Evidence demander.
@@ -210,7 +210,7 @@ team_create({
     members: [
       { name: "skeptic",    kind: "category", category: "unspecified-low",  prompt: "<full Skeptic system prompt>" },
       { name: "validator",  kind: "category", category: "unspecified-high", prompt: "<full Validator system prompt>" },
-      { name: "researcher", kind: "category", category: "deep",             prompt: "<full Researcher system prompt>" },
+      { name: "researcher", kind: "category", category: "deep-low",         prompt: "<full Researcher system prompt>" },
       { name: "architect",  kind: "category", category: "ultrabrain",       prompt: "<full Architect system prompt>" },
       { name: "creative",   kind: "category", category: "artistry",         prompt: "<full Creative system prompt>" }
     ]
@@ -220,7 +220,7 @@ team_create({
 
 Capture the returned `teamRunId`. You will use it for every subsequent call.
 
-If `team_create` errors because `deep` is disabled or unavailable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
+If `team_create` errors because `deep-low` is disabled or unavailable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
 
 ### Phase 2: Round 1 — Independent analysis
 

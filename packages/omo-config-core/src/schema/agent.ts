@@ -13,6 +13,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export const OmoAgentModelEntrySchema = z.union([z.string(), OmoFallbackModelObjectSchema])
 
+const PermissionValueSchema = z.enum(["ask", "allow", "deny"])
+
+const BashPermissionSchema = z.union([
+  PermissionValueSchema,
+  z.record(z.string(), PermissionValueSchema),
+])
+
+export const OmoAgentPermissionSchema = z.object({
+  edit: PermissionValueSchema.optional(),
+  bash: BashPermissionSchema.optional(),
+  webfetch: PermissionValueSchema.optional(),
+  task: PermissionValueSchema.optional(),
+  doom_loop: PermissionValueSchema.optional(),
+  external_directory: PermissionValueSchema.optional(),
+}).catchall(PermissionValueSchema.optional())
+
+export type OmoAgentPermission = z.infer<typeof OmoAgentPermissionSchema>
+
 const OmoAgentDefInputSchema = z.object({
   description: z.string().optional(),
   prompt: z.string().optional(),
@@ -32,6 +50,8 @@ const OmoAgentDefInputSchema = z.object({
   max_turns: z.number().int().nonnegative().optional(),
   temperature: z.number().min(0).max(2).optional(),
   disable: z.boolean().optional(),
+  permission: OmoAgentPermissionSchema.optional(),
+  prompt_append: z.string().optional(),
 }).strict()
 
 export const OmoAgentDefSchema = z.preprocess(

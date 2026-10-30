@@ -62,19 +62,6 @@ describe("todo-continuation-enforcer dispose", () => {
     mockModule.module("./session-state", () => actualSessionStateModule)
   })
 
-  it("#given todo-continuation-enforcer created #when dispose exists on return value #then it is a function", () => {
-    // given
-    const enforcer = createTodoContinuationEnforcer(createMockPluginInput())
-
-    // when
-    const { dispose } = enforcer
-
-    // then
-    expect(typeof dispose).toBe("function")
-
-    enforcer.dispose()
-  })
-
   it("#given enforcer with active session states #when dispose is called #then internal session state store is shut down", async () => {
     // given
     const originalClearInterval = globalThis.clearInterval

@@ -14,6 +14,9 @@ export type AgentDefinition = {
   readonly mode?: string
   readonly model?: string
   readonly models?: readonly AgentModelEntry[]
+  /** Ordered model-policy categories; the first that resolves supplies the model. Model only: the
+   *  agent keeps its own prompt/tools; category prompt_append and tools are never applied. */
+  readonly categories?: readonly string[]
   readonly variant?: string
   readonly reasoningEffort?: string
   readonly temperature?: number
@@ -29,7 +32,7 @@ export type AgentDefinition = {
 
 export type AgentDefinitionInput = AgentDefinition
 
-export type AgentLoaderDiagnosticKind = "frontmatter" | "read" | "validation" | "config_parse"
+export type AgentLoaderDiagnosticKind = "frontmatter" | "read" | "validation" | "config_parse" | "category_shadows_agent"
 
 export type AgentLoaderDiagnostic = {
   readonly kind: AgentLoaderDiagnosticKind

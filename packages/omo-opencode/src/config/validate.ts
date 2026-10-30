@@ -1,17 +1,24 @@
-import { relative } from "node:path"
+import { dirname, isAbsolute, join, relative } from "node:path"
+import { setSkillSourceProvenance } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/config-source-discovery"
+import { knownUserSkillRoots } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
+import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
-import type { OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import { omoConfigDiagnosticLines, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import type * as z from "zod"
 
 import { applyDisabledProviders } from "../shared/disabled-providers"
 import { log } from "../shared/logger"
 import { loadOmoOpenCodeConfigChain, type OmoOpenCodeConfigView } from "../plugin-config/omo-config-chain"
 import { mergeConfigs } from "../plugin-config/config-merger"
 import { findUnknownKeyPaths } from "../plugin-config/unknown-key-diagnostics"
+import { prunePluginView } from "./prune-plugin-view"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./schema"
 
 export type PluginConfigValidation = {
   readonly valid: boolean
   readonly messages: readonly string[]
+  /** One line per value that was ignored while the rest of its file still loaded. */
+  readonly warnings: readonly string[]
   readonly path: string | null
   readonly config: OhMyOpenCodeConfig
 }
@@ -20,6 +27,7 @@ type LoadedConfigView = {
   readonly config: Partial<OhMyOpenCodeConfig>
   readonly messages: readonly string[]
   readonly path: string
+  readonly warnings: readonly string[]
 }
 
 function shortPath(configPath: string): string {
@@ -32,11 +40,8 @@ function formatIssuePath(path: readonly PropertyKey[]): string {
   return formatted.length > 0 ? formatted : "<root>"
 }
 
-function schemaMessages(configPath: string, rawConfig: Record<string, unknown>): readonly string[] {
-  const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
-  const validationMessages = result.success
-    ? []
-    : result.error.issues.map((issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${issue.message}`)
+function schemaMessages(configPath: string, rawConfig: Record<string, unknown>, issues: readonly z.core.$ZodIssue[]): readonly string[] {
+  const validationMessages = issues.map((issue) => `${shortPath(configPath)}: ${formatIssuePath(issue.path)}: ${issue.message}`)
   const unknownKeyMessages = findUnknownKeyPaths(OhMyOpenCodeConfigSchema, rawConfig)
     .map((path) => `${shortPath(configPath)}: Unknown config key: ${formatIssuePath(path)}`)
   return [...validationMessages, ...unknownKeyMessages]
@@ -53,11 +58,13 @@ function parseConfig(rawConfig: Record<string, unknown>): Partial<OhMyOpenCodeCo
   return config
 }
 
-function parseConfigView(path: string, rawConfig: Record<string, unknown>): LoadedConfigView {
+function parseConfigView(view: OmoOpenCodeConfigView, homeDir: string | undefined): LoadedConfigView {
+  const pruned = prunePluginView({ config: view.config, homeDir, keyPrefix: view.keyPrefix, path: view.path })
   return {
-    config: parseConfig(rawConfig),
-    messages: schemaMessages(path, rawConfig),
-    path,
+    config: parseConfig(pruned.config),
+    messages: schemaMessages(view.path, view.config, pruned.issues),
+    path: view.path,
+    warnings: pruned.warnings,
   }
 }
 
@@ -183,21 +190,50 @@ export function validatePluginConfig(
   environment: OmoConfigEnv = process.env,
 ): PluginConfigValidation {
   const chain = loadOmoOpenCodeConfigChain(directory, environment)
-  const views = chain.views.map((view) => parseConfigView(view.path, view.config))
-  const chainMessages = chain.diagnostics.map((diagnostic) => `${shortPath(diagnostic.path)}: ${diagnostic.message}`)
+  const homeDir = environment.HOME ?? environment.USERPROFILE
+  const views = chain.views.map((view) => parseConfigView(view, homeDir))
+  // A deprecated key still loads and still applies, so it is a notice, not a validation failure:
+  // counting it here would make `valid` false and report a working config as invalid in doctor.
+  // An ignored invalid value is the same: the rest of its file loads, so it is a warning.
+  const failing = chain.diagnostics.filter((diagnostic) => diagnostic.kind !== "deprecated-keys" && diagnostic.kind !== "invalid-value")
+  const chainMessages = failing.map((diagnostic) => `${shortPath(diagnostic.path)}: ${diagnostic.message}`)
   const messages = [...chainMessages, ...views.flatMap((view) => view.messages)]
+  const warnings = [
+    ...omoConfigDiagnosticLines(chain.diagnostics.flatMap((diagnostic) => diagnostic.kind === "invalid-value" ? [diagnostic] : []), { homeDir }),
+    ...views.flatMap((view) => view.warnings),
+  ]
   const firstFailingView = views.find((view) => view.messages.length > 0)
   const firstView = views[0]
-  const userConfig = parseConfig(chain.protectedUserView)
+  const userConfig = parseConfig(prunePluginView({ config: chain.protectedUserView, homeDir, keyPrefix: "", path: "" }).config)
   const config = applyDisabledProviders(materializeAgentModelChains(
     protectUserFields(mergeViews(views), userConfig),
   ))
   warnLegacyUlwExecuteKey(chain.views)
+  if (config.skills) {
+    const owner = chain.views.findLast((view) => Object.hasOwn(view.config, "skills"))
+    const userRoots = [...knownUserSkillRoots()]
+    for (const view of chain.views.filter((candidate) => candidate.scope === "user")) {
+      const settings = OhMyOpenCodeConfigSchema.safeParse({ skills: view.config.skills })
+      const skills = settings.success ? settings.data.skills : undefined
+      if (!skills || Array.isArray(skills)) continue
+      for (const source of skills.sources ?? []) {
+        const path = typeof source === "string" ? source : source.path
+        if (/^https?:\/\//.test(path)) continue
+        userRoots.push(path.startsWith("~/") ? join(homeDir ?? "", path.slice(2)) : isAbsolute(path) ? path : join(dirname(view.path), path))
+      }
+    }
+    setSkillSourceProvenance(config.skills, {
+      kind: owner?.scope === "user" ? "user" : "project-auto",
+      selectedRoot: owner ? dirname(owner.path) : directory,
+      projectRoot: detectWorktreePath(directory) ?? directory, userRoots,
+    })
+  }
 
   return {
     valid: messages.length === 0,
     messages,
-    path: chainMessages.length > 0 ? chain.diagnostics[0]?.path ?? null : firstFailingView?.path ?? firstView?.path ?? null,
+    warnings,
+    path: failing[0]?.path ?? firstFailingView?.path ?? firstView?.path ?? null,
     config: migrateRalphLoopConfig(migrateLegacyUlwExecuteKey(config)),
   }
 }

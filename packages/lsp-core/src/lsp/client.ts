@@ -253,7 +253,9 @@ export class LspClient extends LspClientConnection {
 				} catch (error) {
 					if (this.isUnsupportedDiagnosticPullError(error)) {
 						this.setDiagnosticPullSupported(false);
-						pushFallbackOnly = true;
+						// A publish may have landed while the pull was in flight. Re-capture the
+						// snapshot and re-resolve push state instead of deciding on the stale ones.
+						continue;
 					} else if (error instanceof LspRequestTimeoutError) {
 						pushFallbackOnly = true;
 					} else {

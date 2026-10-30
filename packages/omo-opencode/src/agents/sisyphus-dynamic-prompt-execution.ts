@@ -58,10 +58,10 @@ Every \`task()\` output exposes a continuation session ID (\`ses_...\`). Pass it
 
 \`\`\`typescript
 // WRONG: Starting fresh loses all context
-task(category="quick", load_skills=[], run_in_background=false, description="Fix type error", prompt="Fix the type error in auth.ts...")
+task(category="quick", load_skills=[], run_in_background=true, description="Fix type error", prompt="Fix the type error in auth.ts...")
 
 // CORRECT: Resume preserves everything
-task(task_id="ses_abc123", load_skills=[], run_in_background=false, description="Fix type error", prompt="Fix: Type error on line 42")
+task(task_id="ses_abc123", load_skills=[], run_in_background=true, description="Fix type error", prompt="Fix: Type error on line 42")
 \`\`\`
 
 **After EVERY delegation, STORE the \`ses_...\` continuation ID for potential continuation.**

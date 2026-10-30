@@ -28,9 +28,9 @@ describe("task record runtime fallback metadata", () => {
     const fallbackModels = [
       {
         source: "category",
-        provider: "openai-codex",
+        provider: "chatgpt-subscription",
         model_id: "gpt-5.6-luna-fast",
-        display: "openai-codex/gpt-5.6-luna-fast",
+        display: "chatgpt-subscription/gpt-5.6-luna-fast",
         reasoning_effort: "minimal",
       },
     ] as const

@@ -7,6 +7,7 @@ import { ulwLoopCommand } from "../src/cli-commands.js";
 import { ulwLoopDir } from "../src/paths.js";
 import { writePlan } from "../src/plan-io.js";
 import type { UlwLoopItem, UlwLoopPlan, UlwLoopSuccessCriterion } from "../src/types.js";
+import { CLI_TEST_SCOPE, CLI_TEST_SESSION_ID } from "./fixtures/cli-session.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
 const SESSION_ENV_KEYS = ["OMO_ULW_LOOP_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "PI_SESSION_ID"] as const;
@@ -25,6 +26,7 @@ beforeEach(async () => {
 		savedEnv[key] = process.env[key];
 		delete process.env[key];
 	}
+	process.env["OMO_ULW_LOOP_SESSION_ID"] = CLI_TEST_SESSION_ID;
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -87,9 +89,9 @@ function plan(goals: UlwLoopItem[], overrides: Partial<UlwLoopPlan> = {}): UlwLo
 		evidenceLayoutVersion: 2,
 		createdAt: NOW,
 		updatedAt: NOW,
-		briefPath: ".omo/ulw-loop/brief.md",
-		goalsPath: ".omo/ulw-loop/goals.json",
-		ledgerPath: ".omo/ulw-loop/ledger.jsonl",
+		briefPath: ".omo/ulw-loop/cli-test/brief.md",
+		goalsPath: ".omo/ulw-loop/cli-test/goals.json",
+		ledgerPath: ".omo/ulw-loop/cli-test/ledger.jsonl",
 		goals,
 	};
 	Object.assign(result, overrides);
@@ -103,8 +105,8 @@ function legacyLayoutPlan(goals: UlwLoopItem[], overrides: Partial<UlwLoopPlan> 
 }
 
 async function seed(seedPlan: UlwLoopPlan): Promise<void> {
-	await mkdir(ulwLoopDir(testDir), { recursive: true });
-	await writePlan(testDir, seedPlan);
+	await mkdir(ulwLoopDir(testDir, CLI_TEST_SCOPE), { recursive: true });
+	await writePlan(testDir, seedPlan, CLI_TEST_SCOPE);
 }
 
 describe("#given a plan with no goals", () => {

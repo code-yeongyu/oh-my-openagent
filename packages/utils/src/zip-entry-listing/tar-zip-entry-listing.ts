@@ -8,7 +8,7 @@ import { readProcessStream } from "../process-stream-reader"
 
 function parseTarListedZipEntry(line: string): ArchiveEntry | null {
 	const match = line.match(
-		/^([^\s])\S*\s+\d+\s+\S+\s+\S+\s+\d+\s+\w+\s+\d+\s+(?:\d{2}:\d{2}|\d{4})\s+(.*)$/
+		/^([^\s])\S*\s+\d+\s+\S+\s+\S+\s+\d+\s+\S+\s+\d+\s+(?:\d{2}:\d{2}|\d{4})\s+(.*)$/
 	)
 	if (!match) {
 		return null
@@ -50,8 +50,7 @@ function validateParsedTarListing(
 export function parseTarListingOutput(stdout: string): ArchiveEntry[] {
 	const listingLines = stdout
 		.split(/\r?\n/)
-		.map(line => line.trim())
-		.filter(Boolean)
+		.filter(line => line.trim().length > 0)
 
 	if (listingLines.length === 0) {
 		return []

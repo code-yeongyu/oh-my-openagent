@@ -6,6 +6,13 @@ import type {
 
 export type MinimalSenpiResourceLoaderOptions = {
   readonly runtime: ExtensionRuntime
+  /**
+   * System prompt that REPLACES senpi's default dynamic system prompt. Absent keeps the default
+   * (undefined): a loader without this field behaves exactly as before, so the child builds the
+   * engine's own prompt. A present value is returned verbatim from getSystemPrompt(); senpi's
+   * session construction uses the loader's prompt INSTEAD of buildDynamicSystemPrompt().
+   */
+  readonly systemPrompt?: string
 }
 
 export function createMinimalSenpiResourceLoader(options: MinimalSenpiResourceLoaderOptions): ResourceLoader {
@@ -32,7 +39,7 @@ export function createMinimalSenpiResourceLoader(options: MinimalSenpiResourceLo
       return { agentsFiles: [] }
     },
     getSystemPrompt() {
-      return undefined
+      return options.systemPrompt
     },
     getSystemPromptSource() {
       return undefined

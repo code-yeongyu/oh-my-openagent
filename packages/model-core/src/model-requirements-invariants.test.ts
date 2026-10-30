@@ -13,15 +13,13 @@ const expectedAgents = [
   "momus",
   "atlas",
   "sisyphus-junior",
-  "omo-senpi-code-reviewer",
-  "omo-senpi-qa-executor",
-  "omo-senpi-gate-reviewer",
 ] as const
 
 const expectedCategories = [
   "visual-engineering",
   "ultrabrain",
-  "deep",
+  "deep-low",
+  "deep-high",
   "artistry",
   "quick",
   "unspecified-low",

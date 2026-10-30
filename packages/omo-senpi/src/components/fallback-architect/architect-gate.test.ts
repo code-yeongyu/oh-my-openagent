@@ -83,7 +83,7 @@ describe("architect gate", () => {
     describe("#when the gate is evaluated with that registry", () => {
       it("#then the builtin architect category counts as active", () => {
         withFixture({ categories: { quick: { model: "some/model" } } }, (cwd, env) => {
-          const registry = fakeRegistry([{ provider: "anthropic", id: "claude-fable-5" }])
+          const registry = fakeRegistry([{ provider: "anthropic", id: "claude-fable-5-1" }])
           expect(hasActiveArchitectCategory(cwd, { env, registry })).toBe(true)
         })
       })

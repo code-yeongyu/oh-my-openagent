@@ -131,6 +131,9 @@ afterAll(() => {
 
 describe("startReplyListener", () => {
   test("returns the child's ready state only after detached startup reaches the poll loop", async () => {
+    // The success path returns as soon as the child reports ready, so the budget is only an upper
+    // bound here. A loaded runner can delay the fake child's ready write past the 500 ms default.
+    process.env.OMO_OPENCLAW_REPLY_LISTENER_STARTUP_TIMEOUT_MS = "30000"
     const killSpy = spyOn(process, "kill").mockImplementation((pid: number | string) => {
       if (pid === 4321) {
         return true

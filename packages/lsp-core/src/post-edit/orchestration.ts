@@ -1,5 +1,8 @@
 import { extname } from "node:path";
 
+import type { PostEditFileLocation } from "./file-location.js";
+import { notInstalledGuidance, type PostEditNotInstalledOutcome } from "./not-installed-guidance.js";
+
 const DEFAULT_MAX_CONCURRENCY = 4;
 const CLEAN_DIAGNOSTICS_TEXT = "No diagnostics found";
 
@@ -8,18 +11,21 @@ export type PostEditDiagnosticsOutcome =
 	| {
 			readonly kind: "not_configured";
 			readonly extension: string;
-	  };
+	  }
+	| PostEditNotInstalledOutcome;
 
 export type DiagnosticsRunner = (filePath: string) => Promise<PostEditDiagnosticsOutcome>;
 
 export interface PostEditDiagnosticsBlock {
 	readonly filePath: string;
 	readonly diagnostics: string;
+	/** False for missing-server guidance: it is feedback for the model, not a defect in the edit. */
+	readonly blocking: boolean;
 }
 
 export interface PostEditDiagnosticsObservation {
 	readonly filePath: string;
-	readonly kind: "block" | "clean" | "not_configured";
+	readonly kind: "block" | "clean" | "not_configured" | "not_installed";
 }
 
 export interface PostEditDiagnosticsResult {
@@ -29,6 +35,7 @@ export interface PostEditDiagnosticsResult {
 
 export interface PostEditNotConfiguredCache {
 	readonly notConfiguredExtensions: Set<string>;
+	readonly notInstalledServers: Set<string>;
 }
 
 export interface CollectPostEditDiagnosticsInput {
@@ -36,6 +43,7 @@ export interface CollectPostEditDiagnosticsInput {
 	readonly runDiagnostics: DiagnosticsRunner;
 	readonly cache?: PostEditNotConfiguredCache;
 	readonly maxConcurrency?: number;
+	readonly locateFile?: (filePath: string) => PostEditFileLocation;
 }
 
 interface IndexedFilePath {
@@ -50,11 +58,12 @@ interface IndexedDiagnostics {
 }
 
 export function createPostEditNotConfiguredCache(): PostEditNotConfiguredCache {
-	return { notConfiguredExtensions: new Set() };
+	return { notConfiguredExtensions: new Set(), notInstalledServers: new Set() };
 }
 
 export function resetPostEditNotConfiguredCache(cache: PostEditNotConfiguredCache): void {
 	cache.notConfiguredExtensions.clear();
+	cache.notInstalledServers.clear();
 }
 
 export async function collectPostEditDiagnostics(
@@ -67,8 +76,15 @@ export async function collectPostEditDiagnostics(
 	const observations: PostEditDiagnosticsObservation[] = [];
 
 	for (const result of results) {
-		const classification = classifyDiagnostics(result.outcome);
+		const outcome = result.outcome;
+		const classification =
+			typeof outcome !== "string" && outcome.kind === "not_installed"
+				? classifyNotInstalled(notInstalledGuidance(result.filePath, outcome, cache, input.locateFile))
+				: classifyDiagnostics(outcome);
 		switch (classification.kind) {
+			case "not_installed":
+				observations.push({ filePath: result.filePath, kind: "not_installed" });
+				break;
 			case "clean":
 				observations.push({ filePath: result.filePath, kind: "clean" });
 				break;
@@ -77,7 +93,11 @@ export async function collectPostEditDiagnostics(
 				observations.push({ filePath: result.filePath, kind: "not_configured" });
 				break;
 			case "block":
-				blocks.push({ filePath: result.filePath, diagnostics: classification.diagnostics });
+				blocks.push({ filePath: result.filePath, diagnostics: classification.diagnostics, blocking: true });
+				observations.push({ filePath: result.filePath, kind: "block" });
+				break;
+			case "guidance":
+				blocks.push({ filePath: result.filePath, diagnostics: classification.text, blocking: false });
 				observations.push({ filePath: result.filePath, kind: "block" });
 				break;
 			default: {
@@ -146,7 +166,14 @@ async function collectFileDiagnostics(
 
 function normalizeDiagnosticsOutcome(outcome: PostEditDiagnosticsOutcome): PostEditDiagnosticsOutcome {
 	if (typeof outcome === "string") return normalizeDiagnosticsText(outcome);
+	if (outcome.kind === "not_installed") return { ...outcome, text: normalizeDiagnosticsText(outcome.text) };
 	return outcome;
+}
+
+function classifyNotInstalled(
+	guidance: string | undefined,
+): { readonly kind: "not_installed" } | { readonly kind: "guidance"; readonly text: string } {
+	return guidance === undefined ? { kind: "not_installed" } : { kind: "guidance", text: guidance };
 }
 
 function normalizeDiagnosticsText(text: string): string {
@@ -159,7 +186,7 @@ function formatDiagnosticsError(error: Error): string {
 }
 
 function classifyDiagnostics(
-	outcome: PostEditDiagnosticsOutcome,
+	outcome: Exclude<PostEditDiagnosticsOutcome, PostEditNotInstalledOutcome>,
 ):
 	| { readonly kind: "clean" }
 	| { readonly kind: "not_configured"; readonly extension: string }

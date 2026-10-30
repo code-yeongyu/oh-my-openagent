@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, mock } from "bun:test"
 import type { CheckDefinition, CheckResult, DoctorResult, SystemInfo, ToolsSummary } from "./framework/types"
+import { gatherEditionDistTags, resolveLatestVersion } from "./checks/latest-version"
 
 function createSystemInfo(): SystemInfo {
   return {
@@ -29,12 +30,12 @@ function createPassResult(name: string): CheckResult {
   return { name, status: "pass", message: "ok", issues: [] }
 }
 
-function createDeferred(): {
-  promise: Promise<CheckResult>
-  resolve: (value: CheckResult) => void
+function createDeferred<T = CheckResult>(): {
+  promise: Promise<T>
+  resolve: (value: T) => void
 } {
-  let resolvePromise: (value: CheckResult) => void = () => {}
-  const promise = new Promise<CheckResult>((resolve) => {
+  let resolvePromise: (value: T) => void = () => {}
+  const promise = new Promise<T>((resolve) => {
     resolvePromise = resolve
   })
   return { promise, resolve: resolvePromise }
@@ -127,13 +128,15 @@ describe("runner", () => {
   })
 
   describe("runDoctor", () => {
-    it("starts all checks in parallel and returns collected result", async () => {
+    it("starts all checks and the registry lookup in parallel and returns collected result", async () => {
       //#given
       const startedChecks: string[] = []
+      const requestedUrls: string[] = []
       const deferredOne = createDeferred()
       const deferredTwo = createDeferred()
       const deferredThree = createDeferred()
       const deferredFour = createDeferred()
+      const deferredDistTags = createDeferred<Response>()
 
       const checks: CheckDefinition[] = [
         {
@@ -188,6 +191,7 @@ describe("runner", () => {
           duration: 0,
         },
         exitCode: 0,
+        latestVersion: null,
       }
 
       const formatDoctorOutputMock = mock((result: DoctorResult) => result.summary.total.toString())
@@ -197,6 +201,8 @@ describe("runner", () => {
         getAllCheckDefinitions: () => checks,
         gatherSystemInfo: async () => expectedResult.systemInfo,
         gatherToolsSummary: async () => expectedResult.tools,
+        gatherEditionDistTags,
+        resolveLatestVersion,
       }))
       mock.module("./framework/formatter", () => ({
         formatDoctorOutput: formatDoctorOutputMock,
@@ -206,6 +212,12 @@ describe("runner", () => {
       const logSpy = mock(() => {})
       const originalLog = console.log
       console.log = logSpy
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = mock(async (input: string | URL | Request) => {
+        startedChecks.push("latest")
+        requestedUrls.push(String(input))
+        return deferredDistTags.promise
+      }) as unknown as typeof fetch
 
       const { runDoctor } = await import(`./runner?parallel=${Date.now()}`)
       const runPromise = runDoctor({ mode: "default" })
@@ -217,13 +229,17 @@ describe("runner", () => {
       deferredTwo.resolve(createPassResult("Configuration"))
       deferredThree.resolve(createPassResult("Tools"))
       deferredFour.resolve(createPassResult("Models"))
+      deferredDistTags.resolve(new Response(JSON.stringify({ latest: "3.5.0" }), { status: 200 }))
       const result = await runPromise
 
       //#then
       console.log = originalLog
-      expect(startedBeforeResolve.sort()).toEqual(["config", "models", "system", "tools"])
+      globalThis.fetch = originalFetch
+      expect(startedBeforeResolve.sort()).toEqual(["config", "latest", "models", "system", "tools"])
+      expect(requestedUrls).toEqual(["https://registry.npmjs.org/-/package/oh-my-openagent/dist-tags"])
       expect(result.results.length).toBe(4)
       expect(result.exitCode).toBe(0)
+      expect(result.latestVersion).toBe("3.5.0")
       expect(formatDoctorOutputMock).toHaveBeenCalledTimes(1)
       expect(formatJsonOutputMock).toHaveBeenCalledTimes(0)
     })

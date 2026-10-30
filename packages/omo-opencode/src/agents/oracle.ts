@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { buildClaudeThinkingConfig, isGpt5_5Model, isGpt5_6Model, isGptModel } from "./types";
+import { buildClaudeThinkingConfig, isGpt5_5Model, isGpt5_6Model, isGpt6Model, isGptModel } from "./types";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -319,7 +319,7 @@ Hard limits (enforced, not suggestions):
 - Edge cases: up to 3 items, only when applicable.
 - Do not rephrase the user's request unless semantics change.
 
-Never open with filler: "Great question!", "That's a great idea!", "You're right to call that out", "Done —", "Got it", "Sure thing", "Happy to help". Start with the bottom line.
+Never open with filler: "Great question!", "That's a great idea!", "You're right to call that out", "Done ${String.fromCodePoint(0x2014)}", "Got it", "Sure thing", "Happy to help". Start with the bottom line.
 
 ## Uncertainty and ambiguity
 
@@ -426,7 +426,7 @@ export function createOracleAgent(model: string): AgentConfig {
     prompt: ORACLE_DEFAULT_PROMPT,
   } as AgentConfig;
 
-  if (isGpt5_6Model(model)) {
+  if (isGpt5_6Model(model) || isGpt6Model(model)) {
     return {
       ...base,
       prompt: ORACLE_GPT_5_5_PROMPT,

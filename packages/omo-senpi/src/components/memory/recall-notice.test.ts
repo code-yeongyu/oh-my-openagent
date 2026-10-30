@@ -41,6 +41,6 @@ describe("renderRecallEntry", () => {
 
   test("#given the renderer channel #when its custom type is read #then it matches the injected recall message", () => {
     // given / when / then
-    expect(RECALL_CUSTOM_TYPE).toBe("omo-memorian:recall")
+    expect(RECALL_CUSTOM_TYPE).toBe("omo-kibitzer:recall")
   })
 })

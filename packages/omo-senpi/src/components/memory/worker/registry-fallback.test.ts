@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { readModelPricing, selectRegistryFallbackModels } from "./registry-fallback"
+import { readModelContextWindow, readModelPricing, selectRegistryFallbackModels } from "./registry-fallback"
 
 const priced = (provider: string, id: string, input: number, contextWindow = 200_000) => ({
   provider,
@@ -51,7 +51,11 @@ describe("selectRegistryFallbackModels", () => {
 
     test("#when the context window is below the reflection floor #then it is excluded", () => {
       // given: reflection reads transcript slices, so a tiny window cannot serve it
-      const available = [priced("x", "tiny", 0.01, 8_192), priced("x", "roomy", 1, 200_000)]
+      const available = [
+        priced("x", "tiny", 0.01, 8_192),
+        priced("x", "old-floor", 0.02, 65_536),
+        priced("x", "roomy", 1, 131_072),
+      ]
 
       // when / then
       expect(selectRegistryFallbackModels(available).map((entry) => entry.model)).toEqual(["x/roomy"])
@@ -84,6 +88,15 @@ describe("selectRegistryFallbackModels", () => {
         "local/heavyweight",
       ])
     })
+  })
+})
+
+describe("readModelContextWindow", () => {
+  test("#given registry entries #when read #then only a numeric context window survives", () => {
+    expect(readModelContextWindow({ contextWindow: 272_000 })).toBe(272_000)
+    expect(readModelContextWindow({ contextWindow: "272000" })).toBeUndefined()
+    expect(readModelContextWindow({})).toBeUndefined()
+    expect(readModelContextWindow(undefined)).toBeUndefined()
   })
 })
 

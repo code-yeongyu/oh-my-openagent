@@ -1,9 +1,10 @@
 import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { GitMemoryRepo } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
+import type { SyncStatusReader } from "./sync-status-surface"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
@@ -12,6 +13,7 @@ export const MEMORY_PRESSURE_SOFT_RATIO = 0.8
 export const MEMORY_STATUS_MAX_WIDTH = 60
 /** A streak at or above this many consecutive failures earns the `!N` badge. */
 const STREAK_BADGE_THRESHOLD = 3
+export const SYNC_BLOCKED_SEGMENT = " sync blocked"
 /** Shared health history bound so footer and RPC streaks are computed from the same window. */
 export const MEMORY_HEALTH_SCAN_LIMIT = 20
 const SECOND_MS = 1_000
@@ -37,6 +39,9 @@ export interface MemoryStatusSegments {
   readonly dirty: boolean
   readonly backlogSteps: number
   readonly streak: number
+  readonly parked: boolean
+  /** Memory sync for this repository is failing (#10637); never trimmed from the line. */
+  readonly syncBlocked?: boolean
 }
 
 export interface MemoryStatusResult {
@@ -57,6 +62,8 @@ export interface RefreshMemoryStatusInput {
   readonly requestPressureDream?: () => void
   /** Bound session whose reflection backlog feeds the ` (+N)` segment; omitted means no backlog. */
   readonly sessionId?: string
+  /** Reads the repository's sync status for the ` sync blocked` segment; omitted means no segment. */
+  readonly syncStatus?: SyncStatusReader
 }
 
 export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Promise<MemoryStatusResult> {
@@ -71,7 +78,7 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
       ? null
       : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
     if (age !== null) {
-      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId)
+      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus)
       input.ui.setStatus(
         MEMORY_STATUS_KEY,
         formatMemoryStatusLine(input.context.identity, age, segments),
@@ -107,33 +114,51 @@ export async function readMemoryStatusSegments(
   repo: GitRepoForStatus,
   context: MemoryIdentityContext,
   sessionId: string | undefined,
+  syncStatus?: SyncStatusReader,
 ): Promise<MemoryStatusSegments> {
-  const [dirty, backlogSteps, streak] = await Promise.all([
+  const [dirty, backlogSteps, streak, parked, syncBlocked] = await Promise.all([
     readDirty(repo),
     readBacklogSteps(context, sessionId),
     readStreak(context),
+    readParked(context),
+    readSyncBlocked(context, syncStatus),
   ])
-  return { dirty, backlogSteps, streak }
+  return { dirty, backlogSteps, streak, parked, syncBlocked }
 }
 
-/** Assembles `mem:<identity> <age>[*][ (+N)][ !N]`, dropping segments right-to-left to fit. */
+/**
+ * Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused][ sync blocked]`, dropping the optional
+ * segments right-to-left to fit. ` sync blocked` is never dropped: it is the one segment that asks
+ * the person to act.
+ */
 export function formatMemoryStatusLine(
   identity: string,
   age: string,
   segments: MemoryStatusSegments,
 ): string {
   const base = `mem:${identity} ${age}`
+  const sync = segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : ""
   const optional: string[] = [
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
     segments.streak >= STREAK_BADGE_THRESHOLD ? ` !${segments.streak}` : "",
+    segments.parked ? " paused" : "",
   ]
-  // Drop right-to-left (`!N`, then `(+N)`, then `*`) until the line fits the budget.
+  // Drop right-to-left (`paused`, then `!N`, then `(+N)`, then `*`) until the line fits the budget.
   for (let keep = optional.length; keep > 0; keep -= 1) {
-    const candidate = base + optional.slice(0, keep).join("")
+    const candidate = base + optional.slice(0, keep).join("") + sync
     if (candidate.length <= MEMORY_STATUS_MAX_WIDTH) return candidate
   }
-  return base
+  return base + sync
+}
+
+async function readSyncBlocked(context: MemoryIdentityContext, syncStatus: SyncStatusReader | undefined): Promise<boolean> {
+  if (syncStatus === undefined) return false
+  try {
+    return (await syncStatus(context.identityPaths.repo))?.kind === "failing"
+  } catch {
+    return false
+  }
 }
 
 async function readDirty(repo: GitRepoForStatus): Promise<boolean> {
@@ -161,6 +186,14 @@ async function readBacklogSteps(
   }
 }
 
+async function readParked(context: MemoryIdentityContext): Promise<boolean> {
+  try {
+    return (await readReflectionParkFile(context.identityPaths.reflection)).parkedAt !== undefined
+  } catch {
+    return false
+  }
+}
+
 async function readStreak(context: MemoryIdentityContext): Promise<number> {
   try {
     const health = await readReflectionHealth(
@@ -171,6 +204,26 @@ async function readStreak(context: MemoryIdentityContext): Promise<number> {
   } catch {
     return 0
   }
+}
+
+/**
+ * The same estimate, computed once per commit. A commit is immutable, so a second caller at the same
+ * HEAD is owed the identical number and nothing has to be re-read to produce it; the prompt path asks
+ * on every turn and would otherwise list the tree and read every system blob each time.
+ *
+ * A failed read is NOT cached and NOT swallowed. Reporting zero for a repository whose size is merely
+ * unknown is the one answer that silences the advisory exactly when it cannot be trusted.
+ */
+export async function estimateSystemTokensCached(
+  repo: GitRepoForStatus,
+  head: string,
+  cache: Map<string, number>,
+): Promise<number> {
+  const cached = cache.get(head)
+  if (cached !== undefined) return cached
+  const estimate = await estimateSystemTokens(repo, head)
+  cache.set(head, estimate)
+  return estimate
 }
 
 export async function estimateSystemTokens(repo: GitRepoForStatus, head: string): Promise<number> {

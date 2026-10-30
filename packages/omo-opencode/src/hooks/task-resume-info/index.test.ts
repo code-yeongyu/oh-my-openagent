@@ -75,7 +75,7 @@ describe("createTaskResumeInfoHook", () => {
 
         await afterHook(input, output)
 
-        expect(output.output).toContain("run_in_background=false")
+        expect(output.output).toContain("run_in_background=true")
         expect(output.output).toContain('task_id="ses_abc123"')
       })
     })
@@ -123,7 +123,7 @@ describe("createTaskResumeInfoHook", () => {
         const output = {
           title: "task",
           output:
-            'Done.\nSession ID: ses_abc123\nto continue: task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="...")',
+            'Done.\nSession ID: ses_abc123\nto continue: task(task_id="ses_abc123", load_skills=[], run_in_background=true, prompt="...")',
           metadata: {},
         }
 

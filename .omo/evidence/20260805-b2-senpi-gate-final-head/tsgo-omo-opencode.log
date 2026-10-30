@@ -1,3 +1,0 @@
-$ bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
-(no diagnostics)
-exit=0

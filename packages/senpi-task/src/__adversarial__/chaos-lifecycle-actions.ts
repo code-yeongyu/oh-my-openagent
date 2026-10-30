@@ -37,7 +37,7 @@ export async function crashMidSuspend(state: ChaosState): Promise<void> {
   const engine = state.harness.engines.find((candidate) => candidate.manager.getResidentHandle(id) !== undefined)
   const handle = engine?.manager.getResidentHandle(id)
   if (engine === undefined || handle === undefined) return
-  engine.manager.forget(id)
+  engine.manager.forget(id, { path: "park" })
   await handle.abort()
   await engine.lifecycle.reconcileOnSessionStart(CHAOS_SESSION)
   state.harness.observeLiveHandles()
@@ -101,7 +101,7 @@ export async function massReviveAtCap(state: ChaosState): Promise<void> {
     record.parent_session_id === CHAOS_SESSION && record.residency_state === "resident" && record.status === "running")
   if (resident === undefined) return
   const owner = state.harness.engines.find((engine) => engine.manager.getResidentHandle(resident.task_id) !== undefined)
-  owner?.manager.forget(resident.task_id)
+  owner?.manager.forget(resident.task_id, { path: "park" })
   const before = state.harness.store.load(resident.task_id)?.notification.run_epoch
   await owner?.lifecycle.reconcileOnSessionStart(CHAOS_SESSION)
   const after = state.harness.store.load(resident.task_id)
@@ -114,7 +114,7 @@ export async function massReviveAtCap(state: ChaosState): Promise<void> {
     record.task_id !== resident.task_id && record.residency_state === "resident" && record.status === "running")
   if (killed === undefined) return
   const killedOwner = state.harness.engines.find((engine) => engine.manager.getResidentHandle(killed.task_id) !== undefined)
-  killedOwner?.manager.forget(killed.task_id)
+  killedOwner?.manager.forget(killed.task_id, { path: "park" })
   state.harness.store.mutate(killed.task_id, (fresh) => ({ ...fresh, killed: true }))
   await killedOwner?.lifecycle.reconcileOnSessionStart(CHAOS_SESSION)
   if (state.harness.store.load(killed.task_id)?.residency_state !== "disposed") {

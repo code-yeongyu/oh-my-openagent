@@ -1,0 +1,231 @@
+import type { DagTaskOwner } from "../dag/owner"
+import type { TaskStartFailureRecordFields } from "./start-failure"
+import type {
+  BackgroundMode,
+  EffectiveModelRecord,
+  HostSessionIdentity,
+  IsolationRecord,
+  ResolvedModelRecord,
+  ResidencyState,
+  RunnerKind,
+  SuspensionReason,
+  TaskAwaitingInput,
+  TaskIsolationSpec,
+  TaskStatus,
+} from "./types"
+import type { TaskRunStats } from "./run-stats-types"
+
+/** An interrupt the parent did not request: the host replaced the child's session mid-turn. */
+export type TaskInterruptCause = "session_replaced"
+
+export const PARENT_MODEL_FALLBACK_REASONS = ["usage_limit", "not_signed_in", "unavailable", "refused", "error"] as const
+
+export type ParentModelFallbackReason = (typeof PARENT_MODEL_FALLBACK_REASONS)[number]
+
+/**
+ * Why a category child ended up on its parent session's model (#10750): every rung of its category
+ * chain failed first. `detail` is the provider's first error line, `resets` the reset time it named,
+ * and `interrupted_tools` the tool calls the failed model was still writing (never run).
+ */
+export type ParentModelFallback = {
+  readonly from_model: string
+  readonly reason: ParentModelFallbackReason
+  readonly detail?: string
+  readonly resets?: string
+  readonly interrupted_tools?: readonly string[]
+  readonly at: string
+  /**
+   * Derived on read, never persisted (#10797): absent once a child is observed on the parent's model;
+   * `switching` while the handoff onto it is in flight, `unconfirmed` when the task ended without a child ever
+   * being observed on it (never spawned, or spawned without reporting its model and died before its first message).
+   */
+  readonly phase?: ParentModelFallbackPhase
+}
+
+export type ParentModelFallbackPhase = "switching" | "unconfirmed"
+
+export type TaskNotification = {
+  readonly run_epoch: number
+  readonly notified_epoch: number
+  readonly notification_failed_epoch?: number
+  readonly liveness_notified_epoch?: number
+}
+
+export type StartQueued = {
+  readonly model: string
+  readonly queued_at: string
+  readonly queue_position: number
+}
+
+export type ReviveDeliveryUncertainty = {
+  readonly run_epoch: number
+  readonly message_sha256: string
+}
+
+export type LegacyProcessSpawnSpec = {
+  readonly cwd: string
+  readonly extensions?: readonly string[]
+  readonly member_env?: Readonly<Record<string, string>>
+}
+
+export type SpawnSpecV1 = {
+  readonly isolation?: TaskIsolationSpec
+  readonly version: 1
+  readonly cwd: string
+  readonly prompt: string
+  readonly instructions?: string
+  readonly member_scoped_tool_names?: readonly string[]
+}
+
+export type TaskSpawnSpec = LegacyProcessSpawnSpec | SpawnSpecV1
+
+export function isSpawnSpecV1(spec: TaskSpawnSpec): spec is SpawnSpecV1 {
+  return "version" in spec && spec.version === 1
+}
+
+export type PendingSteeringEntry = {
+  readonly id: string
+  readonly message: string
+  readonly deliver_as: "steer" | "followUp"
+  readonly workpool?: {
+    readonly pool_id: string
+    readonly item_id: string
+    readonly key: string
+    readonly generation: number
+    readonly run_epoch: number
+  }
+}
+
+export type TaskRecordInput = {
+  readonly task_id?: string
+  readonly name?: string
+  readonly task_summary?: string
+  readonly description?: string
+  readonly parent_session_id: string
+  readonly root_session_id: string
+  readonly depth: number
+  readonly agent_type?: string
+  readonly category?: string
+  readonly execution_mode: string
+  readonly model: string
+  readonly requested_model?: ResolvedModelRecord
+  readonly fallback_models?: readonly ResolvedModelRecord[]
+  readonly fallback_attempts?: readonly ResolvedModelRecord[]
+  readonly resolved_model?: ResolvedModelRecord
+  /** The parent session's model at spawn (`provider/model`); a category child's last fallback rung (#10750). */
+  readonly parent_model?: string
+  /**
+   * The model the child ACTUALLY runs, recorded once the runner is up (#9722) and kept current
+   * from the child's own model observations AND its live model events - model_changed (any
+   * source) plus the two retry-fallback events (F12). `model`/`resolved_model` state the plan,
+   * this states the route that ran. Absent on records predating the field or a child whose
+   * effective model could not be observed.
+   */
+  readonly effective_model?: EffectiveModelRecord
+  readonly tool_allow?: readonly string[]
+  readonly tool_deny?: readonly string[]
+  readonly notify_on_terminal: boolean
+  readonly pending_steering?: readonly PendingSteeringEntry[]
+  readonly owner?: DagTaskOwner
+  readonly team_run_id?: string
+  readonly team_name?: string
+  readonly team_member_name?: string
+  readonly team_role?: "member"
+  readonly task_seq?: number
+  readonly config_generation?: number
+  readonly background_mode?: BackgroundMode
+  readonly runner_kind?: RunnerKind
+  readonly host_session?: HostSessionIdentity
+}
+
+export type RecordedRunPause = {
+  readonly parent_session_id: string
+  readonly parent_pause_seq: number
+  readonly run_ref: { readonly kind: "dag" | "task" | "workpool" | "team"; readonly id: string }
+}
+
+export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
+  readonly effect_seq?: number
+  /** The exact id of the last identified input this task sent; reconciliation reads its receipt by it. */
+  readonly last_effect_id?: string
+  readonly uncertain_inputs?: readonly import("../runners/input-effects").IdentifiedInput[]
+  readonly isolation?: IsolationRecord
+  readonly task_id: string
+  readonly status: TaskStatus
+  readonly residency_state: ResidencyState
+  readonly created_at: string
+  readonly updated_at: string
+  readonly started_at?: string
+  /** Live snapshot metadata from the owning handle, not a persisted liveness claim. */
+  readonly last_seen_at?: string
+  readonly host_liveness?: import("./host-liveness").HostLivenessStatus
+  readonly terminal_at?: string
+  readonly pid?: number
+  readonly host_pid?: number
+  readonly child_session_id?: string
+  readonly spawn_spec?: TaskSpawnSpec
+  /** Mirrors TaskRecordInput.effective_model; see there. */
+  readonly effective_model?: EffectiveModelRecord
+  /** Set once the child moved onto `parent_model` (#10750): when and why. */
+  readonly parent_model_fallback?: ParentModelFallback
+  readonly final_response?: string
+  readonly error_message?: string
+  /** Why a run was interrupted when the parent did not ask for it; such an interrupt notifies the parent. */
+  readonly interrupt_cause?: TaskInterruptCause
+  readonly stop_reason?: "deadline"
+  readonly deadline?: Readonly<Record<string, unknown>>
+  // Exit observed, cause unconfirmed: status stays running until the owning manager confirms it.
+  readonly provisional_exit?: {
+    readonly observed_at: string
+    readonly run_epoch: number
+    readonly code: number | null
+    readonly signal: string | null
+  }
+  readonly killed?: boolean
+  readonly run_stats?: TaskRunStats
+  // USD the provider reported for this task's EARLIER runs: each revive folds the finished run's
+  // reported `run_stats.cost_usd` in before it drops `run_stats`, so a task's lifetime spend is this
+  // plus the current run's. Absent while no earlier run reported a positive cost.
+  readonly prior_runs_cost_usd?: number
+  readonly notification: TaskNotification
+  readonly revive_delivery_uncertain?: ReviveDeliveryUncertainty
+  readonly resumed_run_epoch?: number
+  // The run_epoch the current user-visible run began at: the spawn epoch, then the epoch of each
+  // revive (a send to a finished task, a self-resumed turn). run_epoch also moves inside one run
+  // (start-time model fallback, runtime fallback handoff, reattach), so a handle minted anywhere in
+  // [run_start_epoch, run_epoch] still names the current run. Absent on records written before it.
+  readonly run_start_epoch?: number
+  // The highest epoch a rollback took back (`rollbackDetachedRevival`). It was issued once, so it is never issued
+  // again: the next run starts above it, and a handle minted for the undone run stays stale instead of naming a
+  // later one. Absent when no rollback ever undid a run.
+  readonly burnt_epoch?: number
+  readonly start_queued?: StartQueued
+  readonly suspension_reason?: SuspensionReason
+  // With `suspension_reason: "revival_deferred"`: the reconcile outcome's reason (capacity, lock_contended, ...).
+  readonly revival_deferred_reason?: string
+  // The reattach found the resumed session's last turn ended aborted (or never answered) and idle:
+  // nothing can continue it but the user. Cleared by a successful delivery, a plain reattach, or terminal (senpi#3266).
+  readonly awaiting_input?: TaskAwaitingInput
+  // One parked episode's absolute deadline; retry writes and parent restarts must not extend it.
+  readonly recovery_deadline_at?: number
+  // The run that paused this child (senpi#3811): a restarted host re-holds it under exactly this owner.
+  readonly run_pause?: RecordedRunPause
+  readonly runner_kind?: RunnerKind
+  readonly host_session?: HostSessionIdentity
+  readonly fallback_handoff_epoch?: number
+  readonly fallback_closing_child?: {
+    readonly pid?: number
+    readonly host_session?: HostSessionIdentity
+    // #9350: silence is not proof of closure after a suspended daemon child is failed.
+    readonly requires_confirmation?: boolean
+  }
+  readonly residency_claim?: string
+  // task_cancel accepted while the child was unreachable (omo#9403). The cancel is final: every
+  // revival reads it and finishes the cancel instead of running the child again.
+  readonly cancel_requested?: CancelRequest
+}
+
+export type CancelRequest = {
+  readonly requested_at: string
+  readonly reason?: string
+}

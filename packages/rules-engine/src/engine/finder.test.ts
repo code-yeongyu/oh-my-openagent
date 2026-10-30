@@ -20,6 +20,7 @@ function makePluginRoot(): string {
 	mkdirSync(hephaestusDir, { recursive: true });
 	writeFileSync(join(hephaestusDir, "gpt-5.5.md"), "---\nalwaysApply: true\n---\nGPT-5.5 variant\n");
 	writeFileSync(join(hephaestusDir, "gpt-5.6.md"), "---\nalwaysApply: true\n---\nGPT-5.6 variant\n");
+	writeFileSync(join(hephaestusDir, "gpt-6.md"), "---\nalwaysApply: true\n---\nGPT-6 variant\n");
 	writeFileSync(join(pluginRoot, "bundled-rules", "other.md"), "---\nalwaysApply: true\n---\nOther\n");
 	return pluginRoot;
 }
@@ -33,7 +34,7 @@ function relativePaths(pluginRoot: string, model?: string): string[] {
 }
 
 describe("engine findPluginBundledCandidates hephaestus model variants", () => {
-	describe("#given hephaestus variant files for gpt-5.5 and gpt-5.6", () => {
+	describe("#given hephaestus variant files for gpt-5.5, gpt-5.6, and gpt-6", () => {
 		it("#when no model is provided #then only the gpt-5.5 default variant is selected", () => {
 			const pluginRoot = makePluginRoot();
 
@@ -61,6 +62,29 @@ describe("engine findPluginBundledCandidates hephaestus model variants", () => {
 				expect(paths).toContain("bundled-rules/hephaestus/gpt-5.6.md");
 				expect(paths).not.toContain("bundled-rules/hephaestus/gpt-5.5.md");
 			}
+		});
+
+		for (const model of ["gpt-6-astra", "gpt-6-astra-fast", "openai/GPT-6-ASTRA"]) {
+			it(`#when the model is ${model} #then only the gpt-6 variant is selected`, () => {
+				const pluginRoot = makePluginRoot();
+
+				const paths = relativePaths(pluginRoot, model);
+
+				expect(paths.filter((path) => path.startsWith("bundled-rules/hephaestus/"))).toEqual([
+					"bundled-rules/hephaestus/gpt-6.md",
+				]);
+				expect(paths).toContain("bundled-rules/other.md");
+			});
+		}
+
+		it("#when the model is gpt-5.6-sol #then it is not mistaken for the gpt-6 family", () => {
+			const pluginRoot = makePluginRoot();
+
+			const paths = relativePaths(pluginRoot, "gpt-5.6-sol");
+
+			expect(paths.filter((path) => path.startsWith("bundled-rules/hephaestus/"))).toEqual([
+				"bundled-rules/hephaestus/gpt-5.6.md",
+			]);
 		});
 
 		it("#when the model is an older slug #then the gpt-5.5 variant is the fallback", () => {

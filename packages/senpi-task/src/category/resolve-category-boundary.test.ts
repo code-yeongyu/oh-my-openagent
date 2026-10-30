@@ -34,7 +34,7 @@ function throwingProviderAccessorModel(message: string): object {
     },
     id: {
       enumerable: true,
-      value: "kimi-for-coding-highspeed",
+      value: "gpt-6-luna-fast",
     },
   })
 }
@@ -50,8 +50,8 @@ describe("resolveCategory boundary parsing", () => {
   test("#given a registry model with legal headers #when resolved #then the header-bearing model is accepted", () => {
     // given
     const headerModel = {
-      provider: "kimi-coding",
-      id: "kimi-for-coding-highspeed",
+      provider: "chatgpt-subscription",
+      id: "gpt-6-luna-fast",
       headers: { "User-Agent": "test" },
     }
 
@@ -60,8 +60,8 @@ describe("resolveCategory boundary parsing", () => {
 
     // then
     const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("kimi-coding")
-    expect(resolved.spec.modelId).toBe("kimi-for-coding-highspeed")
+    expect(resolved.spec.provider).toBe("chatgpt-subscription")
+    expect(resolved.spec.modelId).toBe("gpt-6-luna-fast")
     expect(resolved.spec.model).toBe(headerModel)
   })
 
@@ -79,7 +79,7 @@ describe("resolveCategory boundary parsing", () => {
     expect(result.kind).toBe("model_unavailable")
     if (result.kind !== "model_unavailable") throw new Error("Expected unavailable result")
     expect(result.category).toBe("quick")
-    expect(result.attemptedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
+    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
     expect(result.availableModels).toEqual([])
   })
 
@@ -98,7 +98,7 @@ describe("resolveCategory boundary parsing", () => {
     // then
     expect(result.kind).toBe("model_unavailable")
     if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
-    expect(result.attemptedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
+    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
     expect(result.availableModels).toEqual([])
     expect(JSON.stringify(result)).not.toContain("hidden available accessor marker")
   })
@@ -107,12 +107,12 @@ describe("resolveCategory boundary parsing", () => {
     // given
     const malformedFindResults = [
       {},
-      { provider: { secret: "hidden" }, id: ["kimi-for-coding-highspeed"] },
-      { provider: "kimi-coding", id: "kimi-for-coding-highspeed", password: "hidden" },
-      { provider: "kimi-coding", id: "kimi-for-coding-highspeed", accessToken: "hidden" },
-      { provider: "kimi-coding", id: "kimi-for-coding-highspeed", privateToken: "hidden" },
+      { provider: { secret: "hidden" }, id: ["gpt-6-luna-fast"] },
+      { provider: "chatgpt-subscription", id: "gpt-6-luna-fast", password: "hidden" },
+      { provider: "chatgpt-subscription", id: "gpt-6-luna-fast", accessToken: "hidden" },
+      { provider: "chatgpt-subscription", id: "gpt-6-luna-fast", privateToken: "hidden" },
     ]
-    const availableModel = model("kimi-coding", "kimi-for-coding-highspeed")
+    const availableModel = model("chatgpt-subscription", "gpt-6-luna-fast")
 
     // when
     const results = malformedFindResults.map((findResult) => resolveCategory("quick", {}, {
@@ -124,15 +124,15 @@ describe("resolveCategory boundary parsing", () => {
     for (const result of results) {
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
-      expect(result.attemptedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
-      expect(result.availableModels).toEqual(["kimi-coding/kimi-for-coding-highspeed"])
+      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
+      expect(result.availableModels).toEqual(["chatgpt-subscription/gpt-6-luna-fast"])
       expect(JSON.stringify(result)).not.toContain("hidden")
     }
   })
 
   test("#given find returns a throwing-accessor model #when resolved #then category resolution returns sanitized model_unavailable", () => {
     // given
-    const availableModel = model("kimi-coding", "kimi-for-coding-highspeed")
+    const availableModel = model("chatgpt-subscription", "gpt-6-luna-fast")
     const throwingModel = throwingProviderAccessorModel("hidden find accessor marker")
     const resolver = () => resolveCategory("quick", {}, {
       getAvailable: () => [availableModel],
@@ -146,18 +146,18 @@ describe("resolveCategory boundary parsing", () => {
     // then
     expect(result.kind).toBe("model_unavailable")
     if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
-    expect(result.attemptedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
-    expect(result.availableModels).toEqual(["kimi-coding/kimi-for-coding-highspeed"])
+    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
+    expect(result.availableModels).toEqual(["chatgpt-subscription/gpt-6-luna-fast"])
     expect(JSON.stringify(result)).not.toContain("hidden find accessor marker")
   })
 
   test("#given find returns an empty or mismatched identity #when resolved #then category resolution rejects the registry result", () => {
     // given
-    const availableModel = model("kimi-coding", "kimi-for-coding-highspeed")
+    const availableModel = model("chatgpt-subscription", "gpt-6-luna-fast")
     const malformedFindResults = [
       { provider: "", id: "" },
       { provider: "evil", id: "other" },
-      { provider: "kimi-coding", id: "" },
+      { provider: "chatgpt-subscription", id: "" },
     ] satisfies readonly FakeModel[]
 
     // when
@@ -169,15 +169,15 @@ describe("resolveCategory boundary parsing", () => {
     // then
     for (const result of results) {
       if (result.kind === "resolved") {
-        expect(result.modelSelection.selectedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
+        expect(result.modelSelection.selectedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
         expect(result.spec.provider).not.toBe("evil")
         expect(result.spec.modelId).not.toBe("")
         throw new Error(`Expected unavailable result, got resolved ${result.spec.provider}/${result.spec.modelId}`)
       }
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
-      expect(result.attemptedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
-      expect(result.availableModels).toEqual(["kimi-coding/kimi-for-coding-highspeed"])
+      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
+      expect(result.availableModels).toEqual(["chatgpt-subscription/gpt-6-luna-fast"])
       expect(JSON.stringify(result)).not.toContain("evil")
       expect(JSON.stringify(result)).not.toContain("other")
     }
@@ -185,10 +185,10 @@ describe("resolveCategory boundary parsing", () => {
 
   test("#given inherited model identity fields #when resolved #then category resolution rejects them without leaking prototype data", () => {
     // given
-    const availableModel = model("kimi-coding", "kimi-for-coding-highspeed")
+    const availableModel = model("chatgpt-subscription", "gpt-6-luna-fast")
     const inheritedIdentityModel: object = Object.create({
-      provider: "kimi-coding",
-      id: "kimi-for-coding-highspeed",
+      provider: "chatgpt-subscription",
+      id: "gpt-6-luna-fast",
       privateToken: "hidden",
     })
 
@@ -201,8 +201,8 @@ describe("resolveCategory boundary parsing", () => {
     // then
     expect(result.kind).toBe("model_unavailable")
     if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
-    expect(result.attemptedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
-    expect(result.availableModels).toEqual(["kimi-coding/kimi-for-coding-highspeed"])
+    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
+    expect(result.availableModels).toEqual(["chatgpt-subscription/gpt-6-luna-fast"])
     expect(JSON.stringify(result)).not.toContain("hidden")
   })
 
@@ -210,28 +210,28 @@ describe("resolveCategory boundary parsing", () => {
     // given
     const malformedAvailableResults = [
       null,
-      { 0: model("kimi-coding", "kimi-for-coding-highspeed"), length: 1 },
-      "kimi-coding/kimi-for-coding-highspeed",
+      { 0: model("chatgpt-subscription", "gpt-6-luna-fast"), length: 1 },
+      "chatgpt-subscription/gpt-6-luna-fast",
     ]
 
     // when
     const results = malformedAvailableResults.map((availableResult) => resolveCategory("quick", {}, {
       getAvailable: () => availableResult,
-      find: () => model("kimi-coding", "kimi-for-coding-highspeed"),
+      find: () => model("chatgpt-subscription", "gpt-6-luna-fast"),
     }))
 
     // then
     for (const result of results) {
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error(`Expected unavailable result, got ${result.kind}`)
-      expect(result.attemptedModel).toBe("kimi-coding/kimi-for-coding-highspeed")
+      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-luna-fast")
       expect(result.availableModels).toEqual([])
     }
   })
 
   test("#given prototype-shaped category names #when resolved #then they return not_found instead of inherited object values", () => {
     // given
-    const models = registry([model("kimi-coding", "kimi-for-coding-highspeed")])
+    const models = registry([model("chatgpt-subscription", "gpt-6-luna-fast")])
 
     // when
     const results = ["__proto__", "toString", "hasOwnProperty"].map((category) =>

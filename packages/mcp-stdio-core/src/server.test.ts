@@ -408,9 +408,9 @@ describe("idle timeout", () => {
   })
 
   test("#given an explicitly zero idle timeout #when the server idles on a held-open pipe #then no idle timer is created", async () => {
-    // Callers on no-respawn hosts (codex: lsp proxy, git_bash, the codegraph
-    // unavailable stub) pin idleTimeoutMs: 0 and rely on zero meaning "no
-    // timer at all": the loop must park until stdin closes or the parent
+    // Callers on no-respawn hosts (codex: lsp proxy, git_bash) pin
+    // idleTimeoutMs: 0 and rely on zero meaning "no timer at all": the loop
+    // must park until stdin closes or the parent
     // dies — never be torn down by a default timer that became live in #6548.
     const input = new PassThrough()
     const output = new PassThrough()

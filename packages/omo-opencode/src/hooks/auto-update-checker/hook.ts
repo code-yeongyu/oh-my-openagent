@@ -4,6 +4,7 @@ import { log } from "../../shared/logger"
 import type { AutoUpdateCheckerOptions } from "./types"
 import { getBundledVersion, getCachedVersion, getLocalDevVersion } from "./checker"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
+import { trackLoadedPluginSandbox } from "./checker/sandbox-refresh"
 import { scheduleDeferredStartupCheck } from "./hook/deferred-startup-check"
 import { showConfigErrorsIfAny } from "./hook/config-errors-toast"
 import { updateAndShowConnectedProvidersCacheStatus } from "./hook/connected-providers-status"
@@ -24,6 +25,8 @@ interface AutoUpdateCheckerDeps {
   showVersionToast: typeof showVersionToast
   runBackgroundUpdateCheck: typeof runBackgroundUpdateCheck
   log: typeof log
+  /** Registers the exit-time sandbox refresh for this process (see checker/sandbox-refresh.ts). */
+  trackLoadedPluginSandbox?: () => void
 }
 
 const defaultDeps: AutoUpdateCheckerDeps = {
@@ -38,6 +41,7 @@ const defaultDeps: AutoUpdateCheckerDeps = {
   showVersionToast,
   runBackgroundUpdateCheck,
   log,
+  trackLoadedPluginSandbox: () => trackLoadedPluginSandbox(),
 }
 
 const getParentID = (properties: unknown): string | undefined => {
@@ -62,6 +66,7 @@ export function createAutoUpdateCheckerHook(
     modelCapabilities,
   } = options
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true"
+  deps.trackLoadedPluginSandbox?.()
 
   const getToastMessage = (isUpdate: boolean, latestVersion?: string): string => {
     if (isSisyphusEnabled) {

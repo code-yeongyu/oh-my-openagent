@@ -104,6 +104,7 @@ export function instrumentCompletionNotifier(
     reconcileFailedNotifications(input) {
       this.reconcileUnnotifiedNotifications(input)
     },
+    recordDeliveryFailure: (input) => notifier.recordDeliveryFailure(input),
     bufferedCount: (sessionId) => notifier.bufferedCount(sessionId),
   }
 }

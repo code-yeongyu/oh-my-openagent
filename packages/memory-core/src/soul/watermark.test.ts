@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
-import { consumeSoulNoticeDelta } from "./watermark"
+import { consumeSoulNoticeDelta, SOUL_SCAN_PAGE } from "./watermark"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
+import { observeWatermarkPublication, withWatermarkReadFault } from "../concurrency/watermark-publication.test-support"
 
 const AUTHOR: GitCommitAuthor = {
   agentId: "agent-soul-watermark-test",
@@ -18,7 +20,7 @@ const roots: string[] = []
 setDefaultTimeout(WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function fixture(): Promise<{
@@ -59,6 +61,39 @@ async function readWatermark(noticesDir: string): Promise<unknown> {
 const IN_BAND = "Omo-Writer: memory-tool\nOmo-Session: session-1\nOmo-Turn: 3"
 
 describe("consumeSoulNoticeDelta", () => {
+  it("#given staged publication #when the writer pauses after truncation and partial writes #then readers see old or new state and each writer owns a unique temporary", async () => {
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed\n", "seed")
+    await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const target = join(noticesDir, "soul-head.json")
+    const temporaries: string[] = []
+    for (const revision of ["first", "second"]) {
+      const head = await commit(repo, "system/persona.md", `${revision}\n`, revision)
+      temporaries.push(await observeWatermarkPublication(target, () =>
+        consumeSoulNoticeDelta(repo, { noticesDir, locksDir }),
+      ))
+      expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })
+    }
+    expect(new Set(temporaries).size).toBe(2)
+  })
+
+  it.each(["malformed", "invalid-shape", "missing", "unreadable"] as const)(
+    "#given a %s unlocked read #when consumed #then the locked reread still delivers the real soul delta",
+    async (fault) => {
+      const { repo, noticesDir, locksDir } = await fixture()
+      await commit(repo, "system/persona.md", "seed\n", "seed")
+      await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+      const head = await commit(repo, "system/persona.md", "reflection\n", "reflection")
+      await withWatermarkReadFault(join(noticesDir, "soul-head.json"), fault, async () => {
+        expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toEqual({
+          sha: head, subject: "reflection",
+        })
+      })
+      expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })
+      expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toBeUndefined()
+    },
+  )
+
   it("#given no watermark file #when consumed #then the watermark is established silently at HEAD with no notice", async () => {
     // given
     const { repo, noticesDir, locksDir } = await fixture()
@@ -73,7 +108,7 @@ describe("consumeSoulNoticeDelta", () => {
     expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })
   })
 
-  it("#given a watermark behind HEAD with an out-of-band persona commit #when consumed #then exactly one notice is emitted and the watermark advances", async () => {
+  it("#given a watermark behind HEAD with an out-of-band persona commit #when consumed concurrently #then exactly one notice is emitted and the watermark advances", async () => {
     // given
     const { repo, noticesDir, locksDir } = await fixture()
     await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
@@ -87,12 +122,49 @@ describe("consumeSoulNoticeDelta", () => {
     )
 
     // when
-    const notice = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const notices = await Promise.all([
+      consumeSoulNoticeDelta(repo, { noticesDir, locksDir }),
+      consumeSoulNoticeDelta(repo, { noticesDir, locksDir }),
+    ])
     const replay = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
 
     // then
-    expect(notice).toEqual({ sha: soulSha, subject: "chore(reflection): merge run abc" })
+    expect(notices.filter((notice) => notice !== undefined)).toEqual([
+      { sha: soulSha, subject: "chore(reflection): merge run abc" },
+    ])
     expect(replay).toBeUndefined()
+    expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: soulSha })
+  })
+
+  it("#given HEAD was read before an out-of-band soul commit landed #when consumed with that earlier HEAD #then the later commit is noticed exactly once", async () => {
+    // given: the prompt reads HEAD once and shares it; another process commits to the soul afterwards
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
+    expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toBeUndefined()
+    await commit(repo, "reference/note.md", "note\n", "note")
+    const readBefore = await repo.head()
+    const soulSha = await commit(
+      repo,
+      "system/persona.md",
+      "reflected persona\n",
+      "chore(reflection): merge run late\n\nOmo-Writer: reflection",
+    )
+    const staleHead = new Proxy(repo, {
+      get(target, property, receiver) {
+        if (property === "head") return async () => readBefore
+        const value = Reflect.get(target, property, receiver)
+        return typeof value === "function" ? value.bind(target) : value
+      },
+    })
+
+    // when
+    const duringPrompt = await consumeSoulNoticeDelta(staleHead, { noticesDir, locksDir })
+    const nextPrompt = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const after = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+
+    // then
+    const notices = [duringPrompt, nextPrompt, after].filter((notice) => notice !== undefined)
+    expect(notices).toEqual([{ sha: soulSha, subject: "chore(reflection): merge run late" }])
     expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: soulSha })
   })
 
@@ -111,6 +183,25 @@ describe("consumeSoulNoticeDelta", () => {
     expect(notice).toBeUndefined()
     expect(await readWatermark(noticesDir)).toEqual(established)
   })
+
+  it("#given more in-band soul commits than one page above an older out-of-band one #when consumed #then that older commit is still the notice", async () => {
+    // given — the scan is bounded to a first page for speed; a page that is entirely memory-tool
+    // commits must still fall through to the older out-of-band commit underneath it, exactly as an
+    // unbounded scan did. PAGE + 2 in-band commits guarantees the first page holds none of it.
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
+    await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const soulSha = await commit(repo, "system/persona.md", "out of band\n", "reflection rewrote the persona")
+    for (let index = 0; index < SOUL_SCAN_PAGE + 2; index += 1) {
+      await commit(repo, "system/persona.md", `in-band ${index}\n`, `edit my soul ${index}\n\n${IN_BAND}`)
+    }
+
+    // when
+    const notice = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+
+    // then
+    expect(notice?.sha).toBe(soulSha)
+  }, 120_000)
 
   it("#given an out-of-band commit that touches only non-soul paths #when consumed #then no notice is emitted", async () => {
     // given
@@ -144,6 +235,25 @@ describe("consumeSoulNoticeDelta", () => {
 
     // then
     expect(notice).toEqual({ sha: dreamSha, subject: "chore(dream): consolidate" })
+  })
+
+  it("#given a reflection commit that creates system/boundaries.md out of band #when consumed #then the notice names that commit", async () => {
+    // given
+    const { repo, noticesDir, locksDir } = await fixture()
+    await commit(repo, "system/persona.md", "seed persona\n", "seed persona")
+    await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+    const reflectionSha = await commit(
+      repo,
+      "system/boundaries.md",
+      "- never do X\n",
+      "feat(reflection): document core boundaries\n\nOmo-Writer: reflection",
+    )
+
+    // when
+    const notice = await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })
+
+    // then
+    expect(notice).toEqual({ sha: reflectionSha, subject: "feat(reflection): document core boundaries" })
   })
 
   it("#given a corrupt watermark file #when consumed #then it re-establishes silently at HEAD", async () => {

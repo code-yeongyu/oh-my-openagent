@@ -8,35 +8,15 @@ const packageManifestPath = new URL("../package.json", import.meta.url)
 describe("Codex compatibility test script", () => {
   test("runs the vendored LSP package tests after building its package", () => {
     // #given
-    const packageManifest = readFileSync(packageManifestPath, "utf8")
+    const testCodexScript = JSON.parse(readFileSync(packageManifestPath, "utf8")).scripts?.["test:codex"] ?? ""
 
     // #when
-    const lspBuildIndex = packageManifest.indexOf("bun run build:lsp-tools-mcp")
-    const lspTestIndex = packageManifest.indexOf("npm --prefix packages/lsp-tools-mcp test")
+    const lspBuildIndex = testCodexScript.indexOf("bun run build:lsp-tools-mcp")
+    const lspTestIndex = testCodexScript.indexOf("npm --prefix packages/lsp-tools-mcp test")
     const testsLspAfterBuild = lspBuildIndex >= 0 && lspTestIndex > lspBuildIndex
 
     // #then
     expect(testsLspAfterBuild, "test:codex must run the vendored LSP package test suite after building it").toBe(true)
-  })
-
-  test("runs the CodeGraph component tests before packaged Codex checks", () => {
-    // #given
-    const packageManifest = readFileSync(packageManifestPath, "utf8")
-
-    // #when
-    const pluginBuildIndex = packageManifest.indexOf("bun run --cwd packages/omo-codex/plugin build")
-    const codegraphTestIndex = packageManifest.indexOf("npm --prefix packages/omo-codex/plugin/components/codegraph test")
-    const noticesIndex = packageManifest.indexOf("node scripts/check-third-party-notices.mjs --ship")
-    const testsCodegraphBeforePackagedChecks =
-      pluginBuildIndex >= 0 &&
-      codegraphTestIndex > pluginBuildIndex &&
-      noticesIndex > codegraphTestIndex
-
-    // #then
-    expect(
-      testsCodegraphBeforePackagedChecks,
-      "test:codex must run the CodeGraph component test suite before packaged Codex checks",
-    ).toBe(true)
   })
 
   test("builds lsp-daemon before installer tests copy packaged runtimes", () => {

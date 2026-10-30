@@ -20,6 +20,7 @@ export {
   invocationConditionForAgent,
 } from "./invocation-guard"
 export type { AgentInvocationCondition, InvocationGuardVerdict, PlanArtifactReference, SkillInvocationState } from "./invocation-guard"
+export { agentToolPolicy, type AgentToolPolicy } from "./agent-tool-policy"
 export { loadAgents } from "./loader"
 export { mapOmoConfigAgents } from "./omo-config-agents"
 export { resolveAgent } from "./resolve-agent"
