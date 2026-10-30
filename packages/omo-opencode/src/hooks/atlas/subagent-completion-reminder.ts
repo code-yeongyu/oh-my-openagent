@@ -59,7 +59,7 @@ export async function buildSubagentCompletionReminder(input: {
   if (input.sessionState) {
     input.sessionState.waitingForFinalWaveApproval = shouldPause
     if (shouldPause && input.sessionState.pendingRetryTimer) {
-      clearTimeout(input.sessionState.pendingRetryTimer)
+      input.sessionState.pendingRetryTimer.cancel()
       input.sessionState.pendingRetryTimer = undefined
     }
   }

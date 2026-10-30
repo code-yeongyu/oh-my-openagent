@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts"
+import { TELEMETRY_INSTALL_DISCLOSURE_LINES } from "@oh-my-opencode/telemetry-core/install-disclosure"
 import color from "picocolors"
 import { PLUGIN_NAME } from "../shared"
 import type { InstallArgs } from "./types"
@@ -218,8 +219,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   if (config.hasOpenCode) {
     p.log.message(`Run ${color.cyan("opencode")} to start!`)
   }
-  p.log.info("Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.")
-  p.log.info("Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md")
+  p.log.info(TELEMETRY_INSTALL_DISCLOSURE_LINES.join("\n"))
 
   p.note(
     `Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +

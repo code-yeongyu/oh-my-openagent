@@ -198,6 +198,12 @@ describe("team-layout-tmux", () => {
     const literals = sendKeysCalls.map((args) => args.join(" "))
     expect(literals.some((s) => s.includes("--session 's-m1'"))).toBe(true)
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
+
+    const paneOptionCalls = commands.filter((args) => args[0] === "set-option" && args[1] === "-p")
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%1", "@omo_attach_server_url", "http://127.0.0.1:12345"])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%1", "@omo_attach_session_id", "s-m1"])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%2", "@omo_attach_server_url", "http://127.0.0.1:12345"])
+    expect(paneOptionCalls).toContainEqual(["set-option", "-p", "-t", "%2", "@omo_attach_session_id", "s-m2"])
   })
 
   test("#given a worktree path holding tmux format syntax #when panes are split #then -c gets every # doubled so tmux keeps the path literal (#10233)", async () => {

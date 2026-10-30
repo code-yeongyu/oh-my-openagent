@@ -9,9 +9,14 @@ import { coverageSummaryParts } from "./category-coverage.js"
 import { formatModelTemplate, MODEL_GUIDE_LINE } from "./setup-models.js"
 import { providerKeySource } from "./setup-providers-import.js"
 
-// The installer's line (omo-opencode cli-installer.ts / tui-installer.ts), word for word: a bare
-// `bun add -g omo-ai` user never runs the installer, so setup is where they see it.
-export const TELEMETRY_NOTICE = "Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1."
+// The installers' disclosure (TELEMETRY_INSTALL_DISCLOSURE_LINES in telemetry-core), word for word: a
+// bare `bun add -g omo-ai` user never runs an installer, so setup is where they see it.
+export const TELEMETRY_NOTICE = [
+  "OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.",
+  "The data goes to PostHog in the United States.",
+  "Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).",
+  "Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md",
+].join("\n")
 
 const LABEL_WIDTH = 14
 const SOURCE_HARNESSES = { opencode: "OpenCode", "oh-my-pi": "oh-my-pi", "gajae-code": "gajae-code" }

@@ -55,9 +55,12 @@ describe("OmO Native telemetry notice", () => {
       await pi.dispatch("session_start", {}, ctx)
 
       // then
-      expect(notifications).toEqual([
-        "OmO Native sends anonymous usage telemetry (no prompts, no paths). Docs: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/reference/senpi-telemetry.md - opt out: DO_NOT_TRACK=1",
-      ])
+      expect(notifications).toHaveLength(1)
+      for (const token of [
+        "DO_NOT_TRACK=1",
+        "~/.omo/omo.jsonc",
+        "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md",
+      ]) expect(notifications[0]).toContain(token)
     })
   })
 

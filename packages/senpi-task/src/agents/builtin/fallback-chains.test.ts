@@ -35,7 +35,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
     expect(lengths).toEqual({
       explore: 6,
       librarian: 6,
-      "plan-consultant": FABLE_55_RELEASED ? 4 : 3,
+      "plan-consultant": FABLE_55_RELEASED ? 5 : 4,
       "plan-reviewer": 7,
     })
   })
@@ -62,7 +62,8 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
-        { providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"], model: "kimi-k3", variant: "max" }
+        { providers: ["opencode-go", "kimi-for-coding", "moonshotai"], model: "kimi-k3.1-pro", variant: "max" },
+        { providers: ["opencode"], model: "kimi-k3", variant: "max" }
       ],
       "plan-reviewer": [
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-astra", variant: "xhigh" },
