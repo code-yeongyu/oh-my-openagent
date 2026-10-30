@@ -13,7 +13,7 @@ use crate::keys::KeyName;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
-use crate::user_input::UserPresses;
+use crate::user_input::{UserInputFeed, UserPresses};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeliveryMode {
@@ -149,6 +149,19 @@ pub trait Backend: Send {
         Ok(())
     }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
+    /// [`Self::key_chord`] with `check_stop` before every key press, so a stop
+    /// or a cancellation lands between presses. The default checks once,
+    /// before the chord, for backends that press a chord in one call.
+    fn key_chord_interruptible(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        check_stop()?;
+        self.key_chord(target, keys, mode)
+    }
     /// Native press/release around a session-owned interruptible wait.
     /// Backends without bounded input refuse rather than synthesizing clicks.
     fn hold_keys(
@@ -240,6 +253,12 @@ pub trait Backend: Send {
     /// The user's presses the watch recorded since the last call.
     fn take_user_presses(&mut self) -> UserPresses {
         UserPresses::default()
+    }
+
+    /// The watch's shared feed, once `watch_user_input` ran; `None` while
+    /// nothing is watched. The session reads it between and inside requests.
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
+        None
     }
 }
 

@@ -9,6 +9,7 @@ import { type FilesystemOperation, registerMemoryFilesystemPolicy } from "./poli
 import { canonical, policyFixture, registeredPolicy } from "./policy-guard.test-support"
 import { grantProjectMemoryRead, isGrantedProjectMemoryRead, revokeProjectMemoryReads } from "./project-memory-grants"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
+import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 const roots: string[] = []
 
@@ -268,5 +269,16 @@ describe("project memory read grants (#10044)", () => {
 
     // then
     expect((await decide("read", setup.foreignFile)).allow).toBe(false)
+  })
+})
+
+describe("project memory read grants never resolve a macOS automount trigger (#11545)", () => {
+  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a granted project and a read of %s on darwin #when the grant is checked #then it is not granted and the trigger is never resolved", async (path) => {
+    const { setup, foreignRepo } = projectGrantFixture()
+    await grantProjectMemoryRead(setup.own, foreignRepo)
+    const touched = await withAutomountTrap(() => {
+      expect(isGrantedProjectMemoryRead(setup.own, path)).toBe(false)
+    })
+    expect(touched).toEqual([])
   })
 })

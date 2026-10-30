@@ -253,6 +253,13 @@ impl Supervisor {
         }
     }
 
+    /// The supervisor's clock, so the session measures the user's pauses on
+    /// the same (possibly fake) clock as heartbeats.
+    #[must_use]
+    pub fn now_ms(&self) -> u64 {
+        self.clock.now_ms()
+    }
+
     /// Invalidation epoch: stops and authority activation invalidate old holds
     /// and grants. This is NOT the immediate authority request generation.
     #[must_use]
