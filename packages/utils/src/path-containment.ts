@@ -90,7 +90,7 @@ export function resolveSegmentwise(target: string, options: SegmentwiseResolveOp
   // existing prefix still resolves natively (8.3 short names included) and a missing remainder is appended.
   if (platform === "win32") return resolveWindowsLexical(target, realpath, lstat)
 
-  const root = posix.parse(target).root === "" ? "/" : posix.parse(target).root
+  const root = posix.parse(target).root || "/"
   const segments = target.split("/")
   let resolved = root
   let missing: string[] | undefined
