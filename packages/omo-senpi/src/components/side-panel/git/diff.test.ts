@@ -334,18 +334,19 @@ describe("readGitDiff pathspec environment", () => {
     git(["init", "-q"])
     git(["config", "user.email", "panel@test"])
     git(["config", "user.name", "panel"])
-    writeFileSync(join(root, "star*file.txt"), "a\n")
+    // `[A]` is a glob character class every OS accepts in a file name (Windows refuses `*` and `?`)
+    writeFileSync(join(root, "star[A]file.txt"), "a\n")
     writeFileSync(join(root, "starAfile.txt"), "a\n")
-    git(["add", "star*file.txt", "starAfile.txt"])
+    git(["add", ":(literal)star[A]file.txt", "starAfile.txt"])
     git(["commit", "-qm", "init"])
-    writeFileSync(join(root, "star*file.txt"), "a\nstar-only\n")
+    writeFileSync(join(root, "star[A]file.txt"), "a\nstar-only\n")
     writeFileSync(join(root, "starAfile.txt"), "a\nstarA-only\n")
     const saved = process.env.GIT_GLOB_PATHSPECS
     try {
       process.env.GIT_GLOB_PATHSPECS = "1"
 
       // when
-      const rows = await readGitDiff(realExec, root, { xy: " M", path: "star*file.txt" })
+      const rows = await readGitDiff(realExec, root, { xy: " M", path: "star[A]file.txt" })
 
       // then
       expect(rows.map((row) => row.text)).toContain("+star-only")

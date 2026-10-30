@@ -130,6 +130,68 @@ jobs:
           arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
           arch -x86_64 "target/${{ matrix.rust_target }}/release/${{ matrix.binary }}" --selftest
 
+      # The engine CA importer's fact helper (omo#10762) ships on macOS and Windows; Linux reads its trust store
+      # from files and gets none. The Windows build stays unsigned, like the Windows engine.
+      - name: Build engine trust helper
+        if: startsWith(matrix.host, 'darwin-') || startsWith(matrix.host, 'win32-')
+        env:
+          # Same floor as the engine: rustc otherwise defaults x86_64-apple-darwin to macOS 10.12.
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+          HOST: ${{ matrix.host }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+        run: |
+          set -euo pipefail
+          cargo build --release -p omo-engine-trust-helper --locked --target "$RUST_TARGET"
+          EXE=""
+          if [[ "$HOST" == win32-* ]]; then EXE=".exe"; fi
+          # A host-named directory: publish.yml merges every desktop-engine artifact into one directory and
+          # uploads only its top-level omo-* and senpi-desktop-engine-* files as release assets.
+          HELPER_DIR=".omo/desktop-engine-assets/engine-trust-helper-${HOST}"
+          mkdir -p "$HELPER_DIR"
+          cp "target/${RUST_TARGET}/release/omo-engine-trust-helper${EXE}" "$HELPER_DIR/"
+          chmod 755 "$HELPER_DIR/omo-engine-trust-helper${EXE}"
+
+      - name: Sign Darwin engine trust helper
+        if: startsWith(matrix.host, 'darwin-')
+        timeout-minutes: 75
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          MACOS_SIGNING_REQUIRED: ${{ vars.MACOS_SIGNING_REQUIRED }}
+          HOST: ${{ matrix.host }}
+        run: |
+          set -euo pipefail
+          HELPER=".omo/desktop-engine-assets/engine-trust-helper-${HOST}/omo-engine-trust-helper"
+          # Signed, not notarized, like the capture helper: the compiled omo extracts it unquarantined into its
+          # runtime directory and spawns it from there, so Gatekeeper never assesses it. The bytes signed here
+          # are the bytes the build job hashes into the runtime manifest.
+          bash .github/scripts/macos-sign-and-notarize.sh --sign-only \
+            --identifier ai.sisyphuslabs.omo-engine-trust-helper "$HELPER"
+          test -s "$HELPER"
+          codesign -dv --verbose=2 "$HELPER" 2>&1 | grep -qx "Identifier=ai.sisyphuslabs.omo-engine-trust-helper" \
+            || { echo "::error::the engine trust helper is not signed with its identifier" >&2; exit 1; }
+
+      # Runs the signed bytes under the hardened runtime and decodes what they print with the production decoder.
+      # The macOS helper takes no input; it reads the runner's own trust store.
+      - name: Smoke signed Darwin engine trust helper
+        if: startsWith(matrix.host, 'darwin-')
+        env:
+          HOST: ${{ matrix.host }}
+        run: |
+          set -euo pipefail
+          HELPER=".omo/desktop-engine-assets/engine-trust-helper-${HOST}/omo-engine-trust-helper"
+          OUTPUT="${RUNNER_TEMP}/engine-trust-helper-output.json"
+          if [ "$HOST" = darwin-x64 ]; then
+            arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
+            arch -x86_64 "$HELPER" < /dev/null > "$OUTPUT"
+          else
+            "$HELPER" < /dev/null > "$OUTPUT"
+          fi
+          bun script/engine-trust-helper-smoke.ts < "$OUTPUT"
+
       - name: Sign and notarize Darwin desktop engine
         if: startsWith(matrix.host, 'darwin-')
         timeout-minutes: 75
@@ -155,7 +217,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: desktop-engine-${{ matrix.host }}
-          path: .omo/desktop-engine-assets/senpi-desktop-engine-*
+          path: |
+            .omo/desktop-engine-assets/senpi-desktop-engine-*
+            .omo/desktop-engine-assets/engine-trust-helper-*/omo-engine-trust-helper*
           retention-days: 1
           if-no-files-found: error
 
@@ -356,12 +420,39 @@ jobs:
             echo "source=$(jq -r '.source // empty' <<<"$TARGET_INFO")"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Resolve engine trust helper availability
+        id: engine-trust-helper-target
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          TARGET_INFO="$(bun script/release-desktop-engine-target.ts --trust-helper-target "$PLATFORM")"
+          {
+            echo "host=$(jq -r '.host // empty' <<<"$TARGET_INFO")"
+            echo "asset=$(jq -r '.asset // empty' <<<"$TARGET_INFO")"
+            echo "source=$(jq -r '.source // empty' <<<"$TARGET_INFO")"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Download desktop engine for compiled payload
         if: steps.desktop-engine-target.outputs.host != ''
         uses: actions/download-artifact@v8
         with:
           name: desktop-engine-${{ steps.desktop-engine-target.outputs.host }}
           path: .omo/desktop-engine-assets
+
+      # The helper travels in the desktop-engine artifact downloaded above.
+      - name: Stage engine trust helper for compiled payload
+        if: steps.engine-trust-helper-target.outputs.host != ''
+        env:
+          HELPER_ASSET: ${{ steps.engine-trust-helper-target.outputs.asset }}
+          HELPER_SOURCE: ${{ steps.engine-trust-helper-target.outputs.source }}
+        run: |
+          set -euo pipefail
+          test -f ".omo/desktop-engine-assets/$HELPER_ASSET"
+          mkdir -p "$(dirname "$HELPER_SOURCE")"
+          cp ".omo/desktop-engine-assets/$HELPER_ASSET" "$HELPER_SOURCE"
+          chmod +x "$HELPER_SOURCE"
 
       - name: Stage target-specific Rust engine for compiled payload
         if: steps.desktop-engine-target.outputs.host != ''

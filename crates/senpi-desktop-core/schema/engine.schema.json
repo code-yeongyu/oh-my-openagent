@@ -460,6 +460,17 @@
         "type": "null"
       }
     },
+    "ax.typeText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxTypeTextParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxInputResult"
+      }
+    },
     "stopPath.start": {
       "effect": "exec",
       "hostOnly": true,
@@ -2206,6 +2217,61 @@
       ],
       "additionalProperties": false
     },
+    "AxTypeTextParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
+      "additionalProperties": false
+    },
+    "AxInputResult": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/AxInputMethod"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "description": "`ax.typeText` reply.",
+      "additionalProperties": false
+    },
+    "AxInputMethod": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "inserted",
+          "description": "Written through the element's own selection (`AXSelectedText` on\nmacOS) and read back exactly; no key was sent and no focus moved."
+        },
+        {
+          "type": "string",
+          "const": "keys",
+          "description": "Sent as keystrokes once the element held its application's keyboard\nfocus."
+        }
+      ],
+      "description": "How `ax.typeText` delivered its text."
+    },
     "StopPathStartParams": {
       "type": "object",
       "properties": {
@@ -2461,6 +2527,7 @@
         "ax.setValue",
         "ax.focus",
         "ax.click",
+        "ax.typeText",
         "stopPath.start",
         "stopPath.status",
         "stopPath.heartbeat",

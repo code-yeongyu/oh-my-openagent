@@ -227,7 +227,7 @@ impl Worker {
 /// The check an interruptible input call runs before each press: a
 /// suspension, then a stop path that stopped authorizing input, then a
 /// cancellation; `doing` names the input in the error.
-fn interrupted(
+pub(crate) fn interrupted(
     supervisor: &Supervisor,
     policy: &StopPolicy,
     cancelled: &dyn Fn() -> bool,
@@ -247,6 +247,6 @@ fn interrupted(
 
 /// Only the delivery mode matters for these requests, but malformed options
 /// still fail like they do for a click.
-fn delivery(options: Option<&PointerOptions>) -> CoreResult<DeliveryMode> {
+pub(crate) fn delivery(options: Option<&PointerOptions>) -> CoreResult<DeliveryMode> {
     ParsedPointerOptions::parse(options).map(|options| options.mode)
 }

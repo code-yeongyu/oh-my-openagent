@@ -6,6 +6,7 @@ mod background;
 mod canary;
 mod cgevent;
 mod chord;
+mod element;
 mod global;
 mod guard;
 mod held;
@@ -18,6 +19,9 @@ mod user_monitor;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod element_tests;
 
 #[cfg(test)]
 mod live;
