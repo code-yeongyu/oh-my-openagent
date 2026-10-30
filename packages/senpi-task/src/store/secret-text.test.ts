@@ -28,35 +28,49 @@ describe("redactSecretText over the shared secret matrix (#11355)", () => {
 })
 
 const MB = 1 << 20
-const fill = (unit: string): string => unit.repeat(Math.ceil(MB / unit.length)).slice(0, MB)
+const fill = (size: number, unit: string): string => unit.repeat(Math.ceil(size / unit.length)).slice(0, size)
 
 // Inputs that made the previous name pattern retry one long run from every position (quadratic), plus every other
 // rule's worst case.
-const ADVERSARIAL: readonly (readonly [label: string, text: string])[] = [
-  ["a keyword repeated", fill("key")],
-  ["a separated keyword repeated", fill("token_")],
-  ["a keyword inside a word repeated", fill("aaaaakey")],
-  ["short credential values repeated", fill("key: a ")],
-  ["separators repeated", fill("a:")],
-  ["whitespace after a credential name", `key:${" ".repeat(MB)}`],
-  ["cookie pairs repeated", `Cookie: ${fill("a=1; ")}`],
-  ["cookie names repeated", fill("Cookie: ")],
-  ["open credential objects repeated", fill("api_key: {")],
-  ["XML credential tags repeated", fill("<apiKey>")],
-  ["URL userinfo heads repeated", fill("https://u:")],
-  ["bearer schemes repeated", fill("bearer ")],
-  ["quotes after a name", `key${fill('\\"')}`],
-  ["names past the length bound", fill(`${"a".repeat(129)}_api_key: x `)],
+const ADVERSARIAL: readonly (readonly [label: string, build: (size: number) => string])[] = [
+  ["a keyword repeated", (size) => fill(size, "key")],
+  ["a separated keyword repeated", (size) => fill(size, "token_")],
+  ["a keyword inside a word repeated", (size) => fill(size, "aaaaakey")],
+  ["short credential values repeated", (size) => fill(size, "key: a ")],
+  ["separators repeated", (size) => fill(size, "a:")],
+  ["whitespace after a credential name", (size) => `key:${" ".repeat(size)}`],
+  ["cookie pairs repeated", (size) => `Cookie: ${fill(size, "a=1; ")}`],
+  ["cookie names repeated", (size) => fill(size, "Cookie: ")],
+  ["open credential objects repeated", (size) => fill(size, "api_key: {")],
+  ["XML credential tags repeated", (size) => fill(size, "<apiKey>")],
+  ["URL userinfo heads repeated", (size) => fill(size, "https://u:")],
+  ["bearer schemes repeated", (size) => fill(size, "bearer ")],
+  ["quotes after a name", (size) => `key${fill(size, '\\"')}`],
+  ["names past the length bound", (size) => fill(size, `${"a".repeat(129)}_api_key: x `)],
 ]
 
+// Linearity is the contract, not a wall-clock budget: a fixed ms bound fails on a slow or loaded runner. Each 10x step
+// in input size must cost well under the 100x a quadratic scan pays (same shape as senpi#4283's scaling test).
+const SIZES = [MB / 100, MB / 10, MB] as const
+const MAX_GROWTH_PER_STEP = 30
+const NOISE_FLOOR_MS = 1
+
+function bestOf3Ms(text: string): number {
+  let best = Number.POSITIVE_INFINITY
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const start = performance.now()
+    redactSecretText(text)
+    best = Math.min(best, performance.now() - start)
+  }
+  return best
+}
+
 describe("redactSecretText stays linear (#11355, senpi#4283)", () => {
-  test.each(ADVERSARIAL)("#given 1 MB of %s #when redacted #then it finishes in under 50 ms", (_label, text) => {
-    let best = Number.POSITIVE_INFINITY
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const start = performance.now()
-      redactSecretText(text)
-      best = Math.min(best, performance.now() - start)
+  test.each(ADVERSARIAL)("#given up to 1 MB of %s #when redacted at 10x larger sizes #then time grows linearly", (_label, build) => {
+    const times = SIZES.map((size) => bestOf3Ms(build(size)))
+    for (let step = 1; step < times.length; step++) {
+      const growth = times[step] / Math.max(times[step - 1], NOISE_FLOOR_MS)
+      expect(growth).toBeLessThan(MAX_GROWTH_PER_STEP)
     }
-    expect(best).toBeLessThan(50)
   })
 })
