@@ -133,6 +133,15 @@ pub enum SinkOp {
         path: Vec<String>,
         delivery: DeliveryMode,
     },
+    /// An item of the context menu a press opened in `window` was pressed.
+    MenuChosen {
+        window: String,
+        path: Vec<String>,
+    },
+    /// The context menu a press opened in `window` was closed unchosen.
+    MenuClosed {
+        window: String,
+    },
 }
 
 /// Shared, cloneable log of every [`SinkOp`]; clones observe the same log, so

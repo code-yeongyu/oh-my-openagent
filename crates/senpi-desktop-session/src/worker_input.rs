@@ -1,10 +1,11 @@
 //! Pointer and keyboard requests. Coordinates are pixels of the target's
 //! latest capture and map through its frame to global logical points.
 
-use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
+use senpi_desktop_core::backend::{DeliveryMode, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::parse_keys;
+use senpi_desktop_core::menus::validate_path;
 use senpi_desktop_core::protocol_params::{
     DragParams, KeyChordParams, PointParams, ScrollParams, TypeTextParams,
 };
@@ -58,8 +59,13 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
+            if let Some(path) = &params.menu {
+                validate_path(path, false)?;
+            }
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
             let event = PointerEvent::Click {
@@ -69,7 +75,16 @@ impl Worker {
                 count: options.count,
                 modifiers: options.modifiers,
             };
-            worker.pointer(&target, event, &frame, options.mode)
+            let Some(path) = &params.menu else {
+                return worker.pointer(&target, event, &frame, options.mode);
+            };
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
+            let choice = MenuChoice {
+                path,
+                check_stop: &check_stop,
+            };
+            worker.backend()?.pointer_menu(&target, event, &frame, options.mode, choice)?;
+            Ok(Response::Unit)
         })
     }
 
@@ -227,7 +242,7 @@ impl Worker {
 /// The check an interruptible input call runs before each press: a
 /// suspension, then a stop path that stopped authorizing input, then a
 /// cancellation; `doing` names the input in the error.
-fn interrupted(
+pub(crate) fn interrupted(
     supervisor: &Supervisor,
     policy: &StopPolicy,
     cancelled: &dyn Fn() -> bool,

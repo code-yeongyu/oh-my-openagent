@@ -7,6 +7,7 @@
 mod displays;
 pub(crate) mod fallback;
 mod filtered;
+mod menu_windows;
 mod minimized;
 mod route;
 mod sck;
@@ -18,6 +19,7 @@ use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::types::{DesktopDisplay, DesktopWindow, DisplaySelector, Target};
 
+pub(crate) use self::menu_windows::{menu_window_frame, menu_windows};
 pub(crate) use self::screencapture::Screencapture;
 use self::screencapture::{display_args, window_args, ShotError};
 
@@ -28,6 +30,15 @@ unsafe extern "C" {
 }
 
 /// Whether captures can hide cursor-helper windows per frame (macOS 14+).
+/// The owner process of WindowServer window `wid`, when it is listed.
+pub(crate) fn window_owner_pid(wid: u32) -> Option<libc::pid_t> {
+    crate::focus::window_info()
+        .ok()?
+        .into_iter()
+        .find(|window| window.window_number == wid)
+        .and_then(|window| libc::pid_t::try_from(window.pid).ok())
+}
+
 pub(crate) fn filtered_capture_supported() -> bool {
     filtered::supported()
 }

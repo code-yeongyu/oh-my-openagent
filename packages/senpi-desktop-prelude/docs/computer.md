@@ -16,7 +16,8 @@ computer.screenshot({ silent? }?) / win.screenshot({ silent? }?) → { target, f
     The root captures the focused monitor by default (primary fallback), not the all-display composite. Auto-displays the image unless `silent: true`. Wayland uses the first display the portal reports, not a known compositor primary.
 computer.zoom({ x, y, width, height }, { silent?, frameId? }?) / win.zoom(...) → { target, frameId, width, height, sourceWidth, sourceHeight, coordinateWidth, coordinateHeight, region, scale, path? }
     Fresh native-detail crop of a region in the SAME target's last full screenshot. Desktop/display zoom pins the displays that full frame captured, even after focus moves. Zoom pixels are NOT input coordinates: later clicks still use the last full screenshot's coordinateWidth/coordinateHeight and frameId. A missing/stale full frame or invalid rectangle throws InvalidCoordinateFrame; take a new full screenshot. Same helper on display handles.
-computer.click(x, y, { button?, count?, modifiers?, delivery? }?) / win.click(...) → None
+computer.click(x, y, { button?, count?, modifiers?, delivery?, menu? }?) / win.click(...) → None
+    `menu: ["<item>", "<subitem>"]` chooses that path in the menu the click opens (a right-click's context menu, or the menu of a menu button or popup button) and closes the menu before returning; labels match like win.menu.select. A path that matches nothing, a disabled item, or a click that opens no menu throws InputFailed naming the menu's items: the click itself was delivered, so inspect the window before retrying. macOS only; other platforms refuse the option before sending anything.
 computer.doubleClick(x, y, opts?) / computer.move(x, y) / computer.drag([[x, y], …], { modifiers?, delivery? }?) / computer.scroll(x, y, { dx?, dy?, delivery? }?) → None
     Same helpers on a window handle: win.doubleClick, win.move, win.drag, win.scroll.
     dx/dy are pixels, the same unit on every OS; one mouse-wheel notch is about 40 px, so dy: 120 scrolls about three notches.
@@ -40,7 +41,8 @@ win.ref("e5") / computer.ref("e5") → ComputerElement | null
 computer.elementAt(x, y) / computer.focusedElement() → ComputerElement | null
     `elementAt` takes GLOBAL desktop coordinates, not screenshot pixels.
 el.value() / el.bounds() / el.attributes() / el.actions() / el.parent() / el.children() → reads
-el.setValue(text) / el.perform(action) / el.press() / el.click({ delivery? }?) / el.focus() → mutations
+el.setValue(text) / el.perform(action, { menu? }?) / el.press({ menu? }?) / el.click({ button?, count?, modifiers?, delivery?, menu? }?) / el.focus() → mutations
+    `menu` on el.click, el.press (a menu button or popup button) and el.perform("showMenu") works as on computer.click: the item path is chosen in the menu the action opens, and the menu is closed before the call returns.
     Element fields: ref, role, nativeRole, title, description, enabled, focused, childCount. AX actions need no screenshot.
 computer.clipboard.read() → str
 computer.clipboard.write(text) → None

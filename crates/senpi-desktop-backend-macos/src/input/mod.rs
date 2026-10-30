@@ -11,6 +11,7 @@ mod guard;
 mod held;
 mod holds;
 mod keys;
+mod menu;
 mod menu_key;
 mod post;
 mod release;
@@ -36,6 +37,7 @@ pub(crate) use self::canary::CANARY_STOP_REASON;
 pub use self::canary::{CanaryMode, CanaryResult};
 pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
 pub(crate) use self::keys::{key_code, update_modifier};
+pub(crate) use self::menu::post_escape;
 pub(crate) use self::user_monitor::UserInputWatch;
 pub(crate) use self::release::post_helper_release;
 

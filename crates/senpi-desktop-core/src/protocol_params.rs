@@ -56,6 +56,11 @@ pub struct PointParams {
     /// the call fails `InvalidCoordinateFrame`.
     pub frame_id: Option<String>,
     pub opts: Option<PointerOptions>,
+    /// `click` only: the path of item labels to choose in the menu the click
+    /// opens (a context menu, or a menu button's or popup button's menu);
+    /// the menu is closed before the call returns (#11459).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub menu: Option<Vec<String>>,
 }
 
 /// `drag`: a pointer path in the pixels of the target's latest frame.
@@ -177,6 +182,11 @@ pub struct AxPerformParams {
     #[serde(rename = "ref")]
     pub ref_: String,
     pub action: String,
+    /// The path of item labels to choose in the menu the action opens
+    /// (`AXShowMenu`, or `AXPress` on a menu button or popup button); the
+    /// menu is closed before the call returns (#11459).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub menu: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -191,6 +201,10 @@ pub struct AxClickParams {
     #[serde(rename = "ref")]
     pub ref_: String,
     pub opts: Option<PointerOptions>,
+    /// The path of item labels to choose in the menu the click opens; the
+    /// menu is closed before the call returns (#11459).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub menu: Option<Vec<String>>,
 }
 
 /// `stopPath.start`: the stop chord the Global listener arms, e.g.

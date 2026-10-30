@@ -206,6 +206,7 @@ pub(crate) fn click_window(frame_id: &str, opts: Option<PointerOptions>) -> Op {
         y: 10.0,
         frame_id: Some(frame_id.to_owned()),
         opts,
+        menu: None,
     })
 }
 

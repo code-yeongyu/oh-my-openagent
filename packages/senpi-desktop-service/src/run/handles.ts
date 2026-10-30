@@ -12,9 +12,15 @@ import {
 	listOf,
 	optional,
 } from "./engine-results";
-import { type DeliveryOptions, InputTarget, pointerOptions, send } from "./input-target";
+import { type ClickOptions, InputTarget, type MenuOptions, menuParam, pointerOptions, send } from "./input-target";
 import { observeWindow, type ObserveOptions, type ObservationResult } from "./observe";
-export { type ClickOptions, type DeliveryOptions, InputTarget, type ScrollOptions } from "./input-target";
+export {
+	type ClickOptions,
+	type DeliveryOptions,
+	InputTarget,
+	type MenuOptions,
+	type ScrollOptions,
+} from "./input-target";
 
 export interface AxOptions {
 	readonly all?: boolean;
@@ -168,16 +174,16 @@ export class ElementHandle {
 		return this.#node("actions", (node) => node.actions ?? []);
 	}
 
-	perform(action: string): Promise<void> {
-		return this.#send("perform", "ax.perform", { action });
+	perform(action: string, options?: MenuOptions): Promise<void> {
+		return this.#send("perform", "ax.perform", { action, ...menuParam(options) });
 	}
 
-	press(): Promise<void> {
-		return this.#send("press", "ax.perform", { action: "press" });
+	press(options?: MenuOptions): Promise<void> {
+		return this.#send("press", "ax.perform", { action: "press", ...menuParam(options) });
 	}
 
-	click(options?: DeliveryOptions): Promise<void> {
-		return this.#send("click", "ax.click", { opts: pointerOptions(options) });
+	click(options?: ClickOptions): Promise<void> {
+		return this.#send("click", "ax.click", { opts: pointerOptions(options), ...menuParam(options) });
 	}
 
 	focus(): Promise<void> {

@@ -1,5 +1,5 @@
 use image::RgbaImage;
-use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
@@ -89,6 +89,17 @@ impl Backend for FakeBackend {
             mode,
         });
         Ok(())
+    }
+
+    fn pointer_menu(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<()> {
+        self.pointer_menu_impl(target, ev, frame, mode, choice)
     }
 
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {

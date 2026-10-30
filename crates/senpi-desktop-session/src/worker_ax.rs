@@ -2,9 +2,10 @@
 //! registry; a ref older than the previous snapshot fails `StaleRef`.
 
 use senpi_desktop_core::ax::{self, register_node};
-use senpi_desktop_core::backend::DeliveryMode;
+use senpi_desktop_core::backend::{DeliveryMode, MenuChoice};
 use senpi_desktop_core::error::CoreResult;
-use senpi_desktop_core::protocol_params::{AxElementAtParams, AxQueryParams, AxSnapshotParams};
+use senpi_desktop_core::menus::validate_path;
+use senpi_desktop_core::protocol_params::{AxElementAtParams, AxPerformParams, AxQueryParams, AxSnapshotParams};
 use senpi_desktop_core::types::{AxNode, Target};
 
 use senpi_desktop_safety::MutatingAction;
@@ -12,6 +13,7 @@ use senpi_desktop_safety::MutatingAction;
 use crate::mutate::Mutation;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
+use crate::worker_input::interrupted;
 
 /// Attribute values longer than this are cut with an ellipsis.
 const ATTRIBUTE_MAX_CHARS: usize = 200;
@@ -116,24 +118,32 @@ impl Worker {
             .unwrap_or_else(|_| reference.to_owned())
     }
 
-    pub(crate) fn ax_perform(
-        &mut self,
-        reference: &str,
-        action: &str,
-        cancelled: &dyn Fn() -> bool,
-    ) -> CoreResult<Audited> {
+    pub(crate) fn ax_perform(&mut self, params: &AxPerformParams, cancelled: &dyn Fn() -> bool) -> CoreResult<Audited> {
+        let (reference, action) = (params.ref_.as_str(), params.action.as_str());
         let mutation = Mutation::new(
             MutatingAction::AxPerform,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
+            if let Some(path) = &params.menu {
+                validate_path(path, false)?;
+            }
             let handle = worker.registry.resolve(reference)?;
             let backend = worker.ax_parts()?.0;
-            if action.eq_ignore_ascii_case("press") {
-                ax::ax_press(backend, &handle)?;
-            } else {
-                backend.perform(&handle, action)?;
+            match &params.menu {
+                Some(path) => {
+                    let check_stop = || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
+                    let choice = MenuChoice {
+                        path,
+                        check_stop: &check_stop,
+                    };
+                    backend.perform_menu(&handle, action, choice)?;
+                }
+                None if action.eq_ignore_ascii_case("press") => ax::ax_press(backend, &handle)?,
+                None => backend.perform(&handle, action)?,
             }
             Ok(Response::Unit)
         })

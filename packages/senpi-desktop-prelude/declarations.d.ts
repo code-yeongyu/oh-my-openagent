@@ -18,8 +18,14 @@ interface ComputerHoldMouseOptions extends ComputerHoldOptions {
 	readonly frameId?: string;
 }
 
+/** A press that opens a menu chooses this path of item labels in it and closes the menu before returning. */
+interface ComputerMenuOptions {
+	/** Labels from the opened menu down to a command, matched like `win.menu.select`; an empty path is refused. */
+	menu?: string[];
+}
+
 /** Options for pointer clicks. */
-interface ComputerClickOptions extends ComputerDeliveryOptions {
+interface ComputerClickOptions extends ComputerDeliveryOptions, ComputerMenuOptions {
 	button?: "left" | "right" | "middle";
 	count?: number;
 	modifiers?: string[];
@@ -191,11 +197,12 @@ interface ComputerElement {
 	bounds(): Promise<ComputerBounds | null>;
 	attributes(): Promise<Record<string, string>>;
 	actions(): Promise<string[]>;
-	perform(action: string): Promise<void>;
+	/** Perform a native action; with `menu`, choose that path in the menu `AXShowMenu` or a menu control's press opens. */
+	perform(action: string, options?: ComputerMenuOptions): Promise<void>;
 	/** Perform the element's native press action; needs no screenshot. */
-	press(): Promise<void>;
-	/** Click the element's center with native input. */
-	click(options?: ComputerDeliveryOptions): Promise<void>;
+	press(options?: ComputerMenuOptions): Promise<void>;
+	/** Click the element's center with native input; `button: "right"` plus `menu` chooses in its context menu. */
+	click(options?: ComputerClickOptions): Promise<void>;
 	focus(): Promise<void>;
 	parent(): Promise<ComputerElement | null>;
 	children(): Promise<ComputerElement[]>;

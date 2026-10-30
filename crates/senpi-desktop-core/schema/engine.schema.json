@@ -1521,6 +1521,16 @@
               "type": "null"
             }
           ]
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "`click` only: the path of item labels to choose in the menu the click\nopens (a context menu, or a menu button's or popup button's menu);\nthe menu is closed before the call returns (#11459)."
         }
       },
       "required": [
@@ -2160,6 +2170,16 @@
         },
         "action": {
           "type": "string"
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The path of item labels to choose in the menu the action opens\n(`AXShowMenu`, or `AXPress` on a menu button or popup button); the\nmenu is closed before the call returns (#11459)."
         }
       },
       "required": [
@@ -2199,6 +2219,16 @@
               "type": "null"
             }
           ]
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The path of item labels to choose in the menu the click opens; the\nmenu is closed before the call returns (#11459)."
         }
       },
       "required": [
