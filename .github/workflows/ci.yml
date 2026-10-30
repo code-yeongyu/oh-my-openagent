@@ -871,7 +871,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          bunx tsgo --noEmit -p packages/omo-senpi/tsconfig.json
+          bun check --no-script --all -p packages/omo-senpi/tsconfig.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

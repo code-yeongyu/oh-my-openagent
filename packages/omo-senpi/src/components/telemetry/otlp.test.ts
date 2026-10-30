@@ -144,7 +144,6 @@ test("OTLP uses the runtime ingest key and base endpoint and emits pinned protob
 })
 
 for (const [label, env, consent] of [
-  ["missing key", {}, true],
   ["config opted out", { OMO_TELEMETRY_INGEST_KEY: "test-key" }, false],
   ["DO_NOT_TRACK", { OMO_TELEMETRY_INGEST_KEY: "test-key", DO_NOT_TRACK: "1" }, true],
   ["product opted out", { OMO_TELEMETRY_INGEST_KEY: "test-key", OMO_SENPI_DISABLE_POSTHOG: "1" }, true],

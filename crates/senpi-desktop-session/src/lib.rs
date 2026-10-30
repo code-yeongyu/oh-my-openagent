@@ -10,6 +10,7 @@ mod budget;
 mod cancel_on_drop;
 mod display_awake;
 mod grant;
+mod intervention;
 mod mutate;
 mod pending;
 mod pointer;

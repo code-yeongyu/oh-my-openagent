@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { GATE_ENTRY_TYPE } from "../notice"
 import { normalizeMemoryPath, resolveWorkspacePath } from "./path-safety"
 import { commitMemory, customEntry, harness, jsonOf, memoryRepo, message, sessionContext, tempRoot, writeMemory } from "./test-support"
+import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../../../automount-trap.test-support"
 
 describe("normalizeMemoryPath", () => {
   test("#given traversal absolute system and backslash paths #when normalized #then each is rejected with a code", () => {
@@ -95,5 +96,17 @@ describe("sidecar tool path safety", () => {
     expect(jsonOf(await h.call("grep", { pattern: "needle", path: "../" }))).toMatchObject({ rejected: "path_escape" })
     const matches = jsonOf(await h.call("grep", { pattern: "needle" })).matches as { path: string }[]
     expect(matches.map((match) => match.path)).toEqual(["inside.txt"])
+  })
+})
+
+describe("resolveWorkspacePath never resolves a macOS automount trigger (#11545)", () => {
+  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given the model asks for %s on darwin #when resolved against a workspace #then it is rejected as an escape without resolving the trigger", async (path) => {
+    const root = await tempRoot("omo-kibitzer-automount-")
+    let verdict: unknown
+    const touched = await withAutomountTrap(async () => {
+      verdict = await resolveWorkspacePath(root, path)
+    })
+    expect(touched).toEqual([])
+    expect(verdict).toMatchObject({ ok: false, code: "path_escape" })
   })
 })

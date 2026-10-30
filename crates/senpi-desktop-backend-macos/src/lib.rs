@@ -18,6 +18,8 @@ mod release_helper;
 mod responsible;
 mod input;
 mod screen;
+#[cfg(test)]
+mod partial_coverage_tests;
 mod skylight;
 mod stop_path;
 

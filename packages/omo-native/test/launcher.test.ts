@@ -2,7 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
-import { spawnSync } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
+import { once } from "node:events"
+import { Socket } from "node:net"
 import { fileURLToPath } from "node:url"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
@@ -225,6 +227,51 @@ await runLauncher(["say", "hi", "-e", "/user/plugin"])
       expect(handed.env.CAPTURE_FILE).toBe(fixture.captureFile)
       expect(result.stderr).not.toContain("ExperimentalWarning")
     })
+
+    test.skipIf(process.platform === "win32" || !runtimeInterpreter("node"))(
+      "hands a private descriptor and its table to the engine through an explicit child, since execve drops it (senpi#4749)",
+      async () => {
+        // given: a launcher-created duplex on fd 5, named by the private descriptor table
+        const fixture = createFixture()
+        writeFile(join(fixture.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js"), `
+import { writeFileSync } from "node:fs"
+let wrote = false
+try { writeFileSync(5, "engine:ok"); wrote = true } catch {}
+writeFileSync(process.env.CAPTURE_FILE, JSON.stringify({ pid: process.pid, table: process.env.SENPI_PRIVATE_FDS ?? null, wrote }))
+`)
+        const node = runtimeInterpreter("node") ?? "node"
+        // `host ensure` is the launch a desktop launcher makes. `spare` names a descriptor it never passed.
+        const child = spawn(node, [fixture.launcher, "host", "ensure"], {
+          env: {
+            ...process.env,
+            PATH: `${dirname(node)}:/usr/bin:/bin`,
+            OMO_RUNTIME: "node",
+            CAPTURE_FILE: fixture.captureFile,
+            OMO_CODING_AGENT_DIR: join(fixture.root, "agent"),
+            SENPI_PRIVATE_FDS: '{"memory-sync":5,"spare":9}',
+          },
+          stdio: ["ignore", "ignore", "pipe", "ignore", "ignore", "pipe"],
+        })
+        const stdio: readonly unknown[] = child.stdio
+        const channel = stdio[5]
+        if (!(channel instanceof Socket)) throw new Error("no private channel")
+        let stderr = ""
+        child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString() })
+        const reply = once(channel, "data", { signal: AbortSignal.timeout(30_000) })
+        // when: the launcher hands off to the engine
+        const [code] = await once(child, "exit", { signal: AbortSignal.timeout(30_000) })
+        const received = String((await reply)[0])
+        channel.destroy()
+        // then: the engine runs as the launcher's child (execve would close fd 5), holds the descriptor,
+        // and still sees the unpassed name declared as null rather than losing it
+        expect(code, stderr).toBe(0)
+        const handed = JSON.parse(readFileSync(fixture.captureFile, "utf8"))
+        expect(handed).toMatchObject({ table: '{"memory-sync":5,"spare":null}', wrote: true })
+        expect(handed.pid).not.toBe(child.pid)
+        expect(received).toBe("engine:ok")
+      },
+      60_000,
+    )
 
     for (const mode of ["throw", "absent", "win32"] as const) {
       test(`preserves the child exit code and environment when execve is ${mode}`, () => {

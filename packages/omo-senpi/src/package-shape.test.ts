@@ -131,6 +131,6 @@ describe("omo-senpi package shape", () => {
     expect(workspaces).toContain("packages/omo-senpi")
     expect(workspaces).not.toContain("packages/lsp-daemon")
     expect(devDependencies["@oh-my-opencode/omo-senpi"]).toBe("workspace:*")
-    expect(typecheckPackages).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(typecheckPackages).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
   })
 })

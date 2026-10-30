@@ -75,18 +75,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.1.49",
-        "oh-my-opencode-darwin-x64": "5.1.49",
-        "oh-my-opencode-darwin-x64-baseline": "5.1.49",
-        "oh-my-opencode-linux-arm64": "5.1.49",
-        "oh-my-opencode-linux-arm64-musl": "5.1.49",
-        "oh-my-opencode-linux-x64": "5.1.49",
-        "oh-my-opencode-linux-x64-baseline": "5.1.49",
-        "oh-my-opencode-linux-x64-musl": "5.1.49",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.1.49",
-        "oh-my-opencode-windows-arm64": "5.1.49",
-        "oh-my-opencode-windows-x64": "5.1.49",
-        "oh-my-opencode-windows-x64-baseline": "5.1.49",
+        "oh-my-opencode-darwin-arm64": "5.1.52",
+        "oh-my-opencode-darwin-x64": "5.1.52",
+        "oh-my-opencode-darwin-x64-baseline": "5.1.52",
+        "oh-my-opencode-linux-arm64": "5.1.52",
+        "oh-my-opencode-linux-arm64-musl": "5.1.52",
+        "oh-my-opencode-linux-x64": "5.1.52",
+        "oh-my-opencode-linux-x64-baseline": "5.1.52",
+        "oh-my-opencode-linux-x64-musl": "5.1.52",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.1.52",
+        "oh-my-opencode-windows-arm64": "5.1.52",
+        "oh-my-opencode-windows-x64": "5.1.52",
+        "oh-my-opencode-windows-x64-baseline": "5.1.52",
       },
     },
     "packages/agents-md-core": {
@@ -207,7 +207,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.1.49",
+      "version": "5.1.52",
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -227,7 +227,7 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.1.49",
+      "version": "5.1.52",
       "bin": {
         "omo": "bin/omo.js",
       },
@@ -271,7 +271,7 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.1.49",
+      "version": "5.1.52",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
         "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.27-2",
@@ -665,9 +665,9 @@
 
     "@earendil-works/pi-tui": ["@code-yeongyu/senpi-tui@2026.10.27-2", "", { "dependencies": { "get-east-asian-width": "1.7.0", "marked": "18.0.13" } }, "sha512-o/VcqWlaYz7I3hS/1tqooWxm7uQlgblCLJAZOl1RV1GRIDZCREQtWxHJQX6+r8DprEMyoOVm9zAn74qvxJxLfg=="],
 
-    "@emnapi/core": ["@emnapi/core@1.11.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ=="],
+    "@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
 
-    "@emnapi/runtime": ["@emnapi/runtime@1.11.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw=="],
+    "@emnapi/runtime": ["@emnapi/runtime@1.11.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA=="],
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.2.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-c95qOXkHdydNKhscBTebqEC1CVAZpyqOfVfBzQ1qgzyl3gfeldUjIggDbIZgDKsHLgnsM+igH7TJ/eAasaVuMA=="],
 
@@ -2133,9 +2133,9 @@
 
     "@opentui/core/marked": ["marked@17.0.1", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-boeBdiS0ghpWcSwoNm/jJBwdpFaMnZWRzjA6SkUMYb40SVaN1x7mmfGKp0jvexGcx+7y2La5zRZsYFZI6Qpypg=="],
 
-    "@oxc-resolver/binding-wasm32-wasi/@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
+    "@rolldown/binding-wasm32-wasi/@emnapi/core": ["@emnapi/core@1.11.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ=="],
 
-    "@oxc-resolver/binding-wasm32-wasi/@emnapi/runtime": ["@emnapi/runtime@1.11.2", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-kyOl3X0DuTiT1h2ft8r2fYO8JYtU9a9Xis/zBSiGArNaagCOWx90N1k2wxp18czFDH+OgcWGb5ZP/XMt3dcyPA=="],
+    "@rolldown/binding-wasm32-wasi/@emnapi/runtime": ["@emnapi/runtime@1.11.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw=="],
 
     "@smithy/core/@smithy/types": ["@smithy/types@4.17.2", "", { "dependencies": { "tslib": "^2.6.2" } }, "sha512-FOKpVZob9MPTn2znRzGrnsMHv7BOsKVw3XiP/cOyYLDVZ9qKp4nifIiSCuUU/fIj5Vu0UOAxCFr+qRAtG0NUkA=="],
 

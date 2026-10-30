@@ -31,7 +31,13 @@
     },
     "./memory-hook": {
       "import": "./src/memfs/memory-hook.ts"
+    },
+    "./external-projection": {
+      "import": "./src/compile/external-projection.ts"
     }
+  },
+  "imports": {
+    "#memory-external-projection": "./src/compile/external-projection.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",
