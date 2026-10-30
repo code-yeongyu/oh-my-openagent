@@ -276,7 +276,7 @@
     "typescript/no-explicit-any": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/category-resolver.ts": {
-    "typescript/no-non-null-assertion": 9
+    "typescript/no-non-null-assertion": 2
   },
   "packages/omo-opencode/src/tools/delegate-task/listed-providers-only.test.ts": {
     "typescript/no-explicit-any": 1

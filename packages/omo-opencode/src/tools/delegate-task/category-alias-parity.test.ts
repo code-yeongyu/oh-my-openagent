@@ -1,5 +1,5 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+declare const require: (name: string) => unknown
+const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test") as typeof import("bun:test")
 import { LEGACY_CATEGORY_NAME_ALIASES } from "@oh-my-opencode/omo-config-core"
 import { resolveCategoryExecution } from "./category-resolver"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
