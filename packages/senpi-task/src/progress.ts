@@ -53,6 +53,9 @@ export function createChildProgress(
   let resolvedModel = target.resolvedModel
   let model = target.model
   let fallbackCount = 0
+  // Senpi emits model_changed (source "fallback") with the applied level right before retry_fallback_applied,
+  // whose `to` is a bare provider/model_id selector (#7934).
+  let fallbackSwitch: { readonly provider: string; readonly modelId: string; readonly level: string } | undefined
   let turnResumed = false
   let awaitingInput = options?.awaitingInput === true
 
@@ -81,18 +84,21 @@ export function createChildProgress(
         awaitingInput = true
         return true
       }
+      if (event.type === "model_changed") {
+        fallbackSwitch = readFallbackSwitch(event)
+        return statsChanged
+      }
       if (event.type === "retry_fallback_applied" && event.to !== undefined) {
-        // Build a resolved model from the selector so the live status line retains the
-        // provider/model_id structure and any thinking level encoded in the selector suffix.
-        // When the Senpi core event carries an explicit thinking field, prefer that over the
-        // selector suffix so the display reflects the actually-applied level even when the
-        // selector was normalized without it.
+        // Keep provider/model_id and the applied level: a selector suffix when present, else the level of the
+        // fallback switch senpi announced for this same model.
         const parsed = parseModelSelector(event.to, resolvedModel?.source ?? "category")
-        const eventThinking = readEventString(event, "thinking")
+        const level = parsed !== undefined && parsed.reasoning === undefined
+          && fallbackSwitch?.provider === parsed.provider && fallbackSwitch.modelId === parsed.model_id
+          ? fallbackSwitch.level
+          : undefined
+        fallbackSwitch = undefined
         if (parsed !== undefined) {
-          resolvedModel = eventThinking !== undefined
-            ? { ...parsed, reasoning: eventThinking, reasoning_effort: eventThinking }
-            : parsed
+          resolvedModel = level === undefined ? parsed : { ...parsed, reasoning: level, reasoning_effort: level }
           model = parsed.display
         } else {
           resolvedModel = undefined
@@ -221,9 +227,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function readEventString(event: ManagedChildEvent, key: string): string | undefined {
-  const value = Reflect.get(event, key)
-  return typeof value === "string" && value.length > 0 ? value : undefined
+function readFallbackSwitch(
+  event: ManagedChildEvent,
+): { readonly provider: string; readonly modelId: string; readonly level: string } | undefined {
+  if (Reflect.get(event, "source") !== "fallback") return undefined
+  const level = Reflect.get(event, "thinkingLevel")
+  const model = Reflect.get(event, "model")
+  if (typeof level !== "string" || level.length === 0 || !isRecord(model)) return undefined
+  const { provider, id } = model
+  return typeof provider === "string" && typeof id === "string" ? { provider, modelId: id, level } : undefined
 }
 
 // Parse a "provider/model_id" or "provider/model_id:reasoning" selector into a ResolvedModelRecord.
