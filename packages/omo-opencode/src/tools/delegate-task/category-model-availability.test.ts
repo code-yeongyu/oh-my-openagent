@@ -14,7 +14,7 @@ import {
   clearAllDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
-import { getFallbackModelsForSession } from "../../hooks/runtime-fallback/fallback-models"
+import { getFallbackModelsForSession, getRawFallbackModels } from "../../hooks/runtime-fallback/fallback-models"
 import { createFallbackState, prepareFallback } from "../../hooks/runtime-fallback/fallback-state"
 import type { ExecutorContext } from "./executor-types"
 import type { DelegateTaskArgs } from "./types"
@@ -131,7 +131,10 @@ describe("category canonical model availability", () => {
 
   test("reactive fallback consumes the spawn snapshot and exhausts without wrapping twice", async () => {
     const category = {
-      models: ["test-provider/a", "test-provider/b", "test-provider/c"],
+      models: [
+        "test-provider/a", "test-provider/b",
+        { model: "test-provider/c", reasoningEffort: "high", temperature: 0.3 },
+      ],
       models_distribution: "round_robin",
     } satisfies CategoryConfig
     const executorContext = createExecutorContext(category, ["a", "b", "c"])
@@ -150,6 +153,11 @@ describe("category canonical model availability", () => {
     })
     const chain = getFallbackModelsForSession("distribution-reactive", undefined, {
       categories: executorContext.userCategories,
+    })
+    expect(getRawFallbackModels("distribution-reactive", undefined, {
+      categories: executorContext.userCategories,
+    })?.[0]).toMatchObject({
+      model: "test-provider/c", reasoningEffort: "high", temperature: 0.3,
     })
     expect(chain).toEqual(["test-provider/c", "test-provider/a"])
     const state = createFallbackState("test-provider/b")

@@ -90,7 +90,7 @@ export async function resolveSubagentModel(
         categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
         log("[delegate-task] Cold cache: using explicit user override for subagent", {
           agent: agentToUse,
-          model: agentOverride?.model ?? agentCategoryModel,
+          model: explicitModel,
         })
       }
     }
