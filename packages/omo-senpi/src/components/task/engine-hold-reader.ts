@@ -17,9 +17,9 @@ export type RpcPauseState = {
  * `noteAutomaticInput`, goal `stop-pause`), so the run-pause bridge must too: reading it as a
  * Stop paused every parked child on a plain reopen instead of reviving it (#11856).
  */
-export const INTERRUPTED_RUN_HOLD_KEY = "interrupted-run"
+const INTERRUPTED_RUN_HOLD_KEY = "interrupted-run"
 
-export function isUserStopHold(entry: { readonly kind: string; readonly key: string }): boolean {
+function isUserStopHold(entry: { readonly kind: string; readonly key: string }): boolean {
   return entry.kind === "session_hold" && entry.key !== INTERRUPTED_RUN_HOLD_KEY
 }
 
