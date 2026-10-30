@@ -46,7 +46,7 @@ export function fakeClock() {
         now = timer.at
         if (timer.interval === undefined) timers.delete(id)
         else timer.at += timer.interval
-        timer.callback()
+        scope.run(true, timer.callback)
         await new Promise<void>((resolve) => setImmediate(resolve))
       }
       now = end
