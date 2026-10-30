@@ -419,7 +419,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) => 
+    const results = errors.map((error) =>
       isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
     )
 
@@ -457,7 +457,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) => 
+    const results = errors.map((error) =>
       isRuntimeFallbackRetryableError(error, [429, 500, 502, 503])
     )
 
@@ -486,7 +486,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) => 
+    const results = errors.map((error) =>
       isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
     )
 
@@ -510,7 +510,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) => 
+    const results = errors.map((error) =>
       isRuntimeFallbackRetryableError(error, [401, 429, 500, 502, 503])
     )
 
@@ -539,7 +539,7 @@ describe("OpenCode UnknownError scoping (fixes #7706)", () => {
     ]
 
     //#when
-    const results = errors.map((error) => 
+    const results = errors.map((error) =>
       isRuntimeFallbackRetryableError(error, [401, 429])
     )
 
