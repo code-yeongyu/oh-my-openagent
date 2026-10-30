@@ -1,3 +1,13 @@
+## 2026-10-29 - First-device genesis construction (#11747)
+
+Add preparation and finishing builders under memory-core's sync/genesis modules,
+with a builder-produced golden vector, creator-anchored verification, both
+epoch-key unwraps and independently re-signed negative vectors.
+
+## 2026-10-26 - Native path traversal before containment (#11339)
+
+The shared containment helper sends the original child and parent paths to native realpath before lexical normalization. Project-memory grants preserve that component sequence, resolve the deepest existing ancestor for missing notes and append the missing segments verbatim, refuse a missing remainder that holds a `.`, `..` or empty segment, and reject non-missing lookup failures. The external-tool soft guard uses the raw target while built-ins keep the resolved target they open. Regression coverage includes the temporary-HOME caller and existing Windows path semantics.
+
 ## 2026-10-26 - A failed paused-child restore cannot wedge parent admission (#11401)
 
 An acknowledged child could fail to restore after the parent quit and reopened. Its resume exception escaped before the parent installed its Resume and reopened admission, leaving subsequent task calls held even after the native Stop was released. Record that participant as lost with the restore failure, finish the parent transaction, and retain its acknowledged cutoff for retries when no live child handle exists yet.

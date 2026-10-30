@@ -1,3 +1,39 @@
+## 2026-10-25 - Record child session spawn ancestry (#11298)
+
+Thread parent, root, and task identity through child-session creation and
+respawn paths. `runners/engine-spawned-by.ts` holds the minimum engine
+(`2026.10.24-4`, senpi#4205) and compares versions field by field. The
+standalone `--spawned-by` argument follows the version of the engine actually
+launched (`resolveSenpiLaunchTarget`: the running engine for the compiled engine
+and the rpc-entry fallback, the launched package manifest for SENPI_BIN, sibling,
+PATH and Windows shim targets), and the host path drops `open_session.spawnedBy`
+unless the host's `get_protocol_info.engineVersion` meets the same minimum. An
+absent or unparseable version sends nothing.
+
+## 2026-10-27 - Workflow category nodes keep the parent model as their last rung (#11439)
+
+A DAG run records the parent session's model at start (`DagRunRecordV1.parentModel`), and scheduler admission, node retry and crash/resume recovery pass it as `parent_model`, so `withParentModelRung` adds the same last rung a task child gets (#10750). Runs persisted before this change behave as before.
+
+## 2026-10-27 - A queued steer reaches the child under its own id; a lost acknowledgment is read before any resend (desktop #2838 step 4) (#11427)
+
+`drainPending` sends each `pending_steering` entry with `{ clientMessageId: entry.id }`, and every handle
+layer (`ManagedChildHandle` and both adapters, the in-process handle, both RPC runners, `input-delivery`)
+passes that identity to the engine; `input-effects` sends a caller's own id as it is and mints one only when
+none is given. A drain repeated after a lost acknowledgment or a parent restart therefore replays the same id
+on the child instead of delivering a second copy.
+
+An unacknowledged input is resolved through the child's `get_pending_inputs` read (senpi#3549) before
+anything is sent again: `admitted` settles it, `not_admitted` resends the same id, a failed read keeps it
+uncertain. An earlier run's uncertain input is still never sent into a later run, but it now fails as
+`superseded_by_new_run` only when the read says it was not admitted; admitted settles it and a failed read
+keeps it uncertain. The run an uncertain input was sent in is stored on it (`run_epoch`), since a queue
+entry's id carries no epoch. A child that cannot answer the read keeps the previous same-id resend.
+
+Not in this change: TTL/terminal retention of queued entries (T45/T46) and the engine's custody receipt on
+`steer`/`prompt` answers (senpi#4383).
+
+An error answer other than an unknown command, and an id the child leaves out of its answer, both count as unreadable, so nothing is sent on them.
+
 ## 2026-10-26 - Keep parent Resume independent of a failed child restore (#11401)
 
 The run controller records resume-effect failures for acknowledged participants as well as participants already outside custody. A persisted acknowledgement supplies the retry cutoff when the failed child's engine is unavailable. A newer Stop still supersedes the failed old Resume.

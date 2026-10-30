@@ -7,6 +7,13 @@ import { artifactsMatch } from "./build-artifact.mjs"
 import { buildExtension, COMPUTER_PRELUDE_ASSET_NAME, extensionBuildPaths, GATEWAY_STORE_WORKER_NAME, memorySyncAssetSources, resolveOutputs, THREAD_SDK_RELATIVE_PATH } from "./build-extension-core.mjs"
 import { findStaleRuntimePersona } from "./persona-artifacts.mjs"
 
+/**
+ * Compares the current outputs against an independent reproduction of the build. By default the
+ * reproduction is built into a fresh temp root and removed afterwards (the CLI `--check` path).
+ * `options.expectedRoot` names an already-built reproduction root (laid out like a build into an
+ * empty directory) so callers that check many output trees against the same sources build it once;
+ * that root is read only and left in place.
+ */
 export async function checkExtensionCurrent(options = {}) {
   const {
     output,
@@ -32,6 +39,7 @@ export async function checkExtensionCurrent(options = {}) {
     threadClientOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
+    desktopToolkitOutput,
     claimReceiptOutput,
     gatewayStoreWorkerOutput,
     threadSdkOutput,
@@ -65,6 +73,7 @@ export async function checkExtensionCurrent(options = {}) {
   const currentTelemetryOtlp = await readBuiltEntry(telemetryOtlpOutput)
   const currentThreadClient = await readBuiltEntry(threadClientOutput)
   const currentFeedback = await readBuiltEntry(feedbackOutput)
+  const currentDesktopToolkit = await readBuiltEntry(desktopToolkitOutput)
   const currentClaimReceipt = await readBuiltEntry(claimReceiptOutput)
   const currentMemorySync = await readBuiltEntry(memorySyncOutput)
   if (currentMemorySync === undefined) return { ok: false, reason: "missing-output", output: memorySyncOutput }
@@ -89,6 +98,7 @@ export async function checkExtensionCurrent(options = {}) {
   const currentTelemetryRecovery = await readBuiltEntry(telemetryRecoveryOutput)
   if (currentTelemetryRecovery === undefined) return { ok: false, reason: "missing-output", output: telemetryRecoveryOutput }
   if (currentFeedback === undefined) return { ok: false, reason: "missing-output", output: feedbackOutput }
+  if (currentDesktopToolkit === undefined) return { ok: false, reason: "missing-output", output: desktopToolkitOutput }
   if (currentClaimReceipt === undefined) return { ok: false, reason: "missing-output", output: claimReceiptOutput }
   const currentComputerUse = await readBuiltEntry(computerUseOutput)
   if (currentComputerUse === undefined) return { ok: false, reason: "missing-output", output: computerUseOutput }
@@ -97,7 +107,8 @@ export async function checkExtensionCurrent(options = {}) {
   const currentThreadSdk = await readBuiltEntry(threadSdkOutput)
   if (currentThreadSdk === undefined) return { ok: false, reason: "missing-output", output: threadSdkOutput }
 
-  const tempRoot = await mkdtemp(join(tmpdir(), "omo-senpi-build-check-"))
+  const ownsReproduction = options.expectedRoot === undefined
+  const tempRoot = ownsReproduction ? await mkdtemp(join(tmpdir(), "omo-senpi-build-check-")) : options.expectedRoot
   const expected = {
     outputPath: join(tempRoot, "omo.js"),
     taskOutputPath: join(tempRoot, "omo-task.js"),
@@ -121,13 +132,14 @@ export async function checkExtensionCurrent(options = {}) {
     threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
     telemetryRecoveryOutputPath: join(tempRoot, "omo-telemetry-recovery.js"),
     feedbackOutputPath: join(tempRoot, "omo-feedback.js"),
+    desktopToolkitOutputPath: join(tempRoot, "omo-desktop-toolkit.js"),
     claimReceiptOutputPath: join(tempRoot, "omo-claim-receipt.js"),
     computerUseOutputPath: join(tempRoot, "omo-computer-use.js"),
     gatewayStoreWorkerOutputPath: join(tempRoot, GATEWAY_STORE_WORKER_NAME),
     threadSdkOutputPath: join(tempRoot, THREAD_SDK_RELATIVE_PATH),
   }
   try {
-    await buildExtension(expected)
+    if (ownsReproduction) await buildExtension(expected)
     for (const [current, built, outputFile] of [
       [currentRollbackRuntime, expected.rollbackRuntimeOutputPath, rollbackRuntimeOutput],
       [currentToolkitSdk, expected.toolkitSdkOutputPath, toolkitSdkOutput],
@@ -151,6 +163,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
       [currentTelemetryRecovery, expected.telemetryRecoveryOutputPath, telemetryRecoveryOutput],
       [currentFeedback, expected.feedbackOutputPath, feedbackOutput],
+      [currentDesktopToolkit, expected.desktopToolkitOutputPath, desktopToolkitOutput],
       [currentClaimReceipt, expected.claimReceiptOutputPath, claimReceiptOutput],
       [currentComputerUse, expected.computerUseOutputPath, computerUseOutput],
       [currentGatewayStoreWorker, expected.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutput],
@@ -169,7 +182,7 @@ export async function checkExtensionCurrent(options = {}) {
     }
     return { ok: true, output, taskOutput, memberOutput, advisorRuntimeOutput, sidePanelRuntimeOutput, computerUseOutput, gatewayStoreWorkerOutput, threadSdkOutput }
   } finally {
-    await rm(tempRoot, { recursive: true, force: true })
+    if (ownsReproduction) await rm(tempRoot, { recursive: true, force: true })
   }
 }
 

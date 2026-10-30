@@ -55,6 +55,7 @@ import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
+  getBuiltinSkillsRoot,
   getOmoNativeStateDir,
   hashSessionId,
   withOmoNativeAttribution,
@@ -354,7 +355,7 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         captureEvent: sessionClient.captureEvent,
         diagnostics: (message, details) => ctx.logger.warn(message, details),
         hashSessionId: hashSession,
-        skillsRoot: options.skillsRoot,
+        skillsRoot: options.skillsRoot ?? getBuiltinSkillsRoot(env, ctx.logger),
       })
 
       createOmoNativeNoticeRegistration({
