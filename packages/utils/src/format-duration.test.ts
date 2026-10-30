@@ -10,6 +10,11 @@ describe("formatDurationHuman", () => {
     expect(formatDurationHuman(999)).toBe("0s")
   })
 
+  it("returns 0s for non-finite durations", () => {
+    expect(formatDurationHuman(Number.NaN)).toBe("0s")
+    expect(formatDurationHuman(Number.POSITIVE_INFINITY)).toBe("0s")
+  })
+
   it("returns 1s for 1000ms", () => {
     expect(formatDurationHuman(1000)).toBe("1s")
   })
