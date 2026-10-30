@@ -112,6 +112,10 @@ pub enum SinkOp {
     RaiseWindow {
         id: String,
     },
+    /// A window moved into the current Space; focus is untouched.
+    BringToCurrentSpace {
+        id: String,
+    },
     ReleaseAll,
     WarpCursor(DesktopPoint),
     QueryFrontWindow,

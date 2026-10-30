@@ -14,6 +14,9 @@
 //! background. `raiseWindow` needs the grant too: raising a window takes the
 //! user's foreground, the most visible focus steal of all. This is
 //! deliberately stricter than upstream, which gates only `takeover` input.
+//! `window.bringToCurrentSpace` needs no grant, as upstream: it moves a window
+//! into the user's Space without activating it or switching Spaces, and it is
+//! audited like every other mutation.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};

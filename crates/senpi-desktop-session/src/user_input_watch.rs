@@ -41,6 +41,7 @@ pub(crate) fn reads_or_acts_on_an_app(op: &Op) -> bool {
         Op::HoldKeys(params) => names_a_window(&params.target),
         Op::HoldMouse(params) => names_a_window(&params.target),
         Op::RaiseWindow(_)
+        | Op::BringToCurrentSpace(_)
         | Op::MenuItems(_)
         | Op::MenusSelect(_)
         | Op::AxSnapshot(_)

@@ -61,6 +61,11 @@ export class WindowHandle extends InputTarget {
 		return send(this.#method, "raise", "raiseWindow", { windowId: this.id });
 	}
 
+	/** Moves this window into the user's current Space (macOS) without activating it or switching Spaces. */
+	bringToCurrentSpace(): Promise<void> {
+		return send(this.#method, "bringToCurrentSpace", "window.bringToCurrentSpace", { windowId: this.id });
+	}
+
 	/** The window's native menu: `items` lists children (empty path = the menu bar), `select` invokes a leaf. */
 	readonly menu = {
 		items: (path?: readonly string[]): Promise<readonly MenuItem[]> =>

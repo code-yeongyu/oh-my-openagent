@@ -31,6 +31,7 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("holdKeys", "exec", "public"),
     ("holdMouse", "exec", "public"),
     ("raiseWindow", "exec", "public"),
+    ("window.bringToCurrentSpace", "exec", "public"),
     ("menus.items", "read", "public"),
     ("menus.select", "exec", "public"),
     ("clipboard.read", "read", "public"),

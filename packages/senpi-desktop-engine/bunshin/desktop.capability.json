@@ -21,6 +21,7 @@
 		"desktop.holdKeys",
 		"desktop.holdMouse",
 		"desktop.raiseWindow",
+		"desktop.window.bringToCurrentSpace",
 		"desktop.menus.items",
 		"desktop.menus.select",
 		"desktop.clipboard.read",
@@ -58,6 +59,7 @@
 		"desktop.holdKeys": "mutate",
 		"desktop.holdMouse": "mutate",
 		"desktop.raiseWindow": "mutate",
+		"desktop.window.bringToCurrentSpace": "mutate",
 		"desktop.menus.items": "read",
 		"desktop.menus.select": "mutate",
 		"desktop.clipboard.read": "read",
@@ -1046,6 +1048,19 @@
 			"required": [
 				"windowId"
 			],
+			"additionalProperties": false
+		},
+		"desktop.window.bringToCurrentSpace": {
+			"type": "object",
+			"properties": {
+				"windowId": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"windowId"
+			],
+			"description": "`window.bringToCurrentSpace`: the native id of the window to move into the\nuser's current Space. The window is usually on another Space, so it may be\nabsent from `windows`.",
 			"additionalProperties": false
 		},
 		"desktop.menus.items": {

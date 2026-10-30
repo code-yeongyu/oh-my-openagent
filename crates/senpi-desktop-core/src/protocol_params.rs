@@ -103,6 +103,15 @@ pub struct RaiseWindowParams {
     pub window_id: String,
 }
 
+/// `window.bringToCurrentSpace`: the native id of the window to move into the
+/// user's current Space. The window is usually on another Space, so it may be
+/// absent from `windows`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BringToCurrentSpaceParams {
+    pub window_id: String,
+}
+
 /// `control.grant`: `confirmationId` is the host's receipt of the human
 /// confirmation it showed; the engine never sees the confirm itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

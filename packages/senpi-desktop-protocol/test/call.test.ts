@@ -40,6 +40,11 @@ describe("isReadOnlyComputerCall", () => {
 		expect(isReadOnlyComputerCall([{ method: "window" }, { method }])).toBe(false);
 	});
 
+	it("classifies window bringToCurrentSpace as exec and refuses it on a display handle", () => {
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "bringToCurrentSpace" }])).toBe(false);
+		expect(rejectionReason([{ method: "display" }, { method: "bringToCurrentSpace" }])).toBe("unknownMethod");
+	});
+
 	it("returns false when clipboard.write is the only step", () => {
 		expect(isReadOnlyComputerCall([{ method: "clipboard.write" }])).toBe(false);
 	});

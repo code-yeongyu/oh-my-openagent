@@ -172,6 +172,7 @@ impl Worker {
             Op::HoldKeys(params) => served(self.hold_keys(&params, cancelled)),
             Op::HoldMouse(params) => served(self.hold_mouse(&params, cancelled)),
             Op::RaiseWindow(params) => served(self.raise_window(&params.window_id, cancelled)),
+            Op::BringToCurrentSpace(params) => served(self.bring_to_current_space(&params.window_id, cancelled)),
             Op::AxSnapshot(params) => self.ax_snapshot(&params),
             Op::AxQuery(params) => self.ax_query(&params),
             Op::AxElementAt(params) => self.ax_element_at(&params),

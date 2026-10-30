@@ -234,6 +234,8 @@ interface ComputerWindow extends ComputerInputTarget {
 	readonly bounds: ComputerBounds;
 	readonly focused: boolean;
 	raise(): Promise<void>;
+	/** macOS: move this window into the user's current Space without activating it; no grant needed. */
+	bringToCurrentSpace(): Promise<void>;
 	readonly menu: {
 		/** Inspect a menu path without activating the application (empty path = the menu bar). */
 		items(path?: string[]): Promise<ComputerMenuItem[]>;

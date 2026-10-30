@@ -9,6 +9,7 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"attributes",
 	"ax",
 	"bounds",
+	"bringToCurrentSpace",
 	"capabilities",
 	"children",
 	"click",

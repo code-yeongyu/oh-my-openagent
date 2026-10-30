@@ -16,6 +16,9 @@ pub enum MutatingAction {
     HoldKeys,
     HoldMouse,
     RaiseWindow,
+    /// Moves a window into the user's current Space. Background-only: it never
+    /// activates or switches Spaces, so it needs no control grant.
+    BringToCurrentSpace,
     AxPerform,
     AxSetValue,
     AxFocus,
@@ -25,7 +28,7 @@ pub enum MutatingAction {
 }
 
 impl MutatingAction {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::Click,
         Self::MoveMouse,
         Self::Drag,
@@ -35,6 +38,7 @@ impl MutatingAction {
         Self::HoldKeys,
         Self::HoldMouse,
         Self::RaiseWindow,
+        Self::BringToCurrentSpace,
         Self::AxPerform,
         Self::AxSetValue,
         Self::AxFocus,
@@ -56,6 +60,7 @@ impl MutatingAction {
             Self::HoldKeys => Method::HoldKeys,
             Self::HoldMouse => Method::HoldMouse,
             Self::RaiseWindow => Method::RaiseWindow,
+            Self::BringToCurrentSpace => Method::RaiseToSpace,
             Self::AxPerform => Method::AxPerform,
             Self::AxSetValue => Method::AxSetValue,
             Self::AxFocus => Method::AxFocus,
@@ -75,6 +80,7 @@ impl MutatingAction {
             | Self::KeyChord
             | Self::HoldKeys
             | Self::RaiseWindow
+            | Self::BringToCurrentSpace
             | Self::AxPerform
             | Self::AxSetValue
             | Self::AxFocus

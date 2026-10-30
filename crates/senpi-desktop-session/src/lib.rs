@@ -29,6 +29,7 @@ mod worker_clipboard;
 mod worker_input;
 mod worker_holds;
 mod worker_menus;
+mod worker_spaces;
 
 pub use grant::ControlSlot;
 pub use mutate::SessionSafety;
