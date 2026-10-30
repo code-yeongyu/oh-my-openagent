@@ -12,6 +12,14 @@ path = "src/main.rs"
 serde.workspace = true
 serde_json.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+libc.workspace = true
+objc2-core-foundation.workspace = true
+objc2-security.workspace = true
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+tempfile.workspace = true
+
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { workspace = true, features = [
     "Win32_Foundation",

@@ -57,12 +57,19 @@ impl Worker {
     ) {
         let checkpoint = matches!(op, Op::Observe(_))
             .then(|| (self.frames.clone(), self.registry.clone()));
+        // A read of a window that began now shows the user's input there only
+        // once its result reaches the caller (plan todo 17): the record is told
+        // after a successful delivery, never for a reply the waiter gave up on.
+        let read = crate::intervention::window_read(&op).map(|target| (target.to_owned(), self.safety.supervisor.now_ms()));
         let result = guarded(|| self.process(op, cancelled));
         let success = result.is_ok();
         let delivered = deliver(result);
         if let Some((frames, registry)) = checkpoint.filter(|_| !success || !delivered) {
             self.frames.restore(frames);
             self.registry.restore(registry);
+        }
+        if let Some((target, started_ms)) = read.filter(|_| success && delivered) {
+            self.note_read(&target, started_ms);
         }
     }
 }

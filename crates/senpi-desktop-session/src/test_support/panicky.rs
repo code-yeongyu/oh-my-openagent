@@ -170,4 +170,7 @@ impl Backend for PanickyFake {
         self.watches.0.fetch_add(1, Ordering::SeqCst);
         self.inner.watch_user_input();
     }
+    fn user_input_feed(&mut self) -> Option<Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+        self.inner.user_input_feed()
+    }
 }
