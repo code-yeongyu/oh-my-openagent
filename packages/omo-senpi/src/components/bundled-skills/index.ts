@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { readDisabledSkills, readDiscoverCwd } from "./contributed-skill"
+import { type BundledSkillsOverrideLogger, type NoticeUi, resolveBundledSkillsOverride } from "./override"
+
+export { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "./override"
 
 export const BUNDLED_SKILLS_COMPONENT_NAME = "bundled-skills"
 
@@ -11,6 +14,10 @@ export interface BundledSkillsComponentOptions {
   readonly env?: Record<string, string | undefined>
   /** Overrides the packaged skills root; tests point it at a fixture. */
   readonly skillsDir?: string
+}
+
+export interface BundledSkillsDirOptions {
+  readonly logger?: BundledSkillsOverrideLogger
 }
 
 /**
@@ -31,10 +38,14 @@ export function createBundledSkillsComponent(options: BundledSkillsComponentOpti
   return {
     name: BUNDLED_SKILLS_COMPONENT_NAME,
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      const env = options.env ?? process.env
+      pi.on("session_start", (_payload: unknown, eventCtx: unknown) => {
+        resolveBundledSkillsOverride(env, ctx.logger, (eventCtx as { readonly ui?: NoticeUi } | undefined)?.ui)
+      })
       pi.on("resources_discover", (payload: unknown) => {
-        const skillsDir = options.skillsDir ?? resolveBundledSkillsDir()
+        const skillsDir = options.skillsDir ?? resolveBundledSkillsDir(undefined, env, ctx)
         if (skillsDir === undefined) return undefined
-        const disabled = readDisabledSkills(readDiscoverCwd(payload) ?? pi.cwd ?? process.cwd(), options.env ?? process.env)
+        const disabled = readDisabledSkills(readDiscoverCwd(payload) ?? pi.cwd ?? process.cwd(), env)
         const skillPaths: string[] = []
         const hidden: string[] = []
         for (const name of readdirSync(skillsDir).sort()) {
@@ -56,14 +67,18 @@ export function createBundledSkillsComponent(options: BundledSkillsComponentOpti
 }
 
 /**
- * Packaged plugin skills win; the source-tree copy keeps dev runs working. From the bundled
- * extension at plugin/extensions/omo.js the packaged URL resolves to plugin/skills; from this
- * source file it resolves to the same synced directory.
+ * A valid OMO_BUNDLED_SKILLS_DIR wins (callers put an explicit `skillsDir` ahead of this); otherwise
+ * the packaged plugin skills, then the source-tree copy that keeps dev runs working. From the bundled extension at plugin/extensions/omo.js the
+ * packaged URL resolves to plugin/skills; from this source file it resolves to the same synced
+ * directory. An invalid override is reported once and falls back to these packaged roots.
  */
-export function resolveBundledSkillsDir(importerUrl: string = import.meta.url): string | undefined {
-  const candidates = [
+export function resolveBundledSkillsDir(
+  importerUrl: string = import.meta.url,
+  env: Record<string, string | undefined> = process.env,
+  options: BundledSkillsDirOptions = {},
+): string | undefined {
+  return resolveBundledSkillsOverride(env, options.logger) ?? [
     fileURLToPath(new URL("../skills", importerUrl)),
     fileURLToPath(new URL("../../../plugin/skills", importerUrl)),
-  ]
-  return candidates.find((candidate) => existsSync(candidate))
+  ].find((candidate) => existsSync(candidate))
 }

@@ -59,6 +59,7 @@ Rules:
     Observe once per turn before interacting with an app (one screenshot or `ax()` of the target), act, then observe again only when you need fresh state; never re-screenshot after every action.
     PREFER AX over pixels: `win.ax()` → `el.press()` / `el.click()` / `el.setValue()`.
     Pointer x,y are pixels in the MOST RECENT FULL screenshot of the SAME target; zoom leaves that frame unchanged. AX coordinates are global desktop coordinates; NEVER mix them. `InvalidCoordinateFrame` → re-screenshot that target.
+    `AxUnconfirmed` from an AX action, `setValue` or focus means the app got the request but never answered (often a modal dialog opened): it may already have taken effect, so observe the window before any retry; NEVER repeat it blindly.
     Each `win.ax()` starts a ref generation; current and previous refs stay valid, older refs throw `StaleRef`. Re-snapshot; NEVER guess refs.
     Input defaults to `delivery: "background"`. On macOS it leaves the frontmost app, its focused window, the cursor and the destination of the user's next keystroke unchanged, but a clicked target window may rise directly under the user's front window. `BackgroundUnavailable` means use AX or retry with `delivery: "foreground"` (briefly activates the target, then the focus guard restores it). Never assume a background action landed without re-observing.
     Background keyboard input goes only to an app's SOLE window: typing or pressing keys into a process with several windows throws `BackgroundUnavailable`; use AX `setValue`, or foreground delivery.

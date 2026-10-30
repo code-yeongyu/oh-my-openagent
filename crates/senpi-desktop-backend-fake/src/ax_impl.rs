@@ -4,7 +4,7 @@ use senpi_desktop_core::types::DesktopWindow;
 
 use crate::ax_tree::node_id;
 use crate::fake::FakeBackend;
-use crate::method::FakeMethod;
+use crate::method::{AxWrite, FakeMethod};
 use crate::sink::SinkOp;
 
 impl AxBackend for FakeBackend {
@@ -30,33 +30,33 @@ impl AxBackend for FakeBackend {
     }
 
     fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()> {
-        self.begin(FakeMethod::AxPerform)?;
+        let reply = self.begin_write(AxWrite::AxPerform)?;
         let node = node_id(h)?;
         self.ax_tree.check_action(node, action)?;
         self.record(SinkOp::AxPerform {
             node,
             action: action.to_string(),
         });
-        Ok(())
+        reply.confirm(&format!("AX action '{action}'"))
     }
 
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()> {
-        self.begin(FakeMethod::AxSetValue)?;
+        let reply = self.begin_write(AxWrite::AxSetValue)?;
         let node = node_id(h)?;
         self.ax_tree.set_value(node, value)?;
         self.record(SinkOp::AxSetValue {
             node,
             value: value.to_string(),
         });
-        Ok(())
+        reply.confirm("setting AXValue")
     }
 
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()> {
-        self.begin(FakeMethod::AxFocus)?;
+        let reply = self.begin_write(AxWrite::AxFocus)?;
         let node = node_id(h)?;
         self.ax_tree.focus(node)?;
         self.record(SinkOp::AxFocus { node });
-        Ok(())
+        reply.confirm("setting AXFocused=true")
     }
 
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>> {

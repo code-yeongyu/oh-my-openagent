@@ -11,6 +11,7 @@ import {
   buildGptSisyphusAgentConfig,
   buildGrokSisyphusAgentConfig,
 } from "./sisyphus-agent-config";
+import { withRefusalRule } from "./refusal-rule";
 import { buildFallbackSisyphusPrompt } from "./sisyphus-dynamic-prompt";
 import { buildClaudeFable5SisyphusPrompt } from "./sisyphus/claude-fable-5";
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
@@ -85,6 +86,25 @@ export function resolveSisyphusPromptFamily(model: string): SisyphusPromptFamily
 }
 
 export function createSisyphusAgent(
+  model: string,
+  availableAgents?: AvailableAgent[],
+  availableToolNames?: string[],
+  availableSkills?: AvailableSkill[],
+  availableCategories?: AvailableCategory[],
+  useTaskSystem = false,
+): AgentConfig {
+  const config = createSisyphusAgentForFamily(
+    model,
+    availableAgents,
+    availableToolNames,
+    availableSkills,
+    availableCategories,
+    useTaskSystem,
+  );
+  return config.prompt === undefined ? config : { ...config, prompt: withRefusalRule(config.prompt) };
+}
+
+function createSisyphusAgentForFamily(
   model: string,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],

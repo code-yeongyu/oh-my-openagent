@@ -409,7 +409,7 @@ describe("/doctor", () => {
     const text = await invoke(pi, "doctor", "", ctx)
 
     // then
-    expect(text).toMatch(/^\[ok\] projection: \d+ entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 24576 bytes\)$/m)
+    expect(text).toMatch(/^\[ok\] projection: \d+ entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\)$/m)
   })
 
   test("#given commit times that cannot be read #when doctor runs #then the projection check warns that names fell back to name order", async () => {
@@ -422,7 +422,7 @@ describe("/doctor", () => {
     const text = await invoke(pi, "doctor", "", ctx).finally(() => commitTimes.mockRestore())
 
     // then
-    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 24576 bytes\); commit times unreadable, names listed in name order$/m)
+    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\); commit times unreadable, names listed in name order$/m)
   })
 
   test("#given more names than the per-directory limit #when doctor runs #then the omitted count is a warning", async () => {

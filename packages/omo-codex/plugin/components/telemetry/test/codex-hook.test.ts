@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,8 +10,15 @@ import type { PostHogActivityReason, PostHogClient } from "../src/posthog.js";
 
 const CLI_PATH = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 
+// Privacy-notice contract (#11583): no install id file is created while telemetry is off.
+function installIdFileCount(dataDir: string): number {
+	if (!existsSync(dataDir)) return 0;
+	return readdirSync(dataDir, { recursive: true }).filter(
+		(entry) => String(entry).split(/[\\/]/).at(-1) === "install-id",
+	).length;
+}
+
 type CapturedCall = {
-	distinctId: string;
 	reason: PostHogActivityReason;
 };
 
@@ -53,8 +60,8 @@ function makeRecordingClient(): { client: PostHogClient; calls: CapturedCall[]; 
 	const calls: CapturedCall[] = [];
 	let shutdownCalls = 0;
 	const client: PostHogClient = {
-		trackActive: (distinctId, reason) => {
-			calls.push({ distinctId, reason });
+		trackActive: (reason) => {
+			calls.push({ reason });
 		},
 		shutdown: async () => {
 			shutdownCalls += 1;
@@ -104,10 +111,9 @@ describe("runSessionStartHook", () => {
 
 			const output = await runSessionStartHook(makeSessionStartInput(), {
 				createClient: () => recorder.client,
-				getDistinctId: () => "distinct-id-abc",
 			});
 
-			expect(recorder.calls).toEqual([{ distinctId: "distinct-id-abc", reason: "session_start" }]);
+			expect(recorder.calls).toEqual([{ reason: "session_start" }]);
 			expect(output).toBe("");
 		});
 
@@ -116,7 +122,6 @@ describe("runSessionStartHook", () => {
 
 			await runSessionStartHook(makeSessionStartInput(), {
 				createClient: () => recorder.client,
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(recorder.shutdownCalls).toBe(1);
@@ -129,7 +134,6 @@ describe("runSessionStartHook", () => {
 				createClient: () => {
 					throw new Error("posthog unavailable");
 				},
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(output).toBe("");
@@ -140,7 +144,6 @@ describe("runSessionStartHook", () => {
 				createClient: async () => {
 					throw new Error("posthog unavailable");
 				},
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(output).toBe("");
@@ -162,6 +165,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 
 		it("#when CLI runs from an isolated snapshot without node_modules #then exits 0 with no output", async () => {
@@ -181,6 +185,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
 			expect(result.stderr).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 
@@ -197,6 +202,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 
@@ -212,6 +218,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 
@@ -227,6 +234,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 

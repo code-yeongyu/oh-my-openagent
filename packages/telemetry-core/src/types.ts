@@ -56,7 +56,6 @@ export type TelemetryProductConfig = {
   readonly defaultApiKey: string
   readonly defaultHost: string
   readonly eventName: string
-  readonly machineIdPrefix: string
   readonly packageName: string
   readonly packageVersion: string
   readonly platform: string

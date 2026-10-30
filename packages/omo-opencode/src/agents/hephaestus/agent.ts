@@ -14,6 +14,7 @@ import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
 import { buildHephaestusPrompt as buildGpt54Prompt } from "./gpt-5-4";
 import { buildGpt55HephaestusPrompt as buildGpt55Prompt } from "./gpt-5-5";
 import { buildGpt56HephaestusPrompt as buildGpt56Prompt } from "./gpt-5-6";
+import { withRefusalRule } from "../refusal-rule";
 
 const MODE: AgentMode = "primary";
 const GPT_5_3_CODEX_RE = /^gpt-5[.-]3-codex(?:$|[.-])/i;
@@ -148,7 +149,7 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
     "Autonomous deep worker for software engineering from OhMyOpenCode",
   );
 
-  return `${agentIdentity}\n${basePrompt}`;
+  return withRefusalRule(`${agentIdentity}\n${basePrompt}`);
 }
 
 export function createHephaestusAgent(

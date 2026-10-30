@@ -121,7 +121,7 @@ describe("BUILTIN_MODEL_PROFILES", () => {
   })
 
   it("orders daily-normal opus medium then kimi max then glm max", () => {
-    expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 medium", "kimi-k3 max", "glm-5.3 max"])
+    expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 medium", "kimi-k3.1-pro max", "glm-5.3 max"])
   })
 
   it("runs daily-heavy as Fable 5.5 then 5.1 at xhigh", () => {

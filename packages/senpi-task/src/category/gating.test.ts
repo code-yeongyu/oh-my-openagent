@@ -254,7 +254,7 @@ describe("category activation gating", () => {
   describe("#given a retargeted fallback fixture", () => {
     test("#when visual-engineering resolves on a kimi-only registry #then it is a REAL chain fallback, not a primary hit", () => {
       // given
-      const models = registry([model("kimi-coding", "k3")])
+      const models = registry([model("kimi-coding", "k3.1-pro")])
 
       // when
       const result = resolveCategory("visual-engineering", {}, models)

@@ -114,9 +114,30 @@ fn error_table_lists_every_error_code_in_ordinal_order() {
     let names = string_set(ERROR_CODES.iter().map(|code| code.as_str()));
     assert_eq!(enum_names(&schema["definitions"]["ErrorCode"]), names);
     let codes: Vec<i64> = ERROR_CODES.into_iter().map(rpc_error_code).collect();
-    assert_eq!(codes, (0..24).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>());
+    assert_eq!(codes, (0..28).map(|ordinal| -32_000 - ordinal).collect::<Vec<i64>>());
     assert_eq!(schema["errors"]["Cancelled"], json!(-32_017));
     assert_eq!(schema["errors"]["CaptureUnavailable"], json!(-32_023));
+}
+
+/// Amendment 1 appends four codes; every earlier numeric code stays put.
+#[test]
+fn amendment_one_codes_follow_the_frozen_table() {
+    use crate::error::ErrorCode;
+    let appended = [
+        (ErrorCode::UserIntervened, -32_024),
+        (ErrorCode::AxUnconfirmed, -32_025),
+        (ErrorCode::SpaceUnsupported, -32_026),
+        (ErrorCode::SpaceMoveDenied, -32_027),
+    ];
+    for (code, numeric) in appended {
+        assert_eq!(rpc_error_code(code), numeric, "{}", code.as_str());
+        assert_eq!(engine_schema()["errors"][code.as_str()], json!(numeric));
+    }
+    assert_eq!(ERROR_CODES[24..], appended.map(|(code, _)| code));
+    assert_eq!(rpc_error_code(ErrorCode::PermissionDenied), -32_000);
+    assert_eq!(rpc_error_code(ErrorCode::CaptureUnavailable), -32_023);
+    assert_eq!(PROTOCOL_VERSION, "1");
+    assert_eq!(ABI, "senpi-desktop/1");
 }
 
 #[test]
@@ -207,7 +228,8 @@ fn protocol_doc() -> String {
          is the standard `-32601 Method not found` with `data: {reason: \"unknown\" | \"hostOnly\" | \
          \"testOnly\"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`. \
          `CaptureUnavailable` also carries `data: {captureUnavailable: {reason}}`; B9 defines the \
-         reason `\"minimized\"` for a window that exists but is minimized.\n\n\
+         reason `\"minimized\"` for a window that exists but is minimized. The table is append-only: \
+         a new code takes the next ordinal, so no existing numeric code moves.\n\n\
          | ErrorCode | JSON-RPC code |\n|---|---|\n",
     );
     for code in ERROR_CODES {

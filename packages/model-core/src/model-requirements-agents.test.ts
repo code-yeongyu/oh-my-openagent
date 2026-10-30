@@ -25,15 +25,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("sisyphus keeps opus primary before Kimi K3, gpt-5.6-sol, GLM 5.2, and big-pickle fallbacks", () => {
+  test("sisyphus keeps opus primary before Kimi K3.1 Pro, Kimi K3, gpt-5.6-sol, GLM 5.2, and big-pickle fallbacks", () => {
     // given
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // when
-    const [primary, second, solFallback, fourth, last] = sisyphus.fallbackChain
+    const [primary, second, kimiK3Fallback, solFallback, fourth, last] = sisyphus.fallbackChain
 
     // then
-    expect(sisyphus.fallbackChain).toHaveLength(5)
+    expect(sisyphus.fallbackChain).toHaveLength(6)
     expect(sisyphus.requiresAnyModel).toBe(true)
     expect(primary).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
@@ -41,7 +41,11 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
           variant: "max",
         })
     expect(second).toEqual({
-          providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "bailian-coding-plan", "moonshotai-cn", "firmware", "ollama-cloud", "aihubmix"],
+          providers: ["opencode-go", "kimi-for-coding", "moonshotai", "moonshotai-cn"],
+          model: "kimi-k3.1-pro",
+        })
+    expect(kimiK3Fallback).toEqual({
+          providers: ["opencode", "bailian-coding-plan", "firmware", "ollama-cloud", "aihubmix"],
           model: "kimi-k3",
         })
     expect(solFallback).toEqual({
@@ -88,7 +92,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
     expect(secondary).toEqual({
           providers: ["opencode-go"],
-          model: "kimi-k3",
+          model: "kimi-k3.1-pro",
         })
     expect(tertiary?.model).toBe("glm-4.6v")
     expect(last).toEqual({
@@ -97,7 +101,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         })
   })
 
-  test("prometheus uses Fable 5.5 (once released) then 5.1 xhigh, then Opus 5.5 max, before Kimi K3 max", () => {
+  test("prometheus uses Fable 5.5 (once released) then 5.1 xhigh, then Opus 5.5 max, before Kimi K3.1 Pro max and Kimi K3 max", () => {
     // given
     const prometheus = AGENT_MODEL_REQUIREMENTS["prometheus"]
 
@@ -106,8 +110,8 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then: the 5.5 rung exists only once FABLE_55_RELEASED is true
     const fableRungs = FABLE_55_RELEASED ? 2 : 1
-    const [fableFallback, opusFallback, kimiFallback] = chain.slice(fableRungs - 1)
-    expect(chain).toHaveLength(fableRungs + 2)
+    const [fableFallback, opusFallback, kimiFallback, kimiK3Fallback] = chain.slice(fableRungs - 1)
+    expect(chain).toHaveLength(fableRungs + 3)
     if (FABLE_55_RELEASED) {
       expect(chain[0]).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
@@ -126,13 +130,18 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
           variant: "max",
         })
     expect(kimiFallback).toEqual({
-          providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+          providers: ["opencode-go", "kimi-for-coding", "moonshotai"],
+          model: "kimi-k3.1-pro",
+          variant: "max",
+        })
+    expect(kimiK3Fallback).toEqual({
+          providers: ["opencode"],
           model: "kimi-k3",
           variant: "max",
         })
   })
 
-  test("metis uses Fable 5.5 (once released) then 5.1 max, then Opus 5.5 max, then Kimi K3 max", () => {
+  test("metis uses Fable 5.5 (once released) then 5.1 max, then Opus 5.5 max, then Kimi K3.1 Pro max and Kimi K3 max", () => {
     // given
     const metis = AGENT_MODEL_REQUIREMENTS["metis"]
 
@@ -141,8 +150,8 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     // then: the 5.5 rung exists only once FABLE_55_RELEASED is true
     const fableRungs = FABLE_55_RELEASED ? 2 : 1
-    const [fableFallback, opusFallback, kimiFallback] = chain.slice(fableRungs - 1)
-    expect(chain).toHaveLength(fableRungs + 2)
+    const [fableFallback, opusFallback, kimiFallback, kimiK3Fallback] = chain.slice(fableRungs - 1)
+    expect(chain).toHaveLength(fableRungs + 3)
     if (FABLE_55_RELEASED) {
       expect(chain[0]).toEqual({
           providers: ["anthropic", "github-copilot", "opencode"],
@@ -161,7 +170,12 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
           variant: "max",
         })
     expect(kimiFallback).toEqual({
-          providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+          providers: ["opencode-go", "kimi-for-coding", "moonshotai"],
+          model: "kimi-k3.1-pro",
+          variant: "max",
+        })
+    expect(kimiK3Fallback).toEqual({
+          providers: ["opencode"],
           model: "kimi-k3",
           variant: "max",
         })
@@ -210,7 +224,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(atlas.fallbackChain).toHaveLength(6)
     expect(primary?.model).toBe("claude-sonnet-5")
     expect(primary?.providers[0]).toBe("anthropic")
-    expect(secondary?.model).toBe("kimi-k3")
+    expect(secondary?.model).toBe("kimi-k3.1-pro")
     expect(secondary?.providers[0]).toBe("opencode-go")
     expect(solFallback).toEqual({
           providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
@@ -237,7 +251,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then
     expect(modelIDs).toEqual([
       "claude-sonnet-5",
-      "kimi-k3",
+      "kimi-k3.1-pro",
       "gpt-5.6-sol",
       "minimax-m3",
       "MiniMax-M3",

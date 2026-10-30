@@ -1,4 +1,4 @@
-import type { RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
+import type { NewSessionOptions, RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
@@ -15,6 +15,8 @@ import type { HostRunHoldClient } from "./task-parent-wire"
 export type HostPromptDisposition = Awaited<ReturnType<RpcClient["prompt"]>>
 /** How the host settled a steer/follow-up: delivered to the running turn, or queued behind it. */
 export type HostQueuedInputDisposition = Awaited<ReturnType<RpcClient["steer"]>>
+/** What the host holds for each input id (`get_pending_inputs`, senpi#3549). */
+export type HostPendingInputs = Awaited<ReturnType<RpcClient["getPendingInputs"]>>
 
 /** omo's structural view of the engine's `RpcClient`; the pinned engine may predate its fields. */
 export interface HostRpcClient extends HostRunHoldClient {
@@ -28,6 +30,8 @@ export interface HostRpcClient extends HostRunHoldClient {
   prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp"; clientMessageId?: string }): Promise<HostPromptDisposition>
   steer(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
   followUp(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
+  /** Absent on an engine before senpi#3549. */
+  getPendingInputs?(knownClientMessageIds?: readonly string[]): Promise<HostPendingInputs>
   abort(): Promise<void>
   getState(): Promise<RpcSessionState>
   getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>
@@ -47,6 +51,7 @@ export const RETRY_FALLBACK_PROFILE_CAPABILITY = "retry_fallback_profile"
 
 /** The wire shape of `open_session`, in the engine's names. */
 export interface HostOpenSessionWire {
+  readonly spawnedBy?: NewSessionOptions["spawnedBy"]
   readonly sessionPath: string
   readonly cwd: string
   readonly provider?: string
@@ -61,6 +66,7 @@ export interface HostOpenSessionWire {
 
 /** The immutable launch profile of one child session, in omo's names. */
 export interface HostSessionOpenInput {
+  readonly spawnedBy?: NewSessionOptions["spawnedBy"]
   readonly sessionPath: string
   readonly cwd: string
   readonly provider?: string
@@ -98,6 +104,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
   return {
     sessionPath: input.sessionPath,
     cwd: input.cwd,
+    ...(input.spawnedBy === undefined ? {} : { spawnedBy: input.spawnedBy }),
     ...(input.provider === undefined ? {} : { provider: input.provider }),
     ...(input.modelId === undefined ? {} : { modelId: input.modelId }),
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),

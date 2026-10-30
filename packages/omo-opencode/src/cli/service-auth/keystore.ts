@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { basename } from "node:path"
 import type { z } from "zod"
+import { signInRoute } from "./accounts-gate"
 import { credentialSchema, type Credentials, serviceOrigin, SignInError } from "./protocol"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
 
@@ -189,7 +190,9 @@ export function createSealedStore<T>(
       try {
         return schema.parse(JSON.parse(value))
       } catch {
-        throw new InvalidCredentialState("Stored sign-in data is invalid. Run omo logout, then omo login.")
+        throw new InvalidCredentialState(signInRoute() === "cli"
+          ? "Stored sign-in data is invalid. Run omo logout, then omo login."
+          : "The OmO sign-in saved on this computer can't be read, and it can't be reset from the terminal yet.")
       }
     },
     async write(value) {

@@ -1,28 +1,12 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { sha256Of } from "./cli-support.mjs"
 import { DEFECT_CODES } from "./contracts.mjs"
-import { FIDELITY_RECORDS, MEANING_RECORD, RECORD_ENVELOPE, writeFidelityRecord } from "./fidelity-records.mjs"
-import { blocksDelivery } from "./gates-fidelity.mjs"
-import { run } from "./report-tools.mjs"
-
-async function delivered(format = "html", codes: string[] | null = null) {
-	const root = mkdtempSync(join(tmpdir(), "delivery-barrier-"))
-	onTestFinished(() => rmSync(root, { recursive: true, force: true }))
-	const dir = join(root, "20260101-120000")
-	mkdirSync(dir)
-	const path = join(dir, `report.${format}`)
-	const record = join(dir, "fidelity-defects.json")
-	writeFileSync(path, "<p>Report</p>")
-	if (codes !== null) writeFidelityRecord(record, "fidelity", { artifact_sha256: sha256Of(readFileSync(path)), report: path, defects: codes.map((code) => ({ code, severity: "minor", message: code })) })
-	const invoke = (args: string[]) => run(["outcome", ...args, "--session-dir", dir])
-	await invoke(["init", "--promised", format])
-	expect((await invoke(["set", format, "delivered", "--path", path, ...(codes === null ? [] : ["--verified-by", record])])).exitCode).toBe(0)
-	return { dir, path, record, invoke }
-}
+import { fidelityProblems, FIDELITY_RECORDS, RECORD_ENVELOPE, writeFidelityRecord } from "./fidelity-records.mjs"
+import { BLOCKER, delivered, expectRefused, fullyRecorded } from "./tests/delivery-barrier-session.ts"
 
 // Enumerate the source registry, not a second list of today's fidelity codes.
 for (const [code, entry] of Object.entries(DEFECT_CODES)) {
@@ -113,32 +97,6 @@ test("#given an explicit skip and an existing blocker #when verified #then the s
 	expect((await invoke(["verify"])).exitCode).toBe(1)
 })
 
-const LOCKED_BRIEF = readFileSync(join(import.meta.dir, "tests", "fixtures", "fidelity-brief-locked.md"), "utf8")
-const BLOCKER = Object.keys(DEFECT_CODES).find((code) => blocksDelivery({ code })) as string
-
-/**
- * A delivered html edition whose locked brief requires every table record, each present, fresh for
- * the delivered bytes, and clean. recordPath is where the session keeps each row's record; a table
- * row with no entry here fails the coverage test below, so a new row brings its own cases.
- */
-async function fullyRecorded(brief = LOCKED_BRIEF) {
-	const session = await delivered("html", [])
-	writeFileSync(join(session.dir, "brief.md"), brief)
-	const recordPath: Record<string, string> = { fidelity: session.record, meaning: join(session.dir, MEANING_RECORD) }
-	const write = (kind: string, fields: Record<string, unknown> = {}) =>
-		writeFidelityRecord(recordPath[kind], kind, { artifact_sha256: sha256Of(readFileSync(session.path)), report: session.path, defects: [], ...fields })
-	write("meaning")
-	const outcomes = async () => Promise.all(["verify", "finish"].map((command) => session.invoke([command])))
-	return { ...session, recordPath, write, outcomes }
-}
-
-async function expectRefused(session: Awaited<ReturnType<typeof fullyRecorded>>, problem: Record<string, unknown>) {
-	for (const result of await session.outcomes()) {
-		expect(result.exitCode).toBe(1)
-		expect(result.json.problems).toContainEqual(expect.objectContaining(problem))
-	}
-}
-
 test("#given the record table #when every row is read #then each row has every rule column and an arranged session path", async () => {
 	const { recordPath } = await fullyRecorded()
 	expect(Object.keys(recordPath).sort()).toEqual(FIDELITY_RECORDS.map((entry) => entry.kind).sort())
@@ -148,13 +106,20 @@ test("#given the record table #when every row is read #then each row has every r
 	}
 })
 
-// The table is the barrier's spec: every row gets the same five cases.
+// The table is the barrier's spec: every row gets the same six cases.
 for (const entry of FIDELITY_RECORDS) {
 	describe(`record row ${entry.kind}`, () => {
 		test("#given the record is missing while required #when verified and finished #then delivery refuses", async () => {
 			const session = await fullyRecorded()
 			unlinkSync(session.recordPath[entry.kind])
 			await expectRefused(session, { code: "edition_unverified", path: session.recordPath[entry.kind] })
+		})
+
+		test("#given the record is missing and the row names none #when verified and finished #then delivery refuses: the step was not run", async () => {
+			const session = await fullyRecorded()
+			unlinkSync(session.recordPath[entry.kind])
+			await session.invoke(["set", "html", "delivered", "--path", session.path])
+			await expectRefused(session, { code: "edition_unverified", message: expect.stringContaining(`${entry.step} not run`) })
 		})
 
 		test("#given the record is for other bytes #when verified and finished #then delivery refuses: a different edition", async () => {
@@ -191,6 +156,12 @@ for (const entry of FIDELITY_RECORDS) {
 	})
 }
 
+test("#given a row whose --verified-by record is gone #when verified and finished #then delivery refuses: the record is missing", async () => {
+	const session = await fullyRecorded()
+	unlinkSync(session.record)
+	await expectRefused(session, { code: "edition_unverified", format: "html", path: session.record, message: `html: fidelity record ${session.record} is missing` })
+})
+
 test("#given a record kind outside the table or a malformed envelope #when written #then the writer refuses", () => {
 	const dir = mkdtempSync(join(tmpdir(), "delivery-barrier-writer-"))
 	onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
@@ -200,46 +171,28 @@ test("#given a record kind outside the table or a malformed envelope #when writt
 	expect(() => writeFidelityRecord(join(dir, "c.json"), "meaning", { ...fields, gatesRun: [] })).toThrow("unknown field")
 })
 
-/** A delivered, fidelity-verified html edition in a session whose locked brief sets `meaning check`. */
-async function meaningSession(meaning: "on" | "off", codes: string[] | null) {
-	const session = await fullyRecorded(LOCKED_BRIEF.replace("meaning check: on", `meaning check: ${meaning}`))
-	if (codes === null) unlinkSync(session.recordPath.meaning)
-	else session.write("meaning", { defects: codes.map((code) => ({ code, severity: "major", message: code })) })
-	return session
-}
+test("#given an unattached session fidelity blocker and a clean attached record #when verified and finished #then the session blocker refuses", async () => {
+	const session = await fullyRecorded()
+	const other = join(session.dir, "other.json")
+	writeFidelityRecord(other, "fidelity", { artifact_sha256: sha256Of(readFileSync(session.path)), report: session.path, defects: [] })
+	await session.invoke(["set", "html", "delivered", "--path", session.path, "--verified-by", other])
+	session.write("fidelity", { defects: [{ code: BLOCKER }] })
+	await expectRefused(session, { code: "fidelity_unresolved", codes: [BLOCKER], path: session.record })
+})
 
-for (const code of ["meaning_drift_confirmed", "meaning_unverified"]) {
-	test(`#given a meaning record with ${code} #when verified and finished #then delivery refuses`, async () => {
-		const session = await meaningSession("on", [code])
-		await expectRefused(session, { code: "fidelity_unresolved", codes: [code], path: join(session.dir, MEANING_RECORD) })
+for (const [name, alias] of [
+	["a dot segment", (dir: string) => `${dir}/./fidelity-defects.json`],
+	["a directory link", (dir: string) => {
+		const link = join(dirname(dir), "alias")
+		symlinkSync(dir, link, "junction")
+		return join(link, "fidelity-defects.json")
+	}],
+] as const) {
+	test(`#given two target paths reaching one blocking record through ${name} #when the barrier runs #then it reports the blocker once`, async () => {
+		const session = await fullyRecorded()
+		session.write("fidelity", { defects: [{ code: BLOCKER }] })
+		const manifest = JSON.parse(readFileSync(join(session.dir, "outcome.json"), "utf8"))
+		manifest.deliverables.push({ ...manifest.deliverables[0], format: "md", verifiedBy: alias(session.dir) })
+		expect(fidelityProblems(session.dir, manifest).filter((problem) => problem.code === "fidelity_unresolved")).toHaveLength(1)
 	})
 }
-
-test("#given the brief says meaning check on and the meaning step was skipped #when verified and finished #then delivery refuses: meaning gate not run", async () => {
-	const session = await meaningSession("on", null)
-	await expectRefused(session, { message: expect.stringContaining("meaning gate not run") })
-})
-
-test("#given a malformed ## Fidelity block that tries to turn meaning check off #when no meaning record exists #then delivery refuses: meaning gate not run", async () => {
-	const malformed = LOCKED_BRIEF.replace("meaning check: on (answered_by: default)", "meaning check: on (answered_by: default)\nmeaning check: off (answered_by: user)")
-	const session = await fullyRecorded(malformed)
-	unlinkSync(session.recordPath.meaning)
-	await expectRefused(session, { message: expect.stringContaining("meaning gate not run") })
-})
-
-test("#given the brief says meaning check off and no meaning record #when verified and finished #then delivery passes", async () => {
-	const session = await meaningSession("off", null)
-	expect((await session.outcomes()).map((result) => result.exitCode)).toEqual([0, 0])
-})
-
-test("#given a clean meaning record (warn only) under meaning check on #when verified #then delivery passes", async () => {
-	const { invoke } = await meaningSession("on", ["meaning_drift_warn"])
-	expect((await invoke(["verify"])).exitCode).toBe(0)
-})
-
-test("#given meaning check on, no fidelity evidence, and an explicit fidelity not_run #when verified #then the logged exemption covers the meaning step too", async () => {
-	const { dir, invoke } = await delivered()
-	writeFileSync(join(dir, "brief.md"), LOCKED_BRIEF)
-	await invoke(["gate", "fidelity", "not_run", "--reason", "No factual content in this edition"])
-	expect((await invoke(["verify"])).exitCode).toBe(0)
-})

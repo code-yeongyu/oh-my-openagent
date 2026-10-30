@@ -11,6 +11,8 @@
 export const ignoredSkillSourceDirNames = Object.freeze([".mypy_cache", ".omo", ".pytest_cache", ".ruff_cache", "__pycache__"]);
 export const ignoredSkillSourceFileNames = Object.freeze([".gitignore", ".npmignore", "pyrightconfig.json"]);
 const sourceTestFilePattern = /\.test\.ts$/;
+const testDirNamePattern = /^(?:tests?|__tests__|.+_test)$/;
+const shippedTopLevelTestDirNames = new Set(["test", "tests"]);
 
 function toSegments(path) {
 	return path.replaceAll("\\", "/").split("/").filter((segment) => segment.length > 0);
@@ -38,7 +40,9 @@ export function createSkillSourceCopyFilter(sourceRoot, options = {}) {
 		if (segments.some((segment) => ignoredDirNames.has(segment))) return false;
 		if (ignoredFileNames.has(name)) return false;
 		if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false;
-		const scriptsIndex = segments.lastIndexOf("scripts");
-		return scriptsIndex === -1 || segments[scriptsIndex + 1] !== "tests";
+		// Test directories are source-only at any depth; only a skill's top-level test/ or tests/ still ships.
+		return !segments.some(
+			(segment, index) => testDirNamePattern.test(segment) && !(index === 0 && shippedTopLevelTestDirNames.has(segment)),
+		);
 	};
 }

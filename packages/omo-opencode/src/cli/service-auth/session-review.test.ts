@@ -1,6 +1,6 @@
 import { expect, onTestFinished, spyOn, test } from "bun:test"
 import { createSession } from "./session"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
+import { clock, fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
 
@@ -20,7 +20,7 @@ for (const code of ["ENOTFOUND", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", 
 }
 
 for (const mode of ["500", "502", "500-terminal-code", "lost-response", "timeout", "invalid-json", "invalid-grant-shape"]) {
-  test(`refresh retains keys but never resends a possibly consumed token after ${mode}`, async () => {
+  test(`refresh retains keys without replaying a possibly consumed legacy token after ${mode}`, async () => {
     let requests = 0
     const api = fakeApi(() => {
       requests++
@@ -40,9 +40,10 @@ for (const mode of ["500", "502", "500-terminal-code", "lost-response", "timeout
       }, { preconnect: globalThis.fetch.preconnect }))
       onTestFinished(() => fetcher.mockRestore())
     }
-    await expect(createSession({ api, store, home }).accessToken()).rejects.toThrow()
+    const { now } = clock()
+    await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
     expect(await store.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
-    await expect(createSession({ api, store, home }).accessToken()).rejects.toThrow()
+    await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
     expect(requests + sent).toBe(1)
   })
 }
@@ -65,9 +66,10 @@ test("failed rotated-token persistence retains the pre-send uncertainty marker",
     await base.write(value)
   } }
   const home = await temporaryHome()
-  await expect(createSession({ api, store, home }).accessToken()).rejects.toThrow()
+  const { now } = clock()
+  await expect(createSession({ api, store, home, now }).accessToken()).rejects.toThrow()
   expect(await base.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
-  await expect(createSession({ api, store: base, home }).accessToken()).rejects.toThrow()
+  await expect(createSession({ api, store: base, home, now }).accessToken()).rejects.toThrow()
   expect(requests).toBe(1)
 })
 

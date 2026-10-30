@@ -7,8 +7,8 @@ use senpi_desktop_core::types::{DesktopCapabilities, DesktopDisplay, DesktopPoin
 use std::collections::BTreeMap;
 
 use crate::ax_tree::AxTree;
-use crate::faults::Faults;
-use crate::method::FakeMethod;
+use crate::faults::{Faults, Reply};
+use crate::method::{AxWrite, FakeMethod};
 use crate::scenario::{DelayMs, FakeMenuNode, FakeScenario, ResizeWindow};
 use crate::sink::{RecordingSink, SinkOp};
 
@@ -47,6 +47,9 @@ impl FakeBackend {
             };
             faults.fail_next_with(failure.method, error);
         }
+        for write in &scenario.ax_cannot_complete {
+            faults.cannot_complete_next(*write);
+        }
         Self {
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
@@ -82,10 +85,21 @@ impl FakeBackend {
 
     /// Entry of every fallible call: scripted delay, then a queued failure.
     pub(crate) fn begin(&self, method: FakeMethod) -> CoreResult<()> {
+        self.delay(method);
+        self.faults.take(method).map_or(Ok(()), Err)
+    }
+
+    /// [`Self::begin`] for an AX write: the reply to report once the write
+    /// has landed ([`Reply::confirm`]).
+    pub(crate) fn begin_write(&self, write: AxWrite) -> CoreResult<Reply> {
+        self.delay(write.method());
+        self.faults.take_write(write)
+    }
+
+    fn delay(&self, method: FakeMethod) {
         if let Some(delay) = self.delays.for_method(method) {
             std::thread::sleep(delay);
         }
-        self.faults.take(method).map_or(Ok(()), Err)
     }
 
     pub(crate) fn window(&self, id: &str) -> CoreResult<&DesktopWindow> {

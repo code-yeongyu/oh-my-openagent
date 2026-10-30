@@ -1,4 +1,8 @@
+import { join } from "node:path"
+
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
+
+import { defaultCommentCheckerCacheDir } from "../components/comment-checker/resolver"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
@@ -83,6 +87,11 @@ export function composeOmoSenpiExtension(
 
   return async (pi: unknown): Promise<void> => {
     releaseHerdrAgentHint()
+    // Shell children inherit process.env: a bundled skill's Python must not write __pycache__ into a signed app (#11373),
+    // so bytecode goes to <user cache>/omo-senpi/pycache unless the user set either variable, even to an empty string.
+    if (process.env.PYTHONDONTWRITEBYTECODE === undefined) {
+      process.env.PYTHONPYCACHEPREFIX ??= join(defaultCommentCheckerCacheDir(process.platform, process.env, "omo-senpi"), "..", "pycache")
+    }
     // Publish the dag eval sdk directory so JavaScript cells can import it from OMO_DAG_SDK_ROOT.
     provisionDagSdkRoot()
     provisionAgentToolkitSdkRoot()

@@ -5,6 +5,7 @@
 mod background;
 mod canary;
 mod cgevent;
+mod chord;
 mod global;
 mod guard;
 mod held;
@@ -13,6 +14,7 @@ mod keys;
 mod menu_key;
 mod post;
 mod release;
+mod user_monitor;
 
 #[cfg(test)]
 mod tests;
@@ -32,8 +34,10 @@ use held::{Held, KeyRoute};
 
 pub(crate) use self::canary::CANARY_STOP_REASON;
 pub use self::canary::{CanaryMode, CanaryResult};
-pub(crate) use self::cgevent::modifier_flags;
+pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
 pub(crate) use self::keys::{key_code, update_modifier};
+pub(crate) use self::user_monitor::UserInputWatch;
+pub(crate) use self::release::post_helper_release;
 
 pub(crate) struct MacInput {
     source: CGEventSource,
@@ -115,14 +119,14 @@ impl MacInput {
         mode: DeliveryMode,
         capture: &MacCapture,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         match target {
             Target::Desktop | Target::Display(_) => global::pointer(&self.source, &mut self.held, event, &self.overlay),
             Target::Window(id) => {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
-                    DeliveryMode::Background => {
-                        self.ensure_background_ready()?;
+                    DeliveryMode::Background => self.background(|this| {
                         guard::guard(
                             &window,
                             guard::pointer_kind(&event),
@@ -130,10 +134,10 @@ impl MacInput {
                         )?;
                         if !window.focused {
                             skylight::activate_without_raise(pid, wid)?;
-                            self.last_activated = Some((pid, wid));
+                            this.last_activated = Some((pid, wid));
                         }
-                        background::pointer(&self.source, &mut self.held, pid, wid, &window, event, &self.overlay)
-                    }
+                        background::pointer(&this.source, &mut this.held, pid, wid, &window, event, &this.overlay)
+                    }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
                         crate::ax::ensure_points_owned(&window, pid, wid, &event)?;
@@ -163,6 +167,7 @@ impl MacInput {
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         match target {
             Target::Desktop | Target::Display(_) => keys::type_text_interruptible(
                 &self.source, &mut self.held, text, KeyRoute::Global, check_stop, delivered,
@@ -171,15 +176,14 @@ impl MacInput {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
-                    DeliveryMode::Background => {
-                        self.ensure_background_ready()?;
+                    DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
                         guard::prepare_keys(&window, pid, wid, capture)?;
-                        self.last_activated = Some((pid, wid));
+                        this.last_activated = Some((pid, wid));
                         keys::type_text_interruptible(
-                            &self.source, &mut self.held, text, KeyRoute::Process(pid), check_stop, delivered,
+                            &this.source, &mut this.held, text, KeyRoute::Process(pid), check_stop, delivered,
                         )
-                    }
+                    }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
                         keys::type_text_interruptible(
@@ -194,26 +198,29 @@ impl MacInput {
     pub(crate) fn key_chord(
         &mut self,
         target: &Target,
-        chord: &[KeyName],
+        keys: &[KeyName],
         mode: DeliveryMode,
         capture: &MacCapture,
+        check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         match target {
-            Target::Desktop | Target::Display(_) => keys::chord(&self.source, &mut self.held, chord, KeyRoute::Global),
+            Target::Desktop | Target::Display(_) => {
+                chord::chord(&self.source, &mut self.held, keys, KeyRoute::Global, check_stop)
+            }
             Target::Window(id) => {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
-                    DeliveryMode::Background => {
-                        self.ensure_background_ready()?;
+                    DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
                         guard::prepare_keys(&window, pid, wid, capture)?;
-                        self.last_activated = Some((pid, wid));
-                        keys::chord(&self.source, &mut self.held, chord, KeyRoute::Process(pid))
-                    }
+                        this.last_activated = Some((pid, wid));
+                        chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), check_stop)
+                    }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
-                        keys::chord(&self.source, &mut self.held, chord, KeyRoute::Global)
+                        chord::chord(&self.source, &mut self.held, keys, KeyRoute::Global, check_stop)
                     }),
                 }
             }
@@ -223,6 +230,16 @@ impl MacInput {
     /// The `(pid, wid)` a background action last made key, then cleared.
     pub(crate) fn take_last_activated(&mut self) -> Option<(libc::pid_t, u32)> {
         self.last_activated.take()
+    }
+
+    /// Runs one background action: readiness first (the canary's probe input
+    /// goes to the engine's own window, never the target), then `action` under
+    /// [`skylight::reporting_partial`], so a refusal after input of the call
+    /// went out is `InputFailed` rather than a rerunnable
+    /// `BackgroundUnavailable`.
+    fn background<T>(&mut self, action: impl FnOnce(&mut Self) -> CoreResult<T>) -> CoreResult<T> {
+        self.ensure_background_ready()?;
+        skylight::reporting_partial(|| action(self))
     }
 
     /// Runs the canary when it has not run yet; refuses background delivery

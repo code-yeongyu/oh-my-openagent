@@ -24,6 +24,8 @@ import {
   type PermissionValue,
 } from "../../shared/permission-compat"
 
+import { withRefusalRule } from "../refusal-rule"
+import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
 import { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
 import { buildKimiK27SisyphusJuniorPrompt } from "./kimi-k2-7"
@@ -80,6 +82,17 @@ export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPro
  * Builds the appropriate Sisyphus-Junior prompt based on model.
  */
 export function buildSisyphusJuniorPrompt(
+  model: string | undefined,
+  useTaskSystem: boolean,
+  promptAppend?: string
+): string {
+  // The rule goes after the model's base prompt and before the user's prompt_append, which stays last.
+  const prompt = withRefusalRule(buildSisyphusJuniorPromptBody(model, useTaskSystem))
+  if (!promptAppend) return prompt
+  return prompt + "\n\n" + resolvePromptAppend(promptAppend)
+}
+
+function buildSisyphusJuniorPromptBody(
   model: string | undefined,
   useTaskSystem: boolean,
   promptAppend?: string

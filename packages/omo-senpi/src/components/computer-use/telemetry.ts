@@ -184,9 +184,10 @@ function isPermissionPolicyFailure(result: Record<string, unknown>): boolean {
   if (!Array.isArray(result.content)) return false
   return result.content.some((part) => {
     if (!isRecord(part) || part.type !== "text" || typeof part.text !== "string") return false
-    return part.text === "The user rejected permission to use this specific tool call." ||
+    // senpi appends guidance after these fixed first sentences, so they are matched as prefixes.
+    return part.text.startsWith("The user rejected permission to use this specific tool call.") ||
       part.text.startsWith("The user rejected permission to use this specific tool call with the following feedback:") ||
-      part.text === "The user has specified a rule which prevents you from using this specific tool call."
+      part.text.startsWith("The user has specified a rule which prevents you from using this specific tool call.")
   })
 }
 

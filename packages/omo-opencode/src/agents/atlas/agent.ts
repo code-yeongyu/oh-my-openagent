@@ -27,6 +27,7 @@ import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynam
 import { buildAgentIdentitySection, buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
 import { mergeCategories } from "../../shared/merge-categories"
+import { withRefusalRule } from "../refusal-rule"
 
 import {
   getCategoryDescription,
@@ -106,7 +107,7 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
     inject: runtimeInjections,
   }).body
 
-  return agentIdentity + "\n" + basePrompt
+  return withRefusalRule(agentIdentity + "\n" + basePrompt)
 }
 
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {

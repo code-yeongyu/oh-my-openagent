@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto"
 import { describe, expect, test } from "bun:test"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -11,10 +10,10 @@ import {
   createDefaultPostHogTransport,
   createTelemetryClient,
   getTelemetryActivityStateFilePath,
-  getTelemetryDistinctId,
   isTelemetryClientEnabled,
   recordDailyActive,
 } from "./index"
+import { TELEMETRY_INSTALL_ID_FILE_NAME } from "./install-id"
 import type {
   TelemetryCaptureMessage,
   TelemetryOsProvider,
@@ -28,7 +27,6 @@ const PRODUCT = {
   defaultApiKey: DEFAULT_POSTHOG_API_KEY,
   defaultHost: DEFAULT_POSTHOG_HOST,
   eventName: "omo_codex_daily_active",
-  machineIdPrefix: "omo-codex:",
   packageName: "@oh-my-opencode/omo-codex",
   packageVersion: "4.9.2",
   platform: "omo-codex",
@@ -114,28 +112,41 @@ describe("posthog telemetry client", () => {
 
   test("#given codex product parameters #when daily active is captured #then payload shape matches current contract", async () => {
     // given
+    const savedTermProgram = process.env.TERM_PROGRAM
+    process.env.TERM_PROGRAM = "WezTerm"
+    const previousShell = process.env.SHELL
+    process.env.SHELL = "/home/contract-user/.nix-profile/bin/zsh"
     const capturedMessages: TelemetryCaptureMessage[] = []
-    const client = createTelemetryClient({
-      env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
-      osProvider: OS_PROVIDER,
-      product: PRODUCT,
-      source: "cli",
-      transportFactory: createCapturingFactory(capturedMessages),
-    })
+    const client = (() => {
+      try {
+        return createTelemetryClient({
+          env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
+          osProvider: OS_PROVIDER,
+          product: PRODUCT,
+          source: "cli",
+          transportFactory: createCapturingFactory(capturedMessages),
+        })
+      } finally {
+        if (savedTermProgram === undefined) delete process.env.TERM_PROGRAM
+        else process.env.TERM_PROGRAM = savedTermProgram
+      }
+    })()
 
     // when
     client.trackActive({
       dayUTC: "2026-05-25",
-      distinctId: getTelemetryDistinctId(PRODUCT.machineIdPrefix, OS_PROVIDER),
+      distinctId: "a".repeat(64),
       reason: "cli_run",
     })
     await client.flush()
     await client.shutdown()
+    if (previousShell === undefined) delete process.env.SHELL
+    else process.env.SHELL = previousShell
 
     // then
     expect(capturedMessages).toHaveLength(1)
     expect(capturedMessages[0]).toEqual({
-      distinctId: createHash("sha256").update("omo-codex:test-host").digest("hex"),
+      distinctId: "a".repeat(64),
       event: "omo_codex_daily_active",
       properties: {
         platform: "omo-codex",
@@ -154,9 +165,9 @@ describe("posthog telemetry client", () => {
         total_memory_gb: 16,
         locale: Intl.DateTimeFormat().resolvedOptions().locale,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        shell: process.env.SHELL,
+        shell: "zsh",
         ci: Boolean(process.env.CI),
-        terminal: process.env.TERM_PROGRAM,
+        terminal: "WezTerm",
         $process_person_profile: false,
         day_utc: "2026-05-25",
         reason: "cli_run",
@@ -187,6 +198,7 @@ describe("posthog telemetry client", () => {
 
       // then
       expect(capturedMessages).toHaveLength(1)
+      expect(existsSync(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).toBe(true)
       const message = capturedMessages[0]
       if (message === undefined || message.properties === undefined) {
         throw new Error("expected one captured message with properties")
@@ -262,7 +274,14 @@ describe("posthog telemetry client", () => {
     expect(transportCreated).toBe(false)
   })
 
-  test("#given telemetry is disabled #when daily active records #then dedup state is not written", async () => {
+  // Privacy-notice contract (#11583): while any opt-out is set, nothing is sent and no install id file is created.
+  test.each([
+    ["DO_NOT_TRACK", { DO_NOT_TRACK: "1" }],
+    ["OMO_DISABLE_TELEMETRY", { OMO_DISABLE_TELEMETRY: "1" }],
+    ["OMO_DISABLE_POSTHOG", { OMO_DISABLE_POSTHOG: "1" }],
+    ["OMO_SEND_ANONYMOUS_TELEMETRY=0", { OMO_SEND_ANONYMOUS_TELEMETRY: "0" }],
+    ["OMO_CODEX_DISABLE_POSTHOG", { OMO_CODEX_DISABLE_POSTHOG: "1" }],
+  ] as const)("#given telemetry is disabled by %s #when daily active records #then no dedup state or install id file is written", async (_name, optOut) => {
     // given
     const capturedMessages: TelemetryCaptureMessage[] = []
     const stateDir = mkdtempSync(join(tmpdir(), "telemetry-core-disabled-"))
@@ -271,7 +290,7 @@ describe("posthog telemetry client", () => {
     try {
       // when
       await recordDailyActive({
-        env: { OMO_CODEX_DISABLE_POSTHOG: "1", POSTHOG_API_KEY: "test-key" },
+        env: { ...optOut, POSTHOG_API_KEY: "test-key" },
         now: new Date("2026-05-25T01:02:03.000Z"),
         osProvider: OS_PROVIDER,
         product: PRODUCT,
@@ -284,6 +303,7 @@ describe("posthog telemetry client", () => {
       // then
       expect(capturedMessages).toHaveLength(0)
       expect(existsSync(stateFilePath)).toBe(false)
+      expect(existsSync(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).toBe(false)
     } finally {
       rmSync(stateDir, { recursive: true, force: true })
     }

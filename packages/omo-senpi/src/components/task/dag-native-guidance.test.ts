@@ -41,7 +41,7 @@ test("production DAG dispatch transfers only the final journal revision into chi
   if (started.kind !== "started") throw new Error(`unexpected start: ${started.kind}`)
   let runtime: ReturnType<typeof createDagRuntime> | undefined
   try {
-    await launchSettled(engine.manager, started.task_id)
+    await launchSettled(engine.manager, started.task_id, 15_000)
     await engine.manager.pauseTask(started.task_id, {
       parentSessionId: "parent-1", parentPauseSeq: 7, runRef: { kind: "dag", id: h.runId },
     })

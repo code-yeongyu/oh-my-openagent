@@ -12,7 +12,8 @@
     "githubStars": "{count} estrelas no GitHub",
     "openMenu": "Abrir menu",
     "closeMenu": "Fechar menu",
-    "primary": "Principal"
+    "primary": "Principal",
+    "skipToContent": "Pular para o conteúdo"
   },
   "footer": {
     "brand": "OmO",
@@ -207,6 +208,8 @@
   "docs": {
     "mobileHeader": "Docs do OmO",
     "searchPlaceholder": "Buscar nos docs...",
+    "searchLabel": "Filtrar seções da documentação",
+    "sectionsLabel": "Seções da documentação",
     "install": {
       "title": "Instalar o OmO",
       "description": "Instale o OmO com um comando no macOS, Linux, WSL e Windows."
@@ -511,5 +514,10 @@
       "discord": "Perguntar no Discord"
     },
     "privacy": "Esta página não salva seu relatório, mas ele foi enviado para omo.dev no link aberto pelo app. Ele só chega ao GitHub quando você mesmo envia a issue."
+  },
+  "notFound": {
+    "title": "Não encontramos esta página.",
+    "body": "O link pode estar desatualizado ou a página pode ter mudado de lugar.",
+    "home": "Voltar para o início"
   }
 }

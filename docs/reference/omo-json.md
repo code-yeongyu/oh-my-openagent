@@ -365,7 +365,7 @@ Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builti
 
 | Id | Display name | Chain |
 |----|--------------|-------|
-| `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3` (max) -> `glm-5.3` (max) |
+| `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3.1-pro` (max) -> `glm-5.3` (max) |
 | `daily-heavy` | Daily · Heavy | `claude-fable-5-1` (xhigh) |
 | `geeky-normal` | Obsessive · Normal | `gpt-6-astra` (medium, ChatGPT subscription/API/Copilot/OpenCode), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
 | `geeky-heavy` | Obsessive · Heavy | `gpt-6-astra` (high) |
@@ -401,6 +401,26 @@ Override semantics: a `model_profiles.<name>` entry that matches a builtin repla
     }
   },
   "model_profile": "office" // or "daily-normal", or a pin such as "anthropic/claude-opus-5-5"
+}
+```
+
+### `model_pad`
+
+How clients draw the four builtin lanes as a 2x2 pad (OmO Desktop's Profile pad and its Settings > Models > Model pad section). The engine never reads it; it lives in `omo.json` so every client and device shows the same words (`schema/model-pad.ts`). A square's own name and model are its `model_profiles.<lane id>` entry (`display_name`, `models`), not part of this block.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `labels.daily` | string | Left column word; unset keeps "Daily". |
+| `labels.geeky` | string | Right column word; unset keeps "Obsessive". |
+| `labels.heavy` | string | Top row word; unset keeps "Heavy". |
+| `labels.normal` | string | Bottom row word; unset keeps "Normal". |
+
+```jsonc
+{
+  "model_pad": { "labels": { "daily": "Claude", "geeky": "GPT" } },
+  "model_profiles": {
+    "daily-normal": { "display_name": "Claude Normal", "models": [{ "model": "anthropic-subscription/claude-opus-5-5", "reasoning": "medium" }] }
+  }
 }
 ```
 

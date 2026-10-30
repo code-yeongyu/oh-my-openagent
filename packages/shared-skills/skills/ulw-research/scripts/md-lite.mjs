@@ -113,7 +113,7 @@ export function parseMarkdown(text) {
 			const codeStart = Math.min(line.next, source.length)
 			let close = lines.length
 			for (let k = i + 1; k < lines.length; k++) {
-				const candidate = lines[k].raw.trim()
+				const candidate = lines[k].raw.replace(/^ {0,3}/, "").trimEnd()
 				if (candidate.startsWith(open[0].repeat(open.length)) && /^(`+|~+)$/.test(candidate)) {
 					close = k
 					break

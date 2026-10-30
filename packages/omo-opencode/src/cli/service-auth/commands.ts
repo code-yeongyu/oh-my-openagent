@@ -1,5 +1,6 @@
 import { Command } from "commander"
 import { isCancel, select, confirm } from "@clack/prompts"
+import { serviceAccountsOpen } from "./accounts-gate"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
@@ -100,7 +101,7 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
     console.log("Signed in to OmO.")
   } catch (error) {
     console.error(controller.signal.aborted ? "Sign-in cancelled."
-      : error instanceof SignInError ? error.message : "Unable to complete OmO sign-in. Check the OS credential store and try again.")
+      : error instanceof SignInError ? error.message : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.")
     process.exitCode = 1
   } finally {
     process.removeListener("SIGINT", cancel)
@@ -108,20 +109,12 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   }
 }
 
-/** The one switch for OmO service accounts (#10262): set to true when accounts open to everyone. */
-export const SERVICE_ACCOUNTS_OPEN: boolean = false
+export { SERVICE_ACCOUNTS_OPEN } from "./accounts-gate"
 
-export const SERVICE_ACCOUNTS_CLOSED_MESSAGE = "OmO accounts aren't available yet."
+export const SERVICE_ACCOUNTS_CLOSED_MESSAGE =
+  "Signing in from the terminal isn't available yet. Sign in from the OmO desktop app on this computer; omo uses that sign-in."
 
 const SERVICE_AUTH_COMMANDS = ["login", "logout", "whoami"] as const
-
-// The sign-in suites exercise the real flow through the launcher; their in-process preload opens
-// the commands here, which nothing a user can set (no env var, flag or config) reaches.
-const testOpenKey = Symbol.for("omo.test.serviceAccountsOpen")
-
-function serviceAccountsOpen(): boolean {
-  return SERVICE_ACCOUNTS_OPEN || (globalThis as Record<symbol, unknown>)[testOpenKey] === true
-}
 
 function refuseClosedServiceAuth(): never {
   console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
