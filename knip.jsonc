@@ -1461,8 +1461,6 @@
       "packages/senpi-desktop-engine/src/locator.ts": ["DESKTOP_ENGINE_BINARY", "QUARANTINE_ATTRIBUTE"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HANG_GUARD_MS, CHORD
       "packages/senpi-desktop-engine/test/support/engine.ts": ["HANG_GUARD_MS", "CHORD"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) ELEMENT_SNAPSHOT
-      "packages/senpi-desktop-prelude/test/harness.ts": ["ELEMENT_SNAPSHOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/senpi-desktop-prelude/test/python-setup.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
@@ -2131,6 +2129,7 @@
         "script/check-temp-leak-report-only.mjs",
         "script/bun-panic-retry.ts",
         "script/ci-leg-tests-guard.mjs",
+        "script/engine-trust-helper-smoke.ts",
         "script/published-install-smoke.mjs",
         "script/verify-omo-ai-payload.mjs",
         "script/release-announce.ts",
@@ -2648,6 +2647,7 @@
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
         "src/sync/item/test-support.ts",
+        "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",
         "src/sync/space/test-support.ts",
       ],

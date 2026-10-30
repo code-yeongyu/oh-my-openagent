@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { basename, extname, relative, resolve } from "node:path"
 import { spawn } from "node:child_process"
 import { execFileSync } from "node:child_process"
@@ -59,6 +60,8 @@ export function createFormatterStep(options: FormatterStepOptions = {}) {
     let requiredError: string | undefined
     for (const rawPath of extractMutatedFilePaths(event)) {
       const filePath = resolve(cwd, rawPath)
+      // A file behind a macOS automount trigger is not formatted: probing it can park the host loop (#11545).
+      if (isDarwinAutomountTriggerPath(filePath)) continue
       if (!existsSync(filePath) || isGitIgnored(filePath, cwd)) continue
       if (readFileSync(filePath).byteLength > config.maxFileBytes) continue
       const markerNames = options.markers?.(cwd) ?? []
