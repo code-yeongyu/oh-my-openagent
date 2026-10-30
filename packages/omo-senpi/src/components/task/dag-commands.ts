@@ -80,6 +80,7 @@ export interface DagCommandRunSummary {
 export interface DagCommandTaskRecord {
   readonly model: string
   readonly resolved_model?: { readonly display: string }
+  readonly effective_model?: { readonly display: string }
 }
 
 // The read seam the command needs: session-scoped run list, per-run snapshot, task lookup.
@@ -226,11 +227,11 @@ function routeLabel(route: DagCommandRoute): string {
   return `category:${normalizeRendererText(route.category)}`
 }
 
-// The route model is only what the caller asked for; the task record holds what actually ran, so
-// the attached record wins whenever the node reached one.
+// The route model is only what the caller asked for; the task record holds what actually runs (its
+// effective model after a fallback or switch), so the attached record wins whenever the node reached one.
 function resolvedModel(node: DagCommandNode, manager: DagCommandManager): string | undefined {
   const record = node.taskId === undefined ? undefined : manager.taskRecord(node.taskId)
-  const resolved = record?.resolved_model?.display ?? record?.model ?? (node.route.kind === "agent" ? node.route.model : undefined)
+  const resolved = record?.effective_model?.display ?? record?.resolved_model?.display ?? record?.model ?? (node.route.kind === "agent" ? node.route.model : undefined)
   return resolved === undefined ? undefined : normalizeRendererText(resolved)
 }
 
