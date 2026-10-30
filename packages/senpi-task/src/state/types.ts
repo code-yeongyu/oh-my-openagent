@@ -158,6 +158,8 @@ export type ResolvedModelRecord = {
   readonly reasoning?: string
   readonly service_tier?: string
   readonly source: ResolvedModelSource
+  /** The parent session's rung (#10750): the engine may use it only for a spent or signed-out provider (#11781). */
+  readonly last_resort?: true
 }
 
 export {

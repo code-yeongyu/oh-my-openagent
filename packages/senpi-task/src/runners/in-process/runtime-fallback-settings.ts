@@ -76,10 +76,15 @@ class SnapshotSettingsStorage implements SettingsStorage {
   }
 }
 
-/** `provider/model[:thinking]`: how a fallback rung is named in a retry fallback chain. */
+/**
+ * `provider/model[:thinking][!last-resort]`: how a fallback rung is named in a retry fallback chain. The flag
+ * (senpi#3845) keeps the parent session's rung for a spent or signed-out provider only, so a refusal or an
+ * overload on a category rung never re-runs the child on the parent's model (#11781).
+ */
 export function modelSelector(model: ResolvedModelRecord): string {
   const thinking = model.reasoning ?? model.reasoning_effort ?? model.variant
-  return thinking === undefined
+  const selector = thinking === undefined
     ? `${model.provider}/${model.model_id}`
     : `${model.provider}/${model.model_id}:${thinking}`
+  return model.last_resort === true ? `${selector}!last-resort` : selector
 }

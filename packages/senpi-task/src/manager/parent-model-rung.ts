@@ -20,7 +20,7 @@ export function withParentModelRung(plan: ResolvedChildPlan, spec: ManagerStartS
   const chain = [plan.resolved_model, plan.requested_model, ...(plan.fallback_models ?? [])]
   if (chain.some((rung) => rung !== undefined && sameModel(rung, parent)) || plan.model === parent.display) return { plan }
   return {
-    plan: { ...plan, fallback_models: [...(plan.fallback_models ?? []), parent] },
+    plan: { ...plan, fallback_models: [...(plan.fallback_models ?? []), { ...parent, last_resort: true }] },
     parentModel: parent.display,
   }
 }
