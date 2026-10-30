@@ -16,6 +16,8 @@ mod overlay;
 mod release_helper;
 mod responsible;
 mod input;
+#[cfg(test)]
+mod partial_coverage_tests;
 mod skylight;
 mod stop_path;
 
