@@ -185,20 +185,54 @@ export function buildFrontendGuidanceSection(
 When you must touch frontend code yourself: avoid generic AI-SaaS aesthetics. Choose a clear visual direction with CSS variables (no purple-on-white default, no dark-mode default). Use expressive, purposeful typography rather than default stacks (Inter, Roboto, Arial, system). Build atmosphere through gradients, shapes, or subtle patterns rather than flat single-color backgrounds. Use a few meaningful animations (page-load, staggered reveals) over generic micro-motion. Verify both desktop and mobile rendering. If working within an existing design system, preserve its patterns instead.`
 }
 
+/**
+ * Machine-readable sentinels for the unresolved, consequential decisions that
+ * justify consulting the Plan Agent on non-Claude models. The planner section
+ * renders from this contract so tests can pin the gate without asserting
+ * authored prose. Procedural step count is deliberately NOT a trigger (#6074).
+ */
+export const PLAN_CONSULT_TRIGGERS = [
+  "unresolved-ambiguity",
+  "architecture-or-migration",
+  "compatibility-impact",
+  "multi-owner-ordering",
+  "explicit-plan-request",
+] as const
+
+export type PlanConsultTrigger = (typeof PLAN_CONSULT_TRIGGERS)[number]
+
+const PLAN_TRIGGER_LABELS: Record<PlanConsultTrigger, string> = {
+  "unresolved-ambiguity":
+    "the task or its success criteria remain ambiguous after reading it",
+  "architecture-or-migration":
+    "an architecture, migration, or data-model decision must be made first",
+  "compatibility-impact":
+    "the change can break existing consumers, contracts, or downstream owners",
+  "multi-owner-ordering":
+    "work spans multiple owners whose execution order must be coordinated",
+  "explicit-plan-request": "the user explicitly asked for a plan",
+}
+
 export function buildNonClaudePlannerSection(model: string): string {
   const isNonClaude = !model.toLowerCase().includes("claude")
   if (!isNonClaude) {
     return ""
   }
 
+  const triggerBullets = PLAN_CONSULT_TRIGGERS.map(
+    (trigger) => `- [plan-trigger:${trigger}] ${PLAN_TRIGGER_LABELS[trigger]}`,
+  ).join("\n")
+
   return `### Plan Agent Dependency (Non-Claude)
 
-Multi-step task? **ALWAYS consult Plan Agent first.** Do NOT start implementation without a plan.
+Consult the Plan Agent only when an unresolved, consequential planning decision remains. A step count alone is NEVER a reason to consult Plan.
 
-- Single-file fix or trivial change → proceed directly
-- Anything else (2+ steps, unclear scope, architecture) → \`task(subagent_type="plan", ...)\` FIRST
-- Use \`task_id\` to resume the same Plan Agent - ask follow-up questions aggressively
-- If ANY part of the task is ambiguous, ask Plan Agent before guessing
+Consult Plan first via \`task(subagent_type="plan", ...)\` only for these unresolved decisions:
+${triggerBullets}
+
+Proceed directly when the action, scope, success criteria, and verification are already known - even when the work takes several steps (for example, one edit followed by its test). Do not delegate fully specified bounded work to Plan.
+
+Use \`task_id\` to resume the same Plan Agent - ask follow-up questions aggressively while a real planning question remains open.
 
 Plan Agent returns a structured work breakdown with parallel execution opportunities. Follow it.`
 }
