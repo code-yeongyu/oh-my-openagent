@@ -2764,6 +2764,7 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "skills/frontend/scripts/detect/cli.ts",
+        "skills/programming/scripts/{python,rust,go}/new-*.ts",
         "scripts/detect-parity.ts",
         "scripts/detect-parity-oracle.ts",
         "scripts/detect-source-parity.ts",
