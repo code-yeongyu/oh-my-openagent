@@ -138,7 +138,7 @@ describe("compile-safe engine preparation", () => {
 
   describe("#given the patch script runs as postinstall does", () => {
     describe("#when the installed engine still resolves css-tree data dynamically", () => {
-      test("#then the script prepares css-tree along with the RPC stream guard", () => {
+      test("#then the script prepares css-tree", () => {
         const root = createEngine()
         write(
           join(root, "dist", "modes", "rpc", "rpc-mode.js"),

@@ -620,6 +620,7 @@
     "packages/omo-native/bin/lib/package-paths.js",
     "packages/omo-native/bin/lib/provider-map.json",
     "packages/omo-native/bin/lib/setup-assets-import.js",
+    "packages/omo-native/bin/lib/setup-commandcode.js",
     "packages/omo-native/bin/lib/setup-credentials.js",
     "packages/omo-native/bin/lib/setup-detect.js",
     "packages/omo-native/bin/lib/setup-guidance.js",

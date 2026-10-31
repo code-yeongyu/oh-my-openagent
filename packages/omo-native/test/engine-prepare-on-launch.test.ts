@@ -10,15 +10,13 @@ const REINSTALL = "npm i -g omo-ai@beta"
 
 const roots: string[] = []
 
-const upstreamRpcMode = () => readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8")
-
 function createEngine(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-engine-prepare-"))
   roots.push(root)
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@code-yeongyu/senpi", version: "2026.9.23", type: "module" }))
   const rpcPath = join(root, RPC_MODE)
   mkdirSync(dirname(rpcPath), { recursive: true })
-  writeFileSync(rpcPath, upstreamRpcMode())
+  writeFileSync(rpcPath, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
   return root
 }
 
@@ -26,7 +24,7 @@ function prepareOnce(root: string, reported: string[] = []) {
   ensureEnginePrepared({ senpiRoot: root, omoVersion: OMO_VERSION, reinstallCommand: REINSTALL, report: (line: string) => reported.push(line) })
 }
 
-const readRpcMode = (root: string) => readFileSync(join(root, RPC_MODE), "utf8")
+const readRpc = (root: string) => readFileSync(join(root, RPC_MODE), "utf8")
 const readStamp = (root: string) => readFileSync(join(root, ENGINE_PREPARED_STAMP), "utf8").trim()
 
 afterEach(() => {
@@ -38,18 +36,20 @@ describe("launcher engine preparation (#8713)", () => {
     test("#then the launch prepares it and stamps it with the omo-ai version", () => {
       const root = createEngine()
       prepareOnce(root)
-      expect(readRpcMode(root)).toContain("invalid_stream_event")
+      expect(readRpc(root)).toContain("invalid_stream_event")
       expect(readStamp(root)).toBe(OMO_VERSION)
     })
   })
 
   describe("#given an engine already stamped for this omo-ai version", () => {
-    test("#then the launch leaves every engine file untouched", () => {
+    test("#then the launch runs no preparation step again", () => {
       const root = createEngine()
       prepareOnce(root)
-      writeFileSync(join(root, RPC_MODE), upstreamRpcMode())
-      prepareOnce(root)
-      expect(readRpcMode(root)).toBe(upstreamRpcMode())
+      rmSync(join(root, RPC_MODE))
+      const reported: string[] = []
+      prepareOnce(root, reported)
+      expect(reported).toEqual([])
+      expect(existsSync(join(root, RPC_MODE))).toBe(false)
     })
   })
 
@@ -58,7 +58,7 @@ describe("launcher engine preparation (#8713)", () => {
       const root = createEngine()
       writeFileSync(join(root, ENGINE_PREPARED_STAMP), "5.0.0-0.beta.85\n")
       prepareOnce(root)
-      expect(readRpcMode(root)).toContain("invalid_stream_event")
+      expect(readRpc(root)).toContain("invalid_stream_event")
       expect(readStamp(root)).toBe(OMO_VERSION)
     })
   })
