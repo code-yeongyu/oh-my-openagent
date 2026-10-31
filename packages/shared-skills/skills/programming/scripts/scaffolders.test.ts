@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,6 +48,35 @@ describe("#given the Bun scaffolders run offline", () => {
     expect(agents).toContain(" billing ");
     expect(agents).not.toMatch(/\$\{?[_a-z]/i);
     expect(readFileSync(join(project, "README.md"), "utf8").split("\n")[0]).toBe("# svc");
+  });
+
+  test("#when the go templates were checked out with CRLF #then every generated file is LF", async () => {
+    // A CRLF checkout (git autocrlf) must not leak into the scaffolded project: its own .editorconfig says end_of_line = lf.
+    const scriptsCopy = join(runRoot, "crlf-scripts");
+    for (const dir of ["go", "shared"]) cpSync(join(import.meta.dir, dir), join(scriptsCopy, dir), { recursive: true });
+    const templatesDir = join(scriptsCopy, "go", "templates");
+    for (const file of readdirSync(templatesDir)) {
+      const path = join(templatesDir, file);
+      writeFileSync(path, readFileSync(path, "utf8").replace(/\r?\n/g, "\r\n"));
+    }
+    const project = join(runRoot, "crlf-svc");
+
+    const child = Bun.spawn([process.execPath, join(scriptsCopy, "go", "new-project.ts"), "crlf-svc", "--path", runRoot, "--module", "example.com/acme/crlf", "--purpose", "billing"], {
+      cwd: runRoot,
+      env: { ...process.env, PATH: emptyBin },
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited]);
+
+    expect(code, stderr).toBe(0);
+    const generated = readdirSync(project, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => join(entry.parentPath, entry.name));
+    expect(generated.length).toBe(11);
+    const withCr = generated.filter((file) => readFileSync(file, "utf8").includes("\r"));
+    expect(withCr).toEqual([]);
+    expect(readFileSync(join(project, "README.md"), "utf8").split("\n")[0]).toBe("# crlf-svc");
   });
 
   test("#when cargo is not on PATH #then rust new-project exits 1 naming cargo", async () => {
