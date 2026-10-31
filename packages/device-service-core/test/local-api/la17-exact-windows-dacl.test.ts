@@ -50,15 +50,13 @@ describe("LA17 exact protected DACL on Windows (second local user omoqa2)", () =
 
       await applyExactDacl(dir, sid, "dir");
       await applyExactDacl(file, sid, "file");
-      expect(await verifyExactDacl(dir, sid, "dir")).toBe(true);
-      expect(await verifyExactDacl(file, sid, "file")).toBe(true);
+      // The SDDL comparison comes first so a refusal prints the descriptor Windows actually wrote.
       const after = await describeDacl(file);
       const dirSddl = (await describeDacl(dir)).sddl;
-      console.log(
-        `dir sddl=${dirSddl.replaceAll(sid, "<user>")} file sddl=${after.sddl.replaceAll(sid, "<user>")}`,
-      );
-      expect(after.sddl).toBe(`O:${sid}D:PAI(A;;FA;;;${sid})`);
-      expect(dirSddl).toBe(`O:${sid}D:PAI(A;OICI;FA;;;${sid})`);
+      expect(dirSddl.replaceAll(sid, "<user>")).toBe("O:<user>D:PAI(A;OICI;FA;;;<user>)");
+      expect(after.sddl.replaceAll(sid, "<user>")).toBe("O:<user>D:PAI(A;;FA;;;<user>)");
+      expect(await verifyExactDacl(dir, sid, "dir")).toBe(true);
+      expect(await verifyExactDacl(file, sid, "file")).toBe(true);
       expect(after.aces.map((ace) => ace.sid)).toEqual([sid]);
       expect(await readAs(SECOND_USER, password, file)).toBe("read_denied");
     },
