@@ -1,6 +1,6 @@
 # Bootstrap — Project Layout, Toolchain, Taskfile, CI
 
-What every new Go project gets in the first 60 seconds. Drop the script in `scripts/go/new-project.go` does all of this — this document explains *what* it produces and *why*.
+What every new Go project gets in the first 60 seconds. The scaffold `bun run ../../scripts/go/new-project.ts <name>` does all of this — this document explains *what* it produces and *why*.
 
 ## Toolchain pin
 
@@ -318,7 +318,7 @@ Go 1.23+ HTTP service for {one-line purpose}.
 - 250 pure LOC ceiling per file — split before adding lines
 ```
 
-The skill's `cmd/new-project.go` writes this file with project-specific values filled in.
+The skill's `scripts/go/new-project.ts` writes this file with project-specific values filled in.
 
 ## Sources
 
