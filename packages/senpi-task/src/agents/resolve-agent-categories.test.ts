@@ -230,7 +230,7 @@ describe("resolveAgent category stage", () => {
   test("#given a user category model override that is unavailable #when resolution fails #then the attempted model names the user model, not the builtin", () => {
     // given: the user pointed deep at their own model; neither it nor the builtin is in the registry.
     const definition: AgentDefinition = { name: "probe", categories: ["deep"] }
-    const omoConfig = { categories: { deep: { model: "openai/my-custom-model" } } } as OmoConfig
+    const omoConfig = { categories: { deep: { model: "openai/my-custom-model" } } } satisfies OmoConfig
     const unrelatedRegistry = registry([model("google", "gemini-3.1-pro")])
 
     // when
