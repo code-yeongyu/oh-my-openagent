@@ -61,7 +61,7 @@ describe("LA17 exact protected DACL on Windows (second local user omoqa2)", () =
       expect(mask(after.sddl)).toBe("O:<user>D:PAI(A;;FA;;;<user>)");
       expect(await verifyExactDacl(dir, sid, "dir")).toBe(true);
       expect(await verifyExactDacl(file, sid, "file")).toBe(true);
-      expect(after.aces.map((ace) => ace.sid)).toEqual([sid]);
+      expect(after.aces.map((ace) => ace.sid)).toEqual([alias]);
       expect(await readAs(SECOND_USER, password, file)).toBe("read_denied");
     },
     SLOW_MS,
