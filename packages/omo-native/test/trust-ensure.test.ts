@@ -17,7 +17,11 @@ beforeAll(async () => {
     name, subject: `/CN=synthetic-ensure-${name}`, days: 2,
     extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
   })))
-  ;[ca, extra, user] = ["root", "extra", "user"].map((name) => new X509Certificate(certs.get(name)!).toString())
+  ;[ca, extra, user] = ["root", "extra", "user"].map((name) => {
+    const pem = certs.get(name)
+    if (pem === undefined) throw new Error(`missing synthetic certificate ${name}`)
+    return new X509Certificate(pem).toString()
+  })
 }, 60_000)
 afterAll(async () => {
   if (root) await rm(root, { recursive: true, force: true })
@@ -78,8 +82,10 @@ test.each([[[], 1500], [["--wait"], 20_000]] as const)(
     expect(text).toContain(ca.trim())
     expect(text).toContain(extra.trim())
     // A server launch never runs without the closure (5.4, 5.8), so ensure always hands one out.
-    expect(await readFile(value.defaults!.file, "utf8")).toBe("")
-    expect(await readdir(value.defaults!.dir)).toEqual([])
+    const defaults = value.defaults
+    if (defaults === undefined || defaults === null) throw new Error("ensure must hand out the default-input closure")
+    expect(await readFile(defaults.file, "utf8")).toBe("")
+    expect(await readdir(defaults.dir)).toEqual([])
     const log = await records(dir)
     expect(log).toHaveLength(1)
     expect(log[0]).toMatchObject({ action: "ensure", kind: expected === 1500 ? "short-host-cli" : "one-shot-network", generation: value.sha256, codes: [] })
@@ -114,13 +120,14 @@ test("--lease-pid writes { v, pid, bootAtMs } by rename, and a second lease by t
   const second = parsed((await ensure(dir, ["--json", "--lease-pid", String(process.pid)])).out)
   expect(second.sha256).toBe(first.sha256)
   const entries = await readdir(join(dir, "leases"))
-  expect(entries).toEqual([`${first.sha256}.${process.pid}`])
-  const lease = JSON.parse(await readFile(join(dir, "leases", entries[0]!), "utf8"))
+  const leaseName = `${first.sha256}.${process.pid}`
+  expect(entries).toEqual([leaseName])
+  const lease = JSON.parse(await readFile(join(dir, "leases", leaseName), "utf8"))
   expect(Object.keys(lease)).toEqual(["v", "pid", "bootAtMs"])
   expect(lease.v).toBe(1)
   expect(lease.pid).toBe(process.pid)
   expect(Math.abs(lease.bootAtMs - (Date.now() - uptime() * 1000))).toBeLessThan(120_000)
-  expect((await stat(join(dir, "leases", entries[0]!))).mode & 0o777).toBe(0o600)
+  expect((await stat(join(dir, "leases", leaseName))).mode & 0o777).toBe(0o600)
 })
 
 test("a lease for another pid outlives the ensure process and pins its generation past 16 newer ones", async () => {
