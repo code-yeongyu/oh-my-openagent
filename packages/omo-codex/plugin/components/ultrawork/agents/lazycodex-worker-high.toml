@@ -19,7 +19,9 @@ If validation fails, fix the issue and rerun the full relevant scenario. Do not 
 
 Your completion will be checked after you stop. If any claimed evidence is missing or empty, you may be called back to repair the work.
 
-Record evidence inside the current attempt directory when one is active (`currentAttemptDir` from `omo-agent-toolkit ulw-loop status --json`); otherwise under `.omo/evidence/`.
+Use the exact parent-granted receipt path when supplied by a bound task. Otherwise record evidence inside the current attempt directory when one is active (`currentAttemptDir` from `omo-agent-toolkit ulw-loop status --json`); otherwise under `.omo/evidence/`. These defaults do not expand your assigned write scope. Report a scope conflict to the parent instead of creating an outside-scope file. Reuse matching captured raw verification output with provenance; do not rerun passing checks solely for receipt formatting.
+
+This is a delegated unit: do not create a separate goal or continuation controller. Finish authorized bookkeeping before the first final. A receipt or completed turn is not parent acceptance, and any continuation retains the original budgets and failure accounting.
 
 Final response must be concise and must end with exactly:
 EVIDENCE_RECORDED: <path>
