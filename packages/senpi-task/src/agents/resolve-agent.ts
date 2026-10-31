@@ -1,7 +1,7 @@
 import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
+import type { ModelSelectionSource, SenpiModelPort, SenpiModelRegistryPort } from "../category"
 import { firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import { withoutExcludedModels } from "../model-exclusion"
@@ -38,6 +38,8 @@ export type ResolvedAgentResult = AgentPersona & {
   readonly kind: "resolved"
   readonly agent: string
   readonly model: string
+  /** `user` when the model came from omo.json (the agent's own model/models, a user category it runs through) or a call-site pin. */
+  readonly modelSource: ModelSelectionSource
   readonly requested_model?: ResolvedModelRecord
   readonly fallback_models?: readonly ResolvedModelRecord[]
   readonly resolved_model?: ResolvedModelRecord
@@ -89,6 +91,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       kind: "resolved",
       agent: name,
       model: options.modelOverride,
+      modelSource: "user",
       availableAgents,
       ...persona,
     }
@@ -118,6 +121,8 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     ...(definition.reasoningEffort === undefined ? {} : { reasoningEffort: definition.reasoningEffort }),
   }
   const directModels = agentModelCandidates(definition.model, definition.models, configuredTuning)
+  const userAgent = options.omoConfig?.agents !== undefined && Object.hasOwn(options.omoConfig.agents, name) ? options.omoConfig.agents[name] : undefined
+  const directSource: ModelSelectionSource = userAgent?.model !== undefined || (userAgent?.models?.length ?? 0) > 0 ? "user" : "builtin"
   for (const candidate of directModels) {
     attemptedModel = candidate.model
     const found = findExactAgentModel(candidate.model, registry)
@@ -126,6 +131,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     return resolvedAgent(
       context,
       found,
+      directSource,
       candidate.variant,
       candidate.reasoningEffort,
       buildRuntimeModelChain({
@@ -148,6 +154,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       return resolvedAgent(
         context,
         { provider: selection.provider, modelId: selection.modelId },
+        selection.source,
         selection.variant,
         selection.reasoningEffort,
         {
@@ -178,6 +185,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
         return resolvedAgent(
           context,
           found,
+          "builtin",
           configuredTuning.variant ?? resolution.variant,
           configuredTuning.reasoningEffort,
           buildRuntimeModelChain({
@@ -222,6 +230,7 @@ function firstConfiguredModel(definition: AgentDefinition): string | undefined {
 function resolvedAgent(
   context: AgentResolutionContext,
   model: ParsedAgentModel,
+  modelSource: ModelSelectionSource,
   variant?: string,
   reasoningEffort?: AgentModelCandidate["reasoningEffort"],
   runtimeModelChain: {
@@ -234,6 +243,7 @@ function resolvedAgent(
     kind: "resolved",
     agent: context.name,
     model: display,
+    modelSource,
     ...runtimeModelChain,
     resolved_model: {
       source: "agent",

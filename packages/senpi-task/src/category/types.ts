@@ -46,11 +46,15 @@ export type ResolveCategoryOptions = {
   readonly systemDefaultModel?: string
 }
 
+/** Who chose the selected model: the user's omo.json (`model`/`models`/`fallback_models`) or omo's builtin default/chain. */
+export type ModelSelectionSource = "user" | "builtin"
+
 export type CategoryModelSelection = {
   readonly selectedModel: string
   readonly variant?: string
   readonly matchedFallback: boolean
   readonly fallbackEntry?: DelegateFallbackEntry
+  readonly source: ModelSelectionSource
 }
 
 export type CategoryResolutionResult<TModel extends SenpiModelPort> =

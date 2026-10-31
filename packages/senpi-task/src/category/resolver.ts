@@ -20,6 +20,7 @@ import { categoryModelCandidates, flattenFallbackModels } from "./user-candidate
 import type {
   CategoryModelSelection,
   CategoryResolutionResult,
+  ModelSelectionSource,
   ResolveCategoryOptions,
   ResolvedChildSpec,
   SenpiModelPort,
@@ -35,6 +36,7 @@ type ModelSelectionInput = {
   readonly variant?: string
   readonly fallbackEntry?: DelegateFallbackEntry
   readonly matchedFallback?: boolean
+  readonly source: ModelSelectionSource
 }
 
 function getOwnRecordValue<TValue>(
@@ -62,12 +64,13 @@ function nearestFallback(selection: CategoryModelSelection): string | undefined 
 }
 
 function modelSelection(input: ModelSelectionInput): CategoryModelSelection {
-  const { fallbackEntry, matchedFallback, selectedModel, variant } = input
+  const { fallbackEntry, matchedFallback, selectedModel, source, variant } = input
   return {
     selectedModel,
     ...(variant !== undefined ? { variant } : {}),
     ...(fallbackEntry !== undefined ? { fallbackEntry } : {}),
     matchedFallback: matchedFallback === true,
+    source,
   }
 }
 
@@ -201,6 +204,11 @@ export function resolveCategory<TModel extends SenpiModelPort>(
       variant: resolution.variant,
       fallbackEntry: resolution.fallbackEntry,
       matchedFallback: resolution.matchedFallback,
+      // A user model always answers from the user branch (as itself or a promoted user fallback); with none, a
+      // fallback match without a chain rung is a user fallback_models entry. Defaults and chain rungs are omo's.
+      source: userModel !== undefined || (resolution.matchedFallback === true && resolution.fallbackEntry === undefined)
+        ? "user"
+        : "builtin",
     },
   )
   const parsedModel = parseModel(selection.selectedModel)

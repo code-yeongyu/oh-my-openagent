@@ -1,6 +1,6 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { DEFAULT_CATEGORIES, resolveCategory, type SenpiModelPort, type SenpiModelRegistryPort } from "../category"
+import { DEFAULT_CATEGORIES, resolveCategory, type ModelSelectionSource, type SenpiModelPort, type SenpiModelRegistryPort } from "../category"
 import { findExactAgentModel } from "./agent-model-registry"
 import type { ResolvedModelRecord } from "../state"
 
@@ -16,6 +16,7 @@ export type AgentCategorySelection = {
   readonly reasoningEffort?: string
   readonly requested_model?: ResolvedModelRecord
   readonly fallback_models?: readonly ResolvedModelRecord[]
+  readonly source: ModelSelectionSource
 }
 
 export type ResolveAgentCategoryInput<TModel extends SenpiModelPort> = {
@@ -43,6 +44,7 @@ function findOnlyCategoryModel<TModel extends SenpiModelPort>(
   return {
     provider: found.provider,
     modelId: found.modelId,
+    source: firstCategoryModelSource(input.categories, input.omoConfig),
     ...(input.configuredTuning.variant !== undefined ? { variant: input.configuredTuning.variant } : {}),
     ...(input.configuredTuning.reasoningEffort !== undefined
       ? { reasoningEffort: input.configuredTuning.reasoningEffort }
@@ -70,6 +72,16 @@ export function firstCategoryDefaultModel(
   return undefined
 }
 
+// Who supplied firstCategoryDefaultModel's answer, walking the categories the same way.
+function firstCategoryModelSource(categories: readonly string[], omoConfig: OmoConfig): ModelSelectionSource {
+  const userCategories = omoConfig.categories
+  for (const name of categories) {
+    if (userCategories !== undefined && Object.hasOwn(userCategories, name) && userCategories[name]?.model !== undefined) return "user"
+    if (Object.hasOwn(DEFAULT_CATEGORIES, name) && DEFAULT_CATEGORIES[name]?.model !== undefined) return "builtin"
+  }
+  return "builtin"
+}
+
 // Categories supply the MODEL only: prompt_append, tools, temperature, top_p, maxTokens and
 // thinking from the category config are deliberately dropped so the agent keeps its own persona.
 // The first category that resolves wins; every later category that also resolves extends the
@@ -90,6 +102,7 @@ export function resolveAgentCategoryModel<TModel extends SenpiModelPort>(
   return {
     provider: spec.provider,
     modelId: spec.modelId,
+    source: winner.modelSelection.source,
     ...(input.configuredTuning.variant !== undefined
       ? { variant: input.configuredTuning.variant }
       : categoryReasoning !== undefined ? { variant: categoryReasoning } : {}),
