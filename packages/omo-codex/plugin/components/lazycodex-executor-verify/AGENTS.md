@@ -10,6 +10,8 @@ Valid receipt: `last_assistant_message` contains `EVIDENCE_RECORDED: <path>` whe
 
 Escape hatches: after 3 blocked attempts (`MAX_ATTEMPTS`) the stop passes and state clears; a transcript containing a context-pressure marker ("context compacted", "context_length_exceeded", ...) passes immediately. Malformed stdin, unknown events, unrelated agents: silent exit 0 (fail-open).
 
+Optional attachment-bound operation receipts are documented in `README.md` and validated by `src/scoped-receipt.ts` before the existing file/content/freshness checks. An absent binding preserves the default root; an invalid grant never broadens it. The external operations adapter owns native admission, actor settlement and cumulative accounting; this component does not dispatch or collect workers.
+
 ## KEY FILES
 
 | File | Role |
@@ -17,7 +19,7 @@ Escape hatches: after 3 blocked attempts (`MAX_ATTEMPTS`) the stop passes and st
 | `src/codex-hook.ts` | Core `runSubagentStopHook()`: input guard, receipt validation, attempt escalation, block decision |
 | `src/state.ts` | Attempt counter at `<cwd>/.omo/lazycodex-executor-verify/<session>-<agent>.json`; atomic tmp+rename write; `MAX_ATTEMPTS = 3` |
 | `src/directive.ts` | Loads `directive.md` at import time; `renderDirective()` fills `{{ATTEMPT_COUNT}}` + `{{LAST_ASSISTANT_MESSAGE}}` |
-| `directive.md` | Korean block message ("your completion claim is not trusted until evidence is recorded"); RUNTIME-READ via `../directive.md` relative to `dist/` |
+| `directive.md` | Scope-preserving block message and completion guidance; RUNTIME-READ via `../directive.md` relative to `dist/` |
 | `src/cli.ts` | Node bin `lazycodex-executor-verify hook subagent-stop`: stdin JSON in, block JSON (or nothing) on stdout |
 | `src/types.ts` | `SubagentStopInput` field guard, `StopHookOutput` (block-only shape), injectable `HookFileSystem` |
 | `hooks/hooks.json` | Component-local wiring (Unix `node .../dist/cli.js` command only) |
