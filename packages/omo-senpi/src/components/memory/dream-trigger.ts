@@ -11,6 +11,7 @@
 // reservation machine; only the run that wins the active slot launches now.
 
 import type {
+  InFlightReads,
   MemoryIdentityPaths,
   ReservedRun,
   ReflectionReservationStore,
@@ -75,6 +76,8 @@ export interface DreamTriggerWiringOptions {
   readonly resolveSettings: (identity: string) => DreamTriggerSettings
   readonly now?: () => number
   readonly scheduler?: DreamTriggerScheduler
+  /** The memory work the session_shutdown drain awaits; each idle fire is tracked there as well. */
+  readonly work?: InFlightReads
   readonly logger?: ComponentLogger
 }
 
@@ -120,6 +123,7 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
         inFlight.delete(promise)
       })
     inFlight.add(promise)
+    void options.work?.track(() => promise)
   }
 
   function cancelTimer(conversationId: string): void {

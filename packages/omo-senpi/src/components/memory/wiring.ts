@@ -1,4 +1,4 @@
-import { MemoryBlockCache } from "@oh-my-opencode/memory-core"
+import { InFlightReads, MemoryBlockCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
@@ -29,6 +29,7 @@ import {
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
 import { recoverStaleReflectionHolder } from "./reflection-stale-active"
+import { runMemorySessionShutdown } from "./wiring-shutdown"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
@@ -50,6 +51,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     }),
   })
   const promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> } = {}
+  const work = options.work ?? new InFlightReads()
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
   const userActivity = createMemoryUserActivity(options.env)
@@ -185,9 +187,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
   })
 
-  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession, userActivity.has)
+  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession, userActivity.has, work)
   const pressureDreamAdmission = createPressureDreamAdmission({
     request: (sessionId) => dreamTriggerWiring.requestPressureDream(sessionId),
+    work,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   shutdownDrain.registerEvaluator(dreamTriggerWiring.shutdownEvaluator())
@@ -316,43 +319,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await flushSkillsUsageTrackers()
     },
 
-    async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
-      // Background packing is never worth holding an exit for: stop it before the drain.
-      maintenance.dispose()
-      // The journal flush runs FIRST, before the pre-drain awaits can consume the fixed budget:
-      // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
-      // one first-position flush captures everything and the drain must never re-run it.
-      const journalFlushed = await shutdownDrain.flushJournal(input)
-      // dispose() stops a running pass but does not wait for it, and the bind/settle status refreshes
-      // run git in the identity dir unawaited. Work still running there holds its files open past
-      // shutdown, which Windows reports as EBUSY/EFAULT on the next remove (#10154).
-      await shutdownDrain.raceDetached(input, "maintenance-settle", () => maintenance.settled())
-      await shutdownDrain.raceDetached(input, "status-settle", () => reflectionLive.settled())
-      // A recall ranking saves the repository's terms into its `.git` after the prompt; let that write finish.
-      await shutdownDrain.raceDetached(input, "recall-store-settle", () => corpusCache.settled())
-      await shutdownDrain.raceDetached(input, "memory-block-settle", () => promptCache.settled())
-      reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
-      // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
-      // drain deadline: both are started and raced against it, and whichever loses keeps running
-      // detached (the Kibitzer wake lease and the sidecar directory lock are still released).
-      const kibitzer = kibitzerRef.current
-      if (kibitzer !== undefined) {
-        await shutdownDrain.raceDetached(input, "kibitzer-shutdown", () => kibitzer.onSessionShutdown(input.sessionId))
+    onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+      const resetSession = (sessionId: string): void => {
+        pressureDreamAdmission.reset(sessionId)
+        userActivity.reset(sessionId)
       }
-      const identity = resolveContext(input.sessionId)
-      if (identity !== undefined) {
-        const facts = factsWiringFor(identity)
-        if (facts.cancelActive !== undefined) {
-          await shutdownDrain.raceDetached(input, "facts-cancel", async () => { await facts.cancelActive?.() })
-        }
-      }
-      await shutdownDrain.run(input, { journalFlushed })
-      // A reflection launch runs its child under the identity dir too. It is awaited last, on what
-      // budget is left: a run that outlives it keeps going detached (by design), and it never
-      // displaces the drain's own steps (#10154).
-      await shutdownDrain.raceDetached(input, "reflection-launch-settle", () => runtimeWiring.settled())
-      pressureDreamAdmission.reset(input.sessionId)
-      userActivity.reset(input.sessionId)
+      const parts = { shutdownDrain, maintenance, reflectionLive, corpusCache, promptCache, kibitzerRef, resolveContext, factsWiringFor }
+      return runMemorySessionShutdown({ ...parts, sessions: options.sessions, launches: runtimeWiring, work, resetSession }, input)
     },
 
     registerShutdownEvaluator(evaluator: ShutdownEvaluator): void {
