@@ -10,6 +10,19 @@ export type RpcPauseState = {
   }[]
 }
 
+/**
+ * The engine's own non-Stop session hold: installed when a session is opened (or an automatic
+ * wake arrives) after its previous run was interrupted, released by the person's next message.
+ * senpi excludes exactly this key from every "is the user's Stop live" check (`_resumeCause`,
+ * `noteAutomaticInput`, goal `stop-pause`), so the run-pause bridge must too: reading it as a
+ * Stop paused every parked child on a plain reopen instead of reviving it (#11856).
+ */
+const INTERRUPTED_RUN_HOLD_KEY = "interrupted-run"
+
+function isUserStopHold(entry: { readonly kind: string; readonly key: string }): boolean {
+  return entry.kind === "session_hold" && entry.key !== INTERRUPTED_RUN_HOLD_KEY
+}
+
 export function readEngineRunHold(state: EnginePauseState | RpcPauseState): {
   readonly pauseSeq: number; readonly stopped: boolean; readonly runRefs: readonly RunRef[]
 } {
@@ -21,7 +34,7 @@ export function readEngineRunHold(state: EnginePauseState | RpcPauseState): {
       : "data" in entry && isRecord(entry.data) ? entry.data["runRef"] : undefined
     if (isRunRef(candidate) && !refs.some(ref => ref.kind === candidate.kind && ref.id === candidate.id)) refs.push(candidate)
   }
-  return { pauseSeq: state.pauseSeq, stopped: entries.some(entry => entry.kind === "session_hold"), runRefs: refs }
+  return { pauseSeq: state.pauseSeq, stopped: entries.some(isUserStopHold), runRefs: refs }
 }
 
 function isRunRef(value: unknown): value is RunRef {

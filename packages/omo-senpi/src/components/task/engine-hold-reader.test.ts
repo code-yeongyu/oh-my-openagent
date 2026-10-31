@@ -22,6 +22,15 @@ test("RPC pause projection and extension hold projection select the same fenced 
   })).toEqual({ pauseSeq: 14, stopped: false, runRefs: [{ kind: "workpool", id: "p" }] })
 })
 
+test("the engine's interrupted-run session hold is not a user Stop, while a Stop beside it still is", () => {
+  expect(readEngineRunHold({
+    pauseSeq: 2, holds: [{ kind: "session_hold", key: "interrupted-run" }],
+  })).toEqual({ pauseSeq: 2, stopped: false, runRefs: [] })
+  expect(readEngineRunHold({
+    pauseSeq: 3, holds: [{ kind: "session_hold", key: "interrupted-run" }, { kind: "session_hold", key: "session_hold:3", data: { localSeq: 3 } }],
+  })).toEqual({ pauseSeq: 3, stopped: true, runRefs: [] })
+})
+
 test("unrelated holds do not impersonate a user Stop or a run fence", () => {
   expect(readEngineRunHold({
     pauseSeq: 4, holds: [{ kind: "deadline_hold", key: "session_hold:4" }],
