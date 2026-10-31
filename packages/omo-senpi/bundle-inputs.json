@@ -581,6 +581,7 @@
     "packages/omo-config-core/src/models/index.ts",
     "packages/omo-config-core/src/models/model-catalog-cycles.ts",
     "packages/omo-config-core/src/models/model-reference-resolution.ts",
+    "packages/omo-config-core/src/models/models-distribution.ts",
     "packages/omo-config-core/src/schema/agent.ts",
     "packages/omo-config-core/src/schema/category.ts",
     "packages/omo-config-core/src/schema/computer.ts",
