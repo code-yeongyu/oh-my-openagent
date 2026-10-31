@@ -62,8 +62,6 @@ export type DetectedError = {
 }
 
 export function detectDelegateTaskError(output: string): DetectedError | null {
-  if (!output.includes("[ERROR]") && !output.includes("Invalid arguments")) return null
-
   for (const errorPattern of DELEGATE_TASK_ERROR_PATTERNS) {
     if (output.includes(errorPattern.pattern)) {
       return {
