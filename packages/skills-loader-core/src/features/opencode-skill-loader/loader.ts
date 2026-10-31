@@ -20,7 +20,7 @@ import type { SkillProvenance } from "./skill-provenance"
 
 export async function loadUserSkills(): Promise<Record<string, CommandDefinition>> {
   const userSkillsDir = join(getClaudeConfigDir(), "skills")
-  const skills = await loadSkillsFromDir({ skillsDir: userSkillsDir, scope: "user", skipMissing: true })
+  const skills = await loadSkillsFromDir({ skillsDir: userSkillsDir, scope: "user", skipMissing: process.env.CLAUDE_CONFIG_DIR === undefined })
   return skillsToCommandDefinitionRecord(skills)
 }
 
@@ -120,7 +120,7 @@ export async function getSkillByName(name: string, options: DiscoverSkillsOption
 
 export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
   const userSkillsDir = join(getClaudeConfigDir(), "skills")
-  return loadSkillsFromDir({ skillsDir: userSkillsDir, scope: "user", skipMissing: true })
+  return loadSkillsFromDir({ skillsDir: userSkillsDir, scope: "user", skipMissing: process.env.CLAUDE_CONFIG_DIR === undefined })
 }
 
 export async function discoverProjectClaudeSkills(directory?: string, provenance?: SkillProvenance): Promise<LoadedSkill[]> {
