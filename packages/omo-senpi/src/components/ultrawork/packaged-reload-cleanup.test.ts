@@ -129,7 +129,7 @@ describe("cleanUpReloadRun", () => {
     expect(restored).toBe(1)
   })
 
-  it("#given a real host that ignores SIGTERM #when cleanup runs #then it is killed inside the budget and no process is left", async () => {
+  it("#given a real host that ignores SIGTERM where the platform lets it (win32 terminates on SIGTERM) #when cleanup runs #then it is gone inside the budget and no process is left", async () => {
     // given
     const root = tempRoot()
     const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setInterval(() => {}, 1000)"], { stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
@@ -150,7 +150,9 @@ describe("cleanUpReloadRun", () => {
     }), 5_000)
 
     // then
-    expect((outcome.error as Error | undefined)?.message).toBe("supervisor did not finish graceful shutdown within 200ms")
+    // Windows has no catchable SIGTERM: kill() terminates the child at once, so no grace overrun is reported there.
+    const graceError = process.platform === "win32" ? undefined : "supervisor did not finish graceful shutdown within 200ms"
+    expect((outcome.error as Error | undefined)?.message).toBe(graceError)
     expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
     expect(() => process.kill(child.pid ?? -1, 0)).toThrow()
     expect(existsSync(root)).toBe(false)

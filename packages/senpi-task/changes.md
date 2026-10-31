@@ -1,3 +1,7 @@
+## 2026-10-29 - Confirm a host-session child's end before recording a cancel (#11783)
+
+A cancel of a daemon-hosted child this process holds no handle for is written durably, then cancelled only after `endHostSessionChild` confirms the end: a close the host answered, or the three-part proof that the generation the record names is gone (serving listing without the path, no handover-parked entry, a second listing). The pending-cancel finish and the TTL sweep no longer read "not listed on the recorded socket" as ended. A retry driver re-drives an unconfirmed cancel on the deferred backoff with explicit exits, all entrants share one in-flight pass per task, and a handle's end counts only when its port's close was answered (`HostSessionPort.close(): Promise<boolean>`).
+
 ## 2026-10-25 - Record child session spawn ancestry (#11298)
 
 Thread parent, root, and task identity through child-session creation and
