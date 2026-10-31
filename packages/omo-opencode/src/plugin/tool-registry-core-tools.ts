@@ -26,6 +26,7 @@ export function createCoreTools(args: {
   readonly factories: ToolRegistryFactories
 }): Record<string, ToolDefinition> {
   const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
+  const prometheusMdOnlyDisabled = (pluginConfig.disabled_hooks ?? []).includes("prometheus-md-only")
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
@@ -34,6 +35,7 @@ export function createCoreTools(args: {
     pluginConfig.agents,
     pluginConfig.categories,
     managers.modelFallbackControllerAccessor,
+    prometheusMdOnlyDisabled,
   )
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -73,6 +75,7 @@ export function createCoreTools(args: {
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     taskCleanupDelayMs: pluginConfig.background_task?.taskCleanupDelayMs,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
+    planningWarningInjectionDisabled: prometheusMdOnlyDisabled,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {
         sessionID: event.sessionID,
