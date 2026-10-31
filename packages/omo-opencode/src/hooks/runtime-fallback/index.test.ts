@@ -3070,7 +3070,7 @@ describe("runtime-fallback", () => {
       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
     })
 
-    test("session.error is skipped while waiting for the dispatched fallback result", async () => {
+    test("explicitly stale model session.error is skipped while waiting for the dispatched fallback result", async () => {
       const promptCalls: Array<unknown> = []
 
       //#given
@@ -3123,7 +3123,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+          properties: { sessionID, model: "google/gemini-2.5-pro", error: { statusCode: 429, message: "Rate limit" } },
         },
       })
 
