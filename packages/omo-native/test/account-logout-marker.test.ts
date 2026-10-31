@@ -27,6 +27,7 @@ function memoryStore(initial: Credentials | null, onClear: () => void): Credenti
   let value = initial
   return {
     read: async () => value,
+    readAuthoritative: async () => value,
     write: async next => {
       value = next
     },

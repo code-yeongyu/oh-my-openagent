@@ -42,6 +42,7 @@ import {
 } from "./build-omo-binary"
 import { PAYLOAD_DIRECTORIES, PAYLOAD_FILES } from "./build-omo-native"
 import { desktopEngineTarget, engineTrustHelperTarget, stageCompiledDesktopEngine, stageCompiledEngineTrustHelper } from "./release-desktop-engine-target"
+import { KEYCHAIN_HELPER_SOURCE, keychainHelperPayload } from "./release-keychain-helper-target"
 import * as binaryBuilder from "./build-omo-binary"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -609,7 +610,9 @@ describe("engine trust helper payload", () => {
         const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === name)
         const engine = desktopEngineTarget(name)
         if (target === undefined || engine.source === null) throw new Error(`${name} target expected`)
-        stageParityFixture(root, [engine.source])
+        // Every other promised sidecar is present, so the trust helper is the only missing one.
+        const keychain = keychainHelperPayload(name) === null ? [] : [KEYCHAIN_HELPER_SOURCE]
+        stageParityFixture(root, [engine.source, ...keychain])
 
         const stage = (): void => { stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root) }
 
