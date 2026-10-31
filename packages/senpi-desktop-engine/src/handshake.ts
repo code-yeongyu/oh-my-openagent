@@ -1,7 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { ENGINE_ABI, PROTOCOL_VERSION } from "@oh-my-opencode/senpi-desktop-protocol";
-import { DesktopLaunchRefusal } from "./launch-refusal";
+import { DesktopLaunchRefusal, type UserFacingErrorInfo } from "./launch-refusal";
 
 /** The `engine.hello` reply of an engine this package accepts. */
 export interface EngineHello {
@@ -52,6 +52,11 @@ export class DesktopEngineAbiMismatchError extends Error {
 export class DesktopEngineHandshakeError extends Error {
 	readonly code = "handshake-failed";
 	readonly enginePath: string;
+	readonly userFacing: UserFacingErrorInfo = {
+		code: "COMPUTER_ENGINE_START_FAILED",
+		message: "Computer use is unavailable: the desktop engine did not start correctly.",
+		action: "Restart this host and try again; if it keeps failing, run `omo doctor`.",
+	};
 
 	constructor(enginePath: string, reason: string) {
 		super(`desktop engine handshake failed at ${enginePath}: ${reason}`);
