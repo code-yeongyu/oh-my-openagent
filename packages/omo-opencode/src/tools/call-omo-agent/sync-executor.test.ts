@@ -89,6 +89,7 @@ function createContext(
   return {
     client: {
       session: {
+        messages: mock(async () => ({ data: [] })),
         prompt: promptAsync,
         promptAsync,
         ...(status ? { status } : {}),
@@ -512,6 +513,65 @@ describe("executeSync", () => {
       expect.objectContaining({ client: expect.anything() }),
     )
     expect(deps.processMessages).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given a reused session #when dispatching a new prompt #then polling is anchored before dispatch", async () => {
+    // given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies({ createOrGetSession: mock(async () => ({ sessionID: "ses-anchor", isNew: false })) })
+    const recorder = createPromptAsyncRecorder()
+    const messages = mock(async () => {
+      expect(recorder.promptAsync).not.toHaveBeenCalled()
+      return { data: [{ info: { id: "msg_previous", role: "assistant", finish: "stop" } }] }
+    })
+    const ctx = createContext(recorder.promptAsync)
+    // when
+    await executeSync({ subagent_type: "explore", description: "resume", prompt: "new turn", run_in_background: false, session_id: "ses-anchor" }, createToolContext(), { ...ctx, client: { session: { ...ctx.client.session, messages } } } as never, deps)
+    // then
+    expect(messages).toHaveBeenCalled()
+    expect(deps.waitForCompletion.mock.calls[0]?.[3]).toBe("msg_previous")
+  })
+
+  test("#given a reused session snapshot is malformed #when dispatching #then it fails before sending a prompt", async () => {
+    // given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies({ createOrGetSession: mock(async () => ({ sessionID: "ses-bad-anchor", isNew: false })) })
+    const recorder = createPromptAsyncRecorder()
+    const ctx = createContext(recorder.promptAsync)
+    const messages = mock(async () => ({ data: undefined }))
+    // when / then
+    await expect(executeSync({ subagent_type: "explore", description: "resume", prompt: "new turn", run_in_background: false, session_id: "ses-bad-anchor" }, createToolContext(), { ...ctx, client: { session: { ...ctx.client.session, messages } } } as never, deps)).rejects.toThrow("Cannot read messages")
+    expect(recorder.promptAsync).not.toHaveBeenCalled()
+  })
+
+  test("#given polling completed but the final result read stalls #when the parent aborts #then execution returns without late output", async () => {
+    // given
+    const executeSync = await importExecuteSync()
+    const controller = new AbortController()
+    const toolContext = { ...createToolContext(), abort: controller.signal }
+    let started!: () => void
+    const reading = new Promise<void>((resolve) => { started = resolve })
+    let release!: (value: string) => void
+    const deps = createDependencies({ processMessages: mock(() => {
+      started()
+      return new Promise<string>((resolve) => { release = resolve })
+    }) })
+    const recorder = createPromptAsyncRecorder()
+    const result = executeSync({ subagent_type: "explore", description: "final read", prompt: "reply", run_in_background: false }, toolContext, createContext(recorder.promptAsync) as never, deps)
+    const observed = result.then(() => "returned late output", (error: Error) => error.message)
+    await reading
+    // when
+    controller.abort()
+    const outcome = await Promise.race([observed, new Promise<string>((resolve) => setTimeout(() => resolve("still pending"), 30))])
+    release("late output")
+    await observed
+    // then
+    expect(outcome).toBe("Task aborted.")
+    expect(deps.processMessages).toHaveBeenCalledTimes(1)
+    const state = await import("../../features/claude-code-session-state")
+    expect(state.subagentSessions.has("ses-test-123")).toBe(false)
+    expect(state.syncSubagentSessions.has("ses-test-123")).toBe(false)
+    expect(state.handedBackSyncSessions.has("ses-test-123")).toBe(true)
   })
 
   test("does not send a duplicate sync prompt when a reused session is active", async () => {
