@@ -9,11 +9,12 @@ const selection = await selectHostMemorySyncSource({
   inherited: { declared: privateChannelDeclared, tablePresent: privateTablePresent, take: takeInheritedPrivateChannel },
   attach: attachDesktopSyncChannel,
 }).selection
+let line: string
 if (selection.kind === "desktop") {
   const reply = await selection.channel.request({ op: "descriptor" })
   selection.channel.close()
-  process.stdout.write(`${JSON.stringify({ kind: "desktop", reply })}\n`)
+  line = JSON.stringify({ kind: "desktop", reply })
 } else {
-  process.stdout.write(`${JSON.stringify(selection)}\n`)
+  line = JSON.stringify(selection)
 }
-process.exit(0)
+process.stdout.write(`${line}\n`, () => process.exit(0))

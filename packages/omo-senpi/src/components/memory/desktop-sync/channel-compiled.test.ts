@@ -41,7 +41,7 @@ afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 async function launch(table: string, slots: number) {
   const stdio: StdioOptions = ["ignore", "pipe", "pipe", "ignore", "ignore"]
-  for (let slot = 0; slot < slots; slot++) stdio.push("pipe")
+  for (let slot = 0; slot < 2; slot++) stdio.push(slot < slots ? "pipe" : "ignore")
   const env: Record<string, string | undefined> = { ...process.env, SENPI_PRIVATE_FDS: table }
   delete env.SENPI_PRIVATE_FDS_FINAL
   const child = spawn(engine, [], { env, stdio, windowsHide: true })

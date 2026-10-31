@@ -1,14 +1,3 @@
-## 2026-10-31 - Desktop memory sync attaches on Windows over senpi's pipe pair (#11997)
-
-`components/memory/desktop-sync/channel.ts` no longer refuses win32. It attaches to the stream senpi's
-`takeInheritedPrivateChannel("memory-sync")` hands over on every platform; on win32 senpi builds that stream
-from two one-way pipes (engine fd 5 read, fd 6 write) and clears their inherit flag before adoption, so the
-receiver opens no descriptor, clears no flag and spawns nothing itself. A declared channel that senpi did not
-adopt (no stream) is `unavailable: private_channel_unavailable` on every platform, never the CLI source.
-Must not break: the receiver stays platform-neutral; Windows handle work belongs to senpi. `channel-compiled.test.ts`
-runs in the Windows Senpi compatibility job and skips the win32 pair case only while the bundled senpi predates
-the pair gate (senpi#5125).
-
 ## 2026-10-30 - Deterministic stale-lock recovery fixture (#11604)
 
 Derive the fixture's hard and grace deadlines from one clock sample, matching
