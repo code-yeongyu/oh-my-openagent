@@ -17,6 +17,7 @@ import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { log } from "../../shared/logger"
 import { cancelSyncSessionDeletion, scheduleSyncSessionDeletion } from "./sync-session-cleanup"
+import { formatDeletedSyncSessionError, isSyncSessionDeleted } from "./sync-session-existence"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -102,11 +103,15 @@ export async function executeSyncContinuation(
   deps: SyncContinuationDeps = syncContinuationDeps,
   systemContent?: string
 ): Promise<string> {
-  const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
+  const { client, syncPollTimeoutMs, taskCleanupDelayMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
   const continuationID = getTaskID(args)
   if (!continuationID) {
     throw new Error("task_id is required to continue a sync task")
+  }
+  if (await isSyncSessionDeleted(client, continuationID)) {
+    log("[task] Refusing to continue deleted sync session", { sessionID: continuationID })
+    return formatDeletedSyncSessionError(continuationID)
   }
   cancelSyncSessionDeletion(continuationID)
   const detachFromManager = executorCtx.manager?.attachSyncContinuation?.(continuationID)
@@ -191,7 +196,7 @@ export async function executeSyncContinuation(
      }
      const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
      detachFromManager?.()
-     scheduleSyncSessionDeletion(client, continuationID)
+     scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
      return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
    }
 
@@ -272,6 +277,6 @@ ${buildTaskMetadataBlock({
      // Every terminal continuation path must restore the cleanup grace timer,
      // including prompt/poll failures after revival cancelled the old timer.
      detachFromManager?.()
-     scheduleSyncSessionDeletion(client, continuationID)
+     scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
    }
 }

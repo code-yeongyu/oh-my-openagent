@@ -100,7 +100,7 @@ export async function handleAtlasSessionIdle(input: {
   if (shouldAbortForNoToolProgress(sessionState)) {
     markContinuationStalled(sessionState, boulderState.plan_name, activePlanPath)
     if (sessionState.pendingRetryTimer) {
-      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer.cancel()
       sessionState.pendingRetryTimer = undefined
     }
     log(`[${HOOK_NAME}] Aborting boulder continuation after repeated no-tool-progress iterations`, {

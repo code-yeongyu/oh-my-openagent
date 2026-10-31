@@ -16,7 +16,7 @@ Harness-neutral MCP client lifecycle and OAuth primitives. Consumed by `omo-open
 | `skill-mcp-manager/env-cleaner.ts` | Filters npm/pnpm/yarn config vars (pnpm breakage) and secret-bearing env vars from stdio server env |
 | `skill-mcp-manager/error-redaction.ts` | Redacts sensitive tokens from error messages (same patterns as env-cleaner) |
 | `skill-mcp-manager/stdio-client.ts` | `createStdioClient()` — `StdioClientTransport`, env cleaning, process cleanup registration |
-| `skill-mcp-manager/http-client.ts` | `createHttpClient()` — `StreamableHTTPClientTransport`, request init with OAuth headers, URL redaction |
+| `skill-mcp-manager/http-client.ts` | `createHttpClient()` — `StreamableHTTPClientTransport` (`SSEClientTransport` for explicit `type: "sse"`), request init with OAuth headers, URL redaction |
 | `skill-mcp-manager/oauth-handler.ts` | `buildHttpRequestInit()`, `handleStepUpIfNeeded()`, `handlePostRequestAuthError()` — token refresh, scope merge, 401/403 retry |
 | `skill-mcp-manager/cleanup.ts` | `disconnectSession()`, `disconnectAll()`, `forceReconnect()`, idle timeout (5 min), SIGTERM/SIGINT handlers |
 | `skill-mcp-manager/types.ts` | `SkillMcpClientInfo`, `ManagedClient`, `ConnectionType`, `SkillMcpManagerState` |
@@ -37,7 +37,7 @@ Harness-neutral MCP client lifecycle and OAuth primitives. Consumed by `omo-open
 ## NOTES
 
 - **Per-session isolation:** client key is `${sessionID}:${skillName}:${serverName}`. The same skill in two sessions does not share state.
-- **Transports:** stdio (local process via `StdioClientTransport`) and HTTP (remote via `StreamableHTTPClientTransport`). Connection type inferred from `url` vs `command`, or explicit `type` field.
+- **Transports:** stdio (local process via `StdioClientTransport`) and HTTP (remote via `StreamableHTTPClientTransport`; an explicit `type: "sse"` uses the legacy HTTP+SSE `SSEClientTransport`, #9050). Connection type inferred from `url` vs `command`, or explicit `type` field.
 - **OAuth flow:** PKCE + optional DCR. Step-up authentication on 403 merges new scopes and re-authenticates. Refresh mutex prevents concurrent refresh storms.
 - **Env hygiene is a security boundary:** stdio servers never receive npm/pnpm/yarn config vars or secret-bearing env vars (`env-cleaner.ts`); errors leaving the manager are token-redacted (`error-redaction.ts`). Preserve both when touching client construction or error paths.
 - **Cleanup:** idle clients evicted after 5 minutes. Process signal handlers close all transports on SIGINT/SIGTERM. `disconnectAll()` is safe across plugin reloads.

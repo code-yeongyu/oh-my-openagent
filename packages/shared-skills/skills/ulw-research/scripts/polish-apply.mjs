@@ -54,9 +54,10 @@ export const POLISH_REFERENCE_REASON = "edit touches a character reference: rout
 /** True when [start, end) overlaps a character reference of html or starts inside one. */
 export function touchesReference(html, start, end) {
 	for (const match of String(html).matchAll(CHARACTER_REFERENCE)) {
-		if (match.index < end && match.index + match[0].length > start) return true
+		const stop = match.index + match[0].length
+		if (match.index < end && (stop > start || (stop === start && !match[0].endsWith(";")))) return true
 	}
-	return /&[#\w]*$/.test(html.slice(Math.max(0, start - 16), start))
+	return false
 }
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")

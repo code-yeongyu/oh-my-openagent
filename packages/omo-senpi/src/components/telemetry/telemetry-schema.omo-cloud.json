@@ -153,8 +153,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -205,8 +209,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -257,8 +265,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -309,8 +321,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -361,8 +377,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -413,8 +433,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -465,8 +489,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -517,8 +545,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -569,8 +601,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -621,8 +657,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -656,13 +696,6 @@
         "max": 1000000000,
         "required": false,
         "posthog_name": "custom_category_count"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.source": {
         "type": "string",
@@ -719,13 +752,6 @@
         ],
         "required": false,
         "posthog_name": "host_platform"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.source": {
         "type": "string",
@@ -793,6 +819,10 @@
           "InputBusy",
           "ControlRequired",
           "CaptureUnavailable",
+          "UserIntervened",
+          "AxUnconfirmed",
+          "SpaceUnsupported",
+          "SpaceMoveDenied",
           "native-unavailable",
           "quarantined",
           "abi-mismatch",
@@ -811,13 +841,6 @@
         ],
         "required": false,
         "posthog_name": "host_platform"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "session.id": {
         "type": "string",
@@ -857,13 +880,6 @@
         ],
         "required": false,
         "posthog_name": "host_platform"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.permission": {
         "type": "string",
@@ -905,13 +921,6 @@
         "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
         "required": false,
         "posthog_name": "day_utc"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.start_trigger": {
         "type": "string",
@@ -1057,13 +1066,6 @@
         "required": false,
         "posthog_name": "input_tokens"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.model_id": {
         "type": "string",
         "values": [
@@ -1100,8 +1102,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -1332,13 +1338,6 @@
         "required": false,
         "posthog_name": "kind"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.name": {
         "type": "string",
         "values": [
@@ -1385,13 +1384,6 @@
         "required": false,
         "posthog_name": "feature"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "session.id": {
         "type": "string",
         "pattern": "^[0-9a-f]{64}$",
@@ -1430,13 +1422,6 @@
         "required": false,
         "posthog_name": "fresh_usd"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.model_id": {
         "type": "string",
         "values": [
@@ -1473,8 +1458,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -1613,13 +1602,6 @@
         "required": false,
         "posthog_name": "input_tokens"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.model_top": {
         "type": "string",
         "values": [
@@ -1656,8 +1638,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -1894,13 +1880,6 @@
         "required": false,
         "posthog_name": "incomplete_calls"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.measured_eval_execution_duration_ms_sum": {
         "type": "number",
         "min": 0,
@@ -2029,13 +2008,6 @@
         ],
         "required": false,
         "posthog_name": "detection"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.process_kind": {
         "type": "string",
@@ -2187,13 +2159,6 @@
         "required": false,
         "posthog_name": "keyword_variant"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.prompt.is_real_user": {
         "type": "boolean",
         "required": false,
@@ -2313,8 +2278,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -2363,13 +2332,6 @@
         ],
         "required": false,
         "posthog_name": "default_provider"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.memory_bucket": {
         "type": "string",
@@ -2585,8 +2547,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -2709,8 +2675,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -2833,8 +2803,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -2906,13 +2880,6 @@
         "max": 1000000000,
         "required": false,
         "posthog_name": "m3_turns"
-      },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
       },
       "omo.model_count": {
         "type": "number",
@@ -3061,13 +3028,6 @@
         "required": true,
         "posthog_name": "event_id"
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.skill_name": {
         "type": "string",
         "values": [
@@ -3179,8 +3139,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -3231,8 +3195,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -3295,13 +3263,6 @@
         "max": 10000000000,
         "required": true
       },
-      "omo.machine_hash": {
-        "type": "string",
-        "pattern": "^[0-9a-f]{64}$",
-        "required": false,
-        "relay_only": true,
-        "posthog_name": "machine_hash"
-      },
       "omo.model_id": {
         "type": "string",
         "values": [
@@ -3338,8 +3299,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -3508,8 +3473,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -3559,8 +3528,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -3610,8 +3583,12 @@
           "grok-4.6",
           "grok-4.7",
           "k3",
+          "k3.1-pro",
+          "k3.1-pro-highspeed",
           "kimi-for-coding-highspeed",
           "kimi-k3",
+          "kimi-k3.1-pro",
+          "kimi-k3.1-pro-highspeed",
           "glm-5.2",
           "glm-5.3",
           "mimo-v2.5-pro",
@@ -3869,5 +3846,5 @@
       }
     }
   },
-  "sha256": "e20fed8c6c81226792bb902ad7a07edfbe6f4988113ac1d3783ac9aa84a8e89e"
+  "sha256": "5c6d03d2200ea313bcc13af54281419073a0bd74b0d284f391d5127b0baa18c7"
 }

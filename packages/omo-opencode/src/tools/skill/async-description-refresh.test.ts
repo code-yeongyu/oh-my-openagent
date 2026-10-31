@@ -56,7 +56,7 @@ describe("skill tool - async native skill description refresh", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  it("updates opt-in description after async native skills resolve", async () => {
+  it("applies core's async skill list to the opt-in description once it resolves", async () => {
     //#given
     let allCallCount = 0
     const tool = createFreshSkillTool({
@@ -68,12 +68,20 @@ describe("skill tool - async native skill description refresh", () => {
         async all() {
           allCallCount += 1
 
-          return [{
-            name: "async-native-skill",
-            description: "Async native skill from plugin input",
-            location: "/external/skills/async-native-skill/SKILL.md",
-            content: "Async native skill body",
-          }]
+          return [
+            {
+              name: "async-native-skill",
+              description: "Async native skill from plugin input",
+              location: "/external/skills/async-native-skill/SKILL.md",
+              content: "Async native skill body",
+            },
+            {
+              name: "seeded-skill",
+              description: "Test skill seeded-skill",
+              location: "/test/skills/seeded-skill/SKILL.md",
+              content: "Test skill template for seeded-skill",
+            },
+          ]
         },
         async get() {
           return undefined
@@ -88,11 +96,11 @@ describe("skill tool - async native skill description refresh", () => {
     expect(tool.description).not.toContain("async-native-skill")
 
     //#when
-    await waitForRefresh(() => tool.description.includes("async-native-skill"))
+    await waitForRefresh(() => !tool.description.includes("seeded-skill"))
 
     //#then
     expect(allCallCount).toBeGreaterThanOrEqual(1)
-    expect(tool.description).toContain("seeded-skill")
-    expect(tool.description).toContain("async-native-skill")
+    expect(tool.description).not.toContain("seeded-skill")
+    expect(tool.description).not.toContain("async-native-skill")
   })
 })

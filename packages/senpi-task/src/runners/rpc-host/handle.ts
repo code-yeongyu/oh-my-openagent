@@ -5,7 +5,7 @@ import { exitTurnOutcome, promptFailureOutcome } from "../rpc/turn-outcome"
 import { createTurnSettlement, sessionIsIdle } from "../rpc/turn-settlement"
 import { createTurnWakeSources } from "../rpc/turn-wake-sources"
 import type { ChildEventListener, ChildExitOutcome, RpcTerminalAssistantMessage } from "../types"
-import { classifySessionExit, type SessionCloseIntent, type SessionExitCause } from "./exit-mapping"
+import { classifySessionExit, isParkingReason, type SessionCloseIntent, type SessionExitCause } from "./exit-mapping"
 import { bindHostSessionPort } from "./handle-client-binding"
 import { settleClassifiedSessionExit } from "./handle-exit"
 import type {
@@ -25,6 +25,7 @@ import { createHandleWaiters } from "./handle-waiters"
 import type { HostSessionParked, HostSessionReplaced } from "./session-client"
 import { extractTerminalAssistantMessage } from "./terminal-message"
 import { createInputEffects } from "../input-effects"
+import { readHostAdmissions } from "../input-admission-read"
 import { toHostInput } from "./input-command"
 import { createInputDelivery } from "../input-delivery"
 import { createRpcRunPause } from "../rpc/native-run-pause"
@@ -57,6 +58,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   let turnOutcome: RunnerOutcome | undefined
   let terminalAssistantMessage: RpcTerminalAssistantMessage | undefined
   let abortedByUser = false
+  // The host answered this child's end of its session; a released port never sets it (omo#11765).
+  let hostEndAnswered = false
+  const markHostEndAnswered = (): void => { hostEndAnswered = true }
   let lastSeenAt: number | undefined
   let outcome: ChildExitOutcome | undefined
   let intent: SessionCloseIntent = "running"
@@ -151,6 +155,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
         return
       }
       confirmedUnresponsiveClose = true
+      markHostEndAnswered()
       settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: "unresponsive, closed: the host confirmed this session is absent" } })
       settleExit({ kind: "killed", facts: { pid: undefined, code: null, signal: null, stderrTail: "unresponsive, closed" } })
     },
@@ -198,6 +203,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     markAborted: () => { abortedByUser = true },
     intent: () => intent,
     settleClosed: () => settleClassified(classifySessionExit({ cause: { kind: "session_closed", reason: "client_close" }, intent })),
+    markHostEndAnswered,
     waitForExit: () => waiters.waitForExit(outcome),
   })
 
@@ -247,6 +253,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     onParked: (event: HostSessionParked) => { if (!closingUnresponsive) park(event) },
     onClosed: (event: { readonly reason: string | undefined }) => {
       if (closingUnresponsive) return
+      if (!isParkingReason(event.reason)) markHostEndAnswered()
       endSession({ kind: "session_closed", reason: event.reason })
     },
     onReplaced: (event: HostSessionReplaced) => listeners.emitReplaced(identity.followReplace(event)),
@@ -261,6 +268,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const inputEffects = createInputEffects({
     taskId, store: options.inputStore,
     send: command => recovery.issue(toHostInput(command)),
+    read: ids => readHostAdmissions(client, ids),
   })
 
   const beginTurn = (): void => {
@@ -293,6 +301,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     clearActive: listeners.clearActive,
     stopHeartbeat: () => { inputEffects.stopRetrying(); stopHeartbeat() },
     settle: settleClassified,
+    markHostEndAnswered,
     onTornDown: () => {
       tornDown = true
       settlement.cancelConfirmation()
@@ -318,13 +327,13 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     },
     getEntries: async (since) => (await recovery.currentPort()).getEntries(since),
     switchSession: async (sessionPath) => (await recovery.currentPort()).switchSession(sessionPath),
-    steer: (text) => {
+    steer: (text, identity) => {
       if (heartbeat.status().state !== "running") return Promise.reject(new HostSessionUnresponsiveError())
-      return delivery.steer(text)
+      return delivery.steer(text, identity?.clientMessageId)
     },
-    followUp: (text) => {
+    followUp: (text, identity) => {
       if (heartbeat.status().state !== "running") return Promise.reject(new HostSessionUnresponsiveError())
-      return delivery.runPrompt(text, "followUp")
+      return delivery.runPrompt(text, "followUp", identity?.clientMessageId)
     },
     liveness: heartbeat.status,
     onLiveness: heartbeat.subscribe,
@@ -337,6 +346,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     },
     transportRecovering: () => recovery.recovering() && outcome === undefined,
     markStopping: stop.markStopping,
+    hostEndAnswered: () => hostEndAnswered,
     stopWhenReachable: stop.stopWhenReachable,
     ...listeners.registrations,
     reconcileTurn: (record) => reconciliation.reconcile(identity.current().sessionPath, record, false, openDisposition === "reopened"),

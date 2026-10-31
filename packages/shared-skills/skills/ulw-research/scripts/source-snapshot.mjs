@@ -1,77 +1,44 @@
 // source-snapshot.mjs - the per-source snapshot that fact locators read.
 //
-// snapshotFromHtml turns a page into text.txt form: one line per block (prose blocks via
-// proseText, one table cell per line; head, scripts, styles and code are dropped). writeSnapshot
-// writes <sourcesDir>/<S-id>/ with text.txt (pages joined by a form feed), source.html when html
-// was given, meta.json, sentences.jsonl (sid S<n>:s<k>) and acronyms.json. The sha256 covers
-// text.txt only. Nothing here touches the network: the caller supplies the html or text.
+// writeSnapshot writes <sourcesDir>/<S-id>/ with raw.bin (the fetched or captured bytes, absent
+// only for converted-only sources), meta.json (sha256 of the pinned body, text_source, charset),
+// text.txt (the locator text of source-view.mjs: the visible text nodes of a page, the decoded
+// bytes of a document, or a declared/converted extraction), source.html for pages (decoded, a
+// reading aid), sentences.jsonl (sid S<n>:s<k>, indexed over text.txt) and acronyms.json; a page
+// also gets conversion.json, the conversion probe's record of the numbers its text.txt altered.
 // Plain Node ESM, node: builtins and sibling imports only.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { sha256Of } from "./cli-support.mjs"
-import { parseHtml, PROSE_TAGS, proseText } from "./html-lite.mjs"
+import { probeConversion } from "./conversion-probe.mjs"
+import { writeFidelityRecord } from "./fidelity-records.mjs"
+import { extractHtml } from "./html-text-map.mjs"
 import { splitSentences } from "./sentence-split.mjs"
+import { buildView } from "./source-view.mjs"
 
-const SKIP = new Set(["head", "script", "style", "svg", "code", "pre", "kbd", "samp", "template", "noscript"])
-const INLINE = new Set([
-	"a", "abbr", "b", "bdi", "bdo", "cite", "data", "del", "dfn", "em", "font", "i", "ins", "label", "mark", "q", "s",
-	"small", "span", "strong", "sub", "sup", "time", "u", "var",
-])
 const SOURCE_ID = /^S[1-9]\d*$/
 const EXTRACTOR = /^(?:tool:source-snapshot@1|model|extractor:[\w.@+-]+)$/
-const KINDS = new Set(["page", "command", "document"])
+const KINDS = new Set(["page", "command", "document", "converted-only"])
 const PROVENANCE = new Set(["primary", "secondary", "unknown"])
 const ACRONYM_AFTER = /\(([A-Z]{2,6})\)/g
 const ACRONYM_BEFORE = /(?<![\p{L}\p{N}])([A-Z]{2,6})\s?\(([A-Z][^()\n]{2,79})\)/gu
 const NAME_WORD = /^[A-Z][\p{L}\p{N}-]*$/u
 const CONNECTOR = new Set(["of", "and", "for", "the", "in", "on", "to", "&"])
+const MARKUP = /^\s*</
 
 /**
- * Block lines of a page: { root, text, blocks: [{ node, start, end }] } where text joins the block
- * texts with "\n" and text.slice(start, end) is one block. fact-locate reads cells through `node`.
+ * Block lines of a page: { root, text, blocks: [{ node, start, end }], starts, ends } where text
+ * joins the visible block texts with "\n" (html-text-map.mjs). fact-locate reads cells through `node`.
  */
 export function snapshotBlocks(html) {
-	const root = parseHtml(html)
-	const lines = []
-	let buffer = ""
-	const flush = (node) => {
-		const line = buffer.replace(/\s+/g, " ").trim()
-		buffer = ""
-		if (line) lines.push({ node, text: line })
-	}
-	const walk = (node) => {
-		for (const child of node.children) {
-			if (child.tag === "#text") buffer += child.text
-			else if (SKIP.has(child.tag)) continue
-			else if (child.tag === "br") flush(node)
-			else if (INLINE.has(child.tag)) walk(child)
-			else if (PROSE_TAGS.has(child.tag)) {
-				flush(node)
-				const line = proseText(child)
-				if (line) lines.push({ node: child, text: line })
-			} else {
-				flush(node)
-				walk(child)
-				flush(child)
-			}
-		}
-	}
-	walk(root)
-	flush(root)
-	const blocks = []
-	let at = 0
-	for (const line of lines) {
-		blocks.push({ node: line.node, start: at, end: at + line.text.length })
-		at += line.text.length + 1
-	}
-	return { root, text: lines.map((line) => line.text).join("\n"), blocks }
+	return extractHtml(html)
 }
 
 /** text.txt form of an html page. */
 export function snapshotFromHtml(html) {
-	return snapshotBlocks(html).text
+	return extractHtml(html).text
 }
 
 /** Sentence index rows { sid: "S<n>:s<k>", start, end, text }; a form feed (page break) always ends a sentence. */
@@ -127,36 +94,61 @@ export function findAcronyms(text, sentences) {
 function snapshotText(input) {
 	if (Array.isArray(input.pages)) return input.pages.join("\f")
 	if (typeof input.text === "string") return input.text
-	if (typeof input.html === "string") return snapshotFromHtml(input.html)
-	throw new TypeError("writeSnapshot needs text, pages, or html")
+	throw new TypeError("writeSnapshot needs raw, html, text, or pages")
+}
+
+/** Which source-view text source the input makes, with the bytes it pins. */
+function bodiesOf(input) {
+	if (input.kind === "converted-only") return { mode: "converted", raw: null, textBody: Buffer.from(snapshotText(input)) }
+	if (input.declared === true) return { mode: "declared", raw: Buffer.from(input.raw), textBody: Buffer.from(snapshotText(input)) }
+	if (input.raw === undefined && typeof input.html === "string") return { mode: "html", raw: Buffer.from(input.html), textBody: null }
+	if (input.raw === undefined) return { mode: "decoded", raw: Buffer.from(snapshotText(input)), textBody: null }
+	const raw = Buffer.from(input.raw)
+	if (input.markup === true || typeof input.html === "string" || input.kind === "page" || MARKUP.test(raw.subarray(0, 1024).toString("latin1").replace(/^\u00ef\u00bb\u00bf/, ""))) return { mode: "html", raw, textBody: null }
+	if (input.text !== undefined || input.pages !== undefined) return { mode: "declared", raw, textBody: Buffer.from(snapshotText(input)) }
+	return { mode: "decoded", raw, textBody: null }
 }
 
 function checkInput(sourceId, input) {
 	if (!SOURCE_ID.test(String(sourceId))) throw new TypeError(`source id must be S<n>, got ${sourceId}`)
 	if (!EXTRACTOR.test(String(input.extractor))) throw new TypeError(`extractor must be tool:source-snapshot@1, model, or extractor:<name>, got ${input.extractor}`)
 	if (typeof (input.url ?? input.path) !== "string") throw new TypeError("writeSnapshot needs a url or a path")
-	if (input.kind !== undefined && !KINDS.has(input.kind)) throw new TypeError(`kind must be page, command, or document, got ${input.kind}`)
+	if (input.kind !== undefined && !KINDS.has(input.kind)) throw new TypeError(`kind must be page, command, document, or converted-only, got ${input.kind}`)
 	if (input.provenance !== undefined && !PROVENANCE.has(input.provenance)) throw new TypeError(`provenance must be primary, secondary, or unknown, got ${input.provenance}`)
+	if (input.observed_at !== undefined && (typeof input.observed_at !== "string" || Number.isNaN(new Date(input.observed_at).getTime()))) throw new TypeError(`observed_at must be an ISO timestamp, got ${input.observed_at}`)
+}
+
+function pinnedHash(dir) {
+	const metaPath = join(dir, "meta.json")
+	return existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, "utf8")).sha256 : null
 }
 
 /**
- * Write <sourcesDir>/<sourceId>/ for one source; returns { dir, sha256 } with sha256 over text.txt.
- * input: { url | path, text | pages | html, extractor, observed_at?, revision?, kind?, provenance? }.
- * Re-writing the same text is a no-op change; a different text over an existing snapshot throws
- * snapshot_exists, because ledger rows pin the old hash.
+ * Write <sourcesDir>/<sourceId>/ for one source; returns { dir, sha256, altered } over the pinned body,
+ * where altered lists the numbers the page conversion altered (null when no page conversion ran).
+ * input: { url | path, raw?, markup?, html?, text? | pages?, charset?, extractor, observed_at?, revision?,
+ * kind?, provenance? } (see bodiesOf). Re-writing the same bytes is a no-op; different bytes over
+ * an existing snapshot throw snapshot_exists, because ledger rows pin the old hash, unless
+ * options.replace (`source refresh`, which re-anchors those rows, or `source snapshot --replace`, which
+ * has checked that no active row pins it) is set; a replacement drops the old capture's command.json.
  */
-export function writeSnapshot(sourcesDir, sourceId, input) {
+export function writeSnapshot(sourcesDir, sourceId, input, options = {}) {
 	checkInput(sourceId, input)
-	const text = snapshotText(input)
-	const sha256 = sha256Of(Buffer.from(text, "utf8"))
+	const { mode, raw, textBody } = bodiesOf(input)
+	const view = buildView(mode, { raw, textBody, charset: input.charset ?? null })
+	const sha256 = sha256Of(raw ?? textBody)
 	const dir = join(sourcesDir, sourceId)
-	const textPath = join(dir, "text.txt")
-	if (existsSync(textPath) && sha256Of(readFileSync(textPath)) !== sha256) {
-		throw new Error(`snapshot_exists: ${sourceId} already holds a different text.txt`)
+	const pinned = pinnedHash(dir)
+	if (pinned !== null && pinned !== sha256) {
+		if (options.replace !== true) throw new Error(`snapshot_exists: ${sourceId} already holds different snapshot bytes`)
+		rmSync(join(dir, "command.json"), { force: true })
 	}
 	mkdirSync(dir, { recursive: true })
-	writeFileSync(textPath, text)
-	if (typeof input.html === "string") writeFileSync(join(dir, "source.html"), input.html)
+	if (raw) writeFileSync(join(dir, "raw.bin"), raw)
+	else rmSync(join(dir, "raw.bin"), { force: true })
+	writeFileSync(join(dir, "text.txt"), textBody ?? view.text)
+	if (view.html !== null) writeFileSync(join(dir, "source.html"), view.html)
+	else rmSync(join(dir, "source.html"), { force: true })
 	const meta = {
 		source_id: sourceId,
 		url: input.url ?? input.path,
@@ -164,13 +156,25 @@ export function writeSnapshot(sourcesDir, sourceId, input) {
 		sha256,
 		extractor: input.extractor,
 		revision: input.revision ?? null,
-		kind: input.kind ?? (input.url !== undefined || typeof input.html === "string" ? "page" : "document"),
+		kind: input.kind ?? (input.url !== undefined || mode === "html" ? "page" : "document"),
 		provenance: input.provenance ?? "unknown",
+		text_source: mode,
+		...(raw ? { charset: view.encoding } : {}),
+		...(mode === "declared" ? { text_sha256: sha256Of(textBody) } : {}),
 	}
 	writeFileSync(join(dir, "meta.json"), `${JSON.stringify(meta, null, 2)}\n`)
-	const sentences = indexSentences(text, sourceId)
+	let altered = null
+	if (mode === "html") {
+		const { altered: changed, ...counts } = probeConversion(view.html, view.text, { attributes: false })
+		altered = changed
+		writeFidelityRecord(join(dir, "conversion.json"), "source_conversion", {
+			artifact_sha256: sha256Of(view.html), report: join(dir, "source.html"), defects: [],
+			conversion_altered_numbers: changed, ...counts,
+		}, new Date(meta.observed_at))
+	} else rmSync(join(dir, "conversion.json"), { force: true })
+	const sentences = indexSentences(view.text, sourceId)
 	writeFileSync(join(dir, "sentences.jsonl"), sentences.map((row) => `${JSON.stringify(row)}\n`).join(""))
-	const acronyms = { schemaVersion: 1, source_id: sourceId, snapshot_sha256: sha256, entries: findAcronyms(text, sentences) }
+	const acronyms = { schemaVersion: 1, source_id: sourceId, snapshot_sha256: sha256, entries: findAcronyms(view.text, sentences) }
 	writeFileSync(join(dir, "acronyms.json"), `${JSON.stringify(acronyms, null, 2)}\n`)
-	return { dir, sha256 }
+	return { dir, sha256, altered }
 }

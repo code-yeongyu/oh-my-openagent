@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { createHash } from "node:crypto"
-import os from "node:os"
 import {
   BUILTIN_CATEGORY_NAMES,
   BUILTIN_SKILL_NAMES,
@@ -22,7 +21,6 @@ import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
-  MACHINE_HASH_SUNSET,
   getOmoNativeAttribution,
   getOmoNativeStateDir,
   hashSessionId,
@@ -48,8 +46,6 @@ const originalAttributionEnv = {
   OMO_NATIVE_INSTALL_ID: process.env.OMO_NATIVE_INSTALL_ID,
 } as const
 const temporaryRoots: string[] = []
-const BEFORE_SUNSET = new Date("2026-12-14T23:59:59.999Z")
-const AT_SUNSET = new Date("2026-12-15T00:00:00.000Z")
 
 afterEach(() => {
   for (const [name, value] of Object.entries({ ...originalAgentDirs, ...originalAttributionEnv })) {
@@ -90,7 +86,6 @@ describe("OmO Native product identity", () => {
     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
     expect(config.productName).toBe("omo-native")
-    expect(config.machineIdPrefix).toBe("omo-senpi:")
     expect(config.packageVersion).toBe(readStampedWorkspaceVersion())
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
     expect(config.disableGeoip ?? false).toBe(false)
@@ -357,7 +352,7 @@ describe("OmO Native product identity", () => {
       USERPROFILE: agentDir,
     }
 
-    expect(getOmoNativeAttribution({ env, now: AT_SUNSET })).toEqual({
+    expect(getOmoNativeAttribution({ env })).toEqual({
       surface: "desktop",
       install_hash: createHash("sha256").update(envInstallId).digest("hex"),
       ci: false,
@@ -384,27 +379,12 @@ describe("OmO Native product identity", () => {
     const agentDir = useTemporaryAgentDir()
     const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir, HOME: agentDir, USERPROFILE: agentDir }
 
-    const attribution = getOmoNativeAttribution({ env, now: BEFORE_SUNSET })
+    const attribution = getOmoNativeAttribution({ env })
 
     const stored = readFileSync(getOmoNativeInstallIdPath({ HOME: agentDir, USERPROFILE: agentDir }), "utf8").trim()
     expect(attribution.install_hash).toBe(createHash("sha256").update(stored).digest("hex"))
     expect(attribution).not.toHaveProperty("install_id")
-    expect(getOmoNativeAttribution({ env, now: AT_SUNSET }).install_hash).toBe(attribution.install_hash)
-  })
-
-  test("#given the machine_hash transition window #when attribution is resolved on either side of the sunset #then machine_hash is the legacy hostname hash before it and absent after", () => {
-    const agentDir = useTemporaryAgentDir()
-    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir, HOME: agentDir, USERPROFILE: agentDir }
-    const osProvider = { ...os, hostname: () => "transition-host" }
-
-    const before = getOmoNativeAttribution({ env, now: BEFORE_SUNSET, osProvider })
-    const after = getOmoNativeAttribution({ env, now: AT_SUNSET, osProvider })
-
-    expect(MACHINE_HASH_SUNSET).toBe("2026-12-15")
-    expect(before.machine_hash).toMatch(/^[0-9a-f]{64}$/)
-    expect(before.machine_hash).toBe(createHash("sha256").update("omo-senpi:transition-host").digest("hex"))
-    expect(after).not.toHaveProperty("machine_hash")
-    expect(after.install_hash).toBe(before.install_hash)
+    expect(getOmoNativeAttribution({ env }).install_hash).toBe(attribution.install_hash)
   })
 
   test("#given a product config #when attribution is attached #then additionalProperties carry it and existing product extras survive", () => {
@@ -420,7 +400,6 @@ describe("OmO Native product identity", () => {
           OMO_CODING_AGENT_DIR: agentDir,
           SENPI_CODING_AGENT_DIR: agentDir,
         },
-        now: AT_SUNSET,
       },
     )
 

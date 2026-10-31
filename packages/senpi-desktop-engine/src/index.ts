@@ -2,6 +2,7 @@ export {
 	DesktopLaunchContextError,
 	DesktopLaunchRefusal,
 	type DesktopLaunchRefusalReason,
+	type UserFacingErrorInfo,
 } from "./launch-refusal";
 export {
 	DesktopEngineAbiMismatchError,

@@ -126,16 +126,16 @@ export class RunPauseController {
     return failures
   }
 
-  // Resumes one participant. A participant outside the run's custody (lost, or never acknowledged)
-  // is resumed only if its engine still holds it, and a failure to resume it never fails the run's
-  // Resume: it is logged, kept as its lostReason, returned, and retried by a later Resume.
+  // An acknowledged child's durable cutoff also survives a failed restore: there may be no live
+  // engine to observe yet. Never let one unavailable child prevent the parent's Resume.
   async #resumeOne(
     parentSessionId: string, pauseSeq: number, resumeId: string, participant: PauseParticipant,
     frozenCutoff: number | undefined, credential: ResumeCredential | undefined, current: () => boolean,
   ): Promise<ResumeFailure | "superseded" | undefined> {
     const outsideCustody = participant.state === "lost" || participant.state === "pending"
-    let cutoff = frozenCutoff
-    if (outsideCustody && participant.kind !== "held_admission") {
+    const acknowledged = participant.ackSeq === pauseSeq && participant.observedChildSeq !== undefined
+    let cutoff = frozenCutoff ?? (acknowledged ? participant.observedChildSeq : undefined)
+    if (outsideCustody && !acknowledged && participant.kind !== "held_admission") {
       const observed = await this.#observe(parentSessionId, participant)
       if (!current()) return "superseded"
       if (observed?.held !== true) {
@@ -155,7 +155,6 @@ export class RunPauseController {
         ...(cutoff === undefined ? {} : { childSeqCutoff: cutoff }),
       }, credential)
     } catch (error) {
-      if (!outsideCustody) throw error
       const reason = `resume failed: ${error instanceof Error ? error.message : String(error)}`
       log("[senpi-task] run resume failed for a lost participant", { parentSessionId, pauseSeq, key: participant.key, reason })
       this.registry.update(parentSessionId, pauseSeq, participant.key, { state: "lost", lostReason: reason })

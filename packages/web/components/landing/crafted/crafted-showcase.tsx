@@ -47,7 +47,7 @@ export function CraftedShowcase({ items, labels }: CraftedShowcaseProps): JSX.El
                 if (event.pointerType === "mouse") select(index)
               }}
               onFocus={() => select(index)}
-              className="crafted-item focus-visible:outline-accent-32 w-full py-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2"
+              className="crafted-item focus-ring w-full py-4 text-left"
             >
               <span aria-hidden="true" className="crafted-item-wash" />
               <span className="relative flex items-center gap-3">

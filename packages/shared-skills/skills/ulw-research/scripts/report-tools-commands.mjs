@@ -133,7 +133,7 @@ export async function runOutcome(argv) {
 	switch (sub) {
 		case "init": {
 			const promised = args.required("promised").split(",").map((s) => s.trim()).filter(Boolean)
-			const manifest = outcome.initManifest({ sessionDir: sessionDirFrom(args.flags), promised, lane: args.flags.lane ?? null, now: nowFrom(args.flags) })
+			const manifest = outcome.initManifest({ sessionDir: sessionDirFrom(args.flags), promised, lane: args.flags.lane ?? null, now: nowFrom(args.flags), startedAt: args.flags["started-at"] })
 			outcome.writeManifest(file, manifest)
 			return { json: { command: "outcome init", path: file, deliverables: manifest.deliverables }, exitCode: 0 }
 		}

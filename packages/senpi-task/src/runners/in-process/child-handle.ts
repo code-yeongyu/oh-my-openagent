@@ -3,6 +3,7 @@ import { reportedEffectiveModel, type CatalogModelIdentity, type EffectiveModel 
 
 import type { TaskInterruptCause } from "../../state/record-types"
 import type { NativeRunPause } from "../../pause/native-child-pause"
+import type { InputIdentity } from "../types"
 import { createInProcessRunPause, type EngineTurnWatch, type RunHoldSession } from "./native-run-pause"
 import type { TaskStartFailureKind, TaskStartFailureReason } from "../../state/start-failure"
 
@@ -34,9 +35,9 @@ export type ChildSession = RunHoldSession & {
   readonly sessionId: string
   readonly model?: CatalogModelIdentity
   readonly effectiveServiceTier?: string
-  prompt(text: string): Promise<void>
-  steer(text: string): Promise<QueuedInputDisposition>
-  followUp(text: string): Promise<QueuedInputDisposition>
+  prompt(text: string, options?: InputIdentity): Promise<void>
+  steer(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
+  followUp(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   abort(): Promise<void>
   subscribe(listener: ChildSessionListener): () => void
   getLastAssistantText(): string | undefined
@@ -108,8 +109,8 @@ export type ChildHandle = {
   readonly runPause?: NativeRunPause
   /** The model the child session is ACTUALLY on, read live - the post-start record's source (#9722). */
   effectiveModel(): EffectiveModel | undefined
-  steer(text: string): Promise<void>
-  followUp(text: string): Promise<void>
+  steer(text: string, identity?: InputIdentity): Promise<void>
+  followUp(text: string, identity?: InputIdentity): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildSessionListener): () => void
   waitForIdle(): Promise<RunnerOutcome>
@@ -214,9 +215,10 @@ async function runTurn(
   isAborted: () => boolean,
   observation: TurnObservation,
   completion: ChildCompletionPolicy,
+  identity: InputIdentity | undefined,
 ): Promise<RunnerOutcome> {
   try {
-    await session.prompt(text)
+    await session.prompt(text, identity)
   } catch (error) {
     if (isAborted()) return { status: "cancelled" }
     if (error instanceof Error) {
@@ -250,7 +252,7 @@ function settledSessionOutcome(session: ChildSession, completion: ChildCompletio
 
 type TrackedChildHandle = {
   readonly handle: ChildHandle
-  beginTurn(text: string): void
+  beginTurn(text: string, identity?: InputIdentity): void
 }
 
 function createTrackedChildHandle(
@@ -270,7 +272,7 @@ function createTrackedChildHandle(
 
   // Start a fresh tracked turn and mark it active until it settles. waitForIdle() always returns the
   // CURRENT turn, so a revive follow-up re-arms it to the new turn instead of a stale resolved one.
-  const beginTurn = (text: string): void => {
+  const beginTurn = (text: string, identity?: InputIdentity): void => {
     aborted = false
     turnActive = true
     observation.text = undefined
@@ -279,7 +281,7 @@ function createTrackedChildHandle(
     observation.provider = undefined
     observation.model = undefined
     observation.baseline = session.getLastAssistantText()
-    running = runTurn(session, text, () => aborted, observation, completion)
+    running = runTurn(session, text, () => aborted, observation, completion, identity)
     void running.then(
       () => {
         turnActive = false
@@ -321,15 +323,15 @@ function createTrackedChildHandle(
     sessionId: session.sessionId,
     ...(runPause === undefined ? {} : { runPause }),
     effectiveModel: () => reportedEffectiveModel(session.model, session.effectiveServiceTier),
-    steer: (text) => session.steer(text).then(ignoreQueuedInputDisposition),
-    followUp: async (text) => {
+    steer: (text, identity) => session.steer(text, undefined, identity).then(ignoreQueuedInputDisposition),
+    followUp: async (text, identity) => {
       // While a turn is running, a follow-up is queued and delivered when the agent settles. Once
       // the child is idle/resident, a follow-up REVIVES it: drive a fresh turn and re-arm tracking.
       if (turnActive) {
-        await session.followUp(text)
+        await session.followUp(text, undefined, identity)
         return
       }
-      beginTurn(text)
+      beginTurn(text, identity)
     },
     abort: async () => {
       aborted = true

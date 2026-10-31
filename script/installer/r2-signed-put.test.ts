@@ -1,5 +1,5 @@
 import { describe, expect, spyOn, test } from "bun:test"
-import { putVerified, R2UploadError } from "./r2-signed-put"
+import { deleteObject, putVerified, R2UploadError, signedRequest } from "./r2-signed-put"
 
 const credentials = { accountId: "dummy", accessKeyId: "test-access-key", secretAccessKey: "test-secret-key", bucket: "omo-releases" }
 
@@ -37,6 +37,43 @@ describe("R2 write diagnostics", () => {
       expect(error).toMatchObject({ code: "<redacted>", requestId: "<redacted>" })
       expect(String(error)).not.toContain("prefix-")
       expect(String(error)).not.toContain("-suffix")
+    } finally {
+      fetch.mockRestore()
+    }
+  })
+
+  test.each(["HEAD", "GET", "DELETE"] as const)("a bodyless %s is signed over the empty payload hash", async (method) => {
+    // given
+    const fetch = spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 404 }))
+    try {
+      // when
+      const response = await signedRequest(credentials, method, "channels/latest")
+      // then
+      expect(response.status).toBe(404)
+      const [url, init] = fetch.mock.calls[0] ?? []
+      const headers = new Headers(init?.headers)
+      expect(url).toBe("https://dummy.r2.cloudflarestorage.com/omo-releases/channels/latest")
+      expect(init?.method).toBe(method)
+      expect(init?.body).toBeUndefined()
+      expect(headers.get("x-amz-content-sha256")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+      expect(headers.get("x-amz-checksum-sha256")).toBeNull()
+      expect(headers.get("authorization")).toMatch(/^AWS4-HMAC-SHA256 Credential=test-access-key\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/)
+    } finally {
+      fetch.mockRestore()
+    }
+  })
+
+  test("a failed DELETE keeps status, code and request id and redacts credentials", async () => {
+    const fetch = spyOn(globalThis, "fetch").mockResolvedValue(new Response(
+      `<Error><Code>InternalError</Code><Message>${credentials.secretAccessKey}</Message><RequestId>delete-request</RequestId></Error>`,
+      { status: 500 },
+    ))
+    try {
+      const error = await deleteObject(credentials, "channels/latest").catch((caught: unknown) => caught)
+      expect(error).toBeInstanceOf(R2UploadError)
+      expect(error).toMatchObject({ status: 500, code: "InternalError", requestId: "delete-request" })
+      expect(String(error)).toContain("DELETE channels/latest -> HTTP 500")
+      expect(String(error)).not.toContain(credentials.secretAccessKey)
     } finally {
       fetch.mockRestore()
     }

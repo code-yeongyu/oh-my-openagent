@@ -66,7 +66,7 @@ function clockFrom(start: number): () => Date {
 }
 
 async function queueFileNames(paths: MemoryIdentityPaths): Promise<string[]> {
-  const names = await readdir(paths.factsQueue).catch(() => [] as string[])
+  const names = await readdir(paths.factsQueue).catch(() => [])
   return names.filter((name) =>
     name.endsWith(".json") && name !== "consumed.json" && name !== "claims.json"
   ).sort()

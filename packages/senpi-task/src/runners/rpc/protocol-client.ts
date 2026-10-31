@@ -285,6 +285,6 @@ export function isHarmlessRpcShutdownError(error: unknown): boolean {
 }
 
 function commandError(response: RpcResponse, expectedCommand: string): RpcCommandError {
-  if (!response.success) return new RpcCommandError(expectedCommand, response.error)
+  if (!response.success) return new RpcCommandError(expectedCommand, response.error, response)
   return new RpcCommandError(expectedCommand, `unexpected response command: ${response.command}`)
 }
