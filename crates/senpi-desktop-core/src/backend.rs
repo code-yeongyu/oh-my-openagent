@@ -10,6 +10,7 @@ use crate::ax::{AxHandle, AxProps};
 use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
+pub use crate::protocol_results::AxInputMethod;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
@@ -86,6 +87,23 @@ pub enum PointerEvent {
     },
 }
 
+/// Where an application has keyboard focus, for the refusal of keys an
+/// element never took: its focused window as [`Backend::windows`] lists it,
+/// and the focused element.
+#[derive(Clone, Default)]
+pub struct KeyboardFocus {
+    pub window: Option<String>,
+    pub element: Option<AxHandle>,
+}
+
+/// How text or keys addressed to an element ended ([`Backend::ax_type_text`]).
+pub enum ElementDelivery {
+    Delivered(AxInputMethod),
+    /// The element did not take keyboard focus when asked to, so no key was
+    /// sent; the focus is where the value says.
+    Unfocused(KeyboardFocus),
+}
+
 pub trait Backend: Send {
     /// Independent release ownership, usable without borrowing a busy backend.
     /// Owners register this before admitting input into bounded fatal-stop mode.
@@ -147,6 +165,22 @@ pub trait Backend: Send {
             delivered();
         }
         Ok(())
+    }
+    /// Types `text` into the element `h` names (`ax.typeText`): by AX
+    /// insertion into a native text field, else as keys once the element
+    /// holds its application's keyboard focus, never unconfirmed.
+    /// `check_stop` runs before every key press and `delivered` reports each
+    /// fully delivered Unicode scalar. Backends without element input keep
+    /// this default and refuse.
+    fn ax_type_text(
+        &mut self,
+        _h: &AxHandle,
+        _text: &str,
+        _mode: DeliveryMode,
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+        _delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        Err(DesktopError::ax_unsupported())
     }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
     /// [`Self::key_chord`] with `check_stop` before every key press, so a stop

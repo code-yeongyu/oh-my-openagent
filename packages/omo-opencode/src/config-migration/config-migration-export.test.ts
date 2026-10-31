@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs"
-import { dirname, join, resolve, sep } from "node:path"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join, relative, resolve, sep } from "node:path"
 
 const PACKAGE_PATH = join(import.meta.dir, "..", "..", "package.json")
 const ENTRY_POINT = join(import.meta.dir, "index.ts")
@@ -31,15 +32,18 @@ function workspacePackageName(manifest: unknown): string | undefined {
   return typeof name === "string" ? name : undefined
 }
 
-function workspacePackages(): ReadonlyMap<string, string> {
-  const packages = new Map<string, string>()
-  for (const entry of readdirSync(PACKAGES_PATH, { withFileTypes: true })) {
+type WorkspacePackage = { directory: string; exports: unknown }
+
+function workspacePackages(packagesPath = PACKAGES_PATH): ReadonlyMap<string, WorkspacePackage> {
+  const packages = new Map<string, WorkspacePackage>()
+  for (const entry of readdirSync(packagesPath, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue
-    const packagePath = join(PACKAGES_PATH, entry.name)
+    const packagePath = join(packagesPath, entry.name)
     const manifestPath = join(packagePath, "package.json")
     if (!existsSync(manifestPath)) continue
-    const name = workspacePackageName(JSON.parse(readFileSync(manifestPath, "utf-8")))
-    if (name !== undefined) packages.set(name, join(packagePath, "src"))
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as Record<string, unknown>
+    const name = workspacePackageName(manifest)
+    if (name !== undefined) packages.set(name, { directory: packagePath, exports: manifest.exports })
   }
   return packages
 }
@@ -57,16 +61,39 @@ function resolveRelativeImport(sourcePath: string, specifier: string): string {
   return resolveModule(resolve(dirname(sourcePath), specifier), specifier, sourcePath)
 }
 
-function resolveWorkspaceImport(sourcePath: string, specifier: string): string | undefined {
-  for (const [packageName, packageSourcePath] of WORKSPACE_PACKAGES) {
-    if (specifier === packageName) return resolveModule(packageSourcePath, specifier, sourcePath)
+function resolveWorkspaceImport(sourcePath: string, specifier: string, packages = WORKSPACE_PACKAGES): string | undefined {
+  for (const [packageName, workspace] of packages) {
     const prefix = `${packageName}/`
-    if (specifier.startsWith(prefix)) return resolveModule(join(packageSourcePath, specifier.slice(prefix.length)), specifier, sourcePath)
+    if (specifier !== packageName && !specifier.startsWith(prefix)) continue
+    const subpath = specifier === packageName ? "." : `./${specifier.slice(prefix.length)}`
+    if (workspace.exports === undefined) {
+      return resolveModule(join(workspace.directory, "src", subpath), specifier, sourcePath)
+    }
+    let entry: unknown = typeof workspace.exports === "object" && workspace.exports !== null
+      ? Reflect.get(workspace.exports, subpath)
+      : subpath === "." ? workspace.exports : undefined
+    let capture: string | undefined
+    if (entry === undefined && typeof workspace.exports === "object" && workspace.exports !== null) {
+      const patterns = Object.keys(workspace.exports).filter((key) => key.includes("*"))
+        .sort((a, b) => b.indexOf("*") - a.indexOf("*") || b.length - a.length)
+      for (const pattern of patterns) {
+        const [prefix = "", suffix = ""] = pattern.split("*")
+        if (!subpath.startsWith(prefix) || !subpath.endsWith(suffix) || subpath.length < prefix.length + suffix.length) continue
+        capture = subpath.slice(prefix.length, subpath.length - suffix.length)
+        entry = Reflect.get(workspace.exports, pattern)
+        break
+      }
+    }
+    const target: unknown = typeof entry === "object" && entry !== null
+      ? Reflect.get(entry, "import") ?? Reflect.get(entry, "default")
+      : entry
+    if (typeof target !== "string") throw new Error(`Cannot resolve exported ${specifier} from ${sourcePath}`)
+    return resolveModule(resolve(workspace.directory, capture === undefined ? target : target.replaceAll("*", capture)), specifier, sourcePath)
   }
   return undefined
 }
 
-function moduleGraph(entryPoint: string): readonly string[] {
+function moduleGraph(entryPoint: string, packages = WORKSPACE_PACKAGES): readonly string[] {
   const pending = [entryPoint]
   const visited = new Set<string>()
   while (pending.length > 0) {
@@ -76,7 +103,7 @@ function moduleGraph(entryPoint: string): readonly string[] {
     for (const specifier of importSpecifiers(readFileSync(current, "utf-8"))) {
       if (specifier.startsWith(".")) pending.push(resolveRelativeImport(current, specifier))
       else {
-        const workspaceImport = resolveWorkspaceImport(current, specifier)
+        const workspaceImport = resolveWorkspaceImport(current, specifier, packages)
         if (workspaceImport !== undefined) pending.push(workspaceImport)
       }
     }
@@ -85,6 +112,49 @@ function moduleGraph(entryPoint: string): readonly string[] {
 }
 
 describe("config-migration public subpath", () => {
+  test("an exports alias resolves to its real file and remains in the audited graph", () => {
+    const entryPoint = join(PACKAGES_PATH, "team-core", "src", "team-state-store", "lock-record.ts")
+    const aliasTarget = join(PACKAGES_PATH, "memory-core", "src", "locks", "process-identity.ts")
+
+    expect(resolveWorkspaceImport(entryPoint, "@oh-my-opencode/memory-core/process-identity")).toBe(aliasTarget)
+    expect(moduleGraph(entryPoint)).toEqual(expect.arrayContaining([
+      aliasTarget,
+      join(PACKAGES_PATH, "memory-core", "src", "locks", "process-start-time.ts"),
+    ]))
+  })
+
+  test("an exports alias targeting a forbidden graph still fails the audit", () => {
+    const root = mkdtempSync(join(tmpdir(), "config-migration-exports-"))
+    try {
+      const packagePath = join(root, "fixture")
+      mkdirSync(join(packagePath, "src"), { recursive: true })
+      writeFileSync(join(packagePath, "package.json"), JSON.stringify({
+        name: "@audit/fixture",
+        exports: {
+          "./*": { import: "./src/*.ts" },
+          "./alias": {
+            import: relative(packagePath, NEGATIVE_FIXTURE_ENTRY_POINT),
+            default: "./src/alias.ts",
+          },
+        },
+      }))
+      writeFileSync(join(packagePath, "src", "alias.ts"), "export {}\n")
+      const entryPoint = join(root, "entry.ts")
+      writeFileSync(entryPoint, 'import "@audit/fixture/alias"\n')
+
+      const modules = moduleGraph(entryPoint, workspacePackages(root))
+      const offenders = modules.flatMap((modulePath) =>
+        importSpecifiers(readFileSync(modulePath, "utf-8"))
+          .filter((specifier) => OPENCODE_IMPORT.test(specifier))
+          .map((specifier) => `${modulePath} imports ${specifier}`))
+
+      expect(modules).toContain(NEGATIVE_FIXTURE_ENTRY_POINT)
+      expect(offenders).toEqual([`${NEGATIVE_FIXTURE_ENTRY_POINT} imports @opencode-ai/sdk`])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given the package manifest #when resolving config-migration #then its dedicated public subpath points only at the dependency-clean module", () => {
     // given
     const packageJson = JSON.parse(readFileSync(PACKAGE_PATH, "utf-8")) as Record<string, unknown>

@@ -55,7 +55,8 @@ export interface HostSessionPort {
   /** What the child holds for each input id; `undefined` from an engine client without the read (senpi#3549). */
   getPendingInputs?(knownClientMessageIds: readonly string[]): Promise<HostPendingInputs | undefined>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
-  close(): Promise<void>
+  /** `true` only when the host answered this connection's close_session; a released port answers `false`. */
+  close(): Promise<boolean>
   /** Retain the route after a rejected close so a liveness stop can retry confirmation. */
   closeConfirmed?(): Promise<void>
   detach(): Promise<void>
@@ -133,6 +134,8 @@ export type HostSessionChildHandle = RpcChildHandle & {
   transportRecovering(): boolean
   /** A cancel was accepted: a recovery that reaches the host ends the session instead of resuming it. */
   markStopping(): void
+  /** The host answered this child's end of its session (omo#11765); a park, detach or transport loss never counts. */
+  hostEndAnswered(): boolean
   /**
    * Stop the child. With its transport down the stop waits for the recovered connection and runs
    * there before anything else; it resolves once the child has ended on this side.

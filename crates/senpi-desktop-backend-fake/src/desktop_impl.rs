@@ -1,5 +1,6 @@
 use image::RgbaImage;
-use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::ax::AxHandle;
+use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
@@ -143,6 +144,17 @@ impl Backend for FakeBackend {
             start = end;
         }
         Ok(())
+    }
+
+    fn ax_type_text(
+        &mut self,
+        h: &AxHandle,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        crate::element_input_impl::ax_type_text(self, h, text, mode, check_stop, delivered)
     }
 
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {

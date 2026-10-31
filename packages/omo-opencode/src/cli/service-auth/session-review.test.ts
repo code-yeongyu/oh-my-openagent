@@ -9,12 +9,13 @@ for (const code of ["ENOTFOUND", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", 
     const api = fakeApi(() => Response.json({ ...grant, refreshToken: "rotated" }))
     const store = memorySecrets().store(api)
     await store.write(expired)
+    const persisted = await store.read()
     const session = createSession({ api, store, home: await temporaryHome() })
     const fetcher = spyOn(globalThis, "fetch").mockRejectedValueOnce(Object.assign(new Error(grant.refreshToken), { code }))
     onTestFinished(() => fetcher.mockRestore())
     const error = await session.accessToken().catch(error => error)
     expect(error).toMatchObject({ retryable: true })
-    expect(await store.read()).toEqual(expired)
+    expect(await store.read()).toEqual(persisted)
     expect(await session.accessToken()).toBe(grant.accessToken)
   })
 }
@@ -78,10 +79,11 @@ test("failed pre-send journal persistence sends no rotating request", async () =
   const api = fakeApi(() => { requests++; return Response.json(grant) })
   const base = memorySecrets().store(api)
   await base.write(expired)
+  const persisted = await base.read()
   const store = { ...base, write: async () => { throw new Error("synthetic store failure") } }
   await expect(createSession({ api, store, home: await temporaryHome() }).accessToken()).rejects.toThrow()
   expect(requests).toBe(0)
-  expect(await base.read()).toEqual(expired)
+  expect(await base.read()).toEqual(persisted)
 })
 
 for (const outcome of ["approved", "offline", "refused"]) {

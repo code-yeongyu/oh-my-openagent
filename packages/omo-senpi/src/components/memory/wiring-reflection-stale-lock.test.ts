@@ -13,13 +13,18 @@ import {
 afterEach(cleanupStaleLockFixtures)
 
 describe("memory reflection stale active lock (#10377)", () => {
-  test("#given a session that already reconciled #when the host dies mid-publish and the next /reflect finds the lock held #then the dead run is finalized and the lock released", async () => {
+  test.each([0, 1])("#given a session that already reconciled and a clock advancing %i ms per read #when the host dies mid-publish and the next /reflect finds the lock held #then the dead run is finalized and the lock released", async (tick) => {
     // given
     const item = await staleLockFixture()
     await settleTurn(item)
     expect(item.reconciles.count).toBe(1)
     const pid = await deadPid()
-    const runId = await hostDiesMidPublish(item, pid)
+    let clock = Date.now()
+    const runId = await hostDiesMidPublish(item, pid, () => {
+      const now = clock
+      clock += tick
+      return now
+    })
     const verdictBefore = await holderVerdict(item)
     const mark = diagnosisMark(item)
 
@@ -194,11 +199,16 @@ test("#given a Windows stack with backslash paths #when the stale-lock diagnosis
 })
 
 test("#given a reconcile pass in flight when the mark is taken #when the diagnosis cuts the evidence #then that pass belongs before the mark (#11604)", async () => {
-  // given: the mark is taken at the instant the bind-time pass starts, before it returns anything.
+  // given: the mark is taken as the first settled-turn pass starts, before it returns anything.
   const item = await staleLockFixture()
   const seen: { mark?: DiagnosisMark } = {}
-  item.reconciles.onStart = () => {
+  item.reconciles.onStart = (pass) => {
     seen.mark ??= diagnosisMark(item)
+    item.reconciles.contention.push({
+      pass, read: "readState", waitTimeoutMs: 0, site: "in-flight pass",
+      lockPath: join(item.paths.locks, "reflection-scheduler.lock"), owner: { pid: process.pid },
+    })
+    item.reconciles.errors.push({ pass, error: "in-flight error" })
   }
 
   // when
@@ -211,4 +221,6 @@ test("#given a reconcile pass in flight when the mark is taken #when the diagnos
   const after = afterMark(item, mark)
   expect(after.reconciled).toBe(0)
   expect(after.passes).toEqual([])
+  expect(after.contention).toEqual([])
+  expect(after.errors).toEqual([])
 }, 30_000)
