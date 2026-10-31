@@ -11,6 +11,7 @@ import {
   windowsSecureFile,
   type PowerShellRunner,
   runPowerShell,
+  userSidToken,
 } from "../../src/local-api/dacl.ts";
 import { LocalApiError } from "../../src/local-api/errors.ts";
 import { rejectionOf } from "./conformance/rejection.ts";
@@ -50,16 +51,17 @@ describe("LA17 exact protected DACL on Windows (second local user omoqa2)", () =
 
       await applyExactDacl(dir, sid, "dir");
       await applyExactDacl(file, sid, "file");
-      expect(await verifyExactDacl(dir, sid, "dir")).toBe(true);
-      expect(await verifyExactDacl(file, sid, "file")).toBe(true);
+      // The SDDL comparison comes first so a refusal prints the descriptor Windows actually wrote.
       const after = await describeDacl(file);
       const dirSddl = (await describeDacl(dir)).sddl;
-      console.log(
-        `dir sddl=${dirSddl.replaceAll(sid, "<user>")} file sddl=${after.sddl.replaceAll(sid, "<user>")}`,
-      );
-      expect(after.sddl).toBe(`O:${sid}D:PAI(A;;FA;;;${sid})`);
-      expect(dirSddl).toBe(`O:${sid}D:PAI(A;OICI;FA;;;${sid})`);
-      expect(after.aces.map((ace) => ace.sid)).toEqual([sid]);
+      const alias = (await userSidToken(sid)) ?? sid;
+      const mask = (sddl: string): string =>
+        sddl.replaceAll(sid, "<user>").replace(new RegExp(`(?<=O:|;)${alias}(?=D:|\\))`, "g"), "<user>");
+      expect(mask(dirSddl)).toBe("O:<user>D:PAI(A;OICI;FA;;;<user>)");
+      expect(mask(after.sddl)).toBe("O:<user>D:PAI(A;;FA;;;<user>)");
+      expect(await verifyExactDacl(dir, sid, "dir")).toBe(true);
+      expect(await verifyExactDacl(file, sid, "file")).toBe(true);
+      expect(after.aces.map((ace) => ace.sid)).toEqual([alias]);
       expect(await readAs(SECOND_USER, password, file)).toBe("read_denied");
     },
     SLOW_MS,

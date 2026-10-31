@@ -3,10 +3,11 @@ import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { connectDeviceService, deviceServiceStateDir, type DeviceService, LocalApiError, type RemoteAttachEvent } from "../src/index.ts"
-import { posixSecureFile, writeToken } from "../src/local-api/access.ts"
+import { writeToken } from "../src/local-api/access.ts"
 import { connectLocalApi } from "../src/local-api/client.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID, type World } from "./local-api/conformance/world.ts"
+import { testSecure } from "./local-api/support.ts"
 
 const owners: FakeOwner[] = []
 const services: DeviceService[] = []
@@ -70,7 +71,7 @@ describe("connectDeviceService", () => {
   test("refuses an owner that cannot prove the per-boot token before sending any request", async () => {
     const owner = await startFakeOwner({ stateDir: stateDir(), world: defaultWorld() })
     owners.push(owner)
-    await writeToken(owner.stateDir, posixSecureFile)
+    await writeToken(owner.stateDir, testSecure)
     const error = await connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(LocalApiError)
     expect((error as LocalApiError).code).toBe("server_proof_invalid")
