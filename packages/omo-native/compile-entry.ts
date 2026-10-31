@@ -35,6 +35,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
+import { runRemoteCommand } from "./remote-cli"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
@@ -147,6 +148,10 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   if (args[0] === "account") {
     await runAccountCommand(args)
+    return true
+  }
+  if (args[0] === "remote") {
+    await runRemoteCommand(args)
     return true
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
