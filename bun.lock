@@ -75,18 +75,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.1.52",
-        "oh-my-opencode-darwin-x64": "5.1.52",
-        "oh-my-opencode-darwin-x64-baseline": "5.1.52",
-        "oh-my-opencode-linux-arm64": "5.1.52",
-        "oh-my-opencode-linux-arm64-musl": "5.1.52",
-        "oh-my-opencode-linux-x64": "5.1.52",
-        "oh-my-opencode-linux-x64-baseline": "5.1.52",
-        "oh-my-opencode-linux-x64-musl": "5.1.52",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.1.52",
-        "oh-my-opencode-windows-arm64": "5.1.52",
-        "oh-my-opencode-windows-x64": "5.1.52",
-        "oh-my-opencode-windows-x64-baseline": "5.1.52",
+        "oh-my-opencode-darwin-arm64": "5.1.53",
+        "oh-my-opencode-darwin-x64": "5.1.53",
+        "oh-my-opencode-darwin-x64-baseline": "5.1.53",
+        "oh-my-opencode-linux-arm64": "5.1.53",
+        "oh-my-opencode-linux-arm64-musl": "5.1.53",
+        "oh-my-opencode-linux-x64": "5.1.53",
+        "oh-my-opencode-linux-x64-baseline": "5.1.53",
+        "oh-my-opencode-linux-x64-musl": "5.1.53",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.1.53",
+        "oh-my-opencode-windows-arm64": "5.1.53",
+        "oh-my-opencode-windows-x64": "5.1.53",
+        "oh-my-opencode-windows-x64-baseline": "5.1.53",
       },
     },
     "packages/agents-md-core": {
@@ -208,7 +208,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.1.52",
+      "version": "5.1.53",
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -228,7 +228,7 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.1.52",
+      "version": "5.1.53",
       "bin": {
         "omo": "bin/omo.js",
       },
@@ -274,7 +274,7 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.1.52",
+      "version": "5.1.53",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
         "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.30-1",
