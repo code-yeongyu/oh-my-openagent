@@ -14,6 +14,7 @@ import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { WorkpoolCreate, WorkpoolEvent } from "../types"
 import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
+import { withinTestBudget } from "../../../../../test-support/test-deadline"
 
 export const poolInput: WorkpoolCreate = { name: "batch", agent: { category: "quick", prompt: "Process input" }, mode: "fresh" }
 export function deferred<T>() {
@@ -23,12 +24,7 @@ export function deferred<T>() {
   return { promise, resolve, reject }
 }
 export function bounded<T>(promise: Promise<T>): Promise<T> {
-  const signal = AbortSignal.timeout(5000)
-  return new Promise<T>((resolve, reject) => {
-    const abort = (): void => reject(signal.reason)
-    signal.addEventListener("abort", abort, { once: true })
-    void promise.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort))
-  })
+  return withinTestBudget(promise, "workpool event did not arrive")
 }
 export function fixtureHandle(taskId: string) {
   let cycle = deferred<RunnerOutcome>()

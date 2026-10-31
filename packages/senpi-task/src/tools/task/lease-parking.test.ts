@@ -13,6 +13,7 @@ import { runTaskOutput } from "../output/output"
 import { runTaskCancel } from "../control/cancel"
 import { buildTaskExecute } from "./execute"
 import { TaskToolParams } from "./params"
+import { withinTestBudget } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -23,15 +24,8 @@ function deferred() {
   return { promise, resolve }
 }
 
-async function bounded(event: Promise<void>): Promise<void> {
-  const signal = AbortSignal.timeout(20_000)
-  let abort = () => {}
-  const timeout = new Promise<never>((_, reject) => {
-    abort = () => reject(signal.reason)
-    signal.addEventListener("abort", abort, { once: true })
-  })
-  try { await Promise.race([event, timeout]) }
-  finally { signal.removeEventListener("abort", abort) }
+function bounded(event: Promise<void>): Promise<void> {
+  return withinTestBudget(event, "lease-parking event did not arrive", 25000)
 }
 
 function tree(levels: number, holdLeaf = false, batch = false, promote = false) {
