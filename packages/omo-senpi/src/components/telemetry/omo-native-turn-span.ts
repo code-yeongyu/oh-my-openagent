@@ -9,17 +9,7 @@ import {
 
 import { pinnedModelId } from "./pinned-model-ids"
 import { maskProviderAndModel } from "./product-identity"
-
-/**
- * The `gen_ai.provider.name` well-known values for our provider ids (D-P VALUE table); an id with no
- * well-known value keeps our id, and `custom` stays `custom`.
- */
-const GEN_AI_PROVIDER_NAMES: Readonly<Record<string, string>> = {
-  anthropic: "anthropic",
-  openai: "openai",
-  google: "gcp.gemini",
-  xai: "x_ai",
-}
+import { toWireValue } from "./semconv-map"
 
 export type TurnModel = { readonly provider: string; readonly modelId: string }
 
@@ -55,7 +45,8 @@ export type OmoNativeTurnSpans = {
 function modelAttributes(model: TurnModel): TurnSpanAttributes {
   const masked = maskProviderAndModel(model.provider, model.modelId)
   return {
-    "gen_ai.provider.name": GEN_AI_PROVIDER_NAMES[masked.provider] ?? masked.provider,
+    // The semconv VALUE table has a row for every masked provider id (the known ids plus `custom`).
+    "gen_ai.provider.name": toWireValue("gen_ai.provider.name", masked.provider) ?? "custom",
     "omo.provider": masked.provider,
     "omo.model_id": pinnedModelId(masked.model_id),
   }
