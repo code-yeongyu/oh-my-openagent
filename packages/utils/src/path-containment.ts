@@ -52,11 +52,10 @@ export function isPathInside(child: string, parent: string, options: PathContain
 /** The canonical child's path relative to the canonical parent ("" for the parent itself), or undefined when outside. */
 export function containedRelativePath(child: string, parent: string, options: PathContainmentOptions = {}): string | undefined {
   const paths = (options.platform ?? process.platform) === "win32" ? win32 : posix
-  const realpath = options.realpath ?? realpathSync.native
   // A caller that injects a resolver decides its own canonical form (the grant check allows a note that
   // does not exist yet), so only the default path is walked here.
   const canonicalChild = paths.normalize(
-    options.realpath === undefined ? resolveSegmentwise(child, { ...options, allowMissing: false }) : realpath(child),
+    options.realpath === undefined ? resolveSegmentwise(child, { ...options, allowMissing: false }) : options.realpath(child),
   )
   // The parent is walked too: a lexical `..` after a link names a directory the opener never reaches, and
   // a containment verdict inherits that error.
