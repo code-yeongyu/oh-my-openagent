@@ -16,12 +16,12 @@ type RpcLine = { readonly id?: string; readonly type?: string; readonly success?
 async function engineLaunch(declared: boolean) {
   const home = mkdtempSync(join(tmpdir(), "omo-memsync-engine-"))
   mkdirSync(join(home, "tmp"))
-  const env: Record<string, string | undefined> = {
-    ...process.env, HOME: home, TMPDIR: join(home, "tmp"), OMO_MEMORY_HOME: join(home, "memory"), SENPI_CODING_AGENT_DIR: join(home, "agent"),
+  // A fresh environment: variables other test files set in this process must not steer the engine's launch path.
+  const env: Record<string, string> = {
+    PATH: process.env.PATH ?? "", HOME: home, TMPDIR: join(home, "tmp"),
+    OMO_MEMORY_HOME: join(home, "memory"), SENPI_CODING_AGENT_DIR: join(home, "agent"),
+    ...(declared ? { SENPI_PRIVATE_FDS: '{"memory-sync":5}' } : {}),
   }
-  delete env.SENPI_PRIVATE_FDS
-  delete env.SENPI_PRIVATE_FDS_FINAL
-  if (declared) env.SENPI_PRIVATE_FDS = '{"memory-sync":5}'
   const child = spawn(process.execPath, [senpiCli, "--mode", "rpc", "--no-session", "--no-extensions", "-e", fixture], {
     cwd: home, env, stdio: ["pipe", "pipe", "pipe", "ignore", "ignore", "pipe"],
   })
