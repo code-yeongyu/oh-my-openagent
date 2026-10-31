@@ -7,6 +7,7 @@
 //! AppKit) only.
 
 mod authentication;
+mod partial;
 mod psn;
 mod spi;
 
@@ -24,6 +25,7 @@ use self::psn::{
     front_process, post_focus_record, process_psn, FocusMarker, ProcessSerialNumber,
     SET_FRONT_NO_WINDOWS,
 };
+pub(crate) use self::partial::{mark_sent, reporting_partial};
 pub(crate) use self::spi::{front_pid, is_available};
 use self::spi::required;
 
@@ -85,6 +87,7 @@ pub(crate) fn post_routed(pid: libc::pid_t, event: &CGEvent) -> CoreResult<()> {
     // SAFETY: `event` remains retained for the synchronous post and
     // `post_to_pid` was atomically resolved with its exact ABI.
     unsafe { (spi.post_to_pid)(pid, event_ptr(event)) };
+    mark_sent();
     Ok(())
 }
 
@@ -96,6 +99,7 @@ pub(crate) fn post_dual(pid: libc::pid_t, event: &CGEvent) -> CoreResult<()> {
     // SAFETY: `event` remains retained for both posts and `post_to_pid` was
     // atomically resolved with its exact ABI.
     unsafe { (spi.post_to_pid)(pid, event_ptr(event)) };
+    mark_sent();
     // SAFETY: `event` remains retained for the synchronous public
     // CoreGraphics post to the same process.
     unsafe { CGEventPostToPid(pid, event.as_ptr()) };
@@ -111,6 +115,7 @@ pub(crate) fn post_keyboard(pid: libc::pid_t, event: &CGEvent) -> CoreResult<()>
     // SAFETY: `event` remains retained and the exact symbol is part of the
     // required atomic probe.
     unsafe { (spi.post_to_pid)(pid, event_ptr(event)) };
+    mark_sent();
     Ok(())
 }
 

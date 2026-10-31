@@ -196,6 +196,12 @@ interface ComputerElement {
 	press(): Promise<void>;
 	/** Click the element's center with native input. */
 	click(options?: ComputerDeliveryOptions): Promise<void>;
+	/**
+	 * Type into this element without taking the user's focus (macOS): a native text field takes the text through its
+	 * own selection (`inserted`), any other element takes keys once it holds its app's keyboard focus (`keys`); an
+	 * element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) with nothing typed.
+	 */
+	type(text: string, options?: ComputerDeliveryOptions): Promise<{ method: "inserted" | "keys" }>;
 	focus(): Promise<void>;
 	parent(): Promise<ComputerElement | null>;
 	children(): Promise<ComputerElement[]>;

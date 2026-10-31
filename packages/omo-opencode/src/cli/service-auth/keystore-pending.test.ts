@@ -107,7 +107,9 @@ describe("a credential read the OS store does not answer", () => {
     await b.write(rotated)
     const outcome = await settled(session.accessToken())
     expect(outcome).toEqual({ state: "resolved", value: rotated.accessToken })
-    expect(item === null ? null : JSON.parse(item)).toEqual(rotated)
+    const saved = await b.read()
+    expect(saved?.credentialGeneration).toEqual(expect.any(String))
+    expect(item === null ? null : JSON.parse(item)).toEqual({ ...rotated, credentialGeneration: saved?.credentialGeneration })
     expect(refreshes).toBe(0)
     expect(clears).toBe(0)
   })
@@ -134,7 +136,9 @@ describe("a credential read the OS store does not answer", () => {
       else await store.clear()
       approval.resolve(old)
       await approval.promise
-      expect(await store.read()).toEqual(action === "write" ? fresh : null)
+      const saved = await store.read()
+      if (action === "write") expect(saved?.credentialGeneration).toEqual(expect.any(String))
+      expect(saved).toEqual(action === "write" ? { ...fresh, credentialGeneration: saved?.credentialGeneration } : null)
     })
   }
 

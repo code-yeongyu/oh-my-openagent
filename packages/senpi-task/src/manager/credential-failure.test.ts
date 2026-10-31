@@ -46,18 +46,23 @@ describe("isCredentialFailure", () => {
     expect(isCredentialFailure(message, "minimax-m3")).toBe(false)
   })
 
-  // Every wording senpi emits when a provider has no credential at request time (#10806). The provider is
-  // signed out, so its sibling models fail the same way.
+  // Every wording senpi emits when a provider has no credential at request time (#10806), enumerated from the
+  // pinned senpi runtime (2026.10.27-1, paths under its dist/). The provider is signed out, so its sibling models
+  // fail the same way.
   test.each([
-    ["the session's request-time check (auth-guidance formatNoApiKeyFoundMessage)", "No API key found for openai.\n\nUse /login to log into a provider via OAuth or API key. See:\n  ~/docs/providers.md"],
-    ["the same check for an unknown provider", "No API key found for the selected model.\n\nUse /login to log into a provider via OAuth or API key."],
-    ["the registry's request auth (model-registry getApiKeyAndHeaders)", 'No API key found for "openai"'],
-    ["a provider adapter (ai api/*)", "No API key for provider: openai"],
-    ["the pi-messages adapter", 'No API key provided for provider "openai"'],
-    ["a model switch onto a keyless provider", "No API key for openai/gpt-6-luna-fast"],
-    ["an empty Claude subscription pool", "authentication_failed: No Anthropic Subscription accounts configured for the managed lane; run /login anthropic-subscription or set CLAUDE_CODE_OAUTH_TOKEN"],
-    ["an empty Cursor CLI account pool", "no accounts: run /login cursor-cli-oauth"],
-    ["a missing Cursor access token", "Cursor access token is required; run /login cursor"],
+    ["the session's request-time check (core/auth-guidance.js:19 formatNoApiKeyFoundMessage)", "No API key found for openai.\n\nUse /login to log into a provider via OAuth or API key. See:\n  ~/docs/providers.md"],
+    ["the same check for an unknown provider (core/auth-guidance.js:19)", "No API key found for the selected model.\n\nUse /login to log into a provider via OAuth or API key."],
+    ["the registry's request auth (core/model-registry.js:80, :103 getApiKeyAndHeaders)", 'No API key found for "openai"'],
+    ["a provider adapter (bundle/chunks/anthropic-messages assertRequestAuth, openai/google/mistral/codex/azure stream)", "No API key for provider: openai"],
+    ["the pi-messages adapter (bundle/chunks/pi-messages)", 'No API key provided for provider "openai"'],
+    ["a model switch onto a keyless provider (core/model-switch-auth-error.js:4)", "No API key for openai/gpt-6-luna-fast"],
+    ["a virtual model routed to a keyless provider (core/model-runtime.js:1159)", "auto routed to openai/gpt-6-luna-fast, which has no credentials."],
+    ["compaction on a keyless session model (extensions/builtin/compaction/speculative.js:164)", 'summarization credentials unavailable: no credentials resolved for provider "openai"'],
+    ["an empty Claude subscription pool (extensions/builtin/anthropic-subscription/auth-lane.js:21)", "authentication_failed: No Anthropic Subscription accounts configured for the managed lane; run /login anthropic-subscription or set CLAUDE_CODE_OAUTH_TOKEN"],
+    ["no Claude account at all (extensions/builtin/anthropic-subscription/guidance.js:5 noAccountGuidance)", "No Claude account configured for anthropic-subscription.\n  /login anthropic-subscription  - sign in with your Claude Pro/Max subscription"],
+    ["the pinned Claude account is gone, fallback off (extensions/builtin/anthropic-subscription/guidance.js:66 singleAccountUnavailableGuidance)", "Claude account 'work' for anthropic-subscription is not configured, and account fallback is off, so no other account is used.\n  /claude-account list  - see the configured accounts"],
+    ["an empty Cursor CLI account pool (extensions/builtin/cursor-cli-oauth/stream.js:18)", "no accounts: run /login cursor-cli-oauth"],
+    ["a missing Cursor access token (bundle/chunks/cursor-agent.js:32)", "Cursor access token is required; run /login cursor"],
     ["a missing Radius login", "Radius authentication is required; start Pi and run /login radius, then retry"],
     ["a signed-out Claude Code SDK", "Not logged in \u00b7 Please run /login"],
     ["a Radius relay with no login (radius-relay)", "Radius authentication is required"],
@@ -116,6 +121,14 @@ describe("isCredentialFailure", () => {
     ["an expired MCP server session (mcp/health)", "MCP server docs session expired; reinitialize retry also expired; run /mcp reconnect docs"],
     ["an expired MCP authorization code (mcp/auth/oauth)", "MCP server docs authorization code was rejected or expired; restart with /mcp auth-start docs."],
     ["a tool server whose access token was rejected (MCP-style)", "MCP server docs access token was rejected"],
+    // An HTTP proxy that wants its own login is not the provider's credential: the provider's other models sit
+    // behind the same proxy, and signing in to the provider does not help. The undici rows are its exact texts as
+    // bundled in senpi (bundle/chunks/session-worker.js:534, :622).
+    ["undici's ProxyAgent 407", "Proxy Authentication Required (407)"],
+    ["undici fetch's proxy network error", "TypeError: fetch failed: proxy authentication required"],
+    ["undici's tunnel refusal", "Proxy response (407) !== 200 when HTTP Tunneling"],
+    ["a 407 status line", "407 Proxy Authentication Required"],
+    ["a proxy whose login was refused", "Proxy authentication failed for the configured HTTPS_PROXY"],
     ["an expired prompt cache (handoff-hint)", "This session is 180k tokens and its cache has expired."],
     ["the subscription login migration notice (auth-storage)", 'The Anthropic Claude subscription login in auth.json was not moved to Anthropic Subscription because a newer login exists. It was left unchanged; sign in again with /login and choose "Anthropic Subscription (Claude Pro/Max)".'],
   ])("#given an expiry or sign-in text that is not a model credential failure (%s) #when classified #then it is not a credential failure", (_label, message) => {
