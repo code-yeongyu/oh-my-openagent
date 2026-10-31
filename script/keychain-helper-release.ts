@@ -27,7 +27,12 @@ const runTool: ToolRunner = (command, args) => {
 
 export function designatedRequirement(codesignOutput: string): string | undefined {
   const line = codesignOutput.split("\n").find((candidate) => candidate.startsWith("designated => "))
-  return line?.slice("designated => ".length).trim()
+  // codesign -d -r- annotates field-existence clauses with /* exists */; the requirement itself is unchanged.
+  return line
+    ?.slice("designated => ".length)
+    .replace(/\/\*.*?\*\//g, "")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 function detail(codesignOutput: string, key: string): string | undefined {
