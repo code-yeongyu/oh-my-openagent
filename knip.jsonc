@@ -569,38 +569,8 @@
       "packages/omo-opencode/src/agents/momus.ts": ["MOMUS_SYSTEM_PROMPT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PROMETHEUS_SYSTEM_PROMPT
       "packages/omo-opencode/src/agents/prometheus/index.ts": ["PROMETHEUS_SYSTEM_PROMPT"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) PROMETHEUS_SYSTEM_PROMPT
-      "packages/omo-opencode/src/agents/prometheus/system-prompt.ts": ["PROMETHEUS_SYSTEM_PROMPT"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) buildDynamicSisyphusPrompt
-      "packages/omo-opencode/src/agents/sisyphus-dynamic-prompt.ts": ["buildDynamicSisyphusPrompt"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) buildDefaultSisyphusJuniorPrompt, buildKimiK26SisyphusJuniorPrompt, buildKimiK27SisyphusJuniorPrompt, buildKimiK3SisyphusJuniorPrompt, buildKimiK31SisyphusJuniorPrompt, buildGptSisyphusJuniorPrompt, buildGpt54SisyphusJuniorPrompt, buildGpt55SisyphusJuniorPrompt, buildGeminiSisyphusJuniorPrompt, buildGlm52SisyphusJuniorPrompt
-      "packages/omo-opencode/src/agents/sisyphus-junior/index.ts": ["buildDefaultSisyphusJuniorPrompt", "buildKimiK26SisyphusJuniorPrompt", "buildKimiK27SisyphusJuniorPrompt", "buildKimiK3SisyphusJuniorPrompt", "buildKimiK31SisyphusJuniorPrompt", "buildGptSisyphusJuniorPrompt", "buildGpt54SisyphusJuniorPrompt", "buildGpt55SisyphusJuniorPrompt", "buildGeminiSisyphusJuniorPrompt", "buildGlm52SisyphusJuniorPrompt"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SISYPHUS_PROMPT_METADATA
       "packages/omo-opencode/src/agents/sisyphus.ts": ["SISYPHUS_PROMPT_METADATA"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-fable-5.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-opus-4-7.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-opus-4-8.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-opus-5.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) buildDefaultSisyphusPrompt, categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/default.ts": ["buildDefaultSisyphusPrompt", "categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/glm-5-2.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/gpt-5-4.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/grok-4.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k2-6.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k2-7.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k3-1.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k3.ts": ["categorizeTools"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isClaudeFableOrMythosModel, isClaudeOpus46Model, isKimiK27Model, isKimiK28Model
       "packages/omo-opencode/src/agents/types.ts": ["isClaudeFableOrMythosModel", "isClaudeOpus46Model", "isKimiK27Model", "isKimiK28Model"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ACCOUNT_KEYS_RECORD_NAME, runAccountKeysCommand
@@ -637,8 +607,8 @@
       "packages/omo-opencode/src/cli/run/index.ts": ["resolveRunAgent", "resolveRunModel", "createServerConnection", "resolveSession", "createJsonOutputManager", "executeOnCompleteHook", "createEventState", "processEvents", "serializeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UnknownRunAgentError
       "packages/omo-opencode/src/cli/run/runnable-agent-resolver.ts": ["UnknownRunAgentError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) InvalidCredentialState, SESSION_READ_WAIT
-      "packages/omo-opencode/src/cli/service-auth/keystore.ts": ["InvalidCredentialState", "SESSION_READ_WAIT"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) SESSION_READ_WAIT
+      "packages/omo-opencode/src/cli/service-auth/keystore.ts": ["SESSION_READ_WAIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) platformSchema
       "packages/omo-opencode/src/cli/service-auth/protocol.ts": ["platformSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) expandHome
@@ -821,8 +791,8 @@
       "packages/omo-opencode/src/hooks/model-fallback/hook.ts": ["getSessionFallbackChain", "getNextFallback", "hasPendingModelFallback", "getFallbackState"],
       // pre-existing at origin dev 4686e425b5: unused export(s) snoozedState, decidedState
       "packages/omo-opencode/src/hooks/native-edition-nudge/decide.ts": ["snoozedState", "decidedState"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) detectNativeEdition, snoozeNativeEditionNudge
-      "packages/omo-opencode/src/hooks/native-edition-nudge/hook.ts": ["detectNativeEdition", "snoozeNativeEditionNudge"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) detectNativeEdition
+      "packages/omo-opencode/src/hooks/native-edition-nudge/hook.ts": ["detectNativeEdition"],
       // pre-existing at origin dev 4686e425b5: unused export(s) decideNativeEditionNudge, detectNativeEdition, NATIVE_NUDGE_TOAST_MESSAGE, NATIVE_NUDGE_TOAST_TITLE, NUDGE_STATE_FILE, parseNudgeState
       "packages/omo-opencode/src/hooks/native-edition-nudge/index.ts": ["decideNativeEditionNudge", "detectNativeEdition", "NATIVE_NUDGE_TOAST_MESSAGE", "NATIVE_NUDGE_TOAST_TITLE", "NUDGE_STATE_FILE", "parseNudgeState"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HephaestusRequiresGptError
@@ -1111,8 +1081,6 @@
       "packages/omo-senpi/src/components/comment-checker/failure-notice.ts": ["commentCheckerFailureNotice"],
       // pre-existing at origin dev 4686e425b5: unused export(s) downloadSenpiCommentCheckerBinary, defaultCommentCheckerCacheDir
       "packages/omo-senpi/src/components/comment-checker/index.ts": ["downloadSenpiCommentCheckerBinary", "defaultCommentCheckerCacheDir"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) ComputerEngineUnavailableError
-      "packages/omo-senpi/src/components/computer-use/engine-status.ts": ["ComputerEngineUnavailableError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_COMPONENT_NAME
       "packages/omo-senpi/src/components/computer-use/index.ts": ["COMPUTER_USE_COMPONENT_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) toComputerSettingsInput
@@ -1127,8 +1095,8 @@
       "packages/omo-senpi/src/components/fallback-architect/detection.ts": ["FABLE_FIVE_ID_PREFIX", "isDemotedEmptyToolUse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_MESSAGE_LIMIT, LOG_WINDOW_MS
       "packages/omo-senpi/src/components/feedback/collect.ts": ["TRANSCRIPT_MESSAGE_LIMIT", "LOG_WINDOW_MS"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) FEEDBACK_SECTION_IDS, REPORT_RETENTION_DAYS, byteLength
-      "packages/omo-senpi/src/components/feedback/draft.ts": ["FEEDBACK_SECTION_IDS", "REPORT_RETENTION_DAYS", "byteLength"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_RETENTION_DAYS, byteLength
+      "packages/omo-senpi/src/components/feedback/draft.ts": ["REPORT_RETENTION_DAYS", "byteLength"],
       // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_SECTION_IDS, REPORT_KINDS, REPORT_MAX_BYTES, ANONYMOUS_REPORT_MAX_BYTES, REPORT_IDEMPOTENCY_HEADER, REPORT_IDEMPOTENCY_KEY, REPORT_DELETE_TOKEN_HEADER, readCreateReportRequest, createReportResponseSchema, reportListSchema and 1 more
       "packages/omo-senpi/src/components/feedback/fixtures/service-contract/reports.ts": ["REPORT_SECTION_IDS", "REPORT_KINDS", "REPORT_MAX_BYTES", "ANONYMOUS_REPORT_MAX_BYTES", "REPORT_IDEMPOTENCY_HEADER", "REPORT_IDEMPOTENCY_KEY", "REPORT_DELETE_TOKEN_HEADER", "readCreateReportRequest", "createReportResponseSchema", "reportListSchema", "compareReportVersions"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ContractError, isRecord, readBoolean, readTrue, readNullable, HTTP_URL, HOSTNAME, ENVIRONMENT_NAME
@@ -1461,8 +1429,6 @@
       "packages/senpi-desktop-engine/src/locator.ts": ["DESKTOP_ENGINE_BINARY", "QUARANTINE_ATTRIBUTE"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HANG_GUARD_MS, CHORD
       "packages/senpi-desktop-engine/test/support/engine.ts": ["HANG_GUARD_MS", "CHORD"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) ELEMENT_SNAPSHOT
-      "packages/senpi-desktop-prelude/test/harness.ts": ["ELEMENT_SNAPSHOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/senpi-desktop-prelude/test/python-setup.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
@@ -2131,6 +2097,7 @@
         "script/check-temp-leak-report-only.mjs",
         "script/bun-panic-retry.ts",
         "script/ci-leg-tests-guard.mjs",
+        "script/engine-trust-helper-smoke.ts",
         "script/published-install-smoke.mjs",
         "script/verify-omo-ai-payload.mjs",
         "script/release-announce.ts",
@@ -2164,6 +2131,7 @@
         "script/install-codex-dev.ts",
         "script/installer/channel-maintenance.ts",
         "script/installer/mirror-release-to-r2.ts",
+        "script/keychain-helper-release.ts",
         "script/lint-ratchet.ts",
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
@@ -2604,6 +2572,9 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "src/team-state-store/locks.ts",
+        "src/team-state-store/lock-worker.fixture.ts",
+        "src/team-state-store/lock-worker-host.fixture.ts",
+        "src/team-state-store/lock-worker-exit.fixture.ts",
         "src/team-tasklist/test-support.ts",
       ],
     },
@@ -2647,6 +2618,7 @@
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
         "src/sync/item/test-support.ts",
+        "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",
         "src/sync/space/test-support.ts",
       ],
@@ -2927,6 +2899,9 @@
         "src/components/feedback/runtime.ts",
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",
+        // spawned by path from tests: a child process or Worker entry, never imported
+        "src/components/memory/desktop-sync/hostSelection.fixture.ts",
+        "src/components/memory/device-session/sibling-writer.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
@@ -3594,8 +3569,6 @@
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/__tests__/perf/fixtures/in-tree/src/lib/file-15.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "src/agents/sisyphus/index.ts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/codex-cache-bins.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/codex-cache-bundled-mcps.ts",
@@ -3900,6 +3873,7 @@
         "bin/senpi-patch.mjs",
         // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
         "keychain-helper/gui-session-runner.ts",
+        "keychain-helper/build.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "test/account-linux-no-gdbus.fixture.ts",

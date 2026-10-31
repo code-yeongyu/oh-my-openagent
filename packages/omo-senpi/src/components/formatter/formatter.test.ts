@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, test } from "bun:test"
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { bunFormatter, createFormatterStep, detectFormatter, formatOnMutationDefaults, resolveFormatMode } from "./formatter"
+import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 describe("format-on-mutation policy", () => {
   it("uses marker precedence and never enables prettier beside biome", () => {
@@ -149,5 +150,17 @@ describe("bun format in place of prettier", () => {
       expect(probes()).toBe(0)
       expect(calls()).toEqual([])
     }
+  })
+})
+
+describe("format-on-mutation never probes a macOS automount trigger (#11545)", () => {
+  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a mutation of %s on darwin #when the formatter step runs #then the file is skipped without touching the trigger", async (filePath) => {
+    const step = createFormatterStep({ markers: () => ["biome.json"], resolveBinary: () => null, daemonFormat: async () => ({ isError: true }) })
+    let result: unknown
+    const touched = await withAutomountTrap(async () => {
+      result = await step({ toolName: "write", input: { filePath } }, "/tmp")
+    })
+    expect(touched).toEqual([])
+    expect(result).toEqual({ content: undefined, error: undefined })
   })
 })

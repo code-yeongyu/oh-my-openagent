@@ -206,7 +206,7 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
     onEvent: (_listener: (event: AgentSessionEvent) => void) => () => undefined,
     onParked: () => () => undefined,
     onClosed: () => () => undefined,
-    close: () => record("close", Promise.resolve()),
+    close: () => record("close", Promise.resolve(true)),
     detach: () => record("detach", Promise.resolve()),
   }
 }

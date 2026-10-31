@@ -109,6 +109,25 @@ describe("runComputerCode", HANG_GUARD, () => {
 		expect(result.displays[2]).toEqual({ type: "text", text: "found main.ts" });
 	});
 
+	it("types into an element through ax.typeText and returns how the text was delivered", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+
+		// When
+		const result = await run(
+			service,
+			`const el = await desktop.ref("e1"); return [await el.type("hello"), await el.type("x", { delivery: "foreground" })];`,
+		);
+
+		// Then
+		expect(result.returnValue).toEqual([{ method: "inserted" }, { method: "inserted" }]);
+		const typed = log.requests.filter((request) => request.method === "ax.typeText").map((request) => request.params);
+		expect(typed).toEqual([
+			{ ref: "e1", text: "hello", opts: {} },
+			{ ref: "e1", text: "x", opts: { deliveryMode: "foreground" } },
+		]);
+	});
+
 	it("shows an artifact-only capture as text with its path and records the artifact", async () => {
 		// Given
 		const { service } = await openDesktop();
