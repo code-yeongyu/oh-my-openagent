@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
+import { once } from "node:events"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -42,8 +43,13 @@ describe("test temp root teardown", () => {
 
 describe("removeAbandonedRunRoots", () => {
   const fixtures: string[] = []
-  afterEach(() => {
-    for (const fixture of fixtures.splice(0)) removeTreeSync(fixture)
+  const removerExits: Promise<unknown[]>[] = []
+  afterEach(async () => {
+    for (const exited of removerExits.splice(0)) expect((await exited)[0]).toBe(0)
+    for (const fixture of fixtures.splice(0)) {
+      removeTreeSync(fixture)
+      expect(existsSync(fixture)).toBe(false)
+    }
   })
 
   function fixtureRoot(): string {
@@ -89,7 +95,12 @@ describe("removeAbandonedRunRoots", () => {
       expect(existsSync(held)).toBe(true)
       expect(existsSync(removable)).toBe(false)
 
-      removeAbandonedRunRoots(fixture)
+      // Join the detached sweep before afterEach removes the fixture that contains it.
+      removeAbandonedRunRoots(fixture, undefined, (path) => {
+        const remover = spawn("/bin/rm", ["-rf", path], { stdio: "ignore" })
+        removerExits.push(once(remover, "exit", { signal: AbortSignal.timeout(5_000) }))
+        return remover
+      })
       expect(existsSync(held)).toBe(false)
     })
   }
@@ -126,7 +137,10 @@ describe("removeAbandonedRunRoots", () => {
 describe("removeRunRootAside (#11630)", () => {
   const fixtures: string[] = []
   afterEach(() => {
-    for (const fixture of fixtures.splice(0)) removeTreeSync(fixture)
+    for (const fixture of fixtures.splice(0)) {
+      removeTreeSync(fixture)
+      expect(existsSync(fixture)).toBe(false)
+    }
   })
 
   // Stands for the OS temp dir of a lane that keeps its bun caches there, beside one run's root.
