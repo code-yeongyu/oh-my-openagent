@@ -199,6 +199,8 @@ uv run scripts/python/check-no-excuse-rules.py <changed paths>
 bash scripts/rust/check-no-excuse-rules.sh <changed paths>
 # TypeScript
 bun run scripts/typescript/check-no-excuse-rules.ts <changed paths>
+# Any language, test files you touched: the junk classes a regex can see (candidates for "test your test")
+bun run scripts/typescript/check-test-junk.ts <changed test paths>
 ```
 
 ### Step 2 — interpret

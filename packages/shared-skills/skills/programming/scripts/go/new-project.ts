@@ -145,7 +145,8 @@ function writeFiles(projectDir: string, { name, module, purpose }: ProjectOption
     ["short_purpose", purpose],
   ]);
   for (const { template, output, substitute: render } of FILES) {
-    const raw = readFileSync(join(TEMPLATES_DIR, template), "utf8");
+    // The generated project is LF (its .editorconfig says end_of_line = lf); a CRLF checkout of the templates must not leak in.
+    const raw = readFileSync(join(TEMPLATES_DIR, template), "utf8").replace(/\r\n/g, "\n");
     const outPath = join(projectDir, output);
     mkdirSync(dirname(outPath), { recursive: true });
     writeFileSync(outPath, render ? substitute(raw, template, values) : raw);
