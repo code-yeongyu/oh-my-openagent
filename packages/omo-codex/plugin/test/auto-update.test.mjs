@@ -417,6 +417,68 @@ test("#given marketplace flow with stale local cache state #when running check #
 	]);
 });
 
+async function writeStaleCacheManifestWithConfig(codexHome, marketplaceBlock) {
+	await mkdir(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins"), { recursive: true });
+	await writeFile(
+		join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"),
+		JSON.stringify({
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: { source: "local", path: "./omo/1.0.1" } }],
+		}),
+	);
+	await writeFile(join(codexHome, "config.toml"), marketplaceBlock);
+}
+
+test("#given a Git marketplace in config and a stale cache manifest #when resolving plan #then no local repair starts", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-git-marketplace-");
+	const codexHome = join(root, "codex-home");
+	await writeStaleCacheManifestWithConfig(
+		codexHome,
+		'[marketplaces.sisyphuslabs]\nsource_type = "git"\nsource = "https://github.com/code-yeongyu/lazycodex.git"\n',
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, join(root, "spawn.log"), { CODEX_HOME: codexHome });
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastCheckedAt: 123_456, lastStatus: "success" });
+
+	assert.equal(plan.shouldRun, false);
+	assert.equal(plan.reason, "marketplace-flow");
+});
+
+test("#given a Git marketplace in config and a dangling managed bin #when resolving plan #then the bin still starts the repair", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-git-marketplace-bin-");
+	const codexHome = join(root, "codex-home");
+	const binDir = join(root, "bin");
+	await writeStaleCacheManifestWithConfig(
+		codexHome,
+		'[marketplaces.sisyphuslabs]\nsource_type = "git"\nsource = "https://github.com/code-yeongyu/lazycodex.git"\n',
+	);
+	await mkdir(binDir, { recursive: true });
+	await symlink(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.1", "components", "ulw-loop", "dist", "cli.js"), join(binDir, "ulw"));
+	const env = marketplaceCheckEnv(root, pluginRoot, join(root, "spawn.log"), { CODEX_HOME: codexHome, CODEX_LOCAL_BIN_DIR: binDir });
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastCheckedAt: 123_456, lastStatus: "success" });
+
+	assert.equal(plan.shouldRun, true);
+	assert.equal(plan.kind, "marketplace-local-repair");
+	assert.deepEqual(plan.repairReasons, [{ kind: "dangling-managed-bin", binName: "ulw" }]);
+});
+
+test("#given a local marketplace in config and a stale cache manifest #when resolving plan #then local repair still starts", async () => {
+	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-local-marketplace-");
+	const codexHome = join(root, "codex-home");
+	await writeStaleCacheManifestWithConfig(
+		codexHome,
+		`[marketplaces.sisyphuslabs]\nsource_type = "local"\nsource = ${JSON.stringify(join(codexHome, "plugins", "cache", "sisyphuslabs"))}\n`,
+	);
+	const env = marketplaceCheckEnv(root, pluginRoot, join(root, "spawn.log"), { CODEX_HOME: codexHome });
+
+	const plan = resolveAutoUpdatePlan({ env, now: 123_457, lastCheckedAt: 123_456, lastStatus: "success" });
+
+	assert.equal(plan.shouldRun, true);
+	assert.equal(plan.kind, "marketplace-local-repair");
+	assert.deepEqual(plan.repairReasons, [{ kind: "missing-marketplace-payload" }]);
+});
+
 test("#given stale marketplace cache and recent success state #when resolving plan #then repair bypasses success throttle", async () => {
 	const { root, pluginRoot } = await makeStorePluginRoot("lazycodex-auto-update-marketplace-repair-throttle-");
 	const spawnLogPath = join(root, "spawn.log");

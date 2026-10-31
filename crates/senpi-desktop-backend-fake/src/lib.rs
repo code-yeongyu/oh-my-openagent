@@ -14,6 +14,7 @@ mod frames_impl;
 mod holds_impl;
 mod menus_impl;
 mod method;
+mod remote_impl;
 mod scenario;
 mod scenario_nodes;
 mod sink;
@@ -23,6 +24,7 @@ pub use clock::FakeClock;
 pub use fake::FakeBackend;
 pub use faults::Faults;
 pub use method::{AxWrite, FakeMethod};
+pub use remote_impl::FakeRemoteScreen;
 pub use scenario::{
     fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeMenuNode, FakeScenario, ResizeWindow,
     ScenarioError, ScriptedFailure,
