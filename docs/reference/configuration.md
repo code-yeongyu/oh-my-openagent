@@ -378,6 +378,7 @@ Domain-specific model delegation used by the `task()` tool. When the main agent 
 | `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled when the resolved model id contains "gemini" or "minimax". |
 | `disable`           | boolean       | `false` | Exclude this category from task delegation                          |
 | `warn_unavailable`  | boolean       | -       | Present on the OpenCode schema. The dead-chain notice it suppresses is a Senpi/core `task` behavior. |
+| `provider_lock`     | boolean       | -       | Senpi `task` only. A delegated child normally keeps the parent session's model as its last fallback rung. When unset, a category whose chain lists one model vendor only (e.g. `deep-high`, all OpenAI) never falls back to a parent model from another vendor. `true` applies the same lock to a mixed chain (only the chain's own vendors may serve it); `false` always allows the parent-model fallback. A locked child whose rungs are all usage-limited or signed out fails with `failure_kind: "provider_lock_exhausted"`, naming the category and the reported reset time. |
 
 Disable categories: `{ "categories": { "ultrabrain": { "disable": true } } }`
 

@@ -83,6 +83,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const resolvedTier = isRecord(value["resolved_model"]) ? readOptionalString(value["resolved_model"], "service_tier") : undefined
   const effectiveModel = parseOptionalEffectiveModel(value)
   const parentModel = readOptionalString(value, "parent_model")
+  const providerLock = readOptionalString(value, "provider_lock")
   const parentModelFallback = parseOptionalParentModelFallback(value)
   const effectiveTier = isRecord(value["effective_model"]) ? readOptionalString(value["effective_model"], "service_tier") : undefined
   const spawnSpec = parseOptionalSpawnSpec(value)
@@ -157,6 +158,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
       effective_model: { ...effectiveModel, ...(effectiveTier === undefined ? {} : { service_tier: effectiveTier }) },
     }),
     ...(parentModel === undefined ? {} : { parent_model: parentModel }),
+    ...(providerLock === undefined ? {} : { provider_lock: providerLock }),
     ...(parentModelFallback === undefined ? {} : { parent_model_fallback: parentModelFallback }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(owner === undefined ? {} : { owner }),

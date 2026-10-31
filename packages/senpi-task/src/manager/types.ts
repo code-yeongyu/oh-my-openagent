@@ -135,6 +135,8 @@ export type ResolvedChildPlan = {
   readonly promptAppend?: string
   readonly allowedSubagents?: readonly string[]
   readonly maxDepth?: number
+  // The category's `provider_lock` from omo.json; unset lets a one-vendor chain lock itself (#12006).
+  readonly providerLock?: boolean
 }
 
 export type PlanResolutionError = {

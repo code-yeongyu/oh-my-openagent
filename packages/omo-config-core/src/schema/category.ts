@@ -40,6 +40,11 @@ export const OmoCategoryConfigObjectSchema = z.object({
   is_unstable_agent: z.boolean().optional(),
   disable: z.boolean().optional(),
   warn_unavailable: z.boolean().optional(),
+  /**
+   * Keep a delegated child on its chain's own model vendors: `true` never falls back to a parent-session model
+   * from another vendor, `false` always allows it. Unset locks a chain whose rungs are all one vendor.
+   */
+  provider_lock: z.boolean().optional(),
 }).strict()
 
 export const OmoCategoryConfigSchema = z.preprocess(

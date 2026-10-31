@@ -1,10 +1,13 @@
 import { isFallbackHandoff } from "../lifecycle/fallback-handoff"
 import type { EffectiveModelRecord, ResolvedModelRecord, TaskRecord } from "../state"
+import { parentRungLock } from "./provider-lock"
 import type { ManagerStartSpec, ResolvedChildPlan } from "./types"
 
 export type ParentRungPlan = {
   readonly plan: ResolvedChildPlan
   readonly parentModel?: string
+  // The vendor families the child stays on because the parent's model was withheld (#12006).
+  readonly providerLock?: string
 }
 
 /**
@@ -19,6 +22,8 @@ export function withParentModelRung(plan: ResolvedChildPlan, spec: ManagerStartS
   if (parent === undefined) return { plan }
   const chain = [plan.resolved_model, plan.requested_model, ...(plan.fallback_models ?? [])]
   if (chain.some((rung) => rung !== undefined && sameModel(rung, parent)) || plan.model === parent.display) return { plan }
+  const providerLock = parentRungLock(plan, parent)
+  if (providerLock !== undefined) return { plan, providerLock }
   return {
     plan: { ...plan, fallback_models: [...(plan.fallback_models ?? []), parent] },
     parentModel: parent.display,

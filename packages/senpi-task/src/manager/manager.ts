@@ -553,6 +553,7 @@ class TaskManagerImpl implements TaskManager {
         ...(effectivePlan.resolved_model === undefined ? {} : { resolved_model: effectivePlan.resolved_model }),
         ...(effectivePlan.fallback_models === undefined ? {} : { fallback_models: effectivePlan.fallback_models }),
         ...(routed.parentModel === undefined ? {} : { parent_model: routed.parentModel }),
+        ...(routed.providerLock === undefined ? {} : { provider_lock: routed.providerLock }),
         ...(isolation === undefined ? {} : { isolation: isolation.spec }),
       }
       managedSpec = buildManagedSpec({

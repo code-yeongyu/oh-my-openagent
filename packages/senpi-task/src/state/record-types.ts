@@ -114,6 +114,8 @@ export type TaskRecordInput = {
   readonly resolved_model?: ResolvedModelRecord
   /** The parent session's model at spawn (`provider/model`); a category child's last fallback rung (#10750). */
   readonly parent_model?: string
+  /** The vendor families a category child is locked to after its parent's model was withheld (#12006). */
+  readonly provider_lock?: string
   /**
    * The model the child ACTUALLY runs, recorded once the runner is up (#9722) and kept current
    * from the child's own model observations AND its live model events - model_changed (any

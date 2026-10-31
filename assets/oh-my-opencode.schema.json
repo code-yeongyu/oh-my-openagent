@@ -8783,6 +8783,9 @@
           },
           "warn_unavailable": {
             "type": "boolean"
+          },
+          "provider_lock": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

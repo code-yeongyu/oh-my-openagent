@@ -1753,6 +1753,7 @@
     "packages/senpi-task/src/manager/pending-pauses.ts",
     "packages/senpi-task/src/manager/pending-stops.ts",
     "packages/senpi-task/src/manager/plan-warm.ts",
+    "packages/senpi-task/src/manager/provider-lock.ts",
     "packages/senpi-task/src/manager/provisional-exit.ts",
     "packages/senpi-task/src/manager/reconcile-daemon-turn.ts",
     "packages/senpi-task/src/manager/residency-signal.ts",

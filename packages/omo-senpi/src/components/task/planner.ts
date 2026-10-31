@@ -80,8 +80,10 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = resolveCategory(categoryName, omoConfig, registry)
-    return toPlanResolution(categoryName, resolution, availableAgents)
+    const resolution = toPlanResolution(categoryName, resolveCategory(categoryName, omoConfig, registry), availableAgents)
+    const providerLock = omoConfig.categories?.[categoryName]?.provider_lock
+    if (resolution.kind !== "resolved" || providerLock === undefined) return resolution
+    return { kind: "resolved", plan: { ...resolution.plan, providerLock } }
   }
   return (spec): PlanResolution => {
     const resolution = planChild(spec)
