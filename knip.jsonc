@@ -1537,8 +1537,6 @@
       "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
       "packages/senpi-task/src/manager/index.ts": ["TaskConcurrency", "decideDepthPolicy", "NameRegistry", "AUTO_HOST_CAPABILITIES", "adaptInProcessHandle", "adaptRpcHandle", "TASK_AWAITING_INPUT_EVENT", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "logTranscriptEvent", "subscribeTranscriptLog"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) START_REPORT_WINDOW_MS
-      "packages/senpi-task/src/manager/manager.ts": ["START_REPORT_WINDOW_MS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
       "packages/senpi-task/src/manager/observed-model.ts": ["readObservedModel", "observeChildEffectiveModel"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
