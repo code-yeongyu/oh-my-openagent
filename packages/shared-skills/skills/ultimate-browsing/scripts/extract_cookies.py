@@ -7,8 +7,8 @@ with synthetic fixtures on any OS. This module wires them to a real browser DB
 and a local Chrome CDP session controlled by playwright-core scripts.
 
 Usage:
-    python extract_cookies.py --browser chrome --domain youtube.com --output /tmp/cookies.json
-    python extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
+    python -B extract_cookies.py --browser chrome --domain youtube.com --output /tmp/cookies.json
+    python -B extract_cookies.py --browser chrome --domain youtube.com --inject --cdp 9242
 """
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Callable, NotRequired, TypedDict
+
+sys.dont_write_bytecode = True
 
 from cookie_crypto import (
     decrypt_chromium_value,

@@ -6,24 +6,21 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { scheduleRetry } from "./idle-continuation"
-import type { SessionState } from "./types"
+import type { AtlasRetryScheduler, SessionState } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
-
-type SetTimeoutParameters = Parameters<typeof setTimeout>
-type SetTimeoutRestParameters = SetTimeoutParameters extends [
-  SetTimeoutParameters[0],
-  SetTimeoutParameters[1]?,
-  ...infer Rest,
-] ? Rest : never
 
 describe("scheduleRetry", () => {
   const sessionID = "session-main-1"
-  const originalSetTimeout = globalThis.setTimeout
-  const originalClearTimeout = globalThis.clearTimeout
   const originalDateNow = Date.now
   const capturedTimers = new Map<number, { readonly callback: () => void | Promise<void> }>()
   let testDirectory = ""
   let nextTimerId = 1000
+  const retryScheduler: AtlasRetryScheduler = (callback) => {
+    const timerId = nextTimerId
+    nextTimerId += 1
+    capturedTimers.set(timerId, { callback })
+    return { cancel: () => { capturedTimers.delete(timerId) } }
+  }
 
   beforeEach(() => {
     testDirectory = join(tmpdir(), `atlas-idle-continuation-${randomUUID()}`)
@@ -34,40 +31,9 @@ describe("scheduleRetry", () => {
     capturedTimers.clear()
     nextTimerId = 1000
     Date.now = () => 10_000
-
-    const fakeSetTimeout = Object.assign(
-      (
-        callback: SetTimeoutParameters[0],
-        delay?: SetTimeoutParameters[1],
-        ...args: SetTimeoutRestParameters
-      ): ReturnType<typeof setTimeout> => {
-        if (typeof callback !== "function") {
-          return originalSetTimeout(callback, delay, ...args)
-        }
-
-        const timerId = nextTimerId
-        nextTimerId += 1
-        capturedTimers.set(timerId, { callback: () => callback(...args) })
-        return unsafeTestValue<ReturnType<typeof setTimeout>>(timerId)
-      },
-      { __promisify__: originalSetTimeout.__promisify__ },
-    )
-    globalThis.setTimeout = fakeSetTimeout
-
-    const fakeClearTimeout = (timerId?: Parameters<typeof clearTimeout>[0]): void => {
-      if (typeof timerId === "number") {
-        capturedTimers.delete(timerId)
-        return
-      }
-
-      originalClearTimeout(unsafeTestValue<Parameters<typeof originalClearTimeout>[0]>(timerId))
-    }
-    globalThis.clearTimeout = unsafeTestValue<typeof clearTimeout>(fakeClearTimeout)
   })
 
   afterEach(() => {
-    globalThis.setTimeout = originalSetTimeout
-    globalThis.clearTimeout = originalClearTimeout
     Date.now = originalDateNow
     if (existsSync(testDirectory)) {
       rmSync(testDirectory, { recursive: true, force: true })
@@ -96,6 +62,7 @@ describe("scheduleRetry", () => {
       sessionState,
       options: {
         directory: testDirectory,
+        retryScheduler,
         backgroundManager: {
           getTasksByParentSession: () => {
             throw new Error("background status unavailable")
@@ -138,6 +105,7 @@ describe("scheduleRetry", () => {
       sessionState,
       options: {
         directory: testDirectory,
+        retryScheduler,
         backgroundManager: {
           getTasksByParentSession: () => {
             throw new Error("background status unavailable")

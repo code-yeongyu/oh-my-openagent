@@ -137,11 +137,11 @@ function sourcesOf(row, rows, seen = new Set()) {
 /** sha256 of the locked `## Fidelity` block normalized: the seven fields in FIDELITY_FIELDS order, `field: value` per line. */
 export const briefHashOf = (parsed) => sha256Of(FIDELITY_FIELDS.map((field) => `${field}: ${parsed.fields[field]}`).join("\n"))
 
-/** brief_changed when a fill map was not written under the current brief (or predates the binding). */
+/** brief_changed when there is no fill map (map null) or it was not written under the current brief (or predates the binding). */
 export function briefBindingErrors(map, mapPath, parsed) {
-	if (map.brief_sha256 === briefHashOf(parsed)) return []
-	const why = typeof map.brief_sha256 === "string" ? "was filled under a different ## Fidelity block" : "records no brief_sha256"
-	return [{ code: "brief_changed", token: null, line: null, message: `${mapPath} ${why}; re-run fact fill under the current brief`, severity: DEFECT_CODES.brief_changed.severity, integrity: DEFECT_CODES.brief_changed.integrity, hint: DEFECT_CODES.brief_changed.hint }]
+	if (map?.brief_sha256 === briefHashOf(parsed)) return []
+	const why = map === null ? `no fill map at ${mapPath}` : `${mapPath} ${typeof map.brief_sha256 === "string" ? "was filled under a different ## Fidelity block" : "records no brief_sha256"}`
+	return [{ code: "brief_changed", token: null, line: null, message: `${why}; re-run fact fill under the current brief`, severity: DEFECT_CODES.brief_changed.severity, integrity: DEFECT_CODES.brief_changed.integrity, hint: DEFECT_CODES.brief_changed.hint }]
 }
 
 function metaOf(sessionDir, sourceId, cache) {

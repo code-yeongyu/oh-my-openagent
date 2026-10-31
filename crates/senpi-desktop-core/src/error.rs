@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 /// FROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,
 /// cancellation, and restore-transaction codes. Adding a code needs a plan
 /// amendment because the TS protocol and numeric JSON-RPC codes derive from it.
+/// The enum is append-only: a new code takes the next ordinal, so no existing
+/// numeric code moves. Amendment 1 (macOS shared-screen parity, #11459 /
+/// #11461) appended `UserIntervened`, `AxUnconfirmed`, `SpaceUnsupported` and
+/// `SpaceMoveDenied` (-32024..-32027) without a protocol version change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 pub enum ErrorCode {
     PermissionDenied,
@@ -38,6 +42,22 @@ pub enum ErrorCode {
     /// The capture target exists but cannot be captured right now; `data`
     /// says why (e.g. `{ "reason": "minimized" }`).
     CaptureUnavailable,
+    /// The user was using the target app, or brought another window to the
+    /// front, before or during the action, so the action stopped; the message
+    /// says whether any input was sent. Read the window again once the user
+    /// pauses; never repeat the action blindly.
+    UserIntervened,
+    /// An accessibility request was made, but the app did not confirm its
+    /// outcome (it did not reply in time or messaging failed, e.g. while the
+    /// action opened a modal dialog). It may already have taken effect: read
+    /// the element back before any retry.
+    AxUnconfirmed,
+    /// Moving a window between Spaces is not available on this backend or OS
+    /// version.
+    SpaceUnsupported,
+    /// The window server refused the Space move, or the move could not be
+    /// verified.
+    SpaceMoveDenied,
 }
 
 impl ErrorCode {
@@ -67,6 +87,10 @@ impl ErrorCode {
             Self::InputBusy => "InputBusy",
             Self::ControlRequired => "ControlRequired",
             Self::CaptureUnavailable => "CaptureUnavailable",
+            Self::UserIntervened => "UserIntervened",
+            Self::AxUnconfirmed => "AxUnconfirmed",
+            Self::SpaceUnsupported => "SpaceUnsupported",
+            Self::SpaceMoveDenied => "SpaceMoveDenied",
         }
     }
 }
@@ -182,6 +206,22 @@ impl DesktopError {
 
     pub fn ax_failed(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::AxFailed, message)
+    }
+
+    pub fn ax_unconfirmed(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::AxUnconfirmed, message)
+    }
+
+    pub fn user_intervened(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::UserIntervened, message)
+    }
+
+    pub fn space_unsupported(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::SpaceUnsupported, message)
+    }
+
+    pub fn space_move_denied(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::SpaceMoveDenied, message)
     }
 
     pub fn timeout(message: impl Into<String>) -> Self {

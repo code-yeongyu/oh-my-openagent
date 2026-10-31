@@ -24,6 +24,7 @@ import type { ExitConfirmationSchedule } from "./provisional-exit"
 import type { ChildCreationPort, ChildPausePort, ResumedChildTurn, RunPauseOwner } from "../pause/ports"
 import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
 import type { HeldStart, StartAdmission } from "./start-admission"
+import type { HostLivenessStatus } from "../runners/rpc-host/handle-heartbeat"
 
 export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
@@ -229,7 +230,7 @@ export type ResidencyDenied =
 export type ContinueDelivery = "steer" | "followUp" | "revive"
 
 export type ContinueResult =
-  | Extract<SendOutcome, { kind: "uncertain" }>
+  | Extract<SendOutcome, { kind: "uncertain" | "unresponsive" }>
   | {
       readonly kind: "continued"
       readonly task_id: string
@@ -274,6 +275,7 @@ export type TrustedRespawnLaunch = {
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
 export type TaskManagerOptions = {
+  readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void
   readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
   readonly childCreationPort?: ChildCreationPort
   readonly admissionBarrier?: AdmissionBarrier

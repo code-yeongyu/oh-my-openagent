@@ -96,6 +96,28 @@ describe.skipIf(process.platform === "win32")("ensureDesktopEngine", () => {
 		expect(cargoCalls()).toHaveLength(3)
 	})
 
+	test("#given a Darwin target and the trust helper crate #when the build runs #then a separate cargo call builds the helper build-omo-binary stages, as the release workflows do", () => {
+		commitFile(join("crates", "omo-engine-trust-helper", "src", "main.rs"), "fn main() {}\n")
+		const bin = installFakeCargo(
+			`#!/bin/sh\necho "$*" >> "${cargoLog}"\nwhile [ "$1" != "--target" ]; do shift; done\nmkdir -p "$CARGO_TARGET_DIR/$2/release"\necho engine > "$CARGO_TARGET_DIR/$2/release/senpi-desktop-engine"\necho helper > "$CARGO_TARGET_DIR/$2/release/omo-engine-trust-helper"\n`,
+		)
+		const darwin = { ...env, PATH: `${bin}:${process.env.PATH ?? ""}` }
+		const helper = join(repo, "target", "aarch64-apple-darwin", "release", "omo-engine-trust-helper")
+
+		expect(ensureDesktopEngine(repo, "darwin-arm64", darwin, quiet)).toBe("built")
+		// One call per package: a shared call unifies dependency features across both (resolver 2), so the
+		// local engine could differ from the release engine, which CI builds on its own.
+		expect(cargoCalls()).toEqual([
+			"build --release -p senpi-desktop-engine --locked --target aarch64-apple-darwin",
+			"build --release -p omo-engine-trust-helper --locked --target aarch64-apple-darwin",
+		])
+		expect(existsSync(helper)).toBe(true)
+		expect(ensureDesktopEngine(repo, "darwin-arm64", darwin, quiet)).toBe("reused")
+		rmSync(helper)
+		expect(ensureDesktopEngine(repo, "darwin-arm64", darwin, quiet)).toBe("built")
+		expect(cargoCalls()).toHaveLength(4)
+	})
+
 	test("#given a target that ships no engine #when the build runs #then cargo is skipped", () => {
 		expect(ensureDesktopEngine(repo, "linux-arm64-musl", env, quiet)).toBe("skipped")
 		expect(cargoCalls()).toEqual([])

@@ -194,7 +194,7 @@ From the repo root:
 
 ```
 bun test packages/omo-senpi/src/components/thread
-bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs
+THREAD_QA_SENPI_VERSION=<engine under test> bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs
 bun packages/omo-senpi/scripts/qa/task-14/run-all.mjs
 bun test packages/omo-native/test/thread.test.ts packages/omo-native/test/daemon-adopt.test.ts packages/omo-native/test/daemon-status.test.ts packages/omo-native/test/daemon-operations.test.ts
 (cd packages/omo-senpi && bun test plugin/scripts/build-extension-runtimes.test.mjs)
@@ -206,7 +206,7 @@ The first runs the pure-seam unit tests. The second runs two suites sequentially
 
 ### Gateway real-surface scenarios (`scripts/qa/thread-tools/`, todo 16)
 
-Every scenario drives the product as a user runs it: the RELEASED senpi (`THREAD_QA_SENPI_VERSION`, default 2026.9.29-5, installed once into `THREAD_QA_KIT_DIR`, default `/tmp/qa-thread-tools-kit`), this checkout's `omo` launcher over a scratch COPY of the built plugin, real pty TUIs (`Bun.spawn({ terminal })`, screen kept by `@xterm/headless`), `i-*` shard hosts ensured from omo's launch spec, and the `omo` CLI. `lib/gateway.mjs` owns the kit, the sandbox (own HOME + agent dir under `/tmp/qa-thread-tools-<scenario>-*`, never `~/.omo`), a conversation-driven fake model (`QA:CALL`/`QA:SCRIPT` make tool calls, `QA:HOLD` streams until released), event-driven waits (pty output, fs events, feed records, model requests; no sleeps) and the cleanup receipt (`cleanup-receipt.json`: pids, `pgrep`, `lsof -U`/port, scratch removed; asserted as `cleanup-no-leftovers`). The copy is patched, never the checkout; each patch must match exactly one bundle site and only re-opens a test seam (the gateway is the only send path): `crash_after_admit` and `sender_kill_after_commit` expose the drain's `afterAdmit` and the store's `afterDbCommit` seams by env, `cycle_check_off` is the loop-guard mutant.
+Every scenario drives the product as a user runs it: the RELEASED senpi (`THREAD_QA_SENPI_VERSION`, required: unset or empty, `run-all.mjs` and every scenario script exit 2 before installing or creating anything and name the engine omo pins in `packages/omo-senpi/package.json`; installed once into `THREAD_QA_KIT_DIR`, default `qa-thread-tools-kit` under the QA tmp root (`lib/qa-tmp.mjs`: `/tmp` on POSIX so sandbox sockets stay short, the OS temp dir on Windows)), this checkout's `omo` launcher over a scratch COPY of the built plugin, real pty TUIs (`Bun.spawn({ terminal })`, screen kept by `@xterm/headless`), `i-*` shard hosts ensured from omo's launch spec, and the `omo` CLI. `lib/gateway.mjs` owns the kit, the sandbox (own HOME + agent dir under `<QA tmp root>/qa-thread-tools-<scenario>-*`, never `~/.omo`), a conversation-driven fake model (`QA:CALL`/`QA:SCRIPT` make tool calls, `QA:HOLD` streams until released), event-driven waits (pty output, fs events, feed records, model requests; no sleeps) and the cleanup receipt (`cleanup-receipt.json`: pids, `pgrep`, `lsof -U`/port, scratch removed; asserted as `cleanup-no-leftovers`). The copy is patched, never the checkout; each patch must match exactly one bundle site and only re-opens a test seam (the gateway is the only send path): `crash_after_admit` and `sender_kill_after_commit` expose the drain's `afterAdmit` and the store's `afterDbCommit` seams by env, `cycle_check_off` is the loop-guard mutant.
 
 | Scenario | Proves |
 | --- | --- |

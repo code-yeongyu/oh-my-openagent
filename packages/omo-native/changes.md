@@ -1,3 +1,19 @@
+## 2026-10-29 - Recover corrupt account credentials (#11832)
+
+Unscoped forget clears the stored credential under the session lock without a read. Scoped forget compares the current device under that lock and reports unreadable ownership as a JSON refusal. Only a well-formed target argument can select scoped deletion; malformed flags are rejected before store access. Explicit adopt replacement tolerates invalid data but not OS storage failures.
+
+## 2026-10-29 - Private descriptors survive the launcher hop (#11772)
+
+`bin/lib/private-fd-table.js` decides whether a launch carries private descriptors: a valid `SENPI_PRIVATE_FDS` table whose integer entries are open, unshared sockets in 5..15 that are not the runtime's IPC channel; every other entry still travels as `null` so the engine keeps the name declared, and named sockets the launcher cannot forward are closed on all three paths (the npm launcher at its first import, the Bun re-exec, and the compiled provisioned-runtime handoff before it spawns), never on Windows. `bin/lib/private-fds.js` captures and removes the table at the npm launcher's first import, so its helper children never see it. `spawnSenpi`, `maybeReexecUnderBun` and `reexecProvisionedRuntime` hand off through the existing signal-aware child with those descriptors in stdio when a table is present, and keep `execve` otherwise. `reexecProvisionedRuntime` reads the table without removing it, because the compiled entry runs the engine in-process and the engine's own capture must still see it. Measured: `execve` does not keep inherited descriptors on Node 24.22 or Bun 1.4.4 in any hop/target pairing, which also dropped fd 4 presenter enrollment through the npm launcher.
+
+## 2026-10-27 - SENPI_BRAND carries the OmO logo (#11445)
+
+`bin/lib/brand-logo.generated.js` (written by `bun script/build-brand-logo.ts` from `.github/assets/omo-icon-light.svg`) exports `OMO_BRAND_LOGO`, the icon as a base64 SVG data URI. `engine-environment.js` `brandProfile()` and `compiled-environment.ts` put it in `SENPI_BRAND.logo`, which the engine renders on the provider sign-in result page once the pinned senpi includes senpi#4432/#4434 (2026.10.27-1 ignores it). `bun run brand-logo:check` (also in CI's committed-bundle step) fails when the module is stale; the generator normalizes the icon to LF and `.gitattributes` keeps `*.svg` LF, so a Windows checkout produces the same module.
+
+## 2026-10-26 - Reinstall and sign-in guidance (#11390)
+
+The launcher sets `OMO_REINSTALL_COMMAND` (`updateTarget().command`) for the engine so the plugin can name the reinstall command after `SENPI_BRAND` is scrubbed. `runThreadCommand` takes a `reinstall` step from its caller (npm: the reinstall command; compiled: the releases page). `omo update` on an install already at the channel version whose engine tree cannot be resolved exits 1 with the reinstall command. `omo sync` reads the account refusal body's code through `ApiRefusal`, using the shared guidance and falling back to HTTP status for unknown or malformed bodies. Forbidden accounts are not told to sign in again; deleted accounts get the account-deleted action both here and during session refresh.
+
 Review #10496 round 2 (#10478). `applySetupStages` now tracks the files its own earlier stages wrote and passes them to `staleGuard`; `staleSetupTargets(plans, ids, written)` ignores those paths. Before this, an apply of every stage with a custom-provider key stopped halfway: the credentials stage rewrote auth.json, then the provider stage compared auth.json against the scan-time bytes and answered `stale` after credentials were written. A skill directory planned as new is now stale when anything exists at its path (it was read as a file, so the check never fired). `omo setup` passes no guard and is unchanged.
 
 ## 2026-10-18 - Onboarding apply refuses stale targets and rides the engine's credential store (#10496)

@@ -24,7 +24,7 @@ import { reviveRunningOnSend } from "./revive-running"
 import { createSteeringControls } from "./controls"
 import { createPendingSteering } from "./pending-steering"
 import { endDroppedSteering } from "../state/queued-steering"
-import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
+import { HostSessionDetachedError, HostSessionUnresponsiveError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
 import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
@@ -156,6 +156,15 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       }
     }
 
+    const liveness = handle.liveness?.()
+    if (liveness !== undefined && liveness.state !== "running") {
+      if (record.status === "running") return enqueuePending(record, input.message, deliverAs)
+      return {
+        kind: "unresponsive", task_id: record.task_id, retryable: true,
+        reason: `Task ${record.task_id}'s session is unresponsive; nothing was sent. Retry when its host status returns to running.`,
+      }
+    }
+
     // While anything is queued or draining for this child, a new message goes behind it, so a later
     // send never overtakes an earlier one (#9861).
     if (mode === "steer" && ((record.pending_steering?.length ?? 0) > 0 || isDraining(record.task_id))) {
@@ -171,6 +180,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       if (deliverAs === "steer") await handle.steer(message)
       else await handle.followUp(message)
     } catch (error) {
+      if (error instanceof HostSessionUnresponsiveError) return enqueuePending(record, message, deliverAs)
       if (error instanceof InputUncertainError) return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
       if (error instanceof InputConflictError) return { kind: "failed", task_id: record.task_id,
         effect_id: error.effectId, reason: error.reason, detail: error.detail, action: error.action }

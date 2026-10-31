@@ -1,13 +1,14 @@
 //! The fake backend plus injected panics: the fake itself can only fail a
 //! call, and a transaction must also survive a backend that unwinds.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use image::RgbaImage;
 use parking_lot::Mutex;
 use senpi_desktop_backend_fake::{FakeBackend, FakeMethod};
-use senpi_desktop_core::ax::AxBackend;
-use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::ax::{AxBackend, AxHandle};
+use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, PermissionDeniedData, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
@@ -31,9 +32,20 @@ impl Panics {
     }
 }
 
+/// Counts `watch_user_input` calls across every backend a factory built.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Watches(Arc<AtomicUsize>);
+
+impl Watches {
+    pub(crate) fn count(&self) -> usize {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
 pub(crate) struct PanickyFake {
     pub(crate) inner: FakeBackend,
     pub(crate) panics: Panics,
+    pub(crate) watches: Watches,
 }
 
 impl Backend for PanickyFake {
@@ -85,6 +97,16 @@ impl Backend for PanickyFake {
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
         self.inner.type_text_interruptible(target, text, mode, check_stop, delivered)
+    }
+    fn ax_type_text(
+        &mut self,
+        h: &AxHandle,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        self.inner.ax_type_text(h, text, mode, check_stop, delivered)
     }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.inner.key_chord(target, keys, mode)
@@ -143,5 +165,12 @@ impl Backend for PanickyFake {
     }
     fn screen_locked(&mut self) -> CoreResult<bool> {
         self.inner.screen_locked()
+    }
+    fn watch_user_input(&mut self) {
+        self.watches.0.fetch_add(1, Ordering::SeqCst);
+        self.inner.watch_user_input();
+    }
+    fn user_input_feed(&mut self) -> Option<Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+        self.inner.user_input_feed()
     }
 }

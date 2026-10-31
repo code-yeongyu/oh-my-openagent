@@ -53,8 +53,8 @@ export function ControlsShowcase(): JSX.Element {
           ))}
         </Specimen>
         <Specimen label="focus-visible">
-          <Button className="outline-accent-32 outline-2 outline-offset-2">primary</Button>
-          <Button variant="secondary" className="outline-accent-32 outline-2 outline-offset-2">
+          <Button className="outline-ring outline-2 outline-offset-2">primary</Button>
+          <Button variant="secondary" className="outline-ring outline-2 outline-offset-2">
             secondary
           </Button>
         </Specimen>

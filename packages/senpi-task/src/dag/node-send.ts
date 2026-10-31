@@ -99,6 +99,8 @@ function foldSendOutcome(
   const runId = record.runId
   const nodeId = node.id
   switch (outcome.kind) {
+    case "unresponsive":
+      throw new DagNodeControlError({ code: "node_unresponsive", message: outcome.reason, runId, nodeIds: [nodeId] })
     case "uncertain":
       return { nodeId, taskId, delivery: "uncertain", effectId: outcome.effect_id }
     case "failed":

@@ -11,7 +11,7 @@
 
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { packageRoot, resolveSenpi } from "./package-paths.js"
 
@@ -46,10 +46,11 @@ async function loadEngine() {
 // is captured from the extension itself and registered on the runtime, as a session does. The
 // extension's commands and session hooks are not needed here and are dropped. Its settings are
 // read from the inspected agent dir (the extension's default reads the engine's own default dir).
-function extensionProviders(register) {
+function extensionProviders(register, cwd) {
   const providers = []
   const capture = (name, config) => { providers.push([name, config]) }
-  register(new Proxy({}, { get: (_, key) => key === "registerProvider" ? capture : () => undefined }))
+  // The extension reads the session's absolute cwd (senpi 2026.10.25-1 refuses to register without one).
+  register(new Proxy({}, { get: (_, key) => key === "cwd" ? cwd : key === "registerProvider" ? capture : () => undefined }))
   return providers
 }
 
@@ -87,7 +88,7 @@ export async function engineAvailableModels(input) {
     })
     const cwd = input.cwd ?? process.cwd()
     const readSettings = () => engine.loadAnthropicSubscriptionSettings(engine.SettingsManager.create(cwd, input.agentDir))
-    for (const [name, config] of extensionProviders((pi) => engine.registerAnthropicSubscription(pi, { readSettings }))) {
+    for (const [name, config] of extensionProviders((pi) => engine.registerAnthropicSubscription(pi, { readSettings }), resolve(cwd))) {
       await runtime.registerProvider(name, config, { refresh: false })
     }
     return (await runtime.getAvailable()).map((model) => ({ provider: model.provider, id: model.id }))

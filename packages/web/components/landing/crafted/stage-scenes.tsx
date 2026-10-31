@@ -86,7 +86,7 @@ function scene(id: StageStateId, live: boolean, labels: StageLabels): JSX.Elemen
         <div>
           <Line tone="lo">{'edit({ path: "src/app.ts",'}</Line>
           <Line tone="lo">
-            <span className="text-text-faint line-through">oldTxt</span>→
+            <span className="text-text-lo line-through">oldTxt</span>→
             <span className="text-accent">oldText</span>
           </Line>
           <Line tone="hi">{labels.repaired}</Line>

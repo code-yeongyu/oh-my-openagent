@@ -3,7 +3,7 @@ import type { RunRef } from "../../../senpi-task/src/pause/ports"
 import { admissionBatches, failItems, settleItemReceipts, withSuperseded, type AdmissionItem, type ItemReceipt, type QueuedInjection } from "./idle-injection-items"
 import { NO_RECEIPT_ERRORS, type ReceiptErrors } from "./idle-injection-receipts"
 
-export type IdleInjectionSource = "task-completion" | "workpool-aggregate" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "kibitzer"
+export type IdleInjectionSource = "task-status" | "task-completion" | "workpool-aggregate" | "team-message" | "team-liveness" | "boulder-continuation" | "ulw-continuation" | "dag-run" | "kibitzer"
 
 export interface IdleInjection {
   // Cancellation/order key; every enqueue retains its independent custody identity.
@@ -74,6 +74,7 @@ export class IdleInjectionRetiredError extends Error {
 // Deterministic order: task completions are announced first and DAG run summaries last, so a mixed
 // flush leads with the most immediate child completion context.
 const SOURCE_RANK: Readonly<Record<IdleInjectionSource, number>> = {
+  "task-status": 0,
   "task-completion": 0,
   "workpool-aggregate": 0,
   "team-message": 1,

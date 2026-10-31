@@ -8,7 +8,7 @@ test.describe("Download page while the launch flag is off", () => {
     // Shipped desktop builds link /download; this site's own page stays off, so it must not 404.
     for (const path of ["/download", "/ko/download", "/download?channel=beta"]) {
       const response = await request.get(path, { maxRedirects: 0 })
-      expect(response.status(), path).toBe(301)
+      expect(response.status(), path).toBe(307)
       expect(response.headers()["location"], path).toBe("https://get.omo.dev/desktop/beta/")
     }
   })
@@ -18,10 +18,14 @@ test.describe("Download page while the launch flag is off", () => {
     expect(response.status()).toBe(404)
   })
 
-  test("the hero offers no desktop download", async ({ page }) => {
+  test("the hero links the public desktop beta, not this site's own page", async ({ page }) => {
     await page.goto("/")
     await expect(page.getByTestId("hero-desktop-cta")).toHaveCount(0)
     await expect(page.locator('a[href$="/download"]')).toHaveCount(0)
+    await expect(page.getByTestId("hero-desktop-beta-cta")).toHaveAttribute(
+      "href",
+      "https://get.omo.dev/desktop/beta/",
+    )
   })
 
   test("the sitemap leaves the download page out", async ({ request }) => {

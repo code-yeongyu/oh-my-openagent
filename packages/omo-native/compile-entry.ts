@@ -173,6 +173,7 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   if (command === "thread") {
     process.exitCode = await runThreadCommand(args.slice(1), {
       engine,
+      reinstall: `Download this omo release again from ${RELEASES_URL}, then retry.`,
       pluginRoot: join(execDir, "plugin"),
       agentDir: canonicalAgentDir(),
       env: process.env,

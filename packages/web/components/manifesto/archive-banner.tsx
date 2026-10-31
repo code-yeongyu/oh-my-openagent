@@ -23,7 +23,7 @@ export async function ArchiveBanner(): Promise<JSX.Element> {
         <p className="text-text-mid prose-cjk leading-[1.6]">{t("archive.note")}</p>
         <Link
           href="/manifesto"
-          className="text-accent underline-grow focus-visible:outline-accent-32 inline-flex items-center gap-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="text-accent underline-grow focus-ring inline-flex items-center gap-2 text-sm"
         >
           {t("archive.back")} <ArrowRight aria-hidden="true" className="size-4" />
         </Link>

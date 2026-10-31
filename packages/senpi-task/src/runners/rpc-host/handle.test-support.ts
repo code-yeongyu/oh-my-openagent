@@ -84,6 +84,10 @@ export function fakeSessionPort(
     switchSession: () => Promise.resolve({ cancelled: false }),
     close: () => {
       closes += 1
+      return Promise.resolve(true)
+    },
+    closeConfirmed: () => {
+      closes += 1
       return Promise.resolve()
     },
     detach: () => {

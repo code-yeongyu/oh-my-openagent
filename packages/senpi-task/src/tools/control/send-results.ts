@@ -66,6 +66,8 @@ function resolveListedTask(manager: SendManager, to: string): ReturnType<SendMan
 
 export function mapSendOutcome(outcome: Awaited<ReturnType<SendManager["sendToTask"]>>): SendToolResult {
   switch (outcome.kind) {
+    case "unresponsive":
+      return toolResult(outcome.reason, outcome)
     case "uncertain":
       return toolResult(`${outcome.reason} Effect id: ${outcome.effect_id}`, outcome)
     case "failed":

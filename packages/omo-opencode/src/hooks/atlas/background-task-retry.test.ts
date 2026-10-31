@@ -7,25 +7,30 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createAtlasHook } from "./atlas-hook"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, clearSessionAgent, registerAgentName, setSessionAgent } from "../../features/claude-code-session-state"
-import { DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS } from "../../shared/prompt-async-gate"
-import { RETRY_DELAY_MS } from "./idle-constants"
+import type { AtlasRetryScheduler } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-// Force process isolation in CI runner (globalThis.setTimeout override conflicts with other atlas tests)
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => true,
   resetSqliteBackendCache: () => {},
 }))
-
-type LongTimerCallback = (...args: unknown[]) => void | Promise<void>
 
 describe("atlas background task retry", () => {
   let testDir: string
   const sessionID = "main-session-123"
   const capturedTimers = new Map<number, { callback: () => Promise<void> | void; cleared: boolean }>()
   let nextFakeTimerId = 1000
-  const originalSetTimeout = globalThis.setTimeout
-  const originalClearTimeout = globalThis.clearTimeout
+  const retryScheduler: AtlasRetryScheduler = (callback) => {
+    const id = nextFakeTimerId++
+    const entry = { callback, cleared: false }
+    capturedTimers.set(id, entry)
+    return {
+      cancel: () => {
+        entry.cleared = true
+        capturedTimers.delete(id)
+      },
+    }
+  }
   const originalDateNow = Date.now
   let fakeNow = 0
 
@@ -74,40 +79,9 @@ describe("atlas background task retry", () => {
     nextFakeTimerId = 1000
     fakeNow = 10_000
     Date.now = () => fakeNow
-
-    globalThis.setTimeout = ((callback: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]) => {
-      const normalizedDelay = typeof delay === "number" ? delay : 0
-      if (typeof callback !== "function") {
-        return originalSetTimeout(callback, delay, ...args)
-      }
-
-      if (normalizedDelay === RETRY_DELAY_MS && normalizedDelay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS) {
-        const id = nextFakeTimerId++
-        capturedTimers.set(id, {
-          callback: () => (callback as LongTimerCallback)(...args),
-          cleared: false,
-        })
-        return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
-      }
-
-      return originalSetTimeout(callback, delay, ...args)
-    }) as typeof setTimeout
-
-    globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
-      const timerEntry = typeof id === "number" ? capturedTimers.get(id) : undefined
-      if (timerEntry) {
-        timerEntry.cleared = true
-        capturedTimers.delete(id)
-        return
-      }
-
-      originalClearTimeout(id as Parameters<typeof clearTimeout>[0])
-    }) as typeof clearTimeout
   })
 
   afterEach(() => {
-    globalThis.setTimeout = originalSetTimeout
-    globalThis.clearTimeout = originalClearTimeout
     Date.now = originalDateNow
     _resetForTesting()
     clearBoulderState(testDir)
@@ -140,6 +114,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({
@@ -181,6 +156,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({
@@ -224,6 +200,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({
@@ -278,6 +255,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({
@@ -333,6 +311,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({
@@ -396,6 +375,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({
@@ -442,7 +422,7 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }))
+    }), { directory: testDir, retryScheduler })
 
     // when
     const firstIdle = hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
@@ -482,6 +462,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({
@@ -535,6 +516,7 @@ describe("atlas background task retry", () => {
       },
     }), {
       directory: testDir,
+      retryScheduler,
       backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
         getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
       }>({

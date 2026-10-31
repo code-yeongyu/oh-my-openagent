@@ -60,8 +60,15 @@ function run(): number {
       return [];
     }
   };
-  const headFragments = dirNames(head);
-  const baseFragments = dirNames(mergeBase);
+  // CI checks out refs/pull/<n>/merge: the PR merged into the base tip. There the release owes the fragments at its
+  // cut (the PR side's merge base), and fragments the base gained after the cut belong to the next release (#11554).
+  const [, baseSide, prSide, ...extraParents] = git("rev-list", "--parents", "-n", "1", head).trim().split(" ");
+  const mergedIntoBase = baseSide !== undefined && prSide !== undefined && extraParents.length === 0
+    && isAncestor(baseSide, baseHead);
+  const cut = mergedIntoBase ? git("merge-base", baseHead, prSide).trim() : mergeBase;
+  const baseFragments = dirNames(cut);
+  const postCut = mergedIntoBase ? dirNames(baseSide).filter((name) => !baseFragments.includes(name)) : [];
+  const headFragments = dirNames(head).filter((name) => !postCut.includes(name));
   const ownPath = prNumber > 0 ? fragmentPath(prNumber) : null;
   const addedFragment = ownPath && addedFiles.includes(ownPath)
     ? { content: git("show", `${head}:${ownPath}`) }
@@ -97,6 +104,15 @@ function run(): number {
   });
   console.log(`changelog-gate: package logs ${packageLogs.pass ? "PASS" : "FAIL"} - ${packageLogs.reason}`);
   return result.pass && packageLogs.pass ? 0 : 1;
+}
+
+function isAncestor(ancestor: string, descendant: string): boolean {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 if (import.meta.main) {

@@ -21,6 +21,7 @@ import { exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./t
 import { createTurnSettlement, sessionIsIdle, type TurnSettlementScheduler } from "./turn-settlement"
 import { createTurnWakeSources } from "./turn-wake-sources"
 import { createInputEffects } from "../input-effects"
+import { readStdioAdmissions } from "../input-admission-read"
 import { createInputDelivery } from "../input-delivery"
 import { createRpcRunPause } from "./native-run-pause"
 import { createTurnClaim } from "./turn-claim"
@@ -102,7 +103,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   const listeners = createHandleListeners({
     onListenerError: (error) => log("senpi-task rpc child event listener failed", { taskId, error: String(error) }),
   })
+  let heartbeatActivity = (): void => {}
   client.onEvent((event) => {
+    heartbeatActivity()
     // A run the child starts on its own after its turn settled (a monitor or background job woke it)
     // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
     if (event.type === "agent_start" && turnOutcome !== undefined && outcome === undefined) {
@@ -153,6 +156,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       })
     },
   })
+  heartbeatActivity = stopHeartbeat.activity
 
   const settleExit = (built: ChildExitOutcome): void => {
     if (outcome) {
@@ -183,6 +187,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   const inputEffects = createInputEffects({
     taskId, store: options.inputStore,
     send: command => writeCommand(command, command.type),
+    read: ids => readStdioAdmissions(client, ids),
   })
 
   const beginTurn = (): void => {
@@ -228,8 +233,8 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     },
     // task_send is documented to ALWAYS steer into the addressed child, so a steer that the
     // host rejects as busy degrades to followUp queueing rather than failing the delivery.
-    steer: delivery.steer,
-    followUp: (text) => delivery.runPrompt(text, "followUp"),
+    steer: (text, identity) => delivery.steer(text, identity?.clientMessageId),
+    followUp: (text, identity) => delivery.runPrompt(text, "followUp", identity?.clientMessageId),
     abort: () => {
       abortedByUser = true
       return writeCommand({ type: "abort" }, "abort")
@@ -288,7 +293,7 @@ function flush(waiters: Array<() => void>): void {
 
 function assertOk(response: RpcResponse, label: string): void {
   if (!response.success) {
-    throw new RpcCommandError(label, response.error)
+    throw new RpcCommandError(label, response.error, response)
   }
 }
 

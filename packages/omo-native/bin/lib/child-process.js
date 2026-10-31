@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import { StringDecoder } from "node:string_decoder"
+import { PRIVATE_FDS_ENV, privateFdHandoffFor } from "./private-fd-table.js"
 
 // POSIX launchers prefer execve and leave no wrapper. This async fallback remains for Windows
 // and missing/failed execve.
@@ -50,16 +51,29 @@ export function propagateResult(result) {
  * the one path where the returned promise never settles, so callers can release what they hold.
  */
 export function runChild(command, args, options = {}) {
-  const { captureStderr = false, onBeforeSignalExit, ...spawnOptions } = options
+  const { captureStderr = false, onSpawn, onBeforeSignalExit, ...spawnOptions } = options
   const env = spawnOptions.env ?? process.env
+  const shellHandoff = spawnOptions.shell
+    ? privateFdHandoffFor(env, env[PRIVATE_FDS_ENV], process.platform, { shell: true })
+    : undefined
+  const baseStdio = shellHandoff?.stdio ?? spawnOptions.stdio ?? "inherit"
+  const capturedStdio = typeof baseStdio === "string" ? [baseStdio, baseStdio, "pipe"] : [...baseStdio]
+  capturedStdio[2] = "pipe"
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: "inherit",
-      windowsHide: true,
-      ...spawnOptions,
-      // A captured stderr is still shown live; the caller also gets its tail to classify the failure.
-      ...(captureStderr ? { stdio: ["inherit", "inherit", "pipe"] } : {}),
-    })
+    let child
+    try {
+      child = spawn(command, args, {
+        stdio: "inherit",
+        windowsHide: true,
+        ...spawnOptions,
+        ...(shellHandoff ? { env: shellHandoff.env, stdio: shellHandoff.stdio } : {}),
+        // A captured stderr is still shown live; the caller also gets its tail to classify the failure.
+        ...(captureStderr ? { stdio: capturedStdio } : {}),
+      })
+    } finally {
+      const closeOwned = onSpawn ?? shellHandoff?.onSpawn
+      closeOwned?.()
+    }
     let stderr = ""
     if (captureStderr) {
       // The decoder keeps a multi-byte character split across chunks whole; the echo stays raw bytes.

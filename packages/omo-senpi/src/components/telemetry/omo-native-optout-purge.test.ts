@@ -267,4 +267,22 @@ describe("omo-native session_summary opt-out purge", () => {
       expect(pending.map((name) => readSummaryFile(stateDir, name).sessionHash)).toEqual(["hashed:work"])
     })
   })
+
+  // A config that cannot be read back is judged by no one: an env-only opt-out keeps it, a persisted opt-out deletes it.
+  test.each([
+    { name: "a DO_NOT_TRACK-only start", persistedOn: true, kept: true },
+    { name: "a start under a persisted opt-out", persistedOn: false, kept: false },
+  ])("#given a dead owner's queue whose scope.config cannot be parsed #when $name runs #then it is kept: $kept", async ({ persistedOn, kept }) => {
+    await withTempAgentDir(async (agentDir) => {
+      writeInventory(agentDir)
+      const stateDir = join(agentDir, "omo-senpi", "omo-native")
+      const malformed = { cwd: "/repo", config: { OMO_PROFILE: 7 } } as unknown as Parameters<typeof seedDeadOwnerQueue>[1]["scope"]
+      seedDeadOwnerQueue(stateDir, { sessionHash: "hashed:malformed", scope: malformed })
+
+      await registerProcess({ agentDir, recorder: createTransportRecorder(), env: { DO_NOT_TRACK: "1" }, cwd: "/repo", options: { isConfigEnabled: () => persistedOn } })
+
+      const left = summaryFiles(stateDir).filter((name) => !name.startsWith("owners/"))
+      expect(left.length > 0).toBe(kept)
+    })
+  })
 })

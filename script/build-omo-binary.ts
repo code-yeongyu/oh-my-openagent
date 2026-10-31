@@ -35,7 +35,13 @@ import {
   omoBinaryEngineStamp,
   releaseEngineBuildStamp,
 } from "./engine-build-defines"
-import { desktopEngineTarget, stageCompiledDesktopEngine } from "./release-desktop-engine-target"
+import { keychainHelperPayload, stageKeychainHelper } from "./release-keychain-helper-target"
+import {
+  desktopEngineTarget,
+  engineTrustHelperTarget,
+  stageCompiledDesktopEngine,
+  stageCompiledEngineTrustHelper,
+} from "./release-desktop-engine-target"
 import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
 import { reportEmbeddedPayload } from "./embedded-payload-probe"
 
@@ -53,7 +59,7 @@ const repoRoot = resolve(scriptDir, "..")
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
 /**
- * Hard per-binary size budget (182 MiB). It exists to keep the download and install of one
+ * Hard per-binary size budget (200 MiB). It exists to keep the download and install of one
  * platform binary small: every install, `omo update` and CI smoke fetches the full binary, so
  * growth is a user-facing cost, not just a storage one. A release that crosses it fails loud
  * rather than shipping a quietly larger download. Raised from 150 MiB for 5.1.26, when linux-x64
@@ -61,9 +67,14 @@ const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts"
  * (5.1.35: 162,899,424). Bun 1.4.3's runtime alone accounts for +9,482,752 bytes of that (an empty
  * `bun build --compile --target=bun-linux-x64`: 81,315,296 bytes on 1.4.2, 90,798,048 on 1.4.3); senpi
  * 2026.10.16 -> 2026.10.19 adds about 1.25 MB. 182 MiB is the measured size plus about 10% headroom.
+ * Raised to 200 MiB for 5.1.50: 5.1.49's linux-x64 binary measured 200,001,712 bytes (5.1.48:
+ * 181,217,248) and 5.1.49 was not published. Bun 1.4.4's runtime accounts for +18,325,712 bytes of that
+ * (an empty `bun build --compile --target=bun-linux-x64`: 90,798,048 bytes on 1.4.3, 109,123,760 on
+ * 1.4.4; v5.1.48 rebuilt with 1.4.4 already measures 199,542,960); the compiled JS graph added +409,318
+ * and the embedded payload +49,434, which together make up the +18,784,464.
  * `reportBinaryHeadroom` warns well before the next crossing.
  */
-export const MAX_BINARY_BYTES = 182 * 1024 * 1024
+export const MAX_BINARY_BYTES = 200 * 1024 * 1024
 
 /** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
 export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024
@@ -412,6 +423,10 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
   }
   const desktopEngine = desktopEngineTarget(target.target).payload
   if (desktopEngine !== null) relPaths.add(desktopEngine)
+  const keychainHelper = keychainHelperPayload(target.target)
+  if (keychainHelper !== null) relPaths.add(keychainHelper)
+  const trustHelper = engineTrustHelperTarget(target.target).payload
+  if (trustHelper !== null) relPaths.add(trustHelper)
   return [...relPaths].sort()
 }
 
@@ -542,6 +557,10 @@ export function stageSidecarPayload(
   // build (a full build-omo-native run with submodule fetches) so a missing payload fails closed at once (#9857).
   const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
   if (desktopEngine !== null) staged.add(desktopEngine)
+  const keychainHelper = stageKeychainHelper(target.target, stageDir, desktopEngineSourceRoot)
+  if (keychainHelper !== null) staged.add(keychainHelper)
+  const trustHelper = stageCompiledEngineTrustHelper(target.target, stageDir, desktopEngineSourceRoot)
+  if (trustHelper !== null) staged.add(trustHelper)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
   writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")

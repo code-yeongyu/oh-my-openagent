@@ -5,8 +5,10 @@ import { acquireReflectionRunLease, GitMemoryRepo } from "@oh-my-opencode/memory
 import { slotHarness } from "./supervisor-slot.test-support"
 import { runReflectionChild } from "./spawn-supervisor"
 
+const TEST_TIMEOUT_MS = 60_000
+
 test("the real parent waits beyond its original deadline while the supervisor queues", async () => {
-  const harness = await slotHarness()
+  const harness = await slotHarness(TEST_TIMEOUT_MS)
   const holder = await acquireReflectionRunLease(harness.locks)
   let completion: ReturnType<typeof runReflectionChild> | undefined
   try {
@@ -47,4 +49,4 @@ test("the real parent waits beyond its original deadline while the supervisor qu
     if (completion !== undefined) await Promise.allSettled([completion])
     await harness.cleanup()
   }
-}, 60_000)
+}, TEST_TIMEOUT_MS)

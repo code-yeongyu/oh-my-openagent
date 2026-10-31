@@ -34,6 +34,13 @@ describe("queue consent read", () => {
     expect(env.HOME).toBe("/home/writer")
   })
 
+  test("#given a record whose writer named only a profile #when it is judged #then the account home is used", () => {
+    const { enabled, env } = readWith({ HOME: "/tmp/elsewhere" }, { OMO_PROFILE: "work" })
+
+    expect(enabled).toBe(true)
+    expect(env.HOME).toBe("/home/account")
+  })
+
   test("#given a Windows writer that named only USERPROFILE #when its record is judged #then the account home does not override the writer's", () => {
     const { env } = readWith({ HOME: "/tmp/elsewhere" }, { USERPROFILE: "C:\\Users\\writer" })
 

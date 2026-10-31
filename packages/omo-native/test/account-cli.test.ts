@@ -8,7 +8,7 @@ import { appendEntries, emptyChain } from "../../memory-core/src/sync/crypto/cha
 import { createRejectionCounter } from "../../memory-core/src/sync/crypto/rejection.ts"
 import { pinTrustAnchor } from "../../memory-core/src/sync/crypto/trust-pin.ts"
 import { createWorld, removeWorldStateDirs } from "../../memory-core/src/sync/recovery/testing/world.test-support.ts"
-import { createCredentialStore, type CredentialStore, KeychainLockedError } from "../../omo-opencode/src/cli/service-auth/keystore"
+import { createCredentialStore, type CredentialStore, KeychainLockedError, type SecretApi } from "../../omo-opencode/src/cli/service-auth/keystore"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
@@ -31,6 +31,7 @@ function memoryStore(initial: Credentials | null) {
   let value = initial
   const store: CredentialStore = {
     read: async () => value,
+    readAuthoritative: async () => value,
     write: async next => {
       value = next
     },
@@ -76,6 +77,100 @@ function fakeService(answer: (body: Record<string, unknown>) => Response) {
 }
 
 describe("omo account", () => {
+  test.each(["{", JSON.stringify({ accessToken: "synthetic-invalid" })])("#given corrupt stored data %s #when forgotten #then deletion needs no credential read", async initial => {
+    let value: string | null = initial
+    const calls: string[] = []
+    const store = createCredentialStore("http://127.0.0.1:1", { platform: "darwin", secrets: {
+      get: async () => { calls.push("get"); return value },
+      set: async ({ value: next }) => { calls.push("set"); value = next },
+      delete: async () => { calls.push("delete"); value = null; return true },
+    } })
+    const result = await run(store, ["forget"])
+    expect({ code: result.code, out: result.out, calls }).toEqual({
+      code: ACCOUNT_EXIT.ok, out: [{ forgotten: true }], calls: ["delete"],
+    })
+    expect(value).toBeNull()
+  })
+
+  test.each([false, true])("#given corrupt credentials #when adopt replace is %s #then only explicit replacement recovers", async replace => {
+    let value: string | null = "{"
+    const calls: string[] = []
+    const incoming = credential("dev_recovered", 3_600_000)
+    const store = createCredentialStore("http://127.0.0.1:1", { platform: "darwin", secrets: {
+      get: async () => { calls.push("get"); return value },
+      set: async ({ value: next }) => { calls.push("set"); value = next },
+      delete: async () => { calls.push("delete"); value = null; return true },
+    } })
+    const result = await run(store, replace ? ["adopt", "--replace"] : ["adopt"], { stdin: JSON.stringify(incoming) })
+    expect(result.code).toBe(replace ? ACCOUNT_EXIT.ok : ACCOUNT_EXIT.failed)
+    expect(calls).toEqual(replace ? ["get", "get", "set"] : ["get"])
+    if (replace) {
+      expect(JSON.parse(value ?? "null")).toEqual({ ...incoming, credentialGeneration: expect.any(String) })
+    } else {
+      expect(value).toBe("{")
+    }
+  })
+
+  test("#given a native read failure #when adopt explicitly replaces #then it does not overwrite an inaccessible item", async () => {
+    const calls: string[] = []
+    const store = createCredentialStore("http://127.0.0.1:1", { platform: "darwin", secrets: {
+      get: async () => { calls.push("get"); throw new Error("synthetic native failure") },
+      set: async () => { calls.push("set") },
+      delete: async () => { calls.push("delete"); return true },
+    } })
+    const result = await run(store, ["adopt", "--replace"], { stdin: JSON.stringify(credential("dev_a", 3_600_000)) })
+    expect({ code: result.code, out: result.out, calls }).toEqual({
+      code: ACCOUNT_EXIT.storeUnavailable, out: [{ error: "store-unavailable" }], calls: ["get"],
+    })
+  })
+
+  test.each(["dev_a", "dev_b"])("#given readable %s #when forgetting dev_a #then compare and delete targets only that device", async device => {
+    const held = credential(device, 3_600_000)
+    const { store, current } = memoryStore(held)
+    const result = await run(store, ["forget", "--device", "dev_a"])
+    expect({ code: result.code, out: result.out }).toEqual(device === "dev_a"
+      ? { code: ACCOUNT_EXIT.ok, out: [{ forgotten: true }] }
+      : { code: ACCOUNT_EXIT.conflict, out: [{ forgotten: false, device: { id: "dev_b", name: "device dev_b" } }] })
+    expect(current()).toEqual(device === "dev_a" ? null : held)
+  })
+
+  test("#given corrupt credentials #when forget names a device #then unverifiable ownership never permits deletion", async () => {
+    const calls: string[] = []
+    const store = createCredentialStore("http://127.0.0.1:1", { platform: "darwin", secrets: {
+      get: async () => { calls.push("get"); return "{" },
+      set: async () => { calls.push("set") },
+      delete: async () => { calls.push("delete"); return true },
+    } })
+    const result = await run(store, ["forget", "--device", "dev_a"])
+    expect({ code: result.code, out: result.out, calls }).toEqual({
+      code: ACCOUNT_EXIT.failed, out: [{ forgotten: false, error: "unreadable-credential" }], calls: ["get"],
+    })
+  })
+
+  test.each([
+    { args: ["--device"] },
+    { args: ["--device", ""] },
+    { args: ["--device", "--replace"] },
+    { args: ["--device=dev_b"] },
+    { args: ["--devcie", "dev_b"] },
+    { args: ["--unknown"] },
+    { args: ["dev_b"] },
+    { args: ["--device", "dev_b", "--device", "dev_a"] },
+    { args: ["--device", "dev_a", "--unknown"] },
+  ])("#given malformed forget arguments %j #when forgetting #then the store is not touched", async ({ args }) => {
+    const held = credential("dev_a", 3_600_000)
+    const calls: string[] = []
+    const store: CredentialStore = {
+      read: async () => { calls.push("get"); return held },
+      readAuthoritative: async () => { calls.push("get-authoritative"); return held },
+      write: async () => { calls.push("set") },
+      clear: async () => { calls.push("delete") },
+    }
+    const result = await run(store, ["forget", ...args])
+    expect(result.code).toBe(ACCOUNT_EXIT.invalid)
+    expect(calls).toEqual([])
+  })
+
   test("adopt stores the credential and show reports the device without any secret", async () => {
     const { store, current } = memoryStore(null)
     const adopted = await run(store, ["adopt"], { stdin: JSON.stringify(credential("dev_a", 3_600_000)) })
@@ -100,10 +195,10 @@ describe("omo account", () => {
     expect(current()?.device.id).toBe("dev_desk")
   })
 
-  test("adopting the same device keeps the newer token, so an older copy cannot roll the refresh token back", async () => {
+  test.each([false, true])("adopting the same device with replace %s keeps the newer token, so an older copy cannot roll the refresh token back", async replace => {
     const newer = credential("dev_a", 3_600_000, "rt-newer")
     const { store, current } = memoryStore(newer)
-    const adopted = await run(store, ["adopt"], { stdin: JSON.stringify(credential("dev_a", 60_000, "rt-older")) })
+    const adopted = await run(store, replace ? ["adopt", "--replace"] : ["adopt"], { stdin: JSON.stringify(credential("dev_a", 60_000, "rt-older")) })
     expect(adopted.code).toBe(ACCOUNT_EXIT.ok)
     expect(current()?.refreshToken).toBe("rt-newer")
   })
@@ -198,7 +293,7 @@ describe("omo account", () => {
 describe("omo account on a locked OS credential store (desktop#3509)", () => {
   test("every verb reports keychain locked as its own exit code, never a generic failure", async () => {
     const locked = () => Promise.reject(Object.assign(new Error("SecKeychain write failed (-25308)"), { code: "ERR_SECRETS_PLATFORM_ERROR" }))
-    const store = createCredentialStore("http://127.0.0.1:1", { get: locked, set: locked, delete: locked }, "darwin")
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: { get: locked, set: locked, delete: locked }, platform: "darwin" })
     for (const [args, stdin] of [[["show"]], [["token"]], [["export"]], [["forget"]], [["adopt"], JSON.stringify(credential("dev_x", 60_000))]] as const) {
       const result = await run(store, [...args], stdin === undefined ? {} : { stdin })
       expect({ args, code: result.code, out: result.out }).toEqual({ args, code: ACCOUNT_EXIT.keychainLocked, out: [{ keychain: "locked" }] })
@@ -208,7 +303,7 @@ describe("omo account on a locked OS credential store (desktop#3509)", () => {
 
   test("an immediate native store failure returns store-unavailable", async () => {
     const broken = () => Promise.reject(new Error("boom"))
-    const store = createCredentialStore("http://127.0.0.1:1", { get: broken, set: broken, delete: broken }, "darwin")
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: { get: broken, set: broken, delete: broken }, platform: "darwin" })
     const result = await run(store, ["show"])
     expect(result.code).toBe(9)
     expect(result.out).toEqual([{ error: "store-unavailable" }])
@@ -216,14 +311,23 @@ describe("omo account on a locked OS credential store (desktop#3509)", () => {
 })
 
 describe("omo account storage failures do not trigger another store call", () => {
-  test.each(["show", "adopt", "token", "export", "forget"])("%s awaits a native get failure and reports it after exactly one store call", async verb => {
+  test("#given a native delete failure #when forgetting #then it reports the store failure without a read", async () => {
+    const calls: string[] = []
+    const store = createCredentialStore("http://127.0.0.1:1", { platform: "darwin", secrets: {
+      get: async () => { calls.push("get"); return null },
+      set: async () => { calls.push("set") },
+      delete: async () => { calls.push("delete"); throw new Error("synthetic native delete failure") },
+    } })
+    const result = await run(store, ["forget"])
+    expect({ code: result.code, out: result.out, calls }).toEqual({ code: ACCOUNT_EXIT.storeUnavailable, out: [{ error: "store-unavailable" }], calls: ["delete"] })
+  })
+
+  test.each(["show", "adopt", "token", "export"])("%s awaits a native get failure and reports it after exactly one store call", async verb => {
     // given
     const entered = Promise.withResolvers<void>()
     const pending = Promise.withResolvers<never>()
     const calls: string[] = []
-    const store = createCredentialStore(
-      "http://127.0.0.1:1",
-      {
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: {
         get: async () => {
           calls.push("get")
           entered.resolve()
@@ -236,9 +340,7 @@ describe("omo account storage failures do not trigger another store call", () =>
           calls.push("delete")
           return true
         },
-      },
-      "darwin",
-    )
+      }, platform: "darwin" })
 
     // when
     const operation = run(store, [verb], { stdin: JSON.stringify(credential("dev_wait", 60_000)) })
@@ -268,9 +370,7 @@ describe("omo account storage failures do not trigger another store call", () =>
       entered.resolve()
       return pending.promise
     }
-    const store = createCredentialStore(
-      service.api,
-      {
+    const store = createCredentialStore(service.api, { secrets: {
         get: async () => {
           calls.push("get")
           return value
@@ -286,9 +386,7 @@ describe("omo account storage failures do not trigger another store call", () =>
           await fail()
           return true
         },
-      },
-      "darwin",
-    )
+      }, platform: "darwin" })
     try {
       // when
       const operation = run(store, ["token"], { api: service.api })
@@ -309,15 +407,11 @@ describe("omo account storage failures do not trigger another store call", () =>
   })
 
   test("invalid stored credentials remain a non-storage failure", async () => {
-    const store = createCredentialStore(
-      "http://127.0.0.1:1",
-      {
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: {
         get: async () => "not-json",
         set: async () => {},
         delete: async () => true,
-      },
-      "darwin",
-    )
+      }, platform: "darwin" })
     const result = await run(store, ["show"])
     expect({ code: result.code, out: result.out }).toEqual({ code: ACCOUNT_EXIT.failed, out: [] })
   })
@@ -327,18 +421,12 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
   const empty = { get: async () => null, set: async () => {}, delete: async () => true }
   const linuxStore = (
     lock: "locked" | "unlocked" | "absent" | "unknown",
-    secrets: Parameters<typeof createCredentialStore>[1] = empty,
+    secrets: SecretApi = empty,
     notices: string[] = [],
   ) =>
-    createCredentialStore(
-      "http://127.0.0.1:1",
-      secrets,
-      "linux",
-      async () => lock,
-      message => {
+    createCredentialStore("http://127.0.0.1:1", { secrets, platform: "linux", lockProbe: async () => lock, notice: message => {
         notices.push(message)
-      },
-    )
+      } })
   const memorySecretApi = () => {
     const values = new Map<string, string>()
     return {
@@ -405,7 +493,7 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
     homes.push(emptyBin)
     process.env.PATH = emptyBin
     try {
-      const store = createCredentialStore("http://127.0.0.1:1", memorySecretApi(), "linux", undefined, () => {})
+      const store = createCredentialStore("http://127.0.0.1:1", { secrets: memorySecretApi(), platform: "linux", notice: () => {} })
       expect(await loginShowLogout(store)).toEqual([
         ACCOUNT_EXIT.ok,
         { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok" },
@@ -421,6 +509,7 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
     let reads = 0
     const store: CredentialStore = {
       read: async () => (reads++ === 0 ? credential("dev_r", -60_000) : null),
+      readAuthoritative: async () => (reads++ === 0 ? credential("dev_r", -60_000) : null),
       write: async () => {},
       clear: async () => {},
     }
@@ -431,6 +520,7 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
   test("a keychain that locks mid-refresh keeps its own outcome (7), even when the read after it succeeds", async () => {
     const store: CredentialStore = {
       read: async () => credential("dev_k", -60_000),
+      readAuthoritative: async () => credential("dev_k", -60_000),
       write: async () => {
         throw new KeychainLockedError("macOS Keychain is locked.")
       },
@@ -442,16 +532,10 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
 
   test("an unlocked answer is asked once per process, not before every secret call", async () => {
     let probes = 0
-    const store = createCredentialStore(
-      "http://127.0.0.1:1",
-      memorySecretApi(),
-      "linux",
-      async () => {
+    const store = createCredentialStore("http://127.0.0.1:1", { secrets: memorySecretApi(), platform: "linux", lockProbe: async () => {
         probes += 1
         return "unlocked"
-      },
-      () => {},
-    )
+      }, notice: () => {} })
     await loginShowLogout(store)
     expect(probes).toBe(1)
   })

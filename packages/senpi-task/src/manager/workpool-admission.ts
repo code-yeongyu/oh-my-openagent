@@ -175,7 +175,7 @@ function refusal(outcome: Exclude<SendOutcome, { kind: "revived" }>): WorkpoolEr
     case "failed": return new WorkpoolError("worker_not_continuable", `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`)
     case "delivery_uncertain": case "admission_refused": case "cwd_unavailable": case "config_generation_mismatch": case "scope_denied":
       return new WorkpoolError(outcome.kind, outcome.reason)
-    case "capacity_deferred": return new WorkpoolError("admission_refused", outcome.reason)
+    case "unresponsive": case "capacity_deferred": return new WorkpoolError("admission_refused", outcome.reason)
     case "held": return new WorkpoolError("admission_refused", "The worker's run is stopped; its turn is held until Resume.")
     case "one_shot_agent": return new WorkpoolError("worker_not_continuable", outcome.message)
     case "not_continuable": case "not_found": case "stale": return new WorkpoolError("worker_not_continuable", outcome.reason)

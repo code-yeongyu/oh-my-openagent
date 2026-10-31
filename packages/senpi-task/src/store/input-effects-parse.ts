@@ -1,5 +1,5 @@
 import type { IdentifiedInput } from "../runners/input-effects"
-import { isRecord, readOptionalString, readString } from "./scalar-read"
+import { isRecord, readOptionalNumber, readOptionalString, readString } from "./scalar-read"
 
 export function parseUncertainInputs(value: unknown): readonly IdentifiedInput[] | undefined {
   if (value === undefined) return undefined
@@ -10,7 +10,9 @@ export function parseUncertainInputs(value: unknown): readonly IdentifiedInput[]
     if (type !== "prompt" && type !== "steer" && type !== "follow_up") throw new Error("invalid uncertain input type")
     const behavior = readOptionalString(item, "streamingBehavior")
     if (behavior !== undefined && behavior !== "steer" && behavior !== "followUp") throw new Error("invalid uncertain input behavior")
+    const runEpoch = readOptionalNumber(item, "run_epoch")
     return { type, message: readString(item, "message"), clientMessageId: readString(item, "clientMessageId"),
-      ...(behavior === undefined ? {} : { streamingBehavior: behavior }) }
+      ...(behavior === undefined ? {} : { streamingBehavior: behavior }),
+      ...(runEpoch === undefined ? {} : { run_epoch: runEpoch }) }
   })
 }

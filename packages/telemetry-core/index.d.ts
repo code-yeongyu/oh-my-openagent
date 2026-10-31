@@ -66,7 +66,6 @@ export type TelemetryProductConfig = {
   readonly defaultApiKey: string;
   readonly defaultHost: string;
   readonly eventName: string;
-  readonly machineIdPrefix: string;
   readonly packageName: string;
   readonly packageVersion: string;
   readonly platform: string;
@@ -289,10 +288,8 @@ export declare function createEventId(): string;
 export declare function hasTelemetryApiKey(env?: TelemetryEnv, defaultApiKey?: string): boolean;
 export declare function getTelemetryHost(env?: TelemetryEnv, defaultHost?: string): string;
 export declare function getDefaultTelemetryOsProvider(): TelemetryOsProvider;
-export declare function getTelemetryDistinctId(
-  machineIdPrefix: string,
-  osProvider?: TelemetryOsProvider,
-): string;
+export declare const TELEMETRY_INSTALL_ID_FILE_NAME: "install-id";
+export declare function getTelemetryInstallDistinctId(stateDir: string): string;
 export declare function resolveTelemetryStateDir(
   product: Pick<TelemetryProductConfig, "cacheDirName">,
   options?: ResolveTelemetryStateDirOptions,

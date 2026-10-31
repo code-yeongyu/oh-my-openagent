@@ -50,6 +50,7 @@ import {
 } from "./engine-runners"
 import { registerTaskMemoryReporter } from "./memory-reporter"
 import { createParentNotifier } from "./parent-notifier"
+import { notifyHostLiveness } from "./host-liveness-notice"
 import { createTaskChildPlanner, type ResolveModelRegistry } from "./planner"
 import type { TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
@@ -247,6 +248,9 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     settings,
   })
   const manager = createTaskManager({
+    onChildLiveness: (record, status) => {
+      if (record.parent_session_id === runtime.sessionId()) notifyHostLiveness(deps.pi, deps.coordinator, record, status, () => runtime.parentState().kind === "streaming")
+    },
     onPausedChild: (record, owner, childSeq) => runPause.notePausedChild(record, owner, childSeq),
     admissionBarrier,
     childPausePort: deps.childPausePort ?? nativeChildPausePort,
@@ -272,6 +276,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
       destroyResidentTask: (taskId, cause) =>
         lifecycle.destroyResidentTask(taskId, cause),
       parkTerminalResident: (taskId) => lifecycle.parkTerminalResident(taskId),
+      ...(lifecycle.hostSessionCancel === undefined ? {} : { hostSessionCancel: lifecycle.hostSessionCancel }),
     },
     admit: (parentSessionId) => admitAdapter(lifecycle, parentSessionId),
     trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({
