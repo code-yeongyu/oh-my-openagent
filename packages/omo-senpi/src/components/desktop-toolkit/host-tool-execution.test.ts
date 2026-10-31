@@ -3,7 +3,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import type { SenpiExtensionAPI } from "../../extension/types"
+import type { ExtensionRpcRequestContext, SenpiExtensionAPI } from "../../extension/types"
 import { registerHostToolExecution } from "./host-tool-execution"
 
 const ARGS = { html: "<p>page</p>", title: "Page", height: 300 }
@@ -12,7 +12,7 @@ const RESULT = { content: [{ type: "text", text: "Wrote the page." }], details: 
 function host(options: { names?: string[]; cwd?: string; writer?: unknown } = {}) {
   const pi = new FakeExtensionAPI()
   Object.defineProperty(pi, "cwd", { value: options.cwd ?? "/work/thread" })
-  const handlers = new Map<string, (data: unknown, context?: unknown) => unknown>()
+  const handlers = new Map<string, (data: unknown, context?: ExtensionRpcRequestContext) => unknown>()
   const rpc: NonNullable<SenpiExtensionAPI["rpc"]> = { emit: () => {}, handle: (name, handler) => { handlers.set(name, handler) } }
   pi.rpc = rpc
   const calls: unknown[][] = []
