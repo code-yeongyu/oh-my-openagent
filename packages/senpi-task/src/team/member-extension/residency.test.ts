@@ -7,6 +7,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { TeamModeConfigSchema } from "@oh-my-opencode/team-core/config"
 import { sendMessage } from "@oh-my-opencode/team-core/team-mailbox"
 
+import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_MISSES_BEFORE_UNRESPONSIVE } from "../../runners/rpc/heartbeat"
+import { RPC_REQUEST_DEADLINE_MS } from "../../runners/rpc/protocol-client"
 import { terminateRpcChild } from "../../runners/rpc/terminate"
 import { spawnFakeChild } from "../../runners/rpc/__fixtures__/spawn-fake"
 import { RpcProcessRunner } from "../../runners/rpc-process"
@@ -16,6 +18,12 @@ import { createColdReviveTrace, type ColdReviveTrace } from "../../lifecycle/__f
 
 const TEAM_RUN_ID = "11111111-1111-4111-8111-111111111111"
 const MESSAGE_ID = "22222222-2222-4222-8222-222222222222"
+// Never stricter than the product (#10993): a child is dead to it only after this many silent heartbeats,
+// and each cold launch of a child may use a whole request deadline before its first answer. realColdRevive
+// launches three: rpc.start of the parked member, the task_send revive, and the task_send lease probe.
+const CHILD_LIVENESS_WINDOW_MS = HEARTBEAT_MISSES_BEFORE_UNRESPONSIVE * HEARTBEAT_DEADLINE_MS
+const COLD_LAUNCHES = 3
+const COLD_REVIVE_CEILING_MS = COLD_LAUNCHES * RPC_REQUEST_DEADLINE_MS + CHILD_LIVENESS_WINDOW_MS
 const roots: string[] = []
 const children: ChildProcess[] = []
 let activeTrace: ColdReviveTrace | undefined
@@ -25,7 +33,7 @@ afterEach(async () => {
   // from the hook as well, including when the dangling child is killed by the test runner.
   const expired = activeTrace
   activeTrace = undefined
-  if (expired) throw expired.failure("Residency test exceeded its 20000ms budget")
+  if (expired) throw expired.failure(`Residency test exceeded its ${COLD_REVIVE_CEILING_MS}ms ceiling`)
   while (children.length > 0) {
     const child = children.pop()
     if (child !== undefined) await terminateRpcChild(child, { sigkillDelayMs: 100 })
@@ -37,11 +45,16 @@ describe("member injection residency", () => {
   test("#given configured TTL and a real process member #when parked then messaged by task id #then detach_rpc resumes one acknowledged turn", async () => {
     const trace = createColdReviveTrace()
     activeTrace = trace
-    const result = await realColdRevive("process", false, { idleTimeoutMs: 37, team: true, trace }).finally(() => {
+    const progress = trace.watchProgress(CHILD_LIVENESS_WINDOW_MS)
+    const result = await Promise.race([
+      realColdRevive("process", false, { idleTimeoutMs: 37, team: true, trace }),
+      progress.stalled,
+    ]).finally(() => {
+      progress.dispose()
       if (activeTrace === trace) activeTrace = undefined
     })
     expect(result).toMatchObject({ cadenceMs: 37, parked: "rpc_detached", memberExtensionRestored: true, messageCount: 1, status: "completed", leaseReleased: true })
-  }, 20000)
+  }, COLD_REVIVE_CEILING_MS)
 
   test("#given a member whose initial turn ended without a wait #when lead mail is injected #then its resident RPC session revives into a working turn", async () => {
     // given an ended but resident member session
