@@ -12,6 +12,7 @@ export type {
   HookName,
   BuiltinCommandName,
   SisyphusAgentConfig,
+  SecurityMissionConfig,
   ExperimentalConfig,
   DynamicContextPruningConfig,
   DefaultModeConfig,
