@@ -499,8 +499,6 @@
       "packages/omo-native/bin/lib/brand-logo.generated.d.ts": ["OMO_BRAND_LOGO"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
       "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodeVersionFloor
-      "packages/omo-native/bin/lib/claude-code-floor.js": ["claudeCodeVersionFloor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
       "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
