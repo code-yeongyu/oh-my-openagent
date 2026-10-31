@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, spyOn } from "bun:test"
+import { describe, it, expect, beforeEach, onTestFinished, spyOn } from "bun:test"
+import { getEventListeners } from "node:events"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createSkillMcpTool, applyGrepFilter } from "./tools"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"
@@ -203,7 +204,7 @@ describe("skill_mcp tool", () => {
   })
 
   describe("cdp_url execution", () => {
-    it("passes cdpUrl and the session abort signal through to manager.callTool when provided", async () => {
+    it("passes cdpUrl and a request abort signal to manager.callTool when provided", async () => {
       // given
       loadedSkills = [
         createMockSkillWithMcp("browser-skill", {
@@ -231,11 +232,11 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "browser_navigate",
         { url: "https://example.com" },
-        { cdpUrl: "http://localhost:9222", signal: mockContext.abort },
+        { cdpUrl: "http://localhost:9222", signal: expect.any(AbortSignal) },
       )
     })
 
-    it("passes only the session abort signal to manager.callTool when cdp_url is omitted", async () => {
+    it("passes only a request abort signal to manager.callTool when cdp_url is omitted", async () => {
       // given
       loadedSkills = [
         createMockSkillWithMcp("browser-skill", {
@@ -262,9 +263,68 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "browser_navigate",
         { url: "https://example.com" },
-        { signal: mockContext.abort },
+        { signal: expect.any(AbortSignal) },
       )
     })
+  })
+
+  describe("request abort lifetime", () => {
+    for (const operation of [
+      { method: "callTool", args: { tool_name: "echo" } },
+      { method: "readResource", args: { resource_name: "fixture://resource" } },
+      { method: "getPrompt", args: { prompt_name: "example" } },
+    ] as const) {
+      for (const completion of ["completed", "rejected", "aborted", "pre-aborted"] as const) {
+        it(`${operation.method} scopes the signal for ${completion} requests`, async () => {
+          // given
+          const parent = new AbortController()
+          const reason = new Error("request stopped")
+          const response = Promise.withResolvers<void>()
+          const started = Promise.withResolvers<AbortSignal>()
+          let requestSignal: AbortSignal | undefined
+          const cancelRequest = () => response.reject(requestSignal?.reason)
+          const startRequest = (options: unknown) => {
+            if (!options || typeof options !== "object" || !("signal" in options) || !(options.signal instanceof AbortSignal)) throw new Error("Expected a request signal")
+            requestSignal = options.signal
+            if (requestSignal.aborted) response.reject(requestSignal.reason)
+            else requestSignal.addEventListener("abort", cancelRequest, { once: true })
+            started.resolve(requestSignal)
+            return response.promise
+          }
+          const call = spyOn(manager, operation.method).mockImplementation((...args: unknown[]) =>
+            startRequest(args.at(-1)).then(() => operation.method === "callTool" ? { content: [] } : []))
+          const tool = createSkillMcpTool({ manager, getLoadedSkills: () => [createMockSkillWithMcp("fixture", { fixture: { command: "fixture" } })] })
+          if (completion === "pre-aborted") parent.abort(reason)
+
+          // when
+          const outcome = tool.execute({ mcp_name: "fixture", ...operation.args }, { ...mockContext, abort: parent.signal })
+            .then((result) => ({ result, error: undefined }), (error: unknown) => ({ result: undefined, error }))
+          onTestFinished(async () => {
+            response.resolve()
+            await outcome
+            requestSignal?.removeEventListener("abort", cancelRequest)
+            call.mockRestore()
+          })
+          const signal = await started.promise
+          expect(call).toHaveBeenCalledTimes(1)
+          if (completion === "completed") response.resolve()
+          else if (completion === "rejected") response.reject(reason)
+          else if (completion === "aborted") parent.abort(reason)
+          const result = await outcome
+
+          // then
+          expect(result.error).toBe(completion === "completed" ? undefined : reason)
+          expect(getEventListeners(parent.signal, "abort")).toHaveLength(0)
+          if (completion === "completed" || completion === "rejected") {
+            parent.abort(reason)
+            expect(signal.aborted).toBe(false)
+          } else {
+            expect(signal.aborted).toBe(true)
+            expect(signal.reason).toBe(reason)
+          }
+        })
+      }
+    }
   })
 
   describe("MCP result semantics", () => {
@@ -326,7 +386,7 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "some-tool",
         {},
-        { signal: mockContext.abort },
+        { signal: expect.any(AbortSignal) },
       )
     })
 
@@ -353,7 +413,7 @@ describe("skill_mcp tool", () => {
         expect.any(Object),
         "some-tool",
         {},
-        { signal: mockContext.abort },
+        { signal: expect.any(AbortSignal) },
       )
     })
   })
