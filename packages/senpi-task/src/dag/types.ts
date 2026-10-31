@@ -150,6 +150,7 @@ export type DagDiagnostic =
   | {
       readonly kind: "node_flag"
       readonly nodeId: DagNodeId
+      readonly invalidatedBy?: DagNodeId
       readonly message: string
       readonly at: string
     }

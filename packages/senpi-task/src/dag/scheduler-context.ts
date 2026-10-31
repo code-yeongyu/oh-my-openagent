@@ -25,6 +25,7 @@ export type AttachedTaskSettlement =
 
 export type AttachedTask = {
   readonly nodeId: DagNodeId
+  selfResumed: boolean
   readonly settled: Promise<AttachedTaskSettlement>
   readonly folded: Promise<void>
   readonly resolveFolded: () => void
@@ -82,6 +83,9 @@ export type SchedulerContext = {
   // waitFor resolves only at terminal, so this watch is the only signal that folds the task
   // engine's later queue promotion into a scheduled -> running node transition.
   readonly promotionWatches: Map<DagNodeId, () => void>
+  // omo#10487: armed before waitFor, kept through completion so an early self-resume supersedes
+  // the attached settlement and a later one reopens the node; disposed at run end.
+  readonly selfResumeWatches: Map<DagNodeId, () => void>
 }
 
 export function nodeById(record: DagRunRecordV1, nodeId: DagNodeId): DagNode {
