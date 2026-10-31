@@ -5,7 +5,15 @@ description: Developer reference for all 11 Oh My OpenAgent agent definitions, f
 
 # src/agents/ — 11 Agent Definitions
 
-**Generated:** 2026-05-15
+**Prompt ownership updated:** shared Native builders (PR #9856).
+
+Model-specific system cores come from `@code-yeongyu/senpi/prompt-presets` through
+`native-model-prompt.ts`. Existing OpenCode role builders and artifacts retain
+their instructions and runtime context. `native-prompt-frame.ts` lets system-transform rebuild
+the generated core for the actual request model without replacing user appends.
+Do not add copies of Native model bodies. Existing role variants are separate
+from Native model calibration. Explore, librarian and multimodal-looker keep
+their original prompts without a Native core.
 
 ## OVERVIEW
 
@@ -62,10 +70,7 @@ Read-only agents are rejected at TeamSpec parse time. For those, the lead delega
 ```
 agents/
 ├── sisyphus.ts                                # Main orchestrator router
-├── sisyphus/                                  # Model-specific variant prompts
-│   ├── default.ts, gemini.ts, gpt-5-4.ts, gpt-5-5.ts
 ├── hephaestus.ts                              # Routes to model variant
-├── hephaestus/                                # gpt.ts, gpt-5-4.ts, gpt-5-5.ts, gpt-5-6.ts
 ├── oracle.ts                                  # Read-only consultant
 ├── librarian.ts                               # External search
 ├── explore.ts                                 # Codebase grep
@@ -121,7 +126,7 @@ Definition (from [`src/agents/types.ts`](types.ts)):
 
 ## DYNAMIC PROMPT BUILDER
 
-`dynamic-agent-prompt-builder.ts` composes per-agent system prompts at runtime by stitching:
+`dynamic-agent-prompt-builder.ts` supplies reusable OpenCode role-context sections:
 - Core sections (identity, mode, restrictions)
 - Policy sections (citation, verification, anti-patterns)
 - Tool categorization (per-domain tool guidance)
