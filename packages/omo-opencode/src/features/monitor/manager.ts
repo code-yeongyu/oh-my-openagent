@@ -1,3 +1,4 @@
+import { acquirePrWatchManager, type PrWatchManager } from "../pr-watch/manager"
 import { subagentSessions } from "../claude-code-session-state"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "../background-agent/process-cleanup"
 import { log } from "../../shared"
@@ -29,6 +30,7 @@ import type {
 export type { MonitorManagerDeps, MonitorManagerOptions }
 
 export class MonitorManager implements MonitorManagerContract {
+  readonly prWatches: PrWatchManager
   private readonly monitors = new Map<MonitorId, InternalMonitorState>()
   private readonly monitorsByParentSession = new Map<string, Set<MonitorId>>()
   private readonly scheduledFlushTimers = new Map<MonitorId, TimerHandle>()
@@ -40,6 +42,7 @@ export class MonitorManager implements MonitorManagerContract {
   private shutdownTriggered = false
 
   constructor(private readonly options: MonitorManagerOptions) {
+    this.prWatches = acquirePrWatchManager(options.pluginContext)
     this.config = { ...DEFAULT_MONITOR_CONFIG, ...options.config }
     this.scheduler = options.deps?.scheduler ?? createRealScheduler()
     this.registerCleanup = options.deps?.registerManagerForCleanup ?? registerManagerForCleanup
@@ -152,6 +155,7 @@ export class MonitorManager implements MonitorManagerContract {
   }
 
   async stopSessionMonitors(sessionId: string): Promise<void> {
+    await this.prWatches.stopSession(sessionId)
     const ids = [...this.monitorsByParentSession.get(sessionId) ?? []]
     await Promise.all(ids.map((id) => this.stop(id)))
     for (const id of ids) {
@@ -177,6 +181,7 @@ export class MonitorManager implements MonitorManagerContract {
       return
     }
     this.shutdownTriggered = true
+    await this.prWatches.shutdown()
 
     for (const id of [...this.scheduledFlushTimers.keys()]) {
       this.clearScheduledFlush(id)
