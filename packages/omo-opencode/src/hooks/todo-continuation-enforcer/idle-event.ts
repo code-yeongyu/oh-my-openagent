@@ -10,6 +10,7 @@ import { isLastAssistantMessageAborted } from "./abort-detection"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
 import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { startCountdown } from "./countdown"
+import { FallbackCycleRegistry } from "../shared/fallback-cycle-registry"
 import { hasUnansweredQuestion } from "./pending-question-detection"
 import { resolveLatestMessageInfo } from "./resolve-message-info"
 import type { SessionStateStore } from "./session-state"
@@ -51,6 +52,11 @@ export async function handleSessionIdle(args: {
 
   if (state.wasCancelled) {
     log(`[${HOOK_NAME}] Skipped: session was cancelled`, { sessionID })
+    return
+  }
+
+  if (FallbackCycleRegistry.isActive(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped: runtime-fallback retry cycle in progress`, { sessionID })
     return
   }
 
