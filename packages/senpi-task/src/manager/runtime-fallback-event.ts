@@ -150,6 +150,40 @@ function applyModelChanged(
   })
 }
 
+/**
+ * The route a child event moves the child onto, read the same way the record writer reads it, so a
+ * live label that tracks events itself (the progress line) names the model the record names (#11359).
+ * Undefined when the event names no route.
+ */
+export function effectiveModelFromEvent(
+  event: ManagedChildEvent,
+  isOwnEffect?: (effectId: string) => boolean,
+): EffectiveModelRecord | undefined {
+  if (event.type === "retry_fallback_applied" || event.type === "retry_fallback_reverted") {
+    const selector = readEventString(event, "to")
+    const route = selector === undefined ? undefined : parseModelSelector(selector, "category")
+    return route === undefined
+      ? undefined
+      : toEffectiveRecord(route, event.type === "retry_fallback_applied" ? "fallback" : "fallback-revert")
+  }
+  if (event.type !== "model_changed") return undefined
+  const source = readEventString(event, "source")
+  const model = readModelRef(event)
+  if (source === undefined || !MODEL_CHANGED_SOURCES.has(source) || model === undefined) return undefined
+  const thinkingLevel = readEventString(event, "thinkingLevel")
+  const effectId = readEventString(event, "effectId")
+  const switchedByOperator = (source === "set" || source === "cycle")
+    && (effectId === undefined || isOwnEffect?.(effectId) !== true)
+  return {
+    provider: model.provider,
+    model_id: model.id,
+    display: `${model.provider}/${model.id}`,
+    ...(thinkingLevel === undefined ? {} : { reasoning: thinkingLevel }),
+    source: source as EffectiveModelSource,
+    ...(switchedByOperator ? { switched_by_operator: true } : {}),
+  }
+}
+
 function toEffectiveRecord(
   model: ResolvedModelRecord,
   source: EffectiveModelSource,
