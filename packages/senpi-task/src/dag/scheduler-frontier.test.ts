@@ -222,6 +222,11 @@ class FrontierFakeManager implements TaskManager {
     return this.recordOf(String(owner.nodeId))
   }
 
+  findOwnedTasks(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): readonly TaskRecord[] {
+    const record = this.findOwnedTask(owner)
+    return record === undefined ? [] : [record]
+  }
+
   waitFor(taskId: string): Promise<TaskRecord> {
     const entry = this.#tasks.get(taskId)
     if (entry === undefined) throw new Error(`unknown fake task ${taskId}`)

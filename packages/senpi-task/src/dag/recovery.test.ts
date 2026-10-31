@@ -176,9 +176,12 @@ class RecoveryTaskManager implements TaskManager {
   }
 
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].findLast(({ record }) =>
-      record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId,
-    )?.record
+    return this.findOwnedTasks(owner).at(-1)
+  }
+
+  findOwnedTasks(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): readonly TaskRecord[] {
+    return [...this.#tasks.values()].map(({ record }) => record).filter((record) =>
+      record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId)
   }
 
   get(taskId: string): TaskRecord | undefined {
