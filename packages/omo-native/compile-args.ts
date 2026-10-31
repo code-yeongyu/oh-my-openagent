@@ -1,6 +1,6 @@
 import { join } from "node:path"
 
-import { isEngineCommand } from "./bin/lib/engine-commands.js"
+import { engineCommandArgs, isEngineCommand } from "./bin/lib/engine-commands.js"
 
 /**
  * How the compiled binary reads its own argv before it hands the argv to the engine. Only the
@@ -18,7 +18,7 @@ export function launchOptions(args: readonly string[]): readonly string[] {
 
 export function buildSenpiArgs(args: string[], execDir: string): string[] {
   const ownsExtensions = launchOptions(args).includes("--no-extensions")
-  if (isEngineCommand(args)) return args
+  if (isEngineCommand(args)) return engineCommandArgs(args, join(execDir, "plugin"))
   // `--no-extensions` is the caller owning the extension list: a memory child lists none and an
   // RPC task child lists this plugin itself, so injecting it here would load the plugin into a
   // bare child or load it twice.
