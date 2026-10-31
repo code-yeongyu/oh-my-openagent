@@ -37,7 +37,11 @@ export const runPowerShell: PowerShellRunner = async (script, env) => {
 
 // The first non-empty line of a failed script's stderr, bounded, so a refusal names the Windows error.
 const firstErrorLine = (err: string | undefined): string => {
-  const line = (err ?? "").split(/\r?\n/).find((text) => text.trim() !== "")?.trim() ?? "";
+  const line =
+    (err ?? "")
+      .split(/\r?\n/)
+      .find((text) => text.trim() !== "" && !text.startsWith("#< CLIXML"))
+      ?.trim() ?? "";
   return line === "" ? "" : `: ${line.slice(0, 300)}`;
 };
 
@@ -98,6 +102,14 @@ public static class LaSddl {
 }
 '@
 [LaSddl]::Read($env:LA_PATH)
+`;
+
+// SDDL names well-known accounts by alias (the machine's built-in Administrator, RID 500, reads "LA"), so the owner
+// and ACE of an exact DACL may carry an alias instead of the user's SID. This prints the token SDDL uses for
+// $env:LA_SID on this machine, so the verdict can accept exactly that alias and nothing else.
+export const SID_TOKEN_SCRIPT = String.raw`
+$ErrorActionPreference = 'Stop'
+(New-Object System.Security.AccessControl.RawSecurityDescriptor("O:$env:LA_SID")).GetSddlForm('Owner')
 `;
 
 // Prints the current user's SID (the S-1-... form, never an alias).
@@ -212,10 +224,12 @@ export const exactDaclVerdict = (
   dacl: DaclDescription,
   userSid: string,
   kind: "dir" | "file",
+  userAlias?: string,
 ): boolean => {
+  const isUser = (token: string): boolean => token === userSid || (userAlias !== undefined && token === userAlias);
   const [ace, ...others] = dacl.aces;
   return (
-    dacl.owner === userSid &&
+    isUser(dacl.owner) &&
     dacl.flags === "PAI" &&
     ace !== undefined &&
     others.length === 0 &&
@@ -224,7 +238,7 @@ export const exactDaclVerdict = (
     ace.rights === "FA" &&
     ace.objectGuid === "" &&
     ace.inheritObjectGuid === "" &&
-    ace.sid === userSid &&
+    isUser(ace.sid) &&
     ace.extra === undefined
   );
 };
@@ -235,6 +249,17 @@ export const currentUserSid = async (run: PowerShellRunner = runPowerShell): Pro
   if (code !== 0 || !/^S-1-[0-9-]+$/.test(sid))
     throw new LocalApiError("insecure_state_dir", "the user SID is unreadable");
   return sid;
+};
+
+// The SDDL token for userSid on this machine (an alias such as "LA", or the SID itself); undefined when it cannot be
+// read, so the verdict then accepts the literal SID only.
+export const userSidToken = async (
+  userSid: string,
+  run: PowerShellRunner = runPowerShell,
+): Promise<string | undefined> => {
+  const { code, out } = await run(SID_TOKEN_SCRIPT, { LA_SID: userSid });
+  const match = code === 0 ? /^O:(S-1-\d+(?:-\d+)+|[A-Z]{2})$/.exec(out.trim()) : null;
+  return match?.[1];
 };
 
 export const applyExactDacl = async (
@@ -276,7 +301,7 @@ export const verifyExactDacl = async (
     if (error instanceof LocalApiError) return false;
     throw error;
   }
-  return exactDaclVerdict(dacl, userSid, kind);
+  return exactDaclVerdict(dacl, userSid, kind, await userSidToken(userSid, run));
 };
 
 export const windowsSecureFile =

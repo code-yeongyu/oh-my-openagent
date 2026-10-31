@@ -113,6 +113,19 @@ describe("the exact DACL verdict over the raw SDDL", () => {
   });
 });
 
+describe("the SDDL alias of the user", () => {
+  test("the owner and ACE may carry the alias SDDL prints for the user, and only that alias", () => {
+    const aliased = parseSddl("O:LAD:PAI(A;;FA;;;LA)");
+    expect(aliased).toBeDefined();
+    if (aliased === undefined) return;
+    expect(exactDaclVerdict(aliased, U, "file", "LA")).toBe(true);
+    expect(exactDaclVerdict(aliased, U, "file")).toBe(false);
+    expect(exactDaclVerdict(aliased, U, "file", "BA")).toBe(false);
+    const mixed = parseSddl("O:LAD:PAI(A;;FA;;;BA)");
+    expect(mixed !== undefined && exactDaclVerdict(mixed, U, "file", "LA")).toBe(false);
+  });
+});
+
 describe("applying the exact DACL", () => {
   test("a failed apply names the first line of the script's error", async () => {
     const failing = async () => ({
@@ -124,6 +137,17 @@ describe("applying the exact DACL", () => {
       code: "insecure_state_dir",
       reason:
         'the exact DACL could not be applied: Exception calling "SetAccessControl": Attempted to perform an unauthorized operation.',
+    });
+  });
+
+  test("a Windows PowerShell CLIXML header line is skipped when naming the error", async () => {
+    const failing = async () => ({
+      code: 1,
+      out: "",
+      err: "#< CLIXML\r\nAccess to the path is denied.\r\n",
+    });
+    expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
+      reason: "the exact DACL could not be applied: Access to the path is denied.",
     });
   });
 
