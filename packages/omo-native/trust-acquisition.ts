@@ -50,7 +50,12 @@ function selected(facts: EngineTrustFacts, der: ReadonlyMap<string, Uint8Array>,
   codes.push(...result.diagnostics.map((code) => ({ code })))
   if (result.status === "failed") return fallback("negatives-incomplete", codes)
   return {
-    certificates: [...result.S, ...result.I].map((id) => new X509Certificate(der.get(id)!).toString()),
+    certificates: [...result.S, ...result.I].map((id) => {
+      const bytes = der.get(id)
+      // A selected identity without its DER is a broken source; acquisition discards it as malformed.
+      if (bytes === undefined) throw new Error("selected certificate has no DER")
+      return new X509Certificate(bytes).toString()
+    }),
     fallbackReason: null, codes,
   }
 }
@@ -164,8 +169,11 @@ async function native(options: TrustAcquisitionOptions, signal: AbortSignal): Pr
   })
   codes.push(...hashed.diagnostics.map(({ code }) => ({ code })))
   const excluded = new Set(hashed.excludedFingerprints)
-  const allowed = certificates.filter((cert) => cert.source !== "openssl-default-file"
-    || !excluded.has(new X509Certificate(der.get(cert.sha256)!).fingerprint256))
+  const allowed = certificates.filter((cert) => {
+    if (cert.source !== "openssl-default-file") return true
+    const bytes = der.get(cert.sha256)
+    return bytes !== undefined && !excluded.has(new X509Certificate(bytes).fingerprint256)
+  })
   for (const cert of hashed.candidates) {
     const fact = factsOf(cert)
     der.set(fact.sha256, cert.raw)

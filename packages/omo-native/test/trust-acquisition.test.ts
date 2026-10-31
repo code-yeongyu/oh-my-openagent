@@ -24,7 +24,8 @@ test("the owner deadline resolves even when a source never answers", async () =>
     },
   })
   await started
-  expire!()
+  if (expire === undefined) throw new Error("acquisition never armed its deadline")
+  expire()
   expect(await outcome).toEqual({ certificates: [], fallbackReason: "helper-timeout", codes: [] })
 })
 
@@ -70,8 +71,13 @@ test("Linux acquisition applies the shared server-auth policy to a synthetic sel
       { name: "client", subject: "/CN=synthetic-client-ca", days: 2,
         extensions: "basicConstraints=critical,CA:TRUE\nextendedKeyUsage=clientAuth" },
     ])
-    const server = new X509Certificate(issued.get("server")!).toString()
-    const client = new X509Certificate(issued.get("client")!).toString()
+    const pem = (name: string) => {
+      const value = issued.get(name)
+      if (value === undefined) throw new Error(`synthetic ${name} certificate was not issued`)
+      return new X509Certificate(value).toString()
+    }
+    const server = pem("server")
+    const client = pem("client")
     const result = await acquireEngineTrust({
       deadlineMs: 20_000, platform: "linux", environment: {},
       linux: {
