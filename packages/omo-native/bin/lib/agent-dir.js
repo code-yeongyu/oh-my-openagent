@@ -63,31 +63,66 @@ function readJsonFile(path) {
   }
 }
 
+/** Keys that must never be copied between state objects, whatever a legacy file contains. */
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"])
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
 /**
- * Backfills top-level keys the canonical settings file no longer has. Present keys are never
- * overwritten: the canonical file is always the newer truth, the flat file only fills its gaps.
+ * Recursively copies properties the canonical object is missing. Present values are never
+ * overwritten: the canonical file is always the newer truth, the flat file only fills its
+ * gaps. Objects recurse so partially overlapping subtrees keep their missing leaves; arrays,
+ * scalars and nulls never merge element-wise. Returns the number of properties copied and
+ * collects the top-level keys that gained additions into `touched`.
  */
-function backfillSettings(source, target) {
+function mergeMissing(source, target, touched, owner = null) {
+  let copied = 0
+  for (const key of Object.keys(source)) {
+    if (UNSAFE_KEYS.has(key)) continue
+    const value = source[key]
+    const topKey = owner ?? key
+    if (!(key in target)) {
+      target[key] = value
+      touched.add(topKey)
+      copied += 1
+      continue
+    }
+    if (isPlainObject(value) && isPlainObject(target[key])) {
+      copied += mergeMissing(value, target[key], touched, topKey)
+    }
+  }
+  return copied
+}
+
+/**
+ * Backfills properties an existing canonical state file is missing. Present values are never
+ * overwritten: the canonical file is always the newer truth, the flat file only fills its gaps.
+ * Returns the touched top-level keys, or undefined when either side cannot be parsed - leaving
+ * the marker unwritten, so a repaired file is still adopted on a later launch.
+ */
+function backfillJsonObject(source, target) {
   const legacy = readJsonFile(source)
   const current = readJsonFile(target)
   if (!legacy || !current) return undefined
 
-  const missing = Object.keys(legacy).filter((key) => !(key in current))
-  if (missing.length === 0) return []
+  const touched = new Set()
+  if (mergeMissing(legacy, current, touched) === 0) return []
 
   copyFileSync(target, `${target}.bak-${timestamp()}`)
-  const merged = { ...current }
-  for (const key of missing) merged[key] = legacy[key]
-  writeFileSync(target, `${JSON.stringify(merged, null, 2)}\n`)
-  return missing
+  writeFileSync(target, `${JSON.stringify(current, null, 2)}\n`)
+  return [...touched]
 }
 
 /**
  * One-time carry-forward from the legacy flat directory into the canonical one.
  *
  * Unifying the directory would otherwise present itself as one more reset to anyone whose state
- * still lives in the flat layout. Idempotent, never overwrites an existing canonical file, and
- * skipped entirely when the user pinned a directory of their own.
+ * still lives in the flat layout. Idempotent, never overwrites an existing canonical file or
+ * value: when a canonical file already exists its missing entries - at any depth for objects -
+ * are merged in instead, so credentials adopted before the runtime created its own files are
+ * never dropped. Skipped entirely when the user pinned a directory of their own.
  */
 /** @typedef {{ adopted: boolean, copied: string[], backfilled: string[] }} AdoptionResult */
 
@@ -113,10 +148,10 @@ export function adoptLegacyFlatState(env = process.env, home = runtimeHome(env))
       result.copied.push(file)
       continue
     }
-    if (file !== "settings.json") continue
-    const backfilled = backfillSettings(source, target)
+    const backfilled = backfillJsonObject(source, target)
     if (backfilled === undefined) parseFailed = true
-    else result.backfilled.push(...backfilled)
+    else if (file === "settings.json") result.backfilled.push(...backfilled)
+    else result.backfilled.push(...backfilled.map((key) => `${file}:${key}`))
   }
 
   result.adopted = result.copied.length > 0 || result.backfilled.length > 0
