@@ -177,7 +177,9 @@ describe("TaskManager capacity paths", () => {
     const failed = await manager.start(baseSpec({ name: "failed" }))
     const nextTask = await manager.start(baseSpec({ name: "next" }))
 
-    expect(failed).toMatchObject({ kind: "start_failed", error_message: "spawn bookkeeping failed" })
+    expect(failed.kind).toBe("start_failed")
+    if (failed.kind !== "start_failed") throw new Error("expected failure")
+    expect(failed.error_message).toContain("injected persistence failure")
     expect(nextTask).toMatchObject({ kind: "started", status: "running" })
     expect(runner.startedSpecs).toHaveLength(1)
   })

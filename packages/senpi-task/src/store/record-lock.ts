@@ -19,7 +19,9 @@ const LOCK_RETRY_MS = 10
 // A waiter gives up only when ONE holder keeps the lock this long. Holders that each finish promptly
 // hand the lock on, and a waiter queued behind any number of them keeps waiting: a busy lock never
 // fails an acquisition, only a holder that stops making progress does.
-const LOCK_HOLDER_WAIT_MS = 1_000
+// A normal record writer can spend 1,270 ms retrying a Windows rename (#11269). Its waiter
+// must allow that bounded operation to finish before treating the holder as stalled.
+const LOCK_HOLDER_WAIT_MS = 3_000
 // A lock is taken from its holder only on proof that the holder is dead (lock-owner.ts); age alone
 // never expires a lock. The one exception is a lock with no parseable owner - its writer died between
 // the create and the write, which takes microseconds - once it is older than this window.

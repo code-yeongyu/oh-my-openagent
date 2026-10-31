@@ -314,7 +314,7 @@ describe("TaskManager claim characterization", () => {
     if (result.kind !== "start_failed") throw new Error("expected start_failed")
     expect(result.task_id).toMatch(/^st_[0-9a-f]{8}$/)
     expect(inner.load(result.task_id)?.status).toBe("error")
-    expect(inner.load(result.task_id)?.error_message).toBe("spawn bookkeeping failed")
+    expect(inner.load(result.task_id)?.error_message).toContain("injected bookkeeping failure")
     expect(transitions.map((transition) => transition.type)).toEqual(["start", "fail"])
     expect(bookkeeping.applied()).toEqual([true, true])
     // wasBackground reads the RECORD: the claim persisted notify_on_terminal from the spec before
