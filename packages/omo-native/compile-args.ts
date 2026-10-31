@@ -26,6 +26,8 @@ export function trustLaunchKind(args: readonly string[]): "static" | "long-lived
   // opens no connection: a static answer, the way update usage is static beside the network `update`.
   if (!serviceAccountsOpen() && ["login", "logout", "whoami"].includes(args[0] ?? "")) return "static"
   const options = launchOptions(args)
+  // 5.2: `trust ensure` imports with 1.5 s and exits; only `--wait` takes the one-shot hard cap.
+  if (options[0] === "trust") return options.includes("--wait") ? "one-shot-network" : "short-host-cli"
   if (["thread", "daemon"].includes(options[0] ?? "")
     || (options[0] === "host" && ["ensure", "status", "stop", "handoff"].includes(options[1] ?? ""))) return "short-host-cli"
   if (["login", "logout", "whoami", "sync", "account", "update", "doctor", "setup"].includes(options[0] ?? "")
