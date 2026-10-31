@@ -949,9 +949,44 @@ jobs:
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
         run: bun run build:omo-native
 
+      # omo-ai ships the signed keychain helper (#11262) as bin/darwin/omo-keychain. A normal run takes
+      # it from this run's keychain-helper job (the tarball keeps its mode); a skip_platform run has no
+      # such job and restores the same asset from the existing release by digest instead.
+      - name: Download keychain helper
+        if: inputs.skip_platform != true && inputs.lazycodex_only != true && needs.release-metadata.outputs.already_published != 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: keychain-helper
+          path: .omo/keychain-helper
+
+      - name: Stage keychain helper into the omo-ai payload
+        if: inputs.skip_platform != true && inputs.lazycodex_only != true && needs.release-metadata.outputs.already_published != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p packages/omo-native/bin/darwin
+          tar -xzpf .omo/keychain-helper/omo-keychain.tar.gz -C packages/omo-native/bin/darwin
+          test -x packages/omo-native/bin/darwin/omo-keychain
+
+      # Digest-verified, not requirement-verified: this job runs on ubuntu, and the requirement gate ran
+      # in the keychain-helper job that produced the asset. A release without the asset fails here.
+      - name: Restore keychain helper from the existing release
+        if: inputs.skip_platform == true && inputs.lazycodex_only != true && needs.release-metadata.outputs.already_published != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          dir="$(mktemp -d)"
+          trap 'rm -rf "$dir"' EXIT
+          gh release download "v${VERSION}" --pattern omo-keychain-darwin-universal --pattern SHA256SUMS --dir "$dir"
+          test -f "$dir/omo-keychain-darwin-universal"
+          (cd "$dir" && shasum -a 256 -c --ignore-missing SHA256SUMS)
+          mkdir -p packages/omo-native/bin/darwin
+          install -m 0755 "$dir/omo-keychain-darwin-universal" packages/omo-native/bin/darwin/omo-keychain
+
       - name: Verify omo-ai payload
         if: needs.release-metadata.outputs.already_published != 'true' && inputs.lazycodex_only != true
-        run: node script/verify-omo-ai-payload.mjs
+        run: node script/verify-omo-ai-payload.mjs --release
 
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
@@ -1357,9 +1392,25 @@ jobs:
               gh release download "v${VERSION}" --pattern "$NAME" --dir .omo/release-binaries
             fi
           done
+          if [ ! -f .omo/release-binaries/omo-keychain-darwin-universal ]; then
+            gh release download "v${VERSION}" --pattern omo-keychain-darwin-universal --dir .omo/release-binaries
+          fi
+          # Any other asset an earlier run built (e.g. omo-runtime-capabilities.json) is known only from
+          # what that run published: restore every SHA256SUMS entry this run did not build (RULING-77).
+          PRIOR="$(mktemp -d)"
+          trap 'rm -rf "$PRIOR"' EXIT
+          if gh release download "v${VERSION}" --pattern SHA256SUMS --dir "$PRIOR"; then
+            while read -r _ NAME; do
+              if [ ! -f ".omo/release-binaries/$NAME" ]; then
+                gh release download "v${VERSION}" --pattern "$NAME" --dir .omo/release-binaries
+              fi
+            done < "$PRIOR/SHA256SUMS"
+          else
+            echo "v${VERSION} has no SHA256SUMS yet: nothing beyond the canonical assets to restore"
+          fi
           ls -la .omo/release-binaries/
-          # The release owns two checksum assets: one for 12 omo launchers,
-          # and one for the six separately downloadable desktop engines.
+          # The release owns two checksum assets: one for 12 omo launchers plus the
+          # keychain helper, and one for the six separately downloadable desktop engines.
           (cd .omo/release-binaries && shasum -a 256 omo-* > SHA256SUMS)
           bun script/desktop-engine-release.ts checksums .omo/release-binaries
           gh release upload "v${VERSION}" .omo/release-binaries/omo-* \
@@ -1382,28 +1433,41 @@ jobs:
           VERIFY_DIR="$(mktemp -d)"
           trap 'rm -rf "$VERIFY_DIR"' EXIT
           gh release download "v${VERSION}" --dir "$VERIFY_DIR"
-          EXPECTED_DIR="$(mktemp -d)"
-          trap 'rm -rf "$VERIFY_DIR" "$EXPECTED_DIR"' EXIT
+          RELEASED="$(cd "$VERIFY_DIR" && printf '%s\n' * | sort)"
+          # The contract floor every release carries, built in this run or not.
+          FLOOR=(omo-keychain-darwin-universal SHA256SUMS senpi-desktop-engine-checksums.txt
+            senpi-desktop-engine-win32-x64.exe senpi-desktop-engine-win32-arm64.exe)
           for TARGET in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline windows-arm64; do
             NAME="omo-${TARGET}"
             if [[ "$TARGET" == windows-* ]]; then NAME="${NAME}.exe"; fi
-            touch "$EXPECTED_DIR/$NAME"
+            FLOOR+=("$NAME")
           done
           for HOST in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do
-            touch "$EXPECTED_DIR/senpi-desktop-engine-${HOST}"
+            FLOOR+=("senpi-desktop-engine-${HOST}")
           done
-          touch "$EXPECTED_DIR/senpi-desktop-engine-win32-x64.exe" "$EXPECTED_DIR/senpi-desktop-engine-win32-arm64.exe" \
-            "$EXPECTED_DIR/SHA256SUMS" "$EXPECTED_DIR/senpi-desktop-engine-checksums.txt"
-          diff -u <(cd "$EXPECTED_DIR" && printf '%s\n' * | sort) \
-            <(cd "$VERIFY_DIR" && printf '%s\n' * | sort)
+          for NAME in "${FLOOR[@]}"; do
+            grep -qxF -- "$NAME" <<<"$RELEASED" || { echo "::error::v${VERSION} lacks the release asset ${NAME}"; exit 1; }
+          done
+          # A run that built assets must have published exactly what it built: nothing missing, nothing
+          # extra (RULING-77). skip_platform runs built nothing, so their release is checked by the floor
+          # and the checksum coverage below.
+          # Only top-level regular files are release assets: the desktop-engine artifact also carries payload
+          # directories (engine-trust-helper-<host>, shipped inside the compiled binaries, #12018) that are never uploaded.
+          if [ -d .omo/release-binaries ]; then
+            diff -u <(cd .omo/release-binaries && for NAME in *; do if [ -f "$NAME" ]; then printf '%s\n' "$NAME"; fi; done | sort) <(printf '%s\n' "$RELEASED")
+          fi
           (
             cd "$VERIFY_DIR"
-            test "$(wc -l < SHA256SUMS)" -eq 12
-            test "$(wc -l < senpi-desktop-engine-checksums.txt)" -eq 6
+            # Every asset is listed in exactly one checksum file, and every listed digest matches.
+            diff -u <({ awk '{print $2}' SHA256SUMS senpi-desktop-engine-checksums.txt; printf '%s\n' SHA256SUMS senpi-desktop-engine-checksums.txt; } | sort) \
+              <(printf '%s\n' "$RELEASED")
             shasum -a 256 -c SHA256SUMS
             shasum -a 256 -c senpi-desktop-engine-checksums.txt
+            if [ -f omo-runtime-capabilities.json ]; then
+              printf '{"keychainHandoff":1}\n' | cmp - omo-runtime-capabilities.json
+            fi
           )
-          echo "Verified 20/20 release assets for v${VERSION}"
+          echo "Verified $(grep -c . <<<"$RELEASED") release assets for v${VERSION}"
 
       - name: Delete draft release
         if: inputs.lazycodex_only != true

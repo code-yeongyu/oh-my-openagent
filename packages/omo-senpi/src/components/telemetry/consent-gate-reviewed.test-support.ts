@@ -27,13 +27,45 @@ const OWNER_LIVENESS = "owner liveness: links back an owner entry it moved aside
 const OPTOUT_PURGE_KEEP = "opted-out purge: links a claimed record back to its own name only when that record may still be sent (kept), never over a newer file; it re-creates existing data, never new data"
 const PROCESS_START = "reads a process start time to judge owner liveness; it sends nothing and writes nothing"
 const SUMMARY_SEND = "sends a pending session_summary only while the component's consent gate holds, the same per-event read the fan-in makes"
+const INGEST_CACHE = "the lazy sidecar calls registration only after env opt-outs and the shared consent gate pass; writeCache persists only a registration result, with a fresh consent read after the response; temporary cleanup adds no data"
 
 export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "mkdirSync(dirname(path))", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "writeFileSync(temporary)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "renameSync(temporary)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "writeCache", guard: "",
+    call: "rmSync(temporary)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "resolveInstallIngestKey>=>",
+    guard: "unless(!input.consent())",
+    call: "fetch(`${endpoint}/v1/register`)", reason: INGEST_CACHE,
+  },
+  {
+    file: "ingest-key.ts", fn: "invalidateInstallIngestKey",
+    guard: "if(readCache(path).key === key)",
+    call: "rmSync(path)", reason: "a collector 401 deletes only the rejected cache entry; deletion adds no telemetry data",
+  },
+  {
     file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport",
-    guard: "unless(ingestKey.length === 0 || !isOtlpEvent(message.event))",
+    guard: 'unless(!isOtlpEvent(message.event) || !allowed()) unless(explicitKey === "") unless(!ingestKey || !allowed())',
     call: 'createOtlpTelemetryTransport({ productEnvPrefix: "OMO_SENPI", ingestKey, spoolRoot, spool)',
     reason: "the core constructor checks every environment opt-out and this same consent callback before loading a sender or creating spool files",
+  },
+  {
+    file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport>=>>fetch", guard: "unless(rejected)",
+    call: "fetch(url)",
+    reason: "the core sender checks the same consent before every attempt; an automatic install-key 401 invalidates the key and shuts down only OTLP, while the guard blocks in-flight resends",
   },
   {
     file: "lazy-posthog.ts", fn: "withOtlpTransport>forward",
@@ -51,7 +83,7 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   },
   {
     file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport>capture",
-    guard: "if(isOtlpEvent(value.event))",
+    guard: "if(!rejected && isOtlpEvent(value.event))",
     route: VIA_SESSION_CLIENT,
     call: "transport.capture(value)",
     reason: "forwards only pinned product events to the core transport, which checks the shared consent on every append and send",

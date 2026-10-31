@@ -8,9 +8,10 @@ use core_graphics::event::{CGEventFlags, CGEventTapLocation};
 use core_graphics::event_source::CGEventSource;
 use senpi_desktop_core::backend::Modifiers;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::intervention::check_press;
 use senpi_desktop_core::keys::KeyName;
 
-use super::cgevent::{keyboard_event, modifier_flags};
+use super::cgevent::keyboard_event;
 use super::held::{Held, HeldKey, KeyRoute};
 
 /// The key code for a chord key, as the fixed macOS virtual-key table gives it.
@@ -136,9 +137,9 @@ pub(crate) const fn update_modifier(modifiers: &mut Modifiers, key: KeyName, dow
     }
 }
 
-/// Builds, routes, and records one key event. Held state is recorded before a
-/// down post and cleared after a successful up post, so a failed release stays
-/// replayable by `release_all`.
+/// Builds, routes, and records one key event. A down post runs the press check
+/// first; held state is recorded before a down post and cleared after a
+/// successful up post, so a failed release stays replayable by `release_all`.
 pub(super) fn post_key(
     source: &CGEventSource,
     held: &mut Held,
@@ -149,6 +150,7 @@ pub(super) fn post_key(
     route: KeyRoute,
 ) -> CoreResult<()> {
     if down {
+        check_press()?;
         held.key_down(HeldKey {
             route,
             code,
@@ -174,6 +176,134 @@ pub(super) fn post_key(
         held.key_up(route, code);
     }
     posted
+}
+
+/// Types layout `keys` (a remote screen's) through `route`, pressing Shift
+/// and Option as modifier KEYS only while a key needs them: a client that
+/// forwards input to another machine sends modifier keys, not event flags.
+/// `before_press` runs before every press, modifier presses included; when
+/// it fails nothing more is pressed. Modifiers still held when a post fails
+/// are released.
+pub(super) fn type_layout_keys(
+    source: &CGEventSource,
+    held: &mut Held,
+    keys: &[super::remote::TypedKey<'_>],
+    gap: Duration,
+    route: KeyRoute,
+    before_press: &mut dyn FnMut() -> CoreResult<()>,
+    delivered: &mut dyn FnMut(),
+) -> CoreResult<()> {
+    let mut modifiers = Modifiers::default();
+    let result = (|| {
+        for key in keys {
+            let wanted = Modifiers { shift: key.stroke.shift, alt: key.stroke.option, ..Modifiers::default() };
+            for (code, held_now, want) in [
+                (super::remote::SHIFT_CODE, modifiers.shift, wanted.shift),
+                (super::remote::OPTION_CODE, modifiers.alt, wanted.alt),
+            ] {
+                if held_now == want {
+                    continue;
+                }
+                if want {
+                    before_press()?;
+                }
+                let mut next = modifiers;
+                if code == super::remote::SHIFT_CODE {
+                    next.shift = want;
+                } else {
+                    next.alt = want;
+                }
+                post_key(source, held, code, None, want, super::cgevent::modifier_flags(next), route)?;
+                modifiers = next;
+                thread::sleep(gap);
+            }
+            before_press()?;
+            let flags = super::cgevent::modifier_flags(modifiers);
+            post_key(source, held, key.stroke.code, None, true, flags, route)?;
+            thread::sleep(gap);
+            post_key(source, held, key.stroke.code, None, false, flags, route)?;
+            thread::sleep(gap);
+            delivered();
+        }
+        Ok(())
+    })();
+    // Release in reverse, even after a failure; the first error wins.
+    let mut release = Ok(());
+    for (code, held_now) in [(super::remote::OPTION_CODE, modifiers.alt), (super::remote::SHIFT_CODE, modifiers.shift)] {
+        if held_now {
+            if code == super::remote::SHIFT_CODE {
+                modifiers.shift = false;
+            } else {
+                modifiers.alt = false;
+            }
+            let posted = post_key(source, held, code, None, false, super::cgevent::modifier_flags(modifiers), route);
+            if release.is_ok() {
+                release = posted;
+            }
+        }
+    }
+    result.and(release)
+}
+
+/// Posts bare key `transitions` `(code, down)` at the HID tap from a null
+/// event source, with no flag or text override, so CoreGraphics derives the
+/// modifier state from the transitions exactly as for a hardware keyboard.
+/// `before_press` runs before every press; once a press is refused or fails
+/// nothing more is pressed, and every key this call pressed and did not yet
+/// release is released in reverse order, so no key leaks to the front app
+/// and no release goes out for a key that was never pressed. The first error
+/// wins.
+pub(super) fn post_bare_keys(
+    held: &mut Held,
+    transitions: &[(u16, bool)],
+    gap: Duration,
+    before_press: &mut dyn FnMut() -> CoreResult<()>,
+    delivered: &mut dyn FnMut(),
+) -> CoreResult<()> {
+    let is_modifier = |code: u16| code == super::remote::SHIFT_CODE || code == super::remote::OPTION_CODE;
+    let mut pressed: Vec<u16> = Vec::new();
+    let result = (|| {
+        for &(code, down) in transitions {
+            if down {
+                before_press()?;
+                check_press()?;
+                post_bare(code, true)?;
+                // Only a press that went out is released later.
+                held.key_down(HeldKey { route: KeyRoute::Global, code, text: None });
+                pressed.push(code);
+            } else {
+                post_bare(code, false)?;
+                held.key_up(KeyRoute::Global, code);
+                pressed.retain(|&held_code| held_code != code);
+                if !is_modifier(code) {
+                    delivered();
+                }
+            }
+            thread::sleep(gap);
+        }
+        Ok(())
+    })();
+    let mut release = Ok(());
+    for code in pressed.into_iter().rev() {
+        let posted = post_bare(code, false);
+        if posted.is_ok() {
+            held.key_up(KeyRoute::Global, code);
+        } else if release.is_ok() {
+            release = posted;
+        }
+    }
+    result.and(release)
+}
+
+/// One bare key transition at the HID tap: a null source and no flag or
+/// Unicode overrides (`CGEventCreateKeyboardEvent(NULL, ...)`), so
+/// CoreGraphics derives the modifier state as for a hardware keyboard; the
+/// event still carries the engine tag the user-input watch tells ours by
+/// ([`super::cgevent::bare_keyboard_event`]).
+fn post_bare(code: u16, down: bool) -> CoreResult<()> {
+    let event = super::cgevent::bare_keyboard_event(code, down)?;
+    event.post(CGEventTapLocation::HID);
+    Ok(())
 }
 
 /// Types `text` one character at a time through `route`.
@@ -212,37 +342,4 @@ pub(super) fn type_text_interruptible(
         delivered();
     }
     Ok(())
-}
-
-/// Presses `keys` in order and releases them in reverse, keeping the running
-/// modifier flags faithful; the first release failure is reported after all
-/// releases ran.
-pub(super) fn chord(
-    source: &CGEventSource,
-    held: &mut Held,
-    keys: &[KeyName],
-    route: KeyRoute,
-) -> CoreResult<()> {
-    if keys.is_empty() {
-        return Err(DesktopError::invalid_key("key chord must not be empty"));
-    }
-    let mut active = Modifiers::default();
-    for &key in keys {
-        update_modifier(&mut active, key, true);
-        let code = key_code(key)?;
-        post_key(source, held, code, None, true, modifier_flags(active), route)?;
-        thread::sleep(Duration::from_millis(8));
-    }
-    let mut first_error = None;
-    for &key in keys.iter().rev() {
-        update_modifier(&mut active, key, false);
-        if let Err(error) = (|| {
-            let code = key_code(key)?;
-            post_key(source, held, code, None, false, modifier_flags(active), route)
-        })() {
-            first_error.get_or_insert(error);
-        }
-        thread::sleep(Duration::from_millis(8));
-    }
-    first_error.map_or(Ok(()), Err)
 }

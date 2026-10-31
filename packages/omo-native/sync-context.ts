@@ -10,6 +10,7 @@ import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 
 export interface SyncContext {
   readonly account: string
+  readonly serviceOrigin?: string
   readonly serviceDeviceId: string
   readonly keyring: DeviceKeyring
   readonly pinDir: string
@@ -48,6 +49,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
   return {
     account,
+    serviceOrigin: api,
     serviceDeviceId: credentials.device.id,
     keyring: await deviceKeyringFromMaterial({ signingPrivatePkcs8: base64url(credentials.signingPrivateKey), sealingPrivatePkcs8: base64url(credentials.sealingPrivateKey) }),
     pinDir: syncPinDir(resolveMemoryRoot(options.env, options.cwd)),

@@ -27,6 +27,27 @@ fn tagged(event: CGEvent) -> CGEvent {
     event
 }
 
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    fn CGEventCreateKeyboardEvent(source: CGEventSourceRef, code: u16, down: bool) -> *mut core_graphics::sys::CGEvent;
+}
+
+/// A bare key transition for a remote screen: a NULL event source and no
+/// flag override, so CoreGraphics derives the modifier state from the
+/// transitions exactly as for a hardware keyboard. It still carries the
+/// engine tag: with a null source the event's source pid is 0, and the
+/// user-input watch (D3) tells the engine's events apart by the tag.
+pub(crate) fn bare_keyboard_event(code: u16, down: bool) -> CoreResult<CGEvent> {
+    // SAFETY: [FFI] a NULL source is documented as valid for keyboard events;
+    // the returned create-rule event's ownership moves into `CGEvent`.
+    let raw = unsafe { CGEventCreateKeyboardEvent(std::ptr::null_mut(), code, down) };
+    if raw.is_null() {
+        return Err(DesktopError::input_failed("failed to create a Quartz keyboard event"));
+    }
+    // SAFETY: [FFI] `raw` is a non-null create-rule event owned here.
+    Ok(tagged(unsafe { CGEvent::from_ptr(raw) }))
+}
+
 pub(crate) fn keyboard_event(source: &CGEventSource, code: u16, down: bool) -> CoreResult<CGEvent> {
     CGEvent::new_keyboard_event(source.clone(), code, down)
         .map(tagged)
@@ -114,6 +135,19 @@ pub(super) const fn button_types(
             2,
         ),
     }
+}
+
+/// Whether a pointer event presses or moves, so the user-intervention check
+/// runs before it. A button release or a drag step always follows the press it
+/// belongs to, so a refusal never leaves a button down.
+pub(super) const fn is_press(event_type: CGEventType) -> bool {
+    matches!(
+        event_type,
+        CGEventType::LeftMouseDown
+            | CGEventType::RightMouseDown
+            | CGEventType::OtherMouseDown
+            | CGEventType::MouseMoved
+    )
 }
 
 pub(super) fn point(x: f64, y: f64) -> CoreResult<CGPoint> {
@@ -258,6 +292,17 @@ mod tests {
         assert!(finite_i32(f64::NAN, "x").is_err());
         assert!(finite_i32(1e12, "x").is_err());
         assert_eq!(finite_i32(3.6, "x"), Ok(4));
+    }
+
+    #[test]
+    fn only_presses_and_moves_run_the_press_check() {
+        for button in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
+            let (_, down, up, dragged, _) = button_types(button);
+            assert!(is_press(down));
+            assert!(!is_press(up));
+            assert!(!is_press(dragged));
+        }
+        assert!(is_press(CGEventType::MouseMoved));
     }
 
     #[test]
