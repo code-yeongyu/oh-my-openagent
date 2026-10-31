@@ -1,14 +1,33 @@
-import { z } from "zod"
-
 import type { ExtensionRpcRequestContext, SenpiExtensionAPI } from "../../extension/types"
 
 export type LoadSdk = () => Promise<unknown>
 const defaultLoadSdk: LoadSdk = () => import("@code-yeongyu/senpi")
 
-const Request = z.object({
-  name: z.literal("show_html_page"),
-  args: z.object({ html: z.string().min(1), title: z.string().min(1).max(200), height: z.number().int().optional() }),
-})
+interface HtmlPageArgs {
+  readonly html: string
+  readonly title: string
+  readonly height?: number
+}
+
+interface HostToolRequest {
+  readonly name: "show_html_page"
+  readonly args: HtmlPageArgs
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+// The desktop toolkit runtime is bundled without third-party dependencies, so the request is checked by hand.
+function parseRequest(data: unknown): HostToolRequest | undefined {
+  if (!isRecord(data) || data.name !== "show_html_page" || !isRecord(data.args)) return undefined
+  const { html, title, height } = data.args
+  if (typeof html !== "string" || html.length === 0) return undefined
+  if (typeof title !== "string" || title.length === 0 || title.length > 200) return undefined
+  if (height !== undefined && !Number.isInteger(height)) return undefined
+  const args: HtmlPageArgs = typeof height === "number" ? { html, title, height } : { html, title }
+  return { name: "show_html_page", args }
+}
 
 /** Runs only the SDK's standalone implementation, in the granting session's own cwd. */
 export function registerHostToolExecution(
@@ -17,9 +36,9 @@ export function registerHostToolExecution(
   loadSdk: LoadSdk = defaultLoadSdk,
 ): void {
   pi.rpc?.handle?.("omo.toolkit.executeHostTool", async (data: unknown, context?: ExtensionRpcRequestContext) => {
-    const request = Request.safeParse(data)
+    const request = parseRequest(data)
     // The engine's per-request transport context; dispatching through `admit` ties the write to that request.
-    if (!request.success || !names.has(request.data.name) || pi.cwd === undefined || typeof context?.admit !== "function") {
+    if (request === undefined || !names.has(request.name) || pi.cwd === undefined || typeof context?.admit !== "function") {
       return { isError: true, content: [{ type: "text", text: "The host tool is not available to this session." }], details: {} }
     }
     const cwd = pi.cwd
@@ -31,7 +50,7 @@ export function registerHostToolExecution(
         throw new Error("The pinned SDK does not provide writeHtmlPage.")
       }
       const writeHtmlPage = sdk.writeHtmlPage
-      const result: unknown = await context.admit(() => writeHtmlPage(request.data.args, cwd))
+      const result: unknown = await context.admit(() => writeHtmlPage(request.args, cwd))
       return result
     } catch (error) {
       if (!(error instanceof Error)) throw error
