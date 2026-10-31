@@ -32,7 +32,7 @@ function agentDir(auth?: unknown): string {
 }
 
 const login = (name: string) => ({ name, access: SECRET, refresh: SECRET, expires: 1 })
-// A Claude account as `claude auth login` stores it since senpi 2026.10.31-1: its login lives in a per-account Claude
+// A Claude account as `claude auth login` stores it in the pinned senpi (2026.10.31-2): its login lives in a per-account Claude
 // config dir, never a token in auth.json.
 const cli = (name: string) => ({ name, source: "login", store: "claude-cli", dirId: `dir-${name}`, signedInAt: 1, profile: { email: `${name}@example.com` } })
 const retiredLogin = (name: string) => ({ ...login(name), source: "login" })
