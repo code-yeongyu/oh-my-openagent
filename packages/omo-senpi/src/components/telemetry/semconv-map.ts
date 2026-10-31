@@ -1,4 +1,4 @@
-import semconvMapJson from "./schema-registry/semconv-map.json"
+import { keys, values } from "./schema-registry/semconv-map.json"
 
 /**
  * The vendored OpenTelemetry attribute contract (plan D-P), byte-identical to the collector's
@@ -19,9 +19,11 @@ export type SemconvMap = {
   readonly values: Readonly<Record<string, ValueTable>>
 }
 
-export const SEMCONV_MAP: SemconvMap = semconvMapJson as unknown as SemconvMap
+export const SEMCONV_MAP: SemconvMap = { keys, values } as unknown as SemconvMap
+
+const VALUE_TABLES = values as unknown as SemconvMap["values"]
 
 /** Our value -> the wire value through a VALUE table; undefined outside the table. */
 export function toWireValue(table: string, id: string): string | undefined {
-  return SEMCONV_MAP.values[table]?.rows.find((row) => row.id === id)?.wire
+  return VALUE_TABLES[table]?.rows.find((row) => row.id === id)?.wire
 }

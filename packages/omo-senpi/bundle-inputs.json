@@ -1355,6 +1355,8 @@
     "packages/omo-senpi/src/components/telemetry/posthog-runtime.ts",
     "packages/omo-senpi/src/components/telemetry/product-identity.ts",
     "packages/omo-senpi/src/components/telemetry/savings-math.ts",
+    "packages/omo-senpi/src/components/telemetry/schema-registry/semconv-map.json",
+    "packages/omo-senpi/src/components/telemetry/semconv-map.ts",
     "packages/omo-senpi/src/components/telemetry/session-inventory.ts",
     "packages/omo-senpi/src/components/telemetry/session-model-registry.ts",
     "packages/omo-senpi/src/components/telemetry/session-role-resolver.ts",
