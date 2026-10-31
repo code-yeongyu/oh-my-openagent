@@ -1,6 +1,7 @@
 import { join } from "node:path"
 
 import { isEngineCommand } from "./bin/lib/engine-commands.js"
+import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 
 /**
  * How the compiled binary reads its own argv before it hands the argv to the engine. Only the
@@ -14,6 +15,19 @@ import { isEngineCommand } from "./bin/lib/engine-commands.js"
 export function launchOptions(args: readonly string[]): readonly string[] {
   const end = args.indexOf("--")
   return end === -1 ? args : args.slice(0, end)
+}
+
+/** Design 6.1: unknown argv remains long-lived; message text after -- is never a flag. */
+export function trustLaunchKind(args: readonly string[]): "static" | "long-lived" | "short-host-cli" | "one-shot-network" {
+  if (args.length === 1 && ["--version", "-v", "--help"].includes(args[0] ?? "")) return "static"
+  if (isSelfUpdate(args) && updateUsageAnswer(args) !== undefined) return "static"
+  const options = launchOptions(args)
+  if (["thread", "daemon"].includes(options[0] ?? "")
+    || (options[0] === "host" && ["ensure", "status", "stop", "handoff"].includes(options[1] ?? ""))) return "short-host-cli"
+  if (["login", "logout", "whoami", "sync", "account", "update", "doctor", "setup"].includes(options[0] ?? "")
+    || options.includes("-p") || options.includes("--print")
+    || options.some((arg, index) => arg === "--mode" && options[index + 1] === "json")) return "one-shot-network"
+  return "long-lived"
 }
 
 export function buildSenpiArgs(args: string[], execDir: string): string[] {
