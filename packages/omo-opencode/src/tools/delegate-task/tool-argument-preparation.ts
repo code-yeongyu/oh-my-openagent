@@ -9,10 +9,11 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
   let subagentType = originalSubagentType
 
   if (category && subagentType && subagentType !== SISYPHUS_JUNIOR_AGENT) {
-    log("[task] category provided - overriding subagent_type to sisyphus-junior", {
-      category,
-      subagent_type: subagentType,
-    })
+    throw new Error(
+      "task() received both category and subagent_type. " +
+      "Provide only ONE of them: category for task delegation (uses Sisyphus-Junior), " +
+      "or subagent_type for direct agent invocation."
+    )
   }
 
   if (category) {
