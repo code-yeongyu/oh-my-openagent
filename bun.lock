@@ -19,6 +19,7 @@
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/delegate-core": "workspace:*",
+        "@oh-my-opencode/device-service-core": "workspace:*",
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/isolation-core": "workspace:*",
@@ -135,6 +136,10 @@
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
       },
+    },
+    "packages/device-service-core": {
+      "name": "@oh-my-opencode/device-service-core",
+      "version": "0.1.0",
     },
     "packages/git-bash-mcp": {
       "name": "@oh-my-opencode/git-bash-mcp",
@@ -808,6 +813,8 @@
     "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
 
     "@oh-my-opencode/delegate-core": ["@oh-my-opencode/delegate-core@workspace:packages/delegate-core"],
+
+    "@oh-my-opencode/device-service-core": ["@oh-my-opencode/device-service-core@workspace:packages/device-service-core"],
 
     "@oh-my-opencode/git-bash-mcp": ["@oh-my-opencode/git-bash-mcp@workspace:packages/git-bash-mcp"],
 
