@@ -6,6 +6,7 @@
 // the publish claimant, if any, is gone, and the run recorded a valid outcome. Anything that cannot be
 // proven is "stuck", never "dead". Each rule carries a `rule:` tag named by its test.
 
+import { execFile } from "node:child_process"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
@@ -21,6 +22,11 @@ export type ReflectionLockVerdict =
 export interface ReflectionLockProbe {
   readonly readText?: (path: string) => Promise<string>
   readonly hostname?: () => string
+  readonly hostId?: () => string | null | Promise<string | null>
+  readonly isLocalHost?: (
+    recorded: { readonly hostname: string; readonly hostId?: string },
+    current: { readonly hostname: string; readonly hostId?: string | null },
+  ) => boolean
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
 }
@@ -69,6 +75,80 @@ function isRunOutcome(value: unknown, runId: string): boolean {
     && typeof fields.timedOut === "boolean"
 }
 
+export interface HostIdentity {
+  readonly hostname: string
+  readonly hostId?: string | null
+}
+
+/** Trimmed stdout of a short-lived probe, or `null` when it fails or times out. */
+async function readCommandOutput(command: string, args: readonly string[], timeoutMs: number): Promise<string | null> {
+  return await new Promise((resolve) => {
+    execFile(command, args, { encoding: "utf8", timeout: timeoutMs, windowsHide: true }, (error, stdout) => {
+      if (error !== null) {
+        resolve(null)
+        return
+      }
+      const value = stdout.trim()
+      resolve(value.length > 0 ? value : null)
+    })
+  })
+}
+
+/** Extracts the firmware UUID from `ioreg -c IOPlatformExpertDevice` output. */
+export function parsePlatformUuid(ioreg: string | null): string | null {
+  if (ioreg === null) return null
+  const uuid = /"IOPlatformUUID"\s*=\s*"([^"]*)"/.exec(ioreg)?.[1]?.trim()
+  return uuid === undefined || uuid.length === 0 ? null : uuid
+}
+
+type CommandRunner = (command: string, args: readonly string[], timeoutMs: number) => Promise<string | null>
+
+/**
+ * Absolute path, because a child spawned without `PATH` fails a bare `ioreg` with ENOENT and would
+ * silently drop every machine to "no identity".
+ */
+export function createPlatformUuidReader(run: CommandRunner = readCommandOutput): () => Promise<string | null> {
+  return async () => parsePlatformUuid(await run("/usr/sbin/ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"], 1_000))
+}
+
+const readDarwinPlatformUuid = createPlatformUuidReader()
+
+/** Single flight, and only an answer is remembered: caching `null` would pin a busy process to "unknown machine". */
+export function createMachineIdResolver(read: () => Promise<string | null>): () => Promise<string | null> {
+  let cached: Promise<string | null> | undefined
+  return () => {
+    if (cached !== undefined) return cached
+    let pending: Promise<string | null>
+    pending = read().then((value) => {
+      if (value === null && cached === pending) cached = undefined
+      return value
+    })
+    cached = pending
+    return pending
+  }
+}
+
+/** This machine's identity, or `null` where no probe exists. The prefix makes `active.lock` self-describing. */
+export const getStableLocalHostId = createMachineIdResolver(async () => {
+  if (process.platform !== "darwin") return null
+  const uuid = await readDarwinPlatformUuid()
+  return uuid === null ? null : `darwin-uuid:${uuid}`
+})
+
+/**
+ * Two known ids must match, so machines sharing a hostname stay distinct while one renamed by DHCP
+ * still matches. A missing id on either side falls back to the hostname, because an unknown id never
+ * proves another host.
+ */
+export function isLocalHost(recorded: HostIdentity, current: HostIdentity): boolean {
+  const recordedId = recorded.hostId
+  const currentId = current.hostId
+  if (typeof recordedId === "string" && recordedId.length > 0 && typeof currentId === "string" && currentId.length > 0) {
+    return recordedId === currentId
+  }
+  return recorded.hostname === current.hostname
+}
+
 function stuck(runId: string, reason: string): ReflectionLockVerdict {
   return { state: "stuck", runId, reason }
 }
@@ -96,8 +176,17 @@ export async function classifyReflectionLockHolder(
   const runId = typeof fields.runId === "string" ? fields.runId : "unknown"
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
+  const launcherHostId = typeof fields.launcherHostId === "string" ? fields.launcherHostId : undefined
   if (launcherPid === undefined || launcherHostname === undefined) return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
-  if (launcherHostname !== (probe.hostname ?? readHostname)()) return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
+
+  const currentHost = {
+    hostname: (probe.hostname ?? readHostname)(),
+    hostId: await (probe.hostId ?? getStableLocalHostId)(),
+  }
+  const localCheck = probe.isLocalHost ?? isLocalHost
+  if (!localCheck({ hostname: launcherHostname, hostId: launcherHostId }, currentHost)) {
+    return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
+  }
   const launcher = await launcherLiveness(launcherPid, fields.launcherProcessStart, probe)
   if (launcher === "alive") return { state: "live", runId } // rule:launcher-alive
   if (launcher === "unknown") return stuck(runId, `launcher pid ${launcherPid} could not be checked`) // rule:launcher-unknown
