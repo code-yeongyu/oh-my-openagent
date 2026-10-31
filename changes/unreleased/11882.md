@@ -1,0 +1,1 @@
+**Rejected automatic collector keys now stop the OTLP sender for the rest of the process.** A collector 401 shuts down that transport instead of repeatedly writing and rejecting local diagnostic batches. PostHog and consent behavior are preserved, and regression coverage verifies both the idle spool after rejection and the full 24-hour registration backoff cap.
