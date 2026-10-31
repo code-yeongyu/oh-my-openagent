@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const teamScriptPath = fileURLToPath(new URL("../skills/teammode/scripts/team.mjs", import.meta.url));
 
 describe("MultiAgentV2 spawn schema", () => {
-	it("#given a team member #when preparing its native spawn #then emits only exposed V2 fields", async () => {
+	it("#given a team member #when preparing its native spawn #then requires an exact LazyCodex role when exposed", async () => {
 		// given
 		const root = await mkdtemp(join(tmpdir(), "omo-teammode-v2-schema-"));
 		try {
@@ -60,8 +60,10 @@ describe("MultiAgentV2 spawn schema", () => {
 
 			// then
 			expect(added.exitCode).toBe(0);
-			expect(delivery).toContain('using only task_name "schema_member", message <bootstrap>, and fork_turns "none"');
-			expect(delivery).not.toMatch(/agent_type|model|reasoning_effort|service_tier/);
+			expect(delivery).toContain('task_name "schema_member"');
+			expect(delivery).toContain("agent_type");
+			expect(delivery).toContain('fork_turns "none"');
+			expect(delivery).not.toMatch(/model|reasoning_effort|service_tier/);
 		} finally {
 			await rm(root, { force: true, recursive: true });
 		}
