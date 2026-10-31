@@ -131,4 +131,30 @@ describe("HostSessionClient connection lifetime", () => {
     expect(host.connections).toBe(0)
     expect(disconnected).toBe(true)
   })
+
+  test("#given a close_session the host withholds #when the host stops #then the waiting close is refused and the client hangs up itself", async () => {
+    // given
+    const host = await harness.fakeHost()
+    const client = harness.hostClient(host)
+    await client.open(childOpenInput("/tmp/sessions/lifetime-withheld-close.jsonl"))
+    await host.waitForConnections(1)
+    host.withholdReply("close_session")
+    const sent = host.waitForCommand("close_session")
+    const closing = client.close().then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    await sent
+
+    // when
+    // On win32 the host cannot release the client's pipe handle from its end (#10814): the waiting
+    // client must learn from an answer that the host is gone, not from a connection it never sees drop.
+    await host.stop()
+
+    // then
+    const refusal = await closing
+    expect(refusal).toBeInstanceOf(Error)
+    expect(String(refusal)).toContain("host_stopped")
+    expect(host.connections).toBe(0)
+  })
 })

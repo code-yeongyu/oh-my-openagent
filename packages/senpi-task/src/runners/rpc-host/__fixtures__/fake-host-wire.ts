@@ -43,11 +43,19 @@ export interface FakeHostWirePorts {
   /** Mirror the engine: opening at a path whose directory does not exist fails with ENOENT. */
   readonly enforceSessionDir: boolean
   readonly withheld: ReadonlySet<string>
+  /** Every request a withheld reply left in flight, so a stopping host can still answer it. */
+  readonly unanswered?: FakeUnansweredRequest[]
   /** Commands whose reply is queued until the test releases it; the command itself is recorded at once. */
   readonly held?: Map<string, Array<() => void>>
   /** Commands the host refuses, with the error it answers. */
   readonly failed: ReadonlyMap<string, string>
   readonly record: (command: FakeHostCommand) => void
+}
+
+export interface FakeUnansweredRequest {
+  readonly socket: Socket
+  readonly id: unknown
+  readonly type: string
 }
 
 export function writeFrame(socket: Socket, payload: unknown): void {
@@ -70,7 +78,7 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
     const session = ports.table.view().find(candidate => candidate.routingId === routingId)
     const answer = ports.admissions.admit(session?.sessionPath ?? "", payload)
     if (answer === "conflict") {
-      if (ports.withheld.has(type)) return
+      if (ports.withheld.has(type)) return withhold(ports, socket, payload.id, type)
       return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
         error: "client_message_id_conflict: different payload", errorCode: "client_message_id_conflict" })
     }
@@ -78,13 +86,13 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
       ports.table.appendTranscript(routingId, { role: "user", content: payload.message })
       if (type === "prompt") ports.table.setStreaming(routingId, true)
     }
-    if (ports.withheld.has(type)) return
+    if (ports.withheld.has(type)) return withhold(ports, socket, payload.id, type)
     const failure = ports.failed.get(type)
     if (failure !== undefined) return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
     return writeFrame(socket, { type: "response", id: payload.id, command: type, success: true,
       data: { disposition: answer.disposition, replayed: answer.replayed } })
   }
-  if (ports.withheld.has(type)) return
+  if (ports.withheld.has(type)) return withhold(ports, socket, payload.id, type)
   const failure = ports.failed.get(type)
   if (failure !== undefined) {
     return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
@@ -199,4 +207,8 @@ function refuse(socket: Socket, payload: Readonly<Record<string, unknown>>, fail
     errorCode: failure.code,
     ...(failure.data === undefined ? {} : { errorData: failure.data }),
   })
+}
+
+function withhold(ports: FakeHostWirePorts, socket: Socket, id: unknown, type: string): void {
+  ports.unanswered?.push({ socket, id, type })
 }
