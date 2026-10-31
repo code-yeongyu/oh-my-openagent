@@ -16,17 +16,21 @@ pub enum MutatingAction {
     HoldKeys,
     HoldMouse,
     RaiseWindow,
+    /// Moves a window into the user's current Space. Background-only: it never
+    /// activates or switches Spaces, so it needs no control grant.
+    BringToCurrentSpace,
     AxPerform,
     AxSetValue,
     AxFocus,
     AxClick,
     AxTypeText,
+    AxSelectText,
     ClipboardWrite,
     MenuSelect,
 }
 
 impl MutatingAction {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 18] = [
         Self::Click,
         Self::MoveMouse,
         Self::Drag,
@@ -36,11 +40,13 @@ impl MutatingAction {
         Self::HoldKeys,
         Self::HoldMouse,
         Self::RaiseWindow,
+        Self::BringToCurrentSpace,
         Self::AxPerform,
         Self::AxSetValue,
         Self::AxFocus,
         Self::AxClick,
         Self::AxTypeText,
+        Self::AxSelectText,
         Self::ClipboardWrite,
         Self::MenuSelect,
     ];
@@ -58,11 +64,13 @@ impl MutatingAction {
             Self::HoldKeys => Method::HoldKeys,
             Self::HoldMouse => Method::HoldMouse,
             Self::RaiseWindow => Method::RaiseWindow,
+            Self::BringToCurrentSpace => Method::RaiseToSpace,
             Self::AxPerform => Method::AxPerform,
             Self::AxSetValue => Method::AxSetValue,
             Self::AxFocus => Method::AxFocus,
             Self::AxClick => Method::AxClick,
             Self::AxTypeText => Method::AxTypeText,
+            Self::AxSelectText => Method::AxSelectText,
             Self::ClipboardWrite => Method::ClipboardWrite,
             Self::MenuSelect => Method::MenusSelect,
         }
@@ -78,11 +86,13 @@ impl MutatingAction {
             | Self::KeyChord
             | Self::HoldKeys
             | Self::RaiseWindow
+            | Self::BringToCurrentSpace
             | Self::AxPerform
             | Self::AxSetValue
             | Self::AxFocus
             | Self::AxClick
             | Self::AxTypeText
+            | Self::AxSelectText
             | Self::ClipboardWrite
             | Self::MenuSelect => false,
         }

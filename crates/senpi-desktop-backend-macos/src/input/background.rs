@@ -10,12 +10,20 @@ use std::time::Duration;
 use core_graphics::event::{CGEventFlags, CGEventType, CGMouseButton};
 use core_graphics::event_source::CGEventSource;
 use senpi_desktop_core::backend::{Modifiers, MouseButton, PointerEvent};
+use senpi_desktop_core::drag_guard::{
+    drag_session_outcome, picked_up_refusal, stroke_path, Stroke,
+};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::types::DesktopWindow;
 
 use super::cgevent::{button_types, click_group_id, modifier_flags};
+use super::drag_pasteboard;
 use super::held::{ButtonRoute, Held, HeldButton};
 use super::post::{local_point, post_mouse, scroll, ScrollTarget};
+
+/// The gap between a drag's events, which the source gets to handle the
+/// previous one (and write the drag pasteboard) before the next is decided.
+const DRAG_STEP_GAP: Duration = Duration::from_millis(16);
 
 pub(super) fn pointer(
     source: &CGEventSource,
@@ -27,7 +35,8 @@ pub(super) fn pointer(
     overlay: &crate::overlay::Overlay,
 ) -> CoreResult<()> {
     let start = match &event {
-        PointerEvent::Click { x, y, .. } | PointerEvent::Move { x, y }
+        PointerEvent::Click { x, y, .. }
+        | PointerEvent::Move { x, y }
         | PointerEvent::Scroll { x, y, .. } => Some((*x, *y)),
         PointerEvent::Drag { path, .. } => path.first().copied(),
     };
@@ -41,7 +50,9 @@ pub(super) fn pointer(
             button,
             count,
             modifiers,
-        } => click(source, held, pid, wid, window, x, y, button, count, modifiers),
+        } => click(
+            source, held, pid, wid, window, x, y, button, count, modifiers,
+        ),
         PointerEvent::Move { x, y } => post_mouse(
             source,
             pid,
@@ -61,7 +72,9 @@ pub(super) fn pointer(
             path,
             button,
             modifiers,
-        } => drag(source, held, pid, wid, window, &path, button, modifiers, overlay),
+        } => drag(
+            source, held, pid, wid, window, &path, button, modifiers, overlay,
+        ),
         PointerEvent::Scroll { x, y, dx, dy } => scroll(
             ScrollTarget {
                 source,
@@ -216,42 +229,56 @@ fn drag(
     modifiers: Modifiers,
     overlay: &crate::overlay::Overlay,
 ) -> CoreResult<()> {
-    let Some(&(start_x, start_y)) = path.first() else {
+    let Some(&(start_x, start_y)) = path.first().filter(|_| path.len() >= 2) else {
         return Err(DesktopError::input_failed(
             "drag path must contain at least two points",
         ));
     };
-    if path.len() < 2 {
-        return Err(DesktopError::input_failed(
-            "drag path must contain at least two points",
-        ));
-    }
     let group = click_group_id();
     let (cg_button, down, up, dragged, number) = button_types(button);
     let flags = modifier_flags(modifiers);
     let route = ButtonRoute::Window(pid, wid, local_point(window, start_x, start_y));
     prologue(source, pid, wid, window, start_x, start_y, group)?;
-    held.button_down(HeldButton { route, button });
-    post_mouse(
-        source, pid, wid, window, down, cg_button, start_x, start_y, 3, 1, number, group, flags,
+    // A drag source clears and writes the drag pasteboard as it begins a
+    // drag-and-drop session, which macOS then completes from the user's real
+    // pointer: the stroke stops as soon as the count moves. The step gap comes
+    // before each read, so the source has handled the previous event first.
+    let sessions = drag_pasteboard::change_count();
+    let session = stroke_path(
+        path,
+        || {
+            thread::sleep(DRAG_STEP_GAP);
+            drag_pasteboard::change_count() != sessions
+        },
+        |stroke, (x, y)| {
+            let event_type = match stroke {
+                Stroke::Down => {
+                    held.button_down(HeldButton { route, button });
+                    down
+                }
+                Stroke::Dragged => {
+                    overlay.target(x, y);
+                    held.button_moved(&route, button, local_point(window, x, y));
+                    dragged
+                }
+                Stroke::Up => {
+                    thread::sleep(Duration::from_millis(50));
+                    up
+                }
+            };
+            post_mouse(
+                source, pid, wid, window, event_type, cg_button, x, y, 3, 1, number, group, flags,
+            )?;
+            if stroke == Stroke::Up {
+                held.button_up(&route, button);
+            }
+            Ok(())
+        },
     )?;
-    for &(x, y) in &path[1..] {
-        thread::sleep(Duration::from_millis(16));
-        overlay.target(x, y);
-        held.button_moved(&route, button, local_point(window, x, y));
-        post_mouse(
-            source, pid, wid, window, dragged, cg_button, x, y, 3, 1, number, group, flags,
-        )?;
+    if session {
+        return Err(picked_up_refusal(window));
     }
-    thread::sleep(Duration::from_millis(50));
-    let &(end_x, end_y) = path
-        .last()
-        .ok_or_else(|| DesktopError::input_failed("drag path is empty"))?;
-    let result = post_mouse(
-        source, pid, wid, window, up, cg_button, end_x, end_y, 3, 1, number, group, flags,
-    );
-    if result.is_ok() {
-        held.button_up(&route, button);
-    }
-    result
+    drag_session_outcome(window, sessions, drag_pasteboard::change_count, || {
+        crate::ax::round_trip(pid)
+    })
 }

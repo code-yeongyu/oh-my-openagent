@@ -41,6 +41,7 @@ pub(crate) fn reads_or_acts_on_an_app(op: &Op) -> bool {
         Op::HoldKeys(params) => names_a_window(&params.target),
         Op::HoldMouse(params) => names_a_window(&params.target),
         Op::RaiseWindow(_)
+        | Op::BringToCurrentSpace(_)
         | Op::MenuItems(_)
         | Op::MenusSelect(_)
         | Op::AxSnapshot(_)
@@ -55,7 +56,8 @@ pub(crate) fn reads_or_acts_on_an_app(op: &Op) -> bool {
         | Op::AxSetValue(_)
         | Op::AxFocus(_)
         | Op::AxClick(_)
-        | Op::AxTypeText(_) => true,
+        | Op::AxTypeText(_)
+        | Op::AxSelectText(_) => true,
         Op::Displays
         | Op::Windows
         | Op::ClipboardRead

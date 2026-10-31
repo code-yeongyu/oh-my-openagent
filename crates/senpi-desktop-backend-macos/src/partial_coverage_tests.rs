@@ -16,15 +16,21 @@ const BACKGROUND_WRAPPERS: [&str; 3] = [
 ];
 
 /// The background arms that exist today, as `file: count`.
-const BACKGROUND_ARMS: [(&str, usize); 4] =
-    [("input/mod.rs", 3), ("input/element.rs", 1), ("input/holds.rs", 1), ("backend.rs", 1)];
+const BACKGROUND_ARMS: [(&str, usize); 5] = [
+    ("input/mod.rs", 3),
+    ("input/element.rs", 1),
+    ("input/holds.rs", 1),
+    ("input/menu.rs", 1),
+    ("backend.rs", 1),
+];
 
 /// The AX requests the model makes, each a background call of its own.
-const AX_ENTRY_POINTS: [(&str, &str); 4] = [
+const AX_ENTRY_POINTS: [(&str, &str); 5] = [
     ("ax/actions.rs", "perform_requested"),
     ("ax/actions.rs", "set_value"),
     ("ax/actions.rs", "focus"),
     ("ax/text_input.rs", "insert_into_element"),
+    ("ax/open_menu.rs", "perform_menu"),
 ];
 
 const ARM: &str = "DeliveryMode::Background =>";

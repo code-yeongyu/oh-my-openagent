@@ -241,6 +241,17 @@
         "type": "null"
       }
     },
+    "window.bringToCurrentSpace": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/BringToCurrentSpaceParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
     "menus.items": {
       "effect": "read",
       "hostOnly": false,
@@ -469,6 +480,17 @@
       },
       "result": {
         "$ref": "#/definitions/AxInputResult"
+      }
+    },
+    "ax.selectText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxSelectTextParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxTextSelection"
       }
     },
     "stopPath.start": {
@@ -859,6 +881,11 @@
         },
         "screenLocked": {
           "type": "boolean"
+        },
+        "displayAsleep": {
+          "type": "boolean",
+          "description": "Every display the session can capture is asleep (macOS; read live on\neach `capabilities` call). Other backends always report `false`.",
+          "default": false
         },
         "legacyCapture": {
           "type": "boolean",
@@ -1532,6 +1559,16 @@
               "type": "null"
             }
           ]
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "`click` only: the path of item labels to choose in the menu the click\nopens (a context menu, or a menu button's or popup button's menu);\nthe menu is closed before the call returns (#11459)."
         }
       },
       "required": [
@@ -1843,6 +1880,19 @@
       "required": [
         "windowId"
       ],
+      "additionalProperties": false
+    },
+    "BringToCurrentSpaceParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`window.bringToCurrentSpace`: the native id of the window to move into the\nuser's current Space. The window is usually on another Space, so it may be\nabsent from `windows`.",
       "additionalProperties": false
     },
     "MenuPathParams": {
@@ -2171,6 +2221,16 @@
         },
         "action": {
           "type": "string"
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The path of item labels to choose in the menu the action opens\n(`AXShowMenu`, or `AXPress` on a menu button or popup button); the\nmenu is closed before the call returns (#11459)."
         }
       },
       "required": [
@@ -2210,6 +2270,16 @@
               "type": "null"
             }
           ]
+        },
+        "menu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "The path of item labels to choose in the menu the click opens; the\nmenu is closed before the call returns (#11459)."
         }
       },
       "required": [
@@ -2271,6 +2341,70 @@
         }
       ],
       "description": "How `ax.typeText` delivered its text."
+    },
+    "AxSelectTextParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "suffix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "select": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "description": "`ax.selectText`: selects `text` inside the value of the element `ref`\nnames, disambiguated by the `prefix` and `suffix` around it; `select` is\n`text` (the match), `start` or `end` (a caret before or after it).",
+      "additionalProperties": false
+    },
+    "AxTextSelection": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "length": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        },
+        "focused": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "start",
+        "length",
+        "text",
+        "focused"
+      ],
+      "description": "`ax.selectText` reply: the selection that was applied, in UTF-16 code\nunits of the element's value, with the text it covers and whether the\nelement holds its application's focus.",
+      "additionalProperties": false
     },
     "StopPathStartParams": {
       "type": "object",
@@ -2511,6 +2645,7 @@
         "holdKeys",
         "holdMouse",
         "raiseWindow",
+        "window.bringToCurrentSpace",
         "menus.items",
         "menus.select",
         "clipboard.read",
@@ -2528,6 +2663,7 @@
         "ax.focus",
         "ax.click",
         "ax.typeText",
+        "ax.selectText",
         "stopPath.start",
         "stopPath.status",
         "stopPath.heartbeat",

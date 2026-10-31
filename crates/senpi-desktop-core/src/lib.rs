@@ -5,6 +5,7 @@ pub mod ax;
 pub mod backend;
 #[cfg(feature = "system-clipboard")]
 pub mod clipboard;
+pub mod drag_guard;
 pub mod error;
 pub mod frame;
 pub mod holds;

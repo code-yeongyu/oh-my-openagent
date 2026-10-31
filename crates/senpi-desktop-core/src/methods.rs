@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 use crate::menus::MenuItem;
 use crate::protocol_params::{
     AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
-    AxSetValueParams, AxSnapshotParams, AxTypeTextParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
+    AxSelectTextParams, AxSetValueParams, AxSnapshotParams, AxTypeTextParams, BringToCurrentSpaceParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
     EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuPathParams, MenuSelectParams, ObserveParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{
-    AuditEvent, AxInputResult, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
+    AuditEvent, AxInputResult, AxTextSelection, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
 };
 use crate::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
@@ -106,6 +106,7 @@ method_table! {
     HoldKeys = "holdKeys", Exec, Public, HoldKeysParams => ();
     HoldMouse = "holdMouse", Exec, Public, HoldMouseParams => ();
     RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => ();
+    RaiseToSpace = "window.bringToCurrentSpace", Exec, Public, BringToCurrentSpaceParams => ();
     MenusItems = "menus.items", Read, Public, MenuPathParams => Vec<MenuItem>;
     MenusSelect = "menus.select", Exec, Public, MenuSelectParams => ();
     ClipboardRead = "clipboard.read", Read, Public, EmptyParams => ClipboardText;
@@ -123,6 +124,7 @@ method_table! {
     AxFocus = "ax.focus", Exec, Public, AxRefParams => ();
     AxClick = "ax.click", Exec, Public, AxClickParams => ();
     AxTypeText = "ax.typeText", Exec, Public, AxTypeTextParams => AxInputResult;
+    AxSelectText = "ax.selectText", Exec, Public, AxSelectTextParams => AxTextSelection;
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();

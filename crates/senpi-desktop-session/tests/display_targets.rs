@@ -96,6 +96,7 @@ async fn per_call_display_frames_survive_other_target_captures_without_reopening
                 y: 10.0,
                 frame_id: Some(frame_id),
                 opts: None,
+                menu: None,
             }))
             .wait()
             .await;
@@ -114,6 +115,7 @@ async fn per_call_display_frames_survive_other_target_captures_without_reopening
             y: 10.0,
             frame_id: Some(selected.frame_id),
             opts: None,
+            menu: None,
         }))
         .wait()
         .await
