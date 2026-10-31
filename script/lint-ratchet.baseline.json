@@ -196,9 +196,6 @@
   "packages/omo-opencode/src/features/tmux-subagent/manager.test.ts": {
     "typescript/no-non-null-assertion": 3
   },
-  "packages/omo-opencode/src/hooks/agent-usage-reminder/hook.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
