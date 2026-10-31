@@ -17,7 +17,22 @@ export type ResolveOmoConfigPathsOptions = {
 
 export const MAX_PROJECT_CONFIG_DIRECTORY_DEPTH = 256
 
-const ACCOUNT_HOME_DIR = userInfo().homedir
+export class AccountHomeResolutionError extends Error {
+  override readonly name = "AccountHomeResolutionError"
+
+  constructor(readonly cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    super(`Cannot resolve the account home directory: os.userInfo() failed (${detail}).`, { cause })
+  }
+}
+
+function resolveAccountHomeDir(): string {
+  try {
+    return userInfo().homedir
+  } catch (error) {
+    throw new AccountHomeResolutionError(error)
+  }
+}
 
 export function resolveHomeDir(env: OmoConfigEnv = process.env): string {
   const homeDir = env.HOME ?? env.USERPROFILE ?? process.cwd()
@@ -105,7 +120,12 @@ export function resolveOmoConfigPaths(options: ResolveOmoConfigPathsOptions): re
   const fileSystem = options.fileSystem ?? DEFAULT_READ_FILE_SYSTEM
   const env = options.env ?? process.env
   const userPath = detectUserOmoJsonPath(env, fileSystem)
-  const projectPaths = findProjectConfigPathsFarthestFirst(options.cwd, resolveHomeDir(env), fileSystem, ACCOUNT_HOME_DIR)
+  const projectPaths = findProjectConfigPathsFarthestFirst(
+    options.cwd,
+    resolveHomeDir(env),
+    fileSystem,
+    resolveAccountHomeDir(),
+  )
   return [
     { path: userPath, scope: "user" },
     ...projectPaths.map((path): OmoConfigPathCandidate => ({ path, scope: "project" })),
