@@ -14,6 +14,7 @@ mod frames_impl;
 mod holds_impl;
 mod menus_impl;
 mod method;
+mod open_menu_impl;
 mod scenario;
 mod scenario_nodes;
 mod sink;

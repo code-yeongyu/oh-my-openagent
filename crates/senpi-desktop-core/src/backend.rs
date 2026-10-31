@@ -68,6 +68,18 @@ pub struct Modifiers {
     pub meta: bool,
 }
 
+/// The menu item a press should choose in the menu it opens, and the stop
+/// check that runs before that item is pressed (the menu can take up to a
+/// second to appear).
+#[derive(Clone, Copy)]
+pub struct MenuChoice<'a> {
+    /// Item labels from the opened menu down to a command, as
+    /// `menus.select` matches them.
+    pub path: &'a [String],
+    /// The request's cancel and stop-path check.
+    pub check_stop: &'a dyn Fn() -> CoreResult<()>,
+}
+
 #[derive(Debug, Clone)]
 pub enum PointerEvent {
     Click {
@@ -144,6 +156,20 @@ pub trait Backend: Send {
         frame: &FrameGeometry,
         mode: DeliveryMode,
     ) -> CoreResult<()>;
+    /// [`Self::pointer`] for a press that opens a menu: the press is
+    /// delivered, `choice.path` is chosen in the menu it opened, and that
+    /// menu is closed before the call returns, whatever happened. Backends
+    /// without menu handling refuse before anything is sent.
+    fn pointer_menu(
+        &mut self,
+        _target: &Target,
+        _ev: PointerEvent,
+        _frame: &FrameGeometry,
+        _mode: DeliveryMode,
+        _choice: MenuChoice<'_>,
+    ) -> CoreResult<()> {
+        Err(DesktopError::ax_unsupported())
+    }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()>;
     /// The system clipboard's text. Backends without clipboard access keep
     /// this default and refuse instead of pretending.
@@ -353,6 +379,13 @@ pub trait AxBackend {
     fn children(&mut self, h: &AxHandle) -> CoreResult<Vec<AxHandle>>;
     fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>>;
     fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()>;
+    /// [`Self::perform`] for an action that opens a menu (`AXShowMenu`, or
+    /// `AXPress` on a menu button or popup button): `choice.path` is chosen
+    /// in the menu it opened, which is closed before the call returns.
+    /// Backends without menu handling refuse before anything is performed.
+    fn perform_menu(&mut self, _h: &AxHandle, _action: &str, _choice: MenuChoice<'_>) -> CoreResult<()> {
+        Err(DesktopError::ax_unsupported())
+    }
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()>;
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()>;
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;

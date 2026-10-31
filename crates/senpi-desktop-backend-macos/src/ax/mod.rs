@@ -6,6 +6,7 @@ mod actions;
 mod date;
 mod foreground;
 pub(crate) mod menus;
+pub(crate) mod open_menu;
 mod point_owner;
 mod popup;
 pub(crate) mod element;
@@ -15,6 +16,7 @@ mod text_input;
 mod tree;
 
 use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
+use senpi_desktop_core::backend::MenuChoice;
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::protocol_results::AxTextSelection;
 use senpi_desktop_core::text_range::TextSelectRequest;
@@ -154,6 +156,11 @@ impl AxBackend for MacAx {
     fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()> {
         self.show_target(h);
         actions::perform_requested(element(h)?, action)
+    }
+
+    fn perform_menu(&mut self, h: &AxHandle, action: &str, choice: MenuChoice<'_>) -> CoreResult<()> {
+        self.show_target(h);
+        open_menu::perform_menu(element(h)?, action, choice)
     }
 
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()> {
