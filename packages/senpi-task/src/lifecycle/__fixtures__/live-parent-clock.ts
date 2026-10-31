@@ -1,3 +1,4 @@
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 import type { IdleReclaimerScheduler, IdleReclaimerTimer } from "../port"
 
 export function signal<T>() {
@@ -8,13 +9,20 @@ export function signal<T>() {
   return { promise, resolve }
 }
 
-export async function bounded<T>(promise: Promise<T>): Promise<T> {
+/**
+ * A circuit breaker, never a pacing step: it shares the test's whole remaining budget, so real I/O on a slow
+ * runner (and the production abort grace) can finish; a fixed per-step bound raced them (#11257).
+ */
+export async function bounded<T>(promise: Promise<T>, phase = "awaited phase"): Promise<T> {
+  const remainingMs = remainingTestTime()
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("live-parent lifecycle event did not arrive")), 2_000)
+        timer = setTimeout(() => reject(new Error(
+          `live-parent lifecycle event did not arrive: ${phase} (remaining test budget ${Math.round(remainingMs)} ms)`,
+        )), remainingMs)
       }),
     ])
   } finally {
