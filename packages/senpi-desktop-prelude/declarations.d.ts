@@ -172,6 +172,8 @@ interface ComputerCapabilities {
 	integrityLevel?: string | null;
 	/** Input is refused while the screen is locked. */
 	screenLocked: boolean;
+	/** Every display the session can capture is asleep (macOS); captures and input then fail with a note saying so. */
+	displayAsleep?: boolean;
 }
 
 /** Live accessibility element resolved from a snapshot ref; expired refs throw `StaleRef`. */

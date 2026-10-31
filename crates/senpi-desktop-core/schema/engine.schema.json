@@ -860,6 +860,11 @@
         "screenLocked": {
           "type": "boolean"
         },
+        "displayAsleep": {
+          "type": "boolean",
+          "description": "Every display the session can capture is asleep (macOS; read live on\neach `capabilities` call). Other backends always report `false`.",
+          "default": false
+        },
         "legacyCapture": {
           "type": "boolean",
           "description": "Captures run through the legacy `screencapture` path, not the\nScreenCaptureKit worker (B9: macOS < 14, helper missing, or the\nhelper failed to start)."
