@@ -1,7 +1,7 @@
 import { access, open, unlink } from "node:fs/promises"
 import { dirname } from "node:path"
 
-import { errorCode, isPathAbsenceError, markLockRecordHeld, markLockRecordReleased } from "./lock-record"
+import { errorCode, forgetLockRecord, isPathAbsenceError, markLockRecordHeld, markLockRecordReleased } from "./lock-record"
 
 type LockOpenErrorDeps = {
   readonly access?: typeof access
@@ -47,7 +47,7 @@ export async function publishLockRecord(lockPath: string, record: string): Promi
   try {
     fileHandle = await open(lockPath, "wx")
   } catch (error) {
-    markLockRecordReleased(record)
+    forgetLockRecord(record)
     await assertRetryableLockOpenError(lockPath, error)
     return false
   }
