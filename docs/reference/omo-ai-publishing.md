@@ -50,6 +50,16 @@ Verification procedure (npmjs.com, may need one Touch ID or security-key approva
 - After a stable release, move `beta` to it with `npm-dist-tag-rollback.yml` (`version=X.Y.Z`, `dist_tag=beta`) so users still on `@beta` get the stable build.
 - Remediation if a prerelease ever reaches `latest`: `npm dist-tag add omo-ai@<last stable> latest`.
 
+## Installed-engine lock guard
+
+Installed-engine preparation also guards proper-lockfile's heartbeat `stat`
+callback after a lock has been released. A late callback must neither throw an
+uncaught `ECOMPROMISED` error nor refresh a new owner's lock. Preparation covers
+the external library resolved from Senpi and its inlined CLI/worker bundle
+copies, is idempotent, and preserves compromise detection for an owned lock.
+This runs through the existing postinstall/first-launch preparation path; running
+engines must restart to load a newly prepared runtime.
+
 ## Release checklist
 
 The user dispatches `publish.yml` as usual, then confirms in the run log:
