@@ -113,6 +113,17 @@ impl AxTree {
         Ok(())
     }
 
+    /// Appends `text` to the node's value, as an insertion at the end of its
+    /// selection does.
+    pub(crate) fn append_value(&mut self, id: u64, text: &str) -> CoreResult<()> {
+        let entry = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
+        entry.props.value.get_or_insert_with(String::new).push_str(text);
+        Ok(())
+    }
+
     /// Moves AX focus to `id`, clearing it everywhere else.
     pub(crate) fn focus(&mut self, id: u64) -> CoreResult<()> {
         self.entry(id)?;
