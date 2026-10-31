@@ -64,4 +64,38 @@ describe("provider model id transform", () => {
       expect(transformed).toBe(scenario.expected)
     }
   })
+
+  test("preserves antigravity provider models and canonical ids (#12029)", () => {
+    // given
+    const scenarios = [
+      { provider: "antigravity", model: "gemini-3.1-pro", expected: "gemini-3.1-pro" },
+      { provider: "antigravity", model: "antigravity-gemini-3.1-pro", expected: "antigravity-gemini-3.1-pro" },
+      { provider: "google-antigravity", model: "gemini-3-flash", expected: "gemini-3-flash" },
+      { provider: "agy", model: "claude-opus-4-6-thinking", expected: "claude-opus-4-6-thinking" },
+    ] as const
+
+    for (const scenario of scenarios) {
+      // when
+      const transformed = transformModelForProvider(scenario.provider, scenario.model)
+
+      // then
+      expect(transformed).toBe(scenario.expected)
+    }
+  })
+
+  test("infers subprovider for antigravity-prefixed models under gateway routing (#12029)", () => {
+    // given
+    const scenarios = [
+      { provider: "vercel", model: "antigravity-gemini-3.1-pro", expected: "google/antigravity-gemini-3.1-pro" },
+      { provider: "vercel", model: "antigravity-claude-opus-4-6-thinking", expected: "anthropic/antigravity-claude-opus-4.6-thinking" },
+    ] as const
+
+    for (const scenario of scenarios) {
+      // when
+      const transformed = transformModelForProvider(scenario.provider, scenario.model)
+
+      // then
+      expect(transformed).toBe(scenario.expected)
+    }
+  })
 })

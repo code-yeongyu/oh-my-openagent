@@ -63,9 +63,12 @@
     "xai"
   ],
   "providers": {
+    "agy": "google",
+    "antigravity": "google",
     "anthropic-api": "anthropic",
     "azure": "azure-openai-responses",
     "claude-sdk-oauth": "anthropic-subscription",
+    "google-antigravity": "google",
     "kimi-for-coding": "kimi-coding",
     "moonshot": "moonshotai",
     "openai-codex": "chatgpt-subscription",

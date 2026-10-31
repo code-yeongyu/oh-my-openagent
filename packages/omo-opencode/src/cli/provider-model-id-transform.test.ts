@@ -420,6 +420,37 @@ describe("transformModelForProvider", () => {
     })
   })
 
+  describe("antigravity provider", () => {
+    test("preserves gemini-3.1-pro without -preview rewrite (#12029)", () => {
+      // #given antigravity provider and gemini-3.1-pro model
+      const provider = "antigravity"
+      const model = "gemini-3.1-pro"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then should preserve the canonical model id
+      expect(result).toBe("gemini-3.1-pro")
+    })
+
+    test("preserves antigravity-gemini-3.1-pro intact (#12029)", () => {
+      // #given antigravity provider and antigravity-gemini-3.1-pro model
+      const provider = "antigravity"
+      const model = "antigravity-gemini-3.1-pro"
+
+      // #when transformModelForProvider is called
+      const result = transformModelForProvider(provider, model)
+
+      // #then should preserve the model id unchanged
+      expect(result).toBe("antigravity-gemini-3.1-pro")
+    })
+
+    test("preserves thinking variants across antigravity aliases (#12029)", () => {
+      expect(transformModelForProvider("google-antigravity", "gemini-3-flash")).toBe("gemini-3-flash")
+      expect(transformModelForProvider("agy", "claude-opus-4-6-thinking")).toBe("claude-opus-4-6-thinking")
+    })
+  })
+
   test("uses separate display and runtime transform implementations", () => {
     // #given the display transform (used by the installer) and the runtime transform
     const cliResult = transformModelForProvider("anthropic", "claude-opus-4-7")

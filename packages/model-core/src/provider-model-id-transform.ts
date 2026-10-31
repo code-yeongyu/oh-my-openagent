@@ -1,12 +1,13 @@
 function inferSubProvider(model: string): string | undefined {
-	if (model.startsWith("claude-")) return "anthropic"
-	if (model.startsWith("gpt-")) return "openai"
-	if (model.startsWith("gemini-")) return "google"
-	if (model.startsWith("grok-")) return "xai"
-	if (model.startsWith("minimax-")) return "minimax"
-	if (model.startsWith("kimi-")) return "moonshotai"
-	if (model.startsWith("k3")) return "moonshotai"
-	if (model.startsWith("glm-")) return "zai"
+	const normalized = model.startsWith("antigravity-") ? model.slice(12) : model
+	if (normalized.startsWith("claude-")) return "anthropic"
+	if (normalized.startsWith("gpt-")) return "openai"
+	if (normalized.startsWith("gemini-")) return "google"
+	if (normalized.startsWith("grok-")) return "xai"
+	if (normalized.startsWith("minimax-")) return "minimax"
+	if (normalized.startsWith("kimi-")) return "moonshotai"
+	if (normalized.startsWith("k3")) return "moonshotai"
+	if (normalized.startsWith("glm-")) return "zai"
 	return undefined
 }
 
@@ -53,6 +54,9 @@ function transformModelForProviderUsingAnthropicBehavior(
 			.replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
 	}
 	if (provider === "anthropic") {
+		return model
+	}
+	if (provider === "antigravity" || provider === "google-antigravity" || provider === "agy") {
 		return model
 	}
 	if (provider === "kimi-coding" || provider === "kimi-for-coding") {

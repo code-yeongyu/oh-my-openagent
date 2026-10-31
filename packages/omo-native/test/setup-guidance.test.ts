@@ -65,6 +65,10 @@ describe("omo setup provider map", () => {
         // models.dev zai-coding-plan api == omo `zai` baseUrl (https://api.z.ai/api/coding/paas/v4).
         expect(resolve("zai-coding-plan")).toBe("zai")
         expect(resolve("kimi-for-coding")).toBe("kimi-coding")
+        // Antigravity and aliases map to the Google engine provider (#12029)
+        expect(resolve("antigravity")).toBe("google")
+        expect(resolve("google-antigravity")).toBe("google")
+        expect(resolve("agy")).toBe("google")
         expect(resolve("unknown-gateway")).toBeUndefined()
       })
     })
