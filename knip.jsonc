@@ -1148,6 +1148,8 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) AVAILABLE_MODEL
       "packages/omo-senpi/src/components/memory/facts-runner.test-support.ts": ["AVAILABLE_MODEL"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
+      // the senpi engine loads this extension's default export by path (`senpi -e <file>` in index-engine.test.ts)
+      "packages/omo-senpi/src/components/memory/index-engine.fixture.ts": ["default"],
       "packages/omo-senpi/src/components/memory/index.ts": ["getMemoryRepo"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UNAVAILABLE_CATEGORY_MAX_CHARS, GATE_MODEL_MAX_CHARS
       "packages/omo-senpi/src/components/memory/kibitzer/notice.ts": ["UNAVAILABLE_CATEGORY_MAX_CHARS", "GATE_MODEL_MAX_CHARS"],
@@ -2903,6 +2905,9 @@
         // spawned by path from tests: a child process or Worker entry, never imported
         "src/components/memory/desktop-sync/hostSelection.fixture.ts",
         "src/components/memory/device-session/sibling-writer.fixture.ts",
+        "src/components/memory/index-engine.fixture.ts",
+        "src/components/memory/index-observer.fixture.ts",
+        "src/components/memory/index-selection.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
