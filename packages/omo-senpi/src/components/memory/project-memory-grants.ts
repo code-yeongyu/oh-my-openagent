@@ -48,15 +48,14 @@ export function isGrantedProjectMemoryRead(context: MemoryIdentityContext, targe
   const windows = (options.platform ?? process.platform) === "win32"
   const paths = windows ? path.win32 : path.posix
   const canonicalPath = options.realpath ?? realpathSync.native
-  // A note that does not exist yet stays readable (the read reports it missing); only its existing
-  // ancestors are resolved, so a symlink on the way is still followed before the comparison.
   const lstat = options.lstat ?? lstatSync
   // A macOS automount trigger is never a granted repo note, and resolving it can park the host loop (#11545).
   if (!windows && isDarwinAutomountTriggerPath(paths.resolve(target), { platform: options.platform ?? process.platform })) return false
   const resolve = (input: string) => {
     if (input !== target) return canonicalPath(input)
-    // A dot-free opener is faithful through realpath alone. Anything carrying `..` must be walked
-    // segment by segment: realpath collapses it lexically before the kernel resolves a link first.
+    // A note that does not exist yet stays readable (the read reports it missing). A dot-free opener is
+    // faithful through realpath alone; anything carrying `..` is walked segment by segment, because
+    // realpath collapses it before the kernel resolves a link first.
     if (!input.split(paths.sep).includes("..")) {
       try {
         return canonicalPath(input)
@@ -90,8 +89,6 @@ function samePath(left: string, right: string, paths: typeof path.posix, windows
   return windows ? a.toLowerCase() === b.toLowerCase() : a === b
 }
 
-  // The opener walks the raw component sequence, so containment must too: a lexical join would collapse
-  // a `..` that follows a symlink and name a file the read never reaches.
 async function canonicalAsync(path: string): Promise<string | undefined> {
   try {
     return await realpath(path)
