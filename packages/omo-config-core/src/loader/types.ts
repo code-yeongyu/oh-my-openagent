@@ -18,6 +18,8 @@ export type OmoConfigDiagnostic = {
   readonly path: string
   readonly message: string
   readonly issuePaths?: readonly string[]
+  /** 1-based position of the first parse error, for a `parse` diagnostic. */
+  readonly position?: { readonly line: number; readonly column: number }
 }
 
 export type OmoConfigSourceScope = "project" | "user"
