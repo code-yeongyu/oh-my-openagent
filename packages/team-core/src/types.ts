@@ -1,4 +1,5 @@
 import * as z from "zod"
+import { canonicalCategoryName } from "@oh-my-opencode/omo-config-core"
 import { createParseMember } from "./member-parser"
 
 export const MESSAGE_KINDS = [
@@ -36,7 +37,10 @@ const MemberBaseSchema = z.object({
 
 export const CategoryMemberSchema = MemberBaseSchema.extend({
   kind: z.literal("category"),
-  category: z.string().min(1),
+  // Canonicalized once, where a member is parsed: a retired builtin name (e.g. `deep` -> `deep-low`)
+  // is replaced here, so the launched task, the runtime state, the session category registry and the
+  // runtime fallback that reads `categories[<name>]` all use the key the config loader kept.
+  category: z.string().min(1).transform(canonicalCategoryName),
   prompt: z.string().min(1),
 })
 
@@ -139,7 +143,9 @@ const RuntimeStateMemberSchema = z.object({
   tmuxGridPaneId: z.string().optional(),
   agentType: z.enum(["leader", "general-purpose"]),
   subagent_type: z.string().optional(),
-  category: z.string().optional(),
+  // Canonicalized on read as well: a state.json written before the rename still holds the retired
+  // name, and a resumed run registers this value for its session (idle wake, live delivery).
+  category: z.string().transform(canonicalCategoryName).optional(),
   model: RuntimeStateMemberModelSchema.optional(),
   status: z.enum(["pending", "running", "idle", "errored", "completed", "shutdown_approved"]),
   color: z.string().optional(),

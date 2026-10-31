@@ -441,6 +441,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@oh-my-opencode/memory-core": "workspace:*",
+        "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/tmux-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "zod": "^4.6.5",

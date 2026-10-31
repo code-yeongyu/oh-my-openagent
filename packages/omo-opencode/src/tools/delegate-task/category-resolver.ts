@@ -73,17 +73,17 @@ export async function resolveCategoryExecution(
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
   // A retired builtin name resolves to its replacement so third-party skills and AGENTS.md text
-  // spawning the old category keep working; a user category of that name still wins over the alias.
+  // spawning the old category keep working. Callers canonicalize at their own boundary; this call is
+  // idempotent and covers a caller that passes a name straight through.
   const enabledCategories = mergeCategories(userCategories)
-  const requestedCategoryName = args.category!
-  const categoryName = enabledCategories[requestedCategoryName] !== undefined
-    ? requestedCategoryName
-    : canonicalCategoryName(requestedCategoryName)
+  const categoryName = canonicalCategoryName(args.category!)
+  // Errors name what the caller typed, not what it was canonicalized to.
+  const requestedCategoryName = args.requestedCategory ?? args.category!
   const categoryExists = enabledCategories[categoryName] !== undefined
 
   if (!categoryExists) {
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
-    return categoryResolutionError(`Unknown category: "${categoryName}". Available: ${allCategoryNames}`)
+    return categoryResolutionError(`Unknown category: "${requestedCategoryName}". Available: ${allCategoryNames}`)
   }
 
   const availableModels = await getAvailableModelsForDelegateTask(client)
@@ -128,10 +128,10 @@ To use this category:
 Available categories: ${allCategoryNames}`)
     }
 
-    return categoryResolutionError(`Unknown category: "${categoryName}". Available: ${allCategoryNames}`)
+    return categoryResolutionError(`Unknown category: "${requestedCategoryName}". Available: ${allCategoryNames}`)
   }
 
-  const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category!]
+  const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
   const hasCanonicalModels = resolved.config.models !== undefined
   const canonicalPrimaryEntry = resolved.config.models?.[0]
   const configuredPrimaryModel = getConfiguredModel(canonicalPrimaryEntry)
@@ -149,7 +149,7 @@ Available categories: ${allCategoryNames}`)
   const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = hasCanonicalModels
     ? configuredPrimaryModel
-    : userCategories?.[args.category!]?.model
+    : userCategories?.[categoryName]?.model
 
   if (!requirement) {
     // Precedence: explicit category model > sisyphus-junior default > category resolved model
@@ -161,7 +161,7 @@ Available categories: ${allCategoryNames}`)
         ? { model: actualModel, type: "user-defined", source: "override" }
         : { model: actualModel, type: "system-default", source: "system-default" }
       const parsedModel = parseModelString(actualModel)
-      const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+      const variantToUse = userCategories?.[categoryName]?.variant ?? resolved.config.variant
       categoryModel = parsedModel
         ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
@@ -185,7 +185,7 @@ Available categories: ${allCategoryNames}`)
       if (userModelOverride) {
         actualModel = userModelOverride
         const parsedModel = parseModelString(userModelOverride)
-        const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+        const variantToUse = userCategories?.[categoryName]?.variant ?? resolved.config.variant
         categoryModel = parsedModel
           ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
           : undefined
@@ -223,7 +223,7 @@ Available categories: ${allCategoryNames}`)
       modelInfo = { model: actualModel, type, source }
 
       const parsedModel = parseModelString(actualModel)
-      const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
+      const variantToUse = userCategories?.[categoryName]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
         ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
@@ -235,22 +235,22 @@ Available categories: ${allCategoryNames}`)
     categoryModel = parsedModel ?? undefined
   }
   const categoryPromptAppend = resolveCategoryPromptAppendForModel(
-    args.category!,
+    categoryName,
     actualModel,
     resolved.promptAppend,
-    userCategories?.[args.category!]?.prompt_append,
+    userCategories?.[categoryName]?.prompt_append,
   )
 
   if (!categoryModel && !actualModel && !isModelResolutionSkipped) {
     const categoryNames = Object.keys(enabledCategories)
-    return categoryResolutionError(`Model not configured for category "${args.category}".
+    return categoryResolutionError(`Model not configured for category "${requestedCategoryName}".
 
 Configure in one of:
 1. OpenCode: Set "model" in opencode.json
 2. Oh-My-OpenCode: Set category model in .omo/omo.jsonc
 3. Provider: Connect a provider with available models
 
-Current category: ${args.category}
+Current category: ${requestedCategoryName}
 Available categories: ${categoryNames.join(", ")}`)
   }
 
@@ -289,7 +289,7 @@ Available categories: ${categoryNames.join(", ")}`)
     categoryModel = applyFallbackEntrySettings({
       categoryModel,
       effectiveEntry,
-      variantOverride: userCategories?.[args.category!]?.variant,
+      variantOverride: userCategories?.[categoryName]?.variant,
     })
   }
 

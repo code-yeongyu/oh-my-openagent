@@ -58,6 +58,8 @@ export interface DelegateTaskArgs {
   descriptionSource?: "explicit" | "generated"
   prompt: string
   category?: string
+  /** The category name as the caller typed it, when it differed from the canonical one. Errors use it. */
+  requestedCategory?: string
   subagent_type?: string
   requested_subagent_type?: string
   run_in_background: boolean

@@ -10,7 +10,7 @@ import {
 describe("team-mode types", () => {
   test("member category branch parses and narrows", () => {
     // given
-    const member = { kind: "category", name: "m1", category: "deep", prompt: "impl X" }
+    const member = { kind: "category", name: "m1", category: "deep-low", prompt: "impl X" }
 
     // when
     const result = MemberSchema.safeParse(member)
@@ -19,7 +19,7 @@ describe("team-mode types", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data).toMatchObject(member)
-      expect(result.data).toMatchObject({ kind: "category", category: "deep" })
+      expect(result.data).toMatchObject({ kind: "category", category: "deep-low" })
     }
   })
 
@@ -144,13 +144,24 @@ describe("team-mode types", () => {
 
   test("parseMember returns valid category member", () => {
     // given
-    const member = { name: "m1", kind: "category", category: "deep", prompt: "impl X" }
+    const member = { name: "m1", kind: "category", category: "deep-low", prompt: "impl X" }
 
     // when
     const result = parseMember(member)
 
     // then
     expect(result).toMatchObject(member)
+  })
+
+  test("parseMember canonicalizes a retired category name", () => {
+    // given
+    const member = { name: "m1", kind: "category", category: "deep", prompt: "impl X" }
+
+    // when
+    const result = parseMember(member)
+
+    // then
+    expect(result).toMatchObject({ kind: "category", category: "deep-low" })
   })
 
   test("parseMember returns valid subagent member", () => {
