@@ -19,6 +19,7 @@ import {
   type CreateChildSession,
   type InProcessRunnerLike,
   type SenpiModelPort,
+  type CategoryPinUnserved,
   type SenpiModelRegistryPort,
 } from "@oh-my-opencode/senpi-task"
 
@@ -34,7 +35,7 @@ import type { AnyKibitzerSidecarTool } from "./tools/result"
 
 export const KIBITZER_SIDECAR_DEFAULT_CATEGORY = "quick"
 
-export type KibitzerSidecarModelUnavailableCause = "registry_snapshot_unavailable" | "category_unavailable" | "beyond_category"
+export type KibitzerSidecarModelUnavailableCause = "registry_snapshot_unavailable" | "category_unavailable" | "beyond_category" | "pin_unserved"
 
 export type KibitzerSidecarModelResolution =
   | {
@@ -44,6 +45,7 @@ export type KibitzerSidecarModelResolution =
     readonly thinking?: ReflectionThinkingLevel
     readonly fallbacks: readonly ReflectionModelCandidate[]
     readonly chain: ChildModelChainSpec
+    readonly pinUnserved?: CategoryPinUnserved
   }
   | {
     readonly kind: "unavailable"
@@ -51,6 +53,7 @@ export type KibitzerSidecarModelResolution =
     readonly cause: KibitzerSidecarModelUnavailableCause
     /** The category chain's providers with no connection, when the resolver knew them. */
     readonly missingProviders?: readonly string[]
+    readonly pinUnserved?: CategoryPinUnserved
   }
 
 export interface KibitzerSidecarModelInput {
@@ -69,7 +72,8 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
     return {
       kind: "unavailable",
       category,
-      cause: "category_unavailable",
+      cause: resolution.cause === "pin_unserved" ? "pin_unserved" : "category_unavailable",
+      ...(resolution.pinUnserved === undefined ? {} : { pinUnserved: resolution.pinUnserved }),
       ...(resolution.missingProviders === undefined ? {} : { missingProviders: resolution.missingProviders }),
     }
   }
@@ -101,6 +105,7 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
     ...(chosen.thinking === undefined ? {} : { thinking: chosen.thinking }),
     fallbacks: chosen.fallbacks,
     chain: childModelChainSpec({ model: chosen.model, fallbacks: chosen.fallbacks }),
+    ...(resolution.pinUnserved === undefined ? {} : { pinUnserved: resolution.pinUnserved }),
   }
 }
 
@@ -170,17 +175,19 @@ export class KibitzerSidecarStartError extends Error {
   readonly category?: string
   /** The category chain's providers with no connection, when the resolver knew them. */
   readonly missingProviders?: readonly string[]
+  readonly pinUnserved?: CategoryPinUnserved
 
   constructor(
     code: KibitzerSidecarStartCode,
     message: string,
-    options?: { readonly cause?: unknown; readonly category?: string; readonly missingProviders?: readonly string[] },
+    options?: { readonly cause?: unknown; readonly category?: string; readonly missingProviders?: readonly string[]; readonly pinUnserved?: CategoryPinUnserved },
   ) {
     super(message, options)
     this.name = "KibitzerSidecarStartError"
     this.code = code
     if (options?.category !== undefined) this.category = options.category
     if (options?.missingProviders !== undefined) this.missingProviders = options.missingProviders
+    if (options?.pinUnserved !== undefined) this.pinUnserved = options.pinUnserved
   }
 }
 
@@ -192,12 +199,13 @@ export class KibitzerSidecarStartError extends Error {
  */
 export function kibitzerConfigurationFailure(error: unknown): KibitzerWakeConfiguration | undefined {
   if (!(error instanceof KibitzerSidecarStartError)) return undefined
-  if (error.code !== "category_unavailable" && error.code !== "beyond_category") return undefined
+  if (error.code !== "category_unavailable" && error.code !== "beyond_category" && error.code !== "pin_unserved") return undefined
   if (error.category === undefined) return undefined
   return {
     category: error.category,
     cause: error.code,
     ...(error.missingProviders === undefined ? {} : { missingProviders: error.missingProviders }),
+    ...(error.pinUnserved === undefined ? {} : { pinUnserved: error.pinUnserved }),
   }
 }
 
@@ -243,6 +251,16 @@ export function createKibitzerSidecarChildStarter(
       throw new KibitzerSidecarStartError(resolution.cause, `Kibitzer sidecar model unavailable: ${resolution.category} (${resolution.cause})`, {
         category: resolution.category,
         ...(resolution.missingProviders === undefined ? {} : { missingProviders: resolution.missingProviders }),
+        ...(resolution.pinUnserved === undefined ? {} : { pinUnserved: resolution.pinUnserved }),
+      })
+    }
+    if (resolution.pinUnserved !== undefined) {
+      options.logger?.warn("omo-senpi kibitzer category pin is unserved; recovered through the category default chain", {
+        category: resolution.category,
+        pin: resolution.pinUnserved.pin,
+        providers: resolution.pinUnserved.providers,
+        selectedModel: resolution.model,
+        action: `Connect a serving provider with /login or change ${resolution.pinUnserved.setting} in omo.json`,
       })
     }
     let systemPrompt: string

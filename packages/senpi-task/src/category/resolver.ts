@@ -17,6 +17,7 @@ import { withoutExcludedModels } from "../model-exclusion"
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
 import { parseAvailableModels, parseModel, parseRegistryModel } from "./registry-models"
 import { categoryModelCandidates, flattenFallbackModels } from "./user-candidates"
+import { qualifyBareCategoryCandidate, unservedBareCategoryPin } from "./bare-pin"
 import type {
   CategoryModelSelection,
   CategoryResolutionResult,
@@ -158,17 +159,25 @@ export function resolveCategory<TModel extends SenpiModelPort>(
 
   // Canonical models[] wins over the legacy model + fallback_models branch only when present;
   // builtin categories have no models key and must keep their chain-based resolution.
+  const candidates = categoryModelCandidates(config).map((candidate) => qualifyBareCategoryCandidate(candidate, availableModelSet))
   const canonicalChain = config.models !== undefined && config.models.length > 0
-    ? categoryModelCandidates(config)
+    ? candidates
     : undefined
   const canonicalReasoningByModel = new Map(
     (canonicalChain ?? []).map((candidate) => [candidate.model, candidate.reasoningEffort]),
   )
-  const userModel = canonicalChain !== undefined ? canonicalChain[0].model : userConfig?.model
+  const rawUserModel = config.models !== undefined && config.models.length > 0
+    ? categoryModelCandidates(config)[0]?.model
+    : userConfig?.model
+  const pinUnserved = unservedBareCategoryPin(rawUserModel, availableModelSet, senpiModelRegistry, `categories.${categoryName}.${canonicalChain === undefined ? "model" : "models[0]"}`)
+  const userModel = rawUserModel === undefined ? undefined : (() => {
+    const candidate = qualifyBareCategoryCandidate({ model: rawUserModel }, availableModelSet)
+    return candidate.variant === undefined ? candidate.model : `${candidate.model} ${candidate.variant}`
+  })()
   const userFallbackModels = canonicalChain !== undefined
-    ? canonicalChain.slice(1).map((candidate) => candidate.model)
+    ? canonicalChain.slice(1).map((candidate) => candidate.variant === undefined ? candidate.model : `${candidate.model} ${candidate.variant}`)
     : flattenFallbackModels(config.fallback_models)
-  const resolution = resolveModelForDelegateTask(
+  let resolution = resolveModelForDelegateTask(
     {
       userModel,
       userFallbackModels,
@@ -184,9 +193,18 @@ export function resolveCategory<TModel extends SenpiModelPort>(
       hasConnectedProvidersCache: true,
     },
   )
+  // A bare pin is a model selector, not a provider. If no connected lane serves it and none of
+  // its configured fallbacks resolved, recover only through this category's builtin default/chain.
+  if (pinUnserved !== undefined && resolution !== undefined && "model" in resolution && !parseModel(resolution.model)) {
+    resolution = availableModelSet.size === 0 ? undefined : resolveModelForDelegateTask(
+      { categoryDefaultModel: builtinConfig?.model, fallbackChain, availableModels: availableModelSet, systemDefaultModel: options.systemDefaultModel },
+      { connectedProviders: null, hasProviderModelsCache: true, hasConnectedProvidersCache: true },
+    )
+  }
 
   if (!resolution || "skipped" in resolution) {
     return {
+      ...(pinUnserved === undefined ? {} : { pinUnserved }),
       kind: "model_unavailable",
       category: categoryName,
       attemptedModel: config.model,
@@ -208,6 +226,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   if (!parsedModel || !foundModel) {
     const fallback = nearestFallback(selection)
     return {
+      ...(pinUnserved === undefined ? {} : { pinUnserved }),
       kind: "model_unavailable",
       category: categoryName,
       attemptedModel: selection.selectedModel,
@@ -236,7 +255,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
         availableModels: availableModelSet,
       })
   const runtimeModelChain = buildRuntimeModelChain({
-    candidates: [...categoryModelCandidates(config), ...chainCandidates],
+    candidates: [...candidates.filter((candidate) => candidate.model.includes("/")), ...chainCandidates],
     selectedModel: selection.selectedModel,
     availableModels: availableModelSet,
     source: "category",
@@ -257,6 +276,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     ...(prompt_append !== undefined ? { prompt_append } : {}),
   }
   return {
+    ...(pinUnserved === undefined ? {} : { pinUnserved }),
     kind: "resolved",
     category: categoryName,
     spec,

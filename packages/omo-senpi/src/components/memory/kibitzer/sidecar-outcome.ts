@@ -10,6 +10,7 @@
 
 import type { RecallNudge } from "@oh-my-opencode/memory-core"
 import type { RunnerOutcome } from "@oh-my-opencode/senpi-task"
+import type { CategoryPinUnserved } from "@oh-my-opencode/senpi-task"
 
 import { classifyJudgeTurn, normalizeGateReason } from "./judge-outcome"
 
@@ -21,7 +22,8 @@ export type KibitzerWakeFailureCause = "child_failed" | "child_failed_upstream" 
 /** Why the pinned recall category cannot serve a model, and which providers a connection would fix. */
 export interface KibitzerWakeConfiguration {
   readonly category: string
-  readonly cause: "category_unavailable" | "beyond_category"
+  readonly cause: "category_unavailable" | "beyond_category" | "pin_unserved"
+  readonly pinUnserved?: CategoryPinUnserved
   readonly missingProviders?: readonly string[]
 }
 

@@ -24,6 +24,17 @@ function entry<T>(data: T): CustomEntry<T> {
   return { type: "custom", id: "entry-1", parentId: null, timestamp: new Date(0).toISOString(), customType: "test", data }
 }
 
+test("an unserved pin notice renders its dynamic pin, effective setting and serving providers", () => {
+  const record: KibitzerUnavailableRecord = {
+    version: 1, category: "quick", cause: "pin_unserved",
+    pinUnserved: { pin: "flash-1", setting: "categories.quick.models[0]", providers: ["serving-provider"] },
+  }
+  const rendered = renderKibitzerUnavailableEntry(entry(record), { expanded: false }, theme)?.render(180).join("\n")
+  expect(rendered).toContain("flash-1")
+  expect(rendered).toContain("categories.quick.models[0]")
+  expect(rendered).toContain("serving-provider")
+})
+
 describe("kibitzer gate notice", () => {
   test("#given a dropped deadline gate record #when rendered #then nothing is drawn", () => {
     const record: KibitzerGateRecord = { version: 1, status: "dropped", cause: "deadline", candidateCount: 2 }

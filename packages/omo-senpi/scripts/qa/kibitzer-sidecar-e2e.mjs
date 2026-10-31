@@ -92,7 +92,7 @@ import {
   writeOmoConfig,
 } from "./kibitzer-sidecar-support.mjs"
 
-export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "fast-alias-config", "cjk-auto", "query-expansion"]
+export const SCENARIOS = ["happy", "bare-pin", "bare-pin-unserved", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "fast-alias-config", "cjk-auto", "query-expansion"]
 /**
  * #10536: a priority alias declared only in models.json on an openai-codex-responses provider. senpi's
  * service-tier extension starts such an alias on its base model at session_start, before any request,
@@ -104,6 +104,8 @@ const REFUSED_MODEL = "refused-1"
 const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
 /** Scenario-specific omo config on top of the lane's defaults; `{}` categories kills the recall chain. */
 const CONFIG = {
+  "bare-pin": { categories: { quick: { model: "mock-1" } } },
+  "bare-pin-unserved": { categories: { quick: { model: "unserved-mock" } } },
   "category-unavailable": { categories: {} },
   "refused-pinned-model": { categories: { quick: { description: "QA pin outside the builtin quick chain", model: `omo-mock/${REFUSED_MODEL}` } } },
   "fast-alias-config": { categories: { quick: { description: "QA pin on a models.json priority alias", model: `${FAST_ALIAS.provider}/${FAST_ALIAS.alias}` } } },
@@ -225,7 +227,9 @@ async function withHarness(scenario, options, run) {
     facts.baseUrl = await server.ready
     const sandbox = prepareSandbox(options.pluginRoot, facts.baseUrl)
     cleanup.add("sandbox", () => removeSandbox(sandbox, options.keepSandbox))
-    SANDBOX[scenario]?.(sandbox, facts.baseUrl)
+    // Recovery uses the same connected builtin rung as the refused-pin fixture, but never sends
+    // a request for REFUSED_MODEL: its unserved bare pin must recover before constructing a child.
+    SANDBOX[scenario === "bare-pin-unserved" ? "refused-pinned-model" : scenario]?.(sandbox, facts.baseUrl)
     facts.sandboxRoot = sandbox.root
     const env = sandboxEnv(sandbox)
     assertSandboxEnv(sandbox, env)
@@ -286,6 +290,15 @@ async function runHappy({ session, state, identity, router, facts, parentTurns, 
   record("one-sidecar-lineage", lineages.length === 1 && lineage?.name === encoded && lineage?.sessionId === state.sessionId, `dirs=[${lineages.map((entry) => entry.name).join(",")}] decoded=${lineage?.sessionId} parent=${state.sessionId}`)
   if (lineage === undefined) return
   let transcripts = childTranscripts(lineage.dir)
+  if (facts.scenario === "bare-pin" || facts.scenario === "bare-pin-unserved") {
+    const expected = facts.scenario === "bare-pin" ? "omo-mock/mock-1" : `${BUILTIN_RUNG.provider}/${BUILTIN_RUNG.id}`
+    const records = await watchUntil(lineage.dir, () => {
+      const current = wakeRecords(lineage.dir)
+      return current.some((wake) => wake.model === expected && wake.status === "completed") ? current : undefined
+    }, { timeoutMs: WAKE_TIMEOUT_MS, description: "bare pin: category wake record committed" })
+    record("bare-pin-category-model", records.some((wake) => wake.model === expected && wake.status === "completed" && !wake.diagnostic),
+      `expected=${expected} wakes=${JSON.stringify(records.map(({ model, status, diagnostic }) => ({ model, status, diagnostic })))}`)
+  }
   const seedText = messageText(transcripts[0]?.users[0])
   record("one-child-generation", transcripts.length === 1 && transcripts[0].users.length === 1, `transcripts=${transcripts.length} userMessages=${transcripts[0]?.users.length}`)
   record("seed-envelope", seedText.startsWith("<kibitzer-seed ") && seedText.includes(`session="${state.sessionId}"`) && candidatePathsOf(seedText).includes(MEMORIES.rollout.path) && envelopeCursors(seedText) !== undefined, `head=${JSON.stringify(seedText.slice(0, 120))} candidates=${candidatePathsOf(seedText).join(",")} cursors=${JSON.stringify(envelopeCursors(seedText))}`)
@@ -634,7 +647,7 @@ async function runQueryExpansion({ session, state, identity, router, facts, pare
   }
 }
 
-const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "fast-alias-config": runFastAliasConfig, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
+const RUNNERS = { happy: runHappy, "bare-pin": runHappy, "bare-pin-unserved": runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "fast-alias-config": runFastAliasConfig, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
 
 // ---- main --------------------------------------------------------------------------------------------------------
 

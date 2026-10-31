@@ -21,6 +21,8 @@ export type SenpiModelPort = {
 
 export type SenpiModelRegistryPort<TModel extends SenpiModelPort> = {
   readonly getAvailable: () => readonly TModel[] | unknown
+  /** Full catalog, including unconnected providers; used only for actionable pin diagnostics. */
+  readonly getAll?: () => readonly TModel[] | unknown
   readonly find: (provider: string, modelId: string) => TModel | unknown
 }
 
@@ -53,7 +55,13 @@ export type CategoryModelSelection = {
   readonly fallbackEntry?: DelegateFallbackEntry
 }
 
-export type CategoryResolutionResult<TModel extends SenpiModelPort> =
+export type CategoryPinUnserved = {
+  readonly pin: string
+  readonly providers: readonly string[]
+  readonly setting: string
+}
+
+export type CategoryResolutionResult<TModel extends SenpiModelPort> = (
   | {
       readonly kind: "resolved"
       readonly category: string
@@ -89,3 +97,4 @@ export type CategoryResolutionResult<TModel extends SenpiModelPort> =
       // that `provider/id`, never selected, named so the user can opt in with a category pin (#9146).
       readonly unlisted_provider_model?: string
     }
+) & { readonly pinUnserved?: CategoryPinUnserved }

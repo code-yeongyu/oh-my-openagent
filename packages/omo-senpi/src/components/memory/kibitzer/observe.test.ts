@@ -118,6 +118,17 @@ function outcome(overrides: Partial<KibitzerWakeOutcome> & Pick<KibitzerWakeOutc
 
 const completed: RunnerOutcome = { status: "completed", finalResponse: "", model: "omo-mock/mock-1" }
 
+test("unserved pin configuration survives the notice and durable wake record", async () => {
+  const f = await fixture()
+  const pinUnserved = { pin: "flash", providers: ["serving-provider"], setting: "categories.quick.models[0]" }
+  const configuration = { category: "quick", cause: "pin_unserved" as const, pinUnserved }
+  f.observe.onWake(outcome({ wake: 1, status: "failed", diagnostic: false, configuration }), f.context)
+  await f.idle()
+  expect(f.entries).toMatchObject([{ customType: "omo-kibitzer:unavailable", data: { pinUnserved } }])
+  expect((await f.wakes(SESSION_ID))[0]?.configuration).toEqual(configuration)
+  expect(f.gates()).toHaveLength(0)
+})
+
 /** Backdates every entry of a sidecar directory (and the directory itself) so it reads as idle since `at`. */
 async function backdate(dir: string, at: number): Promise<void> {
   const stamp = new Date(at)

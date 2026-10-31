@@ -4,6 +4,7 @@ import {
   resolveCategory,
   withoutExcludedModels,
   type SenpiModelPort,
+  type CategoryPinUnserved,
   type SenpiModelRegistryPort,
 } from "@oh-my-opencode/senpi-task"
 
@@ -44,11 +45,13 @@ export type ReflectionModelResolution =
       readonly thinking?: ReflectionThinkingLevel
       readonly source?: ReflectionModelSource
       readonly fallbacks: readonly ReflectionModelCandidate[]
+      readonly pinUnserved?: CategoryPinUnserved
     }
   | {
       readonly kind: "category_unavailable"
       readonly category: string
-      readonly cause: "no_registry" | "not_found" | "model_unavailable" | "unknown"
+      readonly cause: "no_registry" | "not_found" | "model_unavailable" | "unknown" | "pin_unserved"
+      readonly pinUnserved?: CategoryPinUnserved
       readonly attemptedChain?: readonly unknown[]
       readonly missingProviders?: readonly string[]
     }
@@ -77,6 +80,9 @@ export function resolveReflectionModel(
   }
   const resolution = resolveCategory(category, config, registry)
   if (resolution.kind !== "resolved") {
+    if (resolution.pinUnserved !== undefined) {
+      return { kind: "category_unavailable", category, cause: "pin_unserved", pinUnserved: resolution.pinUnserved }
+    }
     const pinned = config.categories?.[category]?.model
     const pinnedSelector = typeof pinned === "string" && pinned.includes("/") ? pinned : undefined
     if (resolution.kind === "model_unavailable" && pinnedSelector !== undefined) {
@@ -138,6 +144,7 @@ export function resolveReflectionModel(
   return {
     kind: "resolved",
     category: resolution.category,
+    ...(resolution.pinUnserved === undefined ? {} : { pinUnserved: resolution.pinUnserved }),
     model: `${resolution.spec.provider}/${resolution.spec.modelId}`,
     ...(thinking === undefined ? {} : { thinking }),
     fallbacks,

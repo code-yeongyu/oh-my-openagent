@@ -20,6 +20,15 @@ export function withoutExcludedModels<TModel extends SenpiModelPort>(
 ): SenpiModelRegistryPort<TModel> {
   if (patterns === undefined || patterns.length === 0) return registry
   return {
+    ...(registry.getAll === undefined ? {} : {
+      getAll: () => {
+        const catalog = registry.getAll?.()
+        return Array.isArray(catalog) ? catalog.filter((model) => {
+          const key = modelKey(model)
+          return key === undefined || !isExcludedModel(key, patterns)
+        }) : catalog
+      },
+    }),
     getAvailable: () => {
       const available = registry.getAvailable()
       if (!Array.isArray(available)) return available

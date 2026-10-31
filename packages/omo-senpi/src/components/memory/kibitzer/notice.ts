@@ -45,7 +45,8 @@ export interface KibitzerGateRecord {
 export interface KibitzerUnavailableRecord {
   readonly version: 1
   readonly category: string
-  readonly cause: "category_unavailable" | "beyond_category"
+  readonly cause: "category_unavailable" | "beyond_category" | "pin_unserved"
+  readonly pinUnserved?: { readonly pin: string; readonly providers: readonly string[]; readonly setting: string }
   readonly missingProviders?: readonly string[]
 }
 
@@ -106,18 +107,23 @@ export const renderKibitzerUnavailableEntry: EntryRenderer<unknown> = (entry, op
   if (typeof record.category !== "string") return undefined
   const category = normalizeRendererText(record.category).slice(0, UNAVAILABLE_CATEGORY_MAX_CHARS)
   if (category.length === 0) return undefined
-  if (record.cause !== "category_unavailable" && record.cause !== "beyond_category") return undefined
-  const providers = unavailableProviders(record.missingProviders)
+  if (record.cause !== "category_unavailable" && record.cause !== "beyond_category" && record.cause !== "pin_unserved") return undefined
+  const pin = isRecord(record.pinUnserved) ? validGateField(record.pinUnserved.pin, GATE_MODEL_MAX_CHARS) : undefined
+  const setting = isRecord(record.pinUnserved) ? validGateField(record.pinUnserved.setting, UNAVAILABLE_CATEGORY_MAX_CHARS) : undefined
+  if (record.cause === "pin_unserved" && (pin === undefined || setting === undefined)) return undefined
+  const providers = unavailableProviders(record.cause === "pin_unserved" && isRecord(record.pinUnserved) ? record.pinUnserved.providers : record.missingProviders)
   if (providers === undefined) return undefined
-  const why = record.cause === "category_unavailable"
+  const why = record.cause === "pin_unserved"
+    ? `No connected provider serves ${setting} "${pin}", and the category default chain is unavailable; recalled-memory judging resumes once a serving provider is connected or the pin is changed.`
+    : record.cause === "category_unavailable"
     ? `No connected provider serves the "${category}" category chain, so recalled-memory judging is off; it resumes by itself once one is connected.`
     : `The "${category}" category chain has no connected model and Kibitzer never falls back beyond the category, so recalled-memory judging is off.`
   const fixes = providers.length > 0
     ? [
       { text: `connect one of: ${providers.join(", ")} (run /login <provider>)`, tone: "dim" as const },
-      { text: `or pin categories.${category}.model (or memory.recall.category) in omo.json`, tone: "dim" as const },
+      { text: `or pin ${setting ?? `categories.${category}.model`} (or memory.recall.category) in omo.json`, tone: "dim" as const },
     ]
-    : [{ text: `pin categories.${category}.model (or memory.recall.category) in omo.json to a connected model`, tone: "dim" as const }]
+    : [{ text: `pin ${setting ?? `categories.${category}.model`} (or memory.recall.category) in omo.json to a connected model`, tone: "dim" as const }]
   return noticeComponent({
     glyph: "⚠",
     title: joinFields(["Kibitzer unavailable", category]),

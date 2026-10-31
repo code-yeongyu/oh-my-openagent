@@ -15,6 +15,7 @@ export { builtinCategoryChainCandidates, resolveAvailableCategoryNames, resolveC
 export type {
   BuiltinCategoryDefinition,
   CategoryModelSelection,
+  CategoryPinUnserved,
   CategoryResolutionResult,
   ResolveCategoryOptions,
   ResolvedChildSpec,

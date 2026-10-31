@@ -155,6 +155,7 @@ export { resolveTaskAgents } from "./agents/task-agents"
 export type {
   BuiltinCategoryDefinition,
   CategoryModelSelection,
+  CategoryPinUnserved,
   CategoryResolutionResult,
   ResolvedChildSpec,
   SenpiModelPort,

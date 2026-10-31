@@ -38,6 +38,7 @@ import { redactKibitzerEventText } from "./events"
 import {
   GATE_ENTRY_TYPE,
   UNAVAILABLE_ENTRY_TYPE,
+  UNAVAILABLE_CATEGORY_MAX_CHARS,
   UNAVAILABLE_PROVIDER_MAX_CHARS,
   UNAVAILABLE_PROVIDER_MAX_COUNT,
   type KibitzerGateRecord,
@@ -203,6 +204,13 @@ export function createKibitzerObservability(options: KibitzerObservabilityOption
       version: 1,
       category: capped(redactKibitzerEventText(configuration.category), WAKE_MODEL_MAX_CHARS),
       cause: configuration.cause,
+      ...(configuration.pinUnserved === undefined ? {} : {
+        pinUnserved: {
+          pin: capped(redactKibitzerEventText(configuration.pinUnserved.pin), WAKE_MODEL_MAX_CHARS),
+          setting: capped(redactKibitzerEventText(configuration.pinUnserved.setting), UNAVAILABLE_CATEGORY_MAX_CHARS),
+          providers: configuration.pinUnserved.providers.slice(0, UNAVAILABLE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), UNAVAILABLE_PROVIDER_MAX_CHARS)),
+        },
+      }),
       // A chain can list a dozen providers; the entry is stored bounded, exactly as the renderer draws it.
       ...(configuration.missingProviders === undefined
         ? {}

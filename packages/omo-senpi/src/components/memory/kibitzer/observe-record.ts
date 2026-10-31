@@ -95,6 +95,13 @@ function recordConfiguration(configuration: KibitzerWakeConfiguration | undefine
   return {
     category: capped(redactKibitzerEventText(configuration.category), WAKE_MODEL_MAX_CHARS),
     cause: configuration.cause,
+    ...(configuration.pinUnserved === undefined ? {} : {
+      pinUnserved: {
+        pin: capped(redactKibitzerEventText(configuration.pinUnserved.pin), WAKE_MODEL_MAX_CHARS),
+        setting: capped(redactKibitzerEventText(configuration.pinUnserved.setting), WAKE_MODEL_MAX_CHARS),
+        providers: configuration.pinUnserved.providers.slice(0, WAKE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), WAKE_PROVIDER_MAX_CHARS)),
+      },
+    }),
     ...(configuration.missingProviders === undefined
       ? {}
       : { missingProviders: configuration.missingProviders.slice(0, WAKE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), WAKE_PROVIDER_MAX_CHARS)) }),
