@@ -316,6 +316,20 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bash .github/scripts/ci-root-shard-2.sh
 
+      # #11259: the tmux-core runner tests spawn Git Bash, which has been warning
+      # "could not find /tmp, please create!" on this leg. The per-process test temp root exists
+      # while the worker runs, so the open question is how msys maps TEMP to /tmp here. This step
+      # only prints that mapping from the same Git Bash the tests spawn; every command is
+      # exit-tolerant, so it can never fail the job. The follow-up fix removes it.
+      - name: Print Git Bash temp mapping (#11259 diagnostic)
+        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        # pwsh starts the Git Bash the tests spawn, so this step never runs under shell: bash itself
+        # (script/ci-root-test-partition.test.ts forbids that in the root-test steps).
+        shell: pwsh
+        run: |
+          & "$env:ProgramFiles\Git\bin\bash.exe" -c 'echo "TEMP=$TEMP"; echo "TMP=$TMP"; echo "TMPDIR=$TMPDIR"; cygpath -u "$TEMP"; cygpath -w /tmp; ls -ld /tmp'
+          exit 0
+
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
       # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
