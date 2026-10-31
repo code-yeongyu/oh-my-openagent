@@ -1,4 +1,5 @@
 import type { AgentOverrides } from "../../config/schema"
+import type { DelegatedModelConfig } from "./types"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
@@ -20,6 +21,38 @@ function findAgentOverride(agentOverrides: AgentOverrides | undefined, agentConf
     ?? Object.entries(agentOverrides ?? {}).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
 }
 
+function modelStringFromEntry(entry: string | { model: string } | undefined): string | undefined {
+  if (typeof entry === "string") return entry
+  return entry?.model
+}
+
+/**
+ * The first `models[]` entry is the primary. When it is an object it carries
+ * per-model settings (reasoning/reasoningEffort/temperature/top_p/maxTokens/
+ * thinking) that must be preserved — extracting only `entry.model` silently
+ * drops the rest of the contract (#6869 review). Returns the base config with
+ * the object's settings merged in, or the base untouched when the entry is a
+ * plain string.
+ */
+function applyPrimaryEntrySettings(
+  base: DelegatedModelConfig,
+  entry: string | { model: string; reasoning?: string; variant?: string; reasoningEffort?: string; temperature?: number; top_p?: number; maxTokens?: number; thinking?: { type: "enabled" | "disabled"; budgetTokens?: number } },
+): DelegatedModelConfig {
+  if (typeof entry === "string" || entry === undefined) {
+    return base
+  }
+  return {
+    ...base,
+    ...(entry.reasoning !== undefined ? { reasoning: entry.reasoning } : {}),
+    ...(entry.variant !== undefined ? { variant: entry.variant } : {}),
+    ...(entry.reasoningEffort !== undefined ? { reasoningEffort: entry.reasoningEffort } : {}),
+    ...(entry.temperature !== undefined ? { temperature: entry.temperature } : {}),
+    ...(entry.top_p !== undefined ? { top_p: entry.top_p } : {}),
+    ...(entry.maxTokens !== undefined ? { maxTokens: entry.maxTokens } : {}),
+    ...(entry.thinking !== undefined ? { thinking: entry.thinking } : {}),
+  }
+}
+
 export async function resolveSubagentModel(
   agentToUse: string,
   matchedAgent: AgentInfo,
@@ -35,10 +68,14 @@ export async function resolveSubagentModel(
     ? executorCtx.userCategories?.[agentOverride.category]
     : undefined
   const agentCategoryModel = agentCategoryConfig?.model
-  const hasExplicitUserModel = Boolean(agentOverride?.model ?? agentCategoryModel)
+  const canonicalAgentModels = agentOverride?.models ?? agentCategoryConfig?.models
+  const canonicalPrimaryModel = modelStringFromEntry(canonicalAgentModels?.[0])
+  const explicitUserModel = agentOverride?.model ?? agentCategoryModel
+  const hasExplicitUserModel = Boolean(explicitUserModel ?? canonicalPrimaryModel)
   const normalizedAgentFallbackModels = normalizeFallbackModels(
-    agentOverride?.fallback_models
-    ?? agentCategoryConfig?.fallback_models
+    canonicalAgentModels && canonicalAgentModels.length > 1
+      ? canonicalAgentModels.slice(1)
+      : (agentOverride?.fallback_models ?? agentCategoryConfig?.fallback_models)
   )
 
   const availableModels = await getAvailableModelsForDelegateTask(executorCtx.client)
@@ -51,7 +88,7 @@ export async function resolveSubagentModel(
 
   if (agentOverride?.model || agentCategoryModel || agentRequirement || matchedAgent.model) {
     const resolution = resolveModelForDelegateTask({
-      userModel: agentOverride?.model ?? agentCategoryModel,
+      userModel: explicitUserModel ?? canonicalPrimaryModel,
       userFallbackModels: flattenToFallbackModelStrings(normalizedAgentFallbackModels),
       categoryDefaultModel: matchedAgentModelStr,
       fallbackChain: agentRequirement?.fallbackChain,
@@ -68,8 +105,8 @@ export async function resolveSubagentModel(
         const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
         categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
       }
-    } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-      const explicitModel = agentOverride?.model ?? agentCategoryModel
+    } else if (resolutionSkipped && (explicitUserModel ?? canonicalPrimaryModel)) {
+      const explicitModel = explicitUserModel ?? canonicalPrimaryModel
       const normalized = explicitModel ? normalizeModelFormat(explicitModel) : undefined
       if (normalized) {
         const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant
@@ -77,9 +114,18 @@ export async function resolveSubagentModel(
         categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
         log("[delegate-task] Cold cache: using explicit user override for subagent", {
           agent: agentToUse,
-          model: agentOverride?.model ?? agentCategoryModel,
+          model: explicitModel,
         })
       }
+    }
+
+    // Preserve the full models[0] contract: when the primary entry is an
+    // object, its per-model settings (reasoning, temperature, thinking, …)
+    // must survive resolution instead of being dropped (#6869 review). The
+    // primary entry is the most specific source, so it overrides category
+    // params applied above.
+    if (categoryModel && typeof canonicalAgentModels?.[0] === "object") {
+      categoryModel = applyPrimaryEntrySettings(categoryModel, canonicalAgentModels[0])
     }
 
     const defaultProviderID = categoryModel?.providerID

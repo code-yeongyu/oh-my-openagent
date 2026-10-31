@@ -828,6 +828,56 @@ describe("resolveSubagentExecution", () => {
     })
   })
 
+  test("preserves the full models[0] object contract when the agent primary is an object entry", async () => {
+    //#given — models[0] is an object carrying per-model settings; extracting
+    // only entry.model would drop variant/reasoning/temperature/thinking
+    readProviderModelsCacheMock.mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "explore" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "explore", mode: "subagent", model: "openai/gpt-5.4-preview" },
+      ]),
+      {
+        agentOverrides: {
+          explore: {
+            models: [
+              {
+                model: "openai/gpt-5.4",
+                variant: "xhigh",
+                reasoning: "high",
+                temperature: 0.1,
+                top_p: 0.9,
+                maxTokens: 4096,
+                thinking: { type: "enabled", budgetTokens: 2048 },
+              },
+            ],
+          },
+        } as ExecutorContext["agentOverrides"],
+      }
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then — the full models[0] contract survives resolution
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toMatchObject({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+      variant: "xhigh",
+      reasoning: "high",
+      temperature: 0.1,
+      top_p: 0.9,
+      maxTokens: 4096,
+      thinking: { type: "enabled", budgetTokens: 2048 },
+    })
+  })
+
   test("does not apply object-style fallback settings when the subagent primary model matches directly", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
