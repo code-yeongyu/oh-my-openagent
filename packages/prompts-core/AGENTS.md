@@ -4,15 +4,15 @@
 
 ## OVERVIEW
 
-Owns all static markdown prompt content (`prompts/` tree), bundles it at build time via Bun's `.md` text loader (never read from disk at runtime), and exports it as `VariantTable` records plus typed `loadPrompt`/`loadPromptSync` (frontmatter parse + runtime placeholder injection) and `resolveVariant` (model → variant). Harness-neutral: zero OpenCode SDK coupling, enforced by an audit test. Package: `@oh-my-opencode/prompts-core`.
+Owns static mode and planning-role markdown prompt content (`prompts/` tree), bundles it at build time via Bun's `.md` text loader (never read from disk at runtime), and exports it as `VariantTable` records plus typed `loadPrompt`/`loadPromptSync` (frontmatter parse + runtime placeholder injection) and `resolveVariant` (model → variant). Harness-neutral: zero OpenCode SDK coupling, enforced by an audit test. Package: `@oh-my-opencode/prompts-core`.
 
 ## PROMPT TREE (`prompts/`)
 
 | Family | Variants |
 |--------|----------|
 | `ultrawork/` | `default`, `gpt`, `gemini`, `glm`, `planner`, `codex` (6) |
-| `atlas/` | `default`, `gpt`, `gemini`, `glm`, `kimi`, `kimi-k2-7`, `kimi-k3`, `opus-4-7` (8) |
 | `prometheus/` | `default` only (no model routing) |
+| `atlas/` | Existing OpenCode orchestration-role variants |
 | `mode/` | `hyperplan`, `team` |
 
 ## PUBLIC API (`src/index.ts`)
@@ -32,3 +32,10 @@ Owns all static markdown prompt content (`prompts/` tree), bundles it at build t
 - **No `@opencode-ai/*` imports** — enforced by `test/opencode-coupling-audit.test.ts`.
 - **`codex.md` is exported via a secondary package path** (`./prompts/ultrawork/codex.md`) for the Light edition; prometheus stays single-variant (no per-model files).
 - Parent: [`packages/AGENTS.md`](../AGENTS.md).
+
+## Model cores
+
+Per-model system prompts are not owned here. OpenCode imports Senpi's public
+`./prompt-presets` builders through its native-model-prompt adapter. Atlas
+markdown retains the existing OpenCode orchestration role and its variants.
+`resolveVariant` keeps its original table-order behavior for roles and mode overlays.

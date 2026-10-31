@@ -5,6 +5,7 @@ import { publishLockRecord } from "./lock-publish"
 import {
   buildLockRecord,
   errorCode,
+  forgetLockRecord,
   isLockRecordStale,
   isPathAbsenceError,
   markLockRecordReleased,
@@ -70,10 +71,10 @@ export async function removeLockRecordIfUnchanged(
   deps: LockReclaimDeps = {},
 ): Promise<LockReclaimOutcome> {
   const guardPath = reclaimGuardPath(lockPath, expectedRecord)
-  const guardRecord = buildLockRecord("lock-reclaim")
+  const guardRecord = await buildLockRecord("lock-reclaim")
   if (!(await publishLockRecord(guardPath, guardRecord))) {
     const guard = await readLockRecord(guardPath)
-    if (guard !== null && isLockRecordStale(guard, staleAfterMs)) {
+    if (guard !== null && await isLockRecordStale(guard, staleAfterMs)) {
       await removeLockRecordIfUnchanged(guardPath, guard.content, staleAfterMs, deps)
     }
     return "busy"
@@ -82,11 +83,12 @@ export async function removeLockRecordIfUnchanged(
   try {
     const current = await readLockRecord(lockPath)
     if (current === null) return "absent"
-    if (current.content !== expectedRecord || !isLockRecordStale(current, staleAfterMs)) return "changed"
+    if (current.content !== expectedRecord || !await isLockRecordStale(current, staleAfterMs)) return "changed"
     const unlinked = await unlinkWithRetry(lockPath, deps)
+    if (unlinked !== "stuck") forgetLockRecord(expectedRecord)
     return unlinked === "absent" ? "absent" : unlinked
   } finally {
     markLockRecordReleased(guardRecord)
-    await unlinkWithRetry(guardPath, deps)
+    if (await unlinkWithRetry(guardPath, deps) !== "stuck") forgetLockRecord(guardRecord)
   }
 }

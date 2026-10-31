@@ -166,18 +166,27 @@ export class HostSessionClient {
   }
 
   /** End the session on the host (`close_session`), then drop this child's connection. */
-  async close(): Promise<void> {
+  async close(): Promise<boolean> {
     this.extensionEvents.clear()
     const client = this.client
     const routingId = this.routingId
     this.client = undefined
     this.routingId = undefined
-    if (client === undefined) return
+    if (client === undefined) return false
+    let answered = false
     try {
-      if (routingId !== undefined) await client.closeSession(routingId)
+      if (routingId !== undefined) {
+        await client.closeSession(routingId)
+        answered = true
+      }
     } finally {
-      await client.stop()
+      // A stop failure after the host answered must not erase that answer (omo#11765).
+      await client.stop().catch((error: unknown) => {
+        if (!answered) throw error
+        log("senpi-task host session client stop failed after an answered close", { socket: this.socketPath, error: String(error) })
+      })
     }
+    return answered
   }
 
   /** Only a live post-close host listing releases ownership; ACKs and frames are not proof. */

@@ -1,4 +1,11 @@
-import { join } from "node:path"
+import { mkdir } from "node:fs/promises"
+import { dirname, join } from "node:path"
+
+export const KEYCHAIN_HELPER_IDENTIFIER = "com.mengmota.omo-keychain-helper"
+export const KEYCHAIN_HELPER_TEAM = "523JNR86LZ"
+export const KEYCHAIN_HELPER_REQUIREMENT =
+  `identifier "${KEYCHAIN_HELPER_IDENTIFIER}" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] ` +
+  `and certificate leaf[field.1.2.840.113635.100.6.1.13] and certificate leaf[subject.OU] = "${KEYCHAIN_HELPER_TEAM}"`
 
 /** Q5, decided 2026-10-28 (fewest prompts): the helper serves root. The refuse-root branch stays buildable behind this switch. */
 const KEYCHAIN_HELPER_REFUSE_ROOT_DEFAULT = false
@@ -15,7 +22,7 @@ export type KeychainHelperBuild = {
   readonly architectures?: readonly KeychainHelperArchitecture[]
 }
 
-const UNIVERSAL: readonly KeychainHelperArchitecture[] = ["arm64", "x86_64"]
+export const UNIVERSAL: readonly KeychainHelperArchitecture[] = ["arm64", "x86_64"]
 
 function keychainHelperCompileArgs(build: KeychainHelperBuild): string[] {
   const sourceDir = join(import.meta.dir, "src")
@@ -42,6 +49,7 @@ function keychainHelperCompileArgs(build: KeychainHelperBuild): string[] {
 
 export async function buildKeychainHelper(build: KeychainHelperBuild): Promise<void> {
   if (process.platform !== "darwin") throw new Error("The keychain helper builds on macOS only.")
+  await mkdir(dirname(build.output), { recursive: true })
   const compiler = Bun.spawn(["clang", ...keychainHelperCompileArgs(build)], { stdout: "pipe", stderr: "pipe" })
   const [stderr, exitCode] = await Promise.all([new Response(compiler.stderr).text(), compiler.exited])
   if (exitCode !== 0) throw new Error(`clang failed (${exitCode}) building the keychain helper:\n${stderr}`)
