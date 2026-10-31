@@ -1,0 +1,101 @@
+
+ RUN  v4.1.11 /home/viprix/projects/oom-wt-6304/packages/omo-codex/plugin/components/lsp
+
+ ❯ test/codex-hook-outside-cwd.test.ts (5 tests | 4 failed) 17ms
+     × #given a request-cwd containment rejection #when the hook evaluates diagnostics #then it stays silent instead of blocking the edit 9ms
+     × #given one real error and one containment rejection #when the hook evaluates both files #then only the real diagnostic blocks 4ms
+     × #given a containment rejection on one edit #when the next edit produces real diagnostics #then the rejection is not cached and diagnostics still block 1ms
+     × #given the exact LSP core rejection message shapes #when classifying #then only the containment rejection matches 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/codex-hook-outside-cwd.test.ts > codex PostToolUse hook outside request cwd > #given a request-cwd containment rejection #when the hook evaluates diagnostics #then it stays silent instead of blocking the edit
+AssertionError: expected { decision: 'block', …(2) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "decision": "block",
+  "hookSpecificOutput": {
+    "additionalContext": "LSP diagnostics after editing /repo-worktrees/task-1/docs/example.md:
+
+LSP file path must be inside request cwd: /repo-worktrees/task-1/docs/example.md",
+    "hookEventName": "PostToolUse",
+  },
+  "reason": "LSP diagnostics after editing /repo-worktrees/task-1/docs/example.md:
+
+LSP file path must be inside request cwd: /repo-worktrees/task-1/docs/example.md",
+}
+
+ ❯ test/codex-hook-outside-cwd.test.ts:25:18
+     23|
+     24|   // then
+     25|   expect(parsed).toBeUndefined();
+       |                  ^
+     26|   expect(output).toBe("");
+     27|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/codex-hook-outside-cwd.test.ts > codex PostToolUse hook outside request cwd > #given one real error and one containment rejection #when the hook evaluates both files #then only the real diagnostic blocks
+AssertionError: expected 'LSP diagnostics after editing /repo-w…' to be 'LSP diagnostics after editing src/bro…' // Object.is equality
+
+- Expected
++ Received
+
++ LSP diagnostics after editing /repo-worktrees/task-1/docs/example.md:
++
++ LSP file path must be inside request cwd: /repo-worktrees/task-1/docs/example.md
++
+  LSP diagnostics after editing src/broken.ts:
+
+  - error[typescript] (2304) at 1:1: Cannot find name 'missing'.
+
+ ❯ test/codex-hook-outside-cwd.test.ts:51:25
+     49|
+     50|   // then
+     51|   expect(parsed.reason).toBe(
+       |                         ^
+     52|    "LSP diagnostics after editing src/broken.ts:\n\n" +
+     53|     "- error[typescript] (2304) at 1:1: Cannot find name 'missing'.",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/codex-hook-outside-cwd.test.ts > codex PostToolUse hook outside request cwd > #given a containment rejection on one edit #when the next edit produces real diagnostics #then the rejection is not cached and diagnostics still block
+AssertionError: expected '{"decision":"block","reason":"LSP dia…' to be '' // Object.is equality
+
+- Expected
++ Received
+
++ {"decision":"block","reason":"LSP diagnostics after editing /repo-worktrees/task-1/docs/example.md:\n\nLSP file path must be inside request cwd: /repo-worktrees/task-1/docs/example.md","hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"LSP diagnostics after editing /repo-worktrees/task-1/docs/example.md:\n\nLSP file path must be inside request cwd: /repo-worktrees/task-1/docs/example.md"}}
++
+
+ ❯ test/codex-hook-outside-cwd.test.ts:67:26
+     65|   };
+     66|   const rejectedOutput = await runLspPostToolUseHook(input, async () =…
+     67|   expect(rejectedOutput).toBe("");
+       |                          ^
+     68|
+     69|   // when
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/codex-hook-outside-cwd.test.ts > codex PostToolUse hook outside request cwd > #given the exact LSP core rejection message shapes #when classifying #then only the containment rejection matches
+TypeError: isRequestCwdRejectionDiagnostics is not a function
+ ❯ test/codex-hook-outside-cwd.test.ts:107:10
+    105|
+    106|   // when + then
+    107|   expect(isRequestCwdRejectionDiagnostics(siblingWorktreeRejection)).t…
+       |          ^
+    108|   expect(isRequestCwdRejectionDiagnostics(leadingWhitespaceRejection))…
+    109|   expect(isRequestCwdRejectionDiagnostics("No diagnostics found")).toB…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 1 passed (5)
+   Start at  04:07:55
+   Duration  609ms (transform 298ms, setup 0ms, import 365ms, tests 17ms, environment 0ms)
