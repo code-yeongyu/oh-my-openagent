@@ -460,6 +460,17 @@
         "type": "null"
       }
     },
+    "ax.typeText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxTypeTextParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxInputResult"
+      }
+    },
     "stopPath.start": {
       "effect": "exec",
       "hostOnly": true,
@@ -579,7 +590,11 @@
     "TransactionFailed": -32020,
     "InputBusy": -32021,
     "ControlRequired": -32022,
-    "CaptureUnavailable": -32023
+    "CaptureUnavailable": -32023,
+    "UserIntervened": -32024,
+    "AxUnconfirmed": -32025,
+    "SpaceUnsupported": -32026,
+    "SpaceMoveDenied": -32027
   },
   "standardErrors": {
     "parseError": -32700,
@@ -2202,6 +2217,61 @@
       ],
       "additionalProperties": false
     },
+    "AxTypeTextParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
+      "additionalProperties": false
+    },
+    "AxInputResult": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/AxInputMethod"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "description": "`ax.typeText` reply.",
+      "additionalProperties": false
+    },
+    "AxInputMethod": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "inserted",
+          "description": "Written through the element's own selection (`AXSelectedText` on\nmacOS) and read back exactly; no key was sent and no focus moved."
+        },
+        {
+          "type": "string",
+          "const": "keys",
+          "description": "Sent as keystrokes once the element held its application's keyboard\nfocus."
+        }
+      ],
+      "description": "How `ax.typeText` delivered its text."
+    },
     "StopPathStartParams": {
       "type": "object",
       "properties": {
@@ -2457,6 +2527,7 @@
         "ax.setValue",
         "ax.focus",
         "ax.click",
+        "ax.typeText",
         "stopPath.start",
         "stopPath.status",
         "stopPath.heartbeat",
@@ -2513,9 +2584,29 @@
           "type": "string",
           "const": "CaptureUnavailable",
           "description": "The capture target exists but cannot be captured right now; `data`\nsays why (e.g. `{ \"reason\": \"minimized\" }`)."
+        },
+        {
+          "type": "string",
+          "const": "UserIntervened",
+          "description": "The user was using the target app, or brought another window to the\nfront, before or during the action, so the action stopped; the message\nsays whether any input was sent. Read the window again once the user\npauses; never repeat the action blindly."
+        },
+        {
+          "type": "string",
+          "const": "AxUnconfirmed",
+          "description": "An accessibility request was made, but the app did not confirm its\noutcome (it did not reply in time or messaging failed, e.g. while the\naction opened a modal dialog). It may already have taken effect: read\nthe element back before any retry."
+        },
+        {
+          "type": "string",
+          "const": "SpaceUnsupported",
+          "description": "Moving a window between Spaces is not available on this backend or OS\nversion."
+        },
+        {
+          "type": "string",
+          "const": "SpaceMoveDenied",
+          "description": "The window server refused the Space move, or the move could not be\nverified."
         }
       ],
-      "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."
+      "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it.\nThe enum is append-only: a new code takes the next ordinal, so no existing\nnumeric code moves. Amendment 1 (macOS shared-screen parity, #11459 /\n#11461) appended `UserIntervened`, `AxUnconfirmed`, `SpaceUnsupported` and\n`SpaceMoveDenied` (-32024..-32027) without a protocol version change."
     },
     "EngineLog": {
       "type": "object",

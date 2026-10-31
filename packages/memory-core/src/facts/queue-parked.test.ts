@@ -9,7 +9,7 @@ import type { TranscriptEntry } from "../journal"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { FactsQueue } from "./queue"
 import { FactsFailureStore } from "./failures-store"
-import { renderFailuresFile, type FactsFailureRecord } from "./failures-schema"
+import { parseFailuresFile, renderFailuresFile, type FactsFailureRecord } from "./failures-schema"
 import { selectLaunchable } from "./failures-selection"
 import { factsQueuePaths, type FactsQueueEntry } from "./schema"
 
@@ -203,6 +203,39 @@ test("#given retained files for many healthy conversations #when enqueue and a s
   expect((await queue.claim(pending, "third")).map((entry) => entry.range.end_message_id)).toEqual(["m2"])
 })
 
+test("#given a post-ledger park rename fails #when a later queue operation runs #then parked bytes move cold and live work remains readable", async () => {
+  const { paths, layout, queue } = await fixture()
+  for (const conversationId of ["same", "live"]) {
+    await queue.enqueue({ identity: "agent", sessionId: conversationId, conversationId, entries: [message("m1")] })
+  }
+  const path = layout.entryPath("same", "m1", NOW)
+  const coldPath = join(layout.parkedDir, basename(path))
+  const before = await readFile(path, "utf8")
+  const originalRename = resilient.rename
+  const failure = new Error("synthetic park rename failure")
+  const renameSpy = spyOn(resilient, "rename").mockImplementation(async (source, target) => {
+    if (String(source) === path && String(target) === coldPath) throw failure
+    await originalRename(source, target)
+  })
+  try {
+    await expect(new FactsFailureStore({ identityPaths: paths, now: () => NOW }).recordFailure({
+      targets: [{ conversationId: "same", endMessageId: "m1", endSnapshotLine: 1 }],
+      reason: "payload_entry_oversize", failureId: "park",
+    })).rejects.toBe(failure)
+  } finally {
+    renameSpy.mockRestore()
+  }
+  const ledger = await readFile(layout.failuresPath, "utf8")
+  expect(parseFailuresFile(ledger).entries).toMatchObject([{ state: "parked", streak: 1, lastFailureId: "park" }])
+  expect(await readFile(path, "utf8")).toBe(before)
+
+  readSpy?.mockClear()
+  expect((await queue.listPending()).map((entry) => entry.conversationId).sort()).toEqual(["live"])
+  expect(entryReads()).toEqual([layout.entryPath("live", "m1", NOW)])
+  expect(await readFile(coldPath, "utf8")).toBe(before)
+  expect(await readFile(layout.failuresPath, "utf8")).toBe(ledger)
+})
+
 test.each(["payload_entry_oversize", "secret_like_content", "child_exit"] as const)(
   "#given %s reaches an absorbing park #when the ledger is written #then bytes move to parked and manual retry restores them",
   async (reason) => {
@@ -217,7 +250,9 @@ test.each(["payload_entry_oversize", "secret_like_content", "child_exit"] as con
         failureId: `failure-${index}`, reason,
       })
     }
+    readSpy?.mockClear()
     expect(await queue.listPending()).toEqual([])
+    expect((readSpy?.mock.calls ?? []).filter((call) => String(call[0]) === layout.failuresPath)).toHaveLength(0)
     expect(await readFile(join(layout.parkedDir, basename(path)), "utf8")).toBe(before)
     // A later reason and an idempotent replay cannot resurrect an absorbing park.
     await store.recordFailure({

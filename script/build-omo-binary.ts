@@ -35,7 +35,12 @@ import {
   omoBinaryEngineStamp,
   releaseEngineBuildStamp,
 } from "./engine-build-defines"
-import { desktopEngineTarget, stageCompiledDesktopEngine } from "./release-desktop-engine-target"
+import {
+  desktopEngineTarget,
+  engineTrustHelperTarget,
+  stageCompiledDesktopEngine,
+  stageCompiledEngineTrustHelper,
+} from "./release-desktop-engine-target"
 import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
 import { reportEmbeddedPayload } from "./embedded-payload-probe"
 
@@ -417,6 +422,8 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
   }
   const desktopEngine = desktopEngineTarget(target.target).payload
   if (desktopEngine !== null) relPaths.add(desktopEngine)
+  const trustHelper = engineTrustHelperTarget(target.target).payload
+  if (trustHelper !== null) relPaths.add(trustHelper)
   return [...relPaths].sort()
 }
 
@@ -547,6 +554,8 @@ export function stageSidecarPayload(
   // build (a full build-omo-native run with submodule fetches) so a missing payload fails closed at once (#9857).
   const desktopEngine = stageCompiledDesktopEngine(target.target, stageDir, desktopEngineSourceRoot)
   if (desktopEngine !== null) staged.add(desktopEngine)
+  const trustHelper = stageCompiledEngineTrustHelper(target.target, stageDir, desktopEngineSourceRoot)
+  if (trustHelper !== null) staged.add(trustHelper)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
   writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")

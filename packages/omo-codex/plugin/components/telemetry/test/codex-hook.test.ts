@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,14 @@ import { type CodexSessionStartInput, runSessionStartHook } from "../src/codex-h
 import type { PostHogActivityReason, PostHogClient } from "../src/posthog.js";
 
 const CLI_PATH = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
+
+// Privacy-notice contract (#11583): no install id file is created while telemetry is off.
+function installIdFileCount(dataDir: string): number {
+	if (!existsSync(dataDir)) return 0;
+	return readdirSync(dataDir, { recursive: true }).filter(
+		(entry) => String(entry).split(/[\\/]/).at(-1) === "install-id",
+	).length;
+}
 
 type CapturedCall = {
 	reason: PostHogActivityReason;
@@ -157,6 +165,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 
 		it("#when CLI runs from an isolated snapshot without node_modules #then exits 0 with no output", async () => {
@@ -176,6 +185,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
 			expect(result.stderr).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 
@@ -192,6 +202,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 
@@ -207,6 +218,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 
@@ -222,6 +234,7 @@ describe("telemetry CLI session-start hook (subprocess)", () => {
 
 			expect(result.exitCode).toBe(0);
 			expect(result.stdout).toBe("");
+			expect(installIdFileCount(dataDir)).toBe(0);
 		});
 	});
 

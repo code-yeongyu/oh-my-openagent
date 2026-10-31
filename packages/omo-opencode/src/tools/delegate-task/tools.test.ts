@@ -142,7 +142,7 @@ describe("sisyphus-task", () => {
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
         anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-        google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3", "kimi-for-coding-highspeed"],
+        google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3.1-pro", "kimi-for-coding-highspeed"],
         openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-6-luna-fast", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai", "kimi-for-coding"],
@@ -1248,10 +1248,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - Kimi K3 should be passed with max variant
+      // then - Kimi K3.1 Pro should be passed with max variant
       expect(launchInput.model).toEqual({
         providerID: "kimi-for-coding",
-        modelID: "k3",
+        modelID: "k3.1-pro",
         variant: "max",
       })
     }, { timeout: 20000 })
@@ -1309,10 +1309,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - Kimi K3 should be passed with max variant
+      // then - Kimi K3.1 Pro should be passed with max variant
       expect(promptBody.model).toEqual({
         providerID: "kimi-for-coding",
-        modelID: "k3",
+        modelID: "k3.1-pro",
       })
       expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })

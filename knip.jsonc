@@ -14,8 +14,51 @@
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
   // every other export of these files stays checked. script/knip-coverage.test.ts fails if a row is no longer reported.
-  "preprocessor": "./script/knip-preexisting-exports.ts",
+  // script/knip-next-route-segment-exports.ts drops the Next.js route-segment config exports (read by name from the app
+  // directory's special files by the framework, so never dead) of the web app only, named below. It is scoped to those file
+  // names under that one directory, so every other export of those files - and every file elsewhere - stays checked.
+  "preprocessor": ["./script/knip-preexisting-exports.ts", "./script/knip-next-route-segment-exports.ts"],
   "preprocessorOptions": {
+    // Next.js reads these exports by name from the app directory's special files (route segment config and the metadata
+    // exports): https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config. script/knip-next-route-segment.test.ts
+    // proves a new page's `revalidate` is not reported while an unrelated unused export of that same page still is.
+    "nextRouteSegmentExports": {
+      "dir": "packages/web/app",
+      "files": [
+        "layout",
+        "page",
+        "route",
+        "template",
+        "default",
+        "error",
+        "loading",
+        "not-found",
+        "forbidden",
+        "unauthorized",
+        "global-error",
+        "global-not-found",
+        "icon",
+        "apple-icon",
+        "opengraph-image",
+        "twitter-image",
+        "sitemap",
+        "robots",
+        "manifest"
+      ],
+      "names": [
+        "revalidate",
+        "dynamic",
+        "dynamicParams",
+        "fetchCache",
+        "runtime",
+        "preferredRegion",
+        "maxDuration",
+        "generateStaticParams",
+        "generateMetadata",
+        "metadata",
+        "viewport"
+      ]
+    },
     "preExistingExports": {
       // pre-existing at origin dev 4686e425b5: unused export(s) resolveFilePath, getSessionCache
       "packages/agents-md-core/src/index.ts": ["resolveFilePath", "getSessionCache"],
@@ -1080,8 +1123,6 @@
       "packages/omo-senpi/src/components/config-watch/paths.ts": ["PLAN9_FILE_SYSTEM_TYPE", "OMO_CONFIG_FILE_FILTER_GLOBS", "OMO_CONFIG_DIRECTORY_FILTER_GLOBS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MERGED_OMO_CONFIG_DIAGNOSTIC_PATH
       "packages/omo-senpi/src/components/config-watch/validate.ts": ["MERGED_OMO_CONFIG_DIAGNOSTIC_PATH"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TOOLKITS_CONTEXT_KEY
-      "packages/omo-senpi/src/components/desktop-toolkit/index.ts": ["TOOLKITS_CONTEXT_KEY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_FIVE_ID_PREFIX, isDemotedEmptyToolUse
       "packages/omo-senpi/src/components/fallback-architect/detection.ts": ["FABLE_FIVE_ID_PREFIX", "isDemotedEmptyToolUse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_MESSAGE_LIMIT, LOG_WINDOW_MS
@@ -1420,8 +1461,6 @@
       "packages/senpi-desktop-engine/src/locator.ts": ["DESKTOP_ENGINE_BINARY", "QUARANTINE_ATTRIBUTE"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HANG_GUARD_MS, CHORD
       "packages/senpi-desktop-engine/test/support/engine.ts": ["HANG_GUARD_MS", "CHORD"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) ELEMENT_SNAPSHOT
-      "packages/senpi-desktop-prelude/test/harness.ts": ["ELEMENT_SNAPSHOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/senpi-desktop-prelude/test/python-setup.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
@@ -1450,8 +1489,6 @@
       "packages/senpi-desktop-tool/src/permission.ts": ["computerTier"],
       // pre-existing at origin dev 4686e425b5: unused export(s) defaultStopHotkey, COMPUTER_PERMISSION, computerTier, ComputerSettingsError, ComputerSettingsSchema, computerSkillMarkdown
       "packages/senpi-desktop-tool/src/registration.ts": ["defaultStopHotkey", "COMPUTER_PERMISSION", "computerTier", "ComputerSettingsError", "ComputerSettingsSchema", "computerSkillMarkdown"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) usesCoordinateSafeImageSizing
-      "packages/senpi-desktop-tool/src/session.ts": ["usesCoordinateSafeImageSizing"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ComputerSettingsSchema
       "packages/senpi-desktop-tool/src/settings.ts": ["ComputerSettingsSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) computerSkillMarkdown
@@ -1876,33 +1913,32 @@
       "packages/utils/src/zip-entry-listing/tar-zip-entry-listing.ts": ["parseTarListingOutput"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
       "packages/web/app/[locale]/[...rest]/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateStaticParams, generateMetadata, default
-      "packages/web/app/[locale]/docs/[slug]/page.tsx": ["generateStaticParams", "generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateMetadata, default
-      "packages/web/app/[locale]/docs/install/page.tsx": ["generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) metadata, default
-      "packages/web/app/[locale]/docs/layout.tsx": ["metadata", "default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/docs/[slug]/page.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/docs/install/page.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/docs/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/[locale]/docs/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) dynamic, generateMetadata, default
-      "packages/web/app/[locale]/download/page.tsx": ["dynamic", "generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateMetadata, generateStaticParams, default
-      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) revalidate, viewport
-      "packages/web/app/[locale]/layout.tsx": ["generateMetadata", "generateStaticParams", "default", "revalidate", "viewport"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) metadata, default
-      "packages/web/app/[locale]/manifesto/2026-01/layout.tsx": ["metadata", "default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/download/page.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/layout.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/manifesto/2026-01/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/[locale]/manifesto/2026-01/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) metadata, default
-      "packages/web/app/[locale]/manifesto/layout.tsx": ["metadata", "default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/manifesto/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/[locale]/manifesto/page.tsx": ["default"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
       "packages/web/app/[locale]/not-found.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateMetadata, default
-      "packages/web/app/[locale]/page.tsx": ["generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) dynamic, generateMetadata, default
-      "packages/web/app/[locale]/support/page.tsx": ["dynamic", "generateMetadata", "default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/page.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/support/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) generateLandingMetadata
       "packages/web/app/_components/landing-page.tsx": ["generateLandingMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
@@ -1913,23 +1949,23 @@
       "packages/web/app/api/stats/route.ts": ["GET"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/design/graph/page.tsx": ["default"],
-      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) viewport, generateMetadata, default
-      // pre-existing at origin dev 88a2b06e3f (#11587, b469db9cfe): unused export(s) revalidate (Next.js route segment config)
-      "packages/web/app/design/layout.tsx": ["viewport", "generateMetadata", "default", "revalidate"],
+      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+      // #11646 (origin dev 88a2b06e3f) named this file's revalidate here; nextRouteSegmentExports covers it, so that row is gone.
+      "packages/web/app/design/layout.tsx": ["default"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
       "packages/web/app/design/not-found.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) dynamic, metadata, default
-      "packages/web/app/design/page.tsx": ["dynamic", "metadata", "default"],
-      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) metadata, viewport, default
-      "packages/web/app/global-not-found.tsx": ["metadata", "viewport", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) alt, size, contentType, dynamic
-      "packages/web/app/opengraph-image.tsx": ["alt", "size", "contentType", "dynamic"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/design/page.tsx": ["default"],
+      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+      "packages/web/app/global-not-found.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) alt, size, contentType
+      "packages/web/app/opengraph-image.tsx": ["alt", "size", "contentType"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/robots.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/sitemap.ts": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) default, alt, size, contentType, dynamic
-      "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType", "dynamic"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default, alt, size, contentType
+      "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType"],
       // pre-existing at origin dev 4686e425b5: unused export(s) findHashSectionId
       "packages/web/components/docs/use-docs-navigation.ts": ["findHashSectionId"],
       // pre-existing at origin dev 4686e425b5: unused export(s) STAGE_STATES
@@ -2093,6 +2129,7 @@
         "script/check-temp-leak-report-only.mjs",
         "script/bun-panic-retry.ts",
         "script/ci-leg-tests-guard.mjs",
+        "script/engine-trust-helper-smoke.ts",
         "script/published-install-smoke.mjs",
         "script/verify-omo-ai-payload.mjs",
         "script/release-announce.ts",
@@ -2102,6 +2139,7 @@
         "script/wait-registry-versions.mjs",
         "script/senpi-worker-compile.ts",
         "test-support/remove-tree.ts",
+        "test-support/test-deadline.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "script/build-binaries.ts",
@@ -2608,6 +2646,7 @@
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
         "src/sync/item/test-support.ts",
+        "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",
         "src/sync/space/test-support.ts",
       ],
@@ -2752,6 +2791,10 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "skills/frontend/scripts/detect/cli.ts",
+        "scripts/detect-parity.ts",
+        "scripts/detect-parity-oracle.ts",
+        "scripts/detect-source-parity.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -2878,6 +2921,7 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "scripts/qa/fused-equivalence-e2e.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/feedback/runtime.ts",
@@ -3427,6 +3471,7 @@
         "test/refusal-child.ts",
         "test/support/engine.ts",
         "test/support/error-code-cases.ts",
+        "test/support/input-calls.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -3853,12 +3898,15 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "bin/senpi-patch.mjs",
+        // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
+        "keychain-helper/gui-session-runner.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "test/account-linux-no-gdbus.fixture.ts",
         "test/bun-bin-shim.fixture.ts",
         "test/bun-bin-shim.test-support.ts",
         "test/daemon-test-support.ts",
+        "test/keychain-helper.test-support.ts",
         "test/fixtures/compiled-setup/entry.ts",
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
@@ -3894,8 +3942,9 @@
         "**/*.test-d.ts",
         // Every Next.js special file at any depth: these are the knip 6.43.0 Next.js plugin's own entry patterns
         // (dist/plugins/next/index.js getEntryFilePatterns, this app has no src/ dir and the default pageExtensions), which it
-        // adds with exports unchecked, so they are listed here to be export-checked. Their framework-consumed exports (default,
-        // metadata, generateMetadata, GET, ...) are named per symbol in preExistingExports.
+        // adds with exports unchecked, so they are listed here to be export-checked. Their route-segment config exports
+        // (revalidate, metadata, generateMetadata, ...) are dropped by name by script/knip-next-route-segment-exports.ts;
+        // the remaining framework-consumed ones (default, GET, ...) are named per symbol in preExistingExports.
         "app/{,[(]*[)]/}{manifest,robots}.{js,ts}",
         "app/**/sitemap.{js,ts}",
         "app/**/{icon,apple-icon,opengraph-image,twitter-image}.{js,jsx,ts,tsx}",
@@ -3986,6 +4035,7 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "test/daemon-path-fixture.ts",
+        "test/bun-child.ts",
         "vitest.config.ts",
       ],
       "ignoreFiles": [
@@ -4131,6 +4181,7 @@
         "**/*.test-d.ts",
         "extensions/omo-claim-receipt.js",
         "extensions/omo-computer-use.js",
+        "extensions/omo-desktop-toolkit.js",
         "extensions/omo-device-account.js",
         "extensions/omo-feedback.js",
         "extensions/omo-memory-commands.js",

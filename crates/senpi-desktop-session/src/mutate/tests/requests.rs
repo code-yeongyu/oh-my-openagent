@@ -1,5 +1,5 @@
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, ClipboardText,
+    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, AxTypeTextParams, ClipboardText,
     DragParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuSelectParams,
     PointParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
@@ -10,7 +10,7 @@ use crate::request::Op;
 use crate::test_support::{click_window, Harness};
 
 /// A valid request for each gated action against the owner test's fixture.
-pub(super) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
+pub(crate) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
     let frame = harness.capture("101");
     let frame_id = Some(frame.clone());
     let reference = harness.focused_ref();
@@ -58,6 +58,9 @@ pub(super) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
         }),
         MutatingAction::AxFocus => Op::AxFocus(AxRefParams { ref_: reference }),
         MutatingAction::AxClick => Op::AxClick(AxClickParams { ref_: reference, opts: None }),
+        MutatingAction::AxTypeText => Op::AxTypeText(AxTypeTextParams {
+            ref_: reference, text: "hello".to_owned(), opts: None,
+        }),
         MutatingAction::ClipboardWrite => Op::ClipboardWrite(ClipboardText { text: "hello".to_owned() }),
         MutatingAction::MenuSelect => Op::MenusSelect(MenuSelectParams {
             window_id: target, path: vec!["File".to_owned(), "Save".to_owned()], delivery_mode: None,

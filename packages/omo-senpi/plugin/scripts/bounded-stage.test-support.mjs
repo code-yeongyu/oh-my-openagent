@@ -15,6 +15,8 @@ export function runBoundedStage(stage, command, args, options, capMs, {
   runSync = spawnSync,
 } = {}) {
   return new Promise((resolve, reject) => {
+    // FILETIME lower bound captured before spawn, including when a short-lived launcher exits.
+    const rootStartedAt = BigInt(Date.now()) * 10_000n + 116_444_736_000_000_000n
     const child = spawnChild(command, args, { ...options, windowsHide: true })
     let stdout = ""
     let stderr = ""
@@ -24,7 +26,7 @@ export function runBoundedStage(stage, command, args, options, capMs, {
     const cap = setTimeout(() => {
       stalled = true
       if (platform === "win32" && child.pid !== undefined) {
-        const args = treeKillArgs(child.pid)
+        const args = treeKillArgs(child.pid, undefined, process.pid, rootStartedAt)
         if (args.length > 0) runSync("taskkill", args, { windowsHide: true })
       } else {
         child.kill("SIGKILL")
