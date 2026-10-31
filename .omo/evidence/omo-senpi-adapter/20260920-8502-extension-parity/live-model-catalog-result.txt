@@ -1,0 +1,15 @@
+WHAT WAS TESTED
+`SENPI_BIN=<worktree senpi.exe> bun .omo/evidence/omo-senpi-adapter/20260920-8502-extension-parity/live-model-catalog-parity.ts`
+
+The driver created a real DAG-owned task record, passed a deliberately failing launcher extension followed by the repository's local mock-provider extension, built the production model-catalog descriptor, and drove the real Senpi binary with it.
+
+WHAT WAS OBSERVED
+`{"result":"PASS","code":0,"timedOut":false,"effectiveExtensions":["task-rpc-e2e-mock-provider.ts"],"launcherExcluded":true,"providerIncluded":true,"providerModelVisible":true,"forbiddenLauncherSilent":true,"realCredentialsUntouched":true,"sandboxAgentDirDistinct":true,"stderrExcerpt":""}`
+
+The real Senpi catalog process exited 0, saw `omo-mock/mock-1`, loaded only the provider extension, did not evaluate the forbidden DAG launcher, used a distinct sandbox agent directory, and left the real Senpi credential/config digest unchanged.
+
+WHY IT IS ENOUGH
+This is the narrow real-harness proof for issue #8502: the production descriptor now gives the model-admission probe the same provider-only extension view as the DAG child. A regression that reintroduced the launcher would either expose it in `effectiveExtensions` or evaluate the deliberately failing extension.
+
+WHAT WAS OMITTED
+Absolute machine paths, the randomized sandbox suffix, and the full model table were intentionally omitted. No credentials or secret-bearing environment values were captured.

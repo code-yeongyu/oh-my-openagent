@@ -1,0 +1,19 @@
+WHAT WAS TESTED
+- `OMO_SKIP_MATERIALIZE=1 bun run test:senpi`
+- `bun test --timeout 20000 packages/senpi-task`
+
+WHAT WAS OBSERVED
+The exact package gate did not pass on this Windows checkout. Failures observed before the run was stopped after a nonzero result was certain were outside the changed files:
+- the tracked bundle exceeded the existing size ceiling (1,407,127 bytes versus 1,220,000);
+- a generated-extension freshness check was stale in its temporary tree;
+- `task-13.test.ts` hit the same Windows sandbox-parent creation problem as the raw QA self-test;
+- several RPC-host tests used POSIX `/tmp`, which resolved to an unwritable drive-root temp path on this host;
+- the adversarial chaos bench exceeded its 240-second budget.
+
+The changed RPC spawn suite, adjacent model-admission suite, DAG integration suite, and both relevant TypeScript projects pass independently; see `green-focused-and-typecheck.txt`. The build-generated bundle changes were restored and are not part of this patch.
+
+WHY IT IS ENOUGH
+This receipt prevents a local baseline failure from being presented as a green gate. Linux CI remains the authoritative complete package gate, while the focused and real-Senpi evidence directly exercise the changed behavior.
+
+WHAT WAS OMITTED
+Large repetitive passing-test output and generated bundle diffs were not retained. No secrets or private logs were captured.
