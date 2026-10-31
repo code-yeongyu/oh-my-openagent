@@ -21,6 +21,9 @@ import * as taskComponentModule from "./index"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
+// This suite is not about job widgets: keep the task component off the real senpi job-widget host.
+const noJobWidgetHost = async (): Promise<Record<string, never>> => ({})
+
 const TASK_TOOL_NAMES = ["task", "task_send", "task_cancel", "task_output", "workflow", "workpool"]
 const TEAM_TOOL_NAMES = [
   "team_create",
@@ -178,7 +181,7 @@ describe("omo-senpi task component wiring", () => {
     const pi = new FakeExtensionAPI()
     const logger = createLogger()
 
-    await createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
     expect(readdirSync(project)).toEqual([])
 
     await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, {})
@@ -194,7 +197,7 @@ describe("omo-senpi task component wiring", () => {
 
     try {
       // when
-      await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+      await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
     } finally {
       if (previousMember === undefined) delete process.env.SENPI_TASK_MEMBER
       else process.env.SENPI_TASK_MEMBER = previousMember
@@ -213,7 +216,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
     // the /tasks and /task-kill commands registered
@@ -280,7 +283,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     const registered = toolNames(pi)
     for (const teamTool of TEAM_TOOL_NAMES) expect(registered).toContain(teamTool)
@@ -297,7 +300,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then
     expect(hints).toEqual([{
@@ -313,7 +316,7 @@ describe("omo-senpi task component wiring", () => {
     pi.setFlag("omo-task", false)
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then
     expect(pi.tools).toEqual([])
@@ -331,7 +334,7 @@ describe("omo-senpi task component wiring", () => {
     const logger = createLogger()
 
     // when
-    await createTaskComponent({ resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => project }).register(pi, ctxFor(pi, logger))
 
     // then it never crashed: all tools still registered
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
@@ -560,7 +563,7 @@ describe("omo-senpi task component wiring", () => {
     ;(pi as { registerMessageRenderer?: unknown }).registerMessageRenderer = undefined
 
     // when
-    await createTaskComponent({ resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     // then no tools wired; only the unconditional hygiene sweep handler remains
     expect(pi.tools).toEqual([])

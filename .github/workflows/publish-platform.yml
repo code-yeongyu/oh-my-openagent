@@ -236,6 +236,86 @@ jobs:
           JOB_SUMMARY_NEXT: Check the Rust target build or signed asset staging output.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  # The signed keychain helper (#11262): one universal build, signed with its fixed identifier and
+  # notarized, then gated on its exact designated requirement. Every darwin output takes these bytes:
+  # the darwin build legs (compiled payload and platform packages), publish-main (omo-ai) and the
+  # GitHub release asset the desktop fetches.
+  keychain-helper:
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Build universal keychain helper
+        run: |
+          set -euo pipefail
+          HELPER_DIR="${RUNNER_TEMP}/omo-keychain"
+          mkdir -p "$HELPER_DIR"
+          bun packages/omo-native/keychain-helper/build.ts --out "$HELPER_DIR/omo-keychain"
+          echo "KEYCHAIN_HELPER=$HELPER_DIR/omo-keychain" >> "$GITHUB_ENV"
+
+      - name: Sign and notarize keychain helper
+        timeout-minutes: 75
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          # Forced: an ad-hoc helper would fail every install's requirement check.
+          MACOS_SIGNING_REQUIRED: "true"
+        run: |
+          set -euo pipefail
+          bash .github/scripts/macos-sign-and-notarize.sh --identifier com.mengmota.omo-keychain-helper "$KEYCHAIN_HELPER"
+
+      - name: Verify keychain helper signature
+        run: bun script/keychain-helper-release.ts verify "$KEYCHAIN_HELPER"
+
+      - name: Package keychain helper artifacts
+        run: |
+          set -euo pipefail
+          chmod 0755 "$KEYCHAIN_HELPER"
+          mkdir -p .omo/keychain-helper .omo/release-binaries
+          # The tarball keeps the mode across jobs; upload-artifact alone would drop u+x.
+          tar -czf .omo/keychain-helper/omo-keychain.tar.gz -C "$(dirname "$KEYCHAIN_HELPER")" omo-keychain
+          cp "$KEYCHAIN_HELPER" .omo/release-binaries/omo-keychain-darwin-universal
+
+      - name: Upload keychain helper artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: keychain-helper
+          path: .omo/keychain-helper/omo-keychain.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload keychain helper release asset artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-binary-omo-keychain
+          path: .omo/release-binaries/omo-keychain-darwin-universal
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Keychain helper release build
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the universal (arm64 + x86_64) omo-keychain helper from the release commit.
+            - Signs it as com.mengmota.omo-keychain-helper with the hardened runtime and notarizes it.
+            - Fails unless its designated requirement, team, architectures and mode match the helper contract.
+          JOB_SUMMARY_NEXT: Check the clang build, the signing/notarization log, or the requirement mismatch printed by the verify step.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   # =============================================================================
   # Job 1: Build binaries for all platforms
   # - Windows builds on windows-latest (avoid bun cross-compile segfault)
@@ -243,7 +323,7 @@ jobs:
   # - Uploads compressed artifacts for the publish job
   # =============================================================================
   build:
-    needs: desktop-engine
+    needs: [desktop-engine, keychain-helper]
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9945.
     runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-24.04' }}
@@ -466,6 +546,31 @@ jobs:
           cp ".omo/desktop-engine-assets/$ENGINE_ASSET" "$ENGINE_SOURCE"
           chmod +x "$ENGINE_SOURCE"
 
+      - name: Download keychain helper
+        if: startsWith(matrix.platform, 'darwin-') && (steps.release-assets.outputs.binary_exists != 'true' || steps.check.outputs.skip != 'true')
+        uses: actions/download-artifact@v8
+        with:
+          name: keychain-helper
+          path: .omo/keychain-helper
+
+      # build-omo-binary embeds packages/omo-native/bin/darwin/omo-keychain into every darwin binary (at
+      # the payload root, so execDir/omo-keychain) and fails without it; the platform package ships the
+      # same bytes as bin/omo-keychain.
+      - name: Stage keychain helper
+        if: startsWith(matrix.platform, 'darwin-') && (steps.release-assets.outputs.binary_exists != 'true' || steps.check.outputs.skip != 'true')
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          PACKAGE_SKIP: ${{ steps.check.outputs.skip }}
+        run: |
+          set -euo pipefail
+          mkdir -p packages/omo-native/bin/darwin
+          tar -xzpf .omo/keychain-helper/omo-keychain.tar.gz -C packages/omo-native/bin/darwin
+          test -x packages/omo-native/bin/darwin/omo-keychain
+          if [ "$PACKAGE_SKIP" != "true" ]; then
+            mkdir -p "packages/oh-my-opencode-${PLATFORM}/bin"
+            install -m 0755 packages/omo-native/bin/darwin/omo-keychain "packages/oh-my-opencode-${PLATFORM}/bin/omo-keychain"
+          fi
+
       - name: Build release binary
         if: steps.release-assets.outputs.binary_exists != 'true'
         env:
@@ -558,6 +663,15 @@ jobs:
             fi
           }
 
+          assert_keychain_helper_provisioned() {
+            local helper="${HOME}/.omo/binary-runtime/${OMO_AI_VERSION}/omo-keychain"
+            if [ ! -x "$helper" ]; then
+              echo "first-run provisioning did not materialize an executable ${helper}"
+              return 1
+            fi
+            bun script/keychain-helper-release.ts verify "$helper"
+          }
+
           pty_smoke() {
             # Round-trip the binary through a real pty on the pty-smoked legs.
             if [[ "${OSTYPE:-}" == darwin* ]]; then
@@ -613,6 +727,7 @@ jobs:
               isolate
               assert_version_line
               assert_first_run_provisioned
+              assert_keychain_helper_provisioned
               pty_smoke
               ;;
             darwin-x64|darwin-x64-baseline)
