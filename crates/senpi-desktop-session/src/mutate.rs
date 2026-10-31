@@ -309,3 +309,5 @@ mod stop_tests;
 pub(crate) mod tests;
 #[cfg(test)]
 mod typing_tests;
+#[cfg(test)]
+mod remote_typing_tests;
