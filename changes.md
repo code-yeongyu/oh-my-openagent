@@ -1,3 +1,17 @@
+## 2026-10-29 - Name the corrupt credential recovery command (#11832)
+
+The keystore message names `omo account forget`; session mutation keeps locking and permits corrupt-state replacement only when explicitly requested.
+
+## 2026-10-26 - Share Native model prompt builders with OpenCode (#9856, fixes #9851)
+
+OpenCode imports the public generation facade from the senpi version OmO Native pins, applies one documented host-tool transform, and appends explicit agent roles instead of maintaining duplicate model bodies; the local Sisyphus and Sisyphus-Junior model files, including the Kimi K3.1 copies, are removed because senpi's `kimi-k3-1` preset now carries them. Runtime model switches preserve task mode and Hephaestus model eligibility, with catalog-wide byte parity and mutation checks covering both construction and reconciliation. Session tool permissions are cached per session and refreshed from `session.updated` / `session.deleted` events; the Native toast keeps dev's interactive gating and show records.
+
+## 2026-10-29 - Use Bun for repository type-check gates (#11771)
+
+The root `typecheck`, `typecheck:script`, `typecheck:packages` and `test:senpi` commands use `bun check --no-script --all -p` with their existing projects. Both POSIX and Windows Senpi compatibility checks use the same command. Command-contract tests still enforce script coverage, package registration and execution order.
+
+`--no-script` prevents package-script dispatch, and `--all` preserves complete diagnostics. Keep the full project list, the copy check, test orchestration and emit/build commands intact.
+
 ## 2026-10-29 - First-device genesis construction (#11747)
 
 Add preparation and finishing builders under memory-core's sync/genesis modules,
