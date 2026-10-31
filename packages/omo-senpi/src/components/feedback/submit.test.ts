@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildDraft, type UploadRedactor } from "./draft"
+import { buildDraft, FEEDBACK_SECTION_IDS, type UploadRedactor } from "./draft"
 import { submitReport, type ReportTransport } from "./submit"
 import { expectUserOnly, readWindowsAcl, unexpectedWindowsReaders } from "./report-file.test-support"
 
@@ -122,6 +122,28 @@ describe("submitReport", () => {
       transport,
     })
 
+    expect(result).toEqual({ kind: "refused", reason: "secret-detected", sectionId: "logs" })
+  })
+
+  test.each([
+    "description", "identity", "environment", "session", "logs", "crash", "config",
+    undefined, null, "", "unknown", "LOGS", 1, {}, [],
+  ])("#given a secret refusal naming section %j #when submitted #then only a valid section id is returned", async (sectionId) => {
+    const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail: { sectionId } } })
+    const result = await submitReport({
+      draft, kind: "bug", description: "synthetic", redact: redactTokens, client, env: {},
+      stateDir: tempDir(), apiOrigin: "https://api.example.test", accessToken: null, transport,
+    })
+    const section = FEEDBACK_SECTION_IDS.find(id => id === sectionId)
+    expect(result).toEqual({ kind: "refused", reason: "secret-detected", ...(section === undefined ? {} : { sectionId: section }) })
+  })
+
+  test.each([undefined, null, "logs", 1, []])("#given malformed secret refusal detail %j #when submitted #then the codeless refusal stays compatible", async (detail) => {
+    const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail } })
+    const result = await submitReport({
+      draft, kind: "bug", description: "synthetic", redact: redactTokens, client, env: {},
+      stateDir: tempDir(), apiOrigin: "https://api.example.test", accessToken: null, transport,
+    })
     expect(result).toEqual({ kind: "refused", reason: "secret-detected" })
   })
 
