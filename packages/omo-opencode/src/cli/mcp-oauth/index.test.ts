@@ -119,5 +119,19 @@ describe("mcp oauth command", () => {
       expect(statusCommand).toBeDefined()
       expect(description).toContain("status")
     })
+
+    it("accepts --server-url option", () => {
+      // given
+      const mcpCommand = createMcpOAuthCommand()
+      const oauthCommand = mcpCommand.commands.find((cmd: Command) => cmd.name() === "oauth")
+      const statusCommand = oauthCommand?.commands.find((cmd: Command) => cmd.name() === "status")
+
+      // when
+      const options = statusCommand?.options ?? []
+      const serverUrlOption = options.find((opt: { long?: string }) => opt.long === "--server-url")
+
+      // then
+      expect(serverUrlOption).toBeDefined()
+    })
   })
 })
