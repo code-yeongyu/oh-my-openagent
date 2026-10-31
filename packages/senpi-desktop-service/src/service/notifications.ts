@@ -4,7 +4,7 @@ import {
 	type EngineNotification,
 	type StopPathStatus,
 } from "@oh-my-opencode/senpi-desktop-protocol";
-import { isAuditEvent, isStopPathStatus } from "./parse";
+import { isStopPathStatus, parseAuditEvent } from "./parse";
 
 export type Unsubscribe = () => void;
 export type Listener<T> = (value: T) => void;
@@ -68,13 +68,15 @@ export class NotificationHub {
 
 	#dispatchKnown(method: EngineNotification, params: unknown): void {
 		switch (method) {
-			case "audit":
-				if (isAuditEvent(params)) {
-					for (const listener of this.#audit) listener(params);
+			case "audit": {
+				const event = parseAuditEvent(params);
+				if (event !== undefined) {
+					for (const listener of this.#audit) listener(event);
 				} else {
 					this.emitError(new DesktopNotificationError(method, "is malformed"));
 				}
 				return;
+			}
 			case "stopPath.changed":
 				if (isStopPathStatus(params)) {
 					for (const listener of this.#stopPath) listener(params);

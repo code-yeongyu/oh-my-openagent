@@ -124,6 +124,9 @@ export type DagRunRecordV1 = DagJournalCheckpoint & {
   readonly name: string
   readonly parentSessionId: string
   readonly rootSessionId: string
+  // `provider/model` the parent session ran when the run started: every category node's last fallback
+  // rung (#10783). Captured once, so a recovered or retried node keeps the rung its run started with.
+  readonly parentModel?: string
   readonly definitionFingerprint: string
   readonly definition: DagPersistedDefinition
   readonly status: DagRunStatus
@@ -209,6 +212,7 @@ export type DagStartParams = {
   readonly definition: DagDefinition
   readonly parentSessionId: string
   readonly rootSessionId: string
+  readonly parentModel?: string
 }
 
 export type DagAmendParams = {
@@ -401,6 +405,7 @@ function startRun(params: DagStartParams, context: StartContext): DagStartResult
       name: definition.name,
       parentSessionId: params.parentSessionId,
       rootSessionId: params.rootSessionId,
+      ...(params.parentModel === undefined ? {} : { parentModel: params.parentModel }),
       definitionFingerprint,
       definition: {
         key: definition.key,

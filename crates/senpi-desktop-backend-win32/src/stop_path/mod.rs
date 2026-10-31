@@ -14,9 +14,15 @@
 pub mod chord;
 #[cfg_attr(
     not(target_os = "windows"),
-    allow(dead_code, reason = "only the Windows hook uses it; built everywhere so its tests run on every host")
+    allow(
+        dead_code,
+        reason = "only the Windows hook uses it; built everywhere so its tests run on every host"
+    )
 )]
 mod physical;
+
+#[cfg(any(test, target_os = "windows"))]
+mod pending;
 
 #[cfg(target_os = "windows")]
 mod hook;

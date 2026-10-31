@@ -25,7 +25,9 @@ export default async function InstallDocsPage(): Promise<JSX.Element> {
   return (
     <DocsShell
       mobileHeader={t("mobileHeader")}
+      searchLabel={t("searchLabel")}
       searchPlaceholder={t("searchPlaceholder")}
+      sectionsLabel={t("sectionsLabel")}
       sections={page.sections.map(({ id, title }) => ({ id, title }))}
     >
       <article className="docs-content" dangerouslySetInnerHTML={{ __html: page.lead }} />

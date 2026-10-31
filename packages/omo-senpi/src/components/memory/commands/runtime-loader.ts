@@ -3,6 +3,8 @@
 
 import type * as CommandsRuntime from "./runtime"
 
+import { reinstallStep } from "../../reinstall/reinstall-step"
+
 export type MemoryCommandsRuntimeModule = Pick<typeof CommandsRuntime, "runMemoryCommand">
 export type MemoryCommandsRuntimeLoader = () => Promise<MemoryCommandsRuntimeModule>
 
@@ -28,5 +30,5 @@ export const loadMemoryCommandsRuntime: MemoryCommandsRuntimeLoader = createMemo
 
 export function memoryCommandsRuntimeLoadFailure(command: string, error: unknown): string {
   const cause = error instanceof Error ? error.message : String(error)
-  return `/${command} is unavailable: the memory commands runtime (${MEMORY_COMMANDS_RUNTIME_ARTIFACT}) failed to load: ${cause}. This build's plugin payload is incomplete; reinstall omo, then start a new session.`
+  return `/${command} is unavailable: the memory commands runtime (${MEMORY_COMMANDS_RUNTIME_ARTIFACT}) failed to load: ${cause}. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
 }

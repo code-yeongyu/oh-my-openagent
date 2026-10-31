@@ -6,10 +6,10 @@ import { join } from "node:path"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
 import { AuthStorage, ModelRegistry, ModelRuntime } from "../../senpi-test-runtime"
 import { createModelProfileComponent, MODEL_PROFILE_APPLIED_TYPE, MODEL_PROFILE_UNAVAILABLE_TYPE } from "./index"
+import { ProfileExtensionAPI, recordedOutcome } from "./profile-outcome.test-support"
 import { sanitizedAuthErrorDetail } from "./request-auth"
 import { testTempDir } from "../../../test-support/temp-dir"
 
@@ -79,7 +79,7 @@ async function realRegistryWithModelsJson(
 }
 
 function drive(config: OmoConfig, registry: InstanceType<typeof ModelRegistry>, agentDir = testTempDir("omo-model-profile-real-")) {
-  const pi = new FakeExtensionAPI()
+  const pi = new ProfileExtensionAPI()
   const logs: string[] = []
   const ctx: ComponentContext = {
     config: { getFlag: () => undefined },
@@ -137,8 +137,8 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
 
     // then
     expect(pi.sessionModels).toEqual([model])
-    expect(pi.messages[0]?.message).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE })
-    expect(pi.messages[0]?.message["details"]).not.toHaveProperty("authFailed")
+    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE })
+    expect(recordedOutcome(pi)?.["details"]).not.toHaveProperty("authFailed")
     expect(refreshAttempts.slice(attemptsBeforeStart)).toEqual([expired.refresh])
   })
 
@@ -170,13 +170,13 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
     await start()
 
     expect(pi.sessionModels).toEqual([])
-    expect(pi.messages[0]?.message).toMatchObject({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE })
-    expect(pi.messages[0]?.message["details"]).toEqual({
+    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE })
+    expect(recordedOutcome(pi)?.["details"]).toEqual({
       profile: "pooled",
       authFailed: [{ provider: "pool-fixture", model: "pooled-1", reason: "refresh" }],
     })
     expect(refreshAttempts).toEqual([expired.refresh])
-    expect(JSON.stringify(pi.messages[0]?.message)).not.toContain(PRIVATE_MARKER)
+    expect(JSON.stringify(pi.entries[0])).not.toContain(PRIVATE_MARKER)
     expect(logs.some((line) => line.includes(PRIVATE_MARKER))).toBe(false)
   })
 
@@ -213,8 +213,8 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
 
     // then
     expect(pi.sessionModels).toEqual([])
-    expect(pi.messages[0]?.message).toMatchObject({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE })
-    expect(pi.messages[0]?.message["details"]).toEqual({
+    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_UNAVAILABLE_TYPE })
+    expect(recordedOutcome(pi)?.["details"]).toEqual({
       profile: "pooled",
       authFailed: [{ provider: "pool-fixture", model: "pooled-1", reason: "refresh" }],
     })
@@ -245,11 +245,11 @@ describe("probeRequestAuth against senpi's real ModelRegistry", () => {
     await start()
 
     expect(pi.sessionModels).toEqual([healthy])
-    expect(pi.messages[0]?.message["details"]).toMatchObject({
+    expect(recordedOutcome(pi)?.["details"]).toMatchObject({
       model: "headers-fixture/healthy",
       authFailed: [{ provider: "headers-fixture", model: "broken", reason: "request" }],
     })
-    expect(JSON.stringify(pi.messages[0]?.message)).not.toContain(PRIVATE_MARKER)
+    expect(JSON.stringify(pi.entries[0])).not.toContain(PRIVATE_MARKER)
     expect(logs.some((line) => line.includes(PRIVATE_MARKER))).toBe(false)
   })
 })

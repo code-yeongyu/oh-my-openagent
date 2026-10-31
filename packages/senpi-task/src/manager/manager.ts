@@ -22,6 +22,7 @@ import { discardManagedHandle, releaseOnDispose, releaseSupersededHandle, type M
 import { TaskConcurrency } from "./concurrency"
 import { failOwnedRun, launchRunOf, ownsRun } from "./launch-fence"
 import { chainAfterHop, runtimeFallbackCandidates } from "./credential-failure"
+import { chainWithoutRefusingProvider, startCredentialsRefusal } from "./start-credentials-refusal"
 import { createWorkpoolAdmission } from "./workpool-admission"
 import { withResidentStart } from "./resident-start"
 import { createWorkpoolEngine, type WorkpoolEngine } from "../workpool/engine"
@@ -1192,10 +1193,11 @@ class TaskManagerImpl implements TaskManager {
   /**
    * Advance a refused start onto the next entry of its model chain.
    *
-   * Only `model_unavailable` qualifies: it is the one start failure that says "THIS child cannot
-   * serve THIS model", so a different model is a real remedy. Every other kind - a depth refusal, a
-   * failed session create - would reproduce identically on the next entry and walking would just
-   * multiply one failure into N.
+   * Two failures qualify: `model_unavailable` ("THIS child cannot serve THIS model") and a prompt the
+   * engine refused because the model's provider has no usable credentials (#10806), which also skips
+   * the rest of that provider's rungs. A different model is a real remedy for both. Every other kind -
+   * a depth refusal, a failed session create - would reproduce identically on the next entry and
+   * walking would just multiply one failure into N.
    *
    * The epoch MUST advance. `#releaseSlot` is guarded per (task, epoch) and records the highest
    * epoch it has released, so retrying under the same epoch would make the eventual completion's
@@ -1205,11 +1207,13 @@ class TaskManagerImpl implements TaskManager {
     context: LaunchContext,
     error: unknown,
   ): { kind: "retry"; context: LaunchContext } | { kind: "queued"; runEpoch: number; resolvedModel: ResolvedModelRecord | undefined; queuePosition: number } | { kind: "stale" } | undefined {
-    if (!RunnerError.is(error) || error.failure.kind !== "model_unavailable") return undefined
+    const credentials = startCredentialsRefusal(error)
+    if (!RunnerError.is(error) || (error.failure.kind !== "model_unavailable" && credentials === undefined)) return undefined
     const record = this.#tryLoad(context.record.task_id)
     // A stop (or another owner) that landed while this start was refusing must end the walk here.
     if (!this.#ownsLaunch(context, record)) return { kind: "stale" }
-    const nextModel = record.fallback_models?.[0]
+    const chain = credentials === undefined ? record.fallback_models ?? [] : chainWithoutRefusingProvider(record, credentials)
+    const nextModel = chain[0]
     if (nextModel === undefined) return undefined
 
     this.#releaseSlot(record.task_id, context.model, record.notification.run_epoch)
@@ -1219,7 +1223,7 @@ class TaskManagerImpl implements TaskManager {
       ...record,
       model: nextModel.display,
       resolved_model: nextModel,
-      fallback_models: record.fallback_models?.slice(1) ?? [],
+      fallback_models: chain.slice(1),
       fallback_attempts: [
         ...(record.fallback_attempts ?? (record.resolved_model === undefined ? [] : [record.resolved_model])),
         nextModel,
@@ -1227,7 +1231,9 @@ class TaskManagerImpl implements TaskManager {
       updated_at: nowIso(this.#now),
       notification: { ...record.notification, run_epoch: nextEpoch },
       ...(isFallbackHandoff(record) ? { fallback_handoff_epoch: nextEpoch } : {}),
-      ...(isParentModelRung(record, nextModel) ? { parent_model_fallback: startFallbackToParent(record, error.failure.message, nowIso(this.#now)) } : {}),
+      ...(isParentModelRung(record, nextModel) ? { parent_model_fallback: credentials === undefined
+        ? startFallbackToParent(record, error.failure.message, nowIso(this.#now))
+        : buildParentModelFallback({ fromModel: record.model, reason: "not_signed_in", at: nowIso(this.#now) }) } : {}),
     }
     let advanced = false
     this.#options.store.mutate(record.task_id, (fresh) => {

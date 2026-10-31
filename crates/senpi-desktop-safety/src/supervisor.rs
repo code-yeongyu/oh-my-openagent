@@ -24,6 +24,7 @@ use parking_lot::Mutex;
 use crate::{clock::Clock, reset::UserReset};
 
 mod stop;
+pub(crate) mod authority;
 mod emergency;
 mod deafness;
 mod status;
@@ -136,10 +137,13 @@ impl StopPathState {
 
 /// Kill-switch state shared by the session loop and every stop path.
 pub struct Supervisor {
+    #[cfg(test)]
+    activation_hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     #[cfg(any(test, feature = "test-support"))]
     hold_waiting: Mutex<Option<std::sync::mpsc::Sender<()>>>,
     hold_signals: Mutex<Vec<Weak<crate::HoldSignal>>>,
     suspended: AtomicBool,
+    authority: Option<Arc<authority::AuthorityAdmission>>,
     published: AtomicBool,
     stop_commit_lock: Mutex<()>,
     emergency: Mutex<Option<emergency::EmergencyWorker>>,
@@ -161,10 +165,13 @@ impl Supervisor {
     #[must_use]
     pub fn new(clock: Arc<dyn Clock>) -> Self {
         Self {
+            #[cfg(test)]
+            activation_hook: Mutex::new(None),
             #[cfg(any(test, feature = "test-support"))]
             hold_waiting: Mutex::new(None),
             hold_signals: Mutex::new(Vec::new()),
             suspended: AtomicBool::new(false),
+            authority: None,
             published: AtomicBool::new(false),
             stop_commit_lock: Mutex::new(()),
             emergency: Mutex::new(None),
@@ -246,8 +253,15 @@ impl Supervisor {
         }
     }
 
-    /// How many stops this supervisor observed; a control grant's epoch at
-    /// grant time is how the session tells a later stop happened.
+    /// The supervisor's clock, so the session measures the user's pauses on
+    /// the same (possibly fake) clock as heartbeats.
+    #[must_use]
+    pub fn now_ms(&self) -> u64 {
+        self.clock.now_ms()
+    }
+
+    /// Invalidation epoch: stops and authority activation invalidate old holds
+    /// and grants. This is NOT the immediate authority request generation.
     #[must_use]
     pub fn stop_epoch(&self) -> u64 {
         self.stop_epoch.load(Ordering::SeqCst)
@@ -255,6 +269,9 @@ impl Supervisor {
 
     /// Lift suspension. User-only: the proof comes from the host's resume token.
     pub fn reset(&self, _proof: UserReset) {
+        if self.authority.is_some() {
+            return;
+        }
         let _commit = self.stop_commit_lock.lock();
         let mut stopped_by = self.stopped_by.lock();
         *stopped_by = None;
@@ -264,7 +281,10 @@ impl Supervisor {
 
     #[must_use]
     pub fn is_suspended(&self) -> bool {
-        self.suspended.load(Ordering::SeqCst)
+        match &self.authority {
+            Some(authority) => authority.is_suspended(),
+            None => self.suspended.load(Ordering::SeqCst),
+        }
     }
 
     /// Lifts suspension without a [`UserReset`], for tests only: compiled
@@ -272,6 +292,9 @@ impl Supervisor {
     /// enable, so no production build can call it.
     #[cfg(any(test, feature = "test-support"))]
     pub fn reset_for_test(&self) {
+        if self.authority.is_some() {
+            return;
+        }
         let _commit = self.stop_commit_lock.lock();
         let mut stopped_by = self.stopped_by.lock();
         *stopped_by = None;
@@ -293,6 +316,22 @@ mod tests;
 #[cfg(test)]
 #[path = "supervisor/persistence_tests.rs"]
 mod persistence_tests;
+
+#[cfg(test)]
+#[path = "supervisor/authority_race_tests.rs"]
+mod authority_race_tests;
+
+#[cfg(test)]
+#[path = "supervisor/authority_tests.rs"]
+mod authority_tests;
+
+#[cfg(test)]
+#[path = "supervisor/authority_test_support.rs"]
+mod authority_test_support;
+
+#[cfg(test)]
+#[path = "supervisor/authority_schedule_tests.rs"]
+mod authority_schedule_tests;
 
 #[cfg(test)]
 mod stop_timeout_tests;

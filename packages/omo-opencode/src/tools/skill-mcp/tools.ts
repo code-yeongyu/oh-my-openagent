@@ -158,7 +158,9 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       const parsedArgs = parseSkillMcpArguments(args.arguments)
 
       let output: string
-      const cdpOptions = args.cdp_url ? { cdpUrl: args.cdp_url } : undefined
+      const cdpOptions = args.cdp_url
+        ? { cdpUrl: args.cdp_url, signal: toolContext.abort }
+        : { signal: toolContext.abort }
 
       switch (operation.type) {
         case "tool": {

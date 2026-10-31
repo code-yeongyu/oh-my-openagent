@@ -75,5 +75,6 @@ describe("per-file test timeout budget", () => {
 
   test("#given test-setup.ts #when it sets the preload budget #then it matches the explicit CI budgets", () => {
     expect(preload).toMatch(/setDefaultTimeout\(process\.platform === "win32" \? 30_000 : 20_000\)/)
+    expect(readFileSync(join(repoRoot, "test-support/test-deadline.ts"), "utf8")).toMatch(/export const DEFAULT_TEST_TIMEOUT_MS = process\.platform === "win32" \? 30_000 : 20_000/)
   })
 })

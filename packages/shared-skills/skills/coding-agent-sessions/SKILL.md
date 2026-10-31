@@ -26,16 +26,16 @@ Find local coding-agent sessions across agent products before answering from mem
 When the user remembers a task vaguely ("that OpenCode bug", "the dashboard PR", "when did we fix X"), derive 3-6 short query lanes before searching: product/tool aliases, repo/package names, exact error text, issue/PR/session IDs, English/Korean phrasing, and likely verbs such as `fix`, `review`, `plan`, `deploy`, or `merge`. Run the lanes together with repeated `--query` so `match_reasons` shows which wording found the hit.
 
 ```bash
-python3 scripts/find-agent-sessions.py list --limit 20
-python3 scripts/find-agent-sessions.py find "commit" --from 7d --platform senpi --platform opencode
-python3 scripts/find-agent-sessions.py find "proxy" --platform openclaw --platform droid --platform amp
-python3 scripts/find-agent-sessions.py find "refactor" --platform oh-my-pi --platform gajae-code
-python3 scripts/find-agent-sessions.py find --query "deploy" --query "token usage" --workers 64
-python3 scripts/find-agent-sessions.py find --query "opencode bug" --query "fix opencode" --query "OpenCode parent session" --include-subagents --workers 64
-python3 scripts/find-agent-sessions.py read <session-id>
+python3 -B scripts/find-agent-sessions.py list --limit 20
+python3 -B scripts/find-agent-sessions.py find "commit" --from 7d --platform senpi --platform opencode
+python3 -B scripts/find-agent-sessions.py find "proxy" --platform openclaw --platform droid --platform amp
+python3 -B scripts/find-agent-sessions.py find "refactor" --platform oh-my-pi --platform gajae-code
+python3 -B scripts/find-agent-sessions.py find --query "deploy" --query "token usage" --workers 64
+python3 -B scripts/find-agent-sessions.py find --query "opencode bug" --query "fix opencode" --query "OpenCode parent session" --include-subagents --workers 64
+python3 -B scripts/find-agent-sessions.py read <session-id>
 ```
 
-Use `python` instead of `python3` on systems where that is the available executable.
+Use `python` instead of `python3` on systems where that is the available executable. Keep `-B`: the skill can live inside a signed app bundle, and Python bytecode caches written next to the scripts break its signature.
 
 3. **Use explorer-style parallel lanes when one query batch is not enough.**
 
@@ -107,9 +107,9 @@ When the user asks whether some specific work was ever done, search with `--incl
 For Codex sessions, use the same broad finder. It reads `state_*.sqlite`, rollout JSONL, and archived rollout files:
 
 ```bash
-python3 scripts/find-agent-sessions.py list --platform codex --from 7d
-python3 scripts/find-agent-sessions.py find "deploy" --platform codex
-python3 scripts/find-agent-sessions.py read <session-id> --platform codex
+python3 -B scripts/find-agent-sessions.py list --platform codex --from 7d
+python3 -B scripts/find-agent-sessions.py find "deploy" --platform codex
+python3 -B scripts/find-agent-sessions.py read <session-id> --platform codex
 ```
 
 Use `references/codex.md` for Codex storage details.

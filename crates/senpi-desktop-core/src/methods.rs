@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 use crate::menus::MenuItem;
 use crate::protocol_params::{
     AdvanceClockParams, AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams,
-    AxSetValueParams, AxSnapshotParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
+    AxSetValueParams, AxSnapshotParams, AxTypeTextParams, CancelParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams,
     EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuPathParams, MenuSelectParams, ObserveParams, PointParams, RaiseWindowParams, ScrollParams, StopPathResumeParams,
     StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{
-    AuditEvent, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
+    AuditEvent, AxInputResult, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus,
 };
 use crate::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
@@ -122,6 +122,7 @@ method_table! {
     AxSetValue = "ax.setValue", Exec, Public, AxSetValueParams => ();
     AxFocus = "ax.focus", Exec, Public, AxRefParams => ();
     AxClick = "ax.click", Exec, Public, AxClickParams => ();
+    AxTypeText = "ax.typeText", Exec, Public, AxTypeTextParams => AxInputResult;
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();

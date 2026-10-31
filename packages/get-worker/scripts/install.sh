@@ -317,6 +317,11 @@ main() {
   else
     say "Run: omo"
   fi
+  say ""
+  say "OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product."
+  say "The data goes to PostHog in the United States."
+  say "Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1)."
+  say "Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi

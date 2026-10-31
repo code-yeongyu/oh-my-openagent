@@ -13,12 +13,16 @@ import { LockContentionError, createLockRecord, noticeLockPath, withLock } from 
 import { agreementItemsOf, readAgreementsAt } from "./ledger-file"
 import type { AgreementItem } from "./types"
 
+type WarnSink = NonNullable<ConsumeAgreementsNoticeOptions["onWarn"]>
+
 export const AGREEMENTS_NOTICE_WATERMARK_FILENAME = "agreements-flagged.json"
 
 export interface ConsumeAgreementsNoticeOptions {
   readonly noticesDir: string
   readonly locksDir: string
   readonly waitTimeoutMs?: number
+  /** Receives non-fatal warnings; defaults to a no-op so a host TUI is never written to. */
+  readonly onWarn?: (message: string, detail?: unknown) => void
 }
 
 interface FlaggedWatermark {
@@ -50,7 +54,7 @@ export async function consumeAgreementsNoticeDelta(
     return await withLock(
       noticeLockPath(options.locksDir),
       record,
-      () => consumeUnderLock(repo, options.noticesDir),
+      () => consumeUnderLock(repo, options.noticesDir, options.onWarn),
       { waitTimeoutMs: options.waitTimeoutMs ?? 2_000 },
     )
   } catch (error) {
@@ -59,14 +63,14 @@ export async function consumeAgreementsNoticeDelta(
   }
 }
 
-async function consumeUnderLock(repo: GitMemoryRepo, noticesDir: string): Promise<readonly AgreementItem[]> {
+async function consumeUnderLock(repo: GitMemoryRepo, noticesDir: string, onWarn?: WarnSink): Promise<readonly AgreementItem[]> {
   const head = await repo.head()
   if (head === null) return []
   const flagged = agreementItemsOf(await readAgreementsAt(repo, head)).filter((item) => item.status === "needs-human")
   const announced = readWatermark(noticesDir)
   const fresh = flagged.filter((item) => !announced?.has(item.id))
   const next = [...new Set(flagged.map((item) => item.id))].sort()
-  if (fresh.length > 0 || next.length !== announced?.size) await writeWatermark(noticesDir, next)
+  if (fresh.length > 0 || next.length !== announced?.size) await writeWatermark(noticesDir, next, onWarn)
   return fresh
 }
 
@@ -89,7 +93,7 @@ function isWatermark(value: unknown): value is FlaggedWatermark {
   return Array.isArray(value.announced) && value.announced.every((id) => typeof id === "string")
 }
 
-async function writeWatermark(noticesDir: string, announced: readonly string[]): Promise<void> {
+async function writeWatermark(noticesDir: string, announced: readonly string[], onWarn?: WarnSink): Promise<void> {
   await mkdir(noticesDir, { recursive: true, mode: 0o700 })
   const target = join(noticesDir, AGREEMENTS_NOTICE_WATERMARK_FILENAME)
   const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`
@@ -98,7 +102,8 @@ async function writeWatermark(noticesDir: string, announced: readonly string[]):
     await writeFile(temporary, `${JSON.stringify(watermark)}\n`, { encoding: "utf8", mode: 0o600, flag: "wx", flush: true })
     await rename(temporary, target)
   } catch (error) {
-    await rm(temporary, { force: true })
+    // Cleanup is best-effort: a failing rm must not replace the original write/rename error.
+    await rm(temporary, { force: true }).catch(() => undefined)
     throw error
   }
   try {
@@ -106,6 +111,6 @@ async function writeWatermark(noticesDir: string, announced: readonly string[]):
   } catch (error) {
     if (!(error instanceof Error) || !("code" in error)) throw error
     // Rename already consumed this notice. A durability failure must not discard its announcement.
-    console.warn("[memory] Published agreements watermark directory sync failed:", error.code)
+    onWarn?.("[memory] Published agreements watermark directory sync failed:", error.code)
   }
 }

@@ -3,6 +3,7 @@ use std::sync::{mpsc, Arc};
 use parking_lot::Mutex;
 use senpi_desktop_core::backend::{DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::protocol_results::AxInputMethod;
 use senpi_desktop_core::types::{DesktopPoint, FrontWindow, Target};
 
 /// A pointer event as the fake received it (global logical coordinates).
@@ -127,6 +128,12 @@ pub enum SinkOp {
     },
     AxFocus {
         node: u64,
+    },
+    AxTypeText {
+        node: u64,
+        text: String,
+        method: AxInputMethod,
+        mode: DeliveryMode,
     },
     MenuSelect {
         window: String,

@@ -134,12 +134,14 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "omo-session-history.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-recall-store.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-telemetry-posthog.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-telemetry-otlp.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-memory-sync.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "loro_wasm_bg.wasm"), "")
       await writeFile(join(pluginRoot, "extensions", "CaseFolding.txt"), "")
       await writeFile(join(pluginRoot, "extensions", "omo-thread-client.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-telemetry-recovery.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-feedback.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-desktop-toolkit.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "omo-claim-receipt.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
@@ -217,7 +219,7 @@ describe("Senpi compatibility test script", () => {
     // #when
     const expectedCommands = [
       "bun run build:senpi-plugin",
-      "tsgo --noEmit -p packages/omo-senpi/tsconfig.json",
+      "bun check --no-script --all -p packages/omo-senpi/tsconfig.json",
       "bun test --timeout 20000 packages/omo-senpi",
     ]
     const commandIndexes = expectedCommands.map((command) => script.indexOf(command))
@@ -250,11 +252,11 @@ describe("Senpi compatibility test script", () => {
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
-    expect(senpiJob).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(senpiJob).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
     expect(posixScript).toContain("bun run build:senpi-plugin")
     expect(posixScript).toContain("npm pack --pack-destination")
     expect(posixScript).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
-    expect(posixScript).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(posixScript).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
     expect(posixScript).toContain("bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs")
     expect(posixScript).toContain("bun test --timeout 20000 packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")

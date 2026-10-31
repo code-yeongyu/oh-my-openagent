@@ -36,7 +36,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
-        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" },
+        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3.1-pro", variant: "max" },
       ],
       architect: [
         ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
@@ -63,7 +63,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
-        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }
+        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3.1-pro", variant: "max" }
       ],
       quick: [
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
@@ -91,7 +91,7 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
       "unspecified-high": [
         { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "medium" },
         { providers: ["zai", "zai-coding-cn", "opencode-go"], model: "glm-5.3", variant: "max" },
-        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3", variant: "max" }
+        { providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"], model: "kimi-k3.1-pro", variant: "max" }
       ],
       writing: [
         { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },

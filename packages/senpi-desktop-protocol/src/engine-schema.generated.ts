@@ -46,6 +46,7 @@ export const ENGINE_METHODS = [
 	"ax.setValue",
 	"ax.focus",
 	"ax.click",
+	"ax.typeText",
 	"stopPath.start",
 	"stopPath.status",
 	"stopPath.heartbeat",
@@ -88,6 +89,10 @@ export const ERROR_CODES = [
 	"InputBusy",
 	"ControlRequired",
 	"CaptureUnavailable",
+	"UserIntervened",
+	"AxUnconfirmed",
+	"SpaceUnsupported",
+	"SpaceMoveDenied",
 ] as const;
 
 export type EngineMethod = (typeof ENGINE_METHODS)[number];

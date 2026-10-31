@@ -209,3 +209,29 @@ export declare function upsertTaskSessionStateForWork(
   input: TaskSessionInput,
 ): BoulderState | null
 export declare function writeBoulderState(directory: string, state: BoulderState): boolean
+
+export type MomusReviewVerdict = "okay" | "reject"
+
+export interface MomusReviewArtifactInput {
+  verdict: MomusReviewVerdict
+  reviewedAt: Date
+  model?: string
+  planHash?: string
+  durationMs?: number
+  sessionId?: string
+  reviewerOutput: string
+}
+
+export declare function getPlanReviewsDir(directory: string, planPath: string): string
+export declare function hashPlanContent(content: string): string
+export declare function isContainedPlanPath(directory: string, planPath: string): boolean
+export declare function formatMomusReviewArtifact(input: {
+  sequence: number
+  planPath: string
+  artifact: MomusReviewArtifactInput
+}): string
+export declare function writeMomusReviewArtifact(
+  directory: string,
+  planPath: string,
+  artifact: MomusReviewArtifactInput,
+): string | null

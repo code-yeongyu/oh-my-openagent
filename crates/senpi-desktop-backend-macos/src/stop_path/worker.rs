@@ -32,7 +32,7 @@ impl StopWorker {
             .spawn(move || loop {
                 let flags = work.swap(0, Ordering::SeqCst);
                 if flags & STOP != 0 {
-                    stopping.trigger_stop(StopSource::Hotkey);
+                    stopping.complete_stop(StopSource::Hotkey);
                     {
                         let mut control = control.lock();
                         control.stops = control.stops.saturating_add(1);

@@ -40,10 +40,33 @@ describe("createSkillSourceCopyFilter", () => {
     expect(shouldCopy(join(root, "scripts", "helper.ts"))).toBe(true)
   })
 
-  test("#given scripts/tests #when filtered #then that subtree is skipped but a top-level tests dir is kept", () => {
+  test("#given nested test directory shapes #when filtered #then every subtree is skipped at any depth", () => {
     const shouldCopy = createSkillSourceCopyFilter(root)
-    expect(shouldCopy(join(root, "scripts", "tests", "case.py"))).toBe(false)
-    expect(shouldCopy(join(root, "tests", "fixture.md"))).toBe(true)
+    for (const name of ["tests", "test", "__tests__", "parser_test"]) {
+      for (const parent of ["engine", join("scripts", "nested")]) {
+        expect(shouldCopy(join(root, parent, name))).toBe(false)
+        expect(shouldCopy(join(root, parent, name, "fixtures", "page.html"))).toBe(false)
+      }
+    }
+    expect(shouldCopy(join(root, "engine", "test_helpers.py"))).toBe(true)
+    expect(shouldCopy(join(root, "engine", "contest", "runtime.py"))).toBe(true)
+  })
+
+  test("#given each top-level directory shape #when filtered #then only test and tests are exempt by name", () => {
+    const shouldCopy = createSkillSourceCopyFilter(root)
+    const shapes = [
+      { name: "test", copied: true },
+      { name: "tests", copied: true },
+      { name: "__tests__", copied: false },
+      { name: "foo_test", copied: false },
+      { name: "spec", copied: true },
+      { name: "engine", copied: true },
+    ]
+    for (const { name, copied } of shapes) {
+      expect({ name, dir: shouldCopy(join(root, name)) }).toEqual({ name, dir: copied })
+      expect({ name, file: shouldCopy(join(root, name, "fixture.md")) }).toEqual({ name, file: copied })
+      expect({ name, nested: shouldCopy(join(root, name, "data", "page.html")) }).toEqual({ name, nested: copied })
+    }
   })
 
   test("#given extra ignored file names #when supplied #then they are honoured alongside the defaults", () => {

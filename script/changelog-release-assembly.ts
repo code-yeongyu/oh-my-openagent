@@ -7,9 +7,11 @@
  * own PR gets one, so a grouped entry still names the PR that made it.
  */
 import { assembleUnreleasedBody } from "./changelog-gate-rules.ts"
-import { blocksOf, linkEntry, scanFences } from "./changelog-notes-markdown.ts"
+import { entriesOf, linkEntry, linkScanned, scanFences } from "./changelog-notes-markdown.ts"
 
 const PULL_URL = "https://github.com/code-yeongyu/oh-my-openagent/pull"
+const OWN_PULL_LINK = new RegExp(`${PULL_URL.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}/(\\d+)\\)`, "g")
+const FENCE_LINE = /^(`{3,}|~{3,})/
 const SECTION = /^### (.+?)\s*$/
 
 export type Notes = { readonly paragraphs: string; readonly sections: ReadonlyMap<string, readonly string[]> }
@@ -34,18 +36,20 @@ export function parseNotes(text: string): Notes {
     } else if (fenced || line.trim() !== "") {
       const last = current.pop()
       const blankInFence = fenced && line.trim() === ""
+      if (last !== undefined && fenced && FENCE_LINE.test(line)) throw new Error(`a code fence under a ### bullet must start at the bullet's text: indent the fence and its code by two spaces, opening and closing lines alike: ${line}`)
       if (last === undefined || (!blankInFence && !/^\s/.test(line))) throw new Error(`text under a ### heading must be a "- " bullet or an indented continuation of one: ${line}`)
       current.push(`${last}\n${line}`)
     }
   }
-  return { paragraphs: paragraphs.join("\n").trim(), sections }
+  // Drop surrounding blank lines but keep the first line's indentation: 4+ leading spaces make it indented code.
+  return { paragraphs: paragraphs.join("\n").replace(/^(?:[ \t]*\n)+/, "").trimEnd(), sections }
 }
 
 const linkBullet = (entry: string, pr: number): string => linkEntry(entry, pr, PULL_URL)
 
 /** Every paragraph names the PR that made it (code fences untouched; see changelog-notes-markdown.ts). */
 const linkParagraphs = (text: string, pr: number): string =>
-  blocksOf(text).map((paragraph) => linkBullet(paragraph.trim(), pr)).join("\n\n")
+  entriesOf(text).map((entry) => linkScanned(entry, pr, PULL_URL)).join("\n\n")
 
 /** One notes text from several, in order: their paragraphs first, then one group per section name, first seen first. */
 export function mergeNotes(texts: readonly string[]): string {
@@ -75,7 +79,7 @@ export type Assembly = { readonly body: string; readonly duplicates: readonly nu
  * and reported in `duplicates`, never released twice.
  */
 export function assembleRelease(legacy: string, fragments: readonly { readonly pr: number; readonly content: string }[]): Assembly {
-  const covered = new Set([...legacy.matchAll(/\/pull\/(\d+)\)/g)].map((match) => Number(match[1])))
+  const covered = new Set([...legacy.matchAll(OWN_PULL_LINK)].map((match) => Number(match[1])))
   const duplicates = fragments.filter((fragment) => covered.has(fragment.pr)).map((fragment) => fragment.pr)
   const kept = [...fragments].filter((fragment) => !covered.has(fragment.pr)).sort((left, right) => right.pr - left.pr)
   const old = parseNotes(legacy)

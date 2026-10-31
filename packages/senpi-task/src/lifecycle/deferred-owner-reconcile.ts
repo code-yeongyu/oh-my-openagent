@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import { TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { retriesStopped } from "./deferred-revival"
 import { isHostSessionRecord } from "./host-session"
 import { reconcileLegacyRecord } from "./reconcile"
@@ -73,7 +73,7 @@ async function retryOwner(
 ): Promise<ReconcileOutcome | undefined> {
   for (const backoffMs of options.backoffMs) {
     await context.hostRetry.wait(backoffMs)
-    if (retriesStopped(context, options.parentSessionId ?? observed.parent_session_id)) return
+    if (!reconciliationActive(context) || retriesStopped(context, options.parentSessionId ?? observed.parent_session_id)) return
     const fresh = context.store.load(observed.task_id)
     if (fresh === null || TERMINAL_STATUSES.has(fresh.status) || fresh.residency_state !== "resident"
       || fresh.host_pid !== observed.host_pid || fresh.residency_claim !== observed.residency_claim

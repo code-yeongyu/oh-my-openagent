@@ -37,7 +37,9 @@ export default async function GuideDocsPage({ params }: { params: Params }): Pro
   return (
     <DocsShell
       mobileHeader={t("mobileHeader")}
+      searchLabel={t("searchLabel")}
       searchPlaceholder={t("searchPlaceholder")}
+      sectionsLabel={t("sectionsLabel")}
       sections={page.sections.map(({ id, title }) => ({ id, title }))}
     >
       <article className="docs-content" dangerouslySetInnerHTML={{ __html: page.lead }} />
