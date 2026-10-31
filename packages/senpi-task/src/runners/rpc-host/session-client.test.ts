@@ -134,9 +134,10 @@ describe("HostSessionClient transport", () => {
     const opened = await client.open(childOpenInput("/tmp/sessions/g.jsonl"))
 
     // when
-    await client.close()
+    const answered = await client.close()
 
     // then
+    expect(answered).toBe(true)
     const closes = host.commands.filter((command) => command.type === "close_session")
     expect(closes).toHaveLength(1)
     expect(closes[0]?.payload).toMatchObject({ sessionId: opened.sessionId })
@@ -157,6 +158,8 @@ describe("HostSessionClient transport", () => {
     // then
     expect(gone).toMatchObject({ code: "rpc_transport_gone" })
     expect(client.sessionId).toBeUndefined()
+    // A released port answers nothing: a cancel must never read this close as the host ending the session.
+    expect(await client.close()).toBe(false)
   })
 
   test("#given a command in flight #when the daemon dies under it #then the command rejects and transportGone resolves", async () => {

@@ -515,6 +515,8 @@ async function runBuild(options: OmobOptions): Promise<number> {
 	// The compiled binary embeds the Rust desktop engine; build-omo-binary only stages it.
 	const { ensureDesktopEngine } = await import("./omob-desktop-engine")
 	ensureDesktopEngine(omoSpec.directory, target.target)
+	const { ensureKeychainHelper } = await import("./omob-keychain-helper")
+	ensureKeychainHelper(omoSpec.directory, target.target)
 	const outDir = join(options.cacheDir, "out")
 	rmSync(outDir, { recursive: true, force: true })
 	// Build INSIDE the cache clone: build-omo-binary.ts derives repoRoot from its own
