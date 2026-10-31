@@ -3886,6 +3886,7 @@
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
         "test/fixtures/senpi-hooks-state-consumer.mjs",
+        "test/fixtures/trust-ensure-probe.ts",
         "test/fixtures/trust-stage-probe.ts",
         "test/packed-consumer.mjs",
         "test/teardown.test-support.ts",
