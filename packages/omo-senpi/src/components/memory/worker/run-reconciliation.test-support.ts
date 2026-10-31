@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { realpathSync } from "node:fs"
+import { mkdtempSync, readdirSync, realpathSync } from "node:fs"
 
 import {
   GitMemoryRepo,
@@ -22,6 +22,8 @@ import { rmEfaultTolerant } from "../teardown.test-support"
 const roots: string[] = []
 export const PHASE_IDLE_MS = process.platform === "win32" ? 10_000 : 2_000
 const GIT_PROCESS_ENDED = /"event":"(?:exit|atexit|signal)"/
+/** trace2 names each event file after the process's session id, whose last field is `P<pid in hex>`. */
+const TRACE_FILE_PID = /-P([0-9a-f]+)$/i
 let gitTrace: { readonly dir: string; readonly previous: string | undefined; depth: number } | undefined
 
 export async function cleanupReconciliationFixtures(): Promise<void> {
@@ -153,28 +155,40 @@ export async function commitOrphanWorktree(
  * per process), and the watchdog fires only after PHASE_IDLE_MS in which no git process was in
  * flight and none started. A loaded host that slows git down therefore never trips it, while a pass
  * parked on a wait or on a promise that never settles still fails with the phase's name.
+ *
+ * The trace opens synchronously in the call itself, before `operation` runs, so a git process
+ * started by the operation, or by the caller right after this call returns, is always traced.
+ * Work a caller starts BEFORE calling withinPhase is not covered: start it inside the operation.
  */
 export async function withinPhase<T>(phase: string, operation: () => Promise<T>): Promise<T> {
   const startedAt = performance.now()
-  const traceDir = await openGitTrace()
+  const traceDir = openGitTrace()
   let settled = false
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    let seen = (await gitActivity(traceDir)).started
+    let seen = readdirSync(traceDir).length
     const stalled = new Promise<never>((_, reject) => {
       const check = async (): Promise<void> => {
         const activity = await gitActivity(traceDir)
         if (settled) return
         if (activity.running > 0 || activity.started !== seen) {
           seen = activity.started
-          timer = setTimeout(() => void check(), PHASE_IDLE_MS)
+          schedule()
           return
         }
         reject(new Error(
           `${phase} stalled: no git progress for ${PHASE_IDLE_MS} ms (${Math.round(performance.now() - startedAt)} ms elapsed)`,
         ))
       }
-      timer = setTimeout(() => void check(), PHASE_IDLE_MS)
+      // A check that throws (the trace directory removed under it) fails the phase, never the process.
+      const schedule = (): void => {
+        timer = setTimeout(() => {
+          check().catch((error: unknown) => {
+            if (!settled) reject(error)
+          })
+        }, PHASE_IDLE_MS)
+      }
+      schedule()
     })
     return await Promise.race([operation(), stalled])
   } finally {
@@ -185,9 +199,9 @@ export async function withinPhase<T>(phase: string, operation: () => Promise<T>)
 }
 
 /** Nested phases share one trace directory, so an outer phase sees the git work of an inner one. */
-async function openGitTrace(): Promise<string> {
+function openGitTrace(): string {
   if (gitTrace === undefined) {
-    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reconcile-trace-")))
+    const dir = realpathSync.native(mkdtempSync(join(tmpdir(), "reflection-reconcile-trace-")))
     roots.push(dir)
     gitTrace = { dir, previous: process.env.GIT_TRACE2_EVENT, depth: 0 }
     process.env.GIT_TRACE2_EVENT = dir
@@ -205,11 +219,27 @@ function closeGitTrace(): void {
   gitTrace = undefined
 }
 
-/** A git process is in flight from its first trace event until it records how it ended. */
+/**
+ * A git process is in flight from its first trace event until it records how it ended, or until it
+ * is gone: a SIGKILLed git never writes its end, so its pid (from the trace file name) is probed.
+ * The age of the last write cannot stand in for that: a slow git waiting on a child writes nothing.
+ */
 async function gitActivity(dir: string): Promise<{ readonly started: number; readonly running: number }> {
   const names = await readdir(dir)
-  const events = await Promise.all(names.map((name) => readFile(join(dir, name), "utf8")))
-  return { started: names.length, running: events.filter((text) => !GIT_PROCESS_ENDED.test(text)).length }
+  const events = await Promise.all(names.map(async (name) => ({ name, text: await readFile(join(dir, name), "utf8") })))
+  const running = events.filter(({ name, text }) => !GIT_PROCESS_ENDED.test(text) && gitProcessAlive(name))
+  return { started: names.length, running: running.length }
+}
+
+function gitProcessAlive(traceFile: string): boolean {
+  const hex = TRACE_FILE_PID.exec(traceFile)?.[1]
+  if (hex === undefined) return true
+  try {
+    process.kill(Number.parseInt(hex, 16), 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM"
+  }
 }
 
 export function contendedReservation(lockPath: string, owner: LockRecord | null): ReservationStatePort {
