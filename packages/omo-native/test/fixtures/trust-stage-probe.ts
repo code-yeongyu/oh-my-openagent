@@ -2,7 +2,8 @@ import { adoptedEngineTrust } from "@code-yeongyu/senpi/engine-trust"
 import { runTrustStage } from "../../trust-stage"
 import { get } from "node:https"
 
-const directory = process.argv[2]!
+const directory = process.argv[2]
+if (directory === undefined) throw new Error("usage: trust-stage-probe <directory> [mode]")
 const mode = process.argv[3]
 const result = await runTrustStage({
   args: ["-p"],

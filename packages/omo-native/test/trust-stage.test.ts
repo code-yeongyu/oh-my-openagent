@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { createHash, X509Certificate } from "node:crypto"
-import { mkdir, mkdtemp, readFile, rm, writeFile, readdir, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile, readdir, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { buildTrustLaunchEnvironment, type EngineTrustMarker } from "@code-yeongyu/senpi/engine-trust"
@@ -13,8 +13,15 @@ let executable: string
 let ca: string
 let other: string
 let leaf: string
+function required<T>(value: T | null | undefined, name: string): T {
+  if (value === undefined || value === null) throw new Error(`${name} is missing`)
+  return value
+}
+const trustMarker = (env: NodeJS.ProcessEnv) => JSON.parse(required(env.SENPI_ENGINE_TRUST, "SENPI_ENGINE_TRUST")) as EngineTrustMarker
 beforeAll(async () => {
-  root = await mkdtemp(join(tmpdir(), "omo-trust-stage-"))
+  // The stage relocates a directory reached through any link (macOS tmpdir() is under /var -> /private/var),
+  // so the directories these tests name must be canonical, as temporaryTrustDirectory's own are.
+  root = await mkdtemp(join(await realpath(tmpdir()), "omo-trust-stage-"))
   const certs = await issueCertificates(root, [...["root", "other"].map((name) => ({
     name, subject: `/CN=synthetic-${name}`, days: 2,
     extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
@@ -22,9 +29,10 @@ beforeAll(async () => {
     name: "leaf", subject: "/CN=localhost", issuer: "root", days: 2,
     extensions: "basicConstraints=critical,CA:FALSE\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:localhost",
   }])
-  ca = new X509Certificate(certs.get("root")!).toString()
-  other = new X509Certificate(certs.get("other")!).toString()
-  leaf = new X509Certificate(certs.get("leaf")!).toString()
+  const pem = (name: string) => new X509Certificate(required(certs.get(name), `synthetic ${name} certificate`)).toString()
+  ca = pem("root")
+  other = pem("other")
+  leaf = pem("leaf")
   executable = join(root, process.platform === "win32" ? "probe.exe" : "probe")
   const build = await Bun.build({
     entrypoints: [join(import.meta.dir, "fixtures/trust-stage-probe.ts")],
@@ -67,7 +75,7 @@ async function launch(dir: string, env: NodeJS.ProcessEnv = cleanEnv(), fault?: 
       output = await child(next, dir)
     },
   })
-  return { result, output: output! }
+  return { result, output: required(output, "compiled child output") }
 }
 
 test.each([
@@ -122,7 +130,8 @@ test("a compiled child adopts native extras, scrubs plumbing, and restores old d
   expect(value.marker.owner).toBe("server")
   expect(value.marker.automatic).toBe("os")
   expect((await records(dir)).filter((record) => record.action === "import-exec")).toHaveLength(1)
-  expect((await stat(value.marker.file)).mode & 0o777).toBe(0o600)
+  // Windows has no POSIX mode: libuv reports a writable file as 0o666 and the profile ACL guards it (5.3).
+  expect((await stat(value.marker.file)).mode & 0o777).toBe(process.platform === "win32" ? 0o666 : 0o600)
   const raw = await readFile(join(dir, "diagnostics.jsonl"), "utf8")
   expect(raw).not.toContain(dir)
   expect(raw).not.toContain("/synthetic")
@@ -138,10 +147,10 @@ const faults: Fault[] = [
   { name: "missing marker", code: "trust-exec-loop", check: null,
     apply: async (env) => { delete env.SENPI_ENGINE_TRUST } },
   { name: "replaced generation", code: "trust-load-mismatch", check: "file",
-    apply: async (env) => { await writeFile(env.NODE_EXTRA_CA_CERTS!, other) } },
+    apply: async (env) => { await writeFile(required(env.NODE_EXTRA_CA_CERTS, "NODE_EXTRA_CA_CERTS"), other) } },
   { name: "native loaded-set mismatch", code: "trust-load-mismatch", check: "loaded-set",
     apply: async (env) => {
-      const marker = JSON.parse(env.SENPI_ENGINE_TRUST!) as EngineTrustMarker
+      const marker = trustMarker(env)
       const text = (await readFile(marker.file, "utf8")) + "\n-----BEGIN CERTIFICATE-----\nMAA=\n-----END CERTIFICATE-----\n"
       const sha256 = createHash("sha256").update(text).digest("hex")
       const file = join(root, `${sha256}.pem`)
@@ -195,23 +204,24 @@ test("failed addressed handoff preserves recorded originals and recovers only U"
     args: ["-p"], directory: dir, env: { NODE_EXTRA_CA_CERTS: userFile },
     loadedExtra: () => [other],
     acquire: async () => ({ certificates: [ca], fallbackReason: null, codes: [] }),
-    exec: async (_file, _argv, env) => { marker = JSON.parse(env.SENPI_ENGINE_TRUST!) },
+    exec: async (_file, _argv, env) => { marker = trustMarker(env) },
   })
-  const arrived = buildTrustLaunchEnvironment({}, { marker: marker!, hop: false, platform: process.platform })
-  let recovered: EngineTrustMarker | undefined
+  const arrived = buildTrustLaunchEnvironment({}, { marker: required(marker, "first marker"), hop: false, platform: process.platform })
+  let next: EngineTrustMarker | undefined
   await runTrustStage({
     args: ["-p"], directory: dir, env: arrived, loadedExtra: () => [],
     acquire: async () => ({ certificates: [], fallbackReason: "negatives-incomplete", codes: [] }),
-    exec: async (_file, _argv, env) => { recovered = JSON.parse(env.SENPI_ENGINE_TRUST!) },
+    exec: async (_file, _argv, env) => { next = trustMarker(env) },
   })
-  expect(recovered!.restore.NODE_EXTRA_CA_CERTS).toBe(userFile)
-  const pem = await readFile(recovered!.file, "utf8")
+  const recovered = required(next, "recovered marker")
+  expect(recovered.restore.NODE_EXTRA_CA_CERTS).toBe(userFile)
+  const pem = await readFile(recovered.file, "utf8")
   expect(pem).toContain(other.trim())
   expect(pem).not.toContain(ca.trim())
-  expect(recovered!.fallbackReason).toBe("negatives-incomplete")
-  await rm(join(dir, `u-${recovered!.user}.pem`))
+  expect(recovered.fallbackReason).toBe("negatives-incomplete")
+  await rm(join(dir, `u-${recovered.user}.pem`))
   const refused = await runTrustStage({
-    args: [], directory: dir, env: { NODE_EXTRA_CA_CERTS: recovered!.file },
+    args: [], directory: dir, env: { NODE_EXTRA_CA_CERTS: recovered.file },
     loadedExtra: () => [ca, other], stderr: () => {},
     acquire: async () => { throw new Error("unrecoverable U imported") },
   })
@@ -227,12 +237,13 @@ test.each([[[], 1500], [["host", "ensure"], 1500], [["-p"], 20_000]] as const)(
     await runTrustStage({
       args, directory: dir, env: {}, loadedExtra: () => [],
       acquire: async (options) => { budget = options.deadlineMs; return { certificates: [], fallbackReason: "helper-timeout", codes: [] } },
-      exec: async (_file, _argv, env) => { marker = JSON.parse(env.SENPI_ENGINE_TRUST!) },
+      exec: async (_file, _argv, env) => { marker = trustMarker(env) },
     })
     expect(budget).toBe(expected)
-    expect(marker!.automatic).toBe("fallback")
-    expect(marker!.defaults).not.toBeNull()
-    expect(await readFile(marker!.defaults!.file, "utf8")).toBe("")
+    const written = required(marker, "fallback marker")
+    expect(written.automatic).toBe("fallback")
+    expect(written.defaults).not.toBeNull()
+    expect(await readFile(required(written.defaults, "fallback closure").file, "utf8")).toBe("")
   },
 )
 
@@ -244,8 +255,9 @@ test.each(["native-child", "shell-child"] as const)("compiled %s preserves the n
     acquire: async () => ({ certificates: [ca], fallbackReason: null, codes: [] }),
     exec: async (_file, _argv, env) => { output = await child(env, dir, mode) },
   })
-  expect(output!.code).toBe(0)
-  const nested = JSON.parse(output!.stdout).nested
+  const compiled = required(output, "compiled child output")
+  expect(compiled.code).toBe(0)
+  const nested = JSON.parse(compiled.stdout).nested
   expect(nested.code).toBe(0)
   const log = await records(dir)
   expect(log.filter((record) => record.action === "import-exec")).toHaveLength(mode === "native-child" ? 1 : 2)
@@ -271,8 +283,9 @@ test.each([null, "helper-missing"] as const)("native TLS uses only the selected 
       acquire: async () => ({ certificates: [ca], fallbackReason, codes: [] }),
       exec: async (_file, _argv, env) => { output = await child(env, dir, `https://127.0.0.1:${server.port}`) },
     })
-    expect(output!.code).toBe(0)
-    expect(JSON.parse(output!.stdout).tls).toEqual({
+    const compiled = required(output, "compiled child output")
+    expect(compiled.code).toBe(0)
+    expect(JSON.parse(compiled.stdout).tls).toEqual({
       native: fallbackReason === null, https: fallbackReason === null, websocket: fallbackReason === null,
     })
   } finally { await server.stop(true) }
@@ -282,7 +295,7 @@ test.each(["missing", "directory"] as const)("an addressed generation replaced w
   const dir = await directory()
   await launch(dir, cleanEnv(), async (env) => {
     delete env.SENPI_ENGINE_TRUST_HOP
-    const generation = env.NODE_EXTRA_CA_CERTS!
+    const generation = required(env.NODE_EXTRA_CA_CERTS, "NODE_EXTRA_CA_CERTS")
     await rm(generation)
     if (replacement === "directory") await mkdir(generation)
     const result = await runTrustStage({
@@ -303,10 +316,11 @@ test("a damaged closure relocates without following or trusting the old contents
       args: [], env: {}, directory: dir, loadedExtra: () => [],
       acquire: async () => ({ certificates: [], fallbackReason: "helper-missing", codes: [] }),
       exec: async (_file, _argv, env) => {
-        const marker = JSON.parse(env.SENPI_ENGINE_TRUST!) as EngineTrustMarker
+        const marker = trustMarker(env)
         relocated = join(marker.file, "..")
-        expect(marker.defaults!.dir).not.toBe(join(dir, "defaults/empty.d"))
-        expect(await readdir(marker.defaults!.dir)).toEqual([])
+        const defaults = required(marker.defaults, "relocated closure")
+        expect(defaults.dir).not.toBe(join(dir, "defaults/empty.d"))
+        expect(await readdir(defaults.dir)).toEqual([])
       },
     })
   } finally { if (relocated) await rm(relocated, { recursive: true, force: true }) }
@@ -338,7 +352,7 @@ test("Windows case forms are read at arrival and canonicalized only by senpi's b
         expect(Object.keys(env).filter((key) => key.toUpperCase() === name)).toEqual([name])
       }
       expect(Object.keys(env).filter((key) => key.toUpperCase() === "NODE_USE_SYSTEM_CA")).toEqual([])
-      const marker = JSON.parse(env.SENPI_ENGINE_TRUST!) as EngineTrustMarker
+      const marker = trustMarker(env)
       expect(marker.restore.NODE_EXTRA_CA_CERTS).toBe(incoming)
       expect(marker.restore.NODE_USE_SYSTEM_CA).toBe("1")
       expect(await readFile(marker.file, "utf8")).toContain(other.trim())
