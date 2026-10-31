@@ -1,0 +1,142 @@
+{
+  "request": "hello",
+  "cases": [
+    {
+      "name": "a hello is welcomed with a server_proof over its client_nonce",
+      "outcome": "ok",
+      "handshake": "none",
+      "steps": [
+        {
+          "send": {
+            "type": "hello",
+            "v": 1,
+            "client": {
+              "name": "omo",
+              "version": "2.0.0"
+            },
+            "client_nonce": "<nonce>"
+          }
+        },
+        {
+          "expect": {
+            "type": "welcome",
+            "v": 1,
+            "owner": "service",
+            "server_proof": "<server_proof>",
+            "capabilities": ["sessions", "devices", "enforcement", "upgrade"],
+            "state": {
+              "state": "connected"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a desktop hello with its data_home is welcomed",
+      "outcome": "ok",
+      "handshake": "none",
+      "steps": [
+        {
+          "send": {
+            "type": "hello",
+            "v": 1,
+            "client": {
+              "name": "desktop",
+              "version": "2.0.0",
+              "data_home": "/home/user/.config/omo"
+            },
+            "client_nonce": "<nonce>"
+          }
+        },
+        {
+          "expect": {
+            "type": "welcome",
+            "server_proof": "<server_proof>"
+          }
+        }
+      ]
+    },
+    {
+      "name": "v 2 is refused version and closed",
+      "outcome": "refusal",
+      "handshake": "none",
+      "steps": [
+        {
+          "send": {
+            "type": "hello",
+            "v": 2,
+            "client": {
+              "name": "omo",
+              "version": "2.0.0"
+            },
+            "client_nonce": "<nonce>"
+          }
+        },
+        {
+          "expect": {
+            "type": "refused",
+            "reason": "version"
+          }
+        },
+        {
+          "expect_closed": true
+        }
+      ]
+    },
+    {
+      "name": "a desktop hello without data_home is refused data_home_required",
+      "outcome": "refusal",
+      "handshake": "none",
+      "steps": [
+        {
+          "send": {
+            "type": "hello",
+            "v": 1,
+            "client": {
+              "name": "desktop",
+              "version": "2.0.0"
+            },
+            "client_nonce": "<nonce>"
+          }
+        },
+        {
+          "expect": {
+            "type": "refused",
+            "reason": "data_home_required"
+          }
+        },
+        {
+          "expect_closed": true
+        }
+      ]
+    },
+    {
+      "name": "a relative data_home is refused malformed",
+      "outcome": "refusal",
+      "handshake": "none",
+      "steps": [
+        {
+          "send": {
+            "type": "hello",
+            "v": 1,
+            "client": {
+              "name": "desktop",
+              "version": "2.0.0",
+              "data_home": "relative/home"
+            },
+            "client_nonce": "<nonce>"
+          }
+        },
+        {
+          "expect": {
+            "type": "refused",
+            "reason": "malformed"
+          }
+        },
+        {
+          "expect_closed": true
+        }
+      ]
+    }
+  ]
+}
