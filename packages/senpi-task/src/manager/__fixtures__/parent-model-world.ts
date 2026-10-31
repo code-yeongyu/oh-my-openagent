@@ -9,6 +9,7 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { InProcessRunner } from "../../runners/in-process"
 import { createInProcessManagedRunner } from "../runner"
 import type { ManagedRunner } from "../types"
+import type { ManagedChildHandle } from "../child-handle"
 
 export const CLAUDE = "pm-claude"
 export const GPT = "pm-gpt"
@@ -19,7 +20,10 @@ export const QUOTA_ERROR =
   `403: {"message":"You've reached your usage limit for this billing cycle. Your limit resets 3:20am.",` +
   `"type":"access_terminated_error"}`
 
-export type Step = "quota" | "complete" | { readonly tool: string } | { readonly partialTool: string }
+// A limit whose wording names neither a model family nor the account (#11383).
+export const WEEKLY_LIMIT_ERROR = '{"type":"error","error":{"type":"rate_limit_error","message":"Weekly usage limit reached. Resets at 2099-10-29T04:27:07Z."}}'
+
+export type Step = "quota" | "weekly" | "complete" | "silent" | { readonly tool: string } | { readonly partialTool: string }
 
 export type ProviderCall = {
   readonly model: string
@@ -31,7 +35,7 @@ export type ParentModelWorld = {
   readonly calls: ProviderCall[]
   toolRuns(): number
   runner(): ManagedRunner
-  dispose(): void
+  dispose(): Promise<void>
 }
 
 const MODELS: Readonly<Record<string, readonly string[]>> = {
@@ -56,6 +60,7 @@ export async function createParentModelWorld(scripts: Readonly<Record<string, re
   const modelRegistry = new ModelRegistry(modelRuntime)
   const remaining = new Map(Object.entries(scripts).map(([model, steps]) => [model, [...steps]]))
   const calls: ProviderCall[] = []
+  const handles = new Set<ManagedChildHandle>()
   let toolRuns = 0
 
   for (const [provider, ids] of Object.entries(MODELS)) {
@@ -64,7 +69,14 @@ export async function createParentModelWorld(scripts: Readonly<Record<string, re
       baseUrl: `file://${provider}`,
       apiKey: "test-key",
       models: ids.map(testModel),
-      streamSimple(model: { readonly id: string }, context: { readonly messages: readonly { readonly role: string }[] }) {
+      async streamSimple(
+        model: { readonly id: string },
+        context: { readonly messages: readonly { readonly role: string }[] },
+        options: { readonly onPayload?: (payload: unknown) => unknown },
+      ) {
+        // Real providers call this hook immediately before sending their request. The synthetic
+        // provider has no HTTP payload, but must preserve that boundary for request-time budgets.
+        await options.onPayload?.({ model: model.id })
         const key = `${provider}/${model.id}`
         calls.push({ model: key, toolResults: context.messages.filter((message) => message.role === "toolResult").length })
         const step = remaining.get(key)?.shift() ?? "complete"
@@ -88,12 +100,25 @@ export async function createParentModelWorld(scripts: Readonly<Record<string, re
     settingsPath,
     calls,
     toolRuns: () => toolRuns,
-    runner: () => createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
-      const [provider, id] = (spec.model ?? "").split("/")
-      const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
-      return { agentDir, projectTrusted: false, modelRegistry, modelRuntime, ...(model === undefined ? {} : { model }) }
-    }),
-    dispose: () => rmSync(root, { recursive: true, force: true }),
+    runner: () => {
+      const runner = createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
+        const [provider, id] = (spec.model ?? "").split("/")
+        const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
+        return { agentDir, projectTrusted: false, modelRegistry, modelRuntime, ...(model === undefined ? {} : { model }) }
+      })
+      return { ...runner, start: async spec => {
+        const handle = await runner.start(spec)
+        handles.add(handle)
+        return handle
+      } }
+    },
+    dispose: async () => {
+      try {
+        await Promise.all([...handles].map(async handle => { await handle.abort(); await handle.dispose() }))
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    },
   }
 }
 
@@ -120,6 +145,9 @@ function answer(provider: string, model: string, step: Step) {
   }
   const toolCall = (name: string) => ({ type: "toolCall" as const, id: `call-${name}`, name, arguments: {} })
   if (step === "quota") return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: QUOTA_ERROR })
+  if (step === "weekly") return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: WEEKLY_LIMIT_ERROR })
+  // The provider accepted the call and never answers.
+  if (step === "silent") return { result: () => new Promise<never>(() => {}), [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }) }
   if (step === "complete") {
     return stream([], { ...base, content: [{ type: "text" as const, text: `${provider}/${model} completed` }], stopReason: "stop" as const })
   }
