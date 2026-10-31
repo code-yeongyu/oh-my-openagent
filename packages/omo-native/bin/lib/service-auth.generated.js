@@ -143,7 +143,11 @@ $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid,
 $acl.SetAccessRuleProtection($true, $false)
 $acl.SetOwner($sid)
 $acl.AddAccessRule($rule)
-Set-Acl -LiteralPath $env:LA_PATH -AclObject $acl
+if ($env:LA_KIND -eq 'dir') {
+  [System.IO.Directory]::SetAccessControl($env:LA_PATH, $acl)
+} else {
+  [System.IO.File]::SetAccessControl($env:LA_PATH, $acl)
+}
 Write-Output 'applied'
 `,DESCRIBE_DACL_SCRIPT=String.raw`
 $ErrorActionPreference = 'Stop'

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts";
+import { applyExactDacl, exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts";
+import { rejectionOf } from "./conformance/rejection.ts";
 
 const U = "S-1-5-21-1111111111-2222222222-3333333333-1001";
 const FILE = `O:${U}D:PAI(A;;FA;;;${U})`;
@@ -109,5 +110,28 @@ describe("the exact DACL verdict over the raw SDDL", () => {
     const withGuid = parseSddl(`O:${U}D:PAI(OA;OICI;FA;${guid};;${U})`);
     expect(withGuid?.aces[0]?.objectGuid).toBe(guid);
     expect(withGuid !== undefined && exactDaclVerdict(withGuid, U, "dir")).toBe(false);
+  });
+});
+
+describe("applying the exact DACL", () => {
+  test("a failed apply names the first line of the script's error", async () => {
+    const failing = async () => ({
+      code: 1,
+      out: "",
+      err: "\r\nException calling \"SetAccessControl\": Attempted to perform an unauthorized operation.\r\nAt line:18 char:3\r\n",
+    });
+    expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
+      code: "insecure_state_dir",
+      reason:
+        'the exact DACL could not be applied: Exception calling "SetAccessControl": Attempted to perform an unauthorized operation.',
+    });
+  });
+
+  test("a failed apply without error text keeps the plain refusal", async () => {
+    const failing = async () => ({ code: 1, out: "" });
+    expect(await rejectionOf(applyExactDacl("C:\\state", U, "file", failing))).toMatchObject({
+      code: "insecure_state_dir",
+      reason: "the exact DACL could not be applied",
+    });
   });
 });
