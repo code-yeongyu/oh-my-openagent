@@ -6,6 +6,20 @@ import { join, sep } from "node:path"
 
 const packageRoot = join(import.meta.dir, "..")
 
+// `bun add` of the packed tarball resolves @code-yeongyu/senpi from the npm registry. On CI runners that step has
+// failed in under a second across unrelated PRs while the same pack + add passed on the dev tip, so it gets one
+// retry for a transient registry or network error, and a failure prints bun's output instead of only the exit code.
+function bunAdd(args: string[], cwd: string): void {
+  let output = ""
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const install = Bun.spawnSync(["bun", "add", ...args], { cwd, stdout: "pipe", stderr: "pipe" })
+    if (install.exitCode === 0) return
+    const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes)
+    output += `attempt ${attempt}: exit ${install.exitCode}\n${decode(install.stdout)}${decode(install.stderr)}\n`
+  }
+  throw new Error(`bun add ${args.join(" ")} failed twice:\n${output}`)
+}
+
 describe("omo-ai packed install", () => {
   test("ships the Senpi patch installer and installs a Senpi that surfaces pre-replay results natively", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-ai-packed-install-"))
@@ -22,8 +36,7 @@ describe("omo-ai packed install", () => {
       const consumer = join(root, "consumer")
       Bun.spawnSync(["mkdir", "-p", consumer], { stdout: "ignore", stderr: "ignore" })
       writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "omo-ai-consumer", private: true }))
-      const install = Bun.spawnSync(["bun", "add", "--trust", join(root, tarball!)], { cwd: consumer, stdout: "pipe", stderr: "pipe" })
-      expect(install.exitCode).toBe(0)
+      bunAdd(["--trust", join(root, tarball!)], consumer)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
       const installedFloor = join(installedPackageRoot, "bin", "lib", "claude-code-floor.js")
       expect(readFileSync(installedFloor, "utf8")).toContain("claudeCodeVersionFloor")
@@ -62,8 +75,7 @@ describe("omo-ai packed install", () => {
       const home = join(root, "home")
       Bun.spawnSync(["mkdir", "-p", consumer, home], { stdout: "ignore", stderr: "ignore" })
       writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "omo-ai-consumer", private: true }))
-      const install = Bun.spawnSync(["bun", "add", "--ignore-scripts", "--backend", "copyfile", join(root, tarball!)], { cwd: consumer, stdout: "pipe", stderr: "pipe" })
-      expect(install.exitCode).toBe(0)
+      bunAdd(["--ignore-scripts", "--backend", "copyfile", join(root, tarball!)], consumer)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
       const consumerRequire = createRequire(join(installedPackageRoot, "package.json"))
       const searchPaths = consumerRequire.resolve.paths("@code-yeongyu/senpi") ?? []
