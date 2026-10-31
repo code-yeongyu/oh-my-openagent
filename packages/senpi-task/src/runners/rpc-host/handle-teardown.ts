@@ -23,6 +23,7 @@ export interface HandleTeardownHost extends HostTeardownInput {
   clearActive(): void
   stopHeartbeat(): void
   settle(classified: SessionExitClassification): void
+  markHostEndAnswered(): void
   /** Extra teardown work the owning handle registers (settlement timers, trackers). */
   onTornDown?(): void
 }
@@ -71,7 +72,7 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
     ending ??= (async () => {
       host.stopHeartbeat()
       host.onTornDown?.()
-      await endSessionOnHost(host, next)
+      if (await endSessionOnHost(host, next)) host.markHostEndAnswered()
       const intent = host.intent()
       const reason = intent === "terminated" ? "terminated" : "client_close"
       host.settle(classifySessionExit({ cause: { kind: "session_closed", reason }, intent }))
@@ -110,7 +111,7 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
 
 // Bounded teardown: a daemon that never answers must not hold the parent's shutdown open, and a
 // session is never ended with a signal.
-export async function endSessionOnHost(input: HostTeardownInput, next: "closed" | "terminated"): Promise<void> {
+export async function endSessionOnHost(input: HostTeardownInput, next: "closed" | "terminated"): Promise<boolean> {
   const bestEffort = async (work: () => Promise<void>, step: string): Promise<void> => {
     try {
       await work()
@@ -119,7 +120,11 @@ export async function endSessionOnHost(input: HostTeardownInput, next: "closed" 
     }
   }
   if (next === "terminated") await settleWithin(bestEffort(() => input.port().send({ type: "abort" }), "abort"), ABORT_GRACE_MS)
-  await settleWithin(bestEffort(() => input.port().close(), "close_session"), input.closeGraceMs)
+  let answered = false
+  await settleWithin(bestEffort(async () => {
+    answered = await input.port().close()
+  }, "close_session"), input.closeGraceMs)
+  return answered
 }
 
 /** Resolve when the work settles or the budget expires, whichever comes first. */

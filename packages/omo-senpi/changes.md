@@ -1,3 +1,95 @@
+## 2026-10-30 - Deterministic stale-lock recovery fixture (#11604)
+
+Derive the fixture's hard and grace deadlines from one clock sample, matching
+the production ledger contract. Exercise recovery with an advancing clock and
+verify that in-flight diagnostic contention and errors stay before the mark.
+
+## 2026-10-28 - Job widget author on the quick category and task widget sources
+
+The task component reads senpi's job-widget exports off the loaded `@code-yeongyu/senpi` module (`job-widget-host.ts`, feature-detected: `setJobWidgetAuthorResolver`, `registerJobWidgetSource` + `TextTap`) and wires nothing on a senpi without them. `job-widget-author.ts` installs one process-wide author route that resolves `quick` through `resolveCategory` against the asking session's model registry, using the omo.json of the session whose cwd matches; an unknown cwd or an unresolvable `quick` answers `undefined`, so senpi falls back to the session model. Each registering session holds the route until its `session_shutdown`; the last release withdraws it. `job-widget-sources.ts` registers a `task` job for each running background task (`notify_on_terminal`) of the current session: id = task id, brief `task` = the spawn prompt (capped at 4 KiB) and `intent` = the description, one `tools` TextTap fed `\n» <tool> <first argument>\n<result text>\n` per finished child tool call (the last 64 KiB of each result), `notify()` per call, `settle()` on a terminal status, and `dispose()` on record removal, a session change, a revived run, or `session_shutdown`. A child `bash` call with `run_in_background: true` sets the job's `watch` hint through `update()` to `background command: <command>` (secret shapes redacted with omo's mirror of senpi's `sensitive-output` patterns plus flag, `sk-`, AKIA and JWT shapes, then cut to 300 characters); the newest background command wins and a finished one leaves the hint in place. Without one, senpi's request policy authors no task widget.
+
+## 2026-10-29 - Preserve feedback refusal sections (#11830)
+
+Validate the service's secret-detection section id against the feedback section list and carry it through the existing submit result. Missing or malformed detail keeps the existing refusal shape.
+
+## 2026-10-29 - Wire the task host generation view into the task engine (#11783)
+
+The task engine passes the lifecycle a read-only view of the endpoint's generations and handover-parked entries, and the steering destruction port carries the lifecycle's host-session cancel, so a cancel can tell a child still running on a draining generation from one that ended.
+
+## 2026-10-30 - Darwin `/home` account homes count as real profiles (#11878)
+
+`telemetry/omo-native-session.ts` `isInsideTempDir` now also compares a trigger-path HOME's own lexical parent with the users dirs, so `/home/<name>` (which resolves to `/System/Volumes/Data/home/<name>`) is a real profile. `automount-trap.test-support.ts` exempts the `os.tmpdir()` subtree, so the trap only fires on real `/home` and `/net` resolution. `install-identity.test.ts` adds a table test for HOME under `/home`, `/Users` and the resolved `/System/Volumes/Data/home` path.
+
+## 2026-10-28 - Load the memory name-listing renderer lazily (#11559)
+
+memory-core imports its `<external_projection>` renderer through `#memory-external-projection`, which maps to its own source everywhere except the plugin manifest, where it maps to `extensions/omo-recall-store.js`. `DEFAULT_EXTERNAL_PROJECTION_LIMITS` stays in the entry. Refs #11557.
+
+## 2026-10-28 - Never resolve a macOS automount trigger on the host loop (#11546)
+
+`@oh-my-opencode/utils/path-containment` gains `isDarwinAutomountTriggerPath(path, { platform, homeDir })`. It is true only on darwin, for `/home`, `/net` and anything below them, and never for the user's own home subtree. It is decided from the string alone, before any syscall. `telemetry/omo-native-session.ts` `isInsideTempDir` compares trigger candidates (and a HOME whose parent is one) lexically. The predicate also matches the firmlinked `/System/Volumes/Data/home|net` spellings, case-insensitively. The class sweep applies the same rule to format-on-mutation, `skill_loaded` (`omo-native-tools.ts`), the memory read classifier, the memory guard and policy guard roots, kibitzer `resolveWorkspacePath`, project memory read grants and sandbox `canonicalPath`. `automount-trap.test-support.ts` forces darwin and traps every resolving fs entry, so each site's table test fails if it ever resolves a trigger.
+
+## 2026-10-26 - Feedback identity follows native telemetry consent
+
+Use the shared native enablement decision before collecting install and session hashes. Keep the existing feedback-specific opt-out and configuration checks, and leave ordinary report sections available when hashes are suppressed. Refs #10937, item 1; the tracking issue's other follow-ups remain open.
+
+## 2026-10-29 - Desktop private sync channel receiver (#11750)
+
+`components/memory/desktop-sync/channel.ts` adds `attachDesktopSyncChannel(stream)`, the memory component's receiver for the desktop's private sync duplex (claimed through `takeInheritedPrivateChannel("memory-sync")`). It bootstraps once (the reply names the child capability every later request carries), writes each request synchronously before returning its promise, keeps at most 64 requests in flight, settles each reply once, and retires the channel on disconnect, a malformed or foreign frame, another child's event or `retired`, rejecting every waiter with one fixed, body-free error. A bootstrap main never answers is unavailable after 10 s (a contract bound) and a late reply is discarded. A missing stream or a refused or invalid bootstrap is `private_channel_unavailable`, never a CLI account fallback; Windows is `platform_not_supported`. `framing.ts` (LF JSON, canonical `$omoSyncBytes` base64url, 92 MiB frame bound) and `protocol.ts` (strict zod schemas matching the desktop wire contract) are local, so the plugin does not import the unpublished desktop package. Registration in `memory/index.ts` belongs to the account-source change.
+
+## 2026-10-28 - getBuiltinSkillsRoot honours OMO_BUNDLED_SKILLS_DIR (#11631)
+
+`getBuiltinSkillsRoot()` resolves a valid `OMO_BUNDLED_SKILLS_DIR` through `resolveBundledSkillsOverride`, the resolver the bundled-skills loader uses, so `skill-pointers`, `onboarding`, `init-deep-advisor` and the `skill_loaded` telemetry root name the tree skills actually load from; the returned root still ends in a path separator. The resolver moved unchanged to the leaf module `bundled-skills/override.ts` (node builtins only), re-exported from `bundled-skills/index.ts`, so the telemetry helper and the advisor bundle do not pull the component's config loading. An invalid value is still reported once per process and falls back to the plugin-relative root; `onboarding` and the telemetry component pass their component logger so that one report reaches the component log whichever registers first. Telemetry still exports only the allowlisted skill name, never the directory.
+
+## 2026-10-28 - Distinguish runner argv from nested command pairs
+
+Do not credit a test merely mentioned in an echo argument inside an eval cell. Preserve real command kinds, offsets and supported test receipts. Refs #10802, runner-argv blocker only; the other tracking and replay follow-ups remain open.
+
+## 2026-10-27 - Preserve ordinary thread attachment refusal identity
+
+Keep the host's two session identity refusal codes on ordinary mutation errors. Preserve the existing authentication, draining and typed release/UI reply paths. Refs #10944 item 5 only; the tracking issue's other follow-ups remain open.
+
+## 2026-10-27 - Recover failed facts parking without a restart
+
+Keep migration retryable when a hot-to-parked move fails after the failure ledger is durable. Preserve the original error, ledger, bytes and healthy queued work; restore the existing cache after successful movement. Refs #11091, post-ledger movement only; batching, orphan cleanup and claim revalidation remain open.
+
+## 2026-10-27 - OTLP projection and startup privacy follow-ups (#11431)
+
+Project the actual client field names against the pinned collector types, derive
+summary cost from USD, and purge the previous run's OTLP spool when startup is
+opted out. Cleanup uses the existing recovery sidecar, not the exporter. Reject
+unlisted events and unsupported platforms before importing OTLP, retry failed
+startup after the same 60-second backoff as PostHog, dispose late transports, and
+keep PostHog acknowledgement timing independent of OTLP lifecycle bounds.
+
+## 2026-10-27 - OTLP model ids fall back to custom (#11428)
+
+`pinned-model-ids.ts` holds the pin's model enum (omo-telemetry 13c6e61b, 44 values) and `pinnedModelId`.
+The projection applies it to the 15 keys that share that enum and to the ranked `omo.m*_model` keys
+(`none` kept). The turn span applies it to its three model attributes. The list lives in its own module, so
+the turn span in the main bundle does not pull in the projection tables. Update the list together with the pin.
+
+## 2026-10-26 - model-profile outcomes leave the conversation (#11365)
+
+`components/model-profile/index.ts` records every outcome with `pi.appendEntry(<type>, { content, details }, { startupBookkeeping: true })` instead of `pi.sendMessage`. senpi's `convertToLlm` turns every custom message into user text in the next provider request (its context-exclusion predicate is false for every type), so the notice reached the model, and one sent while the first prompt streamed was delivered as a steer. The three custom types and their `details` are unchanged; only the entry kind moved from `custom_message` to `custom`. An outcome that leaves the profile unapplied also goes to `ctx.ui.notify`: `warning` for a chosen profile that no available model serves, an unknown profile name or a stored login that failed, `info` when the unset default falls back to the session's own model. `notice.ts` names the next step per host (rpc: Provider authentication settings or the composer; headless: `/login` or `--model`). A clean apply is recorded and logged only.
+
+Must not break: no profile outcome may go through `pi.sendMessage`; `index.test.ts` runs senpi's own `convertToLlm` over the component's conversation output for every outcome kind. Live proof: `scripts/qa/model-profile-e2e.mjs` checks `notice_not_in_conversation` and `notice_not_in_request` (the mock provider records whether the request it received carried a profile notice).
+
+## 2026-10-26 - Align project-memory grants with raw file reads (#11339)
+
+Suffix-classified external file tools no longer receive a grant for a different file when a symlink is followed by `..`. Built-in resolved reads remain supported, and the missing-note exception is limited to ENOENT with plain missing segments: a missing path such as `missing/../note.md`, `a/./b` or `a//b` is not granted. Real filesystem tests cover grants, the soft guard, temporary HOME detection, and native case aliases. A missing remainder under a file is refused on every platform (Windows reports ENOENT there, not ENOTDIR), and the temporary-HOME check judges HOME the way the install id is written (lexically resolved), so a HOME like `<tmp>/link/../home` that writes inside the temp root counts as temporary, and a lexical HOME that does not exist yet counts as temporary too (telemetry stays off).
+
+## 2026-10-26 - Admit sessions before host reconciliation (#11335)
+
+The task event bridge restores local pause and transition state, attaches RPC and workpools, then lets the existing durable recovery chain finish asynchronously. Its abort signal fences the recovery tail on a newer start, switch or shutdown. The lifecycle carries its own disposal and shutdown generation through host probes, admission and revival; stale probe completions cannot claim newer ownership, and late respawn handles use fenced suspension. Endpoint groups reconcile independently while the shared admission lease still enforces per-session capacity. Deterministic regressions cover blocked probes, disposal, shutdown, newer same-process claims, independent hosts and late handles.
+
+## 2026-10-27 - The local launcher sends the OmO logo (#11445)
+
+`install/local-launcher.ts` imports the same `OMO_BRAND_LOGO` from omo-native, so a sibling-store install brands the sign-in result page like the published launcher; `plugin/scripts/install.mjs` and `bundle-inputs.json` are regenerated.
+
+## 2026-10-25 - Close research fidelity gate findings (#11310)
+
+Source-backed facts fail verification when their own snapshot metadata or body cannot be checked, with the cause in the message, while facts on healthy sources keep their checks. Grouped derived values verify exactly as fill writes them. Conversion originals remain bound to their operand rows under one bracket grammar: a conversion shown without its original, with a non-numeric or nested bracket, with a dash separator, or with a second original (a bare figure in the operand's dimension right after it) is a mismatch, while another filled fact, prose with a figure, or a range after it is not, and a correct original passes in any bracket style or fullwidth form in HTML and Markdown. The V, A, and D claim prefixes preserve their marks through fill and Markdown projection. Packaged research skills use the shared runtime and the corrected format guidance.
+
 ## 2026-10-26 - Optional lazy OTLP dual-send (#11413)
 
 An optional second telemetry transport, inactive by default and consent-gated; it
