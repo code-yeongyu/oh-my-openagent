@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createKeywordDetectorHook } from "./index"
@@ -43,64 +45,31 @@ describe("keyword-detector hyperplan keyword", () => {
     return textPart.text
   }
 
-  test("should inject hyperplan message when user types 'hyperplan'", async () => {
-    // given - main session typing the full keyword
-    const sessionID = "hyperplan-full-session"
+  test.each([
+    { name: "full keyword", prompt: "hyperplan refactor the auth module" },
+    { name: "shorthand", prompt: "hpp how should I structure this feature" },
+    { name: "mixed case", prompt: "HyperPlan something now" },
+    { name: "activation toast", prompt: "hyperplan this task" },
+    { name: "mid-message slash", prompt: "hyperplan: refactor src/auth/handler.ts" },
+  ])("injects hyperplan guidance and delivers the activation toast for $name", async ({ prompt }) => {
+    // given
+    const sessionID = "hyperplan-activation-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const toastCalls: string[] = []
     const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
     const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "hyperplan refactor the auth module" }],
+      message: {},
+      parts: [{ type: "text", text: prompt }],
     }
 
-    // when - keyword detection runs
+    // when
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - hyperplan activates and preserves the user's task text
+    // then
     const text = textOf(output)
     expect(toastCalls).toContain("Hyperplan Mode Activated")
-    expect(text).toContain("refactor the auth module")
-    expect(text).not.toBe("hyperplan refactor the auth module")
-  })
-
-  test("should inject hyperplan message when user types 'hpp' shorthand", async () => {
-    // given - main session typing the short keyword
-    const sessionID = "hyperplan-short-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const toastCalls: string[] = []
-    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "hpp how should I structure this feature" }],
-    }
-
-    // when - keyword detection runs
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - hyperplan injection should fire
-    const text = textOf(output)
-    expect(toastCalls).toContain("Hyperplan Mode Activated")
-    expect(text).toContain("hpp how should I structure this feature")
-    expect(text).not.toBe("hpp how should I structure this feature")
-  })
-
-  test("should inject hyperplan message case-insensitively", async () => {
-    // given - main session typing in mixed case
-    const sessionID = "hyperplan-case-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const toastCalls: string[] = []
-    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "HyperPlan something now" }],
-    }
-
-    // when - keyword detection runs with mixed case input
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - hyperplan should still fire
-    expect(toastCalls).toContain("Hyperplan Mode Activated")
+    expect(text).toContain(prompt)
+    expect(text).not.toBe(prompt)
   })
 
   test("should NOT trigger hyperplan when 'hpp' is a substring of another word", async () => {
@@ -155,24 +124,6 @@ describe("keyword-detector hyperplan keyword", () => {
     // then - hyperplan must not fire (the trailing '.hpp' is a header extension, not the trigger)
     const text = textOf(output)
     expect(text).toBe("open src/include/audio/buffer.hpp and fix the leak")
-  })
-
-  test("should fire 'Hyperplan Mode Activated' toast when keyword detected", async () => {
-    // given - main session and toast tracking
-    const sessionID = "hyperplan-toast-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const toastCalls: string[] = []
-    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "hyperplan this task" }],
-    }
-
-    // when - hyperplan keyword fires
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - toast title should be present in tracked calls
-    expect(toastCalls).toContain("Hyperplan Mode Activated")
   })
 
   test("should NOT inject hyperplan when disabled_keywords includes 'hyperplan'", async () => {
@@ -272,24 +223,6 @@ describe("keyword-detector hyperplan keyword", () => {
     // then - keyword detector should yield to the slash command system
     const text = textOf(output)
     expect(text).toBe("/hpp investigate the build pipeline")
-  })
-
-  test("should still inject hyperplan when slash appears mid-message (not a slash command)", async () => {
-    // given - text contains a slash later but does not start with one
-    const sessionID = "hyperplan-mid-slash-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const toastCalls: string[] = []
-    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }))
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "hyperplan: refactor src/auth/handler.ts" }],
-    }
-
-    // when - keyword detection runs on free-form text that mentions hyperplan first
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - hyperplan should still fire (this is a real keyword invocation, not a slash command)
-    expect(toastCalls).toContain("Hyperplan Mode Activated")
   })
 
   test("should skip hyperplan injection when agent name contains 'planner' token", async () => {

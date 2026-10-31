@@ -8,27 +8,28 @@
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { desktopEngineRustTarget, loadDesktopEngineTargets } from "./release-desktop-engine-target"
 
 export const DESKTOP_ENGINE_SOURCE_PATHS = ["crates", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"] as const
 
 const FIXTURE = join("script", "release-desktop-engine-fixture.json")
 
-export function desktopEngineCargoArgs(rustTarget: string): string[] {
-	return ["build", "--release", "-p", "senpi-desktop-engine", "--locked", "--target", rustTarget]
+export function desktopEngineCargoArgs(rustTarget: string, withTrustHelper = false): string[] {
+	const helper = withTrustHelper ? ["-p", "omo-engine-trust-helper"] : []
+	return ["build", "--release", "-p", "senpi-desktop-engine", ...helper, "--locked", "--target", rustTarget]
 }
 
 /**
  * Identifies the engine inputs of the checked-out commit. The cache clone is reset to its ref
  * before every build, so the committed tree ids are exact and cost one git process.
  */
-export function desktopEngineFingerprint(repoRoot: string, rustTarget: string): string {
+export function desktopEngineFingerprint(repoRoot: string, rustTarget: string, withTrustHelper = false): string {
 	const result = spawnSync("git", ["ls-tree", "HEAD", "--", ...DESKTOP_ENGINE_SOURCE_PATHS], { cwd: repoRoot, encoding: "utf8" })
 	if (result.error !== undefined) throw result.error
 	if (result.status !== 0) throw new Error(`git ls-tree failed in ${repoRoot}: ${result.stderr.trim()}`)
 	if (result.stdout.trim() === "") throw new Error(`no desktop engine sources (${DESKTOP_ENGINE_SOURCE_PATHS.join(", ")}) at HEAD in ${repoRoot}`)
-	return createHash("sha256").update(desktopEngineCargoArgs(rustTarget).join(" ")).update("\n").update(result.stdout).digest("hex")
+	return createHash("sha256").update(desktopEngineCargoArgs(rustTarget, withTrustHelper).join(" ")).update("\n").update(result.stdout).digest("hex")
 }
 
 interface DesktopEngineStamp {
@@ -80,13 +81,19 @@ export function ensureDesktopEngine(
 	}
 	const rustTarget = desktopEngineRustTarget(entry.host)
 	const binary = join(repoRoot, entry.source)
+	// A checkout that carries the engine trust helper crate also stages the helper on Darwin and Windows hosts
+	// (omo#10762), from the same target directory as the engine.
+	const helper = (entry.host.startsWith("darwin-") || entry.host.startsWith("win32-"))
+		&& existsSync(join(repoRoot, "crates", "omo-engine-trust-helper"))
+		? join(dirname(binary), entry.host.startsWith("win32-") ? "omo-engine-trust-helper.exe" : "omo-engine-trust-helper")
+		: undefined
 	const stampPath = `${binary}.omob-build.json`
-	const fingerprint = desktopEngineFingerprint(repoRoot, rustTarget)
-	if (stampMatches(stampPath, binary, fingerprint)) {
+	const fingerprint = desktopEngineFingerprint(repoRoot, rustTarget, helper !== undefined)
+	if (stampMatches(stampPath, binary, fingerprint) && (helper === undefined || binaryIdentity(helper) !== undefined)) {
 		log(`[omob] reusing desktop engine ${entry.source}`)
 		return "reused"
 	}
-	const args = desktopEngineCargoArgs(rustTarget)
+	const args = desktopEngineCargoArgs(rustTarget, helper !== undefined)
 	log(`[omob] building desktop engine: cargo ${args.join(" ")}`)
 	rmSync(stampPath, { force: true })
 	// build-omo-binary stages from <repoRoot>/target; a caller's CARGO_TARGET_DIR would build elsewhere.
@@ -102,6 +109,9 @@ export function ensureDesktopEngine(
 	}
 	const identity = binaryIdentity(binary)
 	if (identity === undefined) throw new Error(`cargo ${args.join(" ")} produced no desktop engine at ${binary}`)
+	if (helper !== undefined && binaryIdentity(helper) === undefined) {
+		throw new Error(`cargo ${args.join(" ")} produced no engine trust helper at ${helper}`)
+	}
 	const stamp: DesktopEngineStamp = { fingerprint, ...identity }
 	writeFileSync(stampPath, `${JSON.stringify(stamp)}\n`)
 	return "built"
