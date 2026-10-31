@@ -27,8 +27,9 @@ describe("fetchSyncResult", () => {
     //#when
     const result = await fetchSyncResult(mockClient, "ses_test")
 
-    //#then - should return the latest assistant message
-    expect(result).toEqual({ ok: true, textContent: "Latest response" })
+    //#then - should return the latest assistant message; its turn has no terminal
+    // finish, so the outcome classifier reports an interrupted session end
+    expect(result).toEqual({ ok: true, textContent: "Latest response", endState: "interrupted" })
   })
 
   test("with anchor: returns only assistant messages from after anchor point", async () => {
@@ -57,8 +58,9 @@ describe("fetchSyncResult", () => {
     //#when - anchor at 2 (after first assistant message)
     const result = await fetchSyncResult(mockClient, "ses_test", 2)
 
-    //#then - should return assistant message after anchor
-    expect(result).toEqual({ ok: true, textContent: "After anchor response" })
+    //#then - should return assistant message after anchor; latest turn has no
+    // terminal finish, so the outcome classifier reports an interrupted session end
+    expect(result).toEqual({ ok: true, textContent: "After anchor response", endState: "interrupted" })
   })
 
   test("with anchor + no new messages: returns explicit error", async () => {
@@ -118,8 +120,9 @@ describe("fetchSyncResult", () => {
     //#when - anchor at 2 (after first assistant)
     const result = await fetchSyncResult(mockClient, "ses_test", 2)
 
-    //#then - should return the latest assistant message after anchor
-    expect(result).toEqual({ ok: true, textContent: "Latest response" })
+    //#then - should return the latest assistant message; its turn has no terminal
+    // finish, so the outcome classifier reports an interrupted session end
+    expect(result).toEqual({ ok: true, textContent: "Latest response", endState: "interrupted" })
   })
 
   test("empty messages array: returns error", async () => {
@@ -204,8 +207,9 @@ describe("fetchSyncResult", () => {
     //#when
     const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
 
-    //#then - returns the envelope contents, not the newer untagged follow-up
-    expect(result).toEqual({ ok: true, textContent: "# Real Plan\nfull content" })
+    //#then - returns the envelope contents, not the newer untagged follow-up;
+    // the latest turn has no terminal finish, so the end state is interrupted
+    expect(result).toEqual({ ok: true, textContent: "# Real Plan\nfull content", endState: "interrupted" })
   })
 
   test("deliverableTag: prefers the newest tagged turn when multiple envelopes exist", async () => {
@@ -235,7 +239,7 @@ describe("fetchSyncResult", () => {
     const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
 
     //#then
-    expect(result).toEqual({ ok: true, textContent: "refined" })
+    expect(result).toEqual({ ok: true, textContent: "refined", endState: "interrupted" })
   })
 
   test("deliverableTag: falls back to recency when no closed envelope is present", async () => {
@@ -264,8 +268,9 @@ describe("fetchSyncResult", () => {
     //#when
     const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
 
-    //#then - unchanged behavior: newest assistant text
-    expect(result).toEqual({ ok: true, textContent: "Latest response" })
+    //#then - unchanged behavior: newest assistant text; finish-less turn
+    // classifies as interrupted
+    expect(result).toEqual({ ok: true, textContent: "Latest response", endState: "interrupted" })
   })
 
   test("deliverableTag: an unclosed envelope does not match and falls back", async () => {
@@ -289,8 +294,13 @@ describe("fetchSyncResult", () => {
     //#when
     const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
 
-    //#then - falls back to returning the assistant text as-is
-    expect(result).toEqual({ ok: true, textContent: "<plan>\n# Truncated plan with no closing tag" })
+    //#then - falls back to returning the assistant text as-is; streaming was cut
+    // off mid-turn, matching the interrupted classification
+    expect(result).toEqual({
+      ok: true,
+      textContent: "<plan>\n# Truncated plan with no closing tag",
+      endState: "interrupted",
+    })
   })
 
   test("strict abort recovery: requires latest assistant text output", async () => {
@@ -383,8 +393,9 @@ describe("fetchSyncResult", () => {
       deliverableTag: "plan",
     })
 
-    //#then - returns the envelope contents
-    expect(result).toEqual({ ok: true, textContent: "# Recovered plan" })
+    //#then - returns the envelope contents; latest clean message still lacks a
+    // terminal finish, so strict recovery reports an interrupted session end
+    expect(result).toEqual({ ok: true, textContent: "# Recovered plan", endState: "interrupted" })
   })
 
   test("deliverableTag: selects the last complete envelope within a single message", async () => {
@@ -413,8 +424,9 @@ describe("fetchSyncResult", () => {
     //#when
     const result = await fetchSyncResult(mockClient, "ses_test", undefined, { deliverableTag: "plan" })
 
-    //#then - only the final block, with no embedded tags or draft content
-    expect(result).toEqual({ ok: true, textContent: "final plan" })
+    //#then - only the final block, with no embedded tags or draft content;
+    // finish-less turn classifies as interrupted
+    expect(result).toEqual({ ok: true, textContent: "final plan", endState: "interrupted" })
   })
 
   test("deliverableTag: ignores a complete envelope in reasoning when final text is untagged", async () => {
@@ -448,6 +460,108 @@ describe("fetchSyncResult", () => {
     if (result.ok) {
       expect(result.textContent).toContain("Final answer without a tag")
       expect(result.textContent).not.toBe("internal draft sketch")
+    }
+  })
+})
+
+describe("fetchSyncResult outcome classification", () => {
+  const baseMessages = () => [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }]
+
+  function clientWith(assistantMessage: Record<string, unknown>) {
+    return {
+      session: {
+        messages: async () => ({ data: [...baseMessages(), assistantMessage] }),
+      },
+    }
+  }
+
+  test("terminal finish stop classifies the session end as completed", async () => {
+    //#given - the child turn reached a normal terminal finish
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+    const mockClient = clientWith({
+      info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+      parts: [{ type: "text", text: "All done." }],
+    })
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test")
+
+    //#then
+    expect(result).toEqual({ ok: true, textContent: "All done.", endState: "completed" })
+  })
+
+  test("finish-less latest turn with partial text classifies as interrupted", async () => {
+    //#given - issue #6240 scenario: the child was cut off mid-turn, leaving text
+    // but no terminal finish on its latest message
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+    const mockClient = clientWith({
+      info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+      parts: [{ type: "text", text: "Partial progress before cutoff." }],
+    })
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test")
+
+    //#then - content is still returned, but the end state must not read as success
+    expect(result).toEqual({ ok: true, textContent: "Partial progress before cutoff.", endState: "interrupted" })
+  })
+
+  test("non-terminal finish with a dangling tool part classifies as interrupted", async () => {
+    //#given - the last turn stopped at tool-calls and never resolved the tool part
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+    const mockClient = clientWith({
+      info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "tool-calls" },
+      parts: [
+        { type: "tool", toolCallId: "t1", toolName: "bash", state: "input-available", input: {} },
+        { type: "text", text: "Running the check..." },
+      ],
+    })
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test")
+
+    //#then
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.endState).toBe("interrupted")
+    }
+  })
+
+  test("errored latest assistant classifies as failed even when an older turn had text", async () => {
+    //#given - the newest turn failed; recency search would otherwise mask it with
+    // older-turn text and report success
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            ...baseMessages(),
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+              parts: [{ type: "text", text: "Older completed turn." }],
+            },
+            {
+              info: {
+                id: "msg_003",
+                role: "assistant",
+                time: { created: 3000 },
+                error: { name: "ProviderError", message: "upstream failure" },
+              },
+              parts: [],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test")
+
+    //#then - older text is salvaged but the outcome is failed, not completed
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.textContent).toBe("Older completed turn.")
+      expect(result.endState).toBe("failed")
     }
   })
 })

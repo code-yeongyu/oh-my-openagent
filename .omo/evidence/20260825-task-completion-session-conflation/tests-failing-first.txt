@@ -1,0 +1,64 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/tools/delegate-task/sync-completion-message.test.ts:
+44 | 
+45 |     //#when
+46 |     const output = buildSyncTaskCompletion({ ...input, endState: "interrupted" })
+47 | 
+48 |     //#then
+49 |     expect(output).toMatch(/^Task ended before completion/)
+                        ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /^Task ended before completion/
+Received: "Task completed in 5s.\n\nAgent: explore\n\n---\n\nPartial progress before the session was cut off.\n\n<task_metadata>\nsession_id: ses_child\ntask_id: ses_child\nsubagent: explore\n</task_metadata>"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6240/packages/omo-opencode/src/tools/delegate-task/sync-completion-message.test.ts:49:20)
+(fail) buildSyncTaskCompletion > #given the child session ended mid-turn without a terminal finish (interrupted) #then the wrapper must not claim the task completed [0.44ms]
+57 | 
+58 |     //#when
+59 |     const output = buildSyncTaskCompletion({ ...input, endState: "failed" })
+60 | 
+61 |     //#then
+62 |     expect(output).toMatch(/^Task failed in /)
+                        ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /^Task failed in /
+Received: "Task completed in 5s.\n\nAgent: explore\n\n---\n\n(No text output)\n\n<task_metadata>\nsession_id: ses_child\ntask_id: ses_child\nsubagent: explore\n</task_metadata>"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6240/packages/omo-opencode/src/tools/delegate-task/sync-completion-message.test.ts:62:20)
+(fail) buildSyncTaskCompletion > #given the child session's final turn carries an error #then the wrapper reports failure instead of success [0.27ms]
+93 | 
+94 |     //#when
+95 |     const output = buildRecoveredSyncTaskCompletion({ ...input, endState: "interrupted" })
+96 | 
+97 |     //#then
+98 |     expect(output).toMatch(/^Task ended before completion/)
+                        ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /^Task ended before completion/
+Received: "Task completed in 5s.\n\n---\n\nSalvaged partial deliverable.\n\n<task_metadata>\nsession_id: ses_child\ntask_id: ses_child\nsubagent: explore\n</task_metadata>"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6240/packages/omo-opencode/src/tools/delegate-task/sync-completion-message.test.ts:98:20)
+(fail) buildRecoveredSyncTaskCompletion > #given a recovered result whose session was interrupted mid-turn #then the wrapper must not claim the task completed [0.21ms]
+105 | 
+106 |     //#when
+107 |     const output = buildRecoveredSyncTaskCompletion({ ...input, endState: "failed" })
+108 | 
+109 |     //#then
+110 |     expect(output).toMatch(/^Task failed in /)
+                         ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /^Task failed in /
+Received: "Task completed in 5s.\n\n---\n\n(No text output)\n\n<task_metadata>\nsession_id: ses_child\ntask_id: ses_child\nsubagent: explore\n</task_metadata>"
+
+      at <anonymous> (/home/viprix/projects/oom-wt-6240/packages/omo-opencode/src/tools/delegate-task/sync-completion-message.test.ts:110:20)
+(fail) buildRecoveredSyncTaskCompletion > #given a recovered result whose session errored #then the wrapper reports failure instead of success [0.19ms]
+
+ 18 pass
+ 4 fail
+ 29 expect() calls
+Ran 22 tests across 2 files. [1083.00ms]
