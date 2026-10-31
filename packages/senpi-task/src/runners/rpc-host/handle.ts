@@ -5,7 +5,7 @@ import { exitTurnOutcome, promptFailureOutcome } from "../rpc/turn-outcome"
 import { createTurnSettlement, sessionIsIdle } from "../rpc/turn-settlement"
 import { createTurnWakeSources } from "../rpc/turn-wake-sources"
 import type { ChildEventListener, ChildExitOutcome, RpcTerminalAssistantMessage } from "../types"
-import { classifySessionExit, type SessionCloseIntent, type SessionExitCause } from "./exit-mapping"
+import { classifySessionExit, isParkingReason, type SessionCloseIntent, type SessionExitCause } from "./exit-mapping"
 import { bindHostSessionPort } from "./handle-client-binding"
 import { settleClassifiedSessionExit } from "./handle-exit"
 import type {
@@ -58,6 +58,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   let turnOutcome: RunnerOutcome | undefined
   let terminalAssistantMessage: RpcTerminalAssistantMessage | undefined
   let abortedByUser = false
+  // The host answered this child's end of its session; a released port never sets it (omo#11765).
+  let hostEndAnswered = false
+  const markHostEndAnswered = (): void => { hostEndAnswered = true }
   let lastSeenAt: number | undefined
   let outcome: ChildExitOutcome | undefined
   let intent: SessionCloseIntent = "running"
@@ -151,6 +154,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
         return
       }
       confirmedUnresponsiveClose = true
+      markHostEndAnswered()
       settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: "unresponsive, closed: the host confirmed this session is absent" } })
       settleExit({ kind: "killed", facts: { pid: undefined, code: null, signal: null, stderrTail: "unresponsive, closed" } })
     },
@@ -198,6 +202,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     markAborted: () => { abortedByUser = true },
     intent: () => intent,
     settleClosed: () => settleClassified(classifySessionExit({ cause: { kind: "session_closed", reason: "client_close" }, intent })),
+    markHostEndAnswered,
     waitForExit: () => waiters.waitForExit(outcome),
   })
 
@@ -247,6 +252,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     onParked: (event: HostSessionParked) => { if (!closingUnresponsive) park(event) },
     onClosed: (event: { readonly reason: string | undefined }) => {
       if (closingUnresponsive) return
+      if (!isParkingReason(event.reason)) markHostEndAnswered()
       endSession({ kind: "session_closed", reason: event.reason })
     },
     onReplaced: (event: HostSessionReplaced) => listeners.emitReplaced(identity.followReplace(event)),
@@ -294,6 +300,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     clearActive: listeners.clearActive,
     stopHeartbeat: () => { inputEffects.stopRetrying(); stopHeartbeat() },
     settle: settleClassified,
+    markHostEndAnswered,
     onTornDown: () => {
       tornDown = true
       settlement.cancelConfirmation()
@@ -338,6 +345,7 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     },
     transportRecovering: () => recovery.recovering() && outcome === undefined,
     markStopping: stop.markStopping,
+    hostEndAnswered: () => hostEndAnswered,
     stopWhenReachable: stop.stopWhenReachable,
     ...listeners.registrations,
     reconcileTurn: (record) => reconciliation.reconcile(identity.current().sessionPath, record, false, openDisposition === "reopened"),

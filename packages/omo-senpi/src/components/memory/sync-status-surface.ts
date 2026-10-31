@@ -36,9 +36,10 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
         return
       }
       const key = `${failure.kind}\n${failure.action}`
-      if (previous === key) return
+      // Background transitions must not consume a notice the person has never seen.
+      if (previous === key || ui === undefined) return
+      ui.notify(`Memory sync is blocked. ${failure.reason} ${failure.action}`, "warning")
       announced.set(repo, key)
-      ui?.notify(`Memory sync is blocked. ${failure.reason} ${failure.action}`, "warning")
     },
   }
 }

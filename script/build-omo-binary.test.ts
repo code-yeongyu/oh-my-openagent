@@ -13,6 +13,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs"
+import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -37,8 +38,11 @@ import {
   reportEmbeddedPayload,
   resolveExpectedSidecarRelPaths,
   RUNTIME_MANIFEST_REL_PATH,
+  stageSidecarPayload,
 } from "./build-omo-binary"
 import { PAYLOAD_DIRECTORIES, PAYLOAD_FILES } from "./build-omo-native"
+import { desktopEngineTarget, engineTrustHelperTarget, stageCompiledDesktopEngine, stageCompiledEngineTrustHelper } from "./release-desktop-engine-target"
+import { KEYCHAIN_HELPER_SOURCE, keychainHelperPayload } from "./release-keychain-helper-target"
 import * as binaryBuilder from "./build-omo-binary"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -525,8 +529,9 @@ describe("sidecar parity set", () => {
     })
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_pty.darwin-arm64.node")
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi_grep.darwin-arm64.node")
-    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(3)
+    expect(relPaths.filter((path) => path.startsWith("native/prebuilds/"))).toHaveLength(4)
     expect(relPaths).toContain("native/prebuilds/darwin-arm64/senpi-desktop-engine")
+    expect(relPaths).toContain("native/prebuilds/darwin-arm64/omo-engine-trust-helper")
   })
 
   test("#given a native-addon-absent target #when expected paths are resolved #then the desktop engine remains required", () => {
@@ -542,6 +547,81 @@ describe("sidecar parity set", () => {
       "native/prebuilds/linux-x64/senpi-desktop-engine",
     ])
     expect(relPaths).toContain("package.json")
+  })
+})
+
+// Release contract (omo#10762): the engine trust helper ships on the Darwin and Windows hosts only, hashed in the
+// runtime manifest the compiled binary verifies at extraction, and a promised helper that is missing fails the build.
+describe("engine trust helper payload", () => {
+  const helperHosts: Readonly<Record<string, string | null>> = {
+    "darwin-arm64": "native/prebuilds/darwin-arm64/omo-engine-trust-helper",
+    "darwin-x64": "native/prebuilds/darwin-x64/omo-engine-trust-helper",
+    "darwin-x64-baseline": "native/prebuilds/darwin-x64/omo-engine-trust-helper",
+    "linux-x64": null,
+    "linux-x64-baseline": null,
+    "linux-arm64": null,
+    "linux-x64-musl": null,
+    "linux-x64-musl-baseline": null,
+    "linux-arm64-musl": null,
+    "windows-x64": "native/prebuilds/win32-x64/omo-engine-trust-helper.exe",
+    "windows-x64-baseline": "native/prebuilds/win32-x64/omo-engine-trust-helper.exe",
+    "windows-arm64": "native/prebuilds/win32-arm64/omo-engine-trust-helper.exe",
+  }
+
+  test("#given every release target #when expected paths are resolved #then only Darwin and Windows promise the helper", () => {
+    expect(RELEASE_BINARY_TARGETS.map((target) => target.target)).toEqual(Object.keys(helperHosts))
+    for (const target of RELEASE_BINARY_TARGETS) {
+      const promised = resolveExpectedSidecarRelPaths(target).filter((relPath) => relPath.includes("omo-engine-trust-helper"))
+      const expected = helperHosts[target.target]
+      expect(promised, target.target).toEqual(expected === null || expected === undefined ? [] : [expected])
+    }
+  })
+
+  test("#given a staged Windows helper #when the manifest is built #then it is an executable entry carrying the helper's sha256", async () => {
+    const root = makeTempDir("omo-trust-helper-manifest-")
+    try {
+      const helper = engineTrustHelperTarget("windows-arm64")
+      const engine = desktopEngineTarget("windows-arm64")
+      if (helper.source === null || helper.payload === null || engine.source === null) throw new Error("available target expected")
+      stageParityFixture(root, [helper.source, engine.source])
+      const bytes = readFileSync(join(root, helper.source))
+      const stageDir = join(root, "stage")
+
+      expect(stageCompiledDesktopEngine("windows-arm64", stageDir, root)).toBe(engine.payload)
+      expect(stageCompiledEngineTrustHelper("windows-arm64", stageDir, root)).toBe(helper.payload)
+      const manifest = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+
+      expect(manifest.entries.find((entry) => entry.relPath === helper.payload)).toEqual({
+        relPath: "native/prebuilds/win32-arm64/omo-engine-trust-helper.exe",
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        mode: 0o755,
+        size: bytes.byteLength,
+      })
+      expect(stageCompiledEngineTrustHelper("linux-arm64", stageDir, root)).toBeNull()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a target whose helper was not built #when the payload is staged #then the build fails before the plugin build", () => {
+    for (const name of ["darwin-x64-baseline", "windows-x64"]) {
+      const root = makeTempDir("omo-trust-helper-missing-")
+      try {
+        const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === name)
+        const engine = desktopEngineTarget(name)
+        if (target === undefined || engine.source === null) throw new Error(`${name} target expected`)
+        // Every other promised sidecar is present, so the trust helper is the only missing one.
+        const keychain = keychainHelperPayload(name) === null ? [] : [KEYCHAIN_HELPER_SOURCE]
+        stageParityFixture(root, [engine.source, ...keychain])
+
+        const stage = (): void => { stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root) }
+
+        expect(stage).toThrow(new RegExp(`missing required engine trust helper for ${name}:.*omo-engine-trust-helper`))
+        expect(existsSync(join(root, "stage", "plugin"))).toBe(false)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    }
   })
 })
 
