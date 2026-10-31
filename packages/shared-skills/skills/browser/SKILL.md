@@ -55,7 +55,8 @@ node "<skill-root>/scripts/browser-doctor.mjs" --json
 | State | Meaning | Next |
 |---|---|---|
 | `ready` | CLI, daemon and a connected browser | start a session |
-| `no-cli` / `no-daemon` / `no-extension` | something is missing | `node "<skill-root>/scripts/browser-install.mjs" [--browser=<id>]` prepares everything it can for **the browser the user uses**, then prints the **single** step only the user can do (relaunch that browser and click **Enable**); relay it verbatim, wait, re-run the doctor |
+| `no-cli` / `no-extension` | the CLI is missing, or the daemon runs but sees no browser with the extension enabled | `node "<skill-root>/scripts/browser-install.mjs" [--browser=<id>]` prepares everything it can for **the browser the user uses**, then prints the **single** next step; for `no-extension` that is the one only the user can do (relaunch that browser and click **Enable**). Relay it verbatim, wait, re-run the doctor |
+| `no-daemon` | the daemon is not running; `daemon.startBlocked` (doctor or `browser-install.mjs --json`) means the host forbids it from detaching (Windows Job Object breakaway) | start the daemon: run `browser-install.mjs` (it starts it through `bsk status`); if `startBlocked` is set or the daemon still does not run, run `bsk daemon start --foreground` in a persistent background session that outlives the command. Re-run the doctor. Never ask the user to enable the extension while the daemon is down; that step comes only from `no-extension` |
 | `choose-browser` | the signals do not single out one browser (Safari/Firefox default, an idle default while another browser runs, several in use) | nothing was installed; take the browser from memory or ask the user, then `browser-install.mjs --browser=<id>` |
 | `no-browser-support` | no Chromium-family profile on this machine | say so and stop |
 
@@ -94,7 +95,9 @@ try {
 3. **Two identical failures mean change approach, not retry.** A third identical attempt is a defect.
 4. **Borrow a user tab explicitly** (`tabList({ scope: "user" })`, `tabBorrow(id)`, `tabReturn(id)`).
    Borrowing prompts the user; never invent tab ids and never repeat a denied borrow.
-5. **Always `stop()` the session,** on success and on failure.
+5. **Always `stop()` the session,** on success and on failure. If the doctor lists `sessions` you did
+   not start in this task, an earlier or cancelled task left them, each with an Agent Window open:
+   stop them with `bsk session stop <id>`.
 
 Every method, its options, and the failure codes are in [references/commands.md](references/commands.md).
 
