@@ -6,6 +6,7 @@ import {
   createTeamShutdownRequestTool,
 } from "../features/team-mode/tools/lifecycle"
 import { createTeamSendMessageTool } from "../features/team-mode/tools/messaging"
+import { createTeamReadMessagesTool } from "../features/team-mode/tools/read-messages"
 import { createTeamListTool, createTeamStatusTool } from "../features/team-mode/tools/query"
 import {
   createTeamTaskCreateTool,
@@ -57,6 +58,7 @@ export type ToolRegistryFactories = {
   createTeamRejectShutdownTool: typeof createTeamRejectShutdownTool
   createTeamShutdownRequestTool: typeof createTeamShutdownRequestTool
   createTeamSendMessageTool: typeof createTeamSendMessageTool
+  createTeamReadMessagesTool: typeof createTeamReadMessagesTool
   createTeamTaskCreateTool: typeof createTeamTaskCreateTool
   createTeamTaskGetTool: typeof createTeamTaskGetTool
   createTeamTaskListTool: typeof createTeamTaskListTool
@@ -89,6 +91,7 @@ export const defaultToolRegistryFactories: ToolRegistryFactories = {
   createTeamRejectShutdownTool,
   createTeamShutdownRequestTool,
   createTeamSendMessageTool,
+  createTeamReadMessagesTool,
   createTeamTaskCreateTool,
   createTeamTaskGetTool,
   createTeamTaskListTool,
