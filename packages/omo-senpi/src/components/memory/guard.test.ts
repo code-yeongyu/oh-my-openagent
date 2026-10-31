@@ -305,10 +305,8 @@ test("#given a link out of own memory, an unresolvable segment and dot-dot #when
   const raw = relative(setup.workspace, setup.own.identityPaths.repo) + "/link-to-other/missing/../system/persona.md"
   const result = await dispatch(setup, "vendor_read", { path: raw })
 
-  if (process.platform === "win32") {
-    expect(result).toBeUndefined()
-    return
-  }
+  // Unlike the jump/../ row above, collapsing the dot segments on Windows still leaves link-to-other
+  // pointing into the other identity, so both platforms reach the same verdict.
   expect(result).toEqual({
     block: true,
     reason: `cross-identity memory access denied: vendor_read to ${raw} belongs to another memory identity`,
