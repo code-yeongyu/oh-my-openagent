@@ -48,6 +48,10 @@ describe("isReadOnlyComputerCall", () => {
 		expect(isReadOnlyComputerCall([{ method: "ref" }, { method: "press" }])).toBe(false);
 	});
 
+	it("requires exec for selecting text in an element", () => {
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "selectText", args: ["beta"] }])).toBe(false);
+	});
+
 	it("requires exec for typing into an element", () => {
 		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "type", args: ["hello"] }])).toBe(false);
 	});

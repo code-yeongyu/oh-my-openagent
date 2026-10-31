@@ -193,6 +193,22 @@ pub struct AxClickParams {
     pub opts: Option<PointerOptions>,
 }
 
+/// `ax.selectText`: selects `text` inside the value of the element `ref`
+/// names, disambiguated by the `prefix` and `suffix` around it; `select` is
+/// `text` (the match), `start` or `end` (a caret before or after it).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AxSelectTextParams {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suffix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub select: Option<String>,
+}
+
 /// `ax.typeText`: types `text` into the element `ref` names. Only
 /// `opts.deliveryMode` is read: an omitted delivery is background (no focus
 /// change for the user); `foreground` raises the element's window under the

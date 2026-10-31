@@ -32,22 +32,22 @@ const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, s
   [
     "COMPUTER_PRELUDE_JAVASCRIPT",
     "computer.run() expects a function or code string",
-    "7737ef1e5b6304d31ed483243db644f7b180c13e79a5c8d1f9c885fa732f3190",
+    "d522d2930b3a154e24c0e91978eeaac2cb6ffe3fb4936ea34eac85c676e099ae",
   ],
   [
     "COMPUTER_PRELUDE_PYTHON",
     "Positional args with trailing Nones dropped",
-    "acf410337ec2bac4561aaa06f77a6c5af05578a352e53cbf66aec8497c0493fa",
+    "ec398998e7912f651e49b6c3fdf505f548c0f437a72377a138cdb02d956a9cec",
   ],
   [
     "COMPUTER_DECLARATIONS",
     "interface ComputerClickOptions extends ComputerDeliveryOptions",
-    "4d3861c40895d296b8a4c9cc9139e3737970f227ed5b5b8fa82c9cf0924ef640",
+    "a624d478b8dcdbbbbd5391b5fc54c120ba247b5a37489a32a8909bd93814188f",
   ],
   [
     "COMPUTER_DOCUMENTATION",
     "host desktop facade, experimental (present while the `computer` tool is active)",
-    "507ea61b73d1248e189c111e4020ff7686b4a1e52727ade8c2937eec5b714982",
+    "d98919560050b0c0ded70f8fa8e922f4fcaa46dda77e01473176937468af55c0",
   ],
   ["COMPUTER_SAFETY", "<critical>", "bd44e5231c66f4b65c9ac41f8e37234bf6ec70dea6242042ec7246b1a8658db2"],
 ]

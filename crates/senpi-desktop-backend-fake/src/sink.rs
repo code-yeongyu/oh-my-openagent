@@ -135,6 +135,11 @@ pub enum SinkOp {
         method: AxInputMethod,
         mode: DeliveryMode,
     },
+    AxSelectText {
+        node: u64,
+        start: u32,
+        length: u32,
+    },
     MenuSelect {
         window: String,
         path: Vec<String>,

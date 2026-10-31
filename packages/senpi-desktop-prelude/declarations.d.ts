@@ -204,6 +204,15 @@ interface ComputerElement {
 	 * element that never takes focus throws `BackgroundUnavailable` (`InputFailed` in the foreground) with nothing typed.
 	 */
 	type(text: string, options?: ComputerDeliveryOptions): Promise<{ method: "inserted" | "keys" }>;
+	/**
+	 * Select `text` inside this element's value without moving focus or sending keys (macOS): the match must be unique
+	 * after `prefix` and before `suffix`; `select` picks the match (default) or a caret at its start or end. The reply is
+	 * the applied selection in UTF-16 units; a following `type` replaces it.
+	 */
+	selectText(
+		text: string,
+		options?: { prefix?: string; suffix?: string; select?: "text" | "start" | "end" },
+	): Promise<{ start: number; length: number; text: string; focused: boolean }>;
 	focus(): Promise<void>;
 	parent(): Promise<ComputerElement | null>;
 	children(): Promise<ComputerElement[]>;

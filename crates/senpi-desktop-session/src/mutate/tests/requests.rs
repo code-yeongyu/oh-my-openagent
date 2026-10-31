@@ -1,5 +1,5 @@
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSetValueParams, AxTypeTextParams, ClipboardText,
+    AxClickParams, AxPerformParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams, ClipboardText,
     DragParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuSelectParams,
     PointParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
@@ -61,6 +61,20 @@ pub(crate) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
         MutatingAction::AxTypeText => Op::AxTypeText(AxTypeTextParams {
             ref_: reference, text: "hello".to_owned(), opts: None,
         }),
+        MutatingAction::AxSelectText => {
+            // The fixture's text area is empty: give it text to select, and
+            // drop that write's own audit so the sweep sees the selection's.
+            harness
+                .process(Op::AxSetValue(AxSetValueParams {
+                    ref_: reference.clone(),
+                    value: "hello".to_owned(),
+                }))
+                .expect("the value is set");
+            harness.audits.lock().clear();
+            Op::AxSelectText(AxSelectTextParams {
+                ref_: reference, text: "hello".to_owned(), prefix: None, suffix: None, select: None,
+            })
+        }
         MutatingAction::ClipboardWrite => Op::ClipboardWrite(ClipboardText { text: "hello".to_owned() }),
         MutatingAction::MenuSelect => Op::MenusSelect(MenuSelectParams {
             window_id: target, path: vec!["File".to_owned(), "Save".to_owned()], delivery_mode: None,

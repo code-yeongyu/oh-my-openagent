@@ -66,7 +66,7 @@ def _make_computer():
 
     _install(
         _Element,
-        {name: name for name in ("value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "type", "focus")},
+        {name: name for name in ("value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "type", "selectText", "focus")},
     )
 
     class _Window:

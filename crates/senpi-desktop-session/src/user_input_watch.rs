@@ -55,7 +55,8 @@ pub(crate) fn reads_or_acts_on_an_app(op: &Op) -> bool {
         | Op::AxSetValue(_)
         | Op::AxFocus(_)
         | Op::AxClick(_)
-        | Op::AxTypeText(_) => true,
+        | Op::AxTypeText(_)
+        | Op::AxSelectText(_) => true,
         Op::Displays
         | Op::Windows
         | Op::ClipboardRead

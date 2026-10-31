@@ -37,6 +37,7 @@ const CHAIN_METHOD_SNAPSHOT = [
 	"ref",
 	"screenshot",
 	"scroll",
+	"selectText",
 	"setValue",
 	"type",
 	"value",

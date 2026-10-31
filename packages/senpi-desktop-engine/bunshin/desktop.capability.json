@@ -38,6 +38,7 @@
 		"desktop.ax.focus",
 		"desktop.ax.click",
 		"desktop.ax.typeText",
+		"desktop.ax.selectText",
 		"desktop.stopPath.status",
 		"desktop.stop"
 	],
@@ -76,6 +77,7 @@
 		"desktop.ax.focus": "mutate",
 		"desktop.ax.click": "mutate",
 		"desktop.ax.typeText": "mutate",
+		"desktop.ax.selectText": "mutate",
 		"desktop.stopPath.status": "read",
 		"desktop.stop": "read"
 	},
@@ -1478,6 +1480,41 @@
 					"additionalProperties": false
 				}
 			}
+		},
+		"desktop.ax.selectText": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"prefix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"suffix": {
+					"type": [
+						"string",
+						"null"
+					]
+				},
+				"select": {
+					"type": [
+						"string",
+						"null"
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"text"
+			],
+			"description": "`ax.selectText`: selects `text` inside the value of the element `ref`\nnames, disambiguated by the `prefix` and `suffix` around it; `select` is\n`text` (the match), `start` or `end` (a caret before or after it).",
+			"additionalProperties": false
 		},
 		"desktop.stopPath.status": {
 			"type": "object",
