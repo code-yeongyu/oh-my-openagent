@@ -33,6 +33,15 @@ afterEach(async () => {
 })
 
 describe("ensureVendoredLspDaemonBuilt", () => {
+  it("#given an existing daemon dist #when setup runs #then it reports no build and does not change artifacts", async () => {
+    const built = await ensureVendoredLspDaemonBuilt({
+      packageDir: import.meta.dir,
+      exists: () => true,
+      runCommand: async () => { throw new Error("unexpected build") },
+    })
+    expect(built).toBe(false)
+  })
+
   it("#given two callers over one missing dist #when the first build is held and the second enters #then one build runs and both observe the output", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-lsp-build-lock-"))
@@ -76,10 +85,11 @@ describe("ensureVendoredLspDaemonBuilt", () => {
     await firstInstallStarted.promise
     const secondBuild = build()
     releaseFirstInstall.resolve()
-    await Promise.all([firstBuild, secondBuild])
+    const results = await Promise.all([firstBuild, secondBuild])
 
     // then
     expect(installCount).toBe(1)
+    expect(results).toEqual([true, false])
   })
 
   it("#given a waiter subscribed to a live owner #when the owner is killed #then the waiter reaps the lock and completes the build", async () => {
