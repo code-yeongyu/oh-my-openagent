@@ -196,6 +196,25 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given a bound of 0 (disabled) #when a subagent stays silent #then the watchdog never aborts or dispatches", async () => {
+    // given
+    const sessionID = "session-watchdog-disabled"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), 0)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
   it("#given a subagent produces assistant text before the threshold #when progress is observed #then the watchdog is cancelled and no fallback is dispatched", async () => {
     // given
     const sessionID = "session-makes-progress"

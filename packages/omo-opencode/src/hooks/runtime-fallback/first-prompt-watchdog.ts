@@ -196,6 +196,7 @@ export function createFirstPromptWatchdog(
   return {
     onUserMessage(sessionID, model, agent) {
       if (!sessionID) return
+      if (watchdogMs <= 0) return
       if (!subagentSessions.has(sessionID)) return
       if (armed.has(sessionID)) return
 
