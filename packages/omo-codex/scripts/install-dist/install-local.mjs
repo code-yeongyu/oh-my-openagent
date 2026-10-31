@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:fe253e422c754df7a45d9eb1d641963e0d33e6696982a665161bc4204389997b:a29a7ad7a64c3f5d7a9dc83c878b882e25be44d1e583e2f2fc829a8c533369a5
+// omo-codex-install:29544d4c256c33e3344e849215719f136236daf4f55e0e7926e6ab81679da9c5:e6a0e1f4bc0a71c96a8a651af2e16b44f3b5346e7511dfb33fbe9f8b99c9a4ed
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19689,7 +19689,8 @@ var OmoCategoryConfigObjectSchema = object({
   max_prompt_tokens: number2().int().positive().optional(),
   is_unstable_agent: boolean2().optional(),
   disable: boolean2().optional(),
-  warn_unavailable: boolean2().optional()
+  warn_unavailable: boolean2().optional(),
+  provider_lock: boolean2().optional()
 }).strict();
 var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? normalizeLegacyModelFields(value) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);

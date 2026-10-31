@@ -132,7 +132,7 @@ function firstLine(message: string): string | undefined {
   return line.length > DETAIL_MAX ? `${line.slice(0, DETAIL_MAX - 1)}…` : line
 }
 
-function resetsOf(message: string): string | undefined {
+export function resetsOf(message: string): string | undefined {
   const match = RESETS.exec(message)
   const when = withoutUnbalancedParen(match?.[2]?.trim())
   return when === undefined || when.length === 0 ? undefined : `${match?.[1] ?? ""}${when}`

@@ -595,6 +595,9 @@
           },
           "warn_unavailable": {
             "type": "boolean"
+          },
+          "provider_lock": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -3164,6 +3167,9 @@
               },
               "warn_unavailable": {
                 "type": "boolean"
+              },
+              "provider_lock": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -5518,6 +5524,9 @@
               },
               "warn_unavailable": {
                 "type": "boolean"
+              },
+              "provider_lock": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -7871,6 +7880,9 @@
                 "type": "boolean"
               },
               "warn_unavailable": {
+                "type": "boolean"
+              },
+              "provider_lock": {
                 "type": "boolean"
               }
             },
@@ -10232,6 +10244,9 @@
                 },
                 "warn_unavailable": {
                   "type": "boolean"
+                },
+                "provider_lock": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -12585,6 +12600,9 @@
                       "type": "boolean"
                     },
                     "warn_unavailable": {
+                      "type": "boolean"
+                    },
+                    "provider_lock": {
                       "type": "boolean"
                     }
                   },
@@ -14940,6 +14958,9 @@
                     },
                     "warn_unavailable": {
                       "type": "boolean"
+                    },
+                    "provider_lock": {
+                      "type": "boolean"
                     }
                   },
                   "additionalProperties": false
@@ -17293,6 +17314,9 @@
                       "type": "boolean"
                     },
                     "warn_unavailable": {
+                      "type": "boolean"
+                    },
+                    "provider_lock": {
                       "type": "boolean"
                     }
                   },
@@ -27863,6 +27887,9 @@
                 "type": "boolean"
               },
               "warn_unavailable": {
+                "type": "boolean"
+              },
+              "provider_lock": {
                 "type": "boolean"
               }
             },

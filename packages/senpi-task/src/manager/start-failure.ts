@@ -141,6 +141,8 @@ function publicMessage(
       return "The child stopped answering. Action: inspect task_output; run it again with task."
     case "suspended_unresumable":
       return "The child could not be resumed."
+    case "provider_lock_exhausted":
+      return "Every model this category is locked to is unavailable until its limit resets."
     default:
       return assertNever(kind)
   }

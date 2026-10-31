@@ -192,6 +192,14 @@ describe("sisyphus-task", () => {
       expect(high.variant).toBe("high")
     })
 
+    test("only the deep lanes ship provider-locked (#12006)", () => {
+      // when
+      const locked = Object.entries(DEFAULT_CATEGORIES).filter(([, config]) => config.provider_lock === true).map(([name]) => name)
+
+      // then
+      expect(locked.sort()).toEqual(["deep-high", "deep-low"])
+    })
+
     test("unspecified-high category uses Claude Opus 5.5 medium as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]

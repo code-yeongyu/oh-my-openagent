@@ -331,6 +331,14 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
+  test("only the deep lanes ship provider-locked (#12006)", () => {
+    // when
+    const locked = Object.entries(CATEGORY_MODEL_REQUIREMENTS).filter(([, requirement]) => requirement.providerLock === true).map(([name]) => name)
+
+    // then
+    expect(locked.sort()).toEqual(["deep-high", "deep-low"])
+  })
+
   test("the deep lanes and artistry no longer hard-require primary models", () => {
     // given
     const deepLow = CATEGORY_MODEL_REQUIREMENTS["deep-low"]

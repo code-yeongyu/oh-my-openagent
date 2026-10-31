@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 
-import { resolveCategory } from "./index"
+import { DEFAULT_CATEGORIES, resolveCategory } from "./index"
 import {
   DEEP_HIGH_CATEGORY_PROMPT_APPEND,
   DEEP_HIGH_CATEGORY_PROMPT_APPEND_GPT,
@@ -115,8 +115,13 @@ describe("category prompt append resolvers", () => {
 describe("GPT builtin defaults and gates", () => {
   it("#given the builtin definitions #then ultrabrain runs Astra max, deep-high Astra high, deep-low GPT-6.1 Sol medium, all on the chatgpt-subscription lane", () => {
     expect(definition("ultrabrain").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "max" })
-    expect(definition("deep-high").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "high" })
-    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-6.1-sol", variant: "medium" })
+    expect(definition("deep-high").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "high", provider_lock: true })
+    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-6.1-sol", variant: "medium", provider_lock: true })
+  })
+
+  it("#given every shipped default category #then only deep-low and deep-high are provider-locked (#12006)", () => {
+    const locked = Object.entries(DEFAULT_CATEGORIES).filter(([, config]) => config.provider_lock === true).map(([name]) => name)
+    expect(locked.sort()).toEqual(["deep-high", "deep-low"])
   })
 
   it("#given unspecified-high #then its default is the Opus 5.5 rung its chain now leads with, not Astra", () => {
@@ -228,6 +233,16 @@ describe("resolveCategory on GPT registries", () => {
     if (result.kind !== "resolved") throw new Error("Expected resolved")
     expect(result.category).toBe("deep-low")
     expect(result.spec).toMatchObject({ modelId: "gpt-5.6-sol", variant: "medium" })
+  })
+
+  it("#given the shipped deep-high default #when it resolves with and without a provider_lock:false override #then the default carries the lock and the override clears it (#12006)", () => {
+    const shipped = resolveCategory("deep-high", {}, astraRegistry)
+    const overridden = resolveCategory("deep-high", { categories: { "deep-high": { provider_lock: false } } }, astraRegistry)
+    const modelOnly = resolveCategory("deep-high", { categories: { "deep-high": { model: "openai/gpt-6-astra" } } }, astraRegistry)
+    if (shipped.kind !== "resolved" || overridden.kind !== "resolved" || modelOnly.kind !== "resolved") throw new Error("Expected resolved")
+    expect(shipped.config.provider_lock).toBe(true)
+    expect(overridden.config.provider_lock).toBe(false)
+    expect(modelOnly.config.provider_lock).toBe(true)
   })
 
   it("#given an omo.json prompt_append for deep-high #when it resolves on Astra #then the user overlay follows the lane append", () => {
