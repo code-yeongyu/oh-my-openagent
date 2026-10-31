@@ -1,0 +1,1 @@
+parent_assistant_messages=3 parent_tool_call_turns=2 terminal_stops=1 child_task_sessions=1
