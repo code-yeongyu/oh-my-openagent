@@ -41,8 +41,9 @@ export const OmoCategoryConfigObjectSchema = z.object({
   disable: z.boolean().optional(),
   warn_unavailable: z.boolean().optional(),
   /**
-   * Keep a delegated child on its chain's own model vendors: `true` never falls back to a parent-session model
-   * from another vendor, `false` always allows it. Unset locks a chain whose rungs are all one vendor.
+   * Opt-in: `true` keeps a delegated child on its chain's own model vendors, so it never falls back to a
+   * parent-session model from another vendor. Unset or `false` keeps the parent-model fallback. The deep
+   * categories (deep-low, deep-high) ship with it on.
    */
   provider_lock: z.boolean().optional(),
 }).strict()

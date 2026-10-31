@@ -21,8 +21,6 @@ const claudeOnly: ResolvedChildPlan = {
   requested_model: rung(CLAUDE, "primary"),
   resolved_model: rung(CLAUDE, "primary"),
   fallback_models: [],
-  // A one-vendor chain locks itself by default (#12006); this world exercises the opted-out #10750 path.
-  providerLock: false,
 }
 
 let world: ParentModelWorld | undefined
@@ -95,12 +93,12 @@ describe("a category child whose whole chain is spent runs on its parent's model
     expect(record.parent_model_fallback?.interrupted_tools).toEqual([COUNT_TOOL])
   }, 30_000)
 
-  test("#given a Claude-only chain without provider_lock #when Claude hits its usage limit #then the child never runs on the GPT parent and fails typed with the category and reset (#12006)", async () => {
+  test("#given a Claude-only chain with provider_lock true #when Claude hits its usage limit #then the child never runs on the GPT parent and fails typed with the category and reset (#12006)", async () => {
     // given
-    const { providerLock: _optOut, ...lockedByDefault } = claudeOnly
+    const locked: ResolvedChildPlan = { ...claudeOnly, providerLock: true }
 
     // when
-    const { record, world } = await runChild({ scripts: { [PRIMARY]: ["quota"] }, plan: lockedByDefault })
+    const { record, world } = await runChild({ scripts: { [PRIMARY]: ["quota"] }, plan: locked })
 
     // then
     expect(record.status).toBe("error")

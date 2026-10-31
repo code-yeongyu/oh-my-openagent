@@ -38,7 +38,7 @@ export const CategoryConfigSchema = z.object({
   disable: z.boolean().optional(),
   /** Suppress the warning shown when this category's model is unavailable. Mirrors omo-config-core. */
   warn_unavailable: z.boolean().optional(),
-  /** Keep a delegated child on its chain's own model vendors. Mirrors omo-config-core; enforced by the Senpi task engine. */
+  /** Opt-in: keep a delegated child on its chain's own model vendors; the deep categories ship with it on. Mirrors omo-config-core; enforced by the Senpi task engine. */
   provider_lock: z.boolean().optional(),
 })
 

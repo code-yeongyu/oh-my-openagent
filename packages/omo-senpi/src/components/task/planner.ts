@@ -80,10 +80,8 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = toPlanResolution(categoryName, resolveCategory(categoryName, omoConfig, registry), availableAgents)
-    const providerLock = omoConfig.categories?.[categoryName]?.provider_lock
-    if (resolution.kind !== "resolved" || providerLock === undefined) return resolution
-    return { kind: "resolved", plan: { ...resolution.plan, providerLock } }
+    const resolution = resolveCategory(categoryName, omoConfig, registry)
+    return toPlanResolution(categoryName, resolution, availableAgents)
   }
   return (spec): PlanResolution => {
     const resolution = planChild(spec)
@@ -224,6 +222,8 @@ function toPlanResolution(
         ...(appliedVariant !== undefined ? { variant: appliedVariant } : {}),
         category: resolution.category,
         ...(resolution.spec.prompt_append !== undefined && { promptAppend: resolution.spec.prompt_append }),
+        // The shipped default merged with omo.json, so deep-low/deep-high stay locked unless a user sets false (#12006).
+        ...(resolution.config.provider_lock !== undefined && { providerLock: resolution.config.provider_lock }),
       },
     }
   }

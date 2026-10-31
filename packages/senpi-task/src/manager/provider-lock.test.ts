@@ -53,10 +53,10 @@ function modelsVisitedWhenEveryRungIsLimited(record: TaskRecord): readonly strin
   }
 }
 
-describe("a vendor-confined category never inherits a cross-vendor parent model (#12006)", () => {
-  test("#given an all-OpenAI chain and a Claude parent #when every rung hits its usage limit #then the child never runs on the parent's model", () => {
+describe("a provider-locked category never inherits a cross-vendor parent model (#12006)", () => {
+  test("#given an all-OpenAI chain with provider_lock true and a Claude parent #when every rung hits its usage limit #then the child never runs on the parent's model", () => {
     // given
-    const routed = withParentModelRung(plan([ASTRA, ASTRA_API, SOL]), spec(OPUS.display))
+    const routed = withParentModelRung(plan([ASTRA, ASTRA_API, SOL], true), spec(OPUS.display))
 
     // when
     const visited = modelsVisitedWhenEveryRungIsLimited(recordOf(routed.plan, routed.parentModel, routed.providerLock))
@@ -67,9 +67,19 @@ describe("a vendor-confined category never inherits a cross-vendor parent model 
     expect(routed.providerLock).toBe("openai")
   })
 
-  test("#given an all-OpenAI chain and a GPT parent outside the chain #when routed #then the same-vendor parent rung is still appended", () => {
+  test("#given an all-OpenAI chain without provider_lock and a Claude parent #when routed #then the #10750 parent rung is appended as before", () => {
     // when
-    const routed = withParentModelRung(plan([ASTRA]), spec("openai/gpt-6.1-sol"))
+    const routed = withParentModelRung(plan([ASTRA, SOL]), spec(OPUS.display))
+
+    // then
+    expect(routed.plan.fallback_models?.map((model) => model.display)).toEqual([SOL.display, OPUS.display])
+    expect(routed.parentModel).toBe(OPUS.display)
+    expect(routed.providerLock).toBeUndefined()
+  })
+
+  test("#given an all-OpenAI chain with provider_lock true and a GPT parent outside the chain #when routed #then the same-vendor parent rung is still appended", () => {
+    // when
+    const routed = withParentModelRung(plan([ASTRA], true), spec("openai/gpt-6.1-sol"))
 
     // then
     expect(routed.plan.fallback_models?.map((model) => model.display)).toEqual(["openai/gpt-6.1-sol"])

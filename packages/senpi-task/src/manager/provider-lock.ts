@@ -26,16 +26,15 @@ export function vendorFamily(model: ModelRef): string {
 
 /**
  * The vendor families a category child is confined to when the parent session's model falls outside them, or
- * `undefined` when the parent rung may be added (#12006). A chain of one family is confined by default, so a
- * lane such as deep-high never finishes on another vendor's model; `provider_lock: true` confines a mixed
- * chain to its own families, and `provider_lock: false` restores the #10750 parent rung for a one-family chain.
+ * `undefined` when the parent rung may be added (#12006). The lock is opt-in: only a category with
+ * `provider_lock: true` (the shipped deep-low and deep-high carry it) is confined to its chain's own vendors;
+ * every other chain, one-vendor or mixed, keeps the #10750 parent-model rung.
  */
 export function parentRungLock(plan: ResolvedChildPlan, parent: ModelRef): string | undefined {
-  if (plan.providerLock === false) return undefined
+  if (plan.providerLock !== true) return undefined
   const chain = [plan.resolved_model, plan.requested_model, ...(plan.fallback_models ?? [])]
   const families = new Set(chain.flatMap((rung) => rung === undefined ? [] : [vendorFamily(rung)]))
-  const confined = plan.providerLock === true || families.size === 1
-  if (!confined || families.has(vendorFamily(parent))) return undefined
+  if (families.has(vendorFamily(parent))) return undefined
   return [...families].sort().join(", ")
 }
 
