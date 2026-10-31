@@ -212,6 +212,7 @@ async function main() {
   }
   writeEvidenceMaybe(outDir, capture, payload)
   console.log(JSON.stringify(payload))
+  if (result === "FAIL") process.exitCode = 1
 }
 
 function writeEvidenceMaybe(outDir, capture, payload) {
