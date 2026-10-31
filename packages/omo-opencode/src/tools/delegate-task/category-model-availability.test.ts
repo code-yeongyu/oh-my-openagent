@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { validatePluginConfig } from "../../config/validate"
 import { loadOmoConfig, resolveModelReferences } from "@oh-my-opencode/omo-config-core"
@@ -69,7 +70,7 @@ describe("category canonical model availability", () => {
       ["agent", false], ["agent", true], ["category", false], ["category", true],
     ] as const) {
       test(`real ${runtime} ${catalog ? "catalog" : "literal"} config preserves ${target} distribution through materialization`, async () => {
-        const home = mkdtempSync("/home/yeongyu/omo-runs/acct-vis/distribution-config-")
+        const home = mkdtempSync(join(tmpdir(), "distribution-config-"))
         try {
           mkdirSync(join(home, ".omo"))
           mkdirSync(join(home, "project"))
