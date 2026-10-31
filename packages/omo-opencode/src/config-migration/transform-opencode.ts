@@ -30,12 +30,21 @@ function transformLegacyKeys(value: Readonly<Record<string, unknown>>): Record<s
   )
 }
 
+function unimportedKeyDiagnostics(value: Readonly<Record<string, unknown>>): readonly string[] {
+  const config = withoutLegacyMetadata(value)
+  return Object.keys(config)
+    .filter((key) => key !== "omo_agent" && !MIGRATED_OPENCODE_FIELDS.has(key))
+    .map((key) => `not imported: ${key}`)
+}
+
 function loadedConfigs(
   discovered: readonly DiscoveredLegacyConfigSource[],
   sources: readonly LoadedLegacyConfigSource[],
-): readonly LoadedConfig[] {
+): { readonly configs: readonly LoadedConfig[]; readonly diagnostics: readonly string[] } {
   const metadataByPath = new Map(discovered.map((source) => [source.path, source]))
   const configs: LoadedConfig[] = []
+  const diagnostics: string[] = []
+  const reported = new Set<string>()
   for (const source of sources) {
     const metadata = metadataByPath.get(source.path)
     if (metadata === undefined || !isPlainRecord(source.value) || metadata.kind === "migration-sidecar") continue
@@ -43,8 +52,13 @@ function loadedConfigs(
       metadata,
       value: transformLegacyKeys(source.value),
     })
+    for (const diagnostic of unimportedKeyDiagnostics(source.value)) {
+      if (reported.has(diagnostic)) continue
+      reported.add(diagnostic)
+      diagnostics.push(diagnostic)
+    }
   }
-  return configs
+  return { configs, diagnostics }
 }
 
 function mergedConfigs(configs: readonly LoadedConfig[]): Record<string, unknown> {
@@ -58,10 +72,11 @@ function documentWithHistory(
   profiles: Record<string, unknown>,
   discovered: readonly DiscoveredLegacyConfigSource[],
   sources: readonly LoadedLegacyConfigSource[],
+  diagnostics: readonly string[],
 ): ConfigMigrationTransformResult {
   const history = legacyMigrationHistory(discovered, sources)
   return {
-    diagnostics: [],
+    diagnostics,
     document: {
       $schema: OMO_SCHEMA_URL,
       ...(Object.keys(opencode).length === 0 ? {} : { "[opencode]": opencode }),
@@ -75,7 +90,8 @@ function transformUserSources(
   discovered: readonly DiscoveredLegacyConfigSource[],
   sources: readonly LoadedLegacyConfigSource[],
 ): ConfigMigrationTransformResult {
-  const configs = loadedConfigs(discovered, sources)
+  const userDiscovered = discovered.filter((source) => source.projectRoot === undefined)
+  const { configs, diagnostics } = loadedConfigs(userDiscovered, sources)
   const rootConfigs = configs.filter((config) => config.metadata.kind === "user-config")
   const rootByDirectory = new Map<string, Record<string, unknown>>()
   for (const root of new Set(rootConfigs.map((config) => config.metadata.baseRoot))) {
@@ -93,7 +109,7 @@ function transformUserSources(
     const difference = mergedConfigs(differences)
     if (Object.keys(difference).length > 0) profiles[profile] = { "[opencode]": difference }
   }
-  return documentWithHistory(mergedConfigs(rootConfigs), profiles, discovered.filter((source) => source.projectRoot === undefined), sources)
+  return documentWithHistory(mergedConfigs(rootConfigs), profiles, userDiscovered, sources, diagnostics)
 }
 
 function transformProjectSources(
@@ -101,8 +117,8 @@ function transformProjectSources(
   projectRoot: string,
 ): ConfigMigrationTransformResult {
   const discovered = input.discovered.filter((source) => source.projectRoot === projectRoot)
-  const configs = loadedConfigs(discovered, input.sources)
-  return documentWithHistory(mergedConfigs(configs), {}, discovered, input.sources)
+  const { configs, diagnostics } = loadedConfigs(discovered, input.sources)
+  return documentWithHistory(mergedConfigs(configs), {}, discovered, input.sources, diagnostics)
 }
 
 export function transformOpenCodeSources(input: TransformOpenCodeSourcesInput): ConfigMigrationTransformResult {
