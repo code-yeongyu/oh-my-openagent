@@ -2,6 +2,7 @@ import { join } from "node:path"
 
 import { isEngineCommand } from "./bin/lib/engine-commands.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
+import { serviceAccountsOpen } from "../omo-opencode/src/cli/service-auth/accounts-gate"
 
 /**
  * How the compiled binary reads its own argv before it hands the argv to the engine. Only the
@@ -21,6 +22,9 @@ export function launchOptions(args: readonly string[]): readonly string[] {
 export function trustLaunchKind(args: readonly string[]): "static" | "long-lived" | "short-host-cli" | "one-shot-network" {
   if (args.length === 1 && ["--version", "-v", "--help"].includes(args[0] ?? "")) return "static"
   if (isSelfUpdate(args) && updateUsageAnswer(args) !== undefined) return "static"
+  // While accounts are closed, every login/logout/whoami argv refuses from the build switch alone and
+  // opens no connection: a static answer, the way update usage is static beside the network `update`.
+  if (!serviceAccountsOpen() && ["login", "logout", "whoami"].includes(args[0] ?? "")) return "static"
   const options = launchOptions(args)
   if (["thread", "daemon"].includes(options[0] ?? "")
     || (options[0] === "host" && ["ensure", "status", "stop", "handoff"].includes(options[1] ?? ""))) return "short-host-cli"

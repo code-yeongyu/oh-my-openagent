@@ -32,7 +32,7 @@ import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine, loadCompil
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
-import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
+import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
 import { runSyncCommand } from "./sync-cli"
@@ -318,8 +318,8 @@ async function main(): Promise<void> {
       console.log(STATIC_HELP)
       return
     }
-    if ((args.length === 1 && ["--version", "-v"].includes(args[0] ?? ""))
-      || (isSelfUpdate(args) && updateUsageAnswer(args) !== undefined)) {
+    // Design 5.2 step 3: a static answer never reaches the trust stage.
+    if (trustLaunchKind(args) === "static") {
       await runCompiledLauncher(args, execDir)
       return
     }
@@ -355,9 +355,9 @@ async function main(): Promise<void> {
     console.log(STATIC_HELP)
     return
   }
-  if ((args.length === 1 && ["--version", "-v"].includes(args[0] ?? ""))
-    || (isSelfUpdate(args) && updateUsageAnswer(args) !== undefined)) {
-    answerCompiledFastPath(args, manifest)
+  // Design 5.2 step 3: a static answer never reaches the trust stage; the rest is a closed account command.
+  if (trustLaunchKind(args) === "static") {
+    if (!answerCompiledFastPath(args, manifest)) await runServiceAuthCommand(args)
     return
   }
   const helperPath = resolveEngineTrustHelperPath({ OMO_PACKAGE_DIR: dirname(expected) })

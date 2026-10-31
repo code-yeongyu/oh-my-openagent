@@ -74,12 +74,23 @@ test.each([
   [["--help"], "static"], [["--version"], "static"], [["-v"], "static"],
   [["update", "--help"], "static"], [["host", "status"], "short-host-cli"],
   [["thread", "list"], "short-host-cli"], [["daemon", "run"], "short-host-cli"],
-  [["login"], "one-shot-network"], [["update"], "one-shot-network"],
+  [["login"], "static"], [["whoami", "--help"], "static"], [["logout"], "static"], [["update"], "one-shot-network"],
   [["doctor"], "one-shot-network"], [["-p"], "one-shot-network"],
   [["--mode", "json"], "one-shot-network"], [["--mode", "rpc"], "long-lived"],
   [["--", "-p"], "long-lived"], [[], "long-lived"],
 ] as const)("launch kind %j is %s", (args, expected) => {
   expect(trustLaunchKind(args)).toBe(expected)
+})
+
+// Fail closed: the closed-account answer is static only while the build switch refuses it.
+test("an account command that can sign in is a one-shot network launch", () => {
+  const open = Symbol.for("omo.test.serviceAccountsOpen")
+  Object.assign(globalThis, { [open]: true })
+  try {
+    expect(["login", "logout", "whoami"].map((command) => trustLaunchKind([command]))).toEqual(Array(3).fill("one-shot-network"))
+  } finally {
+    delete (globalThis as Record<symbol, unknown>)[open]
+  }
 })
 
 test("static commands never acquire, execute, or create trust storage", async () => {
