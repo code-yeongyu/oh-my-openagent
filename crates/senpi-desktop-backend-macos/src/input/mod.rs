@@ -6,6 +6,7 @@ mod background;
 mod canary;
 mod cgevent;
 mod chord;
+mod drag_pasteboard;
 mod element;
 mod global;
 mod guard;
@@ -28,7 +29,8 @@ mod element_tests;
 mod live;
 
 use core_graphics::event_source::CGEventSource;
-use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
+use senpi_desktop_core::backend::{DeliveryMode, MouseButton, PointerEvent};
+use senpi_desktop_core::drag_guard::{refuse_drag_source, LeftPress};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::types::{DesktopWindow, Target};
@@ -138,6 +140,10 @@ impl MacInput {
                             guard::pointer_kind(&event),
                             guard::pointer_button(&event),
                         )?;
+                        if let Some(start) = drag_start(&event) {
+                            let press = LeftPress { kind: "drag", window: &window, start };
+                            refuse_drag_source(press, |x, y| crate::ax::role_at(pid, wid, x, y))?;
+                        }
                         if !window.focused {
                             skylight::activate_without_raise(pid, wid)?;
                             this.last_activated = Some((pid, wid));
@@ -261,6 +267,21 @@ impl MacInput {
         }
     }
 
+}
+
+/// The start point of a left-button drag, the gesture that can pick up an
+/// item for drag and drop; other gestures pay no hit-test.
+fn drag_start(event: &PointerEvent) -> Option<(f64, f64)> {
+    match event {
+        PointerEvent::Drag {
+            path,
+            button: MouseButton::Left,
+            ..
+        } => path.first().copied(),
+        PointerEvent::Drag { .. } | PointerEvent::Click { .. } | PointerEvent::Move { .. } | PointerEvent::Scroll { .. } => {
+            None
+        }
+    }
 }
 
 fn resolve_window(capture: &MacCapture, id: &str) -> CoreResult<DesktopWindow> {

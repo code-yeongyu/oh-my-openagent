@@ -31,6 +31,8 @@ pub struct FakeBackend {
     pub(crate) legacy_capture: bool,
     pub(crate) ax_tree: AxTree,
     pub(crate) ax_owner_unknown: bool,
+    pub(crate) drag_guard: bool,
+    pub(crate) drag_picks_up: Vec<String>,
     pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
     pub(crate) context_menus: BTreeMap<String, Vec<FakeMenuNode>>,
     /// The window whose scripted context menu a press left open.
@@ -62,6 +64,8 @@ impl FakeBackend {
             user_input_feed: scenario.user_input_feed,
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
+            drag_guard: scenario.drag_guard,
+            drag_picks_up: scenario.drag_picks_up,
             menus: scenario.menus,
             context_menus: scenario.context_menus,
             open_menu: None,

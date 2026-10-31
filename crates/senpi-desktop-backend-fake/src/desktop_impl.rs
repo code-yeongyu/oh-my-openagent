@@ -8,6 +8,7 @@ use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
 };
 
+use crate::drag_guard_impl::Guarded;
 use crate::fake::FakeBackend;
 use crate::method::FakeMethod;
 use crate::sink::{RecordedPointer, SinkOp};
@@ -76,6 +77,10 @@ impl Backend for FakeBackend {
         };
         self.begin(method)?;
         self.input_gate(target, mode)?;
+        let (ev, picked_up) = match self.guard_drag(target, ev, mode)? {
+            Guarded::Deliver(ev) => (ev, None),
+            Guarded::PickedUp { recorded, error } => (recorded, Some(error)),
+        };
         if matches!(ev, PointerEvent::Click { .. } | PointerEvent::Drag { .. }) {
             self.press_check(method)?;
         }
@@ -89,7 +94,7 @@ impl Backend for FakeBackend {
             event,
             mode,
         });
-        Ok(())
+        picked_up.map_or(Ok(()), Err)
     }
 
     fn pointer_menu(
