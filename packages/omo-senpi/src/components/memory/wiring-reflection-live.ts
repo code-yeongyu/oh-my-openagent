@@ -124,6 +124,8 @@ export function createMemoryReflectionLiveWiring(
     },
     async bind(pi, sessionId, identity, eventCtx, requestPressureDream): Promise<void> {
       const ui = readUi(eventCtx)
+      // The engine emits transitions only; a failure may have started before this session became active.
+      await syncNotifier?.changed(identity.identityPaths.repo, ui)
       const api = createReflectionCompletionApi(pi)
       liveSession.current = api === undefined
         ? undefined
