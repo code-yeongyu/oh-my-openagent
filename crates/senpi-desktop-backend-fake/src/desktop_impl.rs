@@ -111,6 +111,9 @@ impl Backend for FakeBackend {
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::TypeText)?;
         self.input_gate(target, mode)?;
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
         self.press_check(FakeMethod::TypeText)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::TypeText {
@@ -144,6 +147,11 @@ impl Backend for FakeBackend {
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
+        // The whole text is admitted before any chunk goes out, as the macOS
+        // port maps every character before posting.
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
         let mut start = 0;
         for end in text
             .char_indices()

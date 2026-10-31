@@ -61,6 +61,9 @@ pub struct FakeScenario {
     /// Marks every capture's frame geometry `legacyCapture` (B9 fallback
     /// shape), so the wire carries the flag.
     pub legacy_capture: bool,
+    /// Processes (by pid) whose windows show a remote screen, and how the
+    /// client forwards input (plan todo 22).
+    pub remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
 }
 
 impl Default for FakeScenario {
@@ -84,6 +87,7 @@ impl Default for FakeScenario {
             user_presses: Vec::new(),
             ax_cannot_complete: Vec::new(),
             legacy_capture: false,
+            remote_screens: BTreeMap::new(),
         }
     }
 }
@@ -217,6 +221,8 @@ struct RawScenario {
     ax_cannot_complete: Vec<AxWrite>,
     #[serde(default)]
     legacy_capture: bool,
+    #[serde(default)]
+    remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -254,6 +260,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             user_input_feed: raw.user_input_feed,
             ax_cannot_complete: raw.ax_cannot_complete,
             legacy_capture: raw.legacy_capture,
+            remote_screens: raw.remote_screens,
         })
     }
 }
