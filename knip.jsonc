@@ -1301,8 +1301,6 @@
       "packages/omo-senpi/src/components/telemetry/omo-native-summary-wiring.ts": ["loadSummaryRuntime"],
       // pre-existing at origin dev 4686e425b5: unused export(s) DEAD_PID
       "packages/omo-senpi/src/components/telemetry/optout-purge.test-support.ts": ["DEAD_PID"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) toWireValue
-      "packages/omo-senpi/src/components/telemetry/semconv-map.ts": ["toWireValue"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readJson
       "packages/omo-senpi/src/components/telemetry/session-summary-files.ts": ["readJson"],
       // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_ROLLUP_REMOVE_LIMIT
