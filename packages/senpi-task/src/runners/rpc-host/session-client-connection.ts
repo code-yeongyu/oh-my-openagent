@@ -166,20 +166,29 @@ export class HostSessionClient {
   }
 
   /** End the session on the host (`close_session`), then drop this child's connection. */
-  async close(): Promise<void> {
+  async close(): Promise<boolean> {
     this.extensionEvents.clear()
     const client = this.client
     const routingId = this.routingId
     // Keep the transport reachable by detach() while close_session is in flight. A bounded
     // handle teardown can give up waiting for its acknowledgement and must still release it.
     this.routingId = undefined
-    if (client === undefined) return
+    if (client === undefined) return false
+    let answered = false
     try {
-      if (routingId !== undefined) await client.closeSession(routingId)
+      if (routingId !== undefined) {
+        await client.closeSession(routingId)
+        answered = true
+      }
     } finally {
       if (this.client === client) this.client = undefined
-      await client.stop()
+      // A stop failure after the host answered must not erase that answer (omo#11765).
+      await client.stop().catch((error: unknown) => {
+        if (!answered) throw error
+        log("senpi-task host session client stop failed after an answered close", { socket: this.socketPath, error: String(error) })
+      })
     }
+    return answered
   }
 
   /** Only a live post-close host listing releases ownership; ACKs and frames are not proof. */

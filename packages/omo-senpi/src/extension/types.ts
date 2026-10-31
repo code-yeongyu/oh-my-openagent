@@ -29,6 +29,13 @@ export interface SettleObserver {
 /** Figures for one section of senpi's on-demand memory report. */
 export type MemoryReporter = () => Readonly<Record<string, number>>
 
+/** Structural transport capability; absent on internal calls and older hosts. */
+export interface ExtensionRpcRequestContext {
+  readonly ownerId: string
+  readonly disconnectSignal: AbortSignal
+  readonly admit: <T>(dispatch: () => T) => T
+}
+
 export interface SenpiExtensionAPI {
   readonly sessionKind?: "interactive" | "worker"
   /**
@@ -51,7 +58,7 @@ export interface SenpiExtensionAPI {
   ): void
   rpc?: {
     emit(name: string, data: unknown): void
-    handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
+    handle?(name: string, handler: (data: unknown, context?: ExtensionRpcRequestContext) => unknown | Promise<unknown>): void
   }
   events?: {
     emit(name: string, data: unknown): void

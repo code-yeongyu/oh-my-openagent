@@ -276,6 +276,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
       destroyResidentTask: (taskId, cause) =>
         lifecycle.destroyResidentTask(taskId, cause),
       parkTerminalResident: (taskId) => lifecycle.parkTerminalResident(taskId),
+      ...(lifecycle.hostSessionCancel === undefined ? {} : { hostSessionCancel: lifecycle.hostSessionCancel }),
     },
     admit: (parentSessionId) => admitAdapter(lifecycle, parentSessionId),
     trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({

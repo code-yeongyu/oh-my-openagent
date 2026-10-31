@@ -33,6 +33,10 @@ export function disposeScopedRetries(context: LifecycleContext): void {
   disposedContexts.add(context)
 }
 
+export function retriesDisposed(context: LifecycleContext): boolean {
+  return disposedContexts.has(context)
+}
+
 export function retriesStopped(context: LifecycleContext, parentSessionId: string): boolean {
   return disposedContexts.has(context) || stoppedSessions.get(context)?.has(parentSessionId) === true
 }

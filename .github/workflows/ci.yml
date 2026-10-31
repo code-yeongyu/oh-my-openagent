@@ -1199,6 +1199,14 @@ jobs:
           rustup default "$toolchain"
           rustup target add ${{ matrix.rust-target }}
           cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}
+          # build-omo-binary.ts stages the engine trust helper on Darwin and Windows (omo#10762); its own call, as release builds it.
+          cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}
+
+      # build-omo-binary embeds the keychain helper into darwin binaries (#11262); the release lane
+      # signs it, this parity leg embeds an unsigned build.
+      - name: Build the keychain helper the binary embeds
+        if: needs.ci-mode.outputs.run_heavy == 'true' && startsWith(matrix.target, 'darwin-')
+        run: bun packages/omo-native/keychain-helper/build.ts --out packages/omo-native/bin/darwin/omo-keychain
 
       - name: Build the standalone binary and the npm launcher payload
         if: needs.ci-mode.outputs.run_heavy == 'true'
