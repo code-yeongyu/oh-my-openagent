@@ -297,5 +297,6 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     for (const entry of ALLOWLIST) {
       expect(entry.reason.trim().length > 0, "allowlist entry without a reason: " + entry.file).toBe(true)
     }
-  })
+    // The whole-tree scan takes ~10 s; the preload's 20 s default reaches only the first file of a multi-file run.
+  }, 60_000)
 })
