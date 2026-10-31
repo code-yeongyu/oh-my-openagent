@@ -22,10 +22,11 @@ permissions:
   contents: read
 
 jobs:
-  # A stable, unconditional context that dev's required checks can enforce even
-  # when the rest of CI takes a docs/web/release fast path.
+  # A stable context that dev's required checks can enforce even when the rest of CI takes a docs/web/release fast
+  # path. Pull requests are gated like ci-mode below (#11868).
   lint-ratchet:
     name: Lint ratchet
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/') || contains(github.event.pull_request.labels.*.name, 'run-full-ci') || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
@@ -57,7 +58,12 @@ jobs:
           JOB_SUMMARY_NEXT: Fix new findings; when removing existing debt, lower the baseline in the same change.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  # Merges are decided on a local whole-suite receipt, so hosted CI runs on a pull request only when it carries
+  # run-full-ci or ci:full-matrix, or is a release-state PR (release/* head), whose own run publish.yml reuses at the
+  # prepared SHA (#9759, #11868). Every other CI job needs ci-mode, so skipping it skips them. A skipped matrix job
+  # reports no expanded context, so the required matrix checks stay expected instead of passing as skipped.
   ci-mode:
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/') || contains(github.event.pull_request.labels.*.name, 'run-full-ci') || contains(github.event.pull_request.labels.*.name, 'ci:full-matrix')
     runs-on: ubuntu-26.04
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
@@ -500,7 +506,7 @@ jobs:
   macos-test-1-status:
     name: test
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && needs.ci-mode.result != 'skipped' }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -525,7 +531,7 @@ jobs:
   macos-test-2-status:
     name: test
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && needs.ci-mode.result != 'skipped' }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -550,7 +556,7 @@ jobs:
   macos-codex-status:
     name: codex-compatibility
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && needs.ci-mode.result != 'skipped' }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -575,7 +581,7 @@ jobs:
   macos-senpi-status:
     name: senpi-compatibility
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && needs.ci-mode.result != 'skipped' }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:

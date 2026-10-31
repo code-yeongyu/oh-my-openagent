@@ -169,7 +169,7 @@ describe("CI fast-path workflow wiring", () => {
       if (!isRecord(job)) throw new Error(`CI must define ${id}`)
       const name = String(job["name"] ?? id)
       if (id.startsWith("macos-")) {
-        expect(job["if"]).toBe("${{ always() && !cancelled() }}")
+        expect(job["if"]).toBe("${{ always() && !cancelled() && needs.ci-mode.result != 'skipped' }}")
       } else {
         expect(job["if"]).toBeUndefined()
       }
