@@ -27,7 +27,7 @@ afterEach(cleanupReconciliationFixtures)
 
 async function writeActiveLauncherIdentity(
   item: Awaited<ReturnType<typeof fixture>>,
-  fields: { readonly launcherMachineId?: string; readonly launcherHostname?: string },
+  fields: { readonly launcherMachineHash?: string; readonly launcherHostname?: string },
 ): Promise<void> {
   const activePath = join(item.identity.paths.reflection, "active.lock")
   const active = JSON.parse(await readFile(activePath, "utf8"))
@@ -337,14 +337,14 @@ describe("reflection and dream run reconciliation", () => {
     // given
     const item = await fixture()
     await rmEfaultTolerant(item.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
-    await writeActiveLauncherIdentity(item, { launcherMachineId: "machine-a", launcherHostname: "fixture-host" })
+    await writeActiveLauncherIdentity(item, { launcherMachineHash: "machine-a", launcherHostname: "fixture-host" })
 
     // when
     const results = await reconcileReflectionRuns({
       identity: item.identity,
       reservation: item.store,
       hostname: () => "fixture-host",
-      machineId: async () => "machine-b",
+      machineHash: async () => "machine-b",
       now: () => Date.parse("2026-08-10T00:01:01.001Z"),
       getPidLiveness: () => "dead",
     })
@@ -358,14 +358,14 @@ describe("reflection and dream run reconciliation", () => {
     // given
     const item = await fixture()
     await rmEfaultTolerant(item.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
-    await writeActiveLauncherIdentity(item, { launcherMachineId: "machine-a", launcherHostname: "other-host" })
+    await writeActiveLauncherIdentity(item, { launcherMachineHash: "machine-a", launcherHostname: "other-host" })
 
     // when
     const results = await reconcileReflectionRuns({
       identity: item.identity,
       reservation: item.store,
       hostname: () => "fixture-host",
-      machineId: async () => "machine-a",
+      machineHash: async () => "machine-a",
       now: () => Date.parse("2026-08-10T00:01:01.001Z"),
       getPidLiveness: () => "dead",
     })

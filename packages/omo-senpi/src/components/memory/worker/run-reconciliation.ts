@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import {
   LockContentionError,
-  readCurrentMachineId,
+  readCurrentMachineHash,
   type MemoryIdentity,
   type ProcessLiveness,
   type ReservedRun,
@@ -43,7 +43,7 @@ export interface ReflectionRunReconciliationOptions {
   readonly launch?: (run: ReservedRun) => void
   readonly now?: () => number
   readonly hostname?: () => string
-  readonly machineId?: () => Promise<string | null>
+  readonly machineHash?: () => Promise<string | null>
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
   readonly waitForOutcome?: (path: string, deadlineAt: number, signal?: AbortSignal) => Promise<SentinelWaitResult>
@@ -57,7 +57,7 @@ export interface ReflectionRunReconciliationOptions {
   readonly warn?: ReceiptWarn
 }
 
-export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname" | "machineId">>
+export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname" | "machineHash">>
   & ReflectionRunReconciliationOptions
 
 export async function reconcileReflectionRuns(
@@ -67,7 +67,7 @@ export async function reconcileReflectionRuns(
     ...options,
     now: options.now ?? Date.now,
     hostname: options.hostname ?? readHostname,
-    machineId: options.machineId ?? readCurrentMachineId,
+    machineHash: options.machineHash ?? readCurrentMachineHash,
   }
   try {
     context.signal?.throwIfAborted()

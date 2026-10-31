@@ -51,7 +51,7 @@ export interface ReservedRun {
   readonly reservedAt?: string
   readonly launcherPid?: number
   readonly launcherHostname?: string
-  readonly launcherMachineId?: string
+  readonly launcherMachineHash?: string
   readonly launcherProcessStart?: string | null
 }
 

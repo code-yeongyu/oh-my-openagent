@@ -36,9 +36,9 @@ async function holderIsForeign(context: ReconcileContext, active: ReservedRun): 
   if (active.launcherHostname === undefined) return true
   const verdict = await classifyHostIdentity({
     recordedHostname: active.launcherHostname,
-    recordedMachineId: active.launcherMachineId,
+    recordedMachineHash: active.launcherMachineHash,
     currentHostname: context.hostname(),
-    currentMachineId: context.machineId,
+    currentMachineHash: context.machineHash,
   })
   return verdict.state === "foreign"
 }

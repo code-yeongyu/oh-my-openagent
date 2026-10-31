@@ -12,6 +12,7 @@ import {
   createReflectionWorktree,
   type LockRecord,
   type MemoryIdentity,
+  type ReflectionLauncherIdentity,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
@@ -28,7 +29,10 @@ export async function cleanupReconciliationFixtures(): Promise<void> {
   ))
 }
 
-export async function reconciliationFixture(trigger: "step-count" | "dream" = "step-count") {
+export async function reconciliationFixture(
+  trigger: "step-count" | "dream" = "step-count",
+  launcherIdentity: () => Promise<ReflectionLauncherIdentity> = async () => ({ pid: 111, hostname: "fixture-host", processStart: "launcher-start" }),
+) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reconcile-")))
   roots.push(root)
   const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
@@ -45,7 +49,7 @@ export async function reconciliationFixture(trigger: "step-count" | "dream" = "s
     getJournal: async () => journal,
     createRunId: () => "run-orphan",
     now: () => new Date("2026-08-10T00:00:00.000Z"),
-    launcherIdentity: async () => ({ pid: 111, hostname: "fixture-host", processStart: "launcher-start" }),
+    launcherIdentity,
   })
   const snapshot = await journal.captureReflectionSnapshot()
   if (snapshot === null) throw new Error("expected snapshot")

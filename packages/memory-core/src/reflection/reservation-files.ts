@@ -4,14 +4,14 @@ import { dirname, join } from "node:path"
 
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from "../fs/resilient"
 import { getProcessStartIdentity } from "../locks"
-import { readCurrentMachineId } from "./host-identity"
+import { readCurrentMachineHash } from "./host-identity"
 import type { ReflectionRequest, ReservedRun } from "./machine"
 
 export interface ReflectionLauncherIdentity {
   readonly pid: number
   readonly hostname: string
   readonly processStart: string | null
-  readonly machineId?: string | null
+  readonly machineHash?: string | null
 }
 
 export async function readRun(path: string): Promise<ReservedRun | null> {
@@ -73,12 +73,14 @@ export async function writeOptionalRun(path: string, run: ReservedRun | undefine
   await writeJsonAtomic(path, run)
 }
 
-export async function currentLauncherIdentity(): Promise<ReflectionLauncherIdentity> {
+export async function currentLauncherIdentity(
+  readMachineHash: () => Promise<string | null> = readCurrentMachineHash,
+): Promise<ReflectionLauncherIdentity> {
   return {
     pid: process.pid,
     hostname: hostname(),
     processStart: await getProcessStartIdentity(process.pid),
-    machineId: await readCurrentMachineId(),
+    machineHash: await readMachineHash(),
   }
 }
 

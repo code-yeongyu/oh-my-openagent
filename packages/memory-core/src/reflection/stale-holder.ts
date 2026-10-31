@@ -11,7 +11,7 @@ import { join } from "node:path"
 
 import { readFile } from "../fs/resilient"
 import { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable, type ProcessLiveness } from "../locks/process-identity"
-import { classifyHostIdentity, readCurrentMachineId } from "./host-identity"
+import { classifyHostIdentity, readCurrentMachineHash } from "./host-identity"
 
 export type ReflectionLockVerdict =
   | { readonly state: "none" }
@@ -22,7 +22,7 @@ export type ReflectionLockVerdict =
 export interface ReflectionLockProbe {
   readonly readText?: (path: string) => Promise<string>
   readonly hostname?: () => string
-  readonly machineId?: () => Promise<string | null>
+  readonly machineHash?: () => Promise<string | null>
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
 }
@@ -98,13 +98,13 @@ export async function classifyReflectionLockHolder(
   const runId = typeof fields.runId === "string" ? fields.runId : "unknown"
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
-  const launcherMachineId = typeof fields.launcherMachineId === "string" ? fields.launcherMachineId : undefined
+  const launcherMachineHash = typeof fields.launcherMachineHash === "string" ? fields.launcherMachineHash : undefined
   if (launcherPid === undefined || launcherHostname === undefined) return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
   const identity = await classifyHostIdentity({
     recordedHostname: launcherHostname,
-    recordedMachineId: launcherMachineId,
+    recordedMachineHash: launcherMachineHash,
     currentHostname: (probe.hostname ?? readHostname)(),
-    currentMachineId: probe.machineId ?? readCurrentMachineId,
+    currentMachineHash: probe.machineHash ?? readCurrentMachineHash,
   })
   if (identity.state === "foreign") {
     return identity.viaMachineId
