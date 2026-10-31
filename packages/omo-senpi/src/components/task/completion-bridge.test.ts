@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, renameSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it } from "bun:test"
@@ -7,6 +7,7 @@ import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import {
   createCompletionNotifier,
   createTaskManager,
+  createTaskRecord,
   createTaskRecordStore,
   markRecordLostForReconciliation,
   RunnerError,
@@ -102,6 +103,39 @@ function createHarness(options: {
 
 afterEach(() => {
   for (const project of projects.splice(0)) rmSync(project, { recursive: true, force: true })
+})
+
+it("#given a held pending task file #when spawn failure is marked twice #then one completion is delivered and its epoch persists off the held target", () => {
+  // given
+  const backing = createTaskRecordStore({ project_dir: tempProject() }, {
+    platform: "win32",
+    rename: (from, to) => {
+      if (String(to).endsWith(".json")) throw Object.assign(new Error("held task target"), { code: "EPERM" })
+      renameSync(from, to)
+    },
+    sleep: () => {},
+  })
+  const record = createTaskRecord({
+    parent_session_id: "parent-session", root_session_id: "parent-session", depth: 1,
+    execution_mode: "in-process", model: "test/model", notify_on_terminal: true,
+  })
+  backing.save(record)
+  const messages: ParentNotifierMessage[] = []
+  const notifier = createCompletionNotifier({ store: backing, notifier: { enqueue: message => { messages.push(message) } } })
+  let notifications = 0
+  const store = createCompletionObservingStore(backing, {
+    notifier: { ...notifier, notifyTerminal: input => { notifications += 1; return notifier.notifyTerminal(input) } },
+    parentState: () => ({ kind: "idle" }), wasBackground: () => true, currentSessionId: () => "parent-session",
+  })
+  // when
+  store.markSpawnFailed(record, "EPERM errno=-4048 file=held.json")
+  store.markSpawnFailed(record)
+  // then
+  expect(notifications).toBe(1)
+  expect(messages).toHaveLength(1)
+  expect(messages[0]?.details[0]?.status).toBe("error")
+  expect(backing.load(record.task_id)?.error_message).toBe("EPERM errno=-4048 file=held.json")
+  expect(backing.load(record.task_id)?.notification.notified_epoch).toBe(record.notification.run_epoch)
 })
 
 describe("completion bridge live background promotion", () => {
