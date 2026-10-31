@@ -13,8 +13,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from cookie_crypto import decrypt_chromium_value, derive_key  # noqa: E402
-from cookie_paths import UnsupportedPlatform, resolve_cookie_db  # noqa: E402
+from cookie_crypto import decrypt_chromium_value, derive_key, windows_oscrypt_key  # noqa: E402
+from cookie_paths import UnsupportedPlatform, platform_base, resolve_cookie_db  # noqa: E402
 from extract_cookies import extract_cookies, inject_cookies, write_cookie_file  # noqa: E402
 
 
@@ -84,6 +84,18 @@ class PathResolution(unittest.TestCase):
         target.write_bytes(b"")
         self.assertEqual(resolve_cookie_db("chrome", "win32", base_override=base), target)
 
+    def test_windows_firefox_path(self) -> None:
+        base = Path(self.tmp())
+        target = base / "Mozilla/Firefox/Profiles/abc.default/cookies.sqlite"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"")
+        self.assertEqual(resolve_cookie_db("firefox", "win32", base_override=base), target)
+
+    def test_win32_platform_base_is_kind_aware(self) -> None:
+        with patch.dict("os.environ", {"APPDATA": "C:\\Mock\\Roaming", "LOCALAPPDATA": "C:\\Mock\\Local"}):
+            self.assertEqual(str(platform_base("win32", "firefox")), "C:\\Mock\\Roaming")
+            self.assertEqual(str(platform_base("win32", "chromium")), "C:\\Mock\\Local")
+
     def test_unsupported_platform_raises(self) -> None:
         with self.assertRaises(UnsupportedPlatform):
             resolve_cookie_db("chrome", "sunos")
@@ -130,6 +142,35 @@ class Decryption(unittest.TestCase):
         blob = _encrypt_gcm_v10(key, "win-token-xyz")
         self.assertEqual(decrypt_chromium_value("win32", key, blob), "win-token-xyz")
 
+    def test_binary_undecodable_value_returned_as_raw_bytes(self) -> None:
+        key = b"k" * 32
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+        raw_binary = b"\x80\xff\xfe\xab\xcd"
+        nonce = b"n" * 12
+        encryptor = Cipher(algorithms.AES(key), modes.GCM(nonce)).encryptor()
+        ciphertext = encryptor.update(raw_binary) + encryptor.finalize()
+        blob = b"v10" + nonce + ciphertext + encryptor.tag
+        decrypted = decrypt_chromium_value("win32", key, blob)
+        self.assertIsInstance(decrypted, bytes)
+        self.assertEqual(decrypted, raw_binary)
+
+    def test_windows_oscrypt_key_missing_pywin32_diagnostic(self) -> None:
+        import base64
+        import json
+        import tempfile
+
+        temp_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(temp_dir), ignore_errors=True))
+        local_state = temp_dir / "Local State"
+        payload = base64.b64encode(b"DPAPI" + b"x" * 32).decode()
+        local_state.write_text(json.dumps({"os_crypt": {"encrypted_key": payload}}))
+
+        with patch.dict(sys.modules, {"win32crypt": None}):
+            with self.assertRaises(ImportError) as ctx:
+                windows_oscrypt_key(local_state)
+            self.assertIn("pip install pywin32", str(ctx.exception))
+
 
 class EndToEnd(unittest.TestCase):
     def _base_with_db(self, rel: str, make: Callable[[Path], None]) -> Path:
@@ -166,6 +207,7 @@ class EndToEnd(unittest.TestCase):
 
 
 class SecretHandling(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "POSIX file permissions do not apply on Windows")
     def test_cookie_output_file_is_owner_only(self) -> None:
         base = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
@@ -176,6 +218,7 @@ class SecretHandling(unittest.TestCase):
         self.assertEqual(output.stat().st_mode & 0o777, 0o600)
         self.assertIn("secret", output.read_text())
 
+    @unittest.skipIf(sys.platform == "win32", "POSIX file permissions do not apply on Windows")
     def test_cookie_output_replaces_existing_file_only_after_private_temp_write(self) -> None:
         base = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
@@ -239,6 +282,15 @@ class SecretHandling(unittest.TestCase):
         command = run.call_args.args[0]
         self.assertNotIn("secret-token", command)
         self.assertIn("secret-token", run.call_args.kwargs["input"])
+
+    def test_write_cookie_file_handles_raw_bytes_value(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(str(base), ignore_errors=True))
+        output = base / "cookies.json"
+        write_cookie_file(output, [{"name": "BINARY_SID", "value": b"\x80\xff\xfe"}])
+        self.assertTrue(output.exists())
+        text = output.read_text(encoding="utf-8")
+        self.assertIn("BINARY_SID", text)
 
 
 if __name__ == "__main__":

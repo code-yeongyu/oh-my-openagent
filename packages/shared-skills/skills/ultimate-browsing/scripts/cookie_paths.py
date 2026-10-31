@@ -69,7 +69,13 @@ def platform_base(platform: str, kind: BrowserKind) -> Path:
                 case unreachable:
                     assert_never(unreachable)
         case "win32":
-            return Path(os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local")))
+            match kind:
+                case "firefox":
+                    return Path(os.environ.get("APPDATA", str(home / "AppData" / "Roaming")))
+                case "chromium":
+                    return Path(os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local")))
+                case unreachable:
+                    assert_never(unreachable)
         case _:
             raise UnsupportedPlatform(f"unsupported platform: {platform!r}")
 
