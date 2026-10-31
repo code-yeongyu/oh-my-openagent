@@ -93,7 +93,7 @@ def _make_computer():
     _install(
         _Window,
         {
-            **{name: name for name in ("screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "ax")},
+            **{name: name for name in ("screenshot", "zoom", "observe", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "bringToCurrentSpace", "ax")},
             "raise_": "raise",
         },
     )

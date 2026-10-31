@@ -24,6 +24,7 @@ pub enum FakeMethod {
     MousePress,
     MouseRelease,
     RaiseWindow,
+    BringToCurrentSpace,
     ReleaseAll,
     CursorPosition,
     WarpCursor,

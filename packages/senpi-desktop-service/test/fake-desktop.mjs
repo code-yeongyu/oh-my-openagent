@@ -47,7 +47,7 @@ const BUTTON = {
 };
 
 const POINTER_METHODS = new Set(["click", "moveMouse", "drag", "scroll", "holdMouse"]);
-const NULL_METHODS = new Set(["typeText", "keyChord", "holdKeys", "raiseWindow", "menus.select", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
+const NULL_METHODS = new Set(["typeText", "keyChord", "holdKeys", "raiseWindow", "window.bringToCurrentSpace", "menus.select", "ax.perform", "ax.setValue", "ax.focus", "ax.click"]);
 
 const MENU_TREE = [
 	{ title: "File", path: ["File"], enabled: true, checked: false, hasSubmenu: true, shortcut: null },

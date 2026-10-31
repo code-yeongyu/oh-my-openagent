@@ -56,6 +56,20 @@ describe("Python computer facade", () => {
 		});
 	});
 
+	it("sends bringToCurrentSpace() as a window-hopped chain", () => {
+		// When
+		const run = runPythonFacade("computer.window(app='Code').bringToCurrentSpace()");
+
+		// Then
+		expect(run.calls[1]).toEqual({
+			action: "call",
+			chain: [
+				{ method: "window", args: ["w1"] },
+				{ method: "bringToCurrentSpace", args: [] },
+			],
+		});
+	});
+
 	it("returns details.value and displays every result image", () => {
 		// When
 		const run = runPythonFacade("out = computer.screenshot(silent=False)");

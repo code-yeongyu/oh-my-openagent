@@ -1,5 +1,5 @@
 use senpi_desktop_core::protocol_params::{
-    AxClickParams, AxPerformParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams, ClipboardText,
+    AxClickParams, AxPerformParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams, BringToCurrentSpaceParams, ClipboardText,
     DragParams, HoldKeysParams, HoldMouseParams, KeyChordParams, MenuSelectParams,
     PointParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
@@ -50,6 +50,9 @@ pub(crate) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
             opts: None,
         }),
         MutatingAction::RaiseWindow => Op::RaiseWindow(RaiseWindowParams { window_id: target }),
+        MutatingAction::BringToCurrentSpace => {
+            Op::BringToCurrentSpace(BringToCurrentSpaceParams { window_id: target })
+        }
         MutatingAction::AxPerform => Op::AxPerform(AxPerformParams {
             ref_: reference, action: "focus".to_owned(),
         }),

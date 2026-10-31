@@ -261,6 +261,11 @@ impl Backend for MacosBackend {
         self.raise(id)
     }
 
+    fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        Self::require_input_permission()?;
+        crate::spaces::bring_to_current_space(id, check_stop)
+    }
+
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
         Some(&mut self.ax)
     }

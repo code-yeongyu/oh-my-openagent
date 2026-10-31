@@ -27,6 +27,8 @@ computer.holdKeys(keys[], { duration, delivery? }) / computer.holdMouse(x, y, { 
     Exec tier, also available on window and display handles and the desktop object inside computer.run. Duration is finite seconds in 0..=100; holdKeys refuses an empty list. Mouse coordinates use the latest full screenshot, never a zoom. Input is always released before the call settles, including errors, cancellation, deadlines and the user's safety stop; keys release in reverse order. Foreground delivery still needs the human-confirmed control grant. Existing run and engine deadlines can interrupt a hold early; give long holds an adequate run budget. Older engines refuse unsupported hold methods without affecting press/click.
 win.raise() → None
     Brings the window to the front (exec tier). Unavailable on Wayland.
+win.bringToCurrentSpace() → None
+    macOS, exec tier, no control grant: moves a window that sits on another Space (Mission Control desktop) into the user's current Space without activating it or switching Spaces; a window already there is left alone. `SpaceMoveDenied` when the user's current Space is fullscreen or system-managed (refused before any move), when macOS will not move the window, or when the user's Space or focus changed meanwhile (the window may have moved: look before retrying); `SpaceUnsupported` on other platforms or macOS versions without the API.
 win.menu.items(path?) → ComputerMenuItem[]
     Read-only (read tier): lists the immediate children of the window's menu at `path`; no argument lists the menu bar. Item fields: title, path (native labels, ellipses included), enabled, checked, hasSubmenu, shortcut.
 win.menu.select(path, { delivery? }?) → None

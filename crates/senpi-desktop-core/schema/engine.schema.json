@@ -241,6 +241,17 @@
         "type": "null"
       }
     },
+    "window.bringToCurrentSpace": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/BringToCurrentSpaceParams"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
     "menus.items": {
       "effect": "read",
       "hostOnly": false,
@@ -1861,6 +1872,19 @@
       ],
       "additionalProperties": false
     },
+    "BringToCurrentSpaceParams": {
+      "type": "object",
+      "properties": {
+        "windowId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "windowId"
+      ],
+      "description": "`window.bringToCurrentSpace`: the native id of the window to move into the\nuser's current Space. The window is usually on another Space, so it may be\nabsent from `windows`.",
+      "additionalProperties": false
+    },
     "MenuPathParams": {
       "type": "object",
       "properties": {
@@ -2591,6 +2615,7 @@
         "holdKeys",
         "holdMouse",
         "raiseWindow",
+        "window.bringToCurrentSpace",
         "menus.items",
         "menus.select",
         "clipboard.read",

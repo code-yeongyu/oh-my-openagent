@@ -178,6 +178,14 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
+    fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        self.begin(FakeMethod::BringToCurrentSpace)?;
+        self.window(id)?;
+        check_stop()?;
+        self.record(SinkOp::BringToCurrentSpace { id: id.to_string() });
+        Ok(())
+    }
+
     fn hold_keys(
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
         control: &senpi_desktop_core::holds::HoldControl<'_>,

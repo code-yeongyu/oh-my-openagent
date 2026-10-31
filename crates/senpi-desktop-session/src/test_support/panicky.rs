@@ -116,6 +116,9 @@ impl Backend for PanickyFake {
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         self.inner.raise_window(id)
     }
+    fn bring_to_current_space(&mut self, id: &str, check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        self.inner.bring_to_current_space(id, check_stop)
+    }
     fn hold_keys(
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
         control: &senpi_desktop_core::holds::HoldControl<'_>,

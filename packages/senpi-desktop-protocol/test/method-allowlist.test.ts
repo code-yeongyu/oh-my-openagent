@@ -7,6 +7,7 @@ const CHAIN_METHOD_SNAPSHOT = [
 	"attributes",
 	"ax",
 	"bounds",
+	"bringToCurrentSpace",
 	"capabilities",
 	"children",
 	"click",
