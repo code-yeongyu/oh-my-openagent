@@ -83,6 +83,15 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 
 #### Fallback Models with Per-Model Settings
 
+Categories and agents accept `models_distribution: "sequential" | "round_robin"`
+next to their canonical `models` array. The default `sequential` keeps the
+existing order. With `round_robin`, new task children start at successive
+entries and fallback wraps through the remaining entries in order without
+repeating a model. Each category and agent has an independent in-memory cursor
+in the plugin process, reset on restart. Concurrent spawns receive separate
+turns; continuations keep their existing model. Availability, cooldowns and error
+fallback still apply. This option does not rotate accounts within one provider.
+
 `fallback_models` accepts either a single model string or an array. Array entries can be plain strings or objects with individual model settings:
 
 ```jsonc

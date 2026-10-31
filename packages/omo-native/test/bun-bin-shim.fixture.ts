@@ -143,9 +143,6 @@ export function stageInstalledPackage(fixture: Fixture): void {
   const rpcMode = join(senpiRoot, "dist", "modes", "rpc", "rpc-mode.js")
   mkdirSync(dirname(rpcMode), { recursive: true })
   writeFileSync(rpcMode, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
-  const anthropicMessages = join(senpiRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js")
-  mkdirSync(dirname(anthropicMessages), { recursive: true })
-  writeFileSync(anthropicMessages, 'const claudeCodeVersion = "2.1.75";\nexport { claudeCodeVersion }\n')
 }
 
 /** A PATH that reaches bun and the system shell but no node, like a launchd job or a bun-only box. */
