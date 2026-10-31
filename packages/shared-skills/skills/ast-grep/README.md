@@ -47,7 +47,7 @@ python3 scripts/ast_grep_helper.py validate '\w+' --lang ts
 # Doctor: check ast-grep binary availability
 python3 scripts/ast_grep_helper.py doctor
 
-# List 25 supported languages
+# List built-in languages plus configured custom languages
 python3 scripts/ast_grep_helper.py langs
 
 # Install / re-install the ast-grep binary
@@ -100,7 +100,7 @@ ast-grep-skill/
 ## Limits
 
 - 5-minute timeout per `sg` invocation (configurable in the helper).
-- ast-grep itself supports 25 languages out-of-the-box. For anything else, use [`customLanguages`](./references/sgconfig.md#customlanguages-experimental) in `sgconfig.yml`.
+- ast-grep itself supports 25 languages out-of-the-box. For anything else, use [`customLanguages`](./references/sgconfig.md#customlanguages-experimental) in `sgconfig.yml`; the helper also accepts comma-separated overrides via `OMO_AST_GREP_EXTRA_LANGUAGES`.
 - Pattern hint detection is heuristic; pass `--force` to skip validation when you know the pattern is correct.
 
 ## Requirements
