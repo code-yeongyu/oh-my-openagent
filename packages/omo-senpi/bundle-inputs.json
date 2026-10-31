@@ -1948,6 +1948,7 @@
     "packages/senpi-task/src/store/run-pause-parse.ts",
     "packages/senpi-task/src/store/run-stats-parse.ts",
     "packages/senpi-task/src/store/scalar-read.ts",
+    "packages/senpi-task/src/store/secret-text.ts",
     "packages/senpi-task/src/store/start-failure-parse.ts",
     "packages/senpi-task/src/store/state-dir.ts",
     "packages/senpi-task/src/store/storable-record.ts",

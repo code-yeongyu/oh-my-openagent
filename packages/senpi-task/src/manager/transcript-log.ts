@@ -1,5 +1,6 @@
 import type { PersistedTaskEvent } from "../store"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
+import { isModelConfigError } from "./credential-failure"
 import { applyModelEvent, type ModelEventStore } from "./runtime-fallback-event"
 
 // The transcript event types the runner subscription writes into OUR JSONL event log. The task_output
@@ -54,6 +55,9 @@ function toPersistedEvent(event: ManagedChildEvent): PersistedTaskEvent | undefi
     }
   }
   if (event.type === "retry_fallback_exhausted") {
+    // A model its route does not serve stops the walk on purpose; it is not an exhausted chain (#11355).
+    const lastError = readEventString(event, "lastError")
+    if (lastError !== undefined && isModelConfigError(lastError)) return undefined
     return {
       type: event.type,
       payload: {

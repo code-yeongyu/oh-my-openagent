@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import { createTaskRecord, type ResolvedModelRecord, type TaskRecord } from "../state"
+import { MODEL_NOT_FOUND_ANSWERS, NOT_MODEL_NOT_FOUND_ANSWERS } from "./__fixtures__/model-not-found-inventory"
+import { READABLE_PROVIDER_TEXT, SECRET_CELLS } from "./__fixtures__/secret-inventory"
 import { isCredentialFailure, runtimeFallbackCandidates, terminalFailureMessage } from "./credential-failure"
 
 function rung(provider: string, modelId: string): ResolvedModelRecord {
@@ -11,8 +13,9 @@ const GO_M3 = rung("opencode-go", "minimax-m3")
 const GO_M27 = rung("opencode-go", "minimax-m2.7")
 const ZAI_GLM = rung("zai", "glm-5.3")
 
-function record(primary: ResolvedModelRecord, fallbacks: readonly ResolvedModelRecord[]): TaskRecord {
+function record(primary: ResolvedModelRecord, fallbacks: readonly ResolvedModelRecord[], category?: string): TaskRecord {
   return createTaskRecord({
+    ...(category === undefined ? {} : { category }),
     parent_session_id: "session-parent",
     root_session_id: "session-root",
     depth: 1,
@@ -193,6 +196,15 @@ describe("runtimeFallbackCandidates", () => {
     expect(candidates).toEqual({ remaining: [ZAI_GLM, GO_M27], skipped: [], limit: "account" })
   })
 
+  test.each([
+    ["a gateway model_not_found", '400 {"code":"model_not_found","message":"unknown provider for model minimax-m3"}'],
+    ["an unknown-provider answer", "400 Bad Request: unknown provider for model minimax-m3"],
+  ])("#given %s on the first rung #when the candidates are computed #then no rung is offered (#11355)", (_label, message) => {
+    const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), message)
+
+    expect(candidates).toEqual({ remaining: [], skipped: [GO_M27, ZAI_GLM] })
+  })
+
   test("#given a limit that names one model #when the candidates are computed #then the sibling model on the same provider is next", () => {
     const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), "You've hit your Fable weekly limit \u00b7 resets Oct 2, 9am")
 
@@ -268,5 +280,54 @@ describe("terminalFailureMessage", () => {
 
   test("#given an ordinary provider error #when the terminal message is built #then it is passed through unchanged", () => {
     expect(terminalFailureMessage(record(GO_M3, []), "500: upstream connect error")).toBe("500: upstream connect error")
+  })
+})
+
+describe("model configuration errors (#11355)", () => {
+  test.each(MODEL_NOT_FOUND_ANSWERS)("#given %s #when the candidates are computed #then no rung is offered", (_label, message) => {
+    expect(runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), message).remaining).toEqual([])
+  })
+
+  test.each(NOT_MODEL_NOT_FOUND_ANSWERS)("#given %s #when the candidates are computed #then the chain is still walked", (_label, message) => {
+    expect(runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), message).remaining).not.toEqual([])
+  })
+
+  test.each(MODEL_NOT_FOUND_ANSWERS)("#given %s on a category task #when the terminal message is built #then it names the model and the omo.json key to fix, never an exhausted chain", (_label, message) => {
+    const text = terminalFailureMessage(record(GO_M3, [GO_M27, ZAI_GLM], "quick"), message)
+
+    expect(text.startsWith(message)).toBe(true)
+    expect(text).toContain("opencode-go/minimax-m3 is not served by its route; fix categories.quick in omo.json.")
+    expect(text).not.toMatch(/exhausted|No other model/i)
+  })
+
+  test("#given a model-not-found answer that also carries a 401 #when it is classified #then it is a configuration error, not a credential failure", () => {
+    const message = '401 {"code":"model_not_found","message":"unknown provider for model minimax-m3"}'
+    const failed = record(GO_M3, [GO_M27, ZAI_GLM], "quick")
+
+    expect(runtimeFallbackCandidates(failed, message).remaining).toEqual([])
+    const text = terminalFailureMessage(failed, message)
+    expect(text).toContain("is not served by its route")
+    expect(text).not.toContain("re-authenticate")
+  })
+})
+
+describe("terminal error text redaction (#11355)", () => {
+  const modelNotFound = '400 {"code":"model_not_found","message":"unknown provider for model minimax-m3"}'
+
+  for (const cell of SECRET_CELLS) {
+    test(`#given ${cell.name} #when a configuration error or an ordinary error is stored #then the secret is gone`, () => {
+      for (const failure of [`${cell.text}\n${modelNotFound}`, `${cell.text}\n500: upstream connect error`]) {
+        const text = terminalFailureMessage(record(GO_M3, [ZAI_GLM], "quick"), failure)
+
+        expect(text).toContain("[REDACTED]")
+        expect(text).not.toContain(cell.secret)
+      }
+    })
+  }
+
+  test("#given model ids, error codes and request ids #when the terminal message is built #then they stay readable", () => {
+    const failure = `500: upstream connect error ${READABLE_PROVIDER_TEXT}`
+
+    expect(terminalFailureMessage(record(GO_M3, [ZAI_GLM], "quick"), failure)).toBe(failure)
   })
 })

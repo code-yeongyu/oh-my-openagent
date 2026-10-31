@@ -1,5 +1,6 @@
 import type { ParentModelFallback, ParentModelFallbackReason, TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
+import { redactSecretText } from "../store/secret-text"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
 import { isCredentialFailure, usageLimitScope } from "./credential-failure"
 import { isParentModelRung } from "./parent-model-rung"
@@ -7,16 +8,19 @@ import { isParentModelRung } from "./parent-model-rung"
 const DETAIL_MAX = 200
 const RESETS = /\bresets?\s+((?:at|in)\s+)?([^.\n;]+)/iu
 
+// A failed turn as kept in memory until a hop: its reason classified on the raw provider text, and only the
+// redacted text (#11355).
 export type FailedTurn = {
   readonly message: string
+  readonly reason: ParentModelFallbackReason
   readonly tools: readonly string[]
 }
 
 // The failure itself outranks the engine's hop label: senpi can route an account limit it retried through
 // its transient lane, and the row must still say "usage limit".
-function reasonOfEngineFallback(event: ManagedChildEvent, detail: string | undefined): ParentModelFallbackReason {
+function reasonOfEngineFallback(event: ManagedChildEvent, failed: FailedTurn | undefined): ParentModelFallbackReason {
   if (readString(event, "limit") !== undefined) return "usage_limit"
-  if (detail !== undefined && reasonOfFailure(detail) !== "error") return reasonOfFailure(detail)
+  if (failed !== undefined && failed.reason !== "error") return failed.reason
   switch (readString(event, "reason")) {
     case "billing":
       return "usage_limit"
@@ -47,8 +51,10 @@ export function buildParentModelFallback(input: {
   readonly interruptedTools?: readonly string[]
   readonly at: string
 }): ParentModelFallback {
-  const detail = input.message === undefined ? undefined : firstLine(input.message)
-  const resets = input.message === undefined ? undefined : resetsOf(input.message)
+  // The record keeps only redacted provider text; callers classify the reason on the raw text before this.
+  const message = input.message === undefined ? undefined : redactSecretText(input.message)
+  const detail = message === undefined ? undefined : firstLine(message)
+  const resets = message === undefined ? undefined : resetsOf(message)
   return {
     from_model: input.fromModel,
     reason: input.reason,
@@ -91,7 +97,7 @@ export function observeParentModelFallback(input: {
     const failed = failedTurns.get(handle)
     const fallback = buildParentModelFallback({
       fromModel: baseSelector(readString(event, "from") ?? record.model),
-      reason: reasonOfEngineFallback(event, failed?.message),
+      reason: reasonOfEngineFallback(event, failed),
       ...(failed === undefined ? {} : { message: failed.message, interruptedTools: failed.tools }),
       at: new Date(now()).toISOString(),
     })
@@ -106,7 +112,8 @@ function failedTurnOf(message: Record<string, unknown>, streamedTools: readonly 
   if (message.stopReason !== "error" && message.stopReason !== "aborted") return undefined
   const text = typeof message.errorMessage === "string" && message.errorMessage.length > 0 ? message.errorMessage : undefined
   const tools = [...new Set([...toolCallNames(message), ...streamedTools])]
-  return { message: text ?? `stopped with ${String(message.stopReason)}`, tools }
+  if (text === undefined) return { message: `stopped with ${String(message.stopReason)}`, reason: "error", tools }
+  return { message: redactSecretText(text), reason: reasonOfFailure(text), tools }
 }
 
 function toolCallNames(message: Record<string, unknown>): readonly string[] {
