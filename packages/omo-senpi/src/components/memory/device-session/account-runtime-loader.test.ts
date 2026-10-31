@@ -1,10 +1,17 @@
 import { describe, expect, test } from "bun:test"
 
-import type { DeviceAccount } from "./account-source"
+import type { CliDeviceAccount } from "./account-source"
 import { SyncSidecarUnavailableError } from "../sync-runner"
 import { type DeviceAccountRuntimeModule, lazyCliAccountSource } from "./account-runtime-loader"
 
-const account = (accountId: string): DeviceAccount => ({
+const account = (accountId: string): CliDeviceAccount => ({
+  kind: "cli",
+  descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId, serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
+  signal: new AbortController().signal,
+  boundary: async dispatch => dispatch(),
+  forOperation: async () => { throw new Error("unused") },
+  serviceDeviceId: "service-device",
+  isCurrent: async () => true,
   api: "http://127.0.0.1:9",
   accountId,
   keyring: () => Promise.reject(new Error("unused")),
