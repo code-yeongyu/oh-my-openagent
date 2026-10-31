@@ -107,7 +107,7 @@ public static class LaSddl {
 // SDDL names well-known accounts by alias (the machine's built-in Administrator, RID 500, reads "LA"), so the owner
 // and ACE of an exact DACL may carry an alias instead of the user's SID. This prints the token SDDL uses for
 // $env:LA_SID on this machine, so the verdict can accept exactly that alias and nothing else.
-export const SID_TOKEN_SCRIPT = String.raw`
+const SID_TOKEN_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
 (New-Object System.Security.AccessControl.RawSecurityDescriptor("O:$env:LA_SID")).GetSddlForm('Owner')
 `;
