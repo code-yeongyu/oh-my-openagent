@@ -1148,6 +1148,8 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) AVAILABLE_MODEL
       "packages/omo-senpi/src/components/memory/facts-runner.test-support.ts": ["AVAILABLE_MODEL"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
+      // the senpi engine loads this extension's default export by path (`senpi -e <file>` in index-engine.test.ts)
+      "packages/omo-senpi/src/components/memory/index-engine.fixture.ts": ["default"],
       "packages/omo-senpi/src/components/memory/index.ts": ["getMemoryRepo"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UNAVAILABLE_CATEGORY_MAX_CHARS, GATE_MODEL_MAX_CHARS
       "packages/omo-senpi/src/components/memory/kibitzer/notice.ts": ["UNAVAILABLE_CATEGORY_MAX_CHARS", "GATE_MODEL_MAX_CHARS"],
