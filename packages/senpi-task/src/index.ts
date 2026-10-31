@@ -337,6 +337,7 @@ export type {
   SpawnAdmission,
   StartResult,
   TaskConcurrencyConfig,
+  TaskLeaseHolderView,
   TaskManager,
   TaskManagerOptions,
   TrustedRespawnLaunch,
