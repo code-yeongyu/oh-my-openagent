@@ -3,6 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it as test } from "bun:test"
 
 import { createSessionStateStore, type SessionStateStore } from "./session-state"
+import { MAX_STAGNATION_COUNT } from "./constants"
+import { shouldStopForStagnation } from "./stagnation-detection"
 
 describe("createSessionStateStore", () => {
   let sessionStateStore: SessionStateStore
@@ -92,28 +94,59 @@ describe("createSessionStateStore", () => {
     expect(progressUpdate.stagnationCount).toBe(0)
   })
 
-  test("given todo status changes without count changes, treats it as progress", () => {
+  test("given todo statuses churn without completion-count changes, does not treat it as progress (#5120)", () => {
     // given
-    const sessionID = "ses-status-change-progress"
+    const sessionID = "ses-status-churn-not-progress"
     const state = sessionStateStore.getState(sessionID)
     state.lastInjectedAt = Date.now()
     const initialTodos = [
       { id: "1", content: "Task 1", status: "pending", priority: "high" },
       { id: "2", content: "Task 2", status: "pending", priority: "medium" },
     ]
-    const progressedTodos = [
+    // Status churn only: pending -> in_progress with identical counts
+    const churnedTodos = [
       { id: "1", content: "Task 1", status: "in_progress", priority: "high" },
       { id: "2", content: "Task 2", status: "pending", priority: "medium" },
     ]
     sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
-    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    state.awaitingPostInjectionProgressCheck = true
 
     // when
-    const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
+    const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, churnedTodos)
 
-    // then
-    expect(progressUpdate.hasProgressed).toBe(true)
-    expect(progressUpdate.stagnationCount).toBe(0)
+    // then: status churn is the #5120 loop fuel and must not reset stagnation
+    expect(progressUpdate.hasProgressed).toBe(false)
+    expect(progressUpdate.progressSource).toBe("none")
+    expect(progressUpdate.stagnationCount).toBe(1)
+  })
+
+  test("given todo statuses keep churning across post-injection turns, stagnation reaches the stop threshold (#5120)", () => {
+    // given
+    const sessionID = "ses-status-churn-loop-terminates"
+    const state = sessionStateStore.getState(sessionID)
+    state.lastInjectedAt = Date.now()
+    let todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    sessionStateStore.trackContinuationProgress(sessionID, 2, todos)
+
+    // when: each injected turn replies by toggling a todo status (planning echo)
+    const updates = []
+    for (let turn = 0; turn < MAX_STAGNATION_COUNT; turn++) {
+      state.awaitingPostInjectionProgressCheck = true
+      todos = todos.map((todo, index) =>
+        index === turn % todos.length
+          ? { ...todo, status: todo.status === "pending" ? "in_progress" : "pending" }
+          : todo,
+      )
+      updates.push(sessionStateStore.trackContinuationProgress(sessionID, 2, todos))
+    }
+
+    // then: no churn cycle ever reads as progress; the third one stops re-arming
+    expect(updates.map((update) => update.hasProgressed)).toEqual([false, false, false])
+    expect(updates[MAX_STAGNATION_COUNT - 1].stagnationCount).toBe(MAX_STAGNATION_COUNT)
+    expect(shouldStopForStagnation({ sessionID, incompleteCount: 2, progressUpdate: updates[MAX_STAGNATION_COUNT - 1] })).toBe(true)
   })
 
   test("given progress resumes after stagnation, restarts the stagnation count from zero", () => {
@@ -125,15 +158,22 @@ describe("createSessionStateStore", () => {
       { id: "1", content: "Task 1", status: "pending", priority: "high" },
       { id: "2", content: "Task 2", status: "pending", priority: "medium" },
     ]
+    // Real progress: one todo completes while another is added, so the
+    // completed count increases even though the incomplete count does not
     const progressedTodos = [
-      { id: "1", content: "Task 1", status: "in_progress", priority: "high" },
+      { id: "1", content: "Task 1", status: "completed", priority: "high" },
       { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+      { id: "3", content: "Task 3", status: "pending", priority: "low" },
     ]
     sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
     state.awaitingPostInjectionProgressCheck = true
     sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
     state.awaitingPostInjectionProgressCheck = true
-    sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
+    const resumedUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
+
+    // then
+    expect(resumedUpdate.hasProgressed).toBe(true)
+    expect(resumedUpdate.stagnationCount).toBe(0)
 
     // when
     state.awaitingPostInjectionProgressCheck = true
