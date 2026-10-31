@@ -2903,6 +2903,9 @@
         // spawned by path from tests: a child process or Worker entry, never imported
         "src/components/memory/desktop-sync/hostSelection.fixture.ts",
         "src/components/memory/device-session/sibling-writer.fixture.ts",
+        "src/components/memory/index-engine.fixture.ts",
+        "src/components/memory/index-observer.fixture.ts",
+        "src/components/memory/index-selection.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",

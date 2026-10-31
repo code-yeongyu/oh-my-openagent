@@ -1,5 +1,5 @@
 // Capture the real inherited table before loading the component or any test support.
-import { privateChannelDeclared } from "@code-yeongyu/senpi/private-fds"
+import * as privateFds from "@code-yeongyu/senpi/private-fds"
 import { provideSessionWorkerData, sessionWorkerDataRegistry } from "@code-yeongyu/senpi/session-worker-data"
 import { mock } from "bun:test"
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads"
@@ -11,6 +11,15 @@ import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySet
 
 const scenario = isMainThread ? process.argv[2] : Reflect.get(Object(workerData), "scenario")
 let cliBuilt = 0
+let takes = 0
+const { privateChannelDeclared, takeInheritedPrivateChannel } = privateFds
+mock.module("@code-yeongyu/senpi/private-fds", () => ({
+  ...privateFds,
+  takeInheritedPrivateChannel: (name: string) => {
+    takes += 1
+    return takeInheritedPrivateChannel(name)
+  },
+}))
 let resolverSource: DeviceAccountSource | undefined
 let rpcSource: Parameters<typeof wireSyncRpc>[0]["source"] | undefined
 const resolveSession = createDeviceSessionResolver
@@ -62,6 +71,7 @@ async function report(): Promise<unknown> {
     cliBuilt,
     declared: privateChannelDeclared("memory-sync"),
     sharedSource: true,
+    takes,
   }
 }
 
@@ -74,12 +84,12 @@ if (isMainThread && scenario === "provider-throw") {
     if (!(error instanceof Error) || !error.message.includes("already provided")) throw error
     process.stdout.write(`${JSON.stringify({ error: error.message, cliBuilt })}\n`)
   }
-} else if (isMainThread && (scenario === "worker-absent" || scenario === "worker-desktop")) {
+} else if (isMainThread && (scenario === "worker-absent" || scenario === "worker-port-absent" || scenario === "worker-desktop")) {
   if (scenario === "worker-desktop") register()
   const start = (extensionData: Readonly<Record<string, unknown>>, transferList: readonly import("node:worker_threads").Transferable[]) =>
     new Worker(new URL(import.meta.url), { workerData: { scenario, extensionData }, transferList: [...transferList] })
   const issued = scenario === "worker-desktop" ? sessionWorkerDataRegistry.spawn(data => start(data.extensionData, data.transfer)) : undefined
-  const worker = issued?.result ?? start({}, [])
+  const worker = issued?.result ?? start(scenario === "worker-port-absent" ? { [MEMORY_SYNC_WORKER_DATA]: "not-a-port" } : {}, [])
   try {
     const result = await new Promise<unknown>((resolve, reject) => {
       worker.on("message", message => {

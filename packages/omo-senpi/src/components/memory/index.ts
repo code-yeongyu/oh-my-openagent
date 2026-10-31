@@ -89,7 +89,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         if (isMainThread) {
           const host = memorySyncHost ?? selectHostMemorySyncSource({
             inherited: { declared: privateChannelDeclared, tablePresent: privateTablePresent, take: takeInheritedPrivateChannel },
-            attach: (stream) => attachDesktopSyncChannel(stream),
+            attach: attachDesktopSyncChannel,
           })
           // A duplicate/late provider is a bootstrap failure, not an unavailable account.
           if (memorySyncHost === undefined) {

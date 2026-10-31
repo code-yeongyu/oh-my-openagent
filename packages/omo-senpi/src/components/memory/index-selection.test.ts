@@ -4,14 +4,14 @@ import { Duplex } from "node:stream"
 import { readFrames, writeFrame } from "./desktop-sync/framing"
 
 async function registration(scenario: string): Promise<{
-  source?: string; cliBuilt: number; declared?: boolean; sharedSource?: boolean; error?: string; claims: number
+  source?: string; cliBuilt: number; declared?: boolean; sharedSource?: boolean; error?: string; claims: number; takes?: number
   observersBefore?: number; observersAfterFirst?: number; observersAfterSecond?: number
 }> {
   const env = { ...process.env }
   delete env.SENPI_PRIVATE_FDS
   delete env.SENPI_PRIVATE_FDS_FINAL
   if (scenario === "desktop" || scenario === "worker-desktop") env.SENPI_PRIVATE_FDS = '{"memory-sync":5}'
-  else if (scenario !== "cli" && scenario !== "worker-absent") env.SENPI_PRIVATE_FDS = '{"memory-sync":null}'
+  else if (scenario !== "cli" && scenario !== "worker-absent" && scenario !== "worker-port-absent") env.SENPI_PRIVATE_FDS = '{"memory-sync":null}'
   const fixture = scenario.startsWith("observer-")
     ? new URL("./index-observer.fixture.ts", import.meta.url)
     : new URL("./index-selection.fixture.ts", import.meta.url)
@@ -71,19 +71,23 @@ describe("memory component registration selects the engine account source", () =
   }, 30_000)
 
   test("(a) an in-process desktop daemon selects desktop through the real inherited channel", async () => {
-    expect(await registration("desktop")).toEqual({ source: "desktop", cliBuilt: 0, declared: true, sharedSource: true, claims: 1 })
+    expect(await registration("desktop")).toEqual({ source: "desktop", cliBuilt: 0, declared: true, sharedSource: true, claims: 1, takes: 1 })
   }, 30_000)
 
   test("(b) a declared null channel is unavailable and never constructs CLI", async () => {
-    expect(await registration("declared-null")).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: 0, declared: true, sharedSource: true, claims: 0 })
+    expect(await registration("declared-null")).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: 0, declared: true, sharedSource: true, claims: 0, takes: 1 })
   }, 30_000)
 
   test("(c) a Worker runtime without bootstrap is unavailable, never CLI", async () => {
-    expect(await registration("worker-absent")).toEqual({ source: "unavailable:host_bootstrap_absent", cliBuilt: 0, declared: false, sharedSource: true, claims: 0 })
+    expect(await registration("worker-absent")).toEqual({ source: "unavailable:host_bootstrap_absent", cliBuilt: 0, declared: false, sharedSource: true, claims: 0, takes: 0 })
+  }, 30_000)
+
+  test("(c2) a Worker handed a non-port memory-sync value is unavailable(port_absent), never CLI", async () => {
+    expect(await registration("worker-port-absent")).toEqual({ source: "unavailable:port_absent", cliBuilt: 0, declared: false, sharedSource: true, claims: 0, takes: 0 })
   }, 30_000)
 
   test("(d) an undeclared launch still builds the CLI source", async () => {
-    expect(await registration("cli")).toEqual({ source: "null", cliBuilt: 1, declared: false, sharedSource: true, claims: 0 })
+    expect(await registration("cli")).toEqual({ source: "null", cliBuilt: 1, declared: false, sharedSource: true, claims: 0, takes: 0 })
   }, 30_000)
 
   test("(e) a provideSessionWorkerData throw propagates out of registration", async () => {
@@ -93,10 +97,10 @@ describe("memory component registration selects the engine account source", () =
   }, 30_000)
 
   test("the real senpi handoff gives a session Worker the host's desktop selection", async () => {
-    expect(await registration("worker-desktop")).toEqual({ source: "desktop", cliBuilt: 0, declared: false, sharedSource: true, claims: 1 })
+    expect(await registration("worker-desktop")).toEqual({ source: "desktop", cliBuilt: 0, declared: false, sharedSource: true, claims: 1, takes: 0 })
   }, 30_000)
 
   test("deviceAccount overrides win without constructing the default source", async () => {
-    expect(await registration("override")).toEqual({ source: "unavailable:selection_failed", cliBuilt: 0, declared: true, sharedSource: true, claims: 0 })
+    expect(await registration("override")).toEqual({ source: "unavailable:selection_failed", cliBuilt: 0, declared: true, sharedSource: true, claims: 0, takes: 0 })
   }, 30_000)
 })
