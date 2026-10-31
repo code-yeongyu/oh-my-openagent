@@ -78,6 +78,11 @@ describe("the compiled entry hands engine commands over unchanged (#9572)", () =
   test("#given a chat prompt starting with models #when built #then the plugin still comes first", () => {
     expect(buildSenpiArgs(["models", "are", "great"], "/provisioned")).toEqual(["--extension", join("/provisioned", "plugin"), "models", "are", "great"])
   })
+
+  test("#given host ensure without a launch spec #when the compiled binary builds the engine argv #then its own plugin spec is appended (#10643)", () => {
+    expect(buildSenpiArgs(["host", "ensure", "--json"], "/provisioned"))
+      .toEqual(["host", "ensure", "--json", "--launch-spec", join("/provisioned", "plugin", "daemon-launch-spec.json")])
+  })
 })
 
 const roots: string[] = []
@@ -130,4 +135,33 @@ describe("the npm launcher hands engine commands over unchanged (#9572)", () => 
     // then
     expect(launched.argv).toEqual(["--extension", join(fixture.packageRoot, "plugin"), "models", "are", "great"])
   })
+})
+
+// A host started without a spec never loads the omo plugin, and every later client reusing it
+// inherits that (#10643): the launcher supplies its own spec to the two subcommands that start one.
+describe("the npm launcher starts omo hosts with its own plugin spec (#10643)", () => {
+  for (const subcommand of ["ensure", "handoff"]) {
+    test(`#given omo host ${subcommand} without --launch-spec #when launched #then the engine receives the launcher's plugin spec`, () => {
+      // given
+      const fixture = launcherWithFakeEngine()
+      // when
+      const launched = fixture.launch(["host", subcommand, "--json", "--socket", "/tmp/h.sock"])
+      // then
+      expect({ status: launched.status, argv: launched.argv }).toEqual({
+        status: 0,
+        argv: ["host", subcommand, "--json", "--socket", "/tmp/h.sock", "--launch-spec", join(fixture.packageRoot, "plugin", "daemon-launch-spec.json")],
+      })
+    })
+  }
+
+  for (const args of [["host", "ensure", "--launch-spec", "/custom/spec.json"], ["host", "status", "--json"], ["host", "stop"]]) {
+    test(`#given omo ${args.join(" ")} #when launched #then the engine receives exactly those arguments`, () => {
+      // given
+      const fixture = launcherWithFakeEngine()
+      // when
+      const launched = fixture.launch([...args])
+      // then
+      expect({ status: launched.status, argv: launched.argv }).toEqual({ status: 0, argv: args })
+    })
+  }
 })
