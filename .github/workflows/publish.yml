@@ -1451,8 +1451,10 @@ jobs:
           # A run that built assets must have published exactly what it built: nothing missing, nothing
           # extra (RULING-77). skip_platform runs built nothing, so their release is checked by the floor
           # and the checksum coverage below.
+          # Only top-level regular files are release assets: the desktop-engine artifact also carries payload
+          # directories (engine-trust-helper-<host>, shipped inside the compiled binaries, #12018) that are never uploaded.
           if [ -d .omo/release-binaries ]; then
-            diff -u <(cd .omo/release-binaries && printf '%s\n' * | sort) <(printf '%s\n' "$RELEASED")
+            diff -u <(cd .omo/release-binaries && for NAME in *; do if [ -f "$NAME" ]; then printf '%s\n' "$NAME"; fi; done | sort) <(printf '%s\n' "$RELEASED")
           fi
           (
             cd "$VERIFY_DIR"
