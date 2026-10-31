@@ -16,7 +16,11 @@ function record(value: unknown): Record<string, unknown> {
 test("lint ratchet is an independent required-check candidate on every dev PR and merge group", () => {
   const workflow = record(load(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")));
   const triggers = record(workflow.on);
-  expect(record(triggers.pull_request).branches).toContain("dev");
+  // #11743: no base-branch filter, so CI also runs for stacked PRs based on another PR branch;
+  // a filter, if one comes back, must still include dev.
+  const branches = record(triggers.pull_request).branches;
+  if (branches !== undefined) expect(branches).toContain("dev");
+  expect(record(triggers.pull_request)["branches-ignore"]).toBeUndefined();
   expect(record(triggers.pull_request).paths).toBeUndefined();
   expect(record(triggers.pull_request)["paths-ignore"]).toBeUndefined();
   expect(record(triggers.merge_group).types).toContain("checks_requested");
