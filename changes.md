@@ -1,3 +1,27 @@
+## 2026-10-29 - Name the corrupt credential recovery command (#11832)
+
+The keystore message names `omo account forget`; session mutation keeps locking and permits corrupt-state replacement only when explicitly requested.
+
+## 2026-10-26 - Share Native model prompt builders with OpenCode (#9856, fixes #9851)
+
+OpenCode imports the public generation facade from the senpi version OmO Native pins, applies one documented host-tool transform, and appends explicit agent roles instead of maintaining duplicate model bodies; the local Sisyphus and Sisyphus-Junior model files, including the Kimi K3.1 copies, are removed because senpi's `kimi-k3-1` preset now carries them. Runtime model switches preserve task mode and Hephaestus model eligibility, with catalog-wide byte parity and mutation checks covering both construction and reconciliation. Session tool permissions are cached per session and refreshed from `session.updated` / `session.deleted` events; the Native toast keeps dev's interactive gating and show records.
+
+## 2026-10-29 - Use Bun for repository type-check gates (#11771)
+
+The root `typecheck`, `typecheck:script`, `typecheck:packages` and `test:senpi` commands use `bun check --no-script --all -p` with their existing projects. Both POSIX and Windows Senpi compatibility checks use the same command. Command-contract tests still enforce script coverage, package registration and execution order.
+
+`--no-script` prevents package-script dispatch, and `--all` preserves complete diagnostics. Keep the full project list, the copy check, test orchestration and emit/build commands intact.
+
+## 2026-10-29 - First-device genesis construction (#11747)
+
+Add preparation and finishing builders under memory-core's sync/genesis modules,
+with a builder-produced golden vector, creator-anchored verification, both
+epoch-key unwraps and independently re-signed negative vectors.
+
+## 2026-10-26 - Native path traversal before containment (#11339)
+
+The shared containment helper sends the original child and parent paths to native realpath before lexical normalization. Project-memory grants preserve that component sequence, resolve the deepest existing ancestor for missing notes and append the missing segments verbatim, refuse a missing remainder that holds a `.`, `..` or empty segment, and reject non-missing lookup failures. The external-tool soft guard uses the raw target while built-ins keep the resolved target they open. Regression coverage includes the temporary-HOME caller and existing Windows path semantics.
+
 ## 2026-10-26 - A failed paused-child restore cannot wedge parent admission (#11401)
 
 An acknowledged child could fail to restore after the parent quit and reopened. Its resume exception escaped before the parent installed its Resume and reopened admission, leaving subsequent task calls held even after the native Stop was released. Record that participant as lost with the restore failure, finish the parent transaction, and retain its acknowledged cutoff for retries when no live child handle exists yet.

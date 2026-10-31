@@ -47,6 +47,7 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `ax.setValue` | exec | no | no | `AxSetValueParams` | `null` | `ErrorCode` |
 | `ax.focus` | exec | no | no | `AxRefParams` | `null` | `ErrorCode` |
 | `ax.click` | exec | no | no | `AxClickParams` | `null` | `ErrorCode` |
+| `ax.typeText` | exec | no | no | `AxTypeTextParams` | `AxInputResult` | `ErrorCode` |
 | `stopPath.start` | exec | yes | no | `StopPathStartParams` | `StopPathStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.status` | read | no | no | `EmptyParams` | `StopPathStatus` | `ErrorCode` |
 | `stopPath.heartbeat` | read | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |

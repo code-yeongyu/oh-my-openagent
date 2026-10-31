@@ -33,6 +33,8 @@ pub struct FakeBackend {
     pub(crate) ax_owner_unknown: bool,
     pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
     pub(crate) sink: RecordingSink,
+    pub(crate) user_input: std::sync::Arc<crate::user_input_impl::FakeUserInput>,
+    pub(crate) user_input_feed: bool,
     faults: Faults,
 }
 
@@ -50,7 +52,11 @@ impl FakeBackend {
         for write in &scenario.ax_cannot_complete {
             faults.cannot_complete_next(*write);
         }
+        let user_input = std::sync::Arc::new(crate::user_input_impl::FakeUserInput::default());
+        user_input.script(scenario.user_presses);
         Self {
+            user_input,
+            user_input_feed: scenario.user_input_feed,
             ax_tree: AxTree::build(&scenario.ax),
             ax_owner_unknown: scenario.ax_owner_unknown,
             menus: scenario.menus,

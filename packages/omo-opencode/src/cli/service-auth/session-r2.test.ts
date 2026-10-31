@@ -2,7 +2,7 @@ import { expect, onTestFinished, spyOn, test } from "bun:test"
 import { inspect } from "node:util"
 import { createSession } from "./session"
 import { SignInError } from "./protocol"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
+import { clock, fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
 const notSentCodes = [
@@ -18,13 +18,14 @@ for (const code of notSentCodes) {
     const api = fakeApi(() => Response.json({ ...grant, refreshToken: "rotated" }))
     const store = memorySecrets().store(api)
     await store.write(expired)
+    const persisted = await store.read()
     const fetcher = spyOn(globalThis, "fetch").mockRejectedValueOnce(
       new TypeError("fetch failed", { cause: Object.assign(new Error("connection rejected"), { code }) }))
     onTestFinished(() => fetcher.mockRestore())
     const session = createSession({ api, store, home: await temporaryHome() })
     const error: unknown = await session.accessToken().catch(error => error)
     expect(error).toMatchObject({ notSent: true, retryable: true })
-    expect(await store.read()).toEqual(expired)
+    expect(await store.read()).toEqual(persisted)
     expect(await session.accessToken()).toBe(grant.accessToken)
   })
 }
@@ -61,16 +62,18 @@ test("refresh 429 restores the original record and a later retry succeeds", asyn
     : Response.json({ ...grant, refreshToken: "rotated" }))
   const store = memorySecrets().store(api)
   await store.write(expired)
+  const persisted = await store.read()
   const session = createSession({ api, store, home: await temporaryHome() })
   const error: unknown = await session.accessToken().catch(error => error)
   expect(error).toMatchObject({ retryable: true })
-  expect(await store.read()).toEqual(expired)
+  expect(await store.read()).toEqual(persisted)
   expect(await session.accessToken()).toBe(grant.accessToken)
   expect(refreshes).toBe(2)
 })
 
-test("failed not-sent restoration retains the durable fence without replay or secret loss", async () => {
-  const api = fakeApi(() => Response.json(grant))
+test("failed legacy not-sent restoration retains the durable fence without inventing recovery proof", async () => {
+  const keys: (string | null)[] = []
+  const api = fakeApi(request => { keys.push(request.headers.get("idempotency-key")); return Response.json(grant) })
   const base = memorySecrets().store(api)
   await base.write(expired)
   let writes = 0
@@ -81,10 +84,14 @@ test("failed not-sent restoration retains the durable fence without replay or se
   const fetcher = spyOn(globalThis, "fetch").mockRejectedValueOnce(Object.assign(new Error("offline"), { code: "ECONNREFUSED" }))
   onTestFinished(() => fetcher.mockRestore())
   const home = await temporaryHome()
-  await expect(createSession({ api, store, home }).accessToken()).rejects.toThrow()
-  expect(await base.read()).toMatchObject({ ...expired, refreshState: "uncertain" })
-  await expect(createSession({ api, store: base, home }).accessToken()).rejects.toThrow()
+  const time = clock()
+  await expect(createSession({ api, store, home, now: time.now }).accessToken()).rejects.toThrow()
+  const journal = await base.read()
+  expect(journal).toMatchObject({ ...expired, refreshState: "uncertain" })
+  await time.sleep(5_000)
+  await expect(createSession({ api, store: base, home, now: time.now }).accessToken()).rejects.toMatchObject({ code: "refresh_recovery_expired" })
   expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(keys).toEqual([])
   expect(writes).toBe(2)
 })
 

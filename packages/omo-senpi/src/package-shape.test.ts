@@ -84,9 +84,9 @@ describe("omo-senpi package shape", () => {
       typecheck: "tsgo --noEmit -p tsconfig.json",
       test: "bun test src/**/*.test.ts",
     })
-    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.27-2")
+    expect(peerDependencies["@code-yeongyu/senpi"]).toBe("2026.10.30-1")
     expect(peerDependenciesMeta["@code-yeongyu/senpi"]).toMatchObject({ optional: true })
-    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.27-2")
+    expect(devDependencies["@code-yeongyu/senpi"]).toBe("2026.10.30-1")
     expect(dependencies).toMatchObject({
       "@oh-my-opencode/utils": "workspace:*",
       "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -131,6 +131,6 @@ describe("omo-senpi package shape", () => {
     expect(workspaces).toContain("packages/omo-senpi")
     expect(workspaces).not.toContain("packages/lsp-daemon")
     expect(devDependencies["@oh-my-opencode/omo-senpi"]).toBe("workspace:*")
-    expect(typecheckPackages).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
+    expect(typecheckPackages).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
   })
 })
