@@ -152,7 +152,9 @@ export function createCliAccountSource(options: {
     })
     if (credentials === null || credentials.credentialGeneration !== generation || credentials.accountId !== accountId) return null
     const captured = credentials
-    if (active?.generation !== generation) {
+    // A refusal aborts only the operations that saw it: a capture that re-reads the same generation and keys under the
+    // lock gets a live controller, so one transiently empty read never leaves sync off until restart (#11812).
+    if (active?.generation !== generation || active.abort.signal.aborted) {
       active?.abort.abort()
       active = { generation, abort: new AbortController() }
     }
