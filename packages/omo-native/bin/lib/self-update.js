@@ -1,3 +1,5 @@
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { runChild } from "./child-process.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
@@ -9,6 +11,69 @@ export { isPrintOnlyUpdate }
 
 export function formatUpdateCommand(update) {
   return `omo is updated via ${update.manager}: ${update.command}`
+}
+
+// npm 11+ ends a global install with an `install-scripts` warning for install scripts that no `allowScripts`
+// entry covers (#9281). npm 11 still runs them ("not yet covered"), npm 12 blocks them. The update never
+// passes `--allow-scripts` itself; it only explains the notice, because npm's own suggested command has no
+// package name. The notice is read from npm's own debug log, not from the child's output, so npm keeps the
+// terminal (colour, progress). The log carries the same `<id> warn install-scripts ...` lines the terminal does.
+const ALLOW_SCRIPTS_HEADER = /install scripts (blocked because they are not|not yet) covered by allowScripts/
+const NOTICE_PACKAGE_LINE = /^(?:npm|\d+) warn install-scripts +((?:@[^/\s@]+\/)?[^@\s]+)(?:@\S+)? \(/gm
+// Packages whose install scripts omo does not need; only these are described as safe to skip.
+// omo-ai itself is listed for its own postinstall (bin/senpi-patch.mjs): the launcher prepares the engine on
+// first launch (ensureEnginePrepared in engine-prepare.js), so omo works without it.
+const SKIPPABLE_SCRIPTS = ["omo-ai", "esbuild", "@google/genai", "protobufjs"]
+
+/**
+ * @param {string} log npm debug log text
+ * @returns {{ blocked: boolean, packages: string[] } | null} null when npm reported no allowScripts notice
+ */
+export function parseAllowScriptsNotice(log) {
+  const header = ALLOW_SCRIPTS_HEADER.exec(log)
+  if (!header) return null
+  const packages = [...new Set([...log.matchAll(NOTICE_PACKAGE_LINE)].map((match) => match[1]))]
+  return { blocked: header[1].startsWith("blocked"), packages }
+}
+
+/** The decision behind the guidance: which reported packages omo vouches for (`known`) and which it has not reviewed. */
+export function classifyAllowScriptsNotice(notice) {
+  return {
+    blocked: notice.blocked,
+    known: notice.packages.filter((name) => SKIPPABLE_SCRIPTS.includes(name)),
+    other: notice.packages.filter((name) => !SKIPPABLE_SCRIPTS.includes(name)),
+  }
+}
+
+/** Guidance lines; empty when the log named no package, so a notice header alone prints nothing. */
+export function formatAllowScriptsGuidance(update, notice) {
+  const { blocked, known, other } = classifyAllowScriptsNotice(notice)
+  if (known.length + other.length === 0) return []
+  const spec = update.argv[update.argv.length - 1]
+  const lines = []
+  if (known.length > 0) {
+    lines.push(blocked
+      ? `omo: npm blocked the install scripts of ${known.join(", ")}; omo works without them`
+      : `omo: npm ran the install scripts of ${known.join(", ")}; omo does not need them, so the notice is informational`)
+  }
+  if (other.length > 0) {
+    lines.push(`omo: npm ${blocked ? "blocked" : "ran"} the install scripts of ${other.join(", ")}; omo has not reviewed them`)
+  }
+  lines.push(`omo: if npm suggested a command without a package name, ignore it; to reinstall use: npm i -g ${spec}`)
+  return lines
+}
+
+function readNpmDebugLogs(dir) {
+  try {
+    return readdirSync(dir)
+      .filter((name) => /-debug-\d+\.log$/.test(name))
+      .sort()
+      .map((name) => readFileSync(join(dir, name), "utf8"))
+      .join("\n")
+  } catch {
+    // An unreadable log only means no guidance; it must never fail an update that already ran.
+    return ""
+  }
 }
 
 export function readInstalledVersion() {
@@ -41,7 +106,7 @@ export function formatVersionChange(before, after) {
  *
  * @typedef {{ omo: string, engine: string }} InstalledVersion
  * @typedef {{ status: number | null, signal: string | null, stderr?: string }} ChildResult
- * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv, captureStderr?: boolean }} RunOptions
+ * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv, captureStderr?: boolean, onBeforeSignalExit?: () => void }} RunOptions
  * @typedef {import("./update-lock.js").ProcessEntry} ProcessEntry
  * @typedef {{ manager: string, command: string, argv: string[], env?: Record<string, string> }} UpdateTarget
  * @typedef {{
@@ -103,30 +168,58 @@ export async function runSelfUpdate(args, options = {}) {
   }
   log(formatUpdateCommand(update))
 
+  // npm keeps the inherited terminal; its debug log, pinned to a fresh directory, is where the notice is read.
+  let npmLogsDir
+  if (update.manager === "npm") {
+    try {
+      npmLogsDir = mkdtempSync(join(tmpdir(), "omo-npm-logs-"))
+    } catch {
+      // An unusable temp dir only costs the guidance: npm still runs exactly as it did without a logs dir.
+    }
+  }
+  const removeLogsDir = () => {
+    try {
+      rmSync(npmLogsDir, { recursive: true, force: true })
+    } catch {
+      // Cleanup (EBUSY/EPERM on Windows) must never change the exit code of an update that already ran.
+    }
+  }
   const install = async (target) => {
     const [command, ...argv] = target.argv
     return run(command, argv, {
       stdio: "inherit",
       windowsHide: true,
-      env: { ...env, ...target.env },
+      env: { ...env, ...target.env, ...(npmLogsDir ? { npm_config_logs_dir: npmLogsDir } : {}) },
       captureStderr: platform === "win32",
+      ...(npmLogsDir ? { onBeforeSignalExit: removeLogsDir } : {}),
     })
   }
   const failed = (result) => Boolean(result.signal) || (result.status ?? 1) !== 0
   const heldOnWindows = (result) => platform === "win32" && !result.signal && isLockFailure(result.stderr)
 
   let result
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      result = await install(update)
-    } catch {
-      error(`omo: update failed; retry with: ${update.command}`)
-      return 1
+  let npmLog = ""
+  try {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        result = await install(update)
+      } catch {
+        error(`omo: update failed; retry with: ${update.command}`)
+        return 1
+      }
+      if (!failed(result) || !heldOnWindows(result) || attempt >= LOCK_RETRY_DELAYS_MS.length) break
+      const delay = LOCK_RETRY_DELAYS_MS[attempt]
+      log(`omo: ${heldTarget(result.stderr) ?? "a package file"} is held by another process; retrying in ${delay / 1000}s (attempt ${attempt + 2} of ${LOCK_RETRY_DELAYS_MS.length + 1})`)
+      await sleep(delay)
     }
-    if (!failed(result) || !heldOnWindows(result) || attempt >= LOCK_RETRY_DELAYS_MS.length) break
-    const delay = LOCK_RETRY_DELAYS_MS[attempt]
-    log(`omo: ${heldTarget(result.stderr) ?? "a package file"} is held by another process; retrying in ${delay / 1000}s (attempt ${attempt + 2} of ${LOCK_RETRY_DELAYS_MS.length + 1})`)
-    await sleep(delay)
+  } finally {
+    if (npmLogsDir) {
+      npmLog = readNpmDebugLogs(npmLogsDir)
+      // A failed npm exit points the user at a log in this directory, so only that case keeps it. A signal or a
+      // spawn error gives no such pointer (npm is killed or never started), so those are cleaned like a success.
+      const failedExit = result !== undefined && !result.signal && (result.status ?? 1) !== 0
+      if (!failedExit) removeLogsDir()
+    }
   }
 
   if (failed(result) && heldOnWindows(result)) {
@@ -145,6 +238,8 @@ export async function runSelfUpdate(args, options = {}) {
     return 1
   }
   log(formatVersionChange(before, after))
+  const notice = parseAllowScriptsNotice(npmLog)
+  if (notice) for (const line of formatAllowScriptsGuidance(update, notice)) log(line)
   return 0
 }
 
