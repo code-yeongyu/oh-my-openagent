@@ -25,6 +25,15 @@ import {
 
 afterEach(cleanupReconciliationFixtures)
 
+async function writeActiveLauncherIdentity(
+  item: Awaited<ReturnType<typeof fixture>>,
+  fields: { readonly launcherMachineHash?: string; readonly launcherHostname?: string },
+): Promise<void> {
+  const activePath = join(item.identity.paths.reflection, "active.lock")
+  const active = JSON.parse(await readFile(activePath, "utf8"))
+  await writeFile(activePath, JSON.stringify({ ...active, ...fields }))
+}
+
 describe("reflection and dream run reconciliation", () => {
   test.each(["alive", "unknown", "dead-before-term", "dead-before-kill"] as const)(
     "#given a %s supervisor wait #when its observer is cancelled #then no new terminal claim or child signal occurs",
@@ -322,6 +331,48 @@ describe("reflection and dream run reconciliation", () => {
     expect(untouched).toEqual([])
     expect(reused).toEqual([{ runId: "run-orphan", outcome: "failed" }])
     expect((await unknown.journal.getState()).reflected_completed_steps).toBe(0)
+  }, 30_000)
+
+  test("#given a foreign machine id on the active reservation #when reconciled #then the reservation is never released or quarantined", async () => {
+    // given
+    const item = await fixture()
+    await rmEfaultTolerant(item.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await writeActiveLauncherIdentity(item, { launcherMachineHash: "machine-a", launcherHostname: "fixture-host" })
+
+    // when
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      hostname: () => "fixture-host",
+      machineHash: async () => "machine-b",
+      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+      getPidLiveness: () => "dead",
+    })
+
+    // then
+    expect(results).toEqual([])
+    expect((await item.store.readState()).active?.runId).toBe("run-orphan")
+  }, 30_000)
+
+  test("#given the same machine id with a different recorded hostname #when reconciled #then the dead launcher's reservation is recoverable", async () => {
+    // given
+    const item = await fixture()
+    await rmEfaultTolerant(item.runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    await writeActiveLauncherIdentity(item, { launcherMachineHash: "machine-a", launcherHostname: "other-host" })
+
+    // when
+    const results = await reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      hostname: () => "fixture-host",
+      machineHash: async () => "machine-a",
+      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+      getPidLiveness: () => "dead",
+    })
+
+    // then
+    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    expect((await item.store.readState()).active).toBeUndefined()
   }, 30_000)
 
   test.each([

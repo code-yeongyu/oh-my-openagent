@@ -1,6 +1,7 @@
 // /doctor ghost active-reservation check: surfaces a wedged `active.lock` whose launcher is
 // gone (the post-#7095 repair state reconcile now reclaims automatically at session start).
 
+import { classifyHostIdentity, readCurrentMachineHash } from "@oh-my-opencode/memory-core"
 import { existsSync, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
@@ -12,7 +13,11 @@ const GHOST_REMEDIATION = "a current runtime reclaims it at session start; on ol
 
 export async function checkGhostReservation(
   identityPaths: MemoryCommandIdentity["identityPaths"],
-  deps: { readonly isProcessAlive?: (pid: number) => boolean },
+  deps: {
+    readonly isProcessAlive?: (pid: number) => boolean
+    readonly hostname?: () => string
+    readonly machineHash?: () => Promise<string | null>
+  },
 ): Promise<DoctorCheck> {
   const activePath = join(identityPaths.reflection, "active.lock")
   if (!existsSync(activePath)) return { name: "reservation", level: "ok", detail: "no active reservation" }
@@ -30,11 +35,21 @@ export async function checkGhostReservation(
   const reservedAtMs = typeof record.reservedAt === "string" ? Date.parse(record.reservedAt) : Number.NaN
   const launcherPid = typeof record.launcherPid === "number" ? record.launcherPid : undefined
   const launcherHostname = typeof record.launcherHostname === "string" ? record.launcherHostname : undefined
+  const launcherMachineHash = typeof record.launcherMachineHash === "string" ? record.launcherMachineHash : undefined
   if (launcherPid === undefined || launcherHostname === undefined || !Number.isFinite(reservedAtMs)) {
     return { name: "reservation", level: "warn", detail: `ghost active reservation ${runId}: launcher identity missing (pre-stamping legacy); ${GHOST_REMEDIATION}` }
   }
   if (Date.now() - reservedAtMs <= 60_000) return { name: "reservation", level: "ok", detail: `reservation ${runId} is recent` }
-  if (launcherHostname !== hostname()) return { name: "reservation", level: "ok", detail: `reservation ${runId} is owned by ${launcherHostname}` }
+  const owner = await classifyHostIdentity({
+    recordedHostname: launcherHostname,
+    recordedMachineHash: launcherMachineHash,
+    currentHostname: (deps.hostname ?? hostname)(),
+    currentMachineHash: deps.machineHash ?? readCurrentMachineHash,
+  })
+  if (owner.state === "foreign") {
+    const where = owner.viaMachineId ? `a different machine (host ${launcherHostname})` : launcherHostname
+    return { name: "reservation", level: "ok", detail: `reservation ${runId} is owned by ${where}` }
+  }
   const alive = (deps.isProcessAlive ?? defaultIsProcessAlive)(launcherPid)
   if (alive) return { name: "reservation", level: "ok", detail: `reservation ${runId} launcher pid ${launcherPid} is alive` }
   return {

@@ -59,6 +59,28 @@ describe("checkGhostReservation", () => {
     expect(await checkGhostReservation(paths, { isProcessAlive: () => false })).toMatchObject({ level: "ok" })
   })
 
+  test("#given another machine's reservation under the same hostname with a pid dead here #then the check is ok and names the other machine", async () => {
+    const paths = await identityPathsWithActive({ ...GHOST_ACTIVE, launcherHostname: "shared-name", launcherMachineHash: "hash-machine-a" })
+    const check = await checkGhostReservation(paths, {
+      isProcessAlive: () => false,
+      hostname: () => "shared-name",
+      machineHash: async () => "hash-machine-b",
+    })
+    expect(check).toMatchObject({ level: "ok" })
+    expect(check.detail).toContain("different machine")
+  })
+
+  test("#given this machine's reservation recorded under its old hostname with a dead launcher #then it warns about the ghost", async () => {
+    const paths = await identityPathsWithActive({ ...GHOST_ACTIVE, launcherHostname: "old-name", launcherMachineHash: "hash-machine-a" })
+    const check = await checkGhostReservation(paths, {
+      isProcessAlive: () => false,
+      hostname: () => "new-name",
+      machineHash: async () => "hash-machine-a",
+    })
+    expect(check).toMatchObject({ level: "warn" })
+    expect(check.detail).toContain("81327")
+  })
+
   test("#given a reservation missing launcher identity #then it warns about the legacy ghost", async () => {
     const paths = await identityPathsWithActive({ runId: "reflection-run-2", request: GHOST_ACTIVE.request })
     const check = await checkGhostReservation(paths, {})

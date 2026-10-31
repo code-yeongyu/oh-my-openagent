@@ -5,7 +5,14 @@ import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { appendMemoryReceiptOnce, readMemoryReceipts, receiptIdentity, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
+import {
+  appendMemoryReceiptOnce,
+  createMachineHashReader,
+  readMemoryReceipts,
+  receiptIdentity,
+  reflectionHostHash,
+  type MemoryReceiptInput,
+} from "@oh-my-opencode/memory-core"
 
 import type { MemoryReceiptsPort } from "../receipts-port"
 import { writeRunJsonAtomic } from "./run-artifacts"
@@ -128,6 +135,23 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect(JSON.parse(await readFile(join(item.runDir, "reservation.quarantined.json"), "utf8"))).toEqual(activeBefore)
     expect(await readFile(join(item.runDir, "ledger.json"), "utf8")).toBe("{ not json")
     expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
+  // Storage/security contract (#11863): quarantine evidence keeps the hashed machine id, never the raw one.
+  test("#given a reservation stamped with a readable machine id #when its run is quarantined #then the evidence carries only the hash", async () => {
+    // given
+    const raw = "synthetic-platform-id-0003"
+    const readMachineHash = createMachineHashReader(async () => raw)
+    const item = await fixture("step-count", async () => ({ pid: 111, hostname: "fixture-host", processStart: "launcher-start", machineHash: await readMachineHash() }))
+    await writeFile(join(item.runDir, "ledger.json"), "{ not json")
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher(), machineHash: readMachineHash })
+
+    // then
+    const evidence = await readFile(join(item.runDir, "reservation.quarantined.json"), "utf8")
+    expect(evidence.includes(raw)).toBe(false)
+    expect(JSON.parse(evidence).launcherMachineHash).toBe(reflectionHostHash(raw))
   }, 30_000)
 
   test("#given an unreadable ledger under a launcher that is still alive #when reconciled #then nothing is quarantined and nothing is written", async () => {
