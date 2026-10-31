@@ -570,7 +570,9 @@ function readJsonFile(path: string, runId?: DagRunId, now: () => number = Date.n
   }
 }
 
-function assertSupportedSchema(value: unknown, path: string, runId: DagRunId | undefined, now: () => number): void {
+// Exported for the in-memory store the retry tests journal to (#11621): a test double that skips these
+// refusals would pass journal state the file store rejects, so both stores call the SAME validator.
+export function assertSupportedSchema(value: unknown, path: string, runId: DagRunId | undefined, now: () => number): void {
   if (!isRecord(value) || typeof value.schemaVersion !== "number") {
     throw corrupt(path, runId, "missing schemaVersion", now)
   }
@@ -923,7 +925,8 @@ function pruneRunArtifacts(
   fs.rmSync(paths.run(runId), { force: true })
 }
 
-function assertSafeSegment(value: string, label: string): void {
+// Exported with assertSupportedSchema above, for the same reason.
+export function assertSafeSegment(value: string, label: string): void {
   if (!isSafeDagPathSegment(value)) {
     throw new Error(`Invalid ${label}`)
   }

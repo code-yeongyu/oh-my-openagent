@@ -6,9 +6,10 @@ import { createTaskManager } from "../manager/manager"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ManagedRunner } from "../manager/types"
 import { createTaskRecordStore } from "../store"
+import { resolveStateDir } from "../store/state-dir"
+import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
 import { createDagManager } from "./manager"
 import { createDagScheduler } from "./scheduler"
-import { createDagFileStore } from "./store"
 import type { DagDefinition } from "./graph"
 
 export type Outcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
@@ -24,9 +25,11 @@ export function infraFixture(
   const project = fs.mkdtempSync(join(tmpdir(), "dag-infra-retry-"))
   const starts = new Map<string, number>()
   const taskStore = createTaskRecordStore({ project_dir: project })
-  // These cases assert retry semantics, not crash durability; fsync on every commit is the dominant cost
-  // on hosted Windows runners (#10711). Writes still go through the real file store.
-  const store = createDagFileStore({ project_dir: project }, { fsync: false })
+  // These cases assert retry semantics, not crash durability. Real journal commits charge contended
+  // host I/O per commit, which is what made two of them exceed the 5 s default under load (#11621),
+  // so the DAG journal is kept in memory with identical seq/paging/encoding semantics.
+  const stateDir = resolveStateDir({ project_dir: project })
+  const store = createInMemoryDagStore(stateDir)
   const runner: ManagedRunner = {
     start: async (spec) => {
       const attempt = (starts.get(spec.prompt) ?? 0) + 1
@@ -57,6 +60,9 @@ export function infraFixture(
   return {
     starts,
     store,
+    // Where a file-backed journal WOULD write. The cases assert it stays absent, so a store swapped
+    // back to disk fails here instead of quietly reintroducing the load-dependent commit cost.
+    dagDirectory: join(stateDir, "dag"),
     taskStore,
     taskManager,
     async scheduler(nodes: DagDefinition["nodes"]) {
