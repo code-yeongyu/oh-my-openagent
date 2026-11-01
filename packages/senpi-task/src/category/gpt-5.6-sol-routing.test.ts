@@ -36,27 +36,27 @@ describe("GPT-5.6 Sol category routing", () => {
     })
   }
 
-  test("#given only OpenCode Sol #when deep-low resolves #then it runs OpenCode GPT-5.6 Sol at medium", () => {
+  test("#given only OpenCode Sol #when deep-low resolves #then it runs OpenCode GPT-5.6 Sol at high", () => {
     // given / when
     const result = resolveCategory("deep-low", {}, registry)
 
     // then
     expect(result.kind).toBe("resolved")
     if (result.kind !== "resolved") throw new Error("Expected resolved")
-    expect(result.spec).toMatchObject({ provider: "opencode", modelId: "gpt-5.6-sol", variant: "medium" })
+    expect(result.spec).toMatchObject({ provider: "opencode", modelId: "gpt-5.6-sol", variant: "high" })
   })
 
-  test("#given only OpenCode Sol #when unspecified-low resolves #then it runs OpenCode GPT-5.6 Sol at medium", () => {
+  test("#given only OpenCode Sol #when unspecified-low resolves #then it runs OpenCode GPT-5.6 Sol at high", () => {
     // given / when
     const result = resolveCategory("unspecified-low", {}, registry)
 
     // then
     expect(result.kind).toBe("resolved")
     if (result.kind !== "resolved") throw new Error("Expected resolved")
-    expect(result.spec).toMatchObject({ provider: "opencode", modelId: "gpt-5.6-sol", variant: "medium" })
+    expect(result.spec).toMatchObject({ provider: "opencode", modelId: "gpt-5.6-sol", variant: "high" })
   })
 
-  test("#given only xAI grok-4.7 #when unspecified-low resolves #then it uses the xhigh grok rung", () => {
+  test("#given only xAI grok-4.7 #when unspecified-low resolves #then it uses the high grok rung", () => {
     // given
     const grokModel: FakeModel = { provider: "xai", id: "grok-4.7" }
     const grokRegistry = {
@@ -74,7 +74,7 @@ describe("GPT-5.6 Sol category routing", () => {
     expect(result.spec).toMatchObject({
       provider: "xai",
       modelId: "grok-4.7",
-      variant: "xhigh",
+      variant: "high",
     })
   })
 

@@ -41,17 +41,17 @@ describe("generateModelConfig provider routes", () => {
       // then Hephaestus uses the native Sol route and keeps its predecessor as fallback
       expect(result.agents?.hephaestus).toEqual({
         model: "openai/gpt-6-sol",
-        variant: "medium",
+        variant: "high",
         fallback_models: [
           {
             model: "openai/gpt-5.6-sol",
-            variant: "medium",
+            variant: "high",
           },
         ],
       })
     })
 
-    test("Hephaestus uses its merged Copilot GPT-6 Sol medium rung", () => {
+    test("Hephaestus uses its merged Copilot GPT-6 Sol high rung", () => {
       // given only GitHub Copilot is available
       const config = createConfig({ hasCopilot: true })
 
@@ -61,11 +61,11 @@ describe("generateModelConfig provider routes", () => {
       // then Hephaestus uses the supported Copilot effort and keeps its predecessor as fallback
       expect(result.agents?.hephaestus).toEqual({
         model: "github-copilot/gpt-6-sol",
-        variant: "medium",
+        variant: "high",
         fallback_models: [
           {
             model: "github-copilot/gpt-5.6-sol",
-            variant: "medium",
+            variant: "high",
           },
         ],
       })
@@ -80,7 +80,7 @@ describe("generateModelConfig provider routes", () => {
 
       // then Hephaestus uses the OpenCode Sol route
       expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-6-sol")
-      expect(result.agents?.hephaestus?.variant).toBe("medium")
+      expect(result.agents?.hephaestus?.variant).toBe("high")
     })
 
     test("Hephaestus is omitted when only Claude is available", () => {
@@ -118,7 +118,7 @@ describe("generateModelConfig provider routes", () => {
   })
 
   describe("librarian agent special cases", () => {
-    test("librarian uses Haiku 5.5 medium when ZAI is available with Claude", () => {
+    test("librarian uses Haiku 5.5 high when ZAI is available with Claude", () => {
       // given Claude and ZAI are available
       const config = createConfig({ hasClaude: true, hasZaiCodingPlan: true })
 
@@ -127,11 +127,11 @@ describe("generateModelConfig provider routes", () => {
 
       // then Librarian uses the current Claude fallback
       expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-5-5")
-      expect(result.agents?.librarian?.variant).toBe("medium")
+      expect(result.agents?.librarian?.variant).toBe("high")
       expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
     })
 
-    test("librarian uses Haiku 5.5 medium when Claude is available", () => {
+    test("librarian uses Haiku 5.5 high when Claude is available", () => {
       // given only Claude is available
       const config = createConfig({ hasClaude: true })
 
@@ -140,7 +140,7 @@ describe("generateModelConfig provider routes", () => {
 
       // then Librarian uses the shared Claude fallback
       expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-5-5")
-      expect(result.agents?.librarian?.variant).toBe("medium")
+      expect(result.agents?.librarian?.variant).toBe("high")
     })
   })
 
@@ -168,7 +168,7 @@ describe("generateModelConfig provider routes", () => {
 
       // then Explore has no remaining fallback
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-5-5")
-      expect(result.agents?.explore?.variant).toBe("medium")
+      expect(result.agents?.explore?.variant).toBe("high")
       expect(result.agents?.explore?.fallback_models).toBeUndefined()
     })
 

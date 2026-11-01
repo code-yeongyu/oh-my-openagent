@@ -19,7 +19,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
   explore: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
-    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
+    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "high" },
     { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
     { providers: ["opencode-go"], model: "minimax-m2.7" }
@@ -27,7 +27,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
   librarian: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
-    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
+    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "high" },
     { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
     { providers: ["opencode-go"], model: "minimax-m2.7" }
@@ -56,7 +56,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
   ]),
   "plan-reviewer": [
-    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
+    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
     { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
     { providers: ["chatgpt-subscription", "openai", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
     {

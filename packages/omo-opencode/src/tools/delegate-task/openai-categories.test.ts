@@ -16,7 +16,7 @@ import {
 } from "./openai-categories"
 
 const ASTRA_IDS = ["gpt-6-astra", "openai/gpt-6-astra", "openai-codex/gpt-6-astra-fast", "github-copilot/gpt-6-astra"]
-const GPT_5_IDS = ["openai/gpt-5.5", "openai/gpt-5.5 medium", "openai/gpt-5-5", "openai/gpt-5.6-sol"]
+const GPT_5_IDS = ["openai/gpt-5.5", "openai/gpt-5.5 high", "openai/gpt-5-5", "openai/gpt-5.6-sol"]
 const NON_GPT_IDS = ["openai/gpt-5.4", "anthropic/claude-opus-4-7", undefined]
 
 describe("deep lane prompt append resolvers", () => {
@@ -90,11 +90,11 @@ describe("OPENAI_CATEGORIES deep lanes", () => {
     const highCat = OPENAI_CATEGORIES.find((c) => c.name === "unspecified-high")
 
     //#then
-    expect(low?.config).toEqual({ model: "openai/gpt-6.1-sol", variant: "medium" })
+    expect(low?.config).toEqual({ model: "openai/gpt-6.1-sol", variant: "high" })
     expect(low?.requiresModel).toEqual(["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol-fast", "gpt-5.6-sol"])
     expect(high?.config).toEqual({ model: "openai/gpt-6-astra", variant: "high" })
     expect(high?.requiresModel).toBe("gpt-6-astra")
-    expect(highCat?.config).toEqual({ model: "anthropic/claude-opus-5-5", variant: "medium" })
+    expect(highCat?.config).toEqual({ model: "anthropic/claude-opus-5-5", variant: "high" })
     expect(highCat?.resolvePromptAppend).toBe(resolveUnspecifiedHighCategoryPromptAppend)
   })
 

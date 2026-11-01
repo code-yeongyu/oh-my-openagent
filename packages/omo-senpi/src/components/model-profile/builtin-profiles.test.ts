@@ -120,31 +120,31 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     expect(claudeRungs.filter((rung) => rung.providers[0] !== "anthropic-subscription").map((rung) => `${rung.profile}: ${rung.model}`)).toEqual([])
   })
 
-  it("orders daily-normal opus medium then kimi max then glm max", () => {
-    expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 medium", "kimi-k3.1-pro max", "glm-5.3 max"])
+  it("orders daily-normal opus high then kimi max then glm max", () => {
+    expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 high", "kimi-k3.1-pro max", "glm-5.3 max"])
   })
 
-  it("runs daily-heavy as Fable 5.5 then 5.1 at xhigh", () => {
+  it("runs daily-heavy as Fable 5.5 then 5.1 at high", () => {
     expect(BUILTIN_MODEL_PROFILES["daily-heavy"]?.models).toEqual([
       ...(FABLE_55_RELEASED ? [{
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-5",
-        variant: "xhigh",
+        variant: "high",
       }] : []),
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
-        variant: "xhigh",
+        variant: "high",
       },
     ])
   })
 
-  it("runs geeky-normal as gpt-6-astra medium on every GPT lane, then gpt-6.1-sol-fast and gpt-6.1-sol medium on the OpenAI lanes, then gpt-5.6-sol medium on every GPT lane", () => {
+  it("runs geeky-normal as gpt-6-astra high on every GPT lane, then gpt-6.1-sol-fast and gpt-6.1-sol high on the OpenAI lanes, then gpt-5.6-sol high on every GPT lane", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.models).toEqual([
-      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "medium" },
-      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "medium" },
-      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },
+      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "high" },
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "high" },
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "high" },
+      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "high" },
     ])
   })
 

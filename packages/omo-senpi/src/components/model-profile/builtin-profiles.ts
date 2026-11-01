@@ -88,7 +88,7 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     displayName: "Daily · Normal",
     description: "Gets any task done without fuss.",
     models: [
-      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeOpus, variant: "medium" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeOpus, variant: "high" },
       { providers: [...KIMI_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.kimi, variant: "max" },
       { providers: [...GLM_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
     ],
@@ -99,8 +99,8 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     displayName: "Daily · Heavy",
     description: "Gets any task done, after thinking it over from more sides.",
     models: launchRungs([
-      { providers: [...CLAUDE_PROVIDERS], model: FABLE_55_LAUNCH.id, variant: "xhigh" },
-      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "xhigh" },
+      { providers: [...CLAUDE_PROVIDERS], model: FABLE_55_LAUNCH.id, variant: "high" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "high" },
     ]),
   },
   "geeky-normal": {
@@ -110,10 +110,10 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     description: "Obsessive focus on one hard task.",
     caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
     models: [
-      { providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "medium" },
-      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
-      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
-      { providers: [...GPT_PROVIDERS], model: "gpt-5.6-sol", variant: "medium" },
+      { providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "high" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "high" },
+      { providers: [...GPT_PROVIDERS], model: "gpt-5.6-sol", variant: "high" },
     ],
   },
   "geeky-heavy": {

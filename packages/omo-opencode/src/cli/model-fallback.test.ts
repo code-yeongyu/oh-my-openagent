@@ -72,7 +72,7 @@ describe("generateModelConfig", () => {
       expect(result.categories?.["deep-high"]?.model).toBe("github-copilot/gpt-6-astra")
       expect(result.categories?.["deep-high"]?.variant).toBe("high")
       expect(result.categories?.["unspecified-low"]?.model).toBe("github-copilot/claude-sonnet-5.5")
-      expect(result.categories?.["unspecified-low"]?.variant).toBe("medium")
+      expect(result.categories?.["unspecified-low"]?.variant).toBe("high")
     })
     test("omits librarian when only ZAI is available", () => {
       // #given only ZAI is available
@@ -145,19 +145,19 @@ describe("generateModelConfig", () => {
       expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
     })
 
-    test("explore uses Claude Haiku 5.5 medium when Claude available", () => {
+    test("explore uses Claude Haiku 5.5 high when Claude available", () => {
       // #given Claude is available
       const config = createConfig({ hasClaude: true, isMax20: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use claude-haiku-5-5 at medium effort
+      // #then explore should use claude-haiku-5-5 at high effort
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-5-5")
-      expect(result.agents?.explore?.variant).toBe("medium")
+      expect(result.agents?.explore?.variant).toBe("high")
     })
 
-    test("explore uses Claude Haiku 5.5 medium regardless of isMax20 flag", () => {
+    test("explore uses Claude Haiku 5.5 high regardless of isMax20 flag", () => {
       // #given Claude is available without Max 20 plan
       const config = createConfig({ hasClaude: true, isMax20: false })
 
@@ -166,7 +166,7 @@ describe("generateModelConfig", () => {
 
       // #then explore should use claude-haiku-5-5 (isMax20 doesn't affect explore)
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-5-5")
-      expect(result.agents?.explore?.variant).toBe("medium")
+      expect(result.agents?.explore?.variant).toBe("high")
     })
 
     test("explore uses OpenAI model when only OpenAI available", () => {
@@ -233,7 +233,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5-5")
     })
 
-    test("Sisyphus resolves to gpt-5.6-sol medium when only OpenAI is available", () => {
+    test("Sisyphus resolves to gpt-5.6-sol high when only OpenAI is available", () => {
       // given
       const config = createConfig({ hasOpenAI: true })
 
@@ -243,13 +243,13 @@ describe("generateModelConfig", () => {
       // then
       expect(result.agents?.sisyphus).toEqual({
         model: "openai/gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       })
     })
   })
 
   describe("OpenAI fallback coverage", () => {
-    test("Atlas resolves to gpt-5.6-sol medium when only OpenAI is available", () => {
+    test("Atlas resolves to gpt-5.6-sol high when only OpenAI is available", () => {
       // given
       const config = createConfig({ hasOpenAI: true })
 
@@ -259,7 +259,7 @@ describe("generateModelConfig", () => {
       // then
       expect(result.agents?.atlas).toEqual({
         model: "openai/gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       })
     })
 
@@ -275,7 +275,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.metis?.variant).toBeUndefined()
     })
 
-    test("Sisyphus-Junior resolves to gpt-5.6-sol medium when only OpenAI is available", () => {
+    test("Sisyphus-Junior resolves to gpt-5.6-sol high when only OpenAI is available", () => {
       // given
       const config = createConfig({ hasOpenAI: true })
 
@@ -285,13 +285,13 @@ describe("generateModelConfig", () => {
       // then
       expect(result.agents?.["sisyphus-junior"]).toEqual({
         model: "openai/gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       })
     })
   })
 
   describe("Momus agent model resolution", () => {
-    test("Momus resolves to gpt-6-astra xhigh when OpenAI is available", () => {
+    test("Momus resolves to gpt-6-astra high when OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -300,11 +300,10 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.momus?.model).toBe("openai/gpt-6-astra")
-      expect(result.agents?.momus?.variant).toBe("xhigh")
-      expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
-        model: "openai/gpt-6-astra",
-        variant: "high",
-      })
+      expect(result.agents?.momus?.variant).toBe("high")
+      // The chain's top tier is high now (was xhigh), and high is universally supported,
+      // so the generator emits no downgraded fallback rung for it.
+      expect(result.agents?.momus?.fallback_models).toBeUndefined()
     })
   })
 

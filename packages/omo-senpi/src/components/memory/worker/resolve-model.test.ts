@@ -379,7 +379,7 @@ describe("resolveReflectionModel", () => {
       if (result.kind === "resolved") {
         expect(result.model).toBe("devin/swe-2-low")
         expect(result.fallbacks).toEqual([
-          { model: "anthropic/claude-haiku-5-5", thinking: "medium" },
+          { model: "anthropic/claude-haiku-5-5", thinking: "high" },
           { model: "deepseek/deepseek-flash", thinking: "off" },
         ])
       }

@@ -64,7 +64,7 @@ describe("resolveAgent category stage", () => {
 
     // then
     expect(result.model).toBe("openai/gpt-5.6-sol")
-    expect(result.resolved_model?.reasoning).toBe("medium")
+    expect(result.resolved_model?.reasoning).toBe("high")
     expect(result.fallback_models?.map((record) => record.display)).toContain("anthropic/claude-opus-5-5")
     for (const record of result.fallback_models ?? []) {
       expect(record.source).toBe("agent")
@@ -82,7 +82,7 @@ describe("resolveAgent category stage", () => {
 
     // then
     expect(result.model).toBe("anthropic/claude-opus-5-5")
-    expect(result.resolved_model?.reasoning).toBe("medium")
+    expect(result.resolved_model?.reasoning).toBe("high")
   })
 
   test("#given categories deep then unspecified-low #when only the low chain head is available #then it resolves at that chain head", () => {
@@ -95,7 +95,7 @@ describe("resolveAgent category stage", () => {
 
     // then
     expect(result.model).toBe("anthropic/claude-sonnet-5-5")
-    expect(result.resolved_model?.reasoning).toBe("medium")
+    expect(result.resolved_model?.reasoning).toBe("high")
   })
 
   test("#given a single unspecified-high category #when only its claude-opus-5-5 rung is available #then the agent runs on it", () => {
@@ -108,7 +108,7 @@ describe("resolveAgent category stage", () => {
 
     // then
     expect(result.model).toBe("anthropic/claude-opus-5-5")
-    expect(result.resolved_model?.reasoning).toBe("medium")
+    expect(result.resolved_model?.reasoning).toBe("high")
   })
 
   test("#given an omo.json deep category model override #when the agent resolves #then the user model reaches the agent", () => {

@@ -32,8 +32,8 @@ function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): 
 const GPT_CATEGORY_CASES = [
   { category: "ultrabrain", modelId: "gpt-6-astra", variant: "max" },
   { category: "deep-high", modelId: "gpt-6-astra", variant: "high" },
-  { category: "deep-low", modelId: "gpt-5.6-sol-fast", variant: "medium" },
-  { category: "deep-low", modelId: "gpt-5.6-sol", variant: "medium" },
+  { category: "deep-low", modelId: "gpt-5.6-sol-fast", variant: "high" },
+  { category: "deep-low", modelId: "gpt-5.6-sol", variant: "high" },
 ] as const
 
 describe("openai lane policy", () => {

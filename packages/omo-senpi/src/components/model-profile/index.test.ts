@@ -207,14 +207,14 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([OPUS])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(pi.entries).toHaveLength(1)
     expect(recordedOutcome(pi)).toMatchObject({
       customType: MODEL_PROFILE_APPLIED_TYPE,
-      details: { profile: "daily-normal", model: "anthropic/claude-opus-5-5", reasoning: "medium", skipped: [] },
+      details: { profile: "daily-normal", model: "anthropic/claude-opus-5-5", reasoning: "high", skipped: [] },
     })
     expect(appliedContent(pi)).toContain('"daily-normal" (Daily · Normal)')
-    expect(appliedContent(pi)).toContain("anthropic/claude-opus-5-5 medium")
+    expect(appliedContent(pi)).toContain("anthropic/claude-opus-5-5 high")
     expect(notices).toEqual([])
   })
 
@@ -224,7 +224,7 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([OPUS])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE, details: { profile: "daily-normal" } })
   })
 
@@ -246,7 +246,7 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SUBSCRIPTION_OPUS])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
   })
 
   test("#given unset with GPT-6.1 Sol and GPT-6 Sol connected beside GLM #when the session starts #then Daily · Normal's GLM rung is applied", async () => {
@@ -267,9 +267,9 @@ describe("createModelProfileComponent", () => {
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_61])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(recordedOutcome(pi)).toMatchObject({
-      details: { profile: "geeky-normal", model: "chatgpt-subscription/gpt-6.1-sol", reasoning: "medium" },
+      details: { profile: "geeky-normal", model: "chatgpt-subscription/gpt-6.1-sol", reasoning: "high" },
     })
   })
 
@@ -354,56 +354,56 @@ describe("createModelProfileComponent", () => {
     expect(existsSync(join(agentDir, "settings.json"))).toBe(false)
   })
 
-  test("#given daily-heavy #when the session starts #then fable xhigh is applied", async () => {
+  test("#given daily-heavy #when the session starts #then fable high is applied", async () => {
     const { pi, start } = harness({ model_profile: "daily-heavy" })
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([FABLE])
-    expect(pi.sessionThinkingLevels).toEqual(["xhigh"])
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
     expect(appliedContent(pi)).toContain('"daily-heavy" (Daily · Heavy)')
-    expect(appliedContent(pi)).toContain("anthropic/claude-fable-5-1 xhigh")
+    expect(appliedContent(pi)).toContain("anthropic/claude-fable-5-1 high")
   })
 
-  test("#given geeky-normal with GPT-6 Astra beside the Sol tiers #when the session starts #then gpt-6-astra medium is applied", async () => {
+  test("#given geeky-normal with GPT-6 Astra beside the Sol tiers #when the session starts #then gpt-6-astra high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, SOL_61, SOL_61_FAST, SOL_56_COPILOT, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([ASTRA])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6-astra medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6-astra high")
     expect(appliedContent(pi)).toContain("**NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.**")
   })
 
-  test("#given geeky-normal without GPT-6 Astra, with GPT-6.1 Sol Fast and GPT-6.1 Sol connected #when the session starts #then gpt-6.1-sol-fast medium is applied", async () => {
+  test("#given geeky-normal without GPT-6 Astra, with GPT-6.1 Sol Fast and GPT-6.1 Sol connected #when the session starts #then gpt-6.1-sol-fast high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_61, SOL_61_FAST, SOL_56_COPILOT, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_61_FAST])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol-fast medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol-fast high")
   })
 
-  test("#given geeky-normal with neither GPT-6 Astra nor the GPT-6.1 Sol Fast tier #when the session starts #then plain gpt-6.1-sol medium is applied", async () => {
+  test("#given geeky-normal with neither GPT-6 Astra nor the GPT-6.1 Sol Fast tier #when the session starts #then plain gpt-6.1-sol high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_56_COPILOT, SOL_61, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_61])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6.1-sol high")
   })
 
-  test("#given geeky-normal with only Copilot GPT-5.6 Sol, no Astra or 6.1 Sol #when the session starts #then gpt-5.6-sol medium is applied", async () => {
+  test("#given geeky-normal with only Copilot GPT-5.6 Sol, no Astra or 6.1 Sol #when the session starts #then gpt-5.6-sol high is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-normal" }, [SOL_56_COPILOT, SOL, UNRELATED])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([SOL_56_COPILOT])
-    expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(appliedContent(pi)).toContain("github-copilot/gpt-5.6-sol medium")
+    expect(pi.sessionThinkingLevels).toEqual(["high"])
+    expect(appliedContent(pi)).toContain("github-copilot/gpt-5.6-sol high")
   })
 
   test("#given geeky-heavy #when the session starts #then astra high is applied", async () => {

@@ -17,12 +17,12 @@ describe("Senpi category routing policy", () => {
     expect(routing).toEqual({
       visualEngineering: { model: "google/gemini-4-argon", variant: "low" },
       quick: { model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" },
-      unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "medium" },
-      unspecifiedLow: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
+      unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "high" },
+      unspecifiedLow: { model: "anthropic/claude-sonnet-5-5", variant: "high" },
     })
   })
 
-  test("unspecified-low fallback chain is claude-sonnet-5-5 medium first and excludes luna", () => {
+  test("unspecified-low fallback chain is claude-sonnet-5-5 high first and excludes luna", () => {
     // given / when
     const chain = CATEGORY_FALLBACK_CHAINS["unspecified-low"]
 
@@ -32,7 +32,7 @@ describe("Senpi category routing policy", () => {
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5-5",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["xiaomi", "opencode-go"],
@@ -42,7 +42,7 @@ describe("Senpi category routing policy", () => {
       {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
-        variant: "xhigh",
+        variant: "high",
       },
       {
         providers: ["zai", "zai-coding-cn", "opencode-go"],
@@ -52,12 +52,12 @@ describe("Senpi category routing policy", () => {
       {
         providers: ["chatgpt-subscription", "openai"],
         model: "gpt-6.1-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
