@@ -1,12 +1,22 @@
 import { existsSync } from "../fs/resilient"
 import { rm } from "../fs/resilient"
 import { resolve } from "node:path"
-import type { GitExec, GitExecResult } from "../git"
-import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
+import type { GitExec } from "../git"
 import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
+import {
+  DEFAULT_INDEX_LOCK_RETRY,
+  gitOrThrow as git,
+  isAncestor,
+  optionalRevision,
+  retryOnIndexLock,
+  runGit as run,
+  type IndexLockRetry,
+} from "./worktree-integration-git"
+import { healStrandedMerge } from "./worktree-integration-heal"
+import { mergeValidatedTip } from "./worktree-integration-merge"
 
-const GIT_TIMEOUT_MS = 30_000
+export type { IndexLockRetry } from "./worktree-integration-git"
 
 export interface ValidatedReflectionTip {
   readonly tipSha: string
@@ -47,6 +57,8 @@ export interface IntegrateValidatedReflectionInput {
   readonly summary: string
   readonly validated: ValidatedReflectionTip
   readonly withWriterLock: WriterLock
+  /** How long a held index.lock is waited out; tests inject the sleep. */
+  readonly indexLockRetry?: IndexLockRetry
 }
 
 /** Legacy-only recovery for auto runs that predate durable validated-tip checkpoints. */
@@ -82,7 +94,9 @@ export async function integrateValidatedReflection(
   worktree: ReflectionWorktree,
   input: IntegrateValidatedReflectionInput,
 ): Promise<ReflectionIntegrationResult> {
+  const retry = input.indexLockRetry ?? DEFAULT_INDEX_LOCK_RETRY
   return input.withWriterLock(async () => {
+    await healStrandedMerge(worktree, retry)
     const existing = await probeReflectionIntegration(worktree, {
       mode: input.mode,
       runId: input.runId,
@@ -97,7 +111,7 @@ export async function integrateValidatedReflection(
 
     const mergeHead = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
     if (mergeHead === input.validated.tipSha) {
-      const aborted = await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
+      const aborted = await retryOnIndexLock(retry, () => run(worktree.exec, worktree.parent.dir, ["merge", "--abort"]))
       if (aborted.code !== 0) {
         return { outcome: "failed", detail: aborted.stderr.trim() || "Owned reflection merge could not be aborted" }
       }
@@ -109,28 +123,12 @@ export async function integrateValidatedReflection(
       return { outcome: "parent_dirty" }
     }
 
-    const merge = await run(worktree.exec, worktree.parent.dir, [
-      ...NO_AUTO_MAINTENANCE, "merge", "--no-ff", input.validated.tipSha,
-      "-m", `merge(reflection): ${input.summary}`,
-      "-m", `Omo-Run: ${input.runId}`,
-    ])
-    if (merge.code === 0) {
-      const head = await git(worktree.exec, worktree.parent.dir, ["rev-parse", "--verify", "HEAD"])
-      return { outcome: "merged", integrationSha: head.stdout.trim() }
-    }
-
-    const landedMergeHead = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
-    const unmerged = await run(worktree.exec, worktree.parent.dir, ["diff", "--name-only", "--diff-filter=U"])
-    if (landedMergeHead === input.validated.tipSha) {
-      const aborted = await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
-      if (aborted.code !== 0) {
-        return { outcome: "failed", detail: aborted.stderr.trim() || "Reflection merge conflict could not be aborted" }
-      }
-    }
-    if (landedMergeHead === input.validated.tipSha || unmerged.stdout.trim()) {
-      return { outcome: "merge_conflict", detail: merge.stderr.trim() }
-    }
-    return { outcome: "failed", detail: merge.stderr.trim() || "Reflection merge failed" }
+    return mergeValidatedTip(worktree, {
+      runId: input.runId,
+      summary: input.summary,
+      tipSha: input.validated.tipSha,
+      retry,
+    })
   })
 }
 
@@ -170,25 +168,3 @@ async function hasExactRunReceipt(exec: GitExec, cwd: string, commit: string, ru
   return trailers.code === 0 && trailers.stdout.split(/\r?\n/).some((value) => value === runId)
 }
 
-async function isAncestor(exec: GitExec, cwd: string, ancestor: string, descendant: string): Promise<boolean> {
-  return (await run(exec, cwd, ["merge-base", "--is-ancestor", ancestor, descendant])).code === 0
-}
-
-async function optionalRevision(exec: GitExec, cwd: string, revision: string): Promise<string | null> {
-  const result = await run(exec, cwd, ["rev-parse", "-q", "--verify", revision])
-  return result.code === 0 ? result.stdout.trim() || null : null
-}
-
-async function git(exec: GitExec, cwd: string, argv: readonly string[]): Promise<GitExecResult> {
-  const result = await run(exec, cwd, argv)
-  if (result.code !== 0) throw new Error(result.stderr.trim() || `git ${argv.join(" ")} failed`)
-  return result
-}
-
-function run(exec: GitExec, cwd: string, argv: readonly string[]): Promise<GitExecResult> {
-  return exec.run(argv, {
-    cwd,
-    timeoutMs: GIT_TIMEOUT_MS,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-  })
-}
