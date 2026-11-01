@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -23,7 +23,6 @@ const LEDGER = [
 ].join("\n")
 const roots: string[] = []
 
-setDefaultTimeout(process.platform === "win32" ? 20_000 : 5_000)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))

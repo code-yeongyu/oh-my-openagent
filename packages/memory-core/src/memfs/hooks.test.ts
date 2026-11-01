@@ -29,7 +29,7 @@ async function seedServerFile(dir: string, relativePath: string, content: string
 
 afterEach(removeTempDirs)
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 describe("memory hook Git pathspec environment", () => {
   for (const variable of ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const) {

@@ -4,7 +4,7 @@ import { scanSecretLikeMaterial } from "../sync/redact"
 
 afterEach(removeTempDirs)
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 10000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 // The hook and the TypeScript gates must agree (#10385): a note that only refers to a credential commits
 // through the hook exactly as the reflection gate accepts it, and a real value is still refused by both.
