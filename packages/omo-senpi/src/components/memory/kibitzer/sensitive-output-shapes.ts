@@ -1,4 +1,4 @@
-// Mirror of senpi-ai `redactCredentialShapes` (2026.10.30-1, senpi#4283: `utils/secret-redaction` in its shapes-only
+// Mirror of senpi-ai `redactCredentialShapes` (2026.10.31-2, senpi#4283: `utils/secret-redaction` in its shapes-only
 // mode plus the key-prefix and JWT rules of `utils/secret-classifier`). The text is read once, left to right, as
 // alternating tokens and delimiters; a token is replaced from where a known key prefix or a JWT starts a word in it.
 // No regular expressions, linear in the input.
