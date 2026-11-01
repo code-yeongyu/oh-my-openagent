@@ -4,9 +4,9 @@ import { accountSourceFromSelection } from "../device-session/selected-account-s
 import type { DesktopSyncAccount } from "../device-session/account-source"
 import type { DesktopSyncEngineWire } from "./desktopSyncAccount"
 import type { DesktopSyncEvent, DesktopSyncRequest } from "./desktopSyncProtocol"
-import {
-  type DesktopSyncAttachment, MEMORY_SYNC_WORKER_DATA, memorySyncWorkerData, selectHostMemorySyncSource, workerMemorySyncSource,
-} from "./hostSelection"
+import { claimDesktopSync, type DesktopSyncAttachment } from "./desktopClaim"
+import { MEMORY_SYNC_WORKER_DATA, selectHostMemorySyncSource } from "./hostSelection"
+import { serveWorkerPort, workerMemorySyncSource } from "./workerPort"
 
 // An engine process in miniature, wired the way senpi provideSessionWorkerData hands each session Worker its value:
 // the main thread selects once; each Worker gets workerData.extensionData[name] plus its transfers; dispose on exit.
@@ -69,17 +69,16 @@ async function inMain(scenario: string): Promise<void> {
   let releaseAttach = () => {}
   const attachGate = new Promise<void>(resolve => { releaseAttach = resolve })
   const host = scenario === "no-port" || scenario === "malformed" ? undefined : selectHostMemorySyncSource({
-    inherited: {
-      declared: name => { if (scenario === "throwing") throw new Error("stub failure"); return name === "memory-sync" && ["desktop", "declared-null", "late", "hang", "in-process", "late-connected", "memoized"].includes(scenario) },
-      tablePresent: () => scenario !== "cli",
+    declared: () => { if (scenario === "throwing") throw new Error("stub failure"); return scenario !== "cli" },
+    sidecar: async () => ({ serveWorkerPort, claimInheritedDesktopSync: () => claimDesktopSync({
       take: name => { claims += 1; return ["desktop", "late", "hang", "in-process", "late-connected", "memoized"].includes(scenario) && name === "memory-sync" ? new PassThrough() : undefined },
-    },
-    ...(scenario === "hang" ? { attachDeadlineMs: 500 } : scenario === "late-connected" ? { attachDeadlineMs: 200 } : {}),
-    attach: async (stream): Promise<DesktopSyncAttachment> => {
-      if (scenario === "late" || scenario === "late-connected") await attachGate
-      if (scenario === "hang") await new Promise(() => {})
-      return stream === undefined ? { kind: "unavailable", reason: "private_channel_unavailable" } : { kind: "connected", channel }
-    },
+      ...(scenario === "hang" ? { attachDeadlineMs: 500 } : scenario === "late-connected" ? { attachDeadlineMs: 200 } : {}),
+      attach: async (stream): Promise<DesktopSyncAttachment> => {
+        if (scenario === "late" || scenario === "late-connected") await attachGate
+        if (scenario === "hang") await new Promise(() => {})
+        return stream === undefined ? { kind: "unavailable", reason: "private_channel_unavailable" } : { kind: "connected", channel }
+      },
+    }) }),
   })
   if (scenario === "late-connected" && host !== undefined) {
     // The attachment connects only AFTER the deadline answered: the late channel must be closed, the answer kept.
@@ -96,8 +95,8 @@ async function inMain(scenario: string): Promise<void> {
   if (scenario === "memoized" && host !== undefined) {
     // A second selection in the same process returns the first one and claims nothing again.
     const again = selectHostMemorySyncSource({
-      inherited: { declared: () => { throw new Error("a second selection must not classify again") }, tablePresent: () => true, take: () => { claims += 1; return undefined } },
-      attach: async () => ({ kind: "unavailable", reason: "private_channel_unavailable" }),
+      declared: () => { throw new Error("a second selection must not classify again") },
+      sidecar: async () => ({ serveWorkerPort, claimInheritedDesktopSync: () => { claims += 1; return Promise.resolve({ kind: "unavailable", reason: "private_channel_unavailable" }) } }),
     })
     const first = await host.selection
     const second = await again.selection
@@ -115,7 +114,7 @@ async function inMain(scenario: string): Promise<void> {
   const workers: Worker[] = []
   const spawn = () => {
     let entry: { value: unknown; transfer: readonly MessagePort[]; dispose(): void } | undefined
-    if (host !== undefined) entry = memorySyncWorkerData(host)()
+    if (host !== undefined) entry = host.workerData()
     if (scenario === "malformed") {
       const { port1, port2 } = new MessageChannel()
       port1.postMessage({ kind: "outcome", outcome: "cli", extra: true })
