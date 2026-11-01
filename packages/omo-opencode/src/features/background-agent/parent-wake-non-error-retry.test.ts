@@ -24,22 +24,33 @@ type NotifierFixture = {
 
 const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
 
-function installThrowingUnrefTimers(): () => void {
+// The process-wide setTimeout stays patched across this test's awaits, so other files' leftover timers run
+// through it too (a senpi-task heartbeat's unguarded unref threw from here under load, #11526). Only timers
+// the parent-wake modules create get the throwing unref; every other caller gets the real timer.
+const PARENT_WAKE_MODULE = /[\\/]background-agent[\\/]parent-wake-[^\\/]+(?<!\.test)\.ts:/
+
+function installThrowingUnrefTimers(): { readonly thrownUnrefs: () => number; readonly restore: () => void } {
   const originalSetTimeout = globalThis.setTimeout
-  const throwingSetTimeout: typeof globalThis.setTimeout = (handler, delay) => {
+  let thrown = 0
+  const throwingSetTimeout = ((handler: Parameters<typeof setTimeout>[0], delay?: number) => {
     const timer = originalSetTimeout(handler, delay)
+    if (!PARENT_WAKE_MODULE.test(new Error().stack ?? "")) return timer
     Object.defineProperty(timer, "unref", {
       configurable: true,
       value: () => {
+        thrown += 1
         const failure = Object.freeze({ message: "timer unref failure" })
         throw failure
       },
     })
     return timer
-  }
+  }) as typeof globalThis.setTimeout
   globalThis.setTimeout = throwingSetTimeout
-  return () => {
-    globalThis.setTimeout = originalSetTimeout
+  return {
+    thrownUnrefs: () => thrown,
+    restore: () => {
+      globalThis.setTimeout = originalSetTimeout
+    },
   }
 }
 
@@ -172,7 +183,7 @@ describe("ParentWakeNotifier non-Error retry recovery", () => {
 
   test("#given an accepted final wake has a timer whose unref throws a plain object #when the wake is tracked #then the accepted wake is not requeued or duplicated", async () => {
     // given
-    const restoreTimers = installThrowingUnrefTimers()
+    const timers = installThrowingUnrefTimers()
     const { notifier, promptAsyncCalls } = createNotifier()
     const sessionID = "parent-non-error-unref-after-accepted"
     notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
@@ -185,13 +196,14 @@ describe("ParentWakeNotifier non-Error retry recovery", () => {
       expect(promptAsyncCalls).toHaveLength(1)
       expect(notifier.getDispatchedParentWakes().get(sessionID)?.notifications).toEqual([FINAL_WAKE])
       expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+      expect(timers.thrownUnrefs()).toBeGreaterThan(0)
 
       releaseParentWakeHold(sessionID)
       await notifier.flushPendingParentWake(sessionID)
 
       expect(promptAsyncCalls).toHaveLength(1)
     } finally {
-      restoreTimers()
+      timers.restore()
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
     }
