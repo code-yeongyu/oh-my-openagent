@@ -1,5 +1,5 @@
 import { lstatSync, readFileSync } from "node:fs"
-import { dirname, isAbsolute, resolve } from "node:path"
+import { dirname, posix, resolve } from "node:path"
 
 export const USERNS_ROOTS_ENV = "OMO_ENGINE_TRUST_USERNS_ROOTS"
 const MAX_ENTRIES = 64
@@ -38,7 +38,7 @@ function parseAttestation(text: string | undefined): Set<string> {
     for (const entry of entries) {
       if (!Array.isArray(entry) || entry.length !== 2) return new Set()
       const [path, inode] = entry as unknown[]
-      if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path
+      if (typeof path !== "string" || !posix.isAbsolute(path) || posix.normalize(path) !== path
         || typeof inode !== "string" || !INODE.test(inode)) return new Set()
       keys.add(entryKey(path, inode))
     }

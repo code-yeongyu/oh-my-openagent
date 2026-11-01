@@ -62,5 +62,8 @@ test("#given a non-Linux platform #when an existing private trust directory is p
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-trust-userns-")))
   roots.push(root)
   const requested = join(root, "engine-trust")
-  expect(await prepareTrustDirectory(requested, "darwin")).toEqual({ directory: requested, codes: [] })
+  const platform = process.platform === "linux" ? "darwin" : process.platform
+  const prepared = await prepareTrustDirectory(requested, platform)
+  roots.push(prepared.directory)
+  expect(prepared).toEqual({ directory: requested, codes: [] })
 })
