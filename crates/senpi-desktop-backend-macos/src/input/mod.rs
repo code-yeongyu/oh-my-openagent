@@ -6,6 +6,7 @@ mod background;
 mod canary;
 mod cgevent;
 mod chord;
+mod drag_pasteboard;
 mod element;
 mod global;
 mod guard;
@@ -13,6 +14,7 @@ mod held;
 mod keymap;
 mod holds;
 mod keys;
+mod menu;
 mod menu_key;
 mod post;
 mod remote;
@@ -32,7 +34,8 @@ mod live;
 
 use core_graphics::event_source::CGEventSource;
 use objc2_application_services::AXUIElement;
-use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, PointerEvent};
+use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, MouseButton, PointerEvent};
+use senpi_desktop_core::drag_guard::{refuse_drag_source, LeftPress};
 use senpi_desktop_core::protocol_results::AxInputMethod;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
@@ -46,6 +49,7 @@ pub(crate) use self::canary::CANARY_STOP_REASON;
 pub use self::canary::{CanaryMode, CanaryResult};
 pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
 pub(crate) use self::keys::{key_code, update_modifier};
+pub(crate) use self::menu::post_escape;
 pub(crate) use self::user_monitor::UserInputWatch;
 pub(crate) use self::release::post_helper_release;
 
@@ -142,6 +146,10 @@ impl MacInput {
                             guard::pointer_kind(&event),
                             guard::pointer_button(&event),
                         )?;
+                        if let Some(start) = drag_start(&event) {
+                            let press = LeftPress { kind: "drag", window: &window, start };
+                            refuse_drag_source(press, |x, y| crate::ax::role_at(pid, wid, x, y))?;
+                        }
                         if !window.focused {
                             skylight::activate_without_raise(pid, wid)?;
                             this.last_activated = Some((pid, wid));
@@ -341,6 +349,21 @@ impl MacInput {
         }
     }
 
+}
+
+/// The start point of a left-button drag, the gesture that can pick up an
+/// item for drag and drop; other gestures pay no hit-test.
+fn drag_start(event: &PointerEvent) -> Option<(f64, f64)> {
+    match event {
+        PointerEvent::Drag {
+            path,
+            button: MouseButton::Left,
+            ..
+        } => path.first().copied(),
+        PointerEvent::Drag { .. } | PointerEvent::Click { .. } | PointerEvent::Move { .. } | PointerEvent::Scroll { .. } => {
+            None
+        }
+    }
 }
 
 fn resolve_window(capture: &MacCapture, id: &str) -> CoreResult<DesktopWindow> {

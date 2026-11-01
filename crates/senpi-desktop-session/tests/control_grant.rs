@@ -61,6 +61,7 @@ fn foreground_click(frame: &str) -> Op {
             delivery_mode: Some("foreground".to_owned()),
             ..PointerOptions::default()
         }),
+        menu: None,
     })
 }
 
@@ -71,6 +72,7 @@ fn background_click() -> Op {
         y: 10.0,
         frame_id: None,
         opts: None,
+        menu: None,
     })
 }
 

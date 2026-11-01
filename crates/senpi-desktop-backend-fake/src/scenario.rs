@@ -28,9 +28,20 @@ pub struct FakeScenario {
     pub ax: BTreeMap<String, FakeAxNode>,
     /// Menu-bar children per window id; absent means the backend has no menus.
     pub menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    /// Per window id, the menu a secondary press, a press on a menu button or
+    /// popup button, or `AXShowMenu` opens there; absent means no press of
+    /// that window opens a menu.
+    pub context_menus: BTreeMap<String, Vec<FakeMenuNode>>,
     /// Reports every AX element's owner as unknown, like a backend that
     /// cannot map an element to its native window.
     pub ax_owner_unknown: bool,
+    /// Guards background left-button drags and mouse holds like macOS: a
+    /// start point whose scripted native role is not a drag-tracking control
+    /// is refused before anything is recorded.
+    pub drag_guard: bool,
+    /// Windows whose drags begin a drag-and-drop session as the first dragged
+    /// event lands: the stroke goes back to its start and is released there.
+    pub drag_picks_up: Vec<String>,
     /// Global cursor position; `None` models a backend without cursor access.
     pub cursor: Option<DesktopPoint>,
     /// RGBA fill of every captured image.
@@ -63,7 +74,10 @@ impl Default for FakeScenario {
             capabilities: fake_capabilities(0),
             ax: BTreeMap::new(),
             menus: BTreeMap::new(),
+            context_menus: BTreeMap::new(),
             ax_owner_unknown: false,
+            drag_guard: false,
+            drag_picks_up: Vec::new(),
             user_input_feed: true,
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
@@ -182,7 +196,13 @@ struct RawScenario {
     #[serde(default)]
     menus: BTreeMap<String, Vec<FakeMenuNode>>,
     #[serde(default)]
+    context_menus: BTreeMap<String, Vec<FakeMenuNode>>,
+    #[serde(default)]
     ax_owner_unknown: bool,
+    #[serde(default)]
+    drag_guard: bool,
+    #[serde(default)]
+    drag_picks_up: Vec<String>,
     #[serde(default = "default_cursor")]
     cursor: Option<DesktopPoint>,
     #[serde(default = "default_capture_color")]
@@ -214,6 +234,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             .ax
             .keys()
             .chain(raw.menus.keys())
+            .chain(raw.context_menus.keys())
             .chain(raw.resize_window.iter().map(|resize| &resize.id));
         if let Some(unknown) = referenced.find(|id| !known(id)) {
             return Err(ScenarioError::UnknownWindow(unknown.clone()));
@@ -226,7 +247,10 @@ impl TryFrom<RawScenario> for FakeScenario {
             capabilities,
             ax: raw.ax,
             menus: raw.menus,
+            context_menus: raw.context_menus,
             ax_owner_unknown: raw.ax_owner_unknown,
+            drag_guard: raw.drag_guard,
+            drag_picks_up: raw.drag_picks_up,
             cursor: raw.cursor,
             capture_color: raw.capture_color,
             delay_ms: raw.delay_ms,

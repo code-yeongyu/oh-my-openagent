@@ -11,10 +11,17 @@ use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
+use crate::protocol_results::AxTextSelection;
+use crate::text_range::TextSelectRequest;
 use crate::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
+    ScreenState, Target,
 };
 use crate::user_input::{UserInputFeed, UserPresses};
+
+/// Keeps the display awake until dropped (macOS: a
+/// `PreventUserIdleDisplaySleep` power assertion).
+pub type DisplayAwakeHold = Box<dyn Send>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeliveryMode {
@@ -59,6 +66,18 @@ pub struct Modifiers {
     pub alt: bool,
     pub shift: bool,
     pub meta: bool,
+}
+
+/// The menu item a press should choose in the menu it opens, and the stop
+/// check that runs before that item is pressed (the menu can take up to a
+/// second to appear).
+#[derive(Clone, Copy)]
+pub struct MenuChoice<'a> {
+    /// Item labels from the opened menu down to a command, as
+    /// `menus.select` matches them.
+    pub path: &'a [String],
+    /// The request's cancel and stop-path check.
+    pub check_stop: &'a dyn Fn() -> CoreResult<()>,
 }
 
 #[derive(Debug, Clone)]
@@ -137,6 +156,20 @@ pub trait Backend: Send {
         frame: &FrameGeometry,
         mode: DeliveryMode,
     ) -> CoreResult<()>;
+    /// [`Self::pointer`] for a press that opens a menu: the press is
+    /// delivered, `choice.path` is chosen in the menu it opened, and that
+    /// menu is closed before the call returns, whatever happened. Backends
+    /// without menu handling refuse before anything is sent.
+    fn pointer_menu(
+        &mut self,
+        _target: &Target,
+        _ev: PointerEvent,
+        _frame: &FrameGeometry,
+        _mode: DeliveryMode,
+        _choice: MenuChoice<'_>,
+    ) -> CoreResult<()> {
+        Err(DesktopError::ax_unsupported())
+    }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()>;
     /// The system clipboard's text. Backends without clipboard access keep
     /// this default and refuse instead of pretending.
@@ -219,6 +252,16 @@ pub trait Backend: Send {
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()>;
 
+    /// Moves window `id` into the user's current Space without switching
+    /// Spaces or activating anything; a window already there is left alone.
+    /// Backends call `check_stop` before the move and while verifying it.
+    /// Backends without Spaces refuse with `SpaceUnsupported`.
+    fn bring_to_current_space(&mut self, _id: &str, _check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        Err(DesktopError::space_unsupported(
+            "moving a window to the current Space is not available on this backend",
+        ))
+    }
+
     /// The immediate children of `window`'s menu at `path` (empty = the menu
     /// bar). Backends without menus yet refuse with `AxUnsupported`.
     fn menu_items(&mut self, _window: &DesktopWindow, _path: &[String]) -> CoreResult<Vec<crate::menus::MenuItem>> {
@@ -289,11 +332,31 @@ pub trait Backend: Send {
         UserPresses::default()
     }
 
+    /// Starts keeping the display awake while the agent operates. `None` when
+    /// the platform has no such hold or refused it; the display then sleeps
+    /// as it would without the agent, and failures say so.
+    fn hold_display_awake(&mut self) -> Option<DisplayAwakeHold> {
+        None
+    }
+
+    /// Lock and display-sleep reads that need no backend borrow, so a waiter
+    /// can explain its timeout while the backend is busy.
+    fn screen_probe(&self) -> Option<std::sync::Arc<dyn ScreenProbe>> {
+        None
+    }
+
     /// The watch's shared feed, once `watch_user_input` ran; `None` while
     /// nothing is watched. The session reads it between and inside requests.
     fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
         None
     }
+}
+
+/// Live lock and display-sleep state, safe to read from any thread.
+pub trait ScreenProbe: Send + Sync {
+    /// `display` names the display a request aims at; `None` means every
+    /// display of the session.
+    fn screen_state(&self, display: Option<&DisplaySelector>) -> ScreenState;
 }
 
 /// Replays only tracked downs. Must not wait for the backend's input scope.
@@ -316,6 +379,13 @@ pub trait AxBackend {
     fn children(&mut self, h: &AxHandle) -> CoreResult<Vec<AxHandle>>;
     fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>>;
     fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()>;
+    /// [`Self::perform`] for an action that opens a menu (`AXShowMenu`, or
+    /// `AXPress` on a menu button or popup button): `choice.path` is chosen
+    /// in the menu it opened, which is closed before the call returns.
+    /// Backends without menu handling refuse before anything is performed.
+    fn perform_menu(&mut self, _h: &AxHandle, _action: &str, _choice: MenuChoice<'_>) -> CoreResult<()> {
+        Err(DesktopError::ax_unsupported())
+    }
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()>;
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()>;
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;
@@ -327,6 +397,13 @@ pub trait AxBackend {
     /// cannot name it keep this default.
     fn owner(&mut self, _h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
         Ok(AxOwner::Unknown)
+    }
+
+    /// Selects the range `request` names in `h`'s value (`ax.selectText`) by
+    /// writing the element's selected text range: no key is sent and no
+    /// focus moves. Backends without text selection keep this default.
+    fn select_text(&mut self, _h: &AxHandle, _request: &TextSelectRequest) -> CoreResult<AxTextSelection> {
+        Err(DesktopError::ax_unsupported())
     }
 }
 

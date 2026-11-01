@@ -186,7 +186,7 @@ fn close_menu<P: PopupControl>(popup: &P, waits: Waits) -> bool {
 
 /// Runs `probe` until it yields a value or `wait` has elapsed; the last probe
 /// runs at or after the deadline, so a zero wait probes exactly once.
-fn poll<T>(wait: Duration, interval: Duration, mut probe: impl FnMut() -> Option<T>) -> Option<T> {
+pub(super) fn poll<T>(wait: Duration, interval: Duration, mut probe: impl FnMut() -> Option<T>) -> Option<T> {
     let deadline = Instant::now() + wait;
     loop {
         if let Some(value) = probe() {

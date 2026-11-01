@@ -85,6 +85,7 @@ impl Engine {
             Method::HoldKeys => op(Op::HoldKeys(parse(params)?)),
             Method::HoldMouse => op(Op::HoldMouse(parse(params)?)),
             Method::RaiseWindow => op(Op::RaiseWindow(parse(params)?)),
+            Method::RaiseToSpace => op(Op::BringToCurrentSpace(parse(params)?)),
             Method::AxSnapshot => op(Op::AxSnapshot(parse(params)?)),
             Method::AxQuery => op(Op::AxQuery(parse(params)?)),
             Method::AxElementAt => op(Op::AxElementAt(parse(params)?)),
@@ -98,6 +99,7 @@ impl Engine {
             Method::AxFocus => op(Op::AxFocus(parse(params)?)),
             Method::AxClick => op(Op::AxClick(parse(params)?)),
             Method::AxTypeText => op(Op::AxTypeText(parse(params)?)),
+            Method::AxSelectText => op(Op::AxSelectText(parse(params)?)),
             Method::StopPathStatus => {
                 parse::<EmptyParams>(params)?;
                 Ok(Route::Immediate(to_result(self.stop_paths().status())))

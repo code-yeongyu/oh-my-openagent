@@ -17,7 +17,8 @@ function readyLines(report) {
   const displayServer = capabilities.displayServer ? ` (${capabilities.displayServer})` : ""
   const backendLevel = capabilities.backend === "unavailable" ? "WARN" : "PASS"
   const permissionLevel = capabilities.capture && capabilities.input && capabilities.ax ? "PASS" : "WARN"
-  const displayLevel = capabilities.displayCount > 0 && !capabilities.screenLocked ? "PASS" : "WARN"
+  const displayAsleep = capabilities.displayAsleep === true
+  const displayLevel = capabilities.displayCount > 0 && !capabilities.screenLocked && !displayAsleep ? "PASS" : "WARN"
   const stopLevel = capabilities.stopPath === "none" ? "WARN" : "PASS"
   const stopReason = capabilities.stopReason ? ` reason=${capabilities.stopReason}` : ""
   // The engine arms the stop chord only when a session starts input (`stopPath.start`), so a pre-session
@@ -32,7 +33,7 @@ function readyLines(report) {
     ...(report.launchedEnginePath ? [`INFO computer use launched executable: ${report.launchedEnginePath}`] : []),
     `${backendLevel} computer use backend: ${capabilities.backend}${displayServer}`,
     `${permissionLevel} computer use permissions: capture=${capabilities.capturePermission} input=${capabilities.inputPermission} accessibility=${capabilities.axPermission}`,
-    `${displayLevel} computer use display: count=${capabilities.displayCount} screenLocked=${capabilities.screenLocked}`,
+    `${displayLevel} computer use display: count=${capabilities.displayCount} screenLocked=${capabilities.screenLocked} displayAsleep=${displayAsleep}`,
     stopLine,
   ]
 }

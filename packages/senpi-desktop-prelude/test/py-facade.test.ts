@@ -56,6 +56,20 @@ describe("Python computer facade", () => {
 		});
 	});
 
+	it("sends bringToCurrentSpace() as a window-hopped chain", () => {
+		// When
+		const run = runPythonFacade("computer.window(app='Code').bringToCurrentSpace()");
+
+		// Then
+		expect(run.calls[1]).toEqual({
+			action: "call",
+			chain: [
+				{ method: "window", args: ["w1"] },
+				{ method: "bringToCurrentSpace", args: [] },
+			],
+		});
+	});
+
 	it("returns details.value and displays every result image", () => {
 		// When
 		const run = runPythonFacade("out = computer.screenshot(silent=False)");
@@ -185,6 +199,24 @@ describe("Python computer facade", () => {
 				],
 			},
 		]);
+	});
+
+	it("sends el.selectText as a ref-hopped chain and returns the selection", () => {
+		// When
+		const run = runPythonFacade("el = computer.ref('e1')\nout = el.selectText('beta', prefix='alpha ')", {
+			selectText: JSON.stringify({ text: "", details: { value: { start: 6, length: 4, text: "beta", focused: true } }, images: [], hasError: false }),
+		});
+
+		// Then
+		expect(run.error).toBeNull();
+		expect(run.out).toEqual({ start: 6, length: 4, text: "beta", focused: true });
+		expect(run.calls.at(-1)).toEqual({
+			action: "call",
+			chain: [
+				{ method: "ref", args: ["e1"] },
+				{ method: "selectText", args: ["beta", { prefix: "alpha " }] },
+			],
+		});
 	});
 
 	it("sends control helpers as one-step call chains (#9651 B5b)", () => {

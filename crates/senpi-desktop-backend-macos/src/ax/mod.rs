@@ -6,15 +6,21 @@ mod actions;
 mod date;
 mod foreground;
 pub(crate) mod menus;
+pub(crate) mod open_menu;
 mod point_owner;
 mod popup;
 pub(crate) mod element;
 mod props;
+mod selection;
 mod text_input;
 mod tree;
 
+use senpi_desktop_core::drag_guard::StartPoint;
 use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
+use senpi_desktop_core::backend::MenuChoice;
 use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::protocol_results::AxTextSelection;
+use senpi_desktop_core::text_range::TextSelectRequest;
 use senpi_desktop_core::types::DesktopWindow;
 
 pub use self::element::is_trusted;
@@ -87,6 +93,33 @@ impl MacAx {
     }
 }
 
+/// What is under global point `(x, y)` for window `wid` of `pid`: the role
+/// of its element there, or that another window of the application covers
+/// the point (the application-wide hit-test answers for the window on top,
+/// while the press is routed to `wid`).
+pub(crate) fn role_at(pid: libc::pid_t, wid: u32, x: f64, y: f64) -> StartPoint {
+    let Some(found) = tree::element_at_in(pid, x, y).ok().flatten() else {
+        return StartPoint::Unread;
+    };
+    match element::owner_window_id(&found) {
+        Some(owner) if owner == wid => {
+            element::copy_string(&found, "AXRole").map_or(StartPoint::Unread, StartPoint::Role)
+        }
+        Some(_) => StartPoint::Covered,
+        None => StartPoint::Unread,
+    }
+}
+
+/// One accessibility round trip to `pid`, which the application answers from
+/// its run loop once it has handled the events posted before it.
+pub(crate) fn round_trip(pid: libc::pid_t) {
+    if let Ok(app) = element::create_application(pid) {
+        if element::set_timeout(&app).is_ok() {
+            drop(element::copy_string(&app, "AXRole"));
+        }
+    }
+}
+
 /// Marks `window` main and focused through AX: the belt-and-braces half of
 /// `restore_key_focus`.
 pub(crate) fn focus_key_window(window: &DesktopWindow) -> CoreResult<()> {
@@ -153,6 +186,11 @@ impl AxBackend for MacAx {
         actions::perform_requested(element(h)?, action)
     }
 
+    fn perform_menu(&mut self, h: &AxHandle, action: &str, choice: MenuChoice<'_>) -> CoreResult<()> {
+        self.show_target(h);
+        open_menu::perform_menu(element(h)?, action, choice)
+    }
+
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()> {
         self.show_target(h);
         actions::set_value(element(h)?, value)
@@ -175,6 +213,11 @@ impl AxBackend for MacAx {
         tree::attributes(element(h)?)
     }
 
+    fn select_text(&mut self, h: &AxHandle, request: &TextSelectRequest) -> CoreResult<AxTextSelection> {
+        self.show_target(h);
+        selection::select(element(h)?, request)
+    }
+
     /// `AXWindow`'s CGWindowID: the id `windows()` lists.
     fn owner(&mut self, h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
         Ok(element::owner_window_id(element(h)?)
@@ -184,6 +227,9 @@ impl AxBackend for MacAx {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod selection_tests;
 
 #[cfg(test)]
 mod text_input_tests;
