@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
-import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, TranscriptJournal, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -111,6 +111,187 @@ function failedCompletion(runId: string, finishedAt: string): Record<string, unk
 }
 
 describe("memory rpc bridge", () => {
+  test.each(["new", "failed-full"] as const)("#given a %s binding without a published snapshot #when journal delivery runs #then it never reads git", async (mode) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    let gitReads = 0
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined,
+      createGitRepo: () => stubRepo({ head: async () => { gitReads++; throw new Error("git unavailable") } }),
+    })
+    bridge.attach("session-1")
+    if (mode === "failed-full") await expect(bridge.sync()).rejects.toThrow("git unavailable")
+    const before = gitReads
+    await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+    expect(gitReads).toBe(before)
+    expect(host.emits).toHaveLength(1)
+    expect(host.emits[0]?.data).toMatchObject({
+      nonJournalState: "unknown", journal: { sessionId: "session-1", totalSteps: 1 },
+      reflection: { backlogSteps: 1 },
+    })
+  })
+
+  test.each(["changed", "unchanged"] as const)("#given an unreadable transcript and %s durable counters #when journal delivery runs #then durable accounting is still published", async (mode) => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(),
+    })
+    bridge.attach("session-1")
+    const state = {
+      total_completed_steps: 7, reflected_completed_steps: 3,
+      steps_since_last_successful_reflection: 4, pending_compaction: true,
+    }
+    if (mode === "unchanged") await writeTranscriptState(context, "session-1", state)
+    await bridge.sync()
+    if (mode === "changed") await writeTranscriptState(context, "session-1", state)
+    // A directory at the file path produces a real non-ENOENT filesystem error, without permission assumptions.
+    await mkdir(join(context.identityPaths.transcripts, "session-1", "transcript.jsonl"))
+    await bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+    expect(host.emits).toHaveLength(2)
+    expect(host.emits[1]?.data).toMatchObject({
+      journal: { totalSteps: 7, reflectedSteps: 3 },
+      reflection: { backlogSteps: 4, pendingCompaction: true },
+    })
+    if (mode === "unchanged") expect(host.emits[1]?.data).toEqual(host.emits[0]?.data)
+  })
+
+  test("#given persisted and observed branch steps #when replay, reflection and rebinding occur #then counters count each canonical answer once", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined, createGitRepo: () => stubRepo(),
+    })
+    const journal = new TranscriptJournal({ journalDir: join(context.identityPaths.transcripts, "session-1") })
+    const first = { kind: "assistant", messageId: "first", textBlocks: ["One."] } as const
+    const second = { kind: "assistant", messageId: "second", textBlocks: ["Two."] } as const
+    const toolOnly = { kind: "assistant", messageId: "tool", toolCalls: [{ callId: "call", name: "read" }] } as const
+    await journal.reconcile([first])
+    bridge.attach("session-1")
+    await bridge.syncJournal([first, second, toolOnly])
+    await bridge.syncJournal([first, second, toolOnly])
+    expect(host.emits).toHaveLength(1)
+    expect(host.emits[0]?.data).toMatchObject({
+      journal: { totalSteps: 2, reflectedSteps: 0 }, reflection: { backlogSteps: 2 },
+    })
+    // A completed reflection may advance the cursor while the new answer is not journaled yet.
+    await writeTranscriptState(context, "session-1", {
+      total_completed_steps: 1, reflected_completed_steps: 1, steps_since_last_successful_reflection: 0,
+    })
+    await bridge.sync()
+    expect(host.emits.at(-1)?.data).toMatchObject({
+      journal: { totalSteps: 2, reflectedSteps: 1 }, reflection: { backlogSteps: 1 },
+    })
+    // A branch that omits the already observed answer cannot rewind the session's step count.
+    await bridge.syncJournal([first])
+    expect(host.emits).toHaveLength(2)
+    bridge.attach("session-2")
+    await bridge.syncJournal([toolOnly])
+    expect(host.emits.at(-1)?.data).toMatchObject({
+      journal: { sessionId: "session-2", totalSteps: 0 }, reflection: { backlogSteps: 0 },
+    })
+  })
+
+  test("#given a published snapshot and stalled git reads #when settle delivers journal steps #then the update is published without any git read", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const stalled = Promise.withResolvers<string>()
+    const gitEntered = Promise.withResolvers<void>()
+    let gitReads = 0
+    let stall = false
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined,
+      createGitRepo: () => stubRepo({
+        head: () => {
+          gitReads += 1
+          if (stall) gitEntered.resolve()
+          return stall ? stalled.promise : Promise.resolve("0123456789abcdef0123456789abcdef01234567")
+        },
+      }),
+    })
+    bridge.attach("session-1")
+    await bridge.sync()
+    stall = true
+    const readsBefore = gitReads
+    const delivery = bridge.syncJournal([{ kind: "assistant", messageId: "answer", textBlocks: ["Done."] }])
+    try {
+      await Promise.race([delivery, gitEntered.promise])
+      expect(gitReads).toBe(readsBefore)
+      expect(host.emits.map(({ data }) => (data as MemoryRpcSnapshot).journal.totalSteps)).toEqual([0, 1])
+      expect(host.emits.at(-1)?.data).toMatchObject({
+        repo: { headSha: "0123456789abcdef0123456789abcdef01234567" }, reflection: { backlogSteps: 1 },
+      })
+    } finally {
+      stalled.resolve("0123456789abcdef0123456789abcdef01234567")
+      await delivery
+    }
+  })
+
+  test("#given an old binding with queued snapshots #when a new session attaches #then its delivery does not wait for or reuse the retired queue", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<string>()
+    let builds = 0
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context, activeRun: () => undefined,
+      createGitRepo: () => stubRepo({
+        head: () => {
+          if (++builds !== 1) return Promise.resolve("new")
+          entered.resolve()
+          return release.promise
+        },
+      }),
+    })
+    bridge.attach("old")
+    const first = bridge.sync()
+    await entered.promise
+    const queued = bridge.sync()
+    bridge.attach("new")
+    try {
+      await bridge.sync()
+      expect(host.emits.map(({ data }) => (data as MemoryRpcSnapshot).journal.sessionId)).toEqual(["new"])
+    } finally {
+      release.resolve("old")
+      await Promise.all([first, queued])
+    }
+    expect(builds).toBe(2)
+    expect(host.emits).toHaveLength(1)
+  })
+
+  test("#given overlapping publications #when the first snapshot is held #then the next build waits for its publication", async () => {
+    const context = await contextFixture()
+    const host = rpcHost()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<string>()
+    let builds = 0
+    const bridge = createMemoryRpcBridge(host.pi, {
+      resolveContext: () => context,
+      activeRun: () => undefined,
+      createGitRepo: () => stubRepo({
+        head: () => {
+          builds += 1
+          if (builds === 1) {
+            entered.resolve()
+            return release.promise
+          }
+          return Promise.resolve("newer")
+        },
+      }),
+    })
+    bridge.attach("session-1")
+    const first = bridge.sync()
+    await entered.promise
+    const second = bridge.sync()
+    try {
+      expect(builds).toBe(1)
+    } finally {
+      release.resolve("older")
+      await Promise.all([first, second])
+    }
+    expect(host.emits.map(({ data }) => (data as MemoryRpcSnapshot).repo.headSha)).toEqual(["older", "newer"])
+  })
+
   test.each(["cancel", "attach", "detach"] as const)(
     "#given a pending status snapshot #when %s retires its observer #then it cannot publish into the next binding",
     async (retire) => {
