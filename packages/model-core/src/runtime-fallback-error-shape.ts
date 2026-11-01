@@ -131,3 +131,21 @@ export function getRuntimeFallbackRetryableSignal(error: unknown): boolean | und
 
   return undefined
 }
+
+export function getRuntimeFallbackProviderID(error: unknown): string | undefined {
+  if (!isRecord(error)) return undefined
+
+  const data = getNestedRecord(error, "data")
+  const nestedError = getNestedRecord(error, "error")
+  const dataError = getNestedRecord(data, "error")
+  const records = [error, data, nestedError, dataError].filter((value): value is Record<string, unknown> => value !== undefined)
+
+  for (const record of records) {
+    const providerID = getRecordValue(record, "providerID")
+    if (typeof providerID === "string" && providerID.length > 0) {
+      return providerID
+    }
+  }
+
+  return undefined
+}
