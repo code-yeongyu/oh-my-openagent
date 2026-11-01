@@ -35,6 +35,7 @@ import {
 	statusCounts,
 	stopSandboxProcesses,
 } from "./fused-equivalence-support.mjs";
+import { prepareCaseSandbox } from "./fused-equivalence-sandbox.mjs";
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -165,41 +166,6 @@ function childPath(lspDir) {
 	return [...new Set(dirs.filter(Boolean))].join(":");
 }
 
-/** Sandbox wiring every case shares: the built plugin, trust, and every config/state root inside the sandbox. */
-function prepare(run, omoConfig) {
-	const root = run.box.dir;
-	run.env.PATH = run.childPath;
-	for (const [name, dir] of [
-		["XDG_CONFIG_HOME", "xdg-config"],
-		["XDG_DATA_HOME", "xdg-data"],
-		["XDG_CACHE_HOME", "xdg-cache"],
-		["XDG_STATE_HOME", "xdg-state"],
-	]) {
-		run.env[name] = join(root, dir);
-		mkdirSync(run.env[name], { recursive: true });
-	}
-	run.env.OMO_CODING_AGENT_DIR = run.box.agentDir;
-	run.env.PI_CODING_AGENT_DIR = run.box.agentDir;
-	run.env.OMO_MEMORY_HOME = join(root, "memory");
-	// The child's os.tmpdir() reaches the observations (the computer skill is materialized under it and listed as a
-	// skill root: senpi-desktop-tool/src/skill.ts materializeComputerSkill), so it is pinned inside the sandbox and the
-	// recording host's TMPDIR never reaches a golden.
-	const tmp = join(root, "tmp");
-	mkdirSync(tmp, { recursive: true });
-	for (const name of ["TMPDIR", "TMP", "TEMP"]) run.env[name] = tmp;
-	writeFileSync(join(run.box.agentDir, "trust.json"), `${JSON.stringify({ [run.box.cwd]: true }, null, 2)}\n`);
-	// The plugin's two remote MCP servers would reach the network, and its local `_ast_grep` server connects on its own
-	// schedule: whether that connect lands before or after the host records the session's first loaded-surfaces digest
-	// decides whether a `loaded_surfaces_changed` is announced at all (both seen in B0 runs on darwin and linux). The user
-	// mcp.json switch the plugin documents turns all three off, so no case depends on a connect race; none of E21-E24
-	// exercises an MCP tool.
-	writeFileSync(
-		join(run.box.agentDir, "mcp.json"),
-		`${JSON.stringify({ mcpServers: { context7: { enabled: false }, grep_app: { enabled: false }, _ast_grep: { enabled: false } } }, null, 2)}\n`,
-	);
-	mkdirSync(join(run.box.cwd, ".omo"), { recursive: true });
-	writeFileSync(join(run.box.cwd, ".omo", "omo.json"), `${JSON.stringify(omoConfig, null, 2)}\n`);
-}
 
 const SETTINGS = { packages: [pluginRoot], defaultProjectTrust: "ask" };
 const E24_WARM_BARRIER = "eq-e24-lsp-warm";
@@ -274,7 +240,7 @@ const cases = [
 			],
 		}),
 		async drive(run, options) {
-			prepare(run, {
+			prepareCaseSandbox(run, {
 				computer: { engine_path: options.desktopEngine, allow_host_relay_only_stop: true },
 			});
 			run.env.SENPI_DESKTOP_BACKEND = `fake:${fakeDesktop}`;
@@ -307,7 +273,7 @@ const cases = [
 			],
 		}),
 		async drive(run) {
-			prepare(run, {
+			prepareCaseSandbox(run, {
 				categories: { eqcat: { description: "EQ category pinned to the fake model", model: FAKE_MODEL } },
 				task: { default_execution_mode: "in-process" },
 			});
@@ -343,7 +309,7 @@ const cases = [
 			],
 		}),
 		async drive(run) {
-			prepare(run, {
+			prepareCaseSandbox(run, {
 				categories: { quick: { description: "EQ quick category", model: FAKE_MODEL } },
 				memory: { enabled: true, reflection: { trigger: { step_count: 0, on_compaction: false } } },
 			});
@@ -387,7 +353,7 @@ const cases = [
 		async drive(run, options) {
 			if (!options.lspDir || !existsSync(join(options.lspDir, "typescript-language-server")))
 				throw new Error("E24 needs the pinned typescript-language-server: pass --lsp-dir <dir> (or EQ_LSP_DIR)");
-			prepare(run, {});
+			prepareCaseSandbox(run, {});
 			if (options.commentChecker) run.env.OMO_COMMENT_CHECKER_BIN = options.commentChecker;
 			await run.open();
 			answerUiRequests(run);
