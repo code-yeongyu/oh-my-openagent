@@ -1,3 +1,15 @@
+## 2026-10-31 - Isolate memory-hook startup from supervisor imports (#11957)
+
+Load supervisor-only dependencies after selecting supervisor mode, and load child bootstrap code only for its mode. Keep the existing checker, entry point, process ownership and deadlines. An import-boundary regression and real Senpi hook proof cover valid writes, duplicate-key rejection and provenance rejection.
+
+## 2026-10-31 - Reduce trusted command-fixture setup cost (#11954)
+
+Install the real memory hooks after the fixture's initial seed commit rather than before it. Keep normal hook installation and validation for commands under test, with a real-git regression proving later invalid writes remain rejected. This is only the fixture part of #10696; actual hook-startup latency is tracked separately in #11953.
+
+## 2026-10-30 - Ordered post-turn memory journal delivery (#11935)
+
+Separate required read-only journal delivery from the two-second maintenance observer. Combine live and durable answer IDs, and run full snapshot builds outside the journal publication queue. Publish journal updates immediately, rebase late full results on newer journal accounting, and use an explicitly unknown non-journal state before the first full snapshot. Transcript read failures retain durable counters.
+
 ## 2026-10-30 - Allocate model distribution turns at spawn (#11905)
 
 The task child planner owns independent category and agent cursors and passes them only into spawn-time resolution, leaving inspection and session continuations unchanged.
