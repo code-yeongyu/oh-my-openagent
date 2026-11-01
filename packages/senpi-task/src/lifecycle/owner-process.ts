@@ -66,11 +66,11 @@ export function createOwnerProcessView(read: ProcessStartReader): OwnerProcessVi
   }
 }
 
-export const defaultOwnerProcessView: OwnerProcessView = createOwnerProcessView(readProcessStartLowerBoundMs)
+const defaultOwnerProcessView: OwnerProcessView = createOwnerProcessView(readProcessStartLowerBoundMs)
 
 // An injected liveness probe answers for pids that are not real processes here; real start times would
 // contradict it, so such a caller learns nothing from the OS unless it injects its own view too.
-export const NO_START_EVIDENCE: OwnerProcessView = { observe: async () => undefined, startedAfter: () => false }
+const NO_START_EVIDENCE: OwnerProcessView = { observe: async () => undefined, startedAfter: () => false }
 
 export function ownerProcessViewFor(injectedLiveness: unknown, injectedView: OwnerProcessView | undefined): OwnerProcessView {
   return injectedView ?? (injectedLiveness === undefined ? defaultOwnerProcessView : NO_START_EVIDENCE)
