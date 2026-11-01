@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 import { log } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
 
@@ -9,15 +10,19 @@ interface SDKMessage {
 
 export async function processMessages(
   sessionID: string,
-  ctx: PluginInput
+  ctx: PluginInput,
+  signal?: AbortSignal,
 ): Promise<string> {
   const messagesResult = await ctx.client.session.messages({
     path: { id: sessionID },
+    ...(signal ? { signal } : {}),
   })
+
+  signal?.throwIfAborted()
 
   if (messagesResult.error) {
     log(`[call_omo_agent] Messages error:`, messagesResult.error)
-    throw new Error(`Failed to get messages: ${messagesResult.error}`)
+    throw new Error(`Failed to get messages: ${extractErrorMessage(messagesResult.error) ?? "Unknown SDK error"}`)
   }
 
   const messages = messagesResult.data

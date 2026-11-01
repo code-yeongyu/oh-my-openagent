@@ -63,7 +63,7 @@ describe("waitForCompletion", () => {
     }
   })
 
-  test("#given the child session has durable messages #when it stays idle and stable #then completion succeeds", async () => {
+  test("#given the child session has durable messages #when it has a terminal assistant reply #then completion succeeds", async () => {
     // given
     const originalDateNow = Date.now
     const originalSetTimeout = globalThis.setTimeout
@@ -82,8 +82,8 @@ describe("waitForCompletion", () => {
     const status = mock(async () => ({ data: { "ses-complete": { type: "idle" } } }))
     const messages = mock(async () => ({
       data: [
-        { info: { id: "msg-user", role: "user" } },
-        { info: { id: "msg-assistant", role: "assistant" } },
+        { info: { id: "msg_001", role: "user" } },
+        { info: { id: "msg_002", role: "assistant", finish: "stop" } },
       ],
     }))
 
