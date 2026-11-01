@@ -21,9 +21,9 @@ const NO_FABLE: OmoConfig = { exclude_models: ["claude-fable-*"] }
 const FABLE_SESSION = { provider: "anthropic", id: "claude-fable-5-1" }
 
 describe("memory children honor exclude_models", () => {
-  test("#given an excluded session model and nothing else logged in #when reflection resolves #then it does not inherit the session model", () => {
+  test("#given only an excluded model logged in #when reflection resolves #then the excluded model is never chosen", () => {
     // when
-    const result = resolveReflectionModel("quick", NO_FABLE, registry([FABLE]), { sessionModel: FABLE_SESSION })
+    const result = resolveReflectionModel("quick", NO_FABLE, registry([FABLE]))
 
     // then
     expect(result.kind === "resolved" ? result.model : result.kind).not.toBe("anthropic/claude-fable-5-1")

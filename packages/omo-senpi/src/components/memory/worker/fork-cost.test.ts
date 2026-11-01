@@ -50,13 +50,13 @@ describe("estimateForkCost", () => {
 })
 
 describe("chooseMemoryLaunchRoute", () => {
-  describe("#given a session model with cheap cache reads", () => {
+  describe("#given a fork candidate with cheap cache reads", () => {
     test("#when the job is short #then fork wins", () => {
       // when
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
         parentContextTokens: PARENT_P50,
         turns: 3,
         cacheHit: true,
@@ -69,13 +69,13 @@ describe("chooseMemoryLaunchRoute", () => {
     })
   })
 
-  describe("#given an expensive session model", () => {
+  describe("#given an expensive fork candidate", () => {
     test("#when opus-class cache reads apply #then quick wins even at one turn", () => {
       // when
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "anthropic/claude-opus-5-5", cost: OPUS },
+        fork: { model: "anthropic/claude-opus-5-5", cost: OPUS },
         parentContextTokens: PARENT_P50,
         turns: 1,
         cacheHit: true,
@@ -85,12 +85,12 @@ describe("chooseMemoryLaunchRoute", () => {
       expect(decision.route).toBe("quick")
     })
 
-    test("#when the job runs long #then quick wins despite a cheap-ish session model", () => {
+    test("#when the job runs long #then quick wins despite a cheap-ish fork candidate", () => {
       // when
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
+        fork: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
         parentContextTokens: PARENT_P90,
         turns: 21,
         cacheHit: true,
@@ -101,14 +101,14 @@ describe("chooseMemoryLaunchRoute", () => {
     })
   })
 
-  describe("#given a session model whose context window cannot hold the fork", () => {
+  describe("#given a fork candidate whose context window cannot hold the fork", () => {
     // Fork seeds the child with the parent's whole context (`--fork <parentSessionFile>`), so at
     // the parent's compaction threshold a cheaper fork still dies on the provider's window.
     test("#when fork is cheaper but the inherited context does not fit #then quick wins with window_unfit", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 200_000 },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 200_000 },
         parentContextTokens: 190_000,
         payloadTokens: 32_000,
         turns: 3,
@@ -123,7 +123,7 @@ describe("chooseMemoryLaunchRoute", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 1_000_000 },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 1_000_000 },
         parentContextTokens: PARENT_P50,
         payloadTokens: 32_000,
         turns: 3,
@@ -133,11 +133,11 @@ describe("chooseMemoryLaunchRoute", () => {
       expect(decision.reason).toBe("cheaper")
     })
 
-    test("#when the session context window is unknown #then routing is unchanged", () => {
+    test("#when the fork context window is unknown #then routing is unchanged", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
         parentContextTokens: 190_000,
         payloadTokens: 32_000,
         turns: 3,
@@ -150,7 +150,7 @@ describe("chooseMemoryLaunchRoute", () => {
     test("#when only the fork candidate exists #then it stays the only candidate regardless of fit", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 8_192 },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA, contextWindow: 8_192 },
         parentContextTokens: 190_000,
         payloadTokens: 32_000,
         turns: 3,
@@ -171,7 +171,7 @@ describe("chooseMemoryLaunchRoute", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "facts",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
         parentContextTokens: 1_000,
         turns: 1,
         cacheHit: true,
@@ -184,11 +184,11 @@ describe("chooseMemoryLaunchRoute", () => {
   })
 
   describe("#given incomplete inputs", () => {
-    test("#when the session model has no pricing #then it falls back to quick deterministically", () => {
+    test("#when the fork candidate has no pricing #then it falls back to quick deterministically", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "mystery/model" },
+        fork: { model: "mystery/model" },
         parentContextTokens: PARENT_P50,
         turns: 3,
         cacheHit: true,
@@ -197,7 +197,7 @@ describe("chooseMemoryLaunchRoute", () => {
       expect(decision.reason).toBe("no_pricing")
     })
 
-    test("#when there is no session model at all #then it routes to quick", () => {
+    test("#when there is no fork candidate at all #then it routes to quick", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
@@ -212,7 +212,7 @@ describe("chooseMemoryLaunchRoute", () => {
       const decision = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
         turns: 3,
         cacheHit: true,
       })
