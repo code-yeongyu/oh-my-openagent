@@ -620,8 +620,6 @@
       "packages/omo-opencode/src/cli/run/index.ts": ["resolveRunAgent", "resolveRunModel", "createServerConnection", "resolveSession", "createJsonOutputManager", "executeOnCompleteHook", "createEventState", "processEvents", "serializeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UnknownRunAgentError
       "packages/omo-opencode/src/cli/run/runnable-agent-resolver.ts": ["UnknownRunAgentError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) SESSION_READ_WAIT
-      "packages/omo-opencode/src/cli/service-auth/keystore.ts": ["SESSION_READ_WAIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) platformSchema
       "packages/omo-opencode/src/cli/service-auth/protocol.ts": ["platformSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) expandHome
