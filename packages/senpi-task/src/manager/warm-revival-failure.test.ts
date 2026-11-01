@@ -44,4 +44,36 @@ describe("warm revival whose prompt the live child refuses", () => {
     fake.settle({ status: "completed", finalResponse: "second" })
     expect(await second).toMatchObject({ status: "completed", final_response: "second" })
   })
+
+  // The restore is fenced on the epoch and host this revival wrote: whatever lands while the prompt is
+  // in flight wins over the finished snapshot.
+  const intruders = [
+    { name: "a cancel", change: { status: "cancelled" as const }, expected: { status: "cancelled" } },
+    { name: "a new owner", change: { host_pid: 777_001 }, expected: { status: "running", host_pid: 777_001 } },
+  ]
+  for (const intruder of intruders) {
+    test(`#given ${intruder.name} lands while the refused revival prompt is in flight #when the refusal returns #then the finished run is not restored over it`, async () => {
+      // given
+      const inProcess = new FakeRunner()
+      const { manager, store } = makeManager({ inProcess })
+      const started = await manager.start(baseSpec({ run_in_background: true }))
+      if (started.kind !== "started") throw new Error("expected started")
+      const fake = inProcess.handles.get(started.task_id)
+      if (fake === undefined) throw new Error("missing child handle")
+      const first = manager.waitFor(started.task_id, { signal: AbortSignal.timeout(5000) })
+      fake.settle({ status: "completed", finalResponse: "first" })
+      await first
+      spyOn(fake.handle, "followUp").mockImplementationOnce(() => {
+        store.mutate(started.task_id, (fresh) => ({ ...fresh, ...intruder.change }))
+        return Promise.reject(new Error("Cannot submit a prompt while compaction is in progress."))
+      })
+
+      // when
+      const refused = await manager.sendToTask({ idOrName: started.task_id, message: "continue" })
+
+      // then
+      expect(refused.kind).toBe("not_continuable")
+      expect(store.load(started.task_id)).toMatchObject({ ...intruder.expected, notification: { run_epoch: 1 } })
+    })
+  }
 })

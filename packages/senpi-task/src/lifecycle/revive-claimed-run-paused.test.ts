@@ -33,3 +33,29 @@ test("#given a run Stop pauses a child while this host's revival holds its claim
   // then
   expect(outcome).toMatchObject({ task_id: held.task_id, kind: "deferred", reason: "run_paused" })
 })
+
+// The same holds for a Stop that lands during the respawn itself, after every earlier check passed.
+test("#given a run Stop pauses a child while its respawn is in flight #when the respawn returns #then the revival defers as run_paused, not foreign_live_owner", async () => {
+  // given
+  const store = tempStore()
+  const claimed = seedRecord(store, {
+    task_id: "st_30000a02", status: "running", residency_state: "resident", execution_mode: "in-process", host_pid: hostPid,
+  })
+  store.replace({ ...claimed, residency_claim: "claim-2" })
+  const held = store.load(claimed.task_id)
+  if (held === null) throw new Error("seeded record vanished")
+  const context = resolveContext({
+    hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid, now: () => 9_000_000, signaller, orphanKillDelayMs: 0,
+    respawn: async (record) => {
+      store.transition(record.task_id, { type: "pause", timestamp: new Date(9_000_000).toISOString() })
+      return { ok: false, disposition: "retryable", code: "session_unavailable", reason: "stopped mid-respawn" }
+    },
+    reattach: async () => ({ ok: true }),
+  })
+
+  // when
+  const outcome = await reviveClaimed(context, held, "persisted_only", "/sessions/child.jsonl")
+
+  // then
+  expect(outcome).toMatchObject({ task_id: held.task_id, kind: "deferred", reason: "run_paused" })
+})

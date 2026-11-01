@@ -156,10 +156,10 @@ export async function reviveClaimed(
     return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
   }
   // Everything above awaited: a stop or another owner that landed meanwhile ends this revival here.
-  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, lostClaim(), fresh)
 
   const reached = isHostSessionRecord(fresh) ? await reachRecordedHost(context, fresh.host_session) : "alive"
-  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, lostClaim(), fresh)
   if (reached !== "alive") {
     const outcome = rollbackOrDeferred(context, fresh.task_id, rollbackResidency, reached, fresh)
     markSuspensionReason(context, fresh.task_id, parkedReason(reached))
@@ -216,7 +216,7 @@ export async function reviveClaimed(
         terminate: () => handle.terminate?.() ?? Promise.resolve(),
       }, "revived_after_shutdown", () => isSameClaim(context, fresh))
     }
-    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, lostClaim(), fresh)
   }
   if (!respawned.ok) {
     reservation.release()
