@@ -133,4 +133,59 @@ describe("config loader", () => {
 			}
 		}
 	});
+
+	it("#given a JSONC project config with comments and trailing commas #when merging servers #then honors its custom lsp bindings (issue #2821)", () => {
+		// given: the oh-my-opencode.jsonc shape from #2821 — comments and a
+		// trailing comma make it invalid strict JSON, but its lsp block must
+		// still reach the agent LSP tools. Project configs may only override
+		// builtin servers, so the binding targets builtin sourcekit-lsp with
+		// one extra extension (.metal) that the builtin entry does not have.
+		const previousProject = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
+		const previousUser = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
+		const root = mkdtempSync(join(tmpdir(), "lsp-tools-config-jsonc-"));
+		tempDirectories.push(root);
+		const projectConfig = join(root, "oh-my-opencode.jsonc");
+		writeFileSync(
+			projectConfig,
+			`{
+  // custom server bindings live here, not in a dedicated lsp.json
+  "lsp": {
+    "sourcekit-lsp": {
+      "extensions": [".swift", ".m", ".mm", ".metal"],
+    },
+  },
+}
+`,
+		);
+		process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = "oh-my-opencode.jsonc";
+		process.env["LSP_TOOLS_MCP_USER_CONFIG"] = join(root, "missing-user.json");
+
+		try {
+			// when
+			const servers = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () =>
+				getMergedServers(),
+			);
+
+			// then
+			expect(servers).toContainEqual(
+				expect.objectContaining({
+					id: "sourcekit-lsp",
+					extensions: [".swift", ".m", ".mm", ".metal"],
+					source: "project",
+				}),
+			);
+		} finally {
+			if (previousProject === undefined) {
+				delete process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
+			} else {
+				process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"] = previousProject;
+			}
+
+			if (previousUser === undefined) {
+				delete process.env["LSP_TOOLS_MCP_USER_CONFIG"];
+			} else {
+				process.env["LSP_TOOLS_MCP_USER_CONFIG"] = previousUser;
+			}
+		}
+	});
 });

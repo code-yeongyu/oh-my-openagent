@@ -289,12 +289,60 @@ describe("createLspMcpConfig", () => {
       join(cwd, ".opencode", "lsp.json"),
       join(cwd, ".omo", "lsp.json"),
       join(cwd, ".omo", "lsp-client.json"),
+      // Fallbacks for #2821: the oh-my-opencode plugin config files whose
+      // `lsp` block the loader honors only when no dedicated lsp.json exists.
+      join(cwd, ".opencode", "oh-my-openagent.jsonc"),
+      join(cwd, ".opencode", "oh-my-openagent.json"),
+      join(cwd, ".opencode", "oh-my-opencode.jsonc"),
+      join(cwd, ".opencode", "oh-my-opencode.json"),
     ])
     expectPathSuffix(config.environment?.LSP_TOOLS_MCP_USER_CONFIG, ["opencode", "lsp.json"])
     expectPathSuffix(config.environment?.LSP_TOOLS_MCP_INSTALL_DECISIONS, [
       "opencode",
       "lsp-install-decisions.json",
     ])
+  })
+
+  it("falls back to the user oh-my-opencode.jsonc when no user lsp.json exists (#2821)", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-lsp-user-fallback-root-")
+    const moduleFilePath = join(packageRoot, "dist", "index.js")
+    const cliPath = join(packageRoot, "packages", "lsp-daemon", "dist", "cli.js")
+    const nodePath = join(packageRoot, "bin", "node")
+    mkdirSync(join(packageRoot, "dist"), { recursive: true })
+    mkdirSync(join(packageRoot, "packages", "lsp-daemon", "dist"), { recursive: true })
+    writeFileSync(cliPath, "#!/usr/bin/env node\n", "utf-8")
+    const configHome = createTemporaryDirectory("omo-lsp-user-fallback-xdg-")
+    const opencodeDir = join(configHome, "opencode")
+    mkdirSync(opencodeDir, { recursive: true })
+    writeFileSync(join(opencodeDir, "oh-my-opencode.jsonc"), '{ "lsp": {} }\n', "utf-8")
+    const previousXdg = process.env["XDG_CONFIG_HOME"]
+    const previousOpencodeDir = process.env["OPENCODE_CONFIG_DIR"]
+    process.env["XDG_CONFIG_HOME"] = configHome
+    delete process.env["OPENCODE_CONFIG_DIR"]
+
+    try {
+      // when
+      const config = createLspMcpConfig({
+        cwd: createTemporaryDirectory("omo-lsp-user-fallback-cwd-"),
+        moduleUrl: pathToFileURL(moduleFilePath).href,
+        resolveExecutable: createResolver({ node: nodePath }),
+      })
+
+      // then
+      expect(config.environment?.LSP_TOOLS_MCP_USER_CONFIG).toBe(join(opencodeDir, "oh-my-opencode.jsonc"))
+    } finally {
+      if (previousXdg === undefined) {
+        delete process.env["XDG_CONFIG_HOME"]
+      } else {
+        process.env["XDG_CONFIG_HOME"] = previousXdg
+      }
+      if (previousOpencodeDir === undefined) {
+        delete process.env["OPENCODE_CONFIG_DIR"]
+      } else {
+        process.env["OPENCODE_CONFIG_DIR"] = previousOpencodeDir
+      }
+    }
   })
 
   it("matches user config path suffixes across POSIX and Windows separators", () => {
