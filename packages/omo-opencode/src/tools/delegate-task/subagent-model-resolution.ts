@@ -28,6 +28,8 @@ export async function resolveSubagentModel(
 ): Promise<ResolvedSubagentModel> {
   let categoryModel = undefined
   let fallbackChain = undefined
+  let resolutionReturnedUndefined = false
+
 
   const agentConfigKey = getAgentConfigKey(agentToUse)
   const agentOverride = findAgentOverride(executorCtx.agentOverrides, agentConfigKey)
@@ -93,7 +95,11 @@ export async function resolveSubagentModel(
           model: explicitModel,
         })
       }
+    } else if (!resolution) {
+      // resolution === undefined: all fallback paths exhausted with available provider knowledge
+      resolutionReturnedUndefined = true
     }
+
 
     const defaultProviderID = categoryModel?.providerID
       ?? normalizedMatchedModel?.providerID
@@ -135,6 +141,17 @@ export async function resolveSubagentModel(
         agent: agentToUse,
         model: fullModel,
       })
+    }
+  }
+
+  if (!categoryModel && resolutionReturnedUndefined && agentRequirement?.requiresAnyModel) {
+    const uniqueProviders = agentRequirement.fallbackChain
+      .flatMap((entry) => entry.providers)
+      .filter((p, i, arr) => arr.indexOf(p) === i)
+    return {
+      categoryModel: undefined,
+      fallbackChain: undefined,
+      error: `Cannot delegate to agent "${agentToUse}": no supported model is available. All configured providers for this agent are currently disconnected. Connect one of: ${uniqueProviders.join(", ")}.`,
     }
   }
 
