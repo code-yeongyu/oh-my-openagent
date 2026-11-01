@@ -41,25 +41,28 @@ describe("reflection and dream run reconciliation", () => {
       const reason = new Error("settle observer cancelled")
       const signals: NodeJS.Signals[] = []
       let waits = 0
-      const pass = reconcileReflectionRuns({
-        identity: item.identity,
-        reservation: item.store,
-        signal: controller.signal,
-        getPidLiveness: (pid) => pid === 333 ? "alive" : branch.startsWith("dead") ? "dead" : branch === "unknown" ? "unknown" : "alive",
-        getProcessStartIdentity: async (pid) => pid === 222 ? "supervisor" : "child",
-        waitForOutcome: async () => { entered.resolve(); await release.promise; return "timeout" },
-        waitUntil: async () => {
-          waits += 1
-          if (branch === "dead-before-kill" && waits === 1) return
-          entered.resolve()
-          await release.promise
-        },
-        signalProcessGroup: (_pid, signal) => { signals.push(signal) },
-      }).then(() => undefined, (error: unknown) => error)
-      await withinPhase("observer entered wait", () => entered.promise)
-      controller.abort(reason)
-      release.resolve()
-      expect(await withinPhase("cancelled pass", () => pass)).toBe(reason)
+      // The pass starts inside the outer phase, so its git work is traced from its first process.
+      expect(await withinPhase("observer pass", async () => {
+        const pass = reconcileReflectionRuns({
+          identity: item.identity,
+          reservation: item.store,
+          signal: controller.signal,
+          getPidLiveness: (pid) => pid === 333 ? "alive" : branch.startsWith("dead") ? "dead" : branch === "unknown" ? "unknown" : "alive",
+          getProcessStartIdentity: async (pid) => pid === 222 ? "supervisor" : "child",
+          waitForOutcome: async () => { entered.resolve(); await release.promise; return "timeout" },
+          waitUntil: async () => {
+            waits += 1
+            if (branch === "dead-before-kill" && waits === 1) return
+            entered.resolve()
+            await release.promise
+          },
+          signalProcessGroup: (_pid, signal) => { signals.push(signal) },
+        }).then(() => undefined, (error: unknown) => error)
+        await withinPhase("observer entered wait", () => entered.promise)
+        controller.abort(reason)
+        release.resolve()
+        return await withinPhase("cancelled pass", () => pass)
+      })).toBe(reason)
       expect(signals).toEqual(branch === "dead-before-kill" ? ["SIGTERM"] : [])
       expect(await item.store.readState()).toEqual(initial)
       for (const name of ["terminal-claim.json", "abandoned.json", "final.json"]) {
