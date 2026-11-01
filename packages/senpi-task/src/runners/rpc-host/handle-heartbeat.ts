@@ -10,6 +10,20 @@ export type { HostLivenessStatus } from "../../state/host-liveness"
 export const HOST_UNRESPONSIVE_DEADLINE_MS = 120_000
 const MAX_BACKOFF_MS = 30_000
 
+// Same semantics as the parent-wake notifier's unrefTimerHandle, kept local because this package must not
+// import packages/omo-opencode: a timer implementation that throws on unref (fake timers, a patched global)
+// must never let the throw escape from heartbeat teardown.
+function unrefTimer(timer: ReturnType<typeof setTimeout> | undefined): void {
+  if (timer === undefined) return
+  const maybeUnref = (timer as { readonly unref?: () => unknown }).unref
+  if (typeof maybeUnref !== "function") return
+  try {
+    maybeUnref.call(timer)
+  } catch {
+    // A failing unref is not a heartbeat failure; swallow it so teardown always completes.
+  }
+}
+
 export interface HostHeartbeatInput {
   readonly taskId: string
   readonly intervalMs: number
@@ -58,7 +72,7 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
     clearTimeout(timer)
     if (!active()) return
     timer = setTimeout(tick, ms)
-    timer.unref?.()
+    unrefTimer(timer)
   }
   const failed = (error: unknown): void => {
     if (!active() || status.state === "terminal-pending") return
@@ -73,7 +87,7 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
         clearTimeout(timer)
         close()
       }, HOST_UNRESPONSIVE_DEADLINE_MS)
-      deadline.unref?.()
+      unrefTimer(deadline)
     }
     schedule(status.state === "running" ? HEARTBEAT_DEADLINE_MS : retryDelay())
   }
@@ -82,7 +96,7 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
     // The close port resolves only after authoritative host absence, never on an ACK or frame.
     // Old probes cannot undo this stop intent or authorize its completion.
     closeTimer = setTimeout(close, MAX_BACKOFF_MS)
-    closeTimer.unref?.()
+    unrefTimer(closeTimer)
     void Promise.resolve().then(input.close).then(() => gone(true), error => {
       if (!active()) return
       log("senpi-task unresponsive session close pending", { taskId: input.taskId, error: String(error) })
