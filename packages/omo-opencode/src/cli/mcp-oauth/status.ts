@@ -1,16 +1,22 @@
 import { listAllTokens, listTokensByHost } from "@oh-my-opencode/mcp-client-core/mcp-oauth/storage"
 
-export async function status(serverName: string | undefined): Promise<number> {
+export interface StatusOptions {
+  serverUrl?: string
+}
+
+export async function status(serverName: string | undefined, options?: StatusOptions): Promise<number> {
   try {
-    if (serverName) {
-      const tokens = listTokensByHost(serverName)
+    const serverHost = options?.serverUrl ?? serverName
+    if (serverHost) {
+      const label = serverName ?? serverHost
+      const tokens = listTokensByHost(serverHost)
 
       if (Object.keys(tokens).length === 0) {
-        console.log(`No tokens found for ${serverName}`)
+        console.log(`No tokens found for ${label}`)
         return 0
       }
 
-      console.log(`OAuth Status for ${serverName}:`)
+      console.log(`OAuth Status for ${label}:`)
       for (const [key, token] of Object.entries(tokens)) {
         console.log(`  ${key}:`)
         console.log(`    Access Token: [REDACTED]`)
