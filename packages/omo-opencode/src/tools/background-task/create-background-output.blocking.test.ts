@@ -127,6 +127,7 @@ describe("createBackgroundOutput block=true polling", () => {
     // #then
     expect(pollCount).toBeGreaterThanOrEqual(2)
     expect(output).toContain("Status | **error**")
+    expect(output).toContain("**Error:** task failed")
     expect(output).not.toContain("Timed out waiting")
   })
 

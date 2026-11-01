@@ -128,13 +128,14 @@ To retrieve the complete output, re-call this tool with:
 
   const textContent = extractedContent.filter((text) => text.length > 0).join("\n\n")
   const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
+  const noteLine = task.completionNote ? `\nNote: ${task.completionNote}` : ""
 
   return `Task Result
 
 Task ID: ${task.id}
 Description: ${task.description}
 Duration: ${duration}
-Session ID: ${task.sessionId}
+Session ID: ${task.sessionId}${noteLine}
 
 ---
 

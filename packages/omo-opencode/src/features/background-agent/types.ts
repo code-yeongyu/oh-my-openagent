@@ -60,6 +60,8 @@ export interface BackgroundTask {
   completedAt?: Date
   result?: string
   error?: string
+  /** Set when a completed task's final turn was cut at the output limit but still delivered a result. */
+  completionNote?: string
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
   model?: DelegatedModelConfig
