@@ -21,7 +21,7 @@ import type { CancelOptions, CancelOutcome, DestructionPort, InterruptOutcome, R
 import { discardManagedHandle, releaseOnDispose, releaseSupersededHandle, type ManagedChildHandle, type ManagedChildListener } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { failOwnedRun, launchRunOf, ownsRun } from "./launch-fence"
-import { chainAfterHop, runtimeFallbackCandidates } from "./credential-failure"
+import { chainAfterHop, isModelConfigError, runtimeFallbackCandidates } from "./credential-failure"
 import { chainWithoutRefusingProvider, startCredentialsRefusal } from "./start-credentials-refusal"
 import { createWorkpoolAdmission } from "./workpool-admission"
 import { withResidentStart } from "./resident-start"
@@ -1453,6 +1453,8 @@ class TaskManagerImpl implements TaskManager {
       && live?.handle === input.handle
       && (record.fallback_attempts?.length ?? 0) > 1
       && !this.#nativeFallbackExhaustions.has(input.handle)
+      // A model its route does not serve ended the walk on purpose; the chain was not exhausted (#11355).
+      && !isModelConfigError(input.outcome.failure.message)
     if (fallbackExhausted && record !== null) {
       this.#options.store.appendEvent(input.taskId, {
         type: "retry_fallback_exhausted",

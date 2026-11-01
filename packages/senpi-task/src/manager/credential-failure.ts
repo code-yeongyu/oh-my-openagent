@@ -1,4 +1,5 @@
 import type { ResolvedModelRecord, TaskRecord } from "../state"
+import { redactSecretText } from "../store/secret-text"
 import { isParentModelRung } from "./parent-model-rung"
 
 // A provider answer that no other model on the SAME provider can fix: the stored credential is
@@ -41,6 +42,19 @@ const USAGE_LIMIT =
 // A `/model` command hint (senpi's own limit text says "Switch to another provider with /model") names no model.
 const MODEL_SCOPED_LIMIT = /(?<!\/)\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
 
+// The route does not serve the configured model id. Another rung would answer a request the caller did not
+// make (often on another provider), so this is a configuration error to surface, never a fallback (#11355).
+// The same shapes as senpi's matcher (senpi#4283): the OpenAI-compatible `model_not_found` code and OpenAI's
+// "The model `<id>` does not exist" prose, a gateway's "unknown provider for model", Anthropic's not_found_error whose message names the model ("model: <id>"; any
+// other not_found_error is not one), and Google's "models/<id> is not found". It wins over every other class,
+// a 401 in the same answer included.
+const MODEL_CONFIG_ERROR =
+  /\bmodel_not_found\b|\bunknown provider for model\b|\bthe model\s+[`'"]?[\w.:/-]+[`'"]?\s+does not exist\b|\bnot_found_error\b[^}]{0,120}?\bmodel:\s*[\w.:/-]|\bmodels\/[\w.:-]+ is not found\b/i
+
+export function isModelConfigError(message: string): boolean {
+  return MODEL_CONFIG_ERROR.test(message)
+}
+
 export type UsageLimitScope = "model" | "account"
 
 export function usageLimitScope(message: string): UsageLimitScope | undefined {
@@ -78,23 +92,30 @@ function modelIdOf(record: TaskRecord): string | undefined {
 // terminal all delegate), so the recovery names both re-authentication paths instead of a slash
 // command only the interactive terminal handles.
 /**
- * The terminal error text: a credential failure names the provider and how to restore it, and a spent
+ * The terminal error text, redacted: a model its route does not serve names the omo.json key to fix, a credential failure names the provider and how to restore it, and a spent
  * usage limit says the task stopped on it (and, when nothing was left, that no other model could take
  * over), so a single-model lane such as deep-high never ends on a bare provider error.
  */
-export function terminalFailureMessage(record: TaskRecord | null | undefined, failureMessage: string): string {
+export function terminalFailureMessage(record: TaskRecord | null | undefined, providerMessage: string): string {
+  // Classified on the raw provider text, like the fallback writers; only the redacted text is returned.
+  const failureMessage = redactSecretText(providerMessage)
   const provider = record == null ? undefined : providerOf(record)
   if (provider === undefined || record == null) return failureMessage
-  if (isCredentialFailure(failureMessage, modelIdOf(record))) {
-    const missing = !CREDENTIAL_REJECTED.test(failureMessage) && isMissingCredential(failureMessage, modelIdOf(record))
+  if (isModelConfigError(providerMessage)) {
+    const model = record.resolved_model === undefined ? record.model : `${provider}/${record.resolved_model.model_id}`
+    const key = record.category === undefined ? "its model" : `categories.${record.category}`
+    return `${failureMessage}\n${model} is not served by its route; fix ${key} in omo.json.`
+  }
+  if (isCredentialFailure(providerMessage, modelIdOf(record))) {
+    const missing = !CREDENTIAL_REJECTED.test(providerMessage) && isMissingCredential(providerMessage, modelIdOf(record))
     const cause = missing
       ? `No credentials for ${provider} were found; sign in to ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or add its API key`
       : `Credentials for ${provider} were rejected; re-authenticate ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or re-add its API key`
     return `${failureMessage}\n${cause}, or pin this category to another provider in omo.json.`
   }
-  if (usageLimitScope(failureMessage) === undefined) return failureMessage
+  if (usageLimitScope(providerMessage) === undefined) return failureMessage
   const model = record.resolved_model === undefined ? record.model : `${provider}/${record.resolved_model.model_id}`
-  const exhausted = runtimeFallbackCandidates(record, failureMessage).remaining.length === 0
+  const exhausted = runtimeFallbackCandidates(record, providerMessage).remaining.length === 0
     ? " No other model in its fallback chain could take over."
     : ""
   return `${failureMessage}\n${model} reached its usage limit, so this task stopped.${exhausted} Retry once the limit resets, or point this category at another provider or model in omo.json.`
@@ -119,6 +140,7 @@ export function chainAfterHop(candidates: RuntimeFallbackCandidates): readonly R
  * spent or signed-out rung, so any other failure walks the category rungs alone.
  */
 export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: string): RuntimeFallbackCandidates {
+  if (isModelConfigError(failureMessage)) return { remaining: [], skipped: [...(record.fallback_models ?? [])] }
   const unusable = usageLimitScope(failureMessage) !== undefined || isCredentialFailure(failureMessage, modelIdOf(record))
   const all = record.fallback_models ?? []
   const fallbacks = all.filter((model) => unusable || !isParentModelRung(record, model))

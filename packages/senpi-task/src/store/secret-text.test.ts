@@ -1,0 +1,77 @@
+import { describe, expect, test } from "bun:test"
+
+import { READABLE_NAMED_VALUES, READABLE_PROVIDER_TEXT, SECRET_CELLS } from "../manager/__fixtures__/secret-inventory"
+import { redactSecretText } from "./secret-text"
+
+// The same generated matrix senpi#4283 runs against its stream boundary: every secret shape, key spelling, quoting and
+// container. omo stores provider text from children, so its redactor must clear exactly the same cells.
+describe("redactSecretText over the shared secret matrix (#11355)", () => {
+  test.each(SECRET_CELLS.map((cell) => [cell.name, cell] as const))("#given %s #when redacted #then the secret is gone", (_name, cell) => {
+    const redacted = redactSecretText(cell.text)
+
+    expect(redacted).toContain("[REDACTED]")
+    expect(redacted.includes(cell.secret)).toBe(false)
+    expect(redactSecretText(redacted)).toBe(redacted)
+  })
+
+  test("#given model ids, error codes and request ids #when redacted #then the text is unchanged", () => {
+    expect(redactSecretText(READABLE_PROVIDER_TEXT)).toBe(READABLE_PROVIDER_TEXT)
+  })
+
+  test.each([...READABLE_NAMED_VALUES, "MAX_TOKENS=4096 exceeded"])("#given %s #when redacted #then the text is unchanged", (text) => {
+    expect(redactSecretText(text)).toBe(text)
+  })
+
+  test("#given a short cookie value #when redacted #then every cookie value is gone", () => {
+    expect(redactSecretText("Cookie: a=1; sid=s3cr3t")).toBe("Cookie: a=[REDACTED]; sid=[REDACTED]")
+  })
+})
+
+const MB = 1 << 20
+const fill = (size: number, unit: string): string => unit.repeat(Math.ceil(size / unit.length)).slice(0, size)
+
+// Inputs that made the previous name pattern retry one long run from every position (quadratic), plus every other
+// rule's worst case.
+const ADVERSARIAL: readonly (readonly [label: string, build: (size: number) => string])[] = [
+  ["a keyword repeated", (size) => fill(size, "key")],
+  ["a separated keyword repeated", (size) => fill(size, "token_")],
+  ["a keyword inside a word repeated", (size) => fill(size, "aaaaakey")],
+  ["short credential values repeated", (size) => fill(size, "key: a ")],
+  ["separators repeated", (size) => fill(size, "a:")],
+  ["whitespace after a credential name", (size) => `key:${" ".repeat(size)}`],
+  ["cookie pairs repeated", (size) => `Cookie: ${fill(size, "a=1; ")}`],
+  ["cookie names repeated", (size) => fill(size, "Cookie: ")],
+  ["open credential objects repeated", (size) => fill(size, "api_key: {")],
+  ["XML credential tags repeated", (size) => fill(size, "<apiKey>")],
+  ["URL userinfo heads repeated", (size) => fill(size, "https://u:")],
+  ["bearer schemes repeated", (size) => fill(size, "bearer ")],
+  ["quotes after a name", (size) => `key${fill(size, '\\"')}`],
+  ["names past the length bound", (size) => fill(size, `${"a".repeat(129)}_api_key: x `)],
+]
+
+// Linearity is the contract, not a wall-clock budget. CPU time, not elapsed time: on a loaded runner the elapsed time
+// mostly measures how long the process waited for a core. A 16x larger input costs 16x on a linear scan and 256x on a
+// quadratic one; 64x sits between the two with room for cache effects (measured worst under load: about 28x).
+const SMALL = MB / 8
+const LARGE = 2 * MB
+const MAX_GROWTH = 64
+const NOISE_FLOOR_MS = 2
+
+function bestCpuMs(text: string): number {
+  let best = Number.POSITIVE_INFINITY
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const start = process.cpuUsage()
+    redactSecretText(text)
+    const spent = process.cpuUsage(start)
+    best = Math.min(best, (spent.user + spent.system) / 1000)
+  }
+  return best
+}
+
+describe("redactSecretText stays linear (#11355, senpi#4283)", () => {
+  test.each(ADVERSARIAL)("#given %s #when the input grows 16x #then the CPU time grows linearly, not quadratically", (_label, build) => {
+    const growth = bestCpuMs(build(LARGE)) / Math.max(bestCpuMs(build(SMALL)), NOISE_FLOOR_MS)
+
+    expect(growth).toBeLessThan(MAX_GROWTH)
+  })
+})

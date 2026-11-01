@@ -151,6 +151,38 @@ describe("TaskManager configured runtime fallback", () => {
     expect(runner.startedSpecs).toHaveLength(1)
   })
 
+  test("#given the configured model is not served by its route #when the child fails with model_not_found #then the task ends in error on that model instead of handing off (#11355)", async () => {
+    // given
+    const runner = new ObservableRunner()
+    const { manager, store } = makeManager({
+      planner: fallbackPlanner(),
+      inProcess: runner,
+    })
+    const initialStart = runner.nextStart()
+    const result = await manager.start(baseSpec({ execution_mode: "in-process" }))
+    if (result.kind !== "started") throw new Error("expected started task")
+    await initialStart
+    const handle = runner.handles.get(result.task_id)
+    if (handle === undefined) throw new Error("expected initial handle")
+    const fallbackStart = runner.nextStart()
+    const terminal = manager.waitFor(result.task_id)
+    const failure = '400 {"code":"model_not_found","message":"unknown provider for model primary-model"}'
+
+    // when
+    handle.settle({ status: "error", failure: { kind: "child-turn-failed", message: failure } })
+
+    // then
+    const outcome = await Promise.race([
+      fallbackStart.then(() => "fallback" as const),
+      terminal.then(() => "terminal" as const),
+    ])
+    expect(outcome).toBe("terminal")
+    expect(runner.startedSpecs).toHaveLength(1)
+    const record = store.load(result.task_id)
+    expect(record).toMatchObject({ status: "error", model: "vendor-a/primary-model" })
+    expect(record?.error_message).toContain(failure)
+  })
+
   test("#given every configured model fails before tools #when the chain exhausts #then attempted models remain in terminal diagnostics", async () => {
     // given
     const runner = new ObservableRunner()
@@ -311,5 +343,67 @@ describe("TaskManager configured runtime fallback", () => {
     expect(events).toContain('"type":"retry_fallback_exhausted"')
     expect(events).toContain('"chain_key":"vendor-a/primary-model"')
     expect(events).toContain('"last_error":"fallback unavailable"')
+  })
+})
+
+describe("TaskManager model configuration errors (#11355)", () => {
+  const secret = ["xkey", "fixture", "0002"].join("-")
+  const modelNotFound = `404 {"code":"model_not_found","message":"unknown provider for model fallback-model"} x-api-key: ${secret}`
+
+  test("#given the task already hopped once #when the fallback model is not served by its route #then no exhaustion is recorded and the stored error is redacted", async () => {
+    // given
+    const runner = new ObservableRunner()
+    const { manager, store } = makeManager({ planner: fallbackPlanner(), inProcess: runner })
+    const initialStart = runner.nextStart()
+    const result = await manager.start(baseSpec({ execution_mode: "in-process" }))
+    if (result.kind !== "started") throw new Error("expected started task")
+    await initialStart
+    const firstHandle = runner.handles.get(result.task_id)
+    if (firstHandle === undefined) throw new Error("expected initial handle")
+    const fallbackStart = runner.nextStart()
+    firstHandle.settle({ status: "error", failure: { kind: "child-prompt-failed", message: "primary unavailable" } })
+    await fallbackStart
+    const secondHandle = runner.handles.get(result.task_id)
+    if (secondHandle === undefined) throw new Error("expected fallback handle")
+    await secondHandle.waitForSubscription()
+    const terminal = manager.waitFor(result.task_id)
+
+    // when
+    secondHandle.settle({ status: "error", failure: { kind: "child-turn-failed", message: modelNotFound } })
+
+    // then
+    const settled = await terminal
+    expect(settled).toMatchObject({ status: "error", model: "vendor-b/fallback-model" })
+    expect(settled.error_message).toContain("vendor-b/fallback-model is not served by its route; fix categories.quick in omo.json.")
+    expect(settled.error_message).not.toMatch(/exhausted|No other model/i)
+    expect(settled.error_message).not.toContain(secret)
+    const events = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
+    expect(events).not.toContain("retry_fallback_exhausted")
+    expect(events).not.toContain(secret)
+  })
+
+  test("#given the child reports its own chain exhausted on a configuration error #when it terminates #then the task records no exhaustion", async () => {
+    // given
+    const runner = new ObservableRunner()
+    const { manager, store } = makeManager({ planner: fallbackPlanner(), inProcess: runner })
+    const result = await manager.start(baseSpec({ execution_mode: "in-process" }))
+    if (result.kind !== "started") throw new Error("expected started task")
+    const handle = runner.handles.get(result.task_id)
+    if (handle === undefined) throw new Error("expected initial handle")
+    await handle.waitForSubscription()
+    const applied = { type: "retry_fallback_applied", from: "vendor-a/primary-model", to: "vendor-b/fallback-model", chainKey: "vendor-a/primary-model", reason: "hard-error" } as const
+    const exhausted = { type: "retry_fallback_exhausted", chainKey: "vendor-a/primary-model", lastError: modelNotFound } as const
+    handle.emit(applied)
+    handle.emit(exhausted)
+    const terminal = manager.waitFor(result.task_id)
+
+    // when
+    handle.settle({ status: "error", failure: { kind: "child-turn-failed", message: modelNotFound } })
+
+    // then
+    expect(await terminal).toMatchObject({ status: "error" })
+    const events = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
+    expect(events).not.toContain("retry_fallback_exhausted")
+    expect(events).not.toContain(secret)
   })
 })
