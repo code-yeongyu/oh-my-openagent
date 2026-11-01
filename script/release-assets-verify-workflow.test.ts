@@ -66,7 +66,7 @@ function fakeGh(bin: string): void {
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string; readonly built: readonly string[] }
 
 /** Runs a real step with `released` as the GitHub release and `built` as this run's .omo/release-binaries (null: skip_platform). */
-function runStep(step: string, released: Files, built: Files | null): Run {
+function runStep(step: string, released: Files, built: Files | null, payloadDirs: readonly string[] = []): Run {
   const root = mkdtempSync(join(tmpdir(), "omo-release-assets-"))
   try {
     const releaseDir = join(root, "release")
@@ -77,6 +77,10 @@ function runStep(step: string, released: Files, built: Files | null): Run {
     if (built !== null) {
       mkdirSync(join(checkout, ".omo", "release-binaries"), { recursive: true })
       for (const [name, bytes] of Object.entries(built)) writeFileSync(join(checkout, ".omo", "release-binaries", name), bytes)
+      for (const dir of payloadDirs) {
+        mkdirSync(join(checkout, ".omo", "release-binaries", dir))
+        writeFileSync(join(checkout, ".omo", "release-binaries", dir, "omo-engine-trust-helper"), "payload\n")
+      }
     }
     const stepTemp = join(root, "tmp")
     mkdirSync(stepTemp)
@@ -104,6 +108,15 @@ describe("Verify uploaded assets compares the release with what the run built (R
       expect(run.status, run.stderr).toBe(0)
       expect(run.stdout).toContain(`Verified ${Object.keys(files).length} release assets`)
     }
+  }, TEST_TIMEOUT_MS)
+
+  test("payload directories the desktop-engine artifact carries are not release assets (#12018)", () => {
+    const files = withCapabilities()
+    const helpers = ["darwin-arm64", "darwin-x64", "win32-arm64", "win32-x64"].map((host) => `engine-trust-helper-${host}`)
+    const run = runStep(verifyStep, files, files, helpers)
+    expect(run.status, run.stderr).toBe(0)
+    expect(runStep(verifyStep, files, withCapabilities('{"keychainHandoff":1}\n'), helpers).status).toBe(0)
+    expect(runStep(verifyStep, release(), files, helpers).status).not.toBe(0)
   }, TEST_TIMEOUT_MS)
 
   const divergent: ReadonlyArray<readonly [string, Files, Files]> = [

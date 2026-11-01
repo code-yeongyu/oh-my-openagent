@@ -1348,8 +1348,23 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #recordSpawnFacts(taskId: string, handle: ManagedChildHandle): void {
-    const current = this.#tryLoad(taskId)
-    if (current === null || isTerminalRecord(current)) return
+    // The stamp rewrites the whole record, so it reads and writes under the record lock: sends mint input ids
+    // into the same record (runners/input-effects.ts), and a stamp built from an unlocked read wrote a minted
+    // effect_seq back to its old value (#10708). The child's route is read first, outside the lock.
+    const effectiveModel = handle.effectiveModel?.()
+    let live = false
+    try {
+      this.#options.store.mutate(taskId, current => {
+        live = !isTerminalRecord(current)
+        return live ? this.#withSpawnFacts(current, handle, effectiveModel) : current
+      })
+    } catch (error) {
+      log("senpi-task manager could not record spawn facts", { taskId, error: String(error) })
+    }
+    if (live) void this.#steering.notifyStarted(taskId)
+  }
+
+  #withSpawnFacts(current: TaskRecord, handle: ManagedChildHandle, effectiveModel: ReturnType<NonNullable<ManagedChildHandle["effectiveModel"]>> | undefined): TaskRecord {
     const spawned = endFallbackHandoff(current)
     const withPid = recordSpawnedPid(spawned, handle.pid) ?? spawned
     const withRunner = recordSpawnedRunner(withPid, handle.kind, handle.hostSession) ?? withPid
@@ -1370,9 +1385,7 @@ class TaskManagerImpl implements TaskManager {
     // The record's effective route comes from the CHILD, never the plan (#9722): the runner read
     // the session's real model at start (in-process session.model, host get_state), and the
     // child's own assistant-message observations keep it current (subscribeEffectiveModel).
-    const updated: TaskRecord = stampSpawnEffectiveModel(specApplied, handle.effectiveModel?.())
-    if (updated !== current) this.#options.store.replace(updated)
-    void this.#steering.notifyStarted(taskId)
+    return stampSpawnEffectiveModel(specApplied, effectiveModel)
   }
 
   // One child subscription feeds BOTH durable facts: the JSONL transcript log and the run-stats
