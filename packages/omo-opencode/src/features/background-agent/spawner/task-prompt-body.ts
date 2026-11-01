@@ -1,4 +1,5 @@
 import { createInternalAgentTextPart, getAgentToolRestrictions } from "../../../shared"
+import { canUseCallOmoAgent } from "../../../shared/delegated-agent-tool-policy"
 import type { LaunchInput } from "../types"
 
 type PromptModel = LaunchInput["model"]
@@ -8,6 +9,7 @@ type TaskPromptBodyOptions =
       readonly kind: "launch"
       readonly agent: string
       readonly model: PromptModel
+      readonly inheritedModel?: LaunchInput["parentModel"]
       readonly system: LaunchInput["skillContent"]
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
@@ -16,6 +18,7 @@ type TaskPromptBodyOptions =
       readonly kind: "resume"
       readonly agent: string
       readonly model: PromptModel
+      readonly inheritedModel?: LaunchInput["parentModel"]
       readonly prompt: string
       readonly includeTeamToolDenylist: boolean
     }
@@ -52,7 +55,7 @@ export function buildTaskPromptBody(options: TaskPromptBodyOptions): TaskPromptB
     ...(options.kind === "launch" ? { system: options.system } : {}),
     tools: {
       task: false,
-      call_omo_agent: true,
+      call_omo_agent: canUseCallOmoAgent(options.model, options.inheritedModel),
       question: false,
       ...getAgentToolRestrictions(options.agent, {
         includeTeamToolDenylist: options.includeTeamToolDenylist,
