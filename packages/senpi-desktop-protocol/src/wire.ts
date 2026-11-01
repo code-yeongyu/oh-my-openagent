@@ -73,8 +73,8 @@ export interface DesktopCapabilities {
 	readonly screenLocked: boolean;
 	/** Captures run through the legacy `screencapture` path, not the ScreenCaptureKit worker (B9). */
 	readonly legacyCapture?: boolean;
-	/** The watch of the user's own key presses and clicks behind `UserIntervened`; absent on backends without one and on older engines. */
-	readonly interventionWatch?: "on" | "off" | "not_started" | null;
+	/** The watch of the user's own key presses and clicks behind `UserIntervened`; absent on backends without one and on older engines. `"unknown"` is the host-side sentinel for a value a newer engine sends that this host does not know yet; the engine itself never sends it. */
+	readonly interventionWatch?: "on" | "off" | "not_started" | UnknownAuditValue | null;
 	/** macOS: the display is asleep, so capture and input may fail; absent on older engines. */
 	readonly displayAsleep?: boolean | null;
 }
