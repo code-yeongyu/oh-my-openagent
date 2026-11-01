@@ -1,11 +1,11 @@
 {
  "repo": {
-  "head": "fa1397fad23852ee5ac0928d28ebe7e45bb77dc2",
+  "head": "c2ae8b67cda3a55e8ce29e6e66ccf25f34dc1f61",
   "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
  },
  "platform": "linux-x64",
  "runtimes": {
-  "harness": "node@24.21.0",
+  "harness": "node@24.22.0",
   "child": "bun@1.4.4 @code-yeongyu/senpi@2026.10.30-1 (pinned)"
  },
  "hashes": {
@@ -14,5 +14,5 @@
   "fakeModelServer": "sha256:cab5b6866b7854287218de51d1fafcc242a8602b2c83fb85572abe332f9f6560",
   "collectors": "sha256:f084a278fe05fa9e3603e95ab86bd3988e4a2c500a3174a2e72521a0d4038bdd"
  },
- "command": "node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --record --repeat 2"
+ "command": "node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --record --repeat 3"
 }
