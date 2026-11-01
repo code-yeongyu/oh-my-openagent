@@ -53,6 +53,9 @@ export function createChildProgress(
   let resolvedModel = target.resolvedModel
   let model = target.model
   let fallbackCount = 0
+  // Senpi emits model_changed (source "fallback") with the applied level right before retry_fallback_applied,
+  // whose `to` is a bare provider/model_id selector (#7934).
+  let fallbackSwitch: { readonly provider: string; readonly modelId: string; readonly level: string } | undefined
   let turnResumed = false
   let awaitingInput = options?.awaitingInput === true
 
@@ -81,9 +84,26 @@ export function createChildProgress(
         awaitingInput = true
         return true
       }
+      if (event.type === "model_changed") {
+        fallbackSwitch = readFallbackSwitch(event)
+        return statsChanged
+      }
       if (event.type === "retry_fallback_applied" && event.to !== undefined) {
-        resolvedModel = undefined
-        model = event.to
+        // Keep provider/model_id and the applied level: a selector suffix when present, else the level of the
+        // fallback switch senpi announced for this same model.
+        const parsed = parseModelSelector(event.to, resolvedModel?.source ?? "category")
+        const level = parsed !== undefined && parsed.reasoning === undefined
+          && fallbackSwitch?.provider === parsed.provider && fallbackSwitch.modelId === parsed.model_id
+          ? fallbackSwitch.level
+          : undefined
+        fallbackSwitch = undefined
+        if (parsed !== undefined) {
+          resolvedModel = level === undefined ? parsed : { ...parsed, reasoning: level, reasoning_effort: level }
+          model = parsed.display
+        } else {
+          resolvedModel = undefined
+          model = event.to
+        }
         fallbackCount += 1
         return true
       }
@@ -205,4 +225,38 @@ function isTextPart(value: unknown): value is { readonly type: "text"; readonly 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function readFallbackSwitch(
+  event: ManagedChildEvent,
+): { readonly provider: string; readonly modelId: string; readonly level: string } | undefined {
+  if (Reflect.get(event, "source") !== "fallback") return undefined
+  const level = Reflect.get(event, "thinkingLevel")
+  const model = Reflect.get(event, "model")
+  if (typeof level !== "string" || level.length === 0 || !isRecord(model)) return undefined
+  const { provider, id } = model
+  return typeof provider === "string" && typeof id === "string" ? { provider, modelId: id, level } : undefined
+}
+
+// Parse a "provider/model_id" or "provider/model_id:reasoning" selector into a ResolvedModelRecord.
+// Mirrors runtime-fallback-event.ts parseModelSelector so the live progress tracker preserves
+// the thinking level that the task record store already retains.
+function parseModelSelector(
+  selector: string,
+  source: ResolvedModelRecord["source"],
+): ResolvedModelRecord | undefined {
+  const slash = selector.indexOf("/")
+  if (slash <= 0 || slash === selector.length - 1) return undefined
+  const colon = selector.lastIndexOf(":")
+  const hasThinking = colon > slash
+  const display = hasThinking ? selector.slice(0, colon) : selector
+  return {
+    source,
+    provider: display.slice(0, slash),
+    model_id: display.slice(slash + 1),
+    display,
+    ...(hasThinking
+      ? { reasoning: selector.slice(colon + 1), reasoning_effort: selector.slice(colon + 1) }
+      : {}),
+  }
 }
