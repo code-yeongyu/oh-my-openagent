@@ -112,7 +112,7 @@ describe("combined macOS CI execution contract (#9974)", () => {
     expect(status.name).toBe(name)
     expect(status["runs-on"]).toBe("ubuntu-26.04")
     expect(status.needs).toEqual(["ci-mode", "macos-combined"])
-    expect(status.if).toBe("${{ always() && !cancelled() }}")
+    expect(status.if).toBe("${{ always() && !cancelled() && needs.ci-mode.result != 'skipped' }}")
     const judge = status.steps.find((step) => step.run?.endsWith("bash .github/scripts/ci-macos-status.sh"))
     expect(judge?.env).toEqual({
       LEG_OS: "${{ matrix.os }}",
