@@ -1,12 +1,16 @@
+import type { InFlightReads } from "@oh-my-opencode/memory-core"
+
 import type { ComponentLogger } from "../../extension/types"
 
 export function createPressureDreamAdmission(options: {
   readonly request: (sessionId: string) => Promise<unknown>
+  /** The memory work the session_shutdown drain awaits; a request runs detached from its caller, so it is tracked here. */
+  readonly work: InFlightReads
   readonly logger?: ComponentLogger
 }) {
   const deferred = new Set<string>()
   const request = (sessionId: string): void => {
-    void options.request(sessionId).catch((error: unknown) => {
+    void options.work.track(() => options.request(sessionId)).catch((error: unknown) => {
       options.logger?.warn("omo-senpi memory pressure dream trigger failed", {
         error: error instanceof Error ? error.message : String(error),
       })

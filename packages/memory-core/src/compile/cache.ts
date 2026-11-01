@@ -4,6 +4,7 @@ import type { CompiledBlockStore } from "./block-persist"
 import { compileMemoryBlockWithReads, type CompileMemoryBlockOptions, type MemoryExpiry } from "./compile"
 import { expirySlot } from "./expiry-slot"
 import { DEFAULT_EXTERNAL_PROJECTION_LIMITS } from "./external-projection-limits"
+import { InFlightReads } from "./in-flight-reads"
 
 export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 
@@ -72,7 +73,7 @@ export class MemoryBlockCache {
   private readonly options: MemoryBlockCacheOptions
   private module: Promise<CompiledBlockStoreModule | undefined> | undefined
   private readonly stores = new Map<string, CompiledBlockStore>()
-  private readonly computing = new Set<Promise<unknown>>()
+  private readonly reads = new InFlightReads()
 
   constructor(options: MemoryBlockCacheOptions = {}) {
     this.options = options
@@ -87,23 +88,33 @@ export class MemoryBlockCache {
    * passes that commit so later memory commits cannot change the bytes it injects, and passes the pin instant as
    * `asOfMs` so a file expiring later does not change them either.
    */
-  async compile(
+  compile(
     repo: GitMemoryRepo,
     template: string,
     options: CompileMemoryBlockOptions,
     pinnedRevision?: string | null,
     asOfMs?: number,
   ): Promise<string> {
-    return (await this.compileWithExpiries(repo, template, options, pinnedRevision, asOfMs)).block
+    return this.compileWithExpiries(repo, template, options, pinnedRevision, asOfMs).then((compiled) => compiled.block)
   }
 
   /** `compile`, plus the revision's `expires` instants, so a pinned caller can announce what expired after its pin. */
-  async compileWithExpiries(
+  compileWithExpiries(
     repo: GitMemoryRepo,
     template: string,
     options: CompileMemoryBlockOptions,
     pinnedRevision?: string | null,
     asOfMs?: number,
+  ): Promise<CompiledMemoryBlock> {
+    return this.track(() => this.compileWithExpiriesAt(repo, template, options, pinnedRevision, asOfMs))
+  }
+
+  private async compileWithExpiriesAt(
+    repo: GitMemoryRepo,
+    template: string,
+    options: CompileMemoryBlockOptions,
+    pinnedRevision: string | null | undefined,
+    asOfMs: number | undefined,
   ): Promise<CompiledMemoryBlock> {
     const revision = pinnedRevision === undefined ? await repo.head() : pinnedRevision
     const at = asOfMs ?? (this.options.now ?? Date.now)()
@@ -158,16 +169,10 @@ export class MemoryBlockCache {
     if (stored !== undefined && stored.slot === expirySlot(stored.expiries, asOfMs)) {
       return { block: stored.block, expiries: stored.expiries }
     }
-    const computed = compileMemoryBlockWithReads(repo, revision, options, asOfMs)
-    this.computing.add(computed)
-    try {
-      const { block, degraded, expiries } = await computed
-      if (degraded.length > 0) this.options.onDegraded?.({ dir: repo.dir, revision, reasons: degraded })
-      else store?.putBlock(key, { block, expiries, slot: expirySlot(expiries, asOfMs) })
-      return { block, expiries }
-    } finally {
-      this.computing.delete(computed)
-    }
+    const { block, degraded, expiries } = await compileMemoryBlockWithReads(repo, revision, options, asOfMs)
+    if (degraded.length > 0) this.options.onDegraded?.({ dir: repo.dir, revision, reasons: degraded })
+    else store?.putBlock(key, { block, expiries, slot: expirySlot(expiries, asOfMs) })
+    return { block, expiries }
   }
 
   private persistKey(revision: string, name: string): string {
@@ -180,7 +185,16 @@ export class MemoryBlockCache {
    * the value of that commit (`persist`), never a fallback produced by a failed read. Without a store this is
    * `compute()`.
    */
-  async remember(
+  remember(
+    repo: GitMemoryRepo,
+    name: string,
+    revision: string,
+    compute: () => Promise<{ readonly value: string; readonly persist: boolean }>,
+  ): Promise<string> {
+    return this.track(() => this.rememberAt(repo, name, revision, compute))
+  }
+
+  private async rememberAt(
     repo: GitMemoryRepo,
     name: string,
     revision: string,
@@ -191,20 +205,27 @@ export class MemoryBlockCache {
     const store = await this.storeWithin(repo.dir)
     const stored = store === undefined ? undefined : await store.get(key)
     if (stored !== undefined) return stored
-    const computed = compute()
-    this.computing.add(computed)
-    try {
-      const { value, persist } = await computed
-      if (persist) store?.put(key, value)
-      return value
-    } finally {
-      this.computing.delete(computed)
-    }
+    const { value, persist } = await compute()
+    if (persist) store?.put(key, value)
+    return value
   }
 
-  /** Settles once no compile that may store a value, and no store write this cache started, is running. */
+  /**
+   * Runs `work` as this cache's own: settled() waits for it. A caller that reads the repository before handing the
+   * result to compile() (a prebuild reading HEAD) runs that read through here, so no git read it starts outlives
+   * settled().
+   */
+  track<T>(work: () => Promise<T>): Promise<T> {
+    return this.reads.track(work)
+  }
+
+  /**
+   * Settles once nothing this cache started is running: no compile or remember() call from its first git read on
+   * (HEAD, the store load, the block compile), no track()ed work, and no store write. A session shutdown waits on
+   * this before the identity directory may be removed (#11135).
+   */
   async settled(): Promise<void> {
-    while (this.computing.size > 0) await Promise.allSettled([...this.computing])
+    await this.reads.settled()
     await Promise.all([...this.stores.values()].map((store) => store.settled()))
   }
 
