@@ -6,6 +6,8 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 
 import { processWithCli } from "./cli-runner"
+import { readCheckerEdits } from "./checker-edits"
+import type { HookInput } from "./cli"
 import type { PendingCall } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -221,6 +223,135 @@ exit /b 2
       await processWithCli({ tool: "write", sessionID: "ses-second", callID: "call-2" }, secondPendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
       // then
       expect(callCount).toBe(2)
+    })
+  })
+
+  describe("processWithCli write and edits-array targets", () => {
+    function pendingCall(overrides: Partial<PendingCall> & Pick<PendingCall, "tool" | "sessionID">): PendingCall {
+      return {
+        filePath: "/repo/src/target.ts",
+        timestamp: Date.now(),
+        ...overrides,
+      }
+    }
+
+    async function runCheck(call: PendingCall): Promise<{ hookInputs: HookInput[]; output: string }> {
+      const hookInputs: HookInput[] = []
+      const output = { output: "Success" }
+      await processWithCli(
+        { tool: call.tool, sessionID: call.sessionID, callID: `call-${call.sessionID}` },
+        call,
+        output,
+        "/tmp/fake-comment-checker",
+        undefined,
+        () => {},
+        {
+          runCommentChecker: async (hookInput) => {
+            hookInputs.push(hookInput)
+            return { hasComments: true, message: "AGENT MEMO COMMENT DETECTED" }
+          },
+        },
+      )
+      return { hookInputs, output: output.output }
+    }
+
+    test("#given write content with a new comment #when processed #then the checker runs as Write and the warning is appended", async () => {
+      // given
+      const content = "# Changed to return the sum instead of the difference\nexport const sum = (a: number, b: number) => a + b\n"
+      const call = pendingCall({ tool: "write", sessionID: "ses-write-content", content })
+
+      // when
+      const result = await runCheck(call)
+
+      // then
+      expect(result.hookInputs).toHaveLength(1)
+      expect(result.hookInputs[0]?.tool_name).toBe("Write")
+      expect(result.hookInputs[0]?.tool_input.content).toBe(content)
+      expect(result.hookInputs[0]?.tool_input.old_string).toBeUndefined()
+      expect(result.output).toContain("AGENT MEMO COMMENT DETECTED")
+    })
+
+    test("#given a write over an existing file that keeps its comments #when processed #then the checker is not run", async () => {
+      // given
+      const previousContent = "// SPDX-License-Identifier: MIT\n/** Adds two numbers. */\nexport const sum = (a: number, b: number) => a - b\n"
+      const content = "// SPDX-License-Identifier: MIT\n/** Adds two numbers. */\nexport const sum = (a: number, b: number) => a + b\n"
+      const call = pendingCall({ tool: "write", sessionID: "ses-write-overwrite-kept", content, previousContent })
+
+      // when
+      const result = await runCheck(call)
+
+      // then
+      expect(result.hookInputs).toHaveLength(0)
+      expect(result.output).toBe("Success")
+    })
+
+    test("#given a write over an existing file that adds a comment #when processed #then the checker runs as Edit against the old file text", async () => {
+      // given
+      const previousContent = "// SPDX-License-Identifier: MIT\nexport const sum = (a: number, b: number) => a - b\n"
+      const content = "// SPDX-License-Identifier: MIT\n// Changed to return the sum instead of the difference\nexport const sum = (a: number, b: number) => a + b\n"
+      const call = pendingCall({ tool: "write", sessionID: "ses-write-overwrite-new", content, previousContent })
+
+      // when
+      const result = await runCheck(call)
+
+      // then
+      expect(result.hookInputs).toHaveLength(1)
+      expect(result.hookInputs[0]?.tool_name).toBe("Edit")
+      expect(result.hookInputs[0]?.tool_input.old_string).toBe(previousContent)
+      expect(result.hookInputs[0]?.tool_input.new_string).toBe(content)
+      expect(result.hookInputs[0]?.tool_input.content).toBeUndefined()
+      expect(result.output).toContain("AGENT MEMO COMMENT DETECTED")
+    })
+
+    test("#given write content without a comment #when processed #then the checker is not run", async () => {
+      // given
+      const call = pendingCall({
+        tool: "write",
+        sessionID: "ses-write-clean",
+        content: "export const sum = (a: number, b: number) => a + b\n",
+      })
+
+      // when
+      const result = await runCheck(call)
+
+      // then
+      expect(result.hookInputs).toHaveLength(0)
+      expect(result.output).toBe("Success")
+    })
+
+    test("#given an edit whose edits array uses camelCase keys #when processed #then the checker runs as MultiEdit with snake_case hunks", async () => {
+      // given
+      const oldString = "const value = 1\n"
+      const newString = "# Changed to double the value as requested\nconst value = 2\n"
+      const edits = readCheckerEdits([{ oldString, newString }])
+      const call = pendingCall({ tool: "edit", sessionID: "ses-edit-edits", edits })
+
+      // when
+      const result = await runCheck(call)
+
+      // then
+      expect(result.hookInputs).toHaveLength(1)
+      expect(result.hookInputs[0]?.tool_name).toBe("MultiEdit")
+      expect(result.hookInputs[0]?.tool_input.edits).toEqual([{ old_string: oldString, new_string: newString }])
+      expect(result.output).toContain("AGENT MEMO COMMENT DETECTED")
+    })
+
+    test("#given an edit whose old and new strings already share the comment #when processed #then the checker is not run", async () => {
+      // given
+      const comment = "// kept comment\nconst value = 1\n"
+      const call = pendingCall({
+        tool: "edit",
+        sessionID: "ses-edit-same-comment",
+        oldString: comment,
+        newString: comment,
+      })
+
+      // when
+      const result = await runCheck(call)
+
+      // then
+      expect(result.hookInputs).toHaveLength(0)
+      expect(result.output).toBe("Success")
     })
   })
 })
