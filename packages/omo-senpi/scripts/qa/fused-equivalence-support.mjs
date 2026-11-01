@@ -52,6 +52,25 @@ export function statusCounts(observations) {
 }
 
 /**
+ * Rows the recording host leaked into an observation (#12015, #12054): the OmO Native telemetry consent notice, which the
+ * driver's telemetry opt-out keeps out of every case, and the terminal extension's monitor/wake restore events, which
+ * only appear when host terminal state reaches the sandbox. A golden carrying either describes the recording machine,
+ * not the engine, so the recorder refuses to write it and the committed goldens are checked for it.
+ */
+const HOST_LEAK_MARKERS = [
+	{ reason: "telemetry notice", test: (value) => typeof value === "string" && value.includes("OmO Native sends anonymous usage telemetry") },
+	{ reason: "terminal_monitor_state event", test: (value) => value === "terminal_monitor_state" },
+	{ reason: "wake_source_state event", test: (value) => value === "wake_source_state" },
+];
+
+export function goldenHostLeaks(node, path = "$") {
+	if (Array.isArray(node)) return node.flatMap((item, index) => goldenHostLeaks(item, `${path}[${index}]`));
+	if (node && typeof node === "object")
+		return Object.entries(node).flatMap(([key, value]) => goldenHostLeaks(value, `${path}.${key}`));
+	return HOST_LEAK_MARKERS.filter((marker) => marker.test(node)).map((marker) => ({ path, reason: marker.reason }));
+}
+
+/**
  * A ranked timestamp's zone designator, left behind by the harness normalizer: its DATETIME rule absorbs a trailing `Z`
  * but not a numeric offset, so one commit time (git `%cI`, e.g. `previousEntryAtISO`) normalizes as `<ts:...:1>` from
  * git >= 2.45 in UTC, `<ts:...:1>+00:00` from older git, and `<ts:...:1>+09:00` on a KST host. The offset is part of the
