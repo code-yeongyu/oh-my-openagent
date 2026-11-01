@@ -1,5 +1,5 @@
-import { lstatSync } from "node:fs";
-import { join, parse, relative, resolve, sep } from "node:path";
+import { lstatSync, realpathSync } from "node:fs";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { HookFileSystem, SubagentStopInput } from "./types.js";
 
 type RecordValue = Record<string, unknown>;
@@ -11,10 +11,14 @@ function readObject(file: string, fs: HookFileSystem): RecordValue {
 	if (!record(value)) throw Error("Invalid receipt binding");
 	return value;
 }
-function noLinks(file: string, fs: HookFileSystem): void {
-	const absolute = resolve(file);
-	let current = parse(absolute).root;
-	for (const part of relative(current, absolute).split(sep).filter(Boolean)) {
+function noLinks(file: string, fs: HookFileSystem, root: string): void {
+	const boundary = resolve(root);
+	const suffix = relative(boundary, resolve(file));
+	if (!suffix || suffix.startsWith("..") || isAbsolute(suffix)) throw Error("Receipt outside trusted root");
+	if ((fs.lstatSync?.(boundary) ?? lstatSync(boundary)).isSymbolicLink?.()) throw Error("Receipt root symlink");
+	// Ancestor aliases are allowed; links inside the protected root are not.
+	let current = fs.realpathSync?.(boundary) ?? realpathSync(boundary);
+	for (const part of suffix.split(sep)) {
 		current = join(current, part);
 		if (fs.existsSync(current) && (fs.lstatSync?.(current) ?? lstatSync(current)).isSymbolicLink?.())
 			throw Error("Receipt path symlink");
@@ -26,12 +30,12 @@ export function scopedReceipt(input: SubagentStopInput, fs: HookFileSystem, bind
 	if (!/^[A-Za-z0-9_-]{1,128}$/.test(input.agent_id)) return null;
 	const bindingFile = join(bindingsRoot, input.agent_id + ".json");
 	if (!fs.existsSync(bindingFile)) return null;
-	noLinks(bindingFile, fs);
+	noLinks(bindingFile, fs, bindingsRoot);
 	const binding = readObject(bindingFile, fs);
 	if (binding["receiptGrant"] === undefined) return null;
 	const grant = binding["receiptGrant"];
 	if (!record(grant) || typeof binding["file"] !== "string") throw Error("Invalid receipt grant");
-	noLinks(binding["file"], fs);
+	noLinks(binding["file"], fs, input.cwd);
 	const run = readObject(binding["file"], fs);
 	const tasks = run["tasks"];
 	if (!Array.isArray(tasks)) throw Error("Missing bound tasks");
@@ -71,6 +75,6 @@ export function scopedReceipt(input: SubagentStopInput, fs: HookFileSystem, bind
 	)
 		throw Error("Missing native attachment");
 	const file = resolve(input.cwd, receiptPath);
-	noLinks(file, fs);
+	noLinks(file, fs, input.cwd);
 	return file;
 }

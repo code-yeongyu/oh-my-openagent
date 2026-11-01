@@ -471,8 +471,7 @@ function isBlockOutput(value: unknown): value is BlockOutput {
 }
 
 describe("parent-attached operation receipts", () => {
-	function attachedReceipt() {
-		const cwd = realpathSync(createWorkspace());
+	function attachedReceipt(cwd = realpathSync(createWorkspace())) {
 		const bindings = join(cwd, "bindings");
 		const operation = join(cwd, ".omo", "operations", "bounded-task");
 		mkdirSync(bindings);
@@ -514,6 +513,18 @@ describe("parent-attached operation receipts", () => {
 		const input = createInput(cwd, { last_assistant_message: `EVIDENCE_RECORDED: ${receiptPath}` });
 		return { cwd, bindings, file, task, run, binding, save, input };
 	}
+
+	it("#given a workspace beneath a symlinked ancestor #when its exact scoped receipt is supplied #then accepts", () => {
+		const parent = realpathSync(createWorkspace());
+		const target = join(parent, "real");
+		const alias = join(parent, "alias");
+		mkdirSync(target);
+		symlinkSync(target, alias, platform === "win32" ? "junction" : "dir");
+		const cwd = join(alias, "workspace");
+		mkdirSync(cwd);
+		const f = attachedReceipt(cwd);
+		expect(runSubagentStopHook(f.input, nodeFileSystem, f.bindings)).toBe("");
+	});
 
 	it("#given a symlinked operation directory #when its granted receipt is supplied #then rejects it", () => {
 		const f = attachedReceipt();

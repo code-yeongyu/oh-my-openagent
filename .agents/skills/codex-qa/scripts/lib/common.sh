@@ -87,6 +87,8 @@ cqa_mk_isolated_home() {
   export CODEX_LOCAL_BIN_DIR="$root/codex/bin"
   export OMO_DISABLE_POSTHOG=1
   export OMO_CODEX_DISABLE_POSTHOG=1
+  # QA must keep the checkout build, not replace it from the registry mid-turn.
+  export OMO_CODEX_AUTO_UPDATE_DISABLED=1
 }
 
 # Start the local mock model server. Sets CQA_MOCK_PID + exports MOCK_PORT.

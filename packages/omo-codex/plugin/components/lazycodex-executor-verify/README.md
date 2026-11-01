@@ -28,6 +28,10 @@ default behavior. This is same-user filesystem integration, not a cryptographic
 security boundary: the parent adapter must preserve its admission evidence and
 restrict worker writes to the authorized artifacts.
 
+Symlinked ancestors above the trusted workspace/bindings roots (such as macOS
+`/tmp` pointing to `/private/tmp`) are allowed. The protected root itself and
+operation/binding/receipt path components inside it still cannot be symlinks.
+
 ## Completion boundary
 
 The hook validates a receipt, not task acceptance or actor settlement. A worker
