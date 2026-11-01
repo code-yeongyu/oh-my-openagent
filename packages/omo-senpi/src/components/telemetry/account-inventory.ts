@@ -9,8 +9,10 @@ import { RETIRED_PROVIDER_IDS } from "./session-inventory"
  * (senpi `getCredentialAccounts`, the listing the app's account list shows), counts only. senpi does not export that
  * function, so its rules are mirrored here and `account-inventory.test.ts` asserts parity against the real engine
  * function from the installed dist on every fixture, so an engine rule change fails the test:
- * - Claude (`anthropic-subscription`): the stored `accounts` list (no list, the managed sign-in sentinel, is zero; an
- *   empty list is the flat credential, one), plus every env slot (`CLAUDE_CODE_OAUTH_TOKEN`, `_2` .. `_16`);
+ * - Claude (`anthropic-subscription`): the stored Claude CLI accounts (`store: "claude-cli"`, one per `claude auth
+ *   login` account dir, signed in or waiting to sign in again) when `accounts` is a list; no list, an empty list (the
+ *   flat sentinel) and any slot still holding a token from the retired senpi sign-in count zero (senpi
+ *   `isListedStoredSlot`); plus every env slot (`CLAUDE_CODE_OAUTH_TOKEN`, `_2` .. `_16`);
  * - any other provider: the stored `accounts` list when it is non-empty, else the flat credential as one account;
  *   env slots only when nothing is stored.
  * Rendered as a `kind:count` list over the shipped provider kinds, unknown kinds summed into `custom`, each count
@@ -79,11 +81,15 @@ function engineAccountCount(provider: string, credential: unknown, env: Env, piA
   const claude = piAi.normalizeProviderId(provider) === CLAUDE
   if (credential !== undefined && credential !== null && credential !== false && credential !== "" && credential !== 0) {
     const accounts = typeof credential === "object" ? Reflect.get(credential, "accounts") : undefined
-    const listed = Array.isArray(accounts) && accounts.length > 0 ? accounts.length : 1
-    if (!claude) return listed
-    return (Array.isArray(accounts) ? listed : 0) + envSlotCount(provider, env, piAi)
+    if (!claude) return Array.isArray(accounts) && accounts.length > 0 ? accounts.length : 1
+    const cliAccounts = Array.isArray(accounts) ? accounts.filter(isClaudeCliSlot).length : 0
+    return cliAccounts + envSlotCount(provider, env, piAi)
   }
   return envSlotCount(provider, env, piAi)
+}
+
+function isClaudeCliSlot(slot: unknown): boolean {
+  return slot !== null && typeof slot === "object" && Reflect.get(slot, "store") === "claude-cli"
 }
 
 function envSlotCount(provider: string, env: Env, piAi: EngineTables): number {
