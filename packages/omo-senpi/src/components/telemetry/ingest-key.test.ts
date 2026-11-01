@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test"
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { expect, spyOn, test } from "bun:test"
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createSenpiOtlpTransport, createSenpiTelemetryTransportFactory } from "./otlp"
@@ -222,6 +222,7 @@ test("#given a huge Retry-After #when registration is throttled #then the backof
   try {
     const before = Date.now()
     expect(await createSenpiOtlpTransport({ env: f.env, consent: () => true }, message)).toBeNull()
+    expect(f.read().notBefore).toBeGreaterThanOrEqual(before + 24 * 3600 * 1000 - 5_000)
     expect(f.read().notBefore).toBeLessThanOrEqual(before + 24 * 3600 * 1000 + 5_000)
   } finally { await f.close() }
 })
@@ -235,16 +236,65 @@ test("#given a path-prefixed endpoint #when registering #then register uses the 
   } finally { await f.close() }
 })
 
-test("#given the collector rejects the key with 401 #when more batches follow #then later batches are not sent", async () => {
+test("#given the collector rejects the key with 401 #when captures and flush intervals follow #then OTLP stops without spool writes", async () => {
   const f = fixture(undefined, 401)
   f.seed({ endpoint: f.origin, key })
+  const intervalSpy = spyOn(globalThis, "setInterval")
+  const cancelSpy = spyOn(globalThis, "clearInterval")
+  let transport: Awaited<ReturnType<typeof createSenpiOtlpTransport>> | undefined
   try {
-    const transport = await createSenpiOtlpTransport({ env: f.env, consent: () => true }, message)
+    transport = await createSenpiOtlpTransport({ env: f.env, consent: () => true }, message)
+    expect(transport).not.toBeNull()
     transport?.capture(message)
     await transport?.flush?.()
-    transport?.capture(message)
-    await transport?.flush?.()
-    await transport?.shutdown()
+    const spool = join(f.env.OMO_CODING_AGENT_DIR, "omo-senpi", "otlp")
+    const snapshot = () => ({
+      files: readdirSync(spool).sort(),
+      modified: statSync(spool, { bigint: true }).mtimeNs,
+    })
+    const before = snapshot()
+    expect(intervalSpy.mock.calls.filter(([, ms]) => ms === 10_000)).toHaveLength(1)
+    const interval = intervalSpy.mock.calls.findIndex(([, ms]) => ms === 10_000)
+    const run = intervalSpy.mock.calls[interval]?.[0]
+    if (typeof run !== "function") throw new Error("OTLP flush interval was not scheduled")
+    for (let cycle = 0; cycle < 3; cycle++) {
+      transport?.capture(message)
+      expect(snapshot()).toEqual(before)
+      run()
+      await transport?.flush?.()
+      expect(snapshot()).toEqual(before)
+    }
     expect(f.requests.filter(row => row.path === "/v1/logs")).toHaveLength(1)
-  } finally { await f.close() }
+    const scheduled = intervalSpy.mock.results[interval]
+    if (scheduled === undefined) throw new Error("OTLP flush interval has no handle")
+    expect(cancelSpy).toHaveBeenCalledWith(scheduled.value)
+  } finally {
+    await transport?.shutdown()
+    intervalSpy.mockRestore()
+    cancelSpy.mockRestore()
+    await f.close()
+  }
+})
+
+test("#given an automatic install key gets 401 #when more events arrive #then PostHog keeps delivering", async () => {
+  const f = fixture(undefined, 401)
+  f.seed({ endpoint: f.origin, key })
+  const transport = createSenpiTelemetryTransportFactory({ env: f.env, consent: () => true })("synthetic-posthog-key", {
+    host: f.origin, disableGeoip: false, enableExceptionAutocapture: false,
+    enableLocalEvaluation: false, strictLocalEvaluation: true, disableRemoteConfig: true,
+    flushAt: 20, flushInterval: 0,
+  })
+  try {
+    transport.capture(message)
+    await transport.flush?.()
+    const batches = f.requests.filter(row => row.path === "/batch/").length
+    expect(batches).toBeGreaterThan(0)
+    transport.capture(message)
+    await transport.flush?.()
+    expect(f.requests.filter(row => row.path === "/batch/")).toHaveLength(batches + 1)
+    expect(f.requests.filter(row => row.path === "/v1/logs")).toHaveLength(1)
+  } finally {
+    await transport.shutdown()
+    await f.close()
+  }
 })

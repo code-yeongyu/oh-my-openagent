@@ -2,7 +2,7 @@ import { spyOn } from "bun:test"
 import * as nodeFs from "node:fs"
 import * as nodeFsPromises from "node:fs/promises"
 
-import { homedir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { posix } from "node:path"
 
 import * as memoryFs from "@oh-my-opencode/memory-core/fs"
@@ -22,7 +22,11 @@ const isTrigger = (path: unknown): boolean => {
   const lexical = posix.resolve(text).toLowerCase()
   const home = posix.resolve(homedir()).toLowerCase()
   const roots = ["/home", "/net", "/system/volumes/data/home", "/system/volumes/data/net"]
-  return roots.some((root) => under(lexical, root)) && (home === "/" || !under(lexical, home))
+  // Fixture temp dirs are the test's own paths: a host whose TMPDIR sits under /home but outside HOME must not
+  // trap them (#11547). A TMPDIR that is itself a trigger root (or `/`) exempts nothing.
+  const tmp = posix.resolve(tmpdir()).toLowerCase()
+  const fixture = tmp !== "/" && !roots.includes(tmp) && under(lexical, tmp)
+  return roots.some((root) => under(lexical, root)) && (home === "/" || !under(lexical, home)) && !fixture
 }
 
 type Restorable = { mockRestore(): void }

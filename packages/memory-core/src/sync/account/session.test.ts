@@ -1,6 +1,8 @@
 import { afterAll, afterEach, describe, expect, test } from "bun:test"
 
 import { creatorAnchor } from "../crypto/anchor.ts"
+import { createHttpTransport } from "../engine/adapters/http-transport.ts"
+import { createAccountHttp } from "./http.ts"
 import { appendEntries, emptyChain } from "../crypto/chain.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { pinTrustAnchor } from "../crypto/trust-pin.ts"
@@ -63,6 +65,24 @@ async function verifyAt(session: SyncSession, seq: number) {
 }
 
 describe("account sync session", () => {
+  test("injected account ports seal and replicate without acquiring engine credentials", async () => {
+    const { world, server } = await setup()
+    const token = () => server.tokenFor({ ...world.owner.principal })
+    const chain = createAccountHttp({ baseUrl: server.url, token })
+    const transport = createHttpTransport({ baseUrl: server.url, token })
+    const session = ready(await openAccountSession({
+      account: world.account,
+      keyring: world.owner.keyring,
+      pinDir: await pinnedDir(world),
+      spaceId: SPACE,
+      chain,
+      transport,
+    }))
+    expect(session.transport).toBe(transport)
+    const seq = await push(session, 1, "notes/proxy.md", "main-owned transport")
+    expect(await verifyAt(session, seq)).toMatchObject({ ok: true })
+  }, 30_000)
+
   test("a batch one member seals is verified and opened by another member, for its own space only", async () => {
     const { world, open } = await setup()
     const second = await newDevice()
