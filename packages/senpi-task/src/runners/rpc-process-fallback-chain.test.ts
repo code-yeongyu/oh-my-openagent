@@ -92,7 +92,11 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     expect(commands.map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
     expect(commands[1]?.retryFallback).toEqual({
       modelFallback: true,
-      fallbackChains: { "anthropic/claude-opus-5-5": ["openai/gpt-5.6-sol", "kimi-coding/kimi-k3"] },
+      fallbackChains: {
+        "anthropic/claude-opus-5-5": ["openai/gpt-5.6-sol", "kimi-coding/kimi-k3"],
+        "openai/gpt-5.6-sol": [],
+        "kimi-coding/kimi-k3": [],
+      },
     })
     expect(engine.warnings).toEqual([])
   })
@@ -112,7 +116,7 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     ])
   })
 
-  test("#given a child without fallback models #when it starts #then the engine is sent nothing new and nothing is reported", async () => {
+  test("#given a child designated one model #when it starts #then fallback is turned off for it before its first prompt, so neither the user's chains nor senpi's shipped ones apply (#12006)", async () => {
     // given
     const engine = processRunner(["retry_fallback_command"])
 
@@ -120,7 +124,9 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     await engine.runner.start(spec("st_p3", { model: "anthropic/claude-opus-5-5" }))
 
     // then
-    expect(engine.commands().map((command) => command.type)).toEqual(["prompt"])
+    const commands = engine.commands()
+    expect(commands.map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
+    expect(commands[1]?.retryFallback).toEqual({ modelFallback: false, fallbackChains: { "anthropic/claude-opus-5-5": [] } })
     expect(engine.warnings).toEqual([])
   })
 
