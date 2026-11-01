@@ -15,7 +15,7 @@ type SessionPromptInput = Omit<SessionPromptData | SessionPromptAsyncData, "url"
   readonly signal?: AbortSignal | null
   readonly [key: string]: unknown
 }
-type SessionStatusInput = Omit<SessionStatusData, "url">
+type SessionStatusInput = Omit<SessionStatusData, "url"> & { readonly signal?: AbortSignal }
 
 type SessionCreateResult =
   | { readonly data: { readonly id: string }; readonly error?: undefined }

@@ -1,3 +1,4 @@
+import { SessionStatusPoll } from "../../shared/session-status-poll"
 import type { OpencodeClient } from "../../tools/delegate-task/types"
 import {
   AUTO_ACTIVATE_GRACE_MS,
@@ -17,6 +18,9 @@ const STABLE_POLLS_REQUIRED = 3
 export class TmuxPollingManager {
   private pollInterval?: ReturnType<typeof setInterval>
   private pollingInFlight = false
+  private readonly sessionStatusPoll = new SessionStatusPoll()
+  private stopped = false
+  private pollGeneration = 0
 
   constructor(
     private client: OpencodeClient,
@@ -41,6 +45,7 @@ export class TmuxPollingManager {
   startPolling(): void {
     if (this.pollInterval) return
 
+    this.stopped = false
     this.pollInterval = setInterval(
       () => this.pollSessions(),
       POLL_INTERVAL_BACKGROUND_MS, // POLL_INTERVAL_BACKGROUND_MS
@@ -49,6 +54,9 @@ export class TmuxPollingManager {
   }
 
   stopPolling(): void {
+    this.stopped = true
+    this.pollGeneration += 1
+    this.sessionStatusPoll.cancel()
     if (this.pollInterval) {
       clearInterval(this.pollInterval)
       this.pollInterval = undefined
@@ -57,29 +65,31 @@ export class TmuxPollingManager {
   }
 
   private async pollSessions(): Promise<void> {
-    if (this.pollingInFlight) return
+    if (this.pollingInFlight || this.stopped) return
     this.pollingInFlight = true
+    const generation = this.pollGeneration
     try {
       if (this.sessions.size === 0) {
         this.stopPolling()
         return
       }
 
-      await this.activateFocusedPanes()
+      await this.activateFocusedPanes(generation)
 
-      const statusResult = await this.client.session.status({ path: undefined })
-      const allStatuses = parseSessionStatusResponse(statusResult)
+      if (this.stopped || generation !== this.pollGeneration) return
+      const allStatuses = await this.readSessionStatuses()
+      if (this.stopped || generation !== this.pollGeneration) return
 
       log("[tmux-session-manager] pollSessions", {
         trackedSessions: Array.from(this.sessions.keys()),
-        allStatusKeys: Object.keys(allStatuses),
+        allStatusKeys: Object.keys(allStatuses ?? {}),
       })
 
       const now = Date.now()
       const sessionsToClose: string[] = []
 
       for (const [sessionId, tracked] of this.sessions.entries()) {
-        const status = allStatuses[sessionId]
+        const status = allStatuses?.[sessionId]
         const elapsedMs = now - tracked.createdAt.getTime()
         if (!tracked.attachActivated && !status) {
           if (elapsedMs <= SESSION_TIMEOUT_MS) {
@@ -122,12 +132,12 @@ export class TmuxPollingManager {
         }
 
         const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
-        const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
+        const missingTooLong = allStatuses !== undefined && missingSince >= SESSION_MISSING_GRACE_MS
         const isTimedOut = elapsedMs > SESSION_TIMEOUT_MS
 
         let shouldCloseViaStability = false
 
-        if (isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
+        if (allStatuses !== undefined && isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
           const activityVersion = tracked.activityVersion ?? 0
 
           if (tracked.observedIdleActivityVersion !== activityVersion) {
@@ -139,9 +149,9 @@ export class TmuxPollingManager {
 
           if ((tracked.stableIdlePolls ?? 0) >= STABLE_POLLS_REQUIRED) {
             const stableWindowActivityVersion = tracked.observedIdleActivityVersion ?? activityVersion
-            const recheckResult = await this.client.session.status({ path: undefined })
-            const recheckStatuses = parseSessionStatusResponse(recheckResult)
-            const recheckStatus = recheckStatuses[sessionId]
+            const recheckStatuses = await this.readSessionStatuses()
+            if (this.stopped || generation !== this.pollGeneration) return
+            const recheckStatus = recheckStatuses?.[sessionId]
             const latestTracked = this.sessions.get(sessionId) ?? tracked
             const recheckActivityVersion = latestTracked.activityVersion ?? 0
 
@@ -189,10 +199,13 @@ export class TmuxPollingManager {
       }
 
       for (const sessionId of sessionsToClose) {
+        if (this.stopped || generation !== this.pollGeneration) return
         log("[tmux-session-manager] closing session due to poll", { sessionId })
         await this.closeSessionById(sessionId)
+        if (this.stopped || generation !== this.pollGeneration) return
       }
 
+      if (this.stopped || generation !== this.pollGeneration) return
       if (this.retryPendingCloses) {
         try {
           await this.retryPendingCloses()
@@ -204,6 +217,16 @@ export class TmuxPollingManager {
       log("[tmux-session-manager] poll error", { error: String(err) })
     } finally {
       this.pollingInFlight = false
+    }
+  }
+
+  private async readSessionStatuses(): Promise<ReturnType<typeof parseSessionStatusResponse> | undefined> {
+    try {
+      const result = await this.sessionStatusPoll.read((options) => this.client.session.status(options))
+      return parseSessionStatusResponse(result)
+    } catch (error) {
+      log("[tmux-session-manager] session status unavailable", { error: String(error) })
+      return undefined
     }
   }
 
@@ -227,13 +250,13 @@ export class TmuxPollingManager {
     return undefined
   }
 
-  private async activateFocusedPanes(): Promise<void> {
+  private async activateFocusedPanes(generation: number): Promise<void> {
     if (!this.getWindowState || !this.activateSessionPane || this.sessions.size === 0) {
       return
     }
 
     const state = await this.getWindowState().catch(() => null)
-    if (!state) return
+    if (!state || this.stopped || generation !== this.pollGeneration) return
     if (this.canActivatePane && !this.canActivatePane(state)) {
       log("[tmux-session-manager] activation gate blocked auto-attach", {
         windowActive: state.windowActive,
@@ -247,6 +270,7 @@ export class TmuxPollingManager {
     const now = Date.now()
 
     for (const tracked of this.sessions.values()) {
+      if (this.stopped || generation !== this.pollGeneration) return
       if (tracked.attachActivated) continue
 
       const isFocused = activePaneIds.has(tracked.paneId)
@@ -262,6 +286,7 @@ export class TmuxPollingManager {
       }
 
       const activated = await this.activateSessionPane(tracked)
+      if (this.stopped || generation !== this.pollGeneration) return
       if (activated) {
         tracked.attachActivated = true
         tracked.attachActivatedAt = new Date()
