@@ -1,3 +1,7 @@
+## 2026-10-30 - Allocate model distribution turns at spawn (#11905)
+
+The task child planner owns independent category and agent cursors and passes them only into spawn-time resolution, leaving inspection and session continuations unchanged.
+
 ## 2026-10-30 - Deterministic stale-lock recovery fixture (#11604)
 
 Derive the fixture's hard and grace deadlines from one clock sample, matching

@@ -253,9 +253,14 @@ jobs:
         if: runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         run: |
-          $bytes = [byte[]]::new(16)
+          # Every character comes from the random bytes (no literal prefix), one per Windows complexity class.
+          $bytes = [byte[]]::new(20)
           [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-          $password = "Qa1!" + [Convert]::ToHexString($bytes)
+          $upper = [char](65 + $bytes[0] % 26)
+          $lower = [char](97 + $bytes[1] % 26)
+          $digit = [char](48 + $bytes[2] % 10)
+          $symbol = [char](35 + $bytes[3] % 3)
+          $password = "$upper$lower$digit$symbol" + [Convert]::ToHexString($bytes, 4, 16)
           Write-Output "::add-mask::$password"
           net user omoqa2 $password /add /y | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "net user omoqa2 /add failed with exit $LASTEXITCODE" }
