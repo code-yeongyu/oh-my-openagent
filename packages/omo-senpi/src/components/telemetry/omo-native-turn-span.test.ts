@@ -628,7 +628,7 @@ describe("omo.turn span provider wire name", () => {
         }),
         isConsented: () => true,
         isSendAllowed: () => true,
-        sessionRole: "main",
+        sessionRole: "root",
         inheritedTraceparent: undefined,
       })
       const model = { provider: row.id, modelId: "gpt-5.6-sol" }
