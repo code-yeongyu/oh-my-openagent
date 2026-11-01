@@ -23,6 +23,7 @@ import {
 } from "./doctor-checks"
 import { checkQuarantinedRuns, checkReceipts, type QuarantinedRun, type ReceiptSummaries } from "./doctor-receipts"
 import { checkGhostReservation } from "./doctor-reservation"
+import { factsParkedCauseSummary } from "./facts-failure-cause"
 import { factsRemediationHint, formatFactsAdvisory, readFactsOverview } from "./facts-status"
 import {
   formatSkillNameFrontmatterRepairReport,
@@ -61,10 +62,11 @@ async function checkFacts(
   const advisory = formatFactsAdvisory(overview)
   if (advisory === undefined) return undefined
   const hint = factsRemediationHint(overview)
+  const causes = factsParkedCauseSummary(overview.records, overview.factsDir)
   return {
     name: "facts",
     level: overview.corrupt === undefined ? "warn" : "fail",
-    detail: `${advisory.replace(/^facts: /, "")}${hint === undefined ? "" : `; ${hint}`}`,
+    detail: `${advisory.replace(/^facts: /, "")}${hint === undefined ? "" : `; ${hint}`}${causes === undefined ? "" : ` (${causes})`}`,
   }
 }
 

@@ -35,6 +35,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
+import { runRemoteAttachCommand, runRemoteCommand } from "./remote-cli"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
@@ -147,6 +148,17 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   if (args[0] === "account") {
     await runAccountCommand(args)
+    return true
+  }
+  if (args[0] === "remote" && args[1] === "attach") {
+    // The compiled binary is the engine: the attach TUI runs in this process, beside the endpoint it attaches to.
+    const engineArgs = await runRemoteAttachCommand(args)
+    if (engineArgs === undefined) return true
+    process.argv.splice(2, process.argv.length - 2, ...engineArgs)
+    return false
+  }
+  if (args[0] === "remote") {
+    await runRemoteCommand(args)
     return true
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
