@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:7a5e393fe4cf6b3a971dbfe7c1af2f9fbec82e24e0166624f70e68744045976d:605cb96deaac62579ee8022f48aa14faabfd60f1af06599851601bd355b5f102
+// omo-codex-install:ddf7e19102ffe354c5ba5ce7b2bade132527d637b1651fb175600156b3bb7b34:8954fd7d0bb0087c34d4b19e89e803ed9894c4a426ecd312d85986611bf08b30
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.52",
+    version: "5.1.54",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19647,6 +19647,7 @@ var OmoAgentDefInputSchema = object({
   prompt: string2().optional(),
   model: string2().optional(),
   models: array(OmoAgentModelEntrySchema).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   variant: string2().optional(),
   reasoningEffort: OmoReasoningEffortSchema.optional(),
@@ -19673,6 +19674,7 @@ var OmoCategoryConfigObjectSchema = object({
   description: string2().optional(),
   model: string2().optional(),
   models: array(union([string2(), OmoFallbackModelObjectSchema])).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   temperature: number2().min(0).max(2).optional(),
   top_p: number2().min(0).max(1).optional(),

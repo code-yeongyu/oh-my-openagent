@@ -193,6 +193,18 @@ pub struct AxClickParams {
     pub opts: Option<PointerOptions>,
 }
 
+/// `ax.typeText`: types `text` into the element `ref` names. Only
+/// `opts.deliveryMode` is read: an omitted delivery is background (no focus
+/// change for the user); `foreground` raises the element's window under the
+/// control grant, like `ax.click`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct AxTypeTextParams {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub text: String,
+    pub opts: Option<PointerOptions>,
+}
+
 /// `stopPath.start`: the stop chord the Global listener arms, e.g.
 /// `ctrl+alt+shift+escape`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

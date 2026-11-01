@@ -12,6 +12,9 @@ const session = createSession({
       const value: unknown = await response.json()
       return value === null ? null : credentialSchema.parse(value)
     },
+    async readAuthoritative() {
+      return this.read()
+    },
     async write(value) {
       await fetch(`${api}/fake-store`, { method: "PUT", body: JSON.stringify(value), proxy: "" })
     },

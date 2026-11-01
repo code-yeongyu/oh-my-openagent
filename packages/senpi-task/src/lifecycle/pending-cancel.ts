@@ -1,7 +1,7 @@
 import type { TaskRecord } from "../state"
 import { nowIso, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
-import { closeHostSessionConfirmed } from "./host-session-close"
+import { endHostSessionChild } from "./host-session-end"
 import { isHostSessionRecord } from "./host-session"
 import type { ReconcileOutcome } from "./types"
 
@@ -18,13 +18,8 @@ import type { ReconcileOutcome } from "./types"
  */
 export async function finishPendingCancel(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome | undefined> {
   if (isHostSessionRecord(record) && context.registry.get(record.task_id) === undefined) {
-    context.hostSessionProbe.refresh(record.host_session.socket)
-    const liveness = await context.hostSessionProbe.sessionLiveness(record.host_session)
-    if (liveness === "unknown") return undefined
-    if (liveness === "live") {
-      const closed = await closeHostSessionConfirmed(context, record.task_id, record.host_session, record.spawn_spec?.cwd)
-      if (!closed) return undefined
-    }
+    // Not listed on the recorded socket is not an end: a draining generation may still run it (omo#11765).
+    if ((await endHostSessionChild(context, record)).kind !== "ended") return undefined
   }
   const reason = record.cancel_requested?.reason
   const result = context.store.transition(record.task_id, {

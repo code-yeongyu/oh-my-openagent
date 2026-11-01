@@ -195,7 +195,7 @@ export async function settleTurn(item: Fixture): Promise<void> {
 
 // The shape from #10377: the child finished and recorded its outcome, publish had claimed the run,
 // and then the supervising host died, so the launcher and the publish claimant are both gone.
-export async function hostDiesMidPublish(item: Fixture, pid: number): Promise<string> {
+export async function hostDiesMidPublish(item: Fixture, pid: number, now: () => number = Date.now): Promise<string> {
   const snapshot = await item.journal.captureReflectionSnapshot()
   if (snapshot === null) throw new Error("expected a snapshot")
   const reserved = await item.store.tryReserve({
@@ -215,6 +215,9 @@ export async function hostDiesMidPublish(item: Fixture, pid: number): Promise<st
   await writeRunJsonAtomic(join(runDir, "prelaunch.json"), {
     version: 1, runId, worktreeDir: worktree.dir, worktreeBranch: worktree.branch,
   })
+  const startedAt = now()
+  const hardDeadlineAt = startedAt + 600_000
+  const terminationGraceMs = 100
   await writeRunJsonAtomic(join(runDir, "ledger.json"), {
     version: 1,
     runId,
@@ -223,10 +226,10 @@ export async function hostDiesMidPublish(item: Fixture, pid: number): Promise<st
     conversationIds: [SESSION_ID],
     kind: "reflection",
     trigger: "manual",
-    startedAt: new Date().toISOString(),
-    hardDeadlineAt: Date.now() + 600_000,
-    terminationGraceMs: 100,
-    deadlineAt: Date.now() + 600_100,
+    startedAt: new Date(startedAt).toISOString(),
+    hardDeadlineAt,
+    terminationGraceMs,
+    deadlineAt: hardDeadlineAt + terminationGraceMs,
     mergePolicy: "auto",
     pid,
     childPid: pid,
