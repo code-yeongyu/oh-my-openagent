@@ -32,6 +32,9 @@ try {
     } else if (process.argv[2] === "account") {
       const { runAccountCommand } = await import("./lib/service-auth.generated.js")
       await runAccountCommand(process.argv.slice(2))
+    } else if (process.argv[2] === "remote") {
+      const { runRemoteCommand } = await import("./lib/service-auth.generated.js")
+      await runRemoteCommand(process.argv.slice(2))
     } else if (process.argv[2] === "setup") await runSetup(process.argv.slice(3))
     else await runLauncher()
   }
