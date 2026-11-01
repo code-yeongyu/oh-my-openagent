@@ -85,7 +85,9 @@ test.skipIf(!bwrapUsable)("#given the real Linux reflection sandbox #when the ch
   // then
   expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
   expect(outcome).toMatchObject({ ok: true })
-  expect(outcome.directory).toStartWith("/tmp/omo-engine-trust-")
+  // Only the sandbox's own tmpfs is writable here: a HOME already under /tmp gets its trust directory created there,
+  // any other HOME falls back to mkdtemp under /tmp.
+  expect(outcome.directory).toStartWith("/tmp/")
 }, 60_000)
 
 test.skipIf(!bwrapUsable)("#given a parent trust generation outside the child's trust directory #when the sandboxed child adopts it #then the inherited marker's ancestors are attested and the generation verifies", async () => {
