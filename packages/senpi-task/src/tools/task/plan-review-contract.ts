@@ -1,3 +1,6 @@
+import { realpathSync, statSync } from "node:fs"
+import { dirname, isAbsolute, resolve } from "node:path"
+
 import { EMPTY_SKILL_INVOCATIONS, interactionPolicyForAgent } from "../../agents"
 import type { PlanArtifactReference, SkillInvocationState } from "../../agents"
 
@@ -5,10 +8,13 @@ import type { TaskToolDeps } from "./types"
 
 // The plan-review prompt contract for one-shot review agents (plan-reviewer): whatever the caller asked,
 // the child receives EXACTLY one canonical sentence carrying one .omo/plans/*.md path - no claims,
-// no emphasis, no skill prepends. Target precedence: an explicit single path in the caller prompt
-// wins; otherwise the session's most-referenced plan artifact (count desc, recency tie-break);
-// otherwise the spawn is denied. The deny branch is defensive: through the real tool path the
-// plan gate (requiresPlanArtifact) fires first, so a passing session always has references.
+// no emphasis, no skill prepends. Target precedence (#10837):
+// - one explicit path in the caller prompt is the target, whether or not the session touched it.
+//   It must be a plan the session recorded, or an existing file directly inside the project's
+//   .omo/plans; anything else is DENIED - an explicit path is never swapped for another plan.
+// - more than one explicit path is denied: the contract reviews exactly one plan.
+// - no explicit path falls back to the session's most-referenced plan artifact (count desc,
+//   recency tie-break); with no recorded plan either, the spawn is denied.
 
 const PLAN_PATH_GLOBAL = /[^\s"'`()\[\]]*\.omo[\\/]plans[\\/][^\s"'`()\[\]/\\]+\.md/gi
 
@@ -29,34 +35,61 @@ export function extractPlanPaths(text: string): readonly string[] {
 
 export type PlanReviewTarget = { readonly kind: "path"; readonly path: string } | { readonly kind: "deny"; readonly message: string }
 
-export function resolvePlanReviewTarget(callerPrompt: string, state: SkillInvocationState): PlanReviewTarget {
+export function resolvePlanReviewTarget(callerPrompt: string, state: SkillInvocationState, cwd: string): PlanReviewTarget {
   const references = state.planArtifactReferences()
   const explicit = extractPlanPaths(callerPrompt)
-  if (explicit.length === 1) {
-    const only = explicit[0]
-    const recorded = only !== undefined ? matchRecordedReference(only, references) : undefined
-    if (recorded !== undefined) return { kind: "path", path: recorded.path }
+  if (explicit.length > 1) {
+    return {
+      kind: "deny",
+      message: `plan-reviewer reviews exactly one plan, but the prompt names ${explicit.length}: ${explicit.join(", ")}. Pass a single .omo/plans/*.md path.`,
+    }
   }
+  const only = explicit[0]
+  if (only !== undefined) return resolveExplicitPlan(only, references, cwd)
   const mostReferenced = topReference(references)
   if (mostReferenced !== undefined) return { kind: "path", path: mostReferenced.path }
   return { kind: "deny", message: PLAN_REVIEW_DENY_MESSAGE }
 }
 
-// An explicit caller path is a SELECTOR over session-recorded references, never a value that
-// reaches the child: the prompt is built from the RECORDED path, so caller-controlled prefixes,
-// absolute paths, and `..` segments cannot be interpolated into the plan-reviewer prompt. Identity is the
-// normalized `.omo/plans/<name>.md` suffix, which keeps worktree-rooted recordings matchable.
-function matchRecordedReference(candidate: string, references: readonly PlanArtifactReference[]): PlanArtifactReference | undefined {
-  const wanted = planSuffix(candidate)
-  if (wanted === undefined) return undefined
-  return references.find((reference) => planSuffix(reference.path) === wanted)
+// The caller's token never reaches the child verbatim: the prompt carries either the RECORDED path
+// of a plan this session touched (worktree plans included) that resolves to the same file, or the
+// canonical real path of an existing file whose parent is the project's real .omo/plans directory.
+// Caller prefixes, `..` segments, symlink escapes, and paths outside the project are refused.
+function resolveExplicitPlan(candidate: string, references: readonly PlanArtifactReference[], cwd: string): PlanReviewTarget {
+  const wanted = resolve(cwd, candidate)
+  const wantedReal = realPath(wanted)
+  const recorded = references.find((reference) => {
+    const recordedPath = resolve(cwd, reference.path)
+    return recordedPath === wanted || (wantedReal !== undefined && realPath(recordedPath) === wantedReal)
+  })
+  if (recorded !== undefined) return { kind: "path", path: recorded.path }
+  const projectPlans = realPath(resolve(cwd, ".omo", "plans"))
+  if (wantedReal !== undefined && projectPlans !== undefined && dirname(wantedReal) === projectPlans && isFile(wantedReal)) {
+    return { kind: "path", path: wantedReal }
+  }
+  const shown = isAbsolute(candidate) ? candidate : `${candidate} (resolved against ${cwd})`
+  return {
+    kind: "deny",
+    message:
+      `plan-reviewer cannot review ${shown}: it is not an existing plan file directly inside this project's .omo/plans ` +
+      `directory and no plan touched in this session resolves to it. Pass the path of an existing plan.`,
+  }
 }
 
-function planSuffix(path: string): string | undefined {
-  const normalized = path.replace(/\\/g, "/")
-  const marker = ".omo/plans/"
-  const index = normalized.indexOf(marker)
-  return index === -1 ? undefined : normalized.slice(index)
+function realPath(path: string): string | undefined {
+  try {
+    return realpathSync.native(path)
+  } catch {
+    return undefined
+  }
+}
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
 }
 
 export function buildPlanReviewPrompt(path: string): string {
@@ -76,10 +109,11 @@ export function planReviewContractOutcome(
   subagentType: string,
   callerPrompt: string,
   sessionId: string,
+  cwd: string,
 ): PlanReviewContractOutcome | undefined {
   if (interactionPolicyForAgent(subagentType)?.promptContract !== "plan-review") return undefined
   const state = deps.resolveSkillInvocations?.(sessionId) ?? EMPTY_SKILL_INVOCATIONS
-  const target = resolvePlanReviewTarget(callerPrompt, state)
+  const target = resolvePlanReviewTarget(callerPrompt, state, cwd)
   if (target.kind === "deny") return { kind: "deny", message: target.message }
   return { kind: "prompt", prompt: buildPlanReviewPrompt(target.path) }
 }

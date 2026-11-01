@@ -23,9 +23,9 @@ function failure(error: unknown): WorkpoolToolResult {
 }
 
 export function buildWorkpoolExecute(deps: WorkpoolToolDeps) {
-  deps.workpools.setSpawnPolicy((agent, parent) => {
+  deps.workpools.setSpawnPolicy((agent, parent, cwd) => {
     if (agent.subagent_type === undefined) return
-    const policy = evaluateSpawnPolicy(deps, agent.subagent_type, agent.prompt, parent)
+    const policy = evaluateSpawnPolicy(deps, agent.subagent_type, agent.prompt, parent, cwd)
     if (policy.kind === "deny") throw new WorkpoolError("policy_denied", policy.message)
     if (policy.kind === "force" && policy.prompt !== agent.prompt) throw new WorkpoolError("policy_denied", "The worker's recorded prompt no longer matches the current spawn policy.")
   })
@@ -39,7 +39,7 @@ export function buildWorkpoolExecute(deps: WorkpoolToolDeps) {
         case "create": {
           let agent = input.agent
           if ("subagent_type" in agent) {
-            const policy = evaluateSpawnPolicy(deps, agent.subagent_type, agent.prompt, sessionId)
+            const policy = evaluateSpawnPolicy(deps, agent.subagent_type, agent.prompt, sessionId, ctx.cwd)
             if (policy.kind === "deny") throw new WorkpoolError("policy_denied", policy.message)
             if (policy.kind === "force") agent = { ...agent, prompt: policy.prompt }
           }
