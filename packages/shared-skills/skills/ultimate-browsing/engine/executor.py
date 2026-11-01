@@ -95,6 +95,11 @@ def _run_node_template(template: str, args: dict, timeout: int = 90) -> tuple[in
     except Exception as e:
         _terminate_template_group(proc)
         return 1, "", f"{type(e).__name__}:{e}"
+    except BaseException:
+        # Cancellation (KeyboardInterrupt, SystemExit): start_new_session keeps a
+        # terminal Ctrl-C from reaching the template's group, so quit it here.
+        _terminate_template_group(proc)
+        raise
 
 
 def _signal_group(pgid: int, sig: int) -> bool:
