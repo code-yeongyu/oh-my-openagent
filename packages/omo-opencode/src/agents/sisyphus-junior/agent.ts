@@ -77,7 +77,7 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: override?.reasoningEffort ?? "medium" } as AgentConfig
+    return { ...base, reasoningEffort: override?.reasoningEffort ?? "high" } as AgentConfig
   }
 
   if (isGlmModel(model)) {

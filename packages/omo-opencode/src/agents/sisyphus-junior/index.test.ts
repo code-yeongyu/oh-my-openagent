@@ -150,21 +150,21 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.reasoningEffort).toBe("medium")
+      expect(result.reasoningEffort).toBe("high")
       expect(result.thinking).toBeUndefined()
     })
 
     test("#given GPT model with variant override #when agent is created #then respects user variant", () => {
       const override = {
         model: "openai/gpt-5.6-sol",
-        variant: "xhigh",
-        reasoningEffort: "xhigh" as const,
+        variant: "high",
+        reasoningEffort: "high" as const,
       }
 
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
-      expect(result.variant).toBe("xhigh")
-      expect(result.reasoningEffort).toBe("xhigh")
+      expect(result.variant).toBe("high")
+      expect(result.reasoningEffort).toBe("high")
     })
 
     test("#given GPT model with reasoningEffort override only #when agent is created #then honors reasoningEffort without injecting variant", () => {
@@ -181,25 +181,25 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("#given GPT model with variant override only #when agent is created #then keeps default reasoningEffort", () => {
       // given
-      const override = { model: "openai/gpt-5.6-sol", variant: "xhigh" }
+      const override = { model: "openai/gpt-5.6-sol", variant: "high" }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.variant).toBe("xhigh")
-      expect(result.reasoningEffort).toBe("medium")
+      expect(result.variant).toBe("high")
+      expect(result.reasoningEffort).toBe("high")
     })
 
     test("#given GPT model with distinct variant and reasoningEffort #when agent is created #then applies each independently", () => {
       // given
-      const override = { model: "openai/gpt-5.6-sol", variant: "xhigh", reasoningEffort: "low" as const }
+      const override = { model: "openai/gpt-5.6-sol", variant: "high", reasoningEffort: "low" as const }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.variant).toBe("xhigh")
+      expect(result.variant).toBe("high")
       expect(result.reasoningEffort).toBe("low")
     })
 
