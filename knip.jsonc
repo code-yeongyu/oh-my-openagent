@@ -60,6 +60,21 @@
       ]
     },
     "preExistingExports": {
+      // The device-service local API keeps its server-side halves beside the client (the reference service its tests run
+      // against, the Windows DACL writer): these exports serve that side, never omo's commands; every other export stays checked.
+      "packages/device-service-core/src/local-api/access.ts": ["applyExactDacl", "verifyExactDacl", "windowsSecureFile", "TOKEN_FILE", "TOKEN_BYTES", "NONCE_BYTES"],
+      "packages/device-service-core/src/local-api/chunking.ts": ["pageListing", "checkCommandText", "UploadAssembler", "uploadParts"],
+      "packages/device-service-core/src/local-api/dacl.ts": ["CURRENT_USER_SID_SCRIPT"],
+      "packages/device-service-core/src/local-api/limits.ts": ["LOCAL_JSON_EXPANSION_MAX"],
+      "packages/device-service-core/src/local-api/transport.ts": ["readEndpointPort"],
+      "packages/device-service-core/src/local-api/validate-fields.ts": ["PATH_MAX_CHARS", "ENTRY_ID_MAX_BYTES", "NONCE_CHARS"],
+      "packages/device-service-core/src/local-api/validate-shapes.ts": ["millis"],
+      "packages/device-service-core/src/local-api/validate.ts": ["EVENT_KINDS"],
+      "packages/device-service-core/src/local-api/vocabulary.ts": ["CLIENT_ERROR_CODES"],
+      "packages/device-service-core/test/local-api/conformance/fake-owner.ts": ["errorReply"],
+      "packages/device-service-core/test/local-api/conformance/raw-peer.ts": ["NEXT_TIMEOUT_MS"],
+      "packages/device-service-core/test/local-api/conformance/runner.ts": ["FIXTURE_DIR"],
+      "packages/device-service-core/test/local-api/support.ts": ["WAIT_MS", "listenRaw"],
       // pre-existing at origin dev 4686e425b5: unused export(s) resolveFilePath, getSessionCache
       "packages/agents-md-core/src/index.ts": ["resolveFilePath", "getSessionCache"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AST_GREP_ERROR_CODES, AST_GREP_MCP_TOOLS, runMcpStdioServer
@@ -499,8 +514,6 @@
       "packages/omo-native/bin/lib/brand-logo.generated.d.ts": ["OMO_BRAND_LOGO"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
       "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodeVersionFloor
-      "packages/omo-native/bin/lib/claude-code-floor.js": ["claudeCodeVersionFloor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
       "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
@@ -607,8 +620,6 @@
       "packages/omo-opencode/src/cli/run/index.ts": ["resolveRunAgent", "resolveRunModel", "createServerConnection", "resolveSession", "createJsonOutputManager", "executeOnCompleteHook", "createEventState", "processEvents", "serializeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UnknownRunAgentError
       "packages/omo-opencode/src/cli/run/runnable-agent-resolver.ts": ["UnknownRunAgentError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) SESSION_READ_WAIT
-      "packages/omo-opencode/src/cli/service-auth/keystore.ts": ["SESSION_READ_WAIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) platformSchema
       "packages/omo-opencode/src/cli/service-auth/protocol.ts": ["platformSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) expandHome
@@ -2306,6 +2317,7 @@
         "@oh-my-opencode/ast-grep-mcp",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@oh-my-opencode/boulder-state",
+        "@oh-my-opencode/device-service-core",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@oh-my-opencode/claude-code-compat-core",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
@@ -2605,6 +2617,21 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+      ],
+    },
+    "packages/device-service-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/local-api/support.ts",
+        "test/local-api/support-windows.ts",
+        "test/local-api/conformance/*.ts",
       ],
     },
     "packages/memory-core": {

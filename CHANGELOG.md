@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.54] - 2026-10-31
+
+5.1.53 and 5.1.52 were not published; their changes, listed under 5.1.53 and 5.1.52 below, ship in this release.
+
+**The `programming` skill's Go scaffolder writes LF files on every platform.** A checkout that converts line endings (Windows with `autocrlf`) no longer leaks CRLF into the project it generates; the templates are pinned to LF in `.gitattributes` and normalised on read. ([#11991](https://github.com/code-yeongyu/oh-my-openagent/pull/11991))
+
+**The `programming` skill's Python, Rust, and Go project scaffolders run on Bun, so Rust and Go users no longer install uv and typer just to start a project.** `bun run scripts/python/new-project.ts`, `scripts/python/new-script.ts`, `scripts/rust/new-project.ts`, and `scripts/go/new-project.ts` replace the old `uv run ... .py` commands and produce the same files. A missing `uv` or `cargo` now ends with a clear message and exit code 1, and a missing `go` still writes a fallback `go.mod`. ([#11970](https://github.com/code-yeongyu/oh-my-openagent/pull/11970))
+
+**The programming skill routes every test file to a testing reference that carries the four-question authoring gate and the junk-test classes.** Writing, reshaping, or deleting a test now loads `references/testing/README.md` (Given/When/Then, the mock ladder, determinism, the prompt-test rule, and a "test your test" mutation step) and `references/testing/junk-classes.md` (the one table of junk classes, retention bar, and R/F/C/D marks that the gate reviewer applies), so a test that would be deleted in review is a test the skill stops you from writing. ([#11967](https://github.com/code-yeongyu/oh-my-openagent/pull/11967))
+
+### Fixed
+
+- The release check for the macOS keychain helper accepts a correctly signed helper again: it ignores the `/* exists */` notes `codesign` prints in the designated requirement, and still rejects a different identifier or team (#11980). ([#11981](https://github.com/code-yeongyu/oh-my-openagent/pull/11981))
+
 ## [5.1.53] - 2026-10-31
 
 5.1.52 was not published; its changes, listed under 5.1.52 below, ship in this release.
