@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps } from "./types"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared/runtime-fallback-retry-marker"
 
 function createDeps(): HookDeps {
   return {
@@ -253,5 +255,131 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       },
       variant: "high",
     })
+  })
+
+  test("#given a capped state #when a human prompt arrives #then only the cap counters reset", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-human-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "google/gemini-2.5-pro"
+    state.fallbackIndex = 1
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.failedModels.set("openai/gpt-5.4", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+
+    await handler({ sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } }, {
+      message: {},
+      parts: [{ type: "text", text: "Please continue with the task" }],
+    })
+
+    expect(state.attemptCount).toBe(0)
+    expect(state.fallbackIndex).toBe(-1)
+    expect(state.failedModels.size).toBe(1)
+    expect(state.currentModel).toBe("google/gemini-2.5-pro")
+  })
+
+  test("#given a capped state #when an internal initiator prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-internal-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)({ sessionID }, {
+      message: {},
+      parts: [{ type: "text", text: `wake${OMO_INTERNAL_INITIATOR_MARKER}` }],
+    })
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when a runtime fallback retry prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-retry-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)({ sessionID }, {
+      message: {},
+      parts: [{ type: "text", text: `retry this${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
+    })
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when chat.message has no parts #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-no-parts"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)({ sessionID }, { message: {} })
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when the rerouted compaction auto-continue prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-compaction-continue"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "google/gemini-2.5-pro"
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+    const COMPACTION_CONTINUE_TEXT =
+      "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
+    const reissuedParts: Array<{ type: string; text?: string; metadata?: { compaction_continue: boolean } }> = [
+      { type: "text", text: COMPACTION_CONTINUE_TEXT, metadata: { compaction_continue: true } },
+    ]
+
+    await createChatMessageHandler(deps)(
+      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
+      { message: {}, parts: reissuedParts ?? [] },
+    )
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when a marker-less synthetic prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-synthetic-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+    const syntheticParts = [{ type: "text", text: "Continue if you have next steps", synthetic: true }]
+
+    await createChatMessageHandler(deps)({ sessionID }, { message: {}, parts: syntheticParts })
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when a human prompt carries a synthetic attachment part #then the cap counters reset", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-human-prompt-with-synthetic-part"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+    const humanPartsWithAttachment = [
+      { type: "text", text: "Please review this file" },
+      { type: "text", text: "Called the Read tool with the following input: {}", synthetic: true },
+    ]
+
+    await createChatMessageHandler(deps)({ sessionID }, { message: {}, parts: humanPartsWithAttachment })
+
+    expect(state.attemptCount).toBe(0)
+    expect(state.fallbackIndex).toBe(-1)
   })
 })

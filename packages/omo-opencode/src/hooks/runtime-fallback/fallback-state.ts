@@ -59,6 +59,17 @@ export function findNextAvailableFallback(
   return undefined
 }
 
+export function canPrepareFallback(
+  state: FallbackState | undefined,
+  fallbackModels: string[],
+  config: Required<Pick<RuntimeFallbackConfig, "max_fallback_attempts" | "cooldown_seconds">>,
+  currentModel?: string,
+): boolean {
+  const availabilityState = state ?? createFallbackState(currentModel ?? "")
+  return availabilityState.attemptCount < config.max_fallback_attempts
+    && findNextAvailableFallback(availabilityState, fallbackModels, config.cooldown_seconds) !== undefined
+}
+
 export function prepareFallback(
   sessionID: string,
   state: FallbackState,

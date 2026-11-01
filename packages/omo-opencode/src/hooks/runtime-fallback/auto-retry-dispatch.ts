@@ -8,6 +8,7 @@ import {
   createRuntimeFallbackRetryTextPart,
   hasRuntimeFallbackRetryMarker,
   OMO_RUNTIME_FALLBACK_RETRY_MARKER,
+  RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT,
 } from "../../shared/runtime-fallback-retry-marker"
 import { hasInternalInitiatorMarker } from "../../shared/internal-initiator-marker"
 import {
@@ -42,7 +43,7 @@ export function createAutoRetryDispatcher(
   ): Promise<AutoRetryDispatchOutcome> => {
     if (sessionRetryInFlight.has(sessionID)) {
       log(`[${HOOK_NAME}] Retry already in flight, skipping (${source})`, { sessionID })
-      return { accepted: false, status: "blocked", reason: "retry already in flight" }
+      return { accepted: false, status: "superseded", reason: "retry already in flight" }
     }
 
     const retryModelPayload = buildRetryModelPayload(
@@ -68,7 +69,7 @@ export function createAutoRetryDispatcher(
       log(`[${HOOK_NAME}] Auto-retry skipped for stale fallback generation (${source})`, {
         sessionID,
       })
-      return { accepted: false, status: "blocked", reason: "stale fallback generation" }
+      return { accepted: false, status: "superseded", reason: "stale fallback generation" }
     }
     const previousCurrentModel = fallbackState?.currentModel
     const previousPendingFallbackModel = fallbackState?.pendingFallbackModel
@@ -115,7 +116,7 @@ export function createAutoRetryDispatcher(
               )
               // Mark this specifically as a fallback retry so the chat adapter
               // can acknowledge it without treating other synthetic prompts as fallback generations.
-              return [createRuntimeFallbackRetryTextPart("continue")]
+              return [createRuntimeFallbackRetryTextPart(RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT)]
             })()
       const retryMessageID = usingFetchedUserParts ? originalRetryMetadata.messageID : undefined
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
@@ -271,6 +272,7 @@ export function createAutoRetryDispatcher(
           }
         }
       }
+      deps.onRetryDispatchSettled?.(sessionID, retryDispatched || retryMayHaveBeenAccepted)
     }
   }
 }

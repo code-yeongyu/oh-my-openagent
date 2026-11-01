@@ -838,8 +838,6 @@
       "packages/omo-opencode/src/hooks/runtime-fallback/agent-resolver.ts": ["AGENT_NAMES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) extractRetryableSignal
       "packages/omo-opencode/src/hooks/runtime-fallback/error-classifier.ts": ["extractRetryableSignal"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) getLastUserRetryParts
-      "packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts": ["getLastUserRetryParts"],
       // pre-existing at origin dev 4686e425b5: unused export(s) hasVisibleAssistantResponse
       "packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts": ["hasVisibleAssistantResponse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
@@ -872,8 +870,6 @@
       "packages/omo-opencode/src/plugin/ultrawork-model-override.ts": ["detectUltrawork"],
       // pre-existing at origin dev 4686e425b5: unused export(s) validateAgentOrder
       "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) hasCompactionPart
-      "packages/omo-opencode/src/shared/compaction-marker.ts": ["hasCompactionPart"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
       "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
