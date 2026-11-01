@@ -1,4 +1,7 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, jest, mock } from "bun:test"
+import { getEventListeners } from "node:events"
+import { DEFAULT_REQUEST_TIMEOUT_MSEC } from "@modelcontextprotocol/sdk/shared/protocol.js"
+import { ErrorCode } from "@modelcontextprotocol/sdk/types.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { disconnectAll } from "./cleanup"
 import { createHttpClient, setHttpClientDependenciesForTesting } from "./http-client"
@@ -316,4 +319,44 @@ describe("createHttpClient cleanup failures", () => {
     expect(logContent).not.toContain("secret-value")
     expect(logContent).not.toContain("abcdefghijklmnopqrstuvwxyz")
   })
+})
+
+describe("createHttpClient connection deadlines", () => {
+  for (const withPolicy of [false, true]) {
+    it(`#given a pending legacy SSE connect ${withPolicy ? "with" : "without"} a policy signal #when its deadline expires #then no policy listener survives`, async () => {
+      // given
+      const state = createState()
+      const info = createInfo()
+      const clientKey = createClientKey(info)
+      const policy = new AbortController()
+      const started = Promise.withResolvers<void>()
+      configureNextClient = (client) => client.connect.mockImplementation(() =>
+        new Promise<void>(() => started.resolve()))
+      jest.useFakeTimers()
+      try {
+        // when
+        const outcome = captureCreateHttpClientError({
+          state, clientKey, info, config: { ...createConfig(), type: "sse" },
+          policySignal: withPolicy ? policy.signal : undefined,
+        })
+        await started.promise
+        jest.advanceTimersByTime(DEFAULT_REQUEST_TIMEOUT_MSEC)
+        jest.useRealTimers()
+        const error = await outcome
+
+        // then
+        expect(error.message).toContain(`MCP error ${ErrorCode.RequestTimeout}`)
+        expect(getEventListeners(policy.signal, "abort")).toHaveLength(0)
+        expect(createdTransports[0]?.close).toHaveBeenCalledTimes(1)
+        expect(createdClients[0]?.close).not.toHaveBeenCalled()
+        expect(state.clients.has(clientKey)).toBe(false)
+        policy.abort()
+        expect(createdTransports[0]?.close).toHaveBeenCalledTimes(1)
+        expect(createdClients[0]?.close).not.toHaveBeenCalled()
+      } finally {
+        jest.useRealTimers()
+        policy.abort()
+      }
+    })
+  }
 })

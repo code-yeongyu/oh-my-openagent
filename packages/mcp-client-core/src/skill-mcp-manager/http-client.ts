@@ -141,8 +141,9 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   const transport: McpTransport = httpClientDependencies.createTransport(url, transportOptions, client, transportKind)
 
   try {
-    const connecting = connectWithPolicySignal(client, transport, params.policySignal)
-    await (transportKind === "sse" ? withConnectDeadline(connecting) : connecting)
+    await connectWithPolicySignal(client, transport, params.policySignal,
+      transportKind === "sse" ? withConnectDeadline : undefined,
+    )
   } catch (error) {
     await closeHttpResourceIgnoringFailure(() => transport.close(), {
       resource: "transport",
