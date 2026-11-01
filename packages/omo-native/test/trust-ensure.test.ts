@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test"
 import { createHash, X509Certificate } from "node:crypto"
-import { mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, realpath, rm, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir, uptime } from "node:os"
 import { basename, join } from "node:path"
 import { trustLaunchKind } from "../compile-args"
@@ -12,7 +12,9 @@ let ca: string
 let extra: string
 let user: string
 beforeAll(async () => {
-  root = await mkdtemp(join(tmpdir(), "omo-trust-ensure-"))
+  // The stage relocates a directory reached through any link (macOS tmpdir() is under /var -> /private/var),
+  // so the directories these tests name must be canonical.
+  root = await mkdtemp(join(await realpath(tmpdir()), "omo-trust-ensure-"))
   const certs = await issueCertificates(root, ["root", "extra", "user"].map((name) => ({
     name, subject: `/CN=synthetic-ensure-${name}`, days: 2,
     extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
@@ -78,7 +80,7 @@ test.each([[[], 1500], [["--wait"], 20_000]] as const)(
     const text = await readFile(value.file, "utf8")
     expect(basename(value.file)).toBe(`${value.sha256}.pem`)
     expect(sha256(text)).toBe(value.sha256)
-    expect((await stat(value.file)).mode & 0o777).toBe(0o600)
+    expect((await stat(value.file)).mode & 0o777).toBe(process.platform === "win32" ? 0o666 : 0o600)
     expect(text).toContain(ca.trim())
     expect(text).toContain(extra.trim())
     // A server launch never runs without the closure (5.4, 5.8), so ensure always hands one out.
@@ -127,7 +129,7 @@ test("--lease-pid writes { v, pid, bootAtMs } by rename, and a second lease by t
   expect(lease.v).toBe(1)
   expect(lease.pid).toBe(process.pid)
   expect(Math.abs(lease.bootAtMs - (Date.now() - uptime() * 1000))).toBeLessThan(120_000)
-  expect((await stat(join(dir, "leases", leaseName))).mode & 0o777).toBe(0o600)
+  expect((await stat(join(dir, "leases", leaseName))).mode & 0o777).toBe(process.platform === "win32" ? 0o666 : 0o600)
 })
 
 test("a lease for another pid outlives the ensure process and pins its generation past 16 newer ones", async () => {
