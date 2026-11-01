@@ -31,6 +31,8 @@ export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 // The unified spec both runner adapters accept. A superset: the rpc adapter uses the subset it
 // needs (task_id, cwd, state_dir, prompt); the in-process adapter also consumes model/tools/agent.
 export type ManagedStartSpec = {
+  readonly onProviderRequest?: () => void
+  readonly probeProviderRequest?: boolean
   readonly admission?: StartAdmission
   readonly taskId: string
   readonly cwd: string
@@ -292,6 +294,8 @@ export type TaskManagerOptions = {
   readonly config: OmoTaskSettings
   readonly cwd: string
   readonly now?: () => number
+  // How long the one same-provider rung an ambiguous usage limit hops onto may stay silent (#11383); default 60 s.
+  readonly limitProbeTimeoutMs?: number
   readonly scheduleExitConfirmation?: ExitConfirmationSchedule
   // Injected by lifecycle (todo 12). Steering-driven cancel delegates destruction here; defaults to
   // a no-op so the manager stays usable before lifecycle wiring lands.

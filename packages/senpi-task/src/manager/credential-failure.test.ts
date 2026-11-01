@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { createTaskRecord, type ResolvedModelRecord, type TaskRecord } from "../state"
 import { isCredentialFailure, runtimeFallbackCandidates, terminalFailureMessage } from "./credential-failure"
+import { createUsageLimitMemory } from "./usage-limit-memory"
 
 function rung(provider: string, modelId: string): ResolvedModelRecord {
   return { source: "category", provider, model_id: modelId, display: `${provider}/${modelId}` }
@@ -149,6 +150,15 @@ describe("isCredentialFailure", () => {
 })
 
 describe("runtimeFallbackCandidates", () => {
+  test("a non-limit failure on A1 leaves A3 available to probe A2's ambiguous limit", () => {
+    const third = rung("opencode-go", "third")
+    const failed = { ...record(GO_M27, [third, ZAI_GLM]), fallback_attempts: [GO_M3, GO_M27] }
+    const memory = createUsageLimitMemory(Date.now)
+    memory.settle(failed.task_id, GO_M3.provider, GO_M3.model_id, "500: upstream overloaded")
+    expect(runtimeFallbackCandidates(failed, "Weekly usage limit reached", memory)).toEqual({
+      remaining: [third, ZAI_GLM], skipped: [], limit: "ambiguous",
+    })
+  })
   test("#given a model-scoped 403 on the first rung #when the candidates are computed #then the sibling model on the same provider stays", () => {
     const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), "403: This model is not enabled for your project.")
 
@@ -184,13 +194,34 @@ describe("runtimeFallbackCandidates", () => {
 
   test.each([
     ["a Claude session limit", "You've hit your session limit \u00b7 resets 3pm (Asia/Seoul)"],
-    ["an OpenCode Go monthly limit", "429 Monthly usage limit reached. It will reset in 2 days 8 hours"],
-    ["a Codex usage limit", '429 {"type":"usage_limit_reached","message":"The usage limit has been reached"}'],
-    ["senpi's account limit text, which points at /model", "The anthropic-subscription account usage limit has been reached (resets 3:20am). Switch to another provider with /model, or configure another provider in retry.fallbackChains."],
-  ])("#given %s on the first rung #when the candidates are computed #then other providers come first and the spent provider's rungs stay as the last resort", (_label, message) => {
+    ["a spent credit balance", "400: Your credit balance is too low to access the API"],
+    ["a limit the provider names as the account's", "429: This account has reached its usage limit"],
+  ])("#given a confirmed account limit (%s) on the first rung #when the candidates are computed #then every remaining rung on that provider is skipped (#9711)", (_label, message) => {
     const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), message)
 
-    expect(candidates).toEqual({ remaining: [ZAI_GLM, GO_M27], skipped: [], limit: "account" })
+    expect(candidates).toEqual({ remaining: [ZAI_GLM], skipped: [GO_M27], limit: "account" })
+  })
+
+  const AMBIGUOUS_LIMITS = [
+    ["a weekly limit that names no family", '{"type":"error","error":{"type":"rate_limit_error","message":"Weekly usage limit reached. Resets at 2026-10-29T04:27:07Z."}}'],
+    ["an OpenCode Go monthly limit", "429 Monthly usage limit reached. It will reset in 2 days 8 hours"],
+    ["a Codex usage limit", '429 {"type":"usage_limit_reached","message":"The usage limit has been reached"}'],
+    ["senpi's account limit rewrite, which points at /model", "The anthropic-subscription account usage limit has been reached (resets 3:20am). Switch to another provider with /model, or configure another provider in retry.fallbackChains."],
+  ] as const
+
+  test.each(AMBIGUOUS_LIMITS)("#given an ambiguous limit (%s) on the first rung #when the candidates are computed #then the next rung on the same provider is tried first (#11383)", (_label, message) => {
+    const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), message)
+
+    expect(candidates).toEqual({ remaining: [GO_M27, ZAI_GLM], skipped: [], limit: "ambiguous" })
+  })
+
+  test.each(AMBIGUOUS_LIMITS)("#given the same-provider rung tried after a limit hits an ambiguous limit too (%s) #when the candidates are computed #then the provider counts as spent and its other rungs are skipped", (_label, message) => {
+    const GO_M25 = rung("opencode-go", "minimax-m2.5")
+    const probed: TaskRecord = { ...record(GO_M27, [GO_M25, ZAI_GLM]), fallback_attempts: [GO_M3, GO_M27] }
+    const memory = createUsageLimitMemory(Date.now)
+    memory.beginProbe(probed.task_id, GO_M3.provider, message)
+
+    expect(runtimeFallbackCandidates(probed, message, memory)).toEqual({ remaining: [ZAI_GLM], skipped: [GO_M25], limit: "account" })
   })
 
   test("#given a limit that names one model #when the candidates are computed #then the sibling model on the same provider is next", () => {
@@ -216,7 +247,7 @@ describe("runtimeFallbackCandidates", () => {
     })
 
     test("#given the parent runs on the account whose limit is spent #when the candidates are computed #then the parent's model is skipped", () => {
-      const candidates = runtimeFallbackCandidates(withParent(SPENT_PARENT), "429 Monthly usage limit reached. It will reset in 2 days 8 hours")
+      const candidates = runtimeFallbackCandidates(withParent(SPENT_PARENT), "You've hit your session limit \u00b7 resets 3pm")
 
       expect(candidates).toEqual({ remaining: [ZAI_GLM], skipped: [SPENT_PARENT], limit: "account" })
     })

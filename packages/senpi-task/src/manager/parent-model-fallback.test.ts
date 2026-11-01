@@ -24,8 +24,8 @@ const claudeOnly: ResolvedChildPlan = {
 }
 
 let world: ParentModelWorld | undefined
-afterEach(() => {
-  world?.dispose()
+afterEach(async () => {
+  await world?.dispose()
   world = undefined
   cleanupProjects()
 })
@@ -93,15 +93,16 @@ describe("a category child whose whole chain is spent runs on its parent's model
     expect(record.parent_model_fallback?.interrupted_tools).toEqual([COUNT_TOOL])
   }, 30_000)
 
-  test("#given the parent runs on the same spent account #when Claude hits its usage limit #then the child fails as before and never tries the parent's model", async () => {
+  // The engine rewrites the provider's body to "The <provider> account usage limit has been reached" for every
+  // limit that names no model, so omo cannot confirm the scope and probes the next same-provider rung once (#11383).
+  test("#given the parent runs on the same provider #when Claude hits a limit and so does the parent's model #then the parent's model is tried once and the child fails", async () => {
     // given / when
     const sibling = `${CLAUDE}/sibling`
-    const { record, world } = await runChild({ scripts: { [PRIMARY]: ["quota"] }, spec: { parent_model: sibling } })
+    const { record, world } = await runChild({ scripts: { [PRIMARY]: ["quota"], [sibling]: ["quota"] }, spec: { parent_model: sibling } })
 
     // then
     expect(record.status).toBe("error")
-    expect(world.calls.map((call) => call.model)).not.toContain(sibling)
-    expect(record.parent_model_fallback).toBeUndefined()
+    expect(world.calls.map((call) => call.model)).toEqual([PRIMARY, sibling])
   }, 30_000)
 
   test("#given a category rung that still works #when Claude hits its usage limit #then the child routes to that rung exactly as before", async () => {

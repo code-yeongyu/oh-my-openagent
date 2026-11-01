@@ -119,7 +119,7 @@ describe("createTurnSettlement terminal provider error (senpi#3262)", () => {
     })
   })
 
-  test("#given a terminal provider error while a goal continuation timer is armed #when the confirmation fires #then the held outcome never settles and a later agent_start clears it", async () => {
+  test("#given a terminal provider error while a goal continuation timer is armed #when the confirmation fires #then the held outcome stays held, re-armed, and a later agent_start clears it", async () => {
     // given
     const probe = countingProbe(idleState)
     let wakeLive = true
@@ -128,21 +128,22 @@ describe("createTurnSettlement terminal provider error (senpi#3262)", () => {
     // when - the turn ends terminally; its wake tracker says a goal owns the recovery
     fixture.settlement.observe(agentEnd(PROVIDER_TIMEOUT) as never)
 
-    // then - the armed confirmation sees the live wake and holds: no probe, no re-arm, no settle
+    // then - the armed confirmation sees the live wake and holds: no probe, no settle, re-armed (omo#9711)
     expect(fixture.scheduler.pending()).toBe(1)
     fixture.scheduler.runNext()
     await flushSettlement()
     expect(probe.calls()).toBe(0)
-    expect(fixture.scheduler.pending()).toBe(0)
+    expect(fixture.scheduler.pending()).toBe(1)
     expect(fixture.settled()).toBeUndefined()
 
     // when - the goal continuation actually starts a new turn
     wakeLive = false
     fixture.settlement.observe({ type: "agent_start" } as never)
 
-    // then - the held outcome is dropped for the new turn
+    // then - the held outcome is dropped for the new turn and its confirmation disarmed
     await flushSettlement()
     expect(fixture.settled()).toBeUndefined()
+    expect(fixture.scheduler.pending()).toBe(0)
   })
 
   test("#given a terminal provider error whose probe reports an active turn #when it later reports true idleness #then only the idle answer settles the held outcome", async () => {
