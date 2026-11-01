@@ -381,7 +381,7 @@ describe("metadata model unification", () => {
         const ctx = makeMockCtx()
         const args: DelegateTaskArgs = {
           description: "test", prompt: "do it",
-          category: "visual-engineering", load_skills: [], run_in_background: true, subagent_type: "explore",
+          category: "visual-engineering", load_skills: [], run_in_background: true,
         }
 
         await executeBackgroundTask(args, ctx, unsafeTestValue({
