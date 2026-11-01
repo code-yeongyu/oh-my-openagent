@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test"
 import { lstatSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { prepareTrustDirectory } from "../trust-generation"
+import { judgeAncestor, prepareTrustDirectory, type AncestorStat } from "../trust-generation"
 import { attestUsernsRoots, attestedOverflowRoot, inheritedTrustPaths, readUsernsView, USERNS_ROOTS_ENV } from "../trust-userns"
 
 const NAMESPACED_MAP = "      1000       1000          1\n"
@@ -29,13 +29,30 @@ test.each([
   ["an unreadable uid map", proc({ "/proc/sys/kernel/overflowuid": "65534" }), ROOT_ENTRY, "/", rootInode, false],
   ["an unreadable overflow uid", proc({ "/proc/self/uid_map": NAMESPACED_MAP }), ROOT_ENTRY, "/", rootInode, false],
   ["a malformed entry poisons the whole value", sandboxed, JSON.stringify([["/", "64769:2"], ["/home", "x"]]), "/", rootInode, false],
-  ["a relative path entry", sandboxed, JSON.stringify([["home", "64769:2"]]), "/", rootInode, false],
+  ["a relative path entry", sandboxed, JSON.stringify([["home", "64769:2"]]), "home", rootInode, false],
+  ["a trailing-slash path entry", sandboxed, JSON.stringify([["/home/", "64769:2"]]), "/home/", rootInode, false],
   ["more entries than the cap", sandboxed, JSON.stringify(Array.from({ length: 65 }, () => ["/", "64769:2"])), "/", rootInode, false],
   ["the old comma format", sandboxed, "64769:2", "/", rootInode, false],
   ["no attestation", sandboxed, undefined, "/", rootInode, false],
 ] as const)("#given %s #when the ancestor is judged #then root equivalence matches the table", (_name, read, value, path, stat, expected) => {
   const view = readUsernsView(value === undefined ? {} : { [USERNS_ROOTS_ENV]: value }, read)
   expect(attestedOverflowRoot(view, path, stat)).toBe(expected)
+})
+
+const attestedRoot: AncestorStat = { directory: true, symlink: false, mode: 0o40755, uid: 65534, dev: 64769n, ino: 2n }
+const attestedView = readUsernsView({ [USERNS_ROOTS_ENV]: ROOT_ENTRY }, sandboxed)
+
+// Security contract (senpi#5334): attestation relaxes only the owner rule; the link and mode rules still refuse.
+test.each([
+  ["an attested root-equivalent ancestor", attestedView, attestedRoot, "ok"],
+  ["an attested ancestor that is group-writable", attestedView, { ...attestedRoot, mode: 0o40775 }, "unsafe-ancestor"],
+  ["an attested ancestor that is world-writable and sticky", attestedView, { ...attestedRoot, mode: 0o41777 }, "ok"],
+  ["an attested ancestor that is a symlink", attestedView, { ...attestedRoot, directory: false, symlink: true }, "unsafe-directory"],
+  ["an unattested overflow owner in a namespace", readUsernsView({}, sandboxed), attestedRoot, "unattested"],
+  ["an unreadable overflow uid in a namespace", readUsernsView({ [USERNS_ROOTS_ENV]: ROOT_ENTRY }, proc({ "/proc/self/uid_map": NAMESPACED_MAP })), attestedRoot, "unattested"],
+  ["another user's directory outside a namespace", null, { ...attestedRoot, uid: 1001 }, "unsafe-ancestor"],
+] as const)("#given %s #when judged #then the verdict matches the table", (_name, view, stat, expected) => {
+  expect(judgeAncestor(view, "/", stat, 1000, "linux")).toBe(expected)
 })
 
 test.skipIf(process.platform !== "linux")("#given the launcher in the initial namespace #when it attests a path #then it lists root-owned ancestors by path and nothing user-owned", () => {

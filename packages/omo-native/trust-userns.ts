@@ -39,6 +39,7 @@ function parseAttestation(text: string | undefined): Set<string> {
       if (!Array.isArray(entry) || entry.length !== 2) return new Set()
       const [path, inode] = entry as unknown[]
       if (typeof path !== "string" || !posix.isAbsolute(path) || posix.normalize(path) !== path
+        || (path.length > 1 && path.endsWith("/"))
         || typeof inode !== "string" || !INODE.test(inode)) return new Set()
       keys.add(entryKey(path, inode))
     }
