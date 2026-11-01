@@ -1,0 +1,35 @@
+[2026-08-26T02:28:19.808Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/omo-qa-sandbox.SJE9Zx/project"}
+[2026-08-26T02:28:19.822Z] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-08-26T02:28:19.833Z] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown
+[2026-08-26T02:28:19.844Z] [live-server-route] registered {"directory":"/tmp/omo-qa-sandbox.SJE9Zx/project","hasServerUrl":true,"registrationCount":1}
+[2026-08-26T02:28:19.858Z] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"/tmp/omo-qa-sandbox.SJE9Zx/project","serverUrl":"http://localhost:4096/"}
+[2026-08-26T02:28:20.265Z] [tool-registry] Built tool registry {"totalTools":13,"teamModeEnabled":false,"teamToolCount":0}
+[2026-08-26T02:28:21.353Z] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.23","nativeVersion":"1.1.37"}
+[2026-08-26T02:28:21.483Z] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-08-26T02:28:21.485Z] [connected-providers-cache] Cache file not found {"cacheFile":"/tmp/omo-qa-sandbox.SJE9Zx/cache/oh-my-opencode/connected-providers.json"}
+[2026-08-26T02:28:21.486Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-26T02:28:21.486Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution
+[2026-08-26T02:28:21.495Z] [agent-registration] Agent skipped: model resolution returned no result {"agent":"atlas"}
+[2026-08-26T02:28:21.497Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-26T02:28:21.497Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution
+[2026-08-26T02:28:21.499Z] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Hephaestus - Deep Agent","Prometheus - Plan Builder","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-08-26T02:28:21.464Z] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers
+[2026-08-26T02:28:21.721Z] [config-handler] config handler applied {"agentCount":12,"commandCount":16}
+[2026-08-26T02:28:30.908Z] [oh-my-openagent] ENTRY - plugin loading {"directory":"/tmp/omo-qa-sandbox.SJE9Zx/project"}
+[2026-08-26T02:28:30.928Z] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-08-26T02:28:30.944Z] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown
+[2026-08-26T02:28:30.970Z] [live-server-route] registered {"directory":"/tmp/omo-qa-sandbox.SJE9Zx/project","hasServerUrl":true,"registrationCount":1}
+[2026-08-26T02:28:31.003Z] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"/tmp/omo-qa-sandbox.SJE9Zx/project","serverUrl":"http://localhost:4096/"}
+[2026-08-26T02:28:31.384Z] [tool-registry] Built tool registry {"totalTools":13,"teamModeEnabled":false,"teamToolCount":0}
+[2026-08-26T02:28:32.604Z] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.23","nativeVersion":"1.1.37"}
+[2026-08-26T02:28:32.732Z] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-08-26T02:28:32.732Z] [connected-providers-cache] Cache file not found {"cacheFile":"/tmp/omo-qa-sandbox.SJE9Zx/cache/oh-my-opencode/connected-providers.json"}
+[2026-08-26T02:28:32.733Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-26T02:28:32.733Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution
+[2026-08-26T02:28:32.738Z] [agent-registration] Agent skipped: model resolution returned no result {"agent":"atlas"}
+[2026-08-26T02:28:32.739Z] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-26T02:28:32.739Z] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution
+[2026-08-26T02:28:32.741Z] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Hephaestus - Deep Agent","Prometheus - Plan Builder","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-08-26T02:28:32.776Z] [config-handler] config handler applied {"agentCount":12,"commandCount":16}
+[2026-08-26T02:28:32.718Z] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers
+[2026-08-26T02:28:32.953Z] [codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap {"matchedRoot":"/tmp","projectRoot":"/tmp/omo-qa-sandbox.SJE9Zx/project","reason":"tmp-root"}

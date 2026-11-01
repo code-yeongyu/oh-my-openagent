@@ -1,0 +1,11 @@
+== real auth.json ==
+634feca22fa1fb9804b2d6fad5f62badf6642ccaca5f10c6264fd430d5e09073
+1787712281
+== real session count ==
+19016
+== forbidden dir mtimes ==
+/home/viprix/.omo 1787703684
+/home/viprix/.senpi 1786319605
+/home/viprix/.config/opencode 1787706186
+/home/viprix/.codex 1787684481
+/home/viprix/.cache/opencode 1787711063
