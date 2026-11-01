@@ -1,6 +1,9 @@
 import { existsSync } from "node:fs"
 
 import {
+  type AccountShowResult,
+  accountStateNotice,
+  classifyAccountShow,
   connectDeviceService,
   type DeviceRow,
   type DeviceService,
@@ -14,6 +17,11 @@ import {
   type Status,
   type StatusState,
 } from "../device-service-core/src/index.ts"
+import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
+import { syncPinDir } from "../memory-core/src/sync/pin-dir"
+import { createCredentialStore, type CredentialStore, INTERACTIVE_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
+import { serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
+import { runAccountVerb } from "./account-cli"
 import packageJson from "./package.json" with { type: "json" }
 
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
@@ -28,6 +36,8 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
   enable | disable                         turn remote sessions on or off for this device`
 
 export interface RemoteCommandDependencies {
+  /** `omo account show`: the first bootstrap step; nothing else runs unless it reports signed in. */
+  readonly accountShow: () => Promise<AccountShowResult>
   readonly stateDir: string
   readonly connect: () => Promise<DeviceService>
   readonly now: () => number
@@ -185,6 +195,8 @@ export async function runRemoteVerb(dependencies: RemoteCommandDependencies, arg
     dependencies.error(REMOTE_USAGE)
     return REMOTE_EXIT.usage
   }
+  const signedOut = await accountNotice(dependencies)
+  if (signedOut !== undefined) return signedOut
   if (!existsSync(dependencies.stateDir)) {
     dependencies.error("The OmO device service is not set up on this device. Install the OmO desktop app to set it up.")
     return REMOTE_EXIT.unavailable
@@ -212,6 +224,34 @@ export async function runRemoteVerb(dependencies: RemoteCommandDependencies, arg
   }
 }
 
+async function accountNotice(dependencies: RemoteCommandDependencies): Promise<number | undefined> {
+  const notice = accountStateNotice(classifyAccountShow(await dependencies.accountShow()))
+  if (notice === undefined) return undefined
+  dependencies.error(notice)
+  return REMOTE_EXIT.unavailable
+}
+
+async function inProcessAccountShow(): Promise<AccountShowResult> {
+  const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
+  const lines: string[] = []
+  let store: CredentialStore | undefined
+  const exitCode = await runAccountVerb(
+    {
+      api,
+      get store() {
+        store ??= createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
+        return store
+      },
+      pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+      readStdin: async () => "",
+      output: line => lines.push(line),
+      error: () => {},
+    },
+    ["show"],
+  )
+  return { exitCode, stdout: lines.join("\n") }
+}
+
 function reportFailure(dependencies: RemoteCommandDependencies, error: unknown): number {
   if (error instanceof LocalApiError) {
     dependencies.error(`omo remote: ${error.reason}`)
@@ -226,6 +266,7 @@ export async function runRemoteCommand(args: readonly string[]): Promise<void> {
   const stateDir = deviceServiceStateDir()
   process.exitCode = await runRemoteVerb(
     {
+      accountShow: inProcessAccountShow,
       stateDir,
       connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
       now: () => Date.now(),
