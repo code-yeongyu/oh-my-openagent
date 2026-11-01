@@ -1,0 +1,57 @@
+# new regression tests against the unpatched line (expected to fail)
+
+bun test v1.4.2 (744846f84)
+
+packages/omo-opencode/src/config-migration/reasoning-unification.test.ts:
+51 | 
+52 |     // when
+53 |     const result = transformReasoningUnification(input)
+54 | 
+55 |     // then
+56 |     expect(result.document.categories?.quick).toEqual({
+                                                   ^
+error: expect(received).toEqual(expected)
+
+@@ -2,7 +2,2 @@
+    "models": [
+-     "primary/model",
+-     {
+-       "model": "second/model",
+-       "reasoning": "high",
+-     },
+      "legacy/fallback",
+
+- Expected  - 5
++ Received  + 0
+
+      at <anonymous> (/Users/lukasbuck/Local/oss-issues/oh-my-openagent/packages/omo-opencode/src/config-migration/reasoning-unification.test.ts:56:47)
+(fail) 2026-08 reasoning unification migration > #given a category with a canonical chain and legacy fallbacks #when transformed #then the chain keeps its primary and the fallbacks are appended [0.32ms]
+64 | 
+65 |     // when
+66 |     const result = transformReasoningUnification(input)
+67 | 
+68 |     // then
+69 |     expect(result.document.categories?.deep).toEqual({ models: [{ model: "a/b", reasoning: "high" }] })
+                                                  ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "models": [
+-     {
+-       "model": "a/b",
+-       "reasoning": "high",
+-     },
+-   ],
++   "models": [],
+  }
+
+- Expected  - 6
++ Received  + 1
+
+      at <anonymous> (/Users/lukasbuck/Local/oss-issues/oh-my-openagent/packages/omo-opencode/src/config-migration/reasoning-unification.test.ts:69:46)
+(fail) 2026-08 reasoning unification migration > #given a category chain with an empty fallback list #when transformed #then the chain survives instead of becoming empty [0.16ms]
+
+ 4 pass
+ 2 fail
+ 14 expect() calls
+Ran 6 tests across 1 file. [616.00ms]

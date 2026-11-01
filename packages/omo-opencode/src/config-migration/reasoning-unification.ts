@@ -88,7 +88,9 @@ function normalizeDefinition(
   if (!shouldCombine) return normalized
 
   const primary = primaryModelRef(value, opencode)
-  const existing = kind === "agent" ? normalizedList(value["models"]) : []
+  // Categories accept the canonical `models` chain too, so a chain already written by hand must
+  // survive the merge; dropping it would silently replace the primary model with a fallback.
+  const existing = normalizedList(value["models"])
   const fallbacks = normalizedList(fallbackModels)
   normalized["models"] = [...(primary === undefined ? [] : [primary]), ...existing, ...fallbacks]
   delete normalized["model"]
