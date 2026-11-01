@@ -15,6 +15,7 @@ import type {
 } from "../state"
 import type { DestructionPort, SendOutcome } from "../steering"
 import type { TaskRecordStore } from "../store"
+import type { OwnerProcessView } from "../lifecycle/owner-process"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 import type { TaskConcurrency } from "./concurrency"
@@ -311,6 +312,8 @@ export type TaskManagerOptions = {
   readonly hostPid?: number
   // Whether a recorded owner host still runs; defaults to the lifecycle's signal-0 probe.
   readonly isProcessAlive?: (pid: number) => boolean
+  // When the recorded owner pid started; a process born after the record was written never owns it.
+  readonly ownerProcesses?: OwnerProcessView
   // The parent engine's RUNTIME-ONLY kernel-tool capability map (item 6). Shared with the runner so
   // a same-host parked child revives onto the same live parent closures; absent = no kernel tools.
   readonly kernelToolBindings?: KernelToolBindingRegistry

@@ -1,5 +1,6 @@
 import type { TaskRecord } from "../state"
-import { reconciliationActive, type LifecycleContext } from "./context"
+import { claimantAlive, reconciliationActive, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
 import { isHostSessionRecord } from "./host-session"
 
 export async function hasForeignLiveOwner(
@@ -7,6 +8,8 @@ export async function hasForeignLiveOwner(
   record: TaskRecord,
   parentSessionId: string | undefined,
 ): Promise<boolean> {
+  const observing = observeRecordOwners(context.ownerProcesses, [record], context.hostPid)
+  if (observing !== undefined) await observing
   if (isHostSessionRecord(record)) {
     if (record.residency_state !== "resident") return false
     const alive = await context.hostSessionProbe.daemonAlive(record.host_session)
@@ -19,9 +22,9 @@ export async function hasForeignLiveOwner(
     // observe the child, so it must reclaim the record instead of deferring to a dead owner.
     return !(record.parent_session_id === parentSessionId && isDeadForeignOwner(context, record))
   }
-  return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
+  return record.host_pid !== undefined && record.host_pid !== context.hostPid && claimantAlive(context, record)
 }
 
 function isDeadForeignOwner(context: LifecycleContext, record: TaskRecord): boolean {
-  return record.host_pid !== undefined && record.host_pid !== context.hostPid && !context.signaller.isAlive(record.host_pid)
+  return record.host_pid !== undefined && record.host_pid !== context.hostPid && !claimantAlive(context, record)
 }

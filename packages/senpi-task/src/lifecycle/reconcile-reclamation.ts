@@ -1,6 +1,6 @@
 import type { TaskRecord } from "../state"
 import { isSpawnSpecV1 } from "../state"
-import { reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { isFallbackHandoff } from "./fallback-handoff"
@@ -15,7 +15,7 @@ import { finishPendingCancel } from "./pending-cancel"
 import { reclaimOrphanedResident } from "./residency"
 import { deferredCode, isSuspendingCode } from "./respawn-failure-code"
 import { deferred, disposeClaimed, markLost, rollbackOrDeferred, terminateOldRpc, type SuspendedResidency } from "./revive-rollback"
-import type { ReconcileOutcome } from "./types"
+import type { ReconcileDeferredReason, ReconcileOutcome } from "./types"
 import { suspendHandle } from "./shutdown"
 
 export { deferred } from "./revive-rollback"
@@ -109,7 +109,10 @@ export async function reviveClaimed(
   options: ReviveClaimedOptions = {},
 ): Promise<ReconcileOutcome> {
   const interrupted = () => !reconciliationActive(context) || !isSameClaim(context, claimed)
-  if (interrupted()) return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "foreign_live_owner", claimed)
+  // A run Stop that lands while this revival holds the claim pauses the child in place. Nobody else
+  // owns it: the run's own Resume restores it, so the deferral says so instead of naming an owner.
+  const lostClaim = (): ReconcileDeferredReason => pausedUnderClaim(context, claimed) ? "run_paused" : "foreign_live_owner"
+  if (interrupted()) return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, lostClaim(), claimed)
   if (claimed.provisional_exit !== undefined && !TERMINAL_STATUSES.has(claimed.status)) {
     return settleProvisionalExitLoss(context, claimed)
   }
@@ -129,14 +132,14 @@ export async function reviveClaimed(
   // handoff resumes nothing: its newest transcript is the failed rung's, so it launches fresh.
   const resumePath = isFallbackHandoff(fresh) ? undefined : hostSessionResumePath(fresh) ?? sessionPath
   if (!isClaimHeld(context, fresh, claimed.parent_session_id) || fresh.killed === true || (!REVIVABLE_STATUSES.has(fresh?.status ?? "pending") && !terminalAllowed)) {
-    return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, "foreign_live_owner", claimed)
+    return rollbackOrDeferred(context, claimed.task_id, rollbackResidency, lostClaim(), claimed)
   }
   // A host session has no pid of its own; only the child-process runner ever leaves one behind. A
   // previous process's child is ended first, a cancelled one included: finishing a cancel never leaves
   // its process running.
   if (fresh.execution_mode === "process" && fresh.pid !== undefined && !isHostSessionRecord(fresh)) {
     const terminated = await terminateOldRpc(context, fresh)
-    if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+    if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, lostClaim(), fresh)
     if (!terminated) {
       return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
     }
@@ -153,10 +156,10 @@ export async function reviveClaimed(
     return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "session_unavailable", fresh)
   }
   // Everything above awaited: a stop or another owner that landed meanwhile ends this revival here.
-  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, lostClaim(), fresh)
 
   const reached = isHostSessionRecord(fresh) ? await reachRecordedHost(context, fresh.host_session) : "alive"
-  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+  if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, lostClaim(), fresh)
   if (reached !== "alive") {
     const outcome = rollbackOrDeferred(context, fresh.task_id, rollbackResidency, reached, fresh)
     markSuspensionReason(context, fresh.task_id, parkedReason(reached))
@@ -213,7 +216,7 @@ export async function reviveClaimed(
         terminate: () => handle.terminate?.() ?? Promise.resolve(),
       }, "revived_after_shutdown", () => isSameClaim(context, fresh))
     }
-    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
+    return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, lostClaim(), fresh)
   }
   if (!respawned.ok) {
     reservation.release()
@@ -297,6 +300,14 @@ async function respawnThroughDrain(
   return result
 }
 
+function pausedUnderClaim(context: LifecycleContext, claimed: TaskRecord): boolean {
+  const now = context.store.load(claimed.task_id)
+  return now !== null && now.status === "paused" && now.killed !== true
+    && isClaimHeld(context, now, claimed.parent_session_id)
+    && now.notification.run_epoch === claimed.notification.run_epoch
+    && now.residency_claim === claimed.residency_claim
+}
+
 function isSameClaim(context: LifecycleContext, claimed: TaskRecord): boolean {
   const now = context.store.load(claimed.task_id)
   return isClaimHeld(context, now, claimed.parent_session_id)
@@ -308,7 +319,7 @@ function isSameClaim(context: LifecycleContext, claimed: TaskRecord): boolean {
 
 export function isOrphan(context: LifecycleContext, record: TaskRecord): boolean {
   if (record.host_pid === context.hostPid) return !hasLiveHandle(context, record.task_id)
-  return record.host_pid === undefined || !context.signaller.isAlive(record.host_pid)
+  return !claimantAlive(context, record)
 }
 
 function hasLiveHandle(context: LifecycleContext, taskId: string): boolean {

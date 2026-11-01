@@ -3,6 +3,7 @@ import type { IsolationRuntime, OwnerProbe } from "../isolation"
 import { log } from "@oh-my-opencode/utils"
 
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
+import type { TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import {
   DEFAULT_HOST_SESSION_RETRY_POLICY,
@@ -13,6 +14,7 @@ import {
   type HostSessionRetryPolicy,
 } from "./host-session"
 import { defaultHostSessionCloser, defaultHostSessionProbe } from "./host-session-default"
+import { ownerProcessViewFor, recordOwnerAlive, type OwnerProcessView } from "./owner-process"
 import { injectedLifecycleReattachPorts } from "./port"
 import type { IdleReclaimerScheduler, LifecycleDeps, LifecycleReattachPorts, ProcessSignaller, ResidencyRegistry } from "./port"
 import type { BatchAdmissionOptions } from "./residency"
@@ -34,6 +36,7 @@ export type LifecycleContext = {
   readonly config: OmoTaskSettings
   readonly now: () => number
   readonly signaller: ProcessSignaller
+  readonly ownerProcesses: OwnerProcessView
   readonly orphanKillDelayMs: number
   readonly hostPid: number
   readonly dequeuePending: (taskId: string) => void
@@ -93,6 +96,7 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     config: deps.config,
     now: deps.now ?? Date.now,
     signaller: deps.signaller ?? defaultSignaller,
+    ownerProcesses: ownerProcessViewFor(deps.signaller, deps.ownerProcesses),
     orphanKillDelayMs: deps.orphanKillDelayMs ?? DEFAULT_ORPHAN_KILL_DELAY_MS,
     hostPid: deps.hostPid ?? process.pid,
     dequeuePending: deps.dequeuePending ?? (() => {}),
@@ -112,6 +116,10 @@ export function resolveContext(deps: LifecycleDeps): LifecycleContext {
     isolation: deps.isolation,
     isolationProbe: deps.isolationProbe,
   }
+}
+
+export function claimantAlive(context: LifecycleContext, record: TaskRecord): boolean {
+  return recordOwnerAlive((pid) => context.signaller.isAlive(pid), context.ownerProcesses, record)
 }
 
 export function nowIso(context: LifecycleContext): string {
