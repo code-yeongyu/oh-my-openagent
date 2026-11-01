@@ -5,6 +5,10 @@ import {
 } from "../../shared/compaction-agent-config-checkpoint"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
+import {
+  clearSessionLoadedSkills,
+  getSessionLoadedSkills,
+} from "../../shared/session-loaded-skills"
 import { COMPACTION_CONTEXT_PROMPT } from "./compaction-context-prompt"
 import { resolveSessionPromptConfig } from "./session-prompt-config-resolver"
 import { finalizeTrackedAssistantMessage, shouldTreatAssistantPartAsOutput, trackAssistantOutput, type TailMonitorState } from "./tail-monitor"
@@ -54,12 +58,17 @@ export function createCompactionContextInjector(options?: {
       return
     }
 
-    setCompactionAgentConfigCheckpoint(sessionID, promptConfig)
+    const loadedSkills = getSessionLoadedSkills(sessionID)
+    setCompactionAgentConfigCheckpoint(
+      sessionID,
+      loadedSkills.length > 0 ? { ...promptConfig, skills: loadedSkills } : promptConfig,
+    )
     log(`[compaction-context-injector] Captured agent checkpoint before compaction`, {
       sessionID,
       agent: promptConfig.agent,
       model: promptConfig.model,
       hasTools: !!promptConfig.tools,
+      skillCount: loadedSkills.length,
     })
   }
 
@@ -83,6 +92,7 @@ export function createCompactionContextInjector(options?: {
       const sessionID = resolveSessionID(props)
       if (sessionID) {
         clearCompactionAgentConfigCheckpoint(sessionID)
+        clearSessionLoadedSkills(sessionID)
         tailStates.delete(sessionID)
       }
       return
