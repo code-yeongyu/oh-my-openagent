@@ -18,8 +18,17 @@ const HostToWorker = z.union([
 const WorkerToHost = z.strictObject({ kind: z.literal("request"), id: z.number().int().positive(), request: DesktopSyncRequest })
 type HostToWorker = z.infer<typeof HostToWorker>
 
+/** Host side of one Worker port: every port hears the settled outcome; a desktop outcome also serves its requests. */
+export function serveWorkerPort(selection: Promise<MemorySyncSelection>, port: MessagePort, closed: AbortSignal): void {
+  void selection.then(settled => {
+    if (closed.aborted) return
+    port.postMessage({ kind: "outcome", outcome: settled.kind === "unavailable" ? settled.reason : settled.kind } satisfies HostToWorker)
+    if (settled.kind === "desktop") serveDesktopWorker(settled.channel, port, closed)
+  })
+}
+
 /** Host side of one Worker port after a desktop outcome; `closed` aborts when the Worker's port closes. */
-export function serveDesktopWorker(channel: DesktopSyncEngineWire, port: MessagePort, closed: AbortSignal): void {
+function serveDesktopWorker(channel: DesktopSyncEngineWire, port: MessagePort, closed: AbortSignal): void {
   if (closed.aborted) return
   const owned = new Set<string>()
   const post = (message: HostToWorker) => { if (!closed.aborted) port.postMessage(message) }

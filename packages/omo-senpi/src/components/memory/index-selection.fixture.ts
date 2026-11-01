@@ -24,9 +24,9 @@ let resolverSource: DeviceAccountSource | undefined
 let rpcSource: Parameters<typeof wireSyncRpc>[0]["source"] | undefined
 const resolveSession = createDeviceSessionResolver
 const registerRpc = wireSyncRpc
-const accountRuntime = await import("./device-session/account-runtime")
-mock.module("./device-session/account-runtime", () => ({
-  ...accountRuntime,
+const accountSource = await import("./device-session/account-source")
+mock.module("./device-session/account-source", () => ({
+  ...accountSource,
   createCliAccountSource: () => {
     cliBuilt += 1
     if (scenario !== "cli") throw new Error("desktop registration constructed the CLI source")

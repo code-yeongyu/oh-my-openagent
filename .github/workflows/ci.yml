@@ -247,6 +247,20 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
 
+      # device-service-core's LA17 DACL tests prove that a second local user cannot read the
+      # protected token file, so the Windows leg creates that user with a fresh random password.
+      - name: Create the second local user for the DACL tests
+        if: runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: pwsh
+        run: |
+          $bytes = [byte[]]::new(16)
+          [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          $password = "Qa1!" + [Convert]::ToHexString($bytes)
+          Write-Output "::add-mask::$password"
+          net user omoqa2 $password /add /y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "net user omoqa2 /add failed with exit $LASTEXITCODE" }
+          "OMOQA2_PASSWORD=$password" >> $env:GITHUB_ENV
+
       # The full install runs the root `prepare` (`bun run build`), whose
       # `build:lsp-daemon` step already runs `npm ci && npm run build` in
       # packages/lsp-daemon, so its node_modules and dist exist before the tests.

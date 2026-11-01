@@ -21,20 +21,19 @@ const account = (accountId: string): CliDeviceAccount => ({
 })
 
 // An undeclared launch (no inherited table in this process) selects the CLI source, so only createCliAccountSource runs.
-const cliRuntime = (create: DeviceAccountRuntimeModule["createCliAccountSource"]): DeviceAccountRuntimeModule => ({
-  createCliAccountSource: create,
-  accountSourceFromSelection: ({ selection, cli }) => {
+const cliRuntime = (create: (options: Parameters<DeviceAccountRuntimeModule["selectedAccountSource"]>[1]) => DeviceAccountSource): DeviceAccountRuntimeModule => ({
+  selectedAccountSource: (selection, options) => {
     let built: DeviceAccountSource | undefined
     return async () => {
       const selected: MemorySyncSelection = await selection()
       if (selected.kind !== "cli") throw new Error(`expected the CLI selection, got ${selected.kind}`)
-      built ??= cli()
+      built ??= create(options)
       return built()
     }
   },
   claimInheritedDesktopSync: () => Promise.reject(new Error("an undeclared launch never claims")),
-  serveDesktopWorker: () => { throw new Error("an undeclared launch serves no desktop port") },
-  workerMemorySyncSource: () => Promise.reject(new Error("the main thread reads no Worker port")),
+  serveWorkerPort: () => { throw new Error("the main thread spawned no session Worker here") },
+  workerMemorySyncSelection: () => Promise.reject(new Error("the main thread reads no Worker port")),
 })
 
 const accountIdOf = (resolved: DeviceAccount | null): string | undefined => resolved?.kind === "cli" ? resolved.accountId : undefined
