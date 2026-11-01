@@ -4,13 +4,14 @@ import { prepareGenesis } from "./prepare.ts"
 import { bytes } from "./seal.test-support.ts"
 import { vector } from "./vector.test-support.ts"
 
-test.each(["nonce length", "non-NFC RP", "invalid credential", "empty credential"] as const)(
+test.each(["nonce length", "non-NFC RP", "invalid credential", "empty credential", "extra bootstrap key"] as const)(
   "refuses bootstrap %s before sealing or countersigning",
   async (mutation) => {
     const v = await vector()
     const bootstrap = {
       ...v.bootstrap,
       ...(mutation === "nonce length" ? { custody_nonce: b64urlEncode(bytes(32, 5)) } : {}),
+      ...(mutation === "extra bootstrap key" ? { extra: true } : {}),
       recovery_key: {
         ...v.bootstrap.recovery_key,
         ...(mutation === "non-NFC RP" ? { rp_id: "e\u0301.test" } : {}),

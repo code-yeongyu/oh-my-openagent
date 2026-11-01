@@ -210,6 +210,8 @@ export function createDesktop() {
 				return { result: null };
 			case "ax.attributes":
 				return { result: [["AXRole", "AXButton"]] };
+			case "ax.typeText":
+				return { result: { method: "inserted" } };
 			default:
 				return undefined;
 		}

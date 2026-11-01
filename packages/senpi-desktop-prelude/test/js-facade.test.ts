@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IMAGE, loadJsFacade, WINDOW_SNAPSHOT, windowResponder } from "./harness";
+import { ELEMENT_SNAPSHOT, IMAGE, loadJsFacade, WINDOW_SNAPSHOT, windowResponder } from "./harness";
 
 type AsyncBody = new (...parameters: string[]) => (...args: unknown[]) => Promise<unknown>;
 const AsyncFunction: AsyncBody = Object.getPrototypeOf(async () => {}).constructor;
@@ -248,6 +248,34 @@ describe("JavaScript computer facade", () => {
 
 		// Then
 		expect(value).toEqual(menu);
+	});
+
+	it("sends el.type as a ref-hopped chain and returns how the text was delivered", async () => {
+		// Given
+		const kernel = loadJsFacade((args) => {
+			const chain = Array.isArray(args.chain) ? args.chain : [];
+			if (chain.length === 1 && chain[0].method === "ref") return { text: "", details: { value: ELEMENT_SNAPSHOT } };
+			return { text: "", details: { value: { method: "inserted" } } };
+		});
+
+		// When
+		const value = await kernel.run(`
+			const el = await computer.ref("e1");
+			return el.type("hello", { delivery: "foreground" });
+		`);
+
+		// Then
+		expect(value).toEqual({ method: "inserted" });
+		expect(kernel.calls).toEqual([
+			{ action: "call", chain: [{ method: "ref", args: ["e1"] }] },
+			{
+				action: "call",
+				chain: [
+					{ method: "ref", args: ["e1"] },
+					{ method: "type", args: ["hello", { delivery: "foreground" }] },
+				],
+			},
+		]);
 	});
 
 	it("sends control helpers as one-step call chains (#9651 B5b)", async () => {

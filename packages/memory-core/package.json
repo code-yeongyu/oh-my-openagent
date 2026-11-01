@@ -17,6 +17,9 @@
     "./sync-engine": {
       "import": "./src/sync/engine/index.ts"
     },
+    "./sync-account-ports": {
+      "import": "./src/sync/account/account-ports-runtime.ts"
+    },
     "./personas": {
       "import": "./src/personas/manifest.ts"
     },
@@ -45,6 +48,7 @@
   },
   "dependencies": {
     "loro-crdt": "1.16.4",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "zod": "^4.6.5"
   }
 }
