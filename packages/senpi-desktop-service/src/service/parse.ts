@@ -94,6 +94,23 @@ export function isDesktopCapabilities(
 		&& (value.cursorOverlay === undefined || typeof value.cursorOverlay === "boolean");
 }
 
+const INTERVENTION_WATCH_VALUES: ReadonlySet<string> = new Set(["on", "off", "not_started"]);
+
+/**
+ * Narrow an `interventionWatch` value to the wire union, the way `parseAuditEvent` maps an unknown
+ * action or code to `"unknown"`: a value this host does not know (sent by a newer engine, for example
+ * `"paused"`) reads as `"unknown"` instead of being typed as a state the engine did not send. The
+ * shape guard above stays string-permissive on purpose, so a newer engine's value is tolerated at
+ * the shape level and only narrowed here, at the call sites that hand capabilities out.
+ */
+export function normalizeInterventionWatch(value: unknown): DesktopCapabilities["interventionWatch"] {
+	if (value === undefined || value === null) return value;
+	if (typeof value === "string" && INTERVENTION_WATCH_VALUES.has(value)) {
+		return value as DesktopCapabilities["interventionWatch"];
+	}
+	return UNKNOWN_AUDIT_VALUE;
+}
+
 type AuditEventShape = Omit<AuditEvent, "action" | "code"> & {
 	readonly action: string;
 	readonly code?: string | null;
@@ -131,7 +148,11 @@ export function parseSessionOpened(value: unknown): SessionOpened | undefined {
 		return undefined;
 	}
 	return {
-		capabilities: { ...value.capabilities, cursorOverlay: value.capabilities.cursorOverlay ?? false },
+		capabilities: {
+			...value.capabilities,
+			cursorOverlay: value.capabilities.cursorOverlay ?? false,
+			interventionWatch: normalizeInterventionWatch(value.capabilities.interventionWatch),
+		},
 		resumeToken: value.resumeToken,
 	};
 }

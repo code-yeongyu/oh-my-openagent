@@ -1,7 +1,7 @@
 import type { AuditEvent } from "@oh-my-opencode/senpi-desktop-protocol";
 import { describe, expect, it } from "vitest";
 import { NotificationHub } from "../src/service/notifications";
-import { isDesktopCapabilities, parseErrorData } from "../src/service/parse";
+import { isDesktopCapabilities, normalizeInterventionWatch, parseErrorData, parseSessionOpened } from "../src/service/parse";
 
 // A host and an engine from different releases still talk: codes, actions and capability fields one side does not
 // know are tolerated, never fatal (ErrorCode amendment 1, #11461).
@@ -76,5 +76,24 @@ describe("capabilities across releases", () => {
 	it("rejects mistyped interventionWatch or displayAsleep", () => {
 		const wrong = [{ ...capabilities, interventionWatch: true }, { ...capabilities, displayAsleep: "no" }];
 		expect(wrong.map((value) => isDesktopCapabilities(value))).toEqual([false, false]);
+	});
+
+	it("maps an unknown interventionWatch value to the unknown sentinel, never a known state", () => {
+		expect(normalizeInterventionWatch("paused")).toBe("unknown");
+		expect(normalizeInterventionWatch("on")).toBe("on");
+		expect(normalizeInterventionWatch(undefined)).toBeUndefined();
+		expect(normalizeInterventionWatch(null)).toBeNull();
+	});
+
+	it("keeps a newer engine's capabilities usable, with the unknown value narrowed at parse", () => {
+		// given: the shape guard tolerates the unknown string, as it does any unknown field
+		expect(isDesktopCapabilities({ ...capabilities, interventionWatch: "paused" })).toBe(true);
+		// when: the session-opened parse hands capabilities out
+		const parsed = parseSessionOpened({
+			capabilities: { ...capabilities, interventionWatch: "paused" },
+			resumeToken: "tok",
+		});
+		// then: the static type never claims a state the engine did not send
+		expect(parsed?.capabilities.interventionWatch).toBe("unknown");
 	});
 });

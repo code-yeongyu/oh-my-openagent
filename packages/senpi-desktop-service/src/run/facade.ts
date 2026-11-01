@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DESKTOP_METHODS, DISPLAY_METHODS, type DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol";
-import { isDesktopCapabilities, isRecord } from "../service/parse";
+import { isDesktopCapabilities, isRecord, normalizeInterventionWatch } from "../service/parse";
 import { ComputerRunError, facadeMethod, type RunScope } from "./context";
 import {
 	type DesktopDisplay,
@@ -48,7 +48,11 @@ export function createDesktopFacade(scope: RunScope) {
 		capabilities: (): Promise<DesktopCapabilities> =>
 			method("capabilities", async ({ call }) => {
 				const capabilities = expectResult("capabilities", await call("capabilities", {}), isDesktopCapabilities);
-				return { ...capabilities, cursorOverlay: capabilities.cursorOverlay ?? false };
+				return {
+					...capabilities,
+					cursorOverlay: capabilities.cursorOverlay ?? false,
+					interventionWatch: normalizeInterventionWatch(capabilities.interventionWatch),
+				};
 			}),
 		displays: (): Promise<readonly DesktopDisplay[]> =>
 			method("displays", async ({ call }) =>
