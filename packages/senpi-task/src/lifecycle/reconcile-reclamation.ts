@@ -79,6 +79,12 @@ async function reclaimResidentExclusive(
     }
   }
   if (TERMINAL_STATUSES.has(claimed.status)) return detachTerminalResident(context, claimed)
+  // A child its own run paused waits for that run's Resume, which restores it from its transcript
+  // under whichever host then owns the run. Park it with its run owner instead of disposing the work.
+  if (claimed.status === "paused" && sessionPath !== undefined) {
+    const parked = await detachTerminalResident(context, claimed)
+    return parked.kind === "resumed" ? { task_id: claimed.task_id, kind: "deferred", reason: "run_paused" } : parked
+  }
   if (!REVIVABLE_STATUSES.has(claimed.status)) {
     await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
     return { task_id: claimed.task_id, kind: "resumed", reason: "non-revivable orphan disposed" }
