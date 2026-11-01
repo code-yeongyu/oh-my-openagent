@@ -1,6 +1,6 @@
 import { join } from "node:path"
 
-import type { ReservedRun } from "@oh-my-opencode/memory-core"
+import type { ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import { createOncePerSessionGuard } from "../task/usage-guidance"
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -41,6 +41,7 @@ export interface MemoryReflectionLiveWiring {
   onLiveReflectionCompleted(identity: string, runId: string): Promise<void>
   onSettled(sessionId: string, eventCtx: unknown, signal?: AbortSignal): Promise<void>
   syncRpc(): Promise<void>
+  syncJournal(sessionId: string, entries: readonly TranscriptProjection[]): Promise<void>
   shutdown(identity?: string): void
   /** Resolves once every status refresh started by bind or settle has finished (each one runs git in the identity dir). */
   settled(): Promise<void>
@@ -175,6 +176,9 @@ export function createMemoryReflectionLiveWiring(
     },
     async syncRpc(): Promise<void> {
       await rpcBridge.current?.sync()
+    },
+    async syncJournal(sessionId, entries): Promise<void> {
+      if (activeSession.current === sessionId) await rpcBridge.current?.syncJournal(entries)
     },
     shutdown(identity): void {
       if (identity !== undefined) activeRuns.clear(identity)

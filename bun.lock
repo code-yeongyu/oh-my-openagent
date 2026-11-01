@@ -19,6 +19,7 @@
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/delegate-core": "workspace:*",
+        "@oh-my-opencode/device-service-core": "workspace:*",
         "@oh-my-opencode/git-bash-mcp": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/isolation-core": "workspace:*",
@@ -75,18 +76,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.1.54",
-        "oh-my-opencode-darwin-x64": "5.1.54",
-        "oh-my-opencode-darwin-x64-baseline": "5.1.54",
-        "oh-my-opencode-linux-arm64": "5.1.54",
-        "oh-my-opencode-linux-arm64-musl": "5.1.54",
-        "oh-my-opencode-linux-x64": "5.1.54",
-        "oh-my-opencode-linux-x64-baseline": "5.1.54",
-        "oh-my-opencode-linux-x64-musl": "5.1.54",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.1.54",
-        "oh-my-opencode-windows-arm64": "5.1.54",
-        "oh-my-opencode-windows-x64": "5.1.54",
-        "oh-my-opencode-windows-x64-baseline": "5.1.54",
+        "oh-my-opencode-darwin-arm64": "5.1.56",
+        "oh-my-opencode-darwin-x64": "5.1.56",
+        "oh-my-opencode-darwin-x64-baseline": "5.1.56",
+        "oh-my-opencode-linux-arm64": "5.1.56",
+        "oh-my-opencode-linux-arm64-musl": "5.1.56",
+        "oh-my-opencode-linux-x64": "5.1.56",
+        "oh-my-opencode-linux-x64-baseline": "5.1.56",
+        "oh-my-opencode-linux-x64-musl": "5.1.56",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.1.56",
+        "oh-my-opencode-windows-arm64": "5.1.56",
+        "oh-my-opencode-windows-x64": "5.1.56",
+        "oh-my-opencode-windows-x64-baseline": "5.1.56",
       },
     },
     "packages/agents-md-core": {
@@ -135,6 +136,10 @@
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
       },
+    },
+    "packages/device-service-core": {
+      "name": "@oh-my-opencode/device-service-core",
+      "version": "0.1.0",
     },
     "packages/git-bash-mcp": {
       "name": "@oh-my-opencode/git-bash-mcp",
@@ -208,7 +213,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.1.54",
+      "version": "5.1.56",
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -228,7 +233,7 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.1.54",
+      "version": "5.1.56",
       "bin": {
         "omo": "bin/omo.js",
       },
@@ -274,7 +279,7 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.1.54",
+      "version": "5.1.56",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
         "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.10.30-1",
@@ -808,6 +813,8 @@
     "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
 
     "@oh-my-opencode/delegate-core": ["@oh-my-opencode/delegate-core@workspace:packages/delegate-core"],
+
+    "@oh-my-opencode/device-service-core": ["@oh-my-opencode/device-service-core@workspace:packages/device-service-core"],
 
     "@oh-my-opencode/git-bash-mcp": ["@oh-my-opencode/git-bash-mcp@workspace:packages/git-bash-mcp"],
 
