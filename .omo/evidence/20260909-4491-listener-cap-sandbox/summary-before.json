@@ -1,0 +1,352 @@
+{
+  "input": "probe-before.jsonl",
+  "totalRecords": 488,
+  "processes": [
+    {
+      "pid": 1229807,
+      "role": "opencode serve",
+      "argv1": "/$bunfs/root/src/index.js",
+      "records": 322,
+      "eventHookCalls": 271,
+      "disposeHookCalls": 1,
+      "capValuesSeen": [
+        10
+      ],
+      "capAtModuleImport": 10,
+      "capAtServerInit": 10,
+      "capAtExit": 10,
+      "warningsTotal": 0,
+      "maxListenersExceededWarnings": 0,
+      "maxListenersExceededMessages": [],
+      "otherWarnings": [],
+      "eventNamesCount": {
+        "moduleImport": 2,
+        "serverInit": 7,
+        "peak": 7,
+        "processExit": 7
+      },
+      "perEvent": {
+        "exit": {
+          "moduleImport": 1,
+          "serverInit": 2,
+          "peakOverall": 2,
+          "peak:startup": 2,
+          "last:startup": 2,
+          "peak:sessions-active": 2,
+          "last:sessions-active": 2,
+          "peak:sessions-deleted": 2,
+          "last:sessions-deleted": 2,
+          "peak:cli-run": 2,
+          "last:cli-run": 2,
+          "peak:disposed": 2,
+          "last:disposed": 2,
+          "processExit": 2
+        },
+        "beforeExit": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "SIGINT": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "SIGTERM": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "SIGHUP": {
+          "moduleImport": 0,
+          "serverInit": 0,
+          "peakOverall": 0,
+          "peak:startup": 0,
+          "last:startup": 0,
+          "peak:sessions-active": 0,
+          "last:sessions-active": 0,
+          "peak:sessions-deleted": 0,
+          "last:sessions-deleted": 0,
+          "peak:cli-run": 0,
+          "last:cli-run": 0,
+          "peak:disposed": 0,
+          "last:disposed": 0,
+          "processExit": 0
+        },
+        "uncaughtException": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "unhandledRejection": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "warning": {
+          "moduleImport": 1,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        }
+      },
+      "firstSample": "2026-09-09T08:04:28.914Z",
+      "lastSample": "2026-09-09T08:04:57.707Z"
+    },
+    {
+      "pid": 1239420,
+      "role": "opencode run",
+      "argv1": "/$bunfs/root/src/index.js",
+      "records": 83,
+      "eventHookCalls": 74,
+      "disposeHookCalls": 1,
+      "capValuesSeen": [
+        10
+      ],
+      "capAtModuleImport": 10,
+      "capAtServerInit": 10,
+      "capAtExit": 10,
+      "warningsTotal": 0,
+      "maxListenersExceededWarnings": 0,
+      "maxListenersExceededMessages": [],
+      "otherWarnings": [],
+      "eventNamesCount": {
+        "moduleImport": 2,
+        "serverInit": 7,
+        "peak": 7,
+        "processExit": 7
+      },
+      "perEvent": {
+        "exit": {
+          "moduleImport": 1,
+          "serverInit": 2,
+          "peakOverall": 2,
+          "peak:cli-run": 2,
+          "last:cli-run": 2,
+          "processExit": 2
+        },
+        "beforeExit": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "SIGINT": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "SIGTERM": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "SIGHUP": {
+          "moduleImport": 0,
+          "serverInit": 0,
+          "peakOverall": 0,
+          "peak:cli-run": 0,
+          "last:cli-run": 0,
+          "processExit": 0
+        },
+        "uncaughtException": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "unhandledRejection": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "warning": {
+          "moduleImport": 1,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        }
+      },
+      "firstSample": "2026-09-09T08:04:44.716Z",
+      "lastSample": "2026-09-09T08:04:48.847Z"
+    },
+    {
+      "pid": 1240017,
+      "role": "opencode run",
+      "argv1": "/$bunfs/root/src/index.js",
+      "records": 83,
+      "eventHookCalls": 74,
+      "disposeHookCalls": 1,
+      "capValuesSeen": [
+        10
+      ],
+      "capAtModuleImport": 10,
+      "capAtServerInit": 10,
+      "capAtExit": 10,
+      "warningsTotal": 0,
+      "maxListenersExceededWarnings": 0,
+      "maxListenersExceededMessages": [],
+      "otherWarnings": [],
+      "eventNamesCount": {
+        "moduleImport": 2,
+        "serverInit": 7,
+        "peak": 7,
+        "processExit": 7
+      },
+      "perEvent": {
+        "exit": {
+          "moduleImport": 1,
+          "serverInit": 2,
+          "peakOverall": 2,
+          "peak:cli-run": 2,
+          "last:cli-run": 2,
+          "processExit": 2
+        },
+        "beforeExit": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "SIGINT": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "SIGTERM": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "SIGHUP": {
+          "moduleImport": 0,
+          "serverInit": 0,
+          "peakOverall": 0,
+          "peak:cli-run": 0,
+          "last:cli-run": 0,
+          "processExit": 0
+        },
+        "uncaughtException": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "unhandledRejection": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        },
+        "warning": {
+          "moduleImport": 1,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:cli-run": 1,
+          "last:cli-run": 1,
+          "processExit": 1
+        }
+      },
+      "firstSample": "2026-09-09T08:04:49.722Z",
+      "lastSample": "2026-09-09T08:04:53.607Z"
+    }
+  ],
+  "totals": {
+    "maxListenersExceededWarnings": 0,
+    "capValuesSeen": [
+      10
+    ]
+  }
+}
