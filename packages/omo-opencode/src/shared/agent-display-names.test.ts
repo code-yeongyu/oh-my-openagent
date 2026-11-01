@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, stripAgentListSortPrefix } from "./agent-display-names"
+import { validateAgentOrder } from "./agent-ordering"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -195,6 +196,8 @@ describe("AGENT_DISPLAY_NAMES", () => {
       explore: "explore",
       "multimodal-looker": "multimodal-looker",
       "council-member": "council-member",
+      plan: "plan",
+      build: "build",
     }
 
     // when checking the constant
@@ -211,5 +214,12 @@ describe("AGENT_DISPLAY_NAMES", () => {
       // then none should contain parentheses
       expect(httpHeaderUnsafe.test(displayName)).toBe(false)
     }
+  })
+
+  it("accepts OpenCode plan and build keys in agent_order", () => {
+    const result = validateAgentOrder(["plan", "build", "sisyphus"])
+
+    expect(result.invalid).toEqual([])
+    expect(result.order.slice(0, 3)).toEqual(["plan", "build", "sisyphus"])
   })
 })
