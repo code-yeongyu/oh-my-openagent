@@ -57,7 +57,6 @@ function probeValueFor(key: string): unknown {
     case "is_unstable_agent":
     case "disable":
     case "warn_unavailable":
-    case "provider_lock":
       return true
     default:
       return "x"

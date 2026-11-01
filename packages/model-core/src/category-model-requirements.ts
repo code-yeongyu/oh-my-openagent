@@ -43,8 +43,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   "deep-low": {
-    // Deep work stays on OpenAI: a spent chain fails typed instead of borrowing the parent's model (#12006).
-    providerLock: true,
     fallbackChain: [
       // GPT-6.1 Sol leads at the same medium effort: it matches GPT-6 Sol's price with near-Astra
       // quality, but only the OpenAI lanes serve it (plain, then the Fast tier). GPT-5.6 Sol stays
@@ -60,7 +58,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   "deep-high": {
-    providerLock: true,
     fallbackChain: [
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],

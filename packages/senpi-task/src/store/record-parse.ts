@@ -31,7 +31,7 @@ import {
 import { parseOptionalProvisionalExit } from "./provisional-exit-parse"
 import { parseUncertainInputs } from "./input-effects-parse"
 import { parseOptionalRunPause } from "./run-pause-parse"
-import { parseOptionalParentModelFallback } from "./parent-model-fallback-parse"
+import { parseOptionalModelRefusals } from "./model-refusals-parse"
 import {
   isRecord,
   readNumber,
@@ -82,9 +82,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const resolvedModel = parseOptionalResolvedModel(value, "resolved_model")
   const resolvedTier = isRecord(value["resolved_model"]) ? readOptionalString(value["resolved_model"], "service_tier") : undefined
   const effectiveModel = parseOptionalEffectiveModel(value)
-  const parentModel = readOptionalString(value, "parent_model")
-  const providerLock = readOptionalString(value, "provider_lock")
-  const parentModelFallback = parseOptionalParentModelFallback(value)
+  const modelRefusals = parseOptionalModelRefusals(value)
   const effectiveTier = isRecord(value["effective_model"]) ? readOptionalString(value["effective_model"], "service_tier") : undefined
   const spawnSpec = parseOptionalSpawnSpec(value)
   const owner = parseOptionalOwner(value)
@@ -157,9 +155,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(effectiveModel === undefined ? {} : {
       effective_model: { ...effectiveModel, ...(effectiveTier === undefined ? {} : { service_tier: effectiveTier }) },
     }),
-    ...(parentModel === undefined ? {} : { parent_model: parentModel }),
-    ...(providerLock === undefined ? {} : { provider_lock: providerLock }),
-    ...(parentModelFallback === undefined ? {} : { parent_model_fallback: parentModelFallback }),
+    ...(modelRefusals === undefined ? {} : { model_refusals: modelRefusals }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(owner === undefined ? {} : { owner }),
     ...(pendingSteering !== undefined && pendingSteering.length > 0 ? { pending_steering: pendingSteering } : {}),

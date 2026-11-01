@@ -36,7 +36,7 @@ export function isInfrastructureFailure(task: TaskRecord): boolean {
     case "depth-exceeded":
     case "model_unavailable":
     case "tools_unavailable":
-    case "provider_lock_exhausted":
+    case "model_chain_exhausted":
     case undefined:
       return false
     default:

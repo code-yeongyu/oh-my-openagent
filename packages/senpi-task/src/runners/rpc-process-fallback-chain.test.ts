@@ -210,7 +210,6 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
 const PRIMARY: ResolvedModelRecord = { provider: "openai", model_id: "gpt-5.6-sol", display: "openai/gpt-5.6-sol", source: "category" }
 const SAME_PROVIDER: ResolvedModelRecord = { provider: "openai", model_id: "gpt-5.5", display: "openai/gpt-5.5", source: "category" }
 const OTHER_PROVIDER: ResolvedModelRecord = { provider: "kimi-coding", model_id: "kimi-k3", display: "kimi-coding/kimi-k3", source: "category" }
-const PARENT = "anthropic/claude-opus-5-5"
 // The engine's typed prompt refusals (senpi `ModelNotReadyError` on the RPC wire): a provider with no
 // stored key, and a stored login that could not be refreshed.
 const MISSING = { error: "No API key found for openai.", errorCode: "provider_credentials_missing", errorData: { provider: "openai" } }
@@ -222,30 +221,28 @@ const chainPlanner: ChildPlanner = () => ({
 })
 
 describe("a process child whose prompt start is refused for missing provider credentials (#10806)", () => {
-  test("#given the primary provider has no key and the next provider's login expired #when the task starts #then it skips the same-provider rung, hops to the next provider, then lands on the parent rung", async () => {
+  test("#given the primary provider has no key and the next provider's login expired #when the task starts #then it skips the same-provider rung, hops to the next provider, and fails typed listing both refusals", async () => {
     // given
     const { runner, launched } = refusingProcessRunner({ [PRIMARY.display]: MISSING, [OTHER_PROVIDER.display]: EXPIRED }, children)
     const { manager, store } = makeManager({ planner: chainPlanner, process: createRpcManagedRunner(runner) })
 
     // when
     const result = await manager.start({
-      prompt: "work", parent_session_id: "parent-1", depth: 1, category: "unspecified-high", execution_mode: "process", parent_model: PARENT,
+      prompt: "work", parent_session_id: "parent-1", depth: 1, category: "unspecified-high", execution_mode: "process",
     })
     await launchSettled(manager, result)
 
     // then
-    if (result.kind !== "started") throw new Error(`expected started, got ${JSON.stringify(result)}`)
-    expect(launched).toEqual([PRIMARY.display, OTHER_PROVIDER.display, PARENT])
+    if (result.kind !== "start_failed") throw new Error(`expected start_failed, got ${JSON.stringify(result)}`)
+    expect(launched).toEqual([PRIMARY.display, OTHER_PROVIDER.display])
+    expect(result.failure_kind).toBe("model_chain_exhausted")
     const fallbacks = taskEvents(store.stateDir, result.task_id).filter((event) => event.type === "task_model_fallback")
     expect(fallbacks.map((event) => [event.payload.from_model, event.payload.to_model, event.payload.cause_class, event.payload.cause_code, event.payload.provider])).toEqual([
       [PRIMARY.display, OTHER_PROVIDER.display, "credentials_missing", "provider_credentials_missing", "openai"],
-      [OTHER_PROVIDER.display, PARENT, "credentials_missing", "provider_credentials_expired", "kimi-coding"],
     ])
-    const record = store.load(result.task_id)
-    expect(record?.model).toBe(PARENT)
-    expect(record?.fallback_models ?? []).toEqual([])
-    expect(record?.parent_model_fallback?.reason).toBe("not_signed_in")
-    expect(record?.parent_model_fallback?.from_model).toBe(OTHER_PROVIDER.display)
+    expect(result.error_message).toContain(`${PRIMARY.display}: not signed in`)
+    expect(result.error_message).toContain(`${OTHER_PROVIDER.display}: not signed in`)
+    expect(store.load(result.task_id)?.status).toBe("error")
     await runner.settleTeardowns()
   })
 

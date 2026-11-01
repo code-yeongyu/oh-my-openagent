@@ -77,14 +77,14 @@ const SCENARIO = process.env.OMO_FALLBACK_SCENARIO ?? "user-fallback"
 const LIMIT_ERRORS: Readonly<Record<string, string>> = {
   "limit-account": "You've hit your session limit · resets 3pm (Asia/Seoul)",
   "limit-model": "You've hit your Fable weekly limit · resets Oct 2, 9am",
-  "parent-model-limit": "You've hit your session limit · resets 3pm (Asia/Seoul)",
+  "designated-only-limit": "You've hit your session limit · resets 3pm (Asia/Seoul)",
 }
-// #10750: the parent runs on its own account (omo-fallback-parent) and the child's category names only
-// spent models, so the parent's model is the one rung left. "parent-model-after-tool" spends the child's
-// model after a tool call, so the parent's model must continue the same turn.
-const PARENT_MODEL_SCENARIOS: Readonly<Record<string, string>> = {
-  "parent-model-limit": "limitsolo",
-  "parent-model-after-tool": "toolsolo",
+// #12006: the parent runs on its own account (omo-fallback-parent) and the child's category names only
+// spent models; the child must fail typed rather than borrow the parent's model. "designated-only-after-tool"
+// spends the child's model after a tool call.
+const DESIGNATED_ONLY_SCENARIOS: Readonly<Record<string, string>> = {
+  "designated-only-limit": "limitsolo",
+  "designated-only-after-tool": "toolsolo",
 }
 // "limit-after-tool" (#9512): the child's primary first makes a tool call, then hits a usage limit on
 // the request that carries the tool result, so the fallback has to happen inside the running turn.
@@ -208,7 +208,7 @@ function parentReply(modelId: string, provider = "omo-fallback-mock"): Assistant
     id: "fallback-task-call",
     name: "task",
     arguments: {
-      category: PARENT_MODEL_SCENARIOS[SCENARIO] ?? (SCENARIO === "user-fallback"
+      category: DESIGNATED_ONLY_SCENARIOS[SCENARIO] ?? (SCENARIO === "user-fallback"
         ? "fallbackcat"
         : SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === LIMIT_NEAR_COMPACTION
           ? "toolcat"
@@ -234,7 +234,7 @@ function childReply(modelId: string, context: Context, provider = "omo-fallback-
           usage: { input: NEAR_COMPACTION_INPUT, output: 40, cacheRead: 0, cacheWrite: 0, totalTokens: NEAR_COMPACTION_INPUT + 40, cost: 0 },
         }
   }
-  if ((SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === "parent-model-after-tool") && modelId === LIMIT_AFTER_TOOL) {
+  if ((SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === "designated-only-after-tool") && modelId === LIMIT_AFTER_TOOL) {
     return hasToolResult(context)
       ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
       : assistant(modelId, "toolUse", [{

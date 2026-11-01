@@ -810,20 +810,4 @@ describe("createTaskChildPlanner parent independence", () => {
     expect(childUnderHighParent.plan.model).toBe(childUnderFableParent.plan.model)
     expect(childUnderFableParent.plan.category).toBe("unspecified-high")
   })
-
-  test("#given the shipped deep-high category #when planned with no override, a provider_lock:false override, and for unspecified-high #then only the shipped deep lane carries providerLock true (#12006)", () => {
-    // given
-    const models = () => registry([model("openai", "gpt-6-astra"), model("anthropic", "claude-opus-5-5")])
-    const spec = (category: string) => ({ prompt: "Decide it.", parent_session_id: "parent-1", depth: 0, category })
-
-    // when
-    const shipped = expectResolved(createTaskChildPlanner({}, {}, models)(spec("deep-high")))
-    const optedOut = expectResolved(createTaskChildPlanner({ categories: { "deep-high": { provider_lock: false } } }, {}, models)(spec("deep-high")))
-    const unlocked = expectResolved(createTaskChildPlanner({}, {}, models)(spec("unspecified-high")))
-
-    // then
-    expect(shipped.plan.providerLock).toBe(true)
-    expect(optedOut.plan.providerLock).toBe(false)
-    expect(unlocked.plan.providerLock).toBeUndefined()
-  })
 })

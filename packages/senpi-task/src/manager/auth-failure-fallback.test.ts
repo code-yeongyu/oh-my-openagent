@@ -49,7 +49,7 @@ function harness(plan: ResolvedChildPlan) {
 afterEach(cleanupProjects)
 
 describe("runtime fallback after a credential failure", () => {
-  test("#given a failure that is not about credentials and no rung left #when the child turn fails #then the error text is kept as is", async () => {
+  test("#given an overload on the only designated model #when the child turn fails #then the provider's text leads and the task fails typed as an exhausted chain", async () => {
     const { runner, manager } = harness(chainPlan(GO_M3, []))
     const task = await manager.start(baseSpec())
     if (task.kind !== "started") throw new Error("expected started")
@@ -57,7 +57,10 @@ describe("runtime fallback after a credential failure", () => {
     const terminal = manager.waitFor(task.task_id)
     runner.handles.get(task.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
 
-    expect((await terminal).error_message).toBe("500: upstream overloaded")
+    const record = await terminal
+    expect(record.failure_kind).toBe("model_chain_exhausted")
+    expect(record.error_message?.split("\n")[0]).toBe("500: upstream overloaded")
+    expect(record.error_message).toContain(`- ${GO_M3.display}: overloaded or unavailable`)
   })
 
   test("#given a provider error that is not about credentials #when the child turn fails #then the next rung on the same provider is still tried", async () => {
@@ -84,22 +87,6 @@ describe("runtime fallback after a credential failure", () => {
     expect(events).toContain('"type":"task_model_fallback"')
     expect(events).toContain(`"to_model":"${ZAI_GLM.display}"`)
     expect(events).toContain(`"skipped_models":["${GO_M27.display}"]`)
-  })
-
-  test("#given an API-key rung with no key and a parent on the ChatGPT subscription #when senpi refuses the request for the missing key #then the other API-key rung is skipped and the child runs on the parent's model as signed out (#10806)", async () => {
-    const luna = rung("openai", "gpt-6-luna-fast")
-    const sibling = rung("openai", "another")
-    const parent = "chatgpt-subscription/gpt-6-luna-fast"
-    const { runner, manager, store } = harness(chainPlan(luna, [sibling]))
-    const task = await manager.start(baseSpec({ parent_model: parent }))
-    if (task.kind !== "started") throw new Error("expected started")
-
-    await failTurn(runner, task.task_id, "No API key found for openai.\n\nUse /login to log into a provider via OAuth or API key.")
-
-    expect(runner.startedSpecs.map((spec) => spec.model)).toEqual([luna.display, parent])
-    const record = store.load(task.task_id)
-    expect(record?.model).toBe(parent)
-    expect(record?.parent_model_fallback?.reason).toBe("not_signed_in")
   })
 
   test("#given a rejected OAuth refresh and only same-provider rungs left #when the child turn fails #then no rung is relaunched and the task ends in error", async () => {

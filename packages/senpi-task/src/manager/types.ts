@@ -100,8 +100,6 @@ export type ManagerStartSpec = {
   readonly subagent_type?: string
   readonly execution_mode?: ExecutionMode
   readonly model?: string
-  // `provider/model` the parent session runs at spawn; appended as a category child's last rung (#10750).
-  readonly parent_model?: string
   readonly name?: string
   readonly description?: string
   readonly team_run_id?: string
@@ -135,8 +133,6 @@ export type ResolvedChildPlan = {
   readonly promptAppend?: string
   readonly allowedSubagents?: readonly string[]
   readonly maxDepth?: number
-  // The category's `provider_lock` (shipped default merged with omo.json); only `true` withholds a cross-vendor parent rung (#12006).
-  readonly providerLock?: boolean
 }
 
 export type PlanResolutionError = {

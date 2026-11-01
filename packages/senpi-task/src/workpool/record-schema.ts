@@ -12,7 +12,6 @@ const plan = z.strictObject({
   agentType: z.string().optional(), category: z.string().optional(), instructions: z.string().optional(),
   toolAllowlist: z.array(z.string()).optional(), toolDenylist: z.array(z.string()).optional(),
   promptAppend: z.string().optional(), allowedSubagents: z.array(z.string()).optional(), maxDepth: z.number().int().nonnegative().optional(),
-  providerLock: z.boolean().optional(),
 })
 const epoch = z.number().int().nonnegative()
 const taskId = z.string().regex(/^st_[0-9a-f]{8}$/)

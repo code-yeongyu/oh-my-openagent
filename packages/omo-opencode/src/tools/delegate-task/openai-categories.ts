@@ -165,7 +165,7 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   },
   {
     name: "deep-low",
-    config: { model: `openai/${LATEST_MODEL_BY_FAMILY.gptSol}`, variant: "medium", provider_lock: true },
+    config: { model: `openai/${LATEST_MODEL_BY_FAMILY.gptSol}`, variant: "medium" },
     description: "Default deep lane: one goal, one deliverable, decisions the child can settle from what it reads; preferred over deep-high for 3D graphics, computer/browser use, CAPTCHA, multimodal, backend, logic, and algorithm work. Multiple goals fan out as parallel calls.",
     callerGuidance: DEEP_LOW_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_LOW_CATEGORY_PROMPT_APPEND,
@@ -174,7 +174,7 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   },
   {
     name: "deep-high",
-    config: { model: `openai/${LATEST_MODEL_BY_FAMILY.gptAstra}`, variant: "high", provider_lock: true },
+    config: { model: `openai/${LATEST_MODEL_BY_FAMILY.gptAstra}`, variant: "high" },
     description: "Escalation deep lane: a goal whose central decision cannot be settled from evidence alone. Same one-goal, one-deliverable contract as deep-low.",
     callerGuidance: DEEP_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_HIGH_CATEGORY_PROMPT_APPEND,

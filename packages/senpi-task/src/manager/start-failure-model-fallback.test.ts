@@ -110,7 +110,7 @@ describe("category chain fallback on a start-time admission refusal", () => {
     expect(store.load(result.task_id)?.model).toBe(BUILTIN_MODEL.display)
   })
 
-  test("#given every chain model is refused #when the task starts #then the task fails with the model-unavailable classification", async () => {
+  test("#given every chain model is refused #when the task starts #then the task fails typed as an exhausted chain listing each refused model", async () => {
     // given
     const runner = new AdmissionRefusingRunner(new Set([PACKAGE_MODEL.display, BUILTIN_MODEL.display]))
     const { manager } = makeManager({ planner: chainPlanner([BUILTIN_MODEL]), inProcess: runner })
@@ -120,10 +120,12 @@ describe("category chain fallback on a start-time admission refusal", () => {
 
     // then
     if (result.kind !== "start_failed") throw new Error("expected start_failed")
-    expect(result.failure_kind).toBe("model_unavailable")
-    expect(result.error_message).toBe(
+    expect(result.failure_kind).toBe("model_chain_exhausted")
+    expect(result.error_message.split("\n")[0]).toBe(
       "The task child cannot serve this model: its provider is not present in the child profile.",
     )
+    expect(result.error_message).toContain(`- ${PACKAGE_MODEL.display}: `)
+    expect(result.error_message).toContain(`- ${BUILTIN_MODEL.display}: `)
     expect(runner.startedSpecs.map((spec) => spec.model)).toEqual([PACKAGE_MODEL.display, BUILTIN_MODEL.display])
   })
 

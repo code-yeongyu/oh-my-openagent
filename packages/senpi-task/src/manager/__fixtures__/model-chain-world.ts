@@ -15,18 +15,24 @@ export const GPT = "pm-gpt"
 export const ALT = "pm-alt"
 export const COUNT_TOOL = "count_once"
 
-export const QUOTA_ERROR =
+const QUOTA_ERROR =
   `403: {"message":"You've reached your usage limit for this billing cycle. Your limit resets 3:20am.",` +
   `"type":"access_terminated_error"}`
 
-export type Step = "quota" | "complete" | { readonly tool: string } | { readonly partialTool: string }
+// A content-policy refusal and a rejected credential: neither is a usage limit.
+const REFUSAL_ERROR = "400: This request was flagged as a possible cybersecurity risk and refused under the content policy."
+const AUTH_ERROR = "401: Unauthorized - invalid api key"
+
+const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR } as const
+
+export type Step = keyof typeof ERRORS | "complete" | { readonly tool: string } | { readonly partialTool: string }
 
 export type ProviderCall = {
   readonly model: string
   readonly toolResults: number
 }
 
-export type ParentModelWorld = {
+export type ModelChainWorld = {
   readonly settingsPath: string
   readonly calls: ProviderCall[]
   toolRuns(): number
@@ -45,9 +51,9 @@ const MODELS: Readonly<Record<string, readonly string[]>> = {
  * completes), every request records how many tool results its context carried, and one tool counts
  * how often it actually ran, so a test can tell a resumed transcript from a re-run.
  */
-export async function createParentModelWorld(scripts: Readonly<Record<string, readonly Step[]>>): Promise<ParentModelWorld> {
+export async function createModelChainWorld(scripts: Readonly<Record<string, readonly Step[]>>): Promise<ModelChainWorld> {
   const { ModelRegistry, ModelRuntime } = await loadSenpiBarrel()
-  const root = mkdtempSync(join(tmpdir(), "senpi-task-parent-model-"))
+  const root = mkdtempSync(join(tmpdir(), "senpi-task-model-chain-"))
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   const settingsPath = join(agentDir, "settings.json")
@@ -119,7 +125,7 @@ function answer(provider: string, model: string, step: Step) {
     timestamp: Date.now(),
   }
   const toolCall = (name: string) => ({ type: "toolCall" as const, id: `call-${name}`, name, arguments: {} })
-  if (step === "quota") return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: QUOTA_ERROR })
+  if (typeof step === "string" && step !== "complete") return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: ERRORS[step] })
   if (step === "complete") {
     return stream([], { ...base, content: [{ type: "text" as const, text: `${provider}/${model} completed` }], stopReason: "stop" as const })
   }

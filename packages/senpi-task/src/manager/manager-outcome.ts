@@ -5,7 +5,7 @@ import type { TaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import type { HostSessionReplaced } from "../runners/rpc-host/session-client"
 import type { ForgetOptions } from "./types"
-import { terminalFailureFields } from "./provider-lock"
+import { isModelTurnFailure, terminalFailureFields } from "./model-refusals"
 import { nowIso } from "./manager-helpers"
 import { createProvisionalExitTracker, type ExitConfirmationSchedule } from "./provisional-exit"
 import { settlePaused } from "./settle-paused"
@@ -165,7 +165,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
     persistTerminal(input.taskId, owned, input.timestamp, {
       type: "fail",
       timestamp: input.timestamp,
-      ...terminalFailureFields(owned, input.outcome.failure),
+      ...terminalFailureFields(owned, input.outcome.failure, isModelTurnFailure(input.outcome)),
       ...(input.outcome.killed === true ? { killed: true } : {}),
       ...(input.runStats === undefined ? {} : { run_stats: input.runStats }),
     })

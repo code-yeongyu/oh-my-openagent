@@ -18,5 +18,4 @@ export type ModelRequirement = {
   requiresModel?: string; // If set, only activates when this model is available (fuzzy match)
   requiresAnyModel?: boolean; // If true, requires at least ONE model in fallbackChain to be available (or empty availability treated as unavailable)
   requiresProvider?: string[]; // If set, only activates when any of these providers is connected
-  providerLock?: boolean; // Shipped categories.<name>.provider_lock: never fall back to a parent model from another vendor (#12006)
 };
