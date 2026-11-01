@@ -17,6 +17,7 @@ import {
 
 type Check = "file" | "loaded-set" | "provenance" | "extras"
 type Refusal = "trust-load-mismatch" | "trust-exec-loop" | "trust-user-extras-unrecoverable" | "trust-path-unrepresentable"
+  | "trust-userns-unattested"
 export type TrustStageResult =
   | { readonly action: "static" | "adopt" | "import-exec" }
   | { readonly action: "refuse"; readonly code: Refusal; readonly check: Check | null }
@@ -108,7 +109,9 @@ export async function runTrustStage(options: TrustStageOptions): Promise<TrustSt
       ? "point NODE_EXTRA_CA_CERTS at your own CA file, or unset it, and start omo again"
       : code === "trust-path-unrepresentable"
         ? "set TMPDIR to a writable private path without the directory-list separator and start omo again"
-        : "if SENPI_ENGINE_TRUST or SENPI_ENGINE_TRUST_HOP is saved in an environment you reuse, remove both and start omo again"
+        : code === "trust-userns-unattested"
+          ? "omo cannot see who owns the directories above its trust directory inside this user namespace (bwrap, flatpak or a rootless container); start omo outside that sandbox, or through omo's own memory sandbox"
+          : "if SENPI_ENGINE_TRUST or SENPI_ENGINE_TRUST_HOP is saved in an environment you reuse, remove both and start omo again"
     ;(options.stderr ?? ((line) => process.stderr.write(line)))(`omo: ${code}${check ? ` (${check})` : ""}; ${action}\n`)
     return { action: "refuse", code, check }
   }
