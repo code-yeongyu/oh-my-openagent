@@ -153,7 +153,7 @@ function createMemoryTool(
     description: MEMORY_TOOL_DESCRIPTION,
     promptSnippet: "memory - edit omo memory blocks (create/str_replace/insert/delete/rename/update_description/apply_patch); auto-commits each change",
     promptGuidelines: [
-      "Record durable facts, preferences, and decisions with the memory tool as you learn them. Pass source on every write: a user decision only as source user with one whole user message, verbatim, in user_quote; your own recommendations as source agent, never 'the user agreed'. Keep each block's description accurate because the memory index surfaces it, and update [[path]] references in other memory files when you create, rename, or delete one.",
+      "memory tool: record durable facts/preferences/decisions as learned. source on every write: user decision -> source user + whole user message verbatim in user_quote; own recommendation -> source agent, never 'the user agreed'. Keep block description accurate (memory index shows it). Create/rename/delete -> update [[path]] refs in other memory files.",
     ],
     parameters: MemoryToolParams,
     executionMode: "sequential",

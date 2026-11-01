@@ -8,7 +8,7 @@ import type { TaskCategoryInfo } from "./types"
 export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task_send to continue an existing child."
 
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
-  "Pass task_summary (one line, <=80 chars) on every spawn saying WHAT was delegated; task_cancel ends a child.",
+  "Every spawn: task_summary, one line <=80 chars, says WHAT was delegated. task_cancel ends a child.",
 ]
 
 type DescriptionInput = {
