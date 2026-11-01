@@ -74,6 +74,19 @@ export function startedDetails(
   }
 }
 
+// The start report holds the launched spawn facts only when the launch settled inside the manager's
+// report window (#10042). A progress partial reads them from the live record instead, so what it
+// reports never depends on how fast the launch settled (#11691).
+export function withLiveSpawnFacts<T extends Extract<StartResult, { kind: "started" }>>(started: T, record: TaskRecord | undefined): T {
+  if (record === undefined) return started
+  return {
+    ...started,
+    run_epoch: record.notification.run_epoch,
+    ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
+    ...(record.effective_model === undefined ? {} : { effective_model: record.effective_model }),
+  }
+}
+
 export function partialDetails(
   started: Extract<StartResult, { kind: "started" }>,
   params: SingleSpawnParams,
