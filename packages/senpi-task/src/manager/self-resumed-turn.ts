@@ -16,6 +16,29 @@ export type SelfResumedTurnPorts = {
   readonly waitForTerminal: (taskId: string) => Promise<TaskRecord>
   readonly reserveForRevive: (taskId: string) => { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
   readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number) => void
+  readonly announce: (taskId: string) => void
+}
+
+/** Per-task listeners told that a settled task reopened itself (TaskManager.subscribeSelfResumed). */
+export function createSelfResumedListeners(): {
+  readonly subscribe: (taskId: string, listener: () => void) => () => void
+  readonly announce: (taskId: string) => void
+} {
+  const listeners = new Map<string, Set<() => void>>()
+  return {
+    subscribe(taskId, listener) {
+      const forTask = listeners.get(taskId) ?? new Set<() => void>()
+      forTask.add(listener)
+      listeners.set(taskId, forTask)
+      return () => {
+        forTask.delete(listener)
+        if (forTask.size === 0 && listeners.get(taskId) === forTask) listeners.delete(taskId)
+      }
+    },
+    announce(taskId) {
+      for (const listener of [...(listeners.get(taskId) ?? [])]) listener()
+    },
+  }
 }
 
 function reopenable(record: TaskRecord | null, handle: ManagedChildHandle, ports: SelfResumedTurnPorts): record is TaskRecord {
@@ -60,5 +83,7 @@ export async function reopenSelfResumedTurn(ports: SelfResumedTurnPorts, taskId:
   // A resumed run is already doing its work: a full lane may deny it a slot, but never its result.
   if (reservation.ok) reservation.commit()
   else ports.trackOutcome(taskId, handle, model, epoch)
+  // Owners that folded the earlier outcome (a DAG node) re-watch the task for this run's end (omo#10487).
+  ports.announce(taskId)
   log("senpi-task child resumed on its own after its turn settled", { taskId, runEpoch: epoch })
 }

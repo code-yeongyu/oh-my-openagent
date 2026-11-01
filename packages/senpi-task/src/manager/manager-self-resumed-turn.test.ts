@@ -18,10 +18,14 @@ async function startedChild() {
 describe("a child that resumes on its own after its turn settled (omo#9069)", () => {
   test("#given a completed resident child #when its monitor wakes it #then the record runs again under the next epoch and its end is a second completion marked as a resumed turn", async () => {
     // given
-    const { store, fake, taskId } = await startedChild()
+    const { manager, store, fake, taskId } = await startedChild()
     fake.settle({ status: "completed", finalResponse: "waiting for the test run monitor" })
     await flush()
     expect(store.load(taskId)?.status).toBe("completed")
+    // A DAG node that folded the first completion re-watches the task from here (omo#10487).
+    const announced: (string | undefined)[] = []
+    if (manager.subscribeSelfResumed === undefined) throw new Error("the manager announces no self-resumed turns")
+    manager.subscribeSelfResumed(taskId, () => announced.push(store.load(taskId)?.status))
 
     // when
     fake.selfResume()
@@ -32,6 +36,7 @@ describe("a child that resumes on its own after its turn settled (omo#9069)", ()
 
     // then
     expect(resumed?.status).toBe("running")
+    expect(announced).toEqual(["running"])
     expect(resumed?.notification.run_epoch).toBe(1)
     const settled = store.load(taskId)
     if (settled === null || settled === undefined) throw new Error("record vanished")
@@ -68,6 +73,9 @@ describe("a child that resumes on its own after its turn settled (omo#9069)", ()
     const { manager, store, fake, taskId } = await startedChild()
     await manager.cancelTask(taskId)
     await flush()
+    let announced = 0
+    if (manager.subscribeSelfResumed === undefined) throw new Error("the manager announces no self-resumed turns")
+    manager.subscribeSelfResumed(taskId, () => { announced += 1 })
 
     // when
     fake.selfResume()
@@ -75,5 +83,6 @@ describe("a child that resumes on its own after its turn settled (omo#9069)", ()
 
     // then
     expect(store.load(taskId)?.status).toBe("cancelled")
+    expect(announced).toBe(0)
   })
 })
