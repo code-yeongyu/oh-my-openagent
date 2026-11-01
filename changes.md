@@ -1,3 +1,7 @@
+## 2026-11-01 - dev-browser standalone setup releases the CDP port with SIGTERM first (part of #12067)
+
+The builtin `dev-browser` skill's macOS/Linux standalone command now runs a release step before `server.sh`. When nothing answers on 9222, it sends SIGTERM to whatever holds 9223, waits up to 5 s, and sends SIGKILL only to survivors. dev-browser's `start-server.ts` then finds the port free and never reaches its `kill -9`, so a browser gets its clean exit and does not leak per-launch state such as the macOS Chrome code-sign clone. A running server on 9222 is left alone. The upstream fix is SawyerHood/dev-browser#146.
+
 ## 2026-10-30 - Distribute model starts per task child (#11905)
 
 Add the category and agent distribution option to the OpenCode schema and spawn resolvers. Round-robin children retain their resolved chain for reactive fallback, including per-model settings.
