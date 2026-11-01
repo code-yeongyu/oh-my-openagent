@@ -82,13 +82,16 @@ export function exportRows(ledger) {
 
 const walk = (node) => node.children.filter((child) => child.tag !== "#text").flatMap((child) => [child, ...walk(child)])
 
-/** SVG text nodes of a chart: data labels, or ticks with their declared grid. */
+/** SVG text nodes of a chart: data labels, or ticks with their declared grid; foreignObject HTML counts as unticked labels. */
 function svgLabels(raw) {
-	return walk(parseHtml(raw)).filter((node) => node.tag === "text").map((node) => {
+	const nodes = walk(parseHtml(raw))
+	const texts = nodes.filter((node) => node.tag === "text").map((node) => {
 		let tick = null
 		for (let cur = node.parent; cur && !tick; cur = cur.parent) if (cur.tag === "g" && /(?:^|\s)ticks(?:\s|$)/.test(cur.attrs.class ?? "")) tick = cur.attrs
 		return { text: proseText(node), tick }
 	})
+	const foreign = nodes.filter((node) => node.tag === "foreignobject").map((node) => ({ text: proseText(node), tick: null }))
+	return [...texts, ...foreign]
 }
 
 function onGrid(value, tick) {
