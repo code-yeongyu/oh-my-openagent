@@ -3,8 +3,8 @@ import { generateKeyPairSync } from "node:crypto"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { type AdoptionCredential, bootstrapDeviceService, type BootstrapDependencies, forgetDeviceService } from "../src/bootstrap.ts"
-import { connectDeviceService, type DeviceService } from "../src/index.ts"
+import { bootstrapDeviceService, type BootstrapDependencies, forgetDeviceService } from "../src/bootstrap.ts"
+import { connectDeviceService, type DeviceCredential, type DeviceService } from "../src/index.ts"
 import type { AccountShowResult } from "../src/account-state.ts"
 import { writeToken } from "../src/local-api/access.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
@@ -26,7 +26,7 @@ afterEach(async () => {
 
 const SIGNED_IN: AccountShowResult = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
 
-const credential = (): AdoptionCredential => ({
+const credential = (): DeviceCredential => ({
   device: { id: "dev-self", name: "This Mac" },
   signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
   sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),

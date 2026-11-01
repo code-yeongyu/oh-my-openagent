@@ -3,7 +3,13 @@ import { createHash } from "node:crypto"
 import { join } from "node:path"
 import pin from "../../src/strict-ed25519/PIN.json"
 import corpus from "../../src/strict-ed25519/strict-ed25519-corpus.json"
-import { strictEd25519Key, strictEd25519Precheck, strictEd25519Verify } from "../../src/strict-ed25519/strict-ed25519.ts"
+import {
+  checkSharedSecret,
+  strictEd25519Key,
+  strictEd25519Precheck,
+  strictEd25519Verify,
+  strictX25519Key,
+} from "../../src/strict-ed25519/strict-ed25519.ts"
 import { nativeEd25519Verify } from "./native-control.ts"
 
 // The device service client verifies release signatures through a byte-identical copy of the repository's canonical
@@ -38,5 +44,13 @@ describe("vendored strict-ed25519 in the device service client", () => {
       expect(await nativeEd25519Verify(bytes(c.key), bytes(c.sig), bytes(c.msg))).toBe(true)
       expect(strictEd25519Precheck(bytes(c.key), bytes(c.sig)).ok).toBe(false)
     }
+  })
+
+  test.each(corpus.x25519.keys)("X25519 key $name", (c) => {
+    expect(strictX25519Key(bytes(c.key))).toBe(c.valid)
+  })
+
+  test.each(corpus.x25519.sharedSecrets)("shared secret $name", (c) => {
+    expect(checkSharedSecret(bytes(c.bytes))).toBe(c.valid)
   })
 })

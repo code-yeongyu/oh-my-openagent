@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import corpus from "../src/strict-ed25519/strict-ed25519-corpus.json"
@@ -54,7 +54,7 @@ describe("verified acquisition of the device service", () => {
 
     const releaseDir = join(state, "bin", PIN_VERSION)
     expect(result).toEqual({ ok: true, version: PIN_VERSION, releaseDir, binary: join(releaseDir, deviceServiceAssetName(HOST)) })
-    expect(readdirSync(releaseDir).toSorted()).toEqual(["checksums.txt", "checksums.txt.sig", deviceServiceAssetName(HOST), "latest.json"])
+    expect(readdirSync(releaseDir).toSorted()).toEqual(["checksums.txt", "checksums.txt.sig", "latest.json", deviceServiceAssetName(HOST)].toSorted())
     for (const [name, content] of release) expect(Buffer.compare(readFileSync(join(releaseDir, name)), content)).toBe(0)
     expect(readdirSync(join(state, "bin"))).toEqual([PIN_VERSION])
     if (process.platform !== "win32") {
@@ -157,6 +157,30 @@ describe("verified acquisition of the device service", () => {
     const state = stateDir()
     expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "malformed" })
     expect(existsSync(state)).toBe(false)
+  })
+
+  test.skipIf(process.platform === "win32")("an existing state dir open to others is made private before the release is written", async () => {
+    const key = releaseKey()
+    const state = stateDir()
+    mkdirSync(state, { mode: 0o755 })
+    chmodSync(state, 0o755)
+    expect(await acquireDeviceService(options(state, serveRelease(buildRelease({ key, host: HOST })), key.publicHex))).toMatchObject({ ok: true })
+    expect(statSync(state).mode & 0o777).toBe(0o700)
+    expect(statSync(join(state, "bin")).mode & 0o777).toBe(0o700)
+  })
+
+  test.skipIf(process.platform === "win32")("a state dir that is a symlink is refused and nothing lands behind it", async () => {
+    const key = releaseKey()
+    const state = stateDir()
+    const target = `${state}-target`
+    mkdirSync(target, { mode: 0o700 })
+    symlinkSync(target, state)
+    const failure = await acquireDeviceService(options(state, serveRelease(buildRelease({ key, host: HOST })), key.publicHex)).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
+    expect(failure).toMatchObject({ code: "insecure_state_dir" })
+    expect(readdirSync(target)).toEqual([])
   })
 
   test("a macOS binary is installed only when its code signature passes, checked before it is renamed into place", async () => {
