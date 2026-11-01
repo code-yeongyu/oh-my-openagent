@@ -9,10 +9,10 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { InProcessRunner } from "../../runners/in-process"
 import { createInProcessManagedRunner } from "../runner"
 import type { ManagedRunner } from "../types"
-import { answer, ALT, CLAUDE, GPT, MODELS, type Step, testModel } from "./model-chain-answers"
+import { answer, ALT, CLAUDE, MODELS, type Step, testModel } from "./model-chain-answers"
 import { type EngineRunner, type EngineRunnerKind, startEngineRunner } from "./model-chain-engines"
 
-export { ALT, CLAUDE, GPT, type Step }
+export { ALT, CLAUDE, type Step }
 export const COUNT_TOOL = "count_once"
 
 export type RunnerKind = "in-process" | EngineRunnerKind

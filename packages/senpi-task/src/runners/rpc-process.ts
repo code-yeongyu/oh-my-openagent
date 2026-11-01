@@ -210,7 +210,7 @@ export class RpcProcessRunner {
     this.fallbackChainUnsupportedNoticed = true
     this.onWarning(
       "this senpi engine cannot take a task child's fallback chain (no retry_fallback_command), so children " +
-        "started as their own process switch to their fallback models only when a turn fails before any tool call",
+        "started as their own process are not held to their designated models (the engine's own fallback settings apply)",
     )
   }
 }

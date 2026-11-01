@@ -9,7 +9,8 @@ const { fakeHost, runnerOver } = harness
 
 afterEach(harness.release)
 
-const PROFILE_CAPABLE = [...FAKE_HOST_CAPABILITIES, "retry_fallback_profile"]
+const PROFILE_CAPABLE = [...FAKE_HOST_CAPABILITIES]
+const BEFORE_PROFILE = FAKE_HOST_CAPABILITIES.filter((capability) => capability !== "retry_fallback_profile")
 
 function openPayloads(commands: readonly FakeHostCommand[]): readonly Record<string, unknown>[] {
   return commands.filter((command) => command.type === "open_session").map((command) => command.payload)
@@ -56,7 +57,7 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
 
   test("#given an older host without retry_fallback_profile #when two children with fallback models start #then both still open without the field and the user is told once", async () => {
     // given
-    const host = await fakeHost()
+    const host = await fakeHost({ capabilities: BEFORE_PROFILE })
     const warnings: string[] = []
     const runner = runnerOver(host, { onWarning: (message) => void warnings.push(message) })
 
