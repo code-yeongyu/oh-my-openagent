@@ -49,7 +49,7 @@ async function managerFor(scripts: Readonly<Record<string, readonly Step[]>>, pl
 }
 
 async function runChild(manager: TaskManager, spec?: Partial<ManagerStartSpec>): Promise<TaskRecord> {
-  const started = await manager.start(baseSpec({ category: "unspecified-high", parent_model: SIBLING, ...spec }))
+  const started = await manager.start(baseSpec({ category: "unspecified-high", ...spec }))
   if (started.kind === "started") return manager.waitFor(started.task_id)
   if (started.kind === "start_failed" && started.task_id !== "") return manager.waitFor(started.task_id)
   throw new Error(`child did not start: ${JSON.stringify(started)}`)
