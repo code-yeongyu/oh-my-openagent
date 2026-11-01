@@ -8,11 +8,7 @@ import type { TaskCategoryInfo } from "./types"
 export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task_send to continue an existing child."
 
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
-  "Spawn children with run_in_background=true.",
-  "NEVER pass model together with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
-  "Continue an existing child with task_send(to=\"st_...\", message=\"...\"); task always spawns.",
-  "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
-  "Pass task_summary (one line, <=80 chars) on every spawn: the user's footer/widget UI shows it instead of the raw prompt, so it should say WHAT was delegated.",
+  "Pass task_summary (one line, <=80 chars) on every spawn saying WHAT was delegated; task_cancel ends a child.",
 ]
 
 type DescriptionInput = {
