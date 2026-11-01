@@ -12,6 +12,7 @@ import { releaseAllPromptAsyncReservationsForTesting } from "./packages/omo-open
 import { resetLiveServerRouteForTesting } from "./packages/omo-opencode/src/shared/live-server-route"
 import { installModuleMockLifecycle } from "./packages/omo-opencode/src/testing/module-mock-lifecycle"
 import { ensureVendoredLspDaemonBuilt } from "./script/ensure-vendored-lsp-daemon"
+import { stageLspDaemonRuntime } from "./packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs"
 import { installEnvironmentIntegrityCheck } from "./test-support/environment-integrity"
 import { installPostHogTestGuard } from "./test-support/posthog-test-guard"
 import { installHermeticHome } from "./test-hermetic-home"
@@ -19,9 +20,12 @@ import { resetTestDeadline } from "./test-support/test-deadline"
 
 // Installer/doctor integration tests need the vendored lsp-daemon dist that CI builds
 // out-of-band before `bun test`; mirror that here so fresh clones/worktrees pass too.
-await ensureVendoredLspDaemonBuilt({
+const builtLspDaemon = await ensureVendoredLspDaemonBuilt({
   packageDir: join(import.meta.dir, "packages", "lsp-daemon"),
 })
+// The freshness check starts verifying the staged runtime once source dist exists.
+// Stage this new build without restaging an existing source dist on every test run.
+if (builtLspDaemon) await stageLspDaemonRuntime()
 
 // senpi-task reads the @earendil-works/pi-tui and @code-yeongyu/senpi namespaces lazily
 // (render helpers and child-session values) so the built task/member blobs do not statically bind
