@@ -4,9 +4,12 @@ import { resolve } from "node:path"
 import type { GitExec, GitExecResult } from "../git"
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
+import { describeMergeConflict, listLines } from "./merge-conflict-detail"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
+import { rebaseValidatedTip } from "./worktree-rebase-recovery"
 
 const GIT_TIMEOUT_MS = 30_000
+const MAX_REBASE_ATTEMPTS = 2
 
 export interface ValidatedReflectionTip {
   readonly tipSha: string
@@ -31,6 +34,8 @@ export interface ReflectionIntegrationResult {
   readonly outcome: "merged" | "parent_dirty" | "merge_conflict" | "failed"
   readonly integrationSha?: string
   readonly detail?: string
+  /** The rebased tip that was merged, when the input tip conflicted and was replayed onto the parent. */
+  readonly validated?: ValidatedReflectionTip
 }
 
 export type WriterLock = <T>(operation: () => Promise<T>) => Promise<T>
@@ -47,6 +52,8 @@ export interface IntegrateValidatedReflectionInput {
   readonly summary: string
   readonly validated: ValidatedReflectionTip
   readonly withWriterLock: WriterLock
+  /** Persists a rebased tip before it is merged, so a resumed run probes the tip that actually lands. */
+  readonly onRebased?: (validated: ValidatedReflectionTip) => Promise<void>
 }
 
 /** Legacy-only recovery for auto runs that predate durable validated-tip checkpoints. */
@@ -109,29 +116,55 @@ export async function integrateValidatedReflection(
       return { outcome: "parent_dirty" }
     }
 
-    const merge = await run(worktree.exec, worktree.parent.dir, [
-      ...NO_AUTO_MAINTENANCE, "merge", "--no-ff", input.validated.tipSha,
-      "-m", `merge(reflection): ${input.summary}`,
-      "-m", `Omo-Run: ${input.runId}`,
-    ])
-    if (merge.code === 0) {
-      const head = await git(worktree.exec, worktree.parent.dir, ["rev-parse", "--verify", "HEAD"])
-      return { outcome: "merged", integrationSha: head.stdout.trim() }
-    }
-
-    const landedMergeHead = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
-    const unmerged = await run(worktree.exec, worktree.parent.dir, ["diff", "--name-only", "--diff-filter=U"])
-    if (landedMergeHead === input.validated.tipSha) {
-      const aborted = await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
-      if (aborted.code !== 0) {
-        return { outcome: "failed", detail: aborted.stderr.trim() || "Reflection merge conflict could not be aborted" }
+    let validated = input.validated
+    for (let attempt = 0; ; attempt += 1) {
+      const merge = await run(worktree.exec, worktree.parent.dir, [
+        ...NO_AUTO_MAINTENANCE, "merge", "--no-ff", validated.tipSha,
+        "-m", `merge(reflection): ${input.summary}`,
+        "-m", `Omo-Run: ${input.runId}`,
+      ])
+      if (merge.code === 0) {
+        const head = await git(worktree.exec, worktree.parent.dir, ["rev-parse", "--verify", "HEAD"])
+        return {
+          outcome: "merged",
+          integrationSha: head.stdout.trim(),
+          ...(validated === input.validated ? {} : { validated }),
+        }
       }
+      const settled = await settleFailedMerge(worktree, validated.tipSha, merge)
+      if (settled.outcome !== "merge_conflict" || attempt >= MAX_REBASE_ATTEMPTS) return settled
+      const rebased = await rebaseValidatedTip(worktree, validated, settled.detail ?? "")
+      if (rebased.status === "refused") return rebased.result
+      await input.onRebased?.(rebased.validated)
+      validated = rebased.validated
     }
-    if (landedMergeHead === input.validated.tipSha || unmerged.stdout.trim()) {
-      return { outcome: "merge_conflict", detail: merge.stderr.trim() }
-    }
-    return { outcome: "failed", detail: merge.stderr.trim() || "Reflection merge failed" }
   })
+}
+
+/** Aborts an owned conflicted merge and proves the parent is clean again before anything else runs. */
+async function settleFailedMerge(
+  worktree: ReflectionWorktree,
+  tipSha: string,
+  merge: GitExecResult,
+): Promise<ReflectionIntegrationResult> {
+  const landedMergeHead = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
+  const unmerged = listLines((await run(worktree.exec, worktree.parent.dir, ["diff", "--name-only", "--diff-filter=U"])).stdout)
+  if (landedMergeHead !== tipSha && unmerged.length === 0) {
+    return { outcome: "failed", detail: merge.stderr.trim() || "Reflection merge failed" }
+  }
+  const detail = describeMergeConflict(unmerged, merge.stdout, merge.stderr)
+  if (landedMergeHead === tipSha) {
+    const aborted = await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
+    if (aborted.code !== 0) {
+      return { outcome: "failed", detail: aborted.stderr.trim() || `Reflection merge conflict could not be aborted; ${detail}` }
+    }
+  }
+  const residue = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
+  const status = (await worktree.parent.status()).trim()
+  if (residue !== null || status) {
+    return { outcome: "parent_dirty", detail: `Parent repository is not clean after aborting the reflection merge; ${detail}` }
+  }
+  return { outcome: "merge_conflict", detail }
 }
 
 export async function cleanupReflectionWorktree(
