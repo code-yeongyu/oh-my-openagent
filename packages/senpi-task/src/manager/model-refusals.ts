@@ -1,7 +1,7 @@
 import type { ModelRefusal, ModelRefusalReason, TaskRecord, TaskRunStats } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ManagedChildEvent } from "./child-handle"
-import { isCredentialFailure, runtimeFallbackCandidates, terminalFailureMessage, usageLimitScope } from "./credential-failure"
+import { isCredentialFailure, isModelNotFound, runtimeFallbackCandidates, terminalFailureMessage, usageLimitScope } from "./credential-failure"
 
 const DETAIL_MAX = 200
 const RESETS = /\bresets?\s+((?:at|in)\s+)?([^.\n;]+)/iu
@@ -15,6 +15,7 @@ export const MODEL_CHAIN_EXHAUSTED = "model_chain_exhausted" as const
 const REASON_LABELS: Readonly<Record<ModelRefusalReason, string>> = {
   usage_limit: "usage limit",
   not_signed_in: "not signed in",
+  model_not_found: "model not found",
   refused: "refused",
   unavailable: "overloaded or unavailable",
   error: "failed",
@@ -39,6 +40,7 @@ export function isChainWalkable(outcome: Outcome, runStats: TaskRunStats | undef
 }
 
 function reasonOfFailure(message: string, modelId?: string): ModelRefusalReason {
+  if (isModelNotFound(message)) return "model_not_found"
   if (usageLimitScope(message) !== undefined) return "usage_limit"
   if (isCredentialFailure(message, modelId)) return "not_signed_in"
   if (POLICY_REFUSAL.test(message)) return "refused"
