@@ -1,24 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { spawn } from "node:child_process"
+import { type ChildProcess, spawn } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
+import { PlantedProcesses, processAlive as alive, runTeardown, stopChildRun, TEARDOWN_HOOK_TIMEOUT_MS } from "./test-support/planted-processes"
 
 const PRELOAD = join(import.meta.dir, "test-support", "hermetic-home.preload.ts")
 
 function readPlanted(pidsFile: string): number[] {
   if (!existsSync(pidsFile)) return []
   return readFileSync(pidsFile, "utf8").split("\n").filter((line) => line !== "").map(Number)
-}
-
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
 }
 
 // The planted processes name the child run's hermetic home on their command line, exactly as a task host's
@@ -55,45 +46,15 @@ test("plants processes that name this run's hermetic home", () => {
 })
 `
 
-const EXIT_WAIT_MS = 10_000
-
-/** Resolves once `promise` settles or `ms` passes; reports which. */
-async function settledWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timedOut = new Promise<false>((resolve) => {
-    timer = setTimeout(() => resolve(false), ms)
-  })
-  return await Promise.race([promise.then(() => true), timedOut]).finally(() => clearTimeout(timer))
-}
-
 describe("hermetic-home teardown signals only the task hosts this run started (#11630)", () => {
   let dir = ""
   let planted: number[] = []
-  let server: Server | undefined
-  // pid -> the close of the connection that planted process holds, i.e. its exit.
-  const exits = new Map<number, Promise<void>>()
-  const announced = new Map<number, () => void>()
-  const announcedPromise = (pid: number): Promise<void> =>
-    exits.has(pid) ? Promise.resolve() : new Promise<void>((resolve) => announced.set(pid, resolve))
+  let registry: PlantedProcesses | undefined
+  let childRun: ChildProcess | undefined
   let run: { readonly code: number | null; readonly output: string; readonly elapsedMs: number } | undefined
 
   beforeAll(async () => {
-    server = createServer((socket: Socket) => {
-      const closed = new Promise<void>((resolve) => socket.once("close", () => resolve()))
-      let text = ""
-      socket.setEncoding("utf8")
-      socket.on("error", () => {})
-      socket.on("data", (chunk: string) => {
-        text += chunk
-        if (!text.includes("\n")) return
-        const pid = Number.parseInt(text, 10)
-        exits.set(pid, closed)
-        announced.get(pid)?.()
-      })
-    })
-    await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve))
-    const address = server.address()
-    if (address === null || typeof address === "string") throw new Error("planting server has no port")
+    registry = await PlantedProcesses.listen()
     dir = mkdtempSync(join(tmpdir(), "omo-hermetic-teardown-"))
     const cwd = join(dir, "run")
     mkdirSync(cwd)
@@ -104,9 +65,10 @@ describe("hermetic-home teardown signals only the task hosts this run started (#
     // process it signalled, or scans the whole process table under load, overruns it as an unnamed hook failure.
     const child = spawn(process.execPath, ["test", "--timeout", "5000", "--preload", PRELOAD, "./planting.test.ts"], {
       cwd,
-      env: { ...process.env, PLANTED_PIDS_FILE: pidsFile, PLANTED_CWD: import.meta.dir, PLANTED_PORT: String(address.port) },
+      env: { ...process.env, PLANTED_PIDS_FILE: pidsFile, PLANTED_CWD: import.meta.dir, PLANTED_PORT: String(registry.port) },
       stdio: ["ignore", "pipe", "pipe"],
     })
+    childRun = child
     let output = ""
     child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString() })
     child.stderr.on("data", (chunk: Buffer) => { output += chunk.toString() })
@@ -114,21 +76,23 @@ describe("hermetic-home teardown signals only the task hosts this run started (#
     run = { code, output, elapsedMs: Date.now() - started }
     planted = readPlanted(pidsFile)
     // The planted processes connect after they start; wait for both before the assertions read their state.
-    await settledWithin(Promise.all(planted.map(announcedPromise)), EXIT_WAIT_MS)
+    await registry.announced(planted)
   }, 60_000)
 
   afterAll(async () => {
-    // Read again here: if the child run failed after planting, beforeAll never got this far.
+    // Read here, not in beforeAll: if the child run failed after planting, beforeAll never got this far.
     const pids = dir === "" ? [] : readPlanted(join(dir, "planted.pids"))
-    for (const pid of pids) {
-      if (alive(pid)) process.kill(pid, "SIGKILL")
+    try {
+      await runTeardown({
+        // A child run that outlived beforeAll's budget still holds dir/run as its cwd: it is stopped first.
+        stopChildRun: (waitMs) => stopChildRun(childRun, waitMs),
+        stop: async (waitMs) => { await registry?.stop(pids, { waitMs }) },
+        close: async (waitMs) => { await registry?.close(waitMs) },
+      })
+    } finally {
+      if (dir !== "") rmSync(dir, { recursive: true, force: true })
     }
-    // On Windows the kill is asynchronous: wait for each exit before removing anything it might hold open.
-    const exited = await settledWithin(Promise.all(pids.map((pid) => exits.get(pid) ?? Promise.resolve())), EXIT_WAIT_MS)
-    server?.close()
-    if (dir !== "") rmSync(dir, { recursive: true, force: true })
-    if (!exited) throw new Error(`planted processes ${pids.join(", ")} had not exited ${EXIT_WAIT_MS}ms after SIGKILL`)
-  })
+  }, TEARDOWN_HOOK_TIMEOUT_MS)
 
   test("#given a process that names the run's home but is no task host of the run #when the run ends #then it is not signalled", () => {
     expect(planted).toHaveLength(2)
