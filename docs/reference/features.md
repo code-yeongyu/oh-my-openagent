@@ -1050,6 +1050,8 @@ mcp:
 
 The `skill_mcp` tool invokes these operations with full schema discovery.
 
+A server entry may set `timeout` (milliseconds, 1 to 2147483647) to bound each MCP request (tool call, resource read, prompt fetch and list calls). A missing or out-of-range value keeps the MCP SDK default.
+
 Skill MCP clients are isolated per session by key `${sessionID}:${skillName}:${serverName}`.
 
 #### OAuth-Enabled MCPs
