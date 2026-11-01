@@ -51,7 +51,7 @@ async function pausedOnAnotherHost(firstHostAlive: boolean, firstHostPidReused =
   before.workpools.dispose()
   store.mutate(taskId, fresh => ({
     ...fresh,
-    host_claim: { pid: FIRST_HOST, at: new Date().toISOString() },
+    host_claim: { pid: FIRST_HOST, at: new Date().toISOString(), start: "linux-proc-start-ticks:100" },
     suspension_reason: "revival_deferred" as const,
     revival_deferred_reason: "foreign_live_owner",
   }))
@@ -72,7 +72,7 @@ async function pausedOnAnotherHost(firstHostAlive: boolean, firstHostPidReused =
     cwd, store, config: settings({ default_concurrency: 5 }), planner: categoryPlanner(), admissionBarrier: barrier,
     runners: { "in-process": runner, process: runner }, childPausePort, hostPid: 424_242,
     isProcessAlive: pid => pid === FIRST_HOST && firstHostAlive,
-    ...(firstHostPidReused ? { ownerProcesses: createOwnerProcessView(async pid => pid === FIRST_HOST ? Date.now() + 60_000 : null) } : {}),
+    ...(firstHostPidReused ? { ownerProcesses: createOwnerProcessView(async pid => pid === FIRST_HOST ? "linux-proc-start-ticks:200" : null) } : {}),
   })
   return { store, taskId, owner, calls, runner, barrier, manager }
 }

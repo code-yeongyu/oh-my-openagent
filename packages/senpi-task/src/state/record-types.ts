@@ -138,7 +138,9 @@ export type TaskRecordInput = {
   readonly host_session?: HostSessionIdentity
 }
 
-export type HostClaim = { readonly pid: number; readonly at: string }
+// `start` is the claimant's own OS start identity (memory-core process-identity), compared only as a
+// value; stamps without it carry no evidence against a live pid.
+export type HostClaim = { readonly pid: number; readonly at: string; readonly start?: string }
 
 export type RecordedRunPause = {
   readonly parent_session_id: string
