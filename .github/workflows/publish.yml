@@ -523,7 +523,7 @@ jobs:
           git add -f packages/omo-senpi/plugin/extensions
           git add -u packages/omo-senpi/plugin/runtime
           git add packages/omo-codex/scripts/install-dist/install-local.mjs
-          git add packages/omo-native/bin/lib/service-auth.generated.js
+          git add -u packages/omo-native/bin/lib
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
           echo "needs_push=true" >> "$GITHUB_OUTPUT"
