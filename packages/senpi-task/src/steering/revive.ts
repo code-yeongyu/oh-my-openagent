@@ -89,6 +89,7 @@ async function deliverRevivedTerminal(
     return { kind: "capacity_deferred", task_id: record.task_id, reason: "Task capacity is full; retry explicitly." }
   }
   let revived: TaskRecord | undefined
+  let terminalBeforeRevival: TaskRecord | undefined
   let deliveryAcknowledged = false
   let poolDeliveryStarted = false
   try {
@@ -106,6 +107,7 @@ async function deliverRevivedTerminal(
       uncertain = uncertainDeliveryDenial(current, message)
       if (uncertain !== undefined) return current
       applied = true
+      terminalBeforeRevival = current
       return buildDeliveryRecord(current, nowIso(), message)
     })
     if (uncertain !== undefined || !applied || updated === null) {
@@ -197,8 +199,23 @@ async function deliverRevivedTerminal(
       return lazyRevivalFailure(record, "the revived run was terminalized before the message was acknowledged")
     }
     if (rollbackOnFailure && priorRecord !== undefined) await bestEffortRollback(port, priorRecord)
+    else if (revived !== undefined && terminalBeforeRevival !== undefined) restoreRefusedWarmRevival(port, terminalBeforeRevival, revived)
     reservation.release()
     return lazyRevivalFailure(record, error instanceof Error ? error.message : String(error))
+  }
+}
+
+// A resident child refused the revival prompt, so the new epoch never started and nothing tracks it.
+// Leaving it running strands the record forever: a later send steers the child as if it were live and
+// its outcome is never settled. Put the finished run back, fenced on the epoch this revival wrote.
+function restoreRefusedWarmRevival(port: SteeringPort, terminal: TaskRecord, revived: TaskRecord): void {
+  try {
+    port.store.mutate(terminal.task_id, (fresh) =>
+      fresh.status === "running" && fresh.notification.run_epoch === revived.notification.run_epoch && fresh.host_pid === revived.host_pid
+        ? terminal
+        : fresh)
+  } catch (error) {
+    log("senpi-task warm revival restore failed", { taskId: terminal.task_id, error: error instanceof Error ? error.message : String(error) })
   }
 }
 
