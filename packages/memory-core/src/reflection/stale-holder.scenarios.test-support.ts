@@ -6,6 +6,8 @@ import type { ReflectionLockProbe, ReflectionLockVerdict } from "./stale-holder"
 export const REFLECTION_DIR = "/memory/agents/agent-a/runtime/reflection"
 const RUN = "reflection-run-64"
 const HOST = "this-host"
+// Without an id the table would spawn a real probe; every recorded id here is absent, so it is inert.
+const HOST_ID = "test-machine"
 const LAUNCHER = 11096
 const CLAIMANT = 4200
 const LOCK = join(REFLECTION_DIR, "active.lock")
@@ -83,6 +85,7 @@ export function probeFor(facts: Facts): ReflectionLockProbe {
       return state
     },
     hostname: () => HOST,
+    hostId: () => HOST_ID,
     getPidLiveness: (pid) => facts.pids[pid] ?? "dead",
     getProcessStartIdentity: async (pid) => facts.starts[pid] ?? null,
   }
