@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:29544d4c256c33e3344e849215719f136236daf4f55e0e7926e6ab81679da9c5:e6a0e1f4bc0a71c96a8a651af2e16b44f3b5346e7511dfb33fbe9f8b99c9a4ed
+// omo-codex-install:433a9648567283696cca4884fe6998c6505e9bb7c6d463cc7df59f23eff71db3:9a2769cbf171ab2cdfdc3886d3c883f0a3f6956ad73617d310ab592eea1abb82
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.53",
+    version: "5.1.55",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19647,6 +19647,7 @@ var OmoAgentDefInputSchema = object({
   prompt: string2().optional(),
   model: string2().optional(),
   models: array(OmoAgentModelEntrySchema).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   variant: string2().optional(),
   reasoningEffort: OmoReasoningEffortSchema.optional(),
@@ -19673,6 +19674,7 @@ var OmoCategoryConfigObjectSchema = object({
   description: string2().optional(),
   model: string2().optional(),
   models: array(union([string2(), OmoFallbackModelObjectSchema])).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   temperature: number2().min(0).max(2).optional(),
   top_p: number2().min(0).max(1).optional(),
@@ -19689,8 +19691,7 @@ var OmoCategoryConfigObjectSchema = object({
   max_prompt_tokens: number2().int().positive().optional(),
   is_unstable_agent: boolean2().optional(),
   disable: boolean2().optional(),
-  warn_unavailable: boolean2().optional(),
-  provider_lock: boolean2().optional()
+  warn_unavailable: boolean2().optional()
 }).strict();
 var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? normalizeLegacyModelFields(value) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);

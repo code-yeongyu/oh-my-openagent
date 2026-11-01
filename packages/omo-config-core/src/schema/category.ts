@@ -17,6 +17,7 @@ export const OmoCategoryConfigObjectSchema = z.object({
   description: z.string().optional(),
   model: z.string().optional(),
   models: z.array(z.union([z.string(), OmoFallbackModelObjectSchema])).optional(),
+  models_distribution: z.enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),

@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.55] - 2026-11-01
+
+**remove-ai-slops now names the two Bun scripts the programming skill ships for test work.** Phase 2 runs `check-test-junk.ts` over every in-scope test file and treats its `file:line` findings as category-9 candidates (never automatic cuts); Phase 4b names `mutation-proof.ts` as the command behind the serial apply/run/restore proof it already described. ([#12017](https://github.com/code-yeongyu/oh-my-openagent/pull/12017))
+
+**The programming skill ships two Bun scripts that make the test rules mechanical.** `check-test-junk.ts` flags the junk classes a regex can see in touched test files (source greps, prose pins, fixed sleeps, `.only`/`.skip`, self-comparisons, lower-bound cardinalities) with a per-line opt-out, and `mutation-proof.ts` breaks a production owner, runs the named tests, restores the file byte for byte and prints red/green, so "test your test" is one command. ([#11972](https://github.com/code-yeongyu/oh-my-openagent/pull/11972))
+
+**remove-ai-slops now prunes junk tests with the same table the programming skill and the gate reviewer use.** Category 9 marks every in-scope test R/F/C/D, proves each deletion or merge by its class's rule (a production mutation for the behavior classes) before the cut, keeps the retention bar, and reports a baseline-red test as a bug instead of deleting it; behavior is locked with gate-passing tests rather than change certificates, and the report carries a Tests Ledger. ([#11968](https://github.com/code-yeongyu/oh-my-openagent/pull/11968))
+
+- senpi-task: a message sent to a daemon task while its launch is being recorded keeps its input identity; the task record no longer rolls its `effect_seq` back, and a record rewritten to the same size is no longer read stale (#10708). ([#11946](https://github.com/code-yeongyu/oh-my-openagent/pull/11946))
+
+- Internal telemetry maintenance. ([#11882](https://github.com/code-yeongyu/oh-my-openagent/pull/11882))
+
+### Fixed
+
+- `omo remote attach` on Windows now reports a stopped OmO device service as not running instead of a raw connection error (#12042). ([#12043](https://github.com/code-yeongyu/oh-my-openagent/pull/12043))
+- Memory sync on a CLI sign-in recovers after the OS credential store briefly reads empty (a locked keychain, a racing writer). The operations that saw the empty read are still refused, but the next sync pass gets a live account instead of staying off until restart. A real sign-out or credential change still stops sync (#11812). ([#12001](https://github.com/code-yeongyu/oh-my-openagent/pull/12001))
+- On Windows, `omo host ensure` forwards a private pipe pair through the npm launcher, Bun re-exec, and provisioned-runtime handoff. Both pipe handles travel together on their original stdio slots, and the waiting launcher closes its owned copies after spawning. Invalid or aliased pairs remain null declarations; POSIX socket forwarding is unchanged. ([#11958](https://github.com/code-yeongyu/oh-my-openagent/pull/11958))
+- Memory git failures that end without any output now say how the git process ended (exit code, signal and elapsed time) instead of a bare exit code. On macOS and Linux the signal tells an externally killed git apart from a silent git error; on Windows a killed child reports no signal, so there the elapsed time is the only clue. ([#11945](https://github.com/code-yeongyu/oh-my-openagent/pull/11945))
+- The compiled-worker relocation test no longer hangs now and then. Its fixture waited on `terminate()` from inside the worker's message handler, which races the worker's own exit and never settles on Bun 1.4.4. It now waits for the worker's clean exit after the ready message, and a timeout failure reports its signal. ([#11941](https://github.com/code-yeongyu/oh-my-openagent/pull/11941), fixes [#11940](https://github.com/code-yeongyu/oh-my-openagent/issues/11940))
+- The maintainer `omob` build now compiles the engine trust helper in its own cargo call, as the release workflows do, so a locally built desktop engine matches the released one. ([#11939](https://github.com/code-yeongyu/oh-my-openagent/pull/11939), part of [#10762](https://github.com/code-yeongyu/oh-my-openagent/issues/10762))
+- Validate retained research source bytes before replacing an extraction and preserve the original capture time when reusing those bytes. ([#11936](https://github.com/code-yeongyu/oh-my-openagent/pull/11936))
+- Memory `/doctor` no longer tells the user to "fix the cause" of parked facts batches without naming it: the facts check now reads as a plain-words to-do (run `/facts retry` for a transient cause such as a timeout, or the named fix such as setting `memory.facts.model`), followed by the cause counts per parked batch and the newest parked batch's run log path, and `/facts retry` reports how many batches it unparked and whether any parked again, with the cause. ([#11909](https://github.com/code-yeongyu/oh-my-openagent/pull/11909), part of [#10897](https://github.com/code-yeongyu/oh-my-openagent/issues/10897))
+- A skill MCP server's `timeout` (milliseconds, set on the server entry in the skill's `mcp` frontmatter or `mcp.json`) now bounds every direct MCP request: list tools/resources/prompts, call tool, read resource and get prompt. Values outside 1 to 2147483647 ms fall back to the SDK default ([#11869](https://github.com/code-yeongyu/oh-my-openagent/pull/11869), carried forward from #7224 by @AceRothstein71)
+
+### Changed
+
+- The `omo-ai` installer and launcher no longer rewrite the Claude Code version the engine advertised on Anthropic OAuth requests: senpi removed that request path together with the declaration the rewrite looked for (senpi#5131), so engine preparation keeps only the compile-safe css-tree data and the RPC stream guard, and an engine without the declaration no longer fails preparation with "unsupported Senpi". ([#11964](https://github.com/code-yeongyu/oh-my-openagent/pull/11964))
+- Simplified OpenCode agent assembly by removing redundant type assertions and an unused builtin-skill name inventory. Agent mode, override precedence, and skill selection remain unchanged. ([#11870](https://github.com/code-yeongyu/oh-my-openagent/pull/11870)) ([#11899](https://github.com/code-yeongyu/oh-my-openagent/pull/11899))
+
+### Added
+
+- Categories and agents can set `models_distribution: "round_robin"` alongside `models` to spread new task children across their configured model chains. The default `sequential` policy keeps the existing order. Each child's fallback chain wraps from its selected starting model without repeating models, and continuations keep their current model. ([#11905](https://github.com/code-yeongyu/oh-my-openagent/pull/11905))
+- `omo remote` checks your OmO sign-in first and stops with one plain line when you are signed out, the keychain is locked or the credential store is unavailable (#11853). ([#11864](https://github.com/code-yeongyu/oh-my-openagent/pull/11864))
+- `omo remote attach <device>/<session>` shows a session from another device of this account in the attach TUI, observe-only for now: input is refused with "remote input not enabled yet" (#11853). ([#11858](https://github.com/code-yeongyu/oh-my-openagent/pull/11858))
+- `omo remote status | devices | sessions | enable | disable` shows this account's devices and the sessions on them through the OmO device service, as tables or `--json`, with a typed SDK (`@oh-my-opencode/device-service-core`) over the service's local API v1 underneath (#11853). ([#11857](https://github.com/code-yeongyu/oh-my-openagent/pull/11857))
+- Computer use (macOS): `type()` into a window that shows another computer or device (Screen Sharing, iPhone Mirroring) sends the keys of the current keyboard layout, since such a window receives key codes rather than typed text; every character is mapped before anything is sent, and a character no key types fails `InvalidKey` with nothing typed. In the background, text into a Screen Sharing window that needs Shift or Option fails `BackgroundUnavailable` before the first key (it takes modifiers from the physical keyboard; use foreground delivery), and `el.type()` never inserts into a remote window. ([#11749](https://github.com/code-yeongyu/oh-my-openagent/pull/11749), part of [#11466](https://github.com/code-yeongyu/oh-my-openagent/issues/11466))
+- Command Code is now offered during setup as a custom provider: when `CMD_API_KEY` (or `COMMANDCODE_API_KEY`) is present in the environment, setup writes a keyless models.json provider entry covering both Command Code wires (Anthropic messages and OpenAI-compatible chat completions) and stores the key reference in auth.json, so agents can use Command Code models without manual provider configuration (#11326). ([#11326](https://github.com/code-yeongyu/oh-my-openagent/pull/11326))
+
+### Improved
+
+- Simplify agent-usage reminder state reuse without changing reminder caps, delegation suppression or session cleanup. ([#11890](https://github.com/code-yeongyu/oh-my-openagent/pull/11890)) ([#11899](https://github.com/code-yeongyu/oh-my-openagent/pull/11899))
+
+## [5.1.54] - 2026-10-31
+
+5.1.53 and 5.1.52 were not published; their changes, listed under 5.1.53 and 5.1.52 below, ship in this release.
+
+**The `programming` skill's Go scaffolder writes LF files on every platform.** A checkout that converts line endings (Windows with `autocrlf`) no longer leaks CRLF into the project it generates; the templates are pinned to LF in `.gitattributes` and normalised on read. ([#11991](https://github.com/code-yeongyu/oh-my-openagent/pull/11991))
+
+**The `programming` skill's Python, Rust, and Go project scaffolders run on Bun, so Rust and Go users no longer install uv and typer just to start a project.** `bun run scripts/python/new-project.ts`, `scripts/python/new-script.ts`, `scripts/rust/new-project.ts`, and `scripts/go/new-project.ts` replace the old `uv run ... .py` commands and produce the same files. A missing `uv` or `cargo` now ends with a clear message and exit code 1, and a missing `go` still writes a fallback `go.mod`. ([#11970](https://github.com/code-yeongyu/oh-my-openagent/pull/11970))
+
+**The programming skill routes every test file to a testing reference that carries the four-question authoring gate and the junk-test classes.** Writing, reshaping, or deleting a test now loads `references/testing/README.md` (Given/When/Then, the mock ladder, determinism, the prompt-test rule, and a "test your test" mutation step) and `references/testing/junk-classes.md` (the one table of junk classes, retention bar, and R/F/C/D marks that the gate reviewer applies), so a test that would be deleted in review is a test the skill stops you from writing. ([#11967](https://github.com/code-yeongyu/oh-my-openagent/pull/11967))
+
+### Fixed
+
+- The release check for the macOS keychain helper accepts a correctly signed helper again: it ignores the `/* exists */` notes `codesign` prints in the designated requirement, and still rejects a different identifier or team (#11980). ([#11981](https://github.com/code-yeongyu/oh-my-openagent/pull/11981))
+
 ## [5.1.53] - 2026-10-31
 
 5.1.52 was not published; its changes, listed under 5.1.52 below, ship in this release.
