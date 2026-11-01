@@ -1,9 +1,11 @@
+import type { FallbackModelObject } from "./fallback-model-object"
+
 export type FallbackEntry = {
   providers: string[];
   model: string;
   variant?: string; // Entry-specific variant (e.g., GPT->high, Opus->max)
   reasoning?: string;
-  reasoningEffort?: string;
+  reasoningEffort?: FallbackModelObject["reasoningEffort"];
   temperature?: number;
   top_p?: number;
   maxTokens?: number;

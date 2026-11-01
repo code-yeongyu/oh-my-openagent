@@ -4,9 +4,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { enableFakeExtensionEvents, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { createDesktopToolkitComponent, TOOLKIT_GRANT_RPC } from "./index"
+import { HOST_TOOL_ROUTE_CHANNEL } from "./thread-tools"
 
 export const schema = { type: "object", properties: { title: { type: "string" } }, required: ["title"] }
 export const content = [{ type: "text", text: "organized" }]
@@ -21,6 +22,7 @@ export function session(id: string) {
 
 export async function setup(options: {
   offer?: string
+  hostToolNames?: string
   reply?: (request: Record<string, unknown>) => Record<string, unknown> | undefined
   timeoutMs?: number
   withRpc?: boolean
@@ -30,6 +32,9 @@ export async function setup(options: {
   component?: ReturnType<typeof createDesktopToolkitComponent>
 } = {}) {
   const pi = new FakeExtensionAPI()
+  enableFakeExtensionEvents(pi)
+  const routes: unknown[] = []
+  pi.events?.on(HOST_TOOL_ROUTE_CHANNEL, (route) => { routes.push(route) })
   const registered = Promise.withResolvers<void>()
   const registerTool = pi.registerTool.bind(pi)
   pi.registerTool = (tool) => {
@@ -37,7 +42,10 @@ export async function setup(options: {
     if (String(tool.name).startsWith("desktop_")) registered.resolve()
   }
   if (options.existingTools) Object.defineProperty(pi, "getAllTools", { value: () => options.existingTools })
-  Object.defineProperty(pi, "sessionContext", { value: { omo_toolkits: options.offer ?? "thread" } })
+  Object.defineProperty(pi, "sessionContext", { value: {
+    omo_toolkits: options.offer ?? "thread",
+    ...(options.hostToolNames === undefined ? {} : { host_tool_names: options.hostToolNames }),
+  } })
   const handlers = new Map<string, (data: unknown) => unknown>()
   const deferred: (() => void | Promise<void>)[] = []
   const requested = Promise.withResolvers<Record<string, unknown>>()
@@ -81,7 +89,7 @@ export async function setup(options: {
   const shutdown = (id = "A") => pi.dispatch("session_shutdown", { type: "session_shutdown" }, session(id))
   cleanups.push(async () => { await shutdown() })
   return {
-    pi, logs, handlers, deferred, dispatchStart, flushStartup, shutdown, failures,
+    pi, logs, handlers, deferred, dispatchStart, flushStartup, shutdown, failures, routes,
     failureCount: () => failureCount,
     registered: registered.promise, requested: requested.promise,
     turn: (id = "A") => pi.dispatch("before_agent_start", { type: "before_agent_start" }, session(id)),
@@ -94,6 +102,9 @@ export async function mcp(options: {
   listFailure?: boolean; callFailure?: boolean; echoToken?: boolean; sse?: boolean; paginated?: boolean
   wrongId?: boolean; holdCall?: boolean; redirect?: boolean; tools?: readonly unknown[]
   holdList?: Promise<void>; deleteFailure?: boolean
+  callResult?: unknown
+  /** Answers tools/call; a rejection becomes a JSON-RPC error. Lets a test put a real host behind this transport. */
+  onCall?: (params: unknown) => Promise<unknown>
 } = {}) {
   const dir = await mkdtemp(join(tmpdir(), "desktop-thread-"))
   const tokenFile = join(dir, "bearer")
@@ -152,7 +163,15 @@ export async function mcp(options: {
         callStarted.resolve()
         if (options.holdCall) return new Response(new ReadableStream(), { headers: { "content-type": "text/event-stream" } })
         if (options.callFailure) return Response.json({ jsonrpc: "2.0", id, error: { code: -32603, message: token } })
-        result = { content: options.echoToken ? [{ type: "text", text: token }] : content }
+        if (options.onCall !== undefined) {
+          try {
+            result = await options.onCall(params)
+          } catch {
+            return Response.json({ jsonrpc: "2.0", id, error: { code: -32603, message: "host call failed" } })
+          }
+        } else {
+          result = options.callResult ?? { content: options.echoToken ? [{ type: "text", text: token }] : content }
+        }
       } else {
         return new Response(null, { status: 400 })
       }
