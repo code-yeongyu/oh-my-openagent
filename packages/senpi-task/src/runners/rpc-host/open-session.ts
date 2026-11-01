@@ -29,7 +29,7 @@ export async function openTaskHostSession(input: {
     open(request: HostSessionOpenInput): Promise<OpenedHostSession>
     getState?(): Promise<HostSessionLiveness>
     getAvailableModels?(): Promise<readonly unknown[]>
-    close?(): Promise<void>
+    close?(): Promise<unknown>
   }
   readonly spec: RpcRunnerSpec
   readonly sessionPath: string

@@ -118,6 +118,8 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     ["one second off", 1_000, true],
     ["exactly at senpi's rounding tolerance", 120_000, true],
     ["one millisecond past senpi's rounding tolerance", 120_001, false],
+    ["exactly at senpi's rounding tolerance, earlier", -120_000, true],
+    ["one millisecond past senpi's rounding tolerance, earlier", -120_001, false],
   ] as const)("judges a lease whose boot instant is %s from this boot's", async (_, offset, pins) => {
     // Given a live pid whose lease's boot instant was computed off this process's (whole-second uptime).
     const names = await generations(17)
@@ -168,8 +170,12 @@ describe.skipIf(process.platform === "win32")("trust generation retention sweep"
     const entry = await lease(oldest, 9191, { v: 2, pid: 9191, bootAtMs: BOOT - 3_600_000 })
     // When the sweep runs.
     const outcome = await sweep()
-    // Then a lease this engine cannot interpret pins and is never deleted (keep-when-unsure).
-    expect(outcome).toEqual({ kind: "swept", removed: { generations: [], leases: [], userExtras: [] }, failures: [] })
+    // Then a lease this engine cannot interpret pins, is never deleted (keep-when-unsure), and is reported.
+    expect(outcome).toEqual({
+      kind: "swept",
+      removed: { generations: [], leases: [], userExtras: [] },
+      failures: [{ entry: `leases/${entry}`, step: "read-lease", code: "LEASE_NEWER_SCHEMA" }],
+    })
     expect(await exists(join(directory, `${oldest}.pem`))).toBe(true)
     expect(await exists(join(directory, "leases", entry))).toBe(true)
   })

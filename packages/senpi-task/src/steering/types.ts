@@ -1,5 +1,6 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ColdRevivalFailureCode, DetachedRevivalResult, DetachedRevivalRollbackResult } from "../lifecycle/port"
+import type { HostSessionCancelPort } from "../lifecycle/host-session"
 import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { HostSessionIdentity, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
@@ -14,6 +15,9 @@ export type DestructionPort = {
   destroyResidentTask(taskId: string, cause: DestructionCause): Promise<void>
   // Releases a finished child still resident here; false when there is none (omo#9785).
   parkTerminalResident?(taskId: string): Promise<boolean>
+  // Ends a daemon-hosted child this process holds no handle for, and re-drives it; absent, such a cancel
+  // stays pending on its record (omo#11765).
+  hostSessionCancel?: HostSessionCancelPort
 }
 
 // The seam steering consumes from the manager. The manager owns concurrency + live handles + the

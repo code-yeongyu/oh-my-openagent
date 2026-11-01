@@ -11,8 +11,11 @@ process.send?.("trying")
 await withLock(`${path}.lock`, await createLockRecord("credential-test-writer"), async () => {
   process.send?.("locked")
   await release.promise
-  const state = JSON.parse(readFileSync(path, "utf8")) as { identity: string; generation: number; token: number }
-  if (mode !== "refresh") {
+  const state = JSON.parse(readFileSync(path, "utf8")) as { identity: string; generation: number; token: number; signingKey: string; sealingKey: string }
+  if (mode === "signing" || mode === "sealing") {
+    // A key rotation keeps the identity and stamps a new generation, as the credential store does.
+    writeFileSync(path, JSON.stringify({ ...state, [mode === "signing" ? "signingKey" : "sealingKey"]: "rotated", generation: state.generation + 1 }))
+  } else if (mode !== "refresh") {
     writeFileSync(path, JSON.stringify({ ...state, identity: "B", generation: 2 }))
     writeFileSync(path, JSON.stringify({ ...state, identity: mode === "aba" ? "A" : "B", generation: 3 }))
   } else {

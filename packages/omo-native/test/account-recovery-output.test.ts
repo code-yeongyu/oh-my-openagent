@@ -24,7 +24,7 @@ test.each(["500", "timeout", "bad-json"])("a keyless legacy lost answer (%s) imm
 
   expect(await runAccountVerb(dependencies, ["token"])).toBe(ACCOUNT_EXIT.ended)
   expect(output).toEqual([{ ended: { code: "refresh_recovery_expired" } }])
-  expect(await store.read()).toEqual({ ...expired, refreshState: "uncertain" })
+  expect(await store.read()).toEqual({ ...expired, refreshState: "uncertain", credentialGeneration: expect.any(String) })
   expect(await runAccountVerb(dependencies, ["token"])).toBe(ACCOUNT_EXIT.ended)
   expect(output).toEqual(Array.from({ length: 2 }, () => ({ ended: { code: "refresh_recovery_expired" } })))
   expect(fetcher).toHaveBeenCalledTimes(1)
@@ -35,8 +35,10 @@ test.each([
   { error: new RecoveryPending(Date.parse("2030-01-01T00:00:25Z")), exit: 6, body: { uncertain: { deadline: "2030-01-01T00:00:25.000Z" } } },
 ])("account token maps $error to exit $exit and its exact JSON without rereading", async outcome => {
   let reads = 0
+  const read = async () => { reads++; throw outcome.error }
   const store: CredentialStore = {
-    read: async () => { reads++; throw outcome.error },
+    read,
+    readAuthoritative: read,
     write: async () => { throw new Error("unexpected write") },
     clear: async () => { throw new Error("unexpected clear") },
   }
@@ -64,5 +66,6 @@ test("adopt strips local recovery markers but preserves service owner and fresh-
   expect(exit).toBe(ACCOUNT_EXIT.ok)
   expect(await store.read()).toEqual({
     ...grant, ...privateKeys, owner: incoming.owner, freshAuthorizationProof: incoming.freshAuthorizationProof,
+    credentialGeneration: expect.any(String),
   })
 })

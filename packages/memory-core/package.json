@@ -17,6 +17,9 @@
     "./sync-engine": {
       "import": "./src/sync/engine/index.ts"
     },
+    "./sync-account-ports": {
+      "import": "./src/sync/account/account-ports-runtime.ts"
+    },
     "./personas": {
       "import": "./src/personas/manifest.ts"
     },

@@ -2,8 +2,8 @@
 //! runtime capabilities that report the SkyLight/canary truth.
 
 use image::RgbaImage;
-use senpi_desktop_core::ax::AxBackend;
-use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::ax::{AxBackend, AxHandle};
+use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
@@ -176,6 +176,20 @@ impl Backend for MacosBackend {
         Self::require_input_permission()?;
         self.show_typing_target(target);
         self.input.type_text_interruptible(target, text, mode, &self.capture, check_stop, delivered)
+    }
+
+    fn ax_type_text(
+        &mut self,
+        h: &AxHandle,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        Self::require_input_permission()?;
+        self.ax.show_target(h);
+        let element = crate::ax::element::element(h)?;
+        self.input.ax_type_text(element, text, mode, &self.capture, check_stop, delivered)
     }
 
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {

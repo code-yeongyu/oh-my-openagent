@@ -43,7 +43,7 @@ for (const code of ["device_revoked", "unknown_refusal"]) {
     } else {
       expect(result).toBe(ACCOUNT_EXIT.ended)
       expect(output.map((line) => JSON.parse(line))).toEqual([{ ended: { code: "refresh_recovery_expired" } }])
-      expect(await store.read()).toEqual({ ...expired, refreshState: "uncertain" })
+      expect(await store.read()).toEqual({ ...expired, refreshState: "uncertain", credentialGeneration: expect.any(String) })
       output.length = 0
       expect(await runAccountVerb(dependencies, ["show"])).toBe(ACCOUNT_EXIT.ok)
       expect(output.map((line) => JSON.parse(line))).toEqual([

@@ -321,7 +321,10 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
   const usersDirs = windows ? [win32.join(`${env["SystemDrive"]?.trim() || "C:"}\\`, "Users")] : POSIX_USERS_DIRS
   const rootHomes = windows ? [] : POSIX_ROOT_HOMES
   const parent = paths.dirname(target)
-  const isUsersDir = (dir: string): boolean => (trigger(dir) || trigger(parent) ? parent === dir : same(parent, dir))
+  // A trigger is compared lexically, on both the resolved parent and the HOME's own lexical parent: on darwin a home
+  // under /home resolves to /System/Volumes/Data/home/<name>, whose parent never equals "/home" (#11547).
+  const isUsersDir = (dir: string): boolean =>
+    trigger(dir) || trigger(parent) ? parent === dir || paths.dirname(lexical) === dir : same(parent, dir)
   if (usersDirs.some(isUsersDir) || rootHomes.some((home) => same(target, home))) return false
   const candidates = [(deps.tmpdir ?? os.tmpdir)(), ...(windows ? [] : (deps.posixTempRoots ?? POSIX_TEMP_ROOTS))]
   return candidates.some((candidate) => {

@@ -139,6 +139,14 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
     }
   })
 
+  it("#given a darwin account home under /home (resolving to the /System/Volumes/Data firmlink) #then it is a real profile, never ephemeral, whatever TMPDIR says (#11547)", () => {
+    const firmlink = (p: string) => (p === "/home" || p.startsWith("/home/") ? `/System/Volumes/Data${p}` : p)
+    for (const tmp of ["/home/me", "/home", "/"]) {
+      const deps = { platform: "darwin" as const, realpath: firmlink, tmpdir: () => tmp, posixTempRoots: [] }
+      expect({ tmp, verdict: automatedRunReason({ HOME: "/home/me" }, deps) }).toEqual({ tmp, verdict: undefined })
+    }
+  })
+
   it("#given a darwin HOME inside a temp dir under an automount trigger #then only that HOME itself is resolved and the run still counts as ephemeral", () => {
     const resolved: string[] = []
     const deps = { platform: "darwin" as const, realpath: (p: string) => (resolved.push(p), p), tmpdir: () => "/home/tmp", posixTempRoots: [] }

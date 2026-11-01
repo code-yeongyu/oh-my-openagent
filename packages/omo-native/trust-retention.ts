@@ -206,8 +206,10 @@ async function run(options: TrustRetentionOptions, failures: TrustRetentionFailu
     }
     const fields = typeof body === "object" && body !== null ? body as Record<string, unknown> : {}
     const { v, pid, bootAtMs } = fields
-    // A newer engine's lease may encode liveness differently: it cannot be proven dead here, so it pins and stays.
+    // A newer engine's lease may encode liveness differently: it cannot be proven dead here, so it pins, stays and is
+    // reported, so an operator can tell why its generation never ages out.
     if (typeof v === "number" && Number.isInteger(v) && v > 1) {
+      failures.push({ entry: `leases/${entry}`, step: "read-lease", code: "LEASE_NEWER_SCHEMA" })
       pinned.add(generation)
       continue
     }

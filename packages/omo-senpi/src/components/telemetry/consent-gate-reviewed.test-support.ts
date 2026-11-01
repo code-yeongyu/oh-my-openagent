@@ -65,7 +65,7 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   {
     file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport>=>>fetch", guard: "unless(rejected)",
     call: "fetch(url)",
-    reason: "the core sender checks the same consent before every attempt; this wrapper only observes 401 to invalidate an automatic install key and stops sending after it",
+    reason: "the core sender checks the same consent before every attempt; an automatic install-key 401 invalidates the key and shuts down only OTLP, while the guard blocks in-flight resends",
   },
   {
     file: "lazy-posthog.ts", fn: "withOtlpTransport>forward",
@@ -83,7 +83,7 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
   },
   {
     file: "otlp-runtime.ts", fn: "createSenpiOtlpTransport>capture",
-    guard: "if(isOtlpEvent(value.event))",
+    guard: "if(!rejected && isOtlpEvent(value.event))",
     route: VIA_SESSION_CLIENT,
     call: "transport.capture(value)",
     reason: "forwards only pinned product events to the core transport, which checks the shared consent on every append and send",

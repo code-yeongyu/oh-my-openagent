@@ -244,6 +244,7 @@ export {
   terminateRpcChild,
 } from "./runners"
 export { resolveInheritedExtensionList, selectPackageExtensionPaths } from "./runners/rpc/parent-extensions"
+export { createHostGenerationView } from "./runners/rpc-host/generation-view"
 export type { InheritedExtensions } from "./runners/rpc/parent-extensions"
 export type {
   ChildEventListener,

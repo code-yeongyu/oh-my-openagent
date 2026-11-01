@@ -18,6 +18,8 @@ enum Fault {
     Pass,
     Fail(DesktopError),
     CannotComplete,
+    /// The element never takes focus (`ax.typeText` keys path): nothing typed.
+    RefuseFocus,
     Panic,
     Hook(Box<dyn FnOnce() + Send>),
 }
@@ -28,6 +30,7 @@ impl std::fmt::Debug for Fault {
             Self::Pass => "Pass",
             Self::Fail(_) => "Fail",
             Self::CannotComplete => "CannotComplete",
+            Self::RefuseFocus => "RefuseFocus",
             Self::Panic => "Panic",
             Self::Hook(_) => "Hook",
         })
@@ -52,6 +55,12 @@ impl Faults {
         self.queues.lock().entry(write.method()).or_default().push_back(Fault::CannotComplete);
     }
 
+    /// Makes the next `ax.typeText` keys path find an element that never
+    /// takes focus, so nothing is typed and the call reports where focus is.
+    pub fn refuse_focus_next(&self) {
+        self.queues.lock().entry(FakeMethod::AxTypeText).or_default().push_back(Fault::RefuseFocus);
+    }
+
     /// Panic after `calls` preceding calls have returned normally.
     pub fn panic_after(&self, method: FakeMethod, calls: usize) {
         let mut queues = self.queues.lock();
@@ -69,6 +78,20 @@ impl Faults {
         self.next(method).err()
     }
 
+    /// Whether a `RefuseFocus` fault is queued for `ax.typeText`, consuming it.
+    pub(crate) fn take_refused_focus(&self) -> bool {
+        let mut queues = self.queues.lock();
+        let Some(queue) = queues.get_mut(&FakeMethod::AxTypeText) else {
+            return false;
+        };
+        if matches!(queue.front(), Some(Fault::RefuseFocus)) {
+            queue.pop_front();
+            true
+        } else {
+            false
+        }
+    }
+
     /// [`Self::take`] for an AX write, which a `CannotComplete` fault lets
     /// run unanswered.
     pub(crate) fn take_write(&self, write: AxWrite) -> CoreResult<Reply> {
@@ -82,11 +105,21 @@ impl Faults {
 
     fn next(&self, method: FakeMethod) -> CoreResult<Reply> {
         *self.calls.lock().entry(method).or_insert(0) += 1;
-        let fault = self.queues.lock().get_mut(&method).and_then(VecDeque::pop_front);
+        let fault = {
+            let mut queues = self.queues.lock();
+            let queue = queues.get_mut(&method);
+            // A refused focus stays queued for `take_refused_focus`, which the
+            // keys path reads after this entry check.
+            match queue.as_ref().and_then(|queue| queue.front()) {
+                Some(Fault::RefuseFocus) => None,
+                _ => queue.and_then(VecDeque::pop_front),
+            }
+        };
         // Run outside the fault-queue lock so hooks can drive the real supervisor.
         match fault {
             Some(Fault::Fail(error)) => Err(error),
             Some(Fault::CannotComplete) => Ok(Reply::Unanswered),
+            Some(Fault::RefuseFocus) => unreachable!("a refused focus is never popped here"),
             Some(Fault::Panic) => panic!("injected {method:?} panic"),
             Some(Fault::Hook(hook)) => {
                 hook();

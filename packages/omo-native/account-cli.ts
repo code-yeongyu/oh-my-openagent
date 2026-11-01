@@ -6,6 +6,7 @@ import {
   type CredentialStore,
   CredentialStoreError,
   INTERACTIVE_READ_WAIT,
+  InvalidCredentialState,
   KeychainLockedError,
   SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
@@ -91,7 +92,7 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
     if (!keepCurrent) await dependencies.store.write(incoming)
     await session.clearSignedOutMarker()
     return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
-  })
+  }, { replaceInvalid: replace })
 }
 
 async function token(dependencies: AccountCommandDependencies): Promise<number> {
@@ -154,11 +155,31 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
     }
     case "forget": {
       const session = sessionOf(dependencies)
-      await session.update(async () => dependencies.store.clear())
+      if (flags.length > 0) {
+        const device = flags[1]
+        if (flags.length !== 2 || flags[0] !== "--device" || device === undefined || device === "" || device.startsWith("--")) {
+          dependencies.error("omo account forget: use forget or forget --device <id>")
+          return ACCOUNT_EXIT.invalid
+        }
+        try {
+          return await session.update(async current => {
+            if (current !== null && current.device.id !== device) {
+              return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
+            }
+            await dependencies.store.clear()
+            return reply(dependencies, { forgotten: true })
+          })
+        } catch (error) {
+          if (!(error instanceof InvalidCredentialState)) throw error
+          dependencies.error(error.message)
+          return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
+        }
+      }
+      await session.forget()
       return reply(dependencies, { forgotten: true })
     }
     default:
-      dependencies.error("usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget")
+      dependencies.error("usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]")
       return ACCOUNT_EXIT.invalid
   }
 }

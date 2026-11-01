@@ -1,9 +1,7 @@
-import { mkdir } from "node:fs/promises"
 import { homedir } from "node:os"
-import { join } from "node:path"
-import { withLock } from "@oh-my-opencode/team-core/team-state-store/locks"
+import { withCredentialLock } from "./credential-lock"
 import { signInHint } from "./accounts-gate"
-import { credentialId, type CredentialStore, CredentialStoreError } from "./keystore"
+import { CredentialIdentityChanged, credentialId, type CredentialStore, CredentialStoreError, InvalidCredentialState } from "./keystore"
 import {
   ApiRefusal, type ChooseDevice, type Credentials, deviceListSchema, jsonRequest, parseReply,
   refusalGuidance, refusalMessage, requestApi, RequestFailure, serviceOrigin, SignInError, tokenSchema,
@@ -26,14 +24,17 @@ export function createSession(options: {
   const api = serviceOrigin(options.api)
   const now = options.now ?? Date.now
   const { store, signal } = options
-  const directory = join(options.home ?? homedir(), ".omo", "session-locks")
-  const lockPath = join(directory, `${credentialId(api)}.lock`)
   const markerPath = signedOutMarkerPath(options.home ?? homedir(), credentialId(api))
   async function locked<T>(action: () => Promise<T>): Promise<T> {
-    await mkdir(directory, { recursive: true, mode: 0o700 })
     signal?.throwIfAborted()
-    return withLock(lockPath, async () => { signal?.throwIfAborted(); return action() },
-      { ownerTag: "cli-session", staleAfterMs: Number.POSITIVE_INFINITY })
+    return withCredentialLock(
+      api,
+      async () => {
+        signal?.throwIfAborted()
+        return action()
+      },
+      options.home,
+    )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
   async function refreshed(current: Credentials): Promise<Credentials> {
@@ -90,15 +91,28 @@ export function createSession(options: {
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),
     clearSignedOutMarker: () => clearSignedOutMarker(markerPath),
-    async update<T>(action: (current: Credentials | null) => Promise<T>): Promise<T> {
-      return locked(async () => action(await store.read()))
+    async update<T>(action: (current: Credentials | null) => Promise<T>, options: { readonly replaceInvalid?: boolean } = {}): Promise<T> {
+      return locked(async () => {
+        let current: Credentials | null
+        try {
+          // Under the lock only a read started now is authoritative: a coalesced read may predate another writer.
+          current = await store.readAuthoritative()
+        } catch (error) {
+          if (!options.replaceInvalid || !(error instanceof InvalidCredentialState)) throw error
+          current = null
+        }
+        return action(current)
+      })
+    },
+    async forget(): Promise<void> {
+      await locked(() => store.clear())
     },
     accessSnapshot: snapshot,
     async logout(): Promise<boolean> {
       return locked(async () => {
         let current: Credentials | null = null
         try {
-          current = await store.read()
+          current = await store.readAuthoritative()
           if (current !== null) {
             if (current.refreshState === "uncertain") return false
             const access = Date.parse(current.accessTokenExpiresAt) <= now() ? (await refreshed(current)).accessToken : current.accessToken
@@ -119,10 +133,22 @@ export function createSession(options: {
         }
       })
     },
-    async accessToken(): Promise<string> {
-      const current = await snapshot()
-      if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
-      return current.accessToken
+    /** `expect` rejects a stored credential that is no longer the caller's captured identity before any refresh. */
+    async accessToken(expect?: (current: Credentials) => boolean): Promise<string> {
+      signal?.throwIfAborted()
+      const snapshot = await store.read()
+      signal?.throwIfAborted()
+      // Only an unjournaled token beyond the refresh path's 30s skew can avoid the writer lock.
+      // Account-bound callers compare their captured keys, account and generation through `expect`.
+      if (snapshot !== null && snapshot.refreshState !== "uncertain" && snapshot.refreshAttempt === undefined
+          && Date.parse(snapshot.accessTokenExpiresAt) > now() + 30_000
+          && (expect === undefined || expect(snapshot))) return snapshot.accessToken
+      return locked(async () => {
+        const current = await store.readAuthoritative()
+        if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+        if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
+        return (await refreshed(current)).accessToken
+      })
     },
     async removeForLimit(error: unknown, choose: ChooseDevice): Promise<boolean> {
       if (!(error instanceof ApiRefusal) || error.detail === undefined) throw error

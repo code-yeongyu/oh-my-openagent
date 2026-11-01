@@ -35,6 +35,8 @@ export const grantSchema = tokenSchema.extend({
 export const credentialSchema = grantSchema.extend({
   signingPrivateKey: nonempty, sealingPrivateKey: nonempty,
   refreshState: z.literal("uncertain").optional(),
+  credentialGeneration: nonempty.optional(),
+  accountId: nonempty.optional(),
   // Preserve even a malformed journal so the owning transaction fails closed without re-keying.
   refreshAttempt: z.unknown().optional(),
 })
@@ -61,6 +63,17 @@ export const deviceListSchema = z.object({
   devices: z.array(z.object({ id: nonempty, name: nonempty, revokedAt: timestamp.nullable() })),
 })
 export type ListedDevice = z.infer<typeof deviceListSchema>["devices"][number]
+const currentDeviceListSchema = z.object({
+  devices: z.array(z.object({ id: nonempty, current: z.boolean(), revokedAt: timestamp.nullable() })),
+})
+/** The one unrevoked device the calling token authenticates, or null when the list does not name exactly one. */
+export function currentServiceDevice(body: unknown): string | null {
+  const parsed = currentDeviceListSchema.safeParse(body)
+  if (!parsed.success) return null
+  const current = parsed.data.devices.filter(device => device.current)
+  const only = current.length === 1 ? current[0] : undefined
+  return only !== undefined && only.revokedAt === null ? only.id : null
+}
 export type ChooseDevice = (devices: readonly ListedDevice[]) => Promise<string | null>
 
 const REFUSAL_CODES = [
