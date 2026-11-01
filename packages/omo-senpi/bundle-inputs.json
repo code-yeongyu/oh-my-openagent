@@ -257,6 +257,7 @@
     "packages/memory-core/src/reflection/completion-secret-scan.ts",
     "packages/memory-core/src/reflection/completion-validation.ts",
     "packages/memory-core/src/reflection/description-preflight.ts",
+    "packages/memory-core/src/reflection/host-identity.ts",
     "packages/memory-core/src/reflection/index.ts",
     "packages/memory-core/src/reflection/machine.ts",
     "packages/memory-core/src/reflection/orphan-sweep.ts",

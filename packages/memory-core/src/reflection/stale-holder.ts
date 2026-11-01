@@ -11,6 +11,7 @@ import { join } from "node:path"
 
 import { readFile } from "../fs/resilient"
 import { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable, type ProcessLiveness } from "../locks/process-identity"
+import { classifyHostIdentity, readCurrentMachineHash } from "./host-identity"
 
 export type ReflectionLockVerdict =
   | { readonly state: "none" }
@@ -21,6 +22,7 @@ export type ReflectionLockVerdict =
 export interface ReflectionLockProbe {
   readonly readText?: (path: string) => Promise<string>
   readonly hostname?: () => string
+  readonly machineHash?: () => Promise<string | null>
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
 }
@@ -96,8 +98,19 @@ export async function classifyReflectionLockHolder(
   const runId = typeof fields.runId === "string" ? fields.runId : "unknown"
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
+  const launcherMachineHash = typeof fields.launcherMachineHash === "string" ? fields.launcherMachineHash : undefined
   if (launcherPid === undefined || launcherHostname === undefined) return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
-  if (launcherHostname !== (probe.hostname ?? readHostname)()) return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
+  const identity = await classifyHostIdentity({
+    recordedHostname: launcherHostname,
+    recordedMachineHash: launcherMachineHash,
+    currentHostname: (probe.hostname ?? readHostname)(),
+    currentMachineHash: probe.machineHash ?? readCurrentMachineHash,
+  })
+  if (identity.state === "foreign") {
+    return identity.viaMachineId
+      ? stuck(runId, `it is owned by a different machine (host ${identity.recordedHostname}), which cannot be checked from here`) // rule:machine-id
+      : stuck(runId, `it is owned by host ${identity.recordedHostname}, which cannot be checked from here`) // rule:other-host
+  }
   const launcher = await launcherLiveness(launcherPid, fields.launcherProcessStart, probe)
   if (launcher === "alive") return { state: "live", runId } // rule:launcher-alive
   if (launcher === "unknown") return stuck(runId, `launcher pid ${launcherPid} could not be checked`) // rule:launcher-unknown

@@ -5,7 +5,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
 import { TranscriptJournal, type ReflectionSnapshot } from "../journal"
-import { ReflectionReservationStore, type ReservationResult } from "./reservation"
+import { createMachineHashReader, reflectionHostHash } from "./host-identity"
+import { ReflectionReservationStore, type ReflectionLauncherIdentity, type ReservationResult } from "./reservation"
+import { currentLauncherIdentity } from "./reservation-files"
 import type { ReflectionRequest, ReservedRun } from "./machine"
 import { realpathSync } from "node:fs"
 import { removeTree } from "../../../../test-support/remove-tree"
@@ -13,7 +15,11 @@ import { removeTree } from "../../../../test-support/remove-tree"
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))))
 
-async function fixture(stepCount = 2, createRunId?: () => string | Promise<string>) {
+async function fixture(
+  stepCount = 2,
+  createRunId?: () => string | Promise<string>,
+  launcherIdentity: () => Promise<ReflectionLauncherIdentity> = async () => ({ pid: 4242, hostname: "fixture-host", processStart: "fixture-start" }),
+) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reservation-")))
   roots.push(root)
   const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
@@ -29,7 +35,7 @@ async function fixture(stepCount = 2, createRunId?: () => string | Promise<strin
     identity,
     config: { stepCount, onCompaction: true },
     now: () => new Date("2026-08-10T00:00:00.000Z"),
-    launcherIdentity: async () => ({ pid: 4242, hostname: "fixture-host", processStart: "fixture-start" }),
+    launcherIdentity,
     getJournal: async (id) => {
       const found = journals.get(id)
       if (!found) throw new Error(`missing journal: ${id}`)
@@ -55,6 +61,16 @@ function runOf(result: ReservationResult | null | undefined): ReservedRun {
 }
 
 describe("persisted reflection reservation", () => {
+  // Storage/security contract (#11863): active.lock carries only the hashed machine id, never the raw one.
+  it("#given a launcher whose platform machine id is readable #when reserving #then active.lock stores its hash and never the raw id", async () => {
+    const raw = "synthetic-platform-id-0002"
+    const { identity, journal, store } = await fixture(2, undefined, () => currentLauncherIdentity(createMachineHashReader(async () => raw)))
+    await store.tryReserve(await captured(journal, "manual"))
+    const text = await readFile(join(identity.paths.reflection, "active.lock"), "utf8")
+    expect(text.includes(raw)).toBe(false)
+    expect(JSON.parse(text).launcherMachineHash).toBe(reflectionHostHash(raw))
+  })
+
   it.each(["active.lock", "pending.json"])("#given %s rename fails #when reserving #then the temporary is removed and the error propagates", async (target) => {
     const { identity, journal, store } = await fixture()
     const request = await captured(journal, "manual")

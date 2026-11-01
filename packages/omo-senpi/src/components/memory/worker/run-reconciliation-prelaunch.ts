@@ -3,6 +3,7 @@ import { mkdir, readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
+  classifyHostIdentity,
   discardReflectionWorktree,
   GitMemoryRepo,
   RESERVATION_EVIDENCE_FILENAME,
@@ -25,6 +26,23 @@ export interface PrelaunchReconcile {
   readonly retiredRunId?: string
 }
 
+/**
+ * Decides whether an active reservation belongs to a different machine, using the one shared host
+ * identity rule (memory-core reflection/host-identity.ts). Legacy records without a machine id and
+ * a null current lookup both fall back to exact hostname equality, so the platform id is never read
+ * unless the record actually carries one.
+ */
+async function holderIsForeign(context: ReconcileContext, active: ReservedRun): Promise<boolean> {
+  if (active.launcherHostname === undefined) return true
+  const verdict = await classifyHostIdentity({
+    recordedHostname: active.launcherHostname,
+    recordedMachineHash: active.launcherMachineHash,
+    currentHostname: context.hostname(),
+    currentMachineHash: context.machineHash,
+  })
+  return verdict.state === "foreign"
+}
+
 export async function reconcilePrelaunch(context: ReconcileContext): Promise<PrelaunchReconcile> {
   context.signal?.throwIfAborted()
   const active = (await context.reservation.readState(
@@ -36,7 +54,7 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   context.signal?.throwIfAborted()
   if (ghost.ghost && ghost.reason === "missing-identity") {
     if (active.launcherPid !== undefined && active.launcherHostname !== undefined) {
-      if (active.launcherHostname !== context.hostname()) return {}
+      if (await holderIsForeign(context, active)) return {}
       if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
     }
     return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
@@ -78,7 +96,7 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     if (context.now() - createdAt <= LAUNCH_WINDOW_MS) return {}
     return quarantineUnderDeadLauncher(context, active, runDir, "prelaunch_missing_after_deadline")
   }
-  if (context.now() - Date.parse(active.reservedAt) <= LAUNCH_WINDOW_MS || active.launcherHostname !== context.hostname()) {
+  if (context.now() - Date.parse(active.reservedAt) <= LAUNCH_WINDOW_MS || await holderIsForeign(context, active)) {
     return retiredGeneration ? { retiredRunId: active.runId } : {}
   }
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) {
@@ -131,7 +149,7 @@ async function recordInterruptedLaunch(context: ReconcileContext, runDir: string
  * touching the run dir, so a later backfill sees exactly one terminal state.
  */
 async function releaseFinishedUnderDeadLauncher(context: ReconcileContext, active: ReservedRun): Promise<PrelaunchReconcile> {
-  if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
+  if (active.launcherPid === undefined || await holderIsForeign(context, active)) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
   return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
 }
@@ -166,7 +184,7 @@ async function quarantineUnderDeadLauncher(
   reason: QuarantineReason,
   ledger?: ReservationRunLedger,
 ): Promise<PrelaunchReconcile> {
-  if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
+  if (active.launcherPid === undefined || await holderIsForeign(context, active)) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
   return { result: await quarantineRun(context, runDir, active.runId, reason, ledger, active), retiredRunId: active.runId }
 }
