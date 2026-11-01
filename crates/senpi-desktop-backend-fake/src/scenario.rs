@@ -10,6 +10,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::method::{AxWrite, FakeMethod};
+pub use crate::scenario_nodes::{FakeAxNode, FakeBounds, FakeMenuNode};
 
 const DEFAULT_CAPTURE_COLOR: [u8; 4] = [32, 96, 160, 255];
 
@@ -38,12 +39,20 @@ pub struct FakeScenario {
     pub resize_window: Option<ResizeWindow>,
     /// Failures queued at load time, as if `fail_next` had been called.
     pub fail_next: Vec<ScriptedFailure>,
+    /// User presses that land right before the fake's next press of a method.
+    pub user_presses: Vec<crate::user_input_impl::ScriptedUserPress>,
+    /// Whether the backend exposes a user-input feed (false: a backend with no
+    /// watch, as win32, x11 and wayland, or macOS while the watch is off).
+    pub user_input_feed: bool,
     /// AX writes left unanswered at load time, in order, as if
     /// `Faults::cannot_complete_next` had been called.
     pub ax_cannot_complete: Vec<AxWrite>,
     /// Marks every capture's frame geometry `legacyCapture` (B9 fallback
     /// shape), so the wire carries the flag.
     pub legacy_capture: bool,
+    /// Processes (by pid) whose windows show a remote screen, and how the
+    /// client forwards input (plan todo 22).
+    pub remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
 }
 
 impl Default for FakeScenario {
@@ -55,13 +64,16 @@ impl Default for FakeScenario {
             ax: BTreeMap::new(),
             menus: BTreeMap::new(),
             ax_owner_unknown: false,
+            user_input_feed: true,
             cursor: default_cursor(),
             capture_color: DEFAULT_CAPTURE_COLOR,
             delay_ms: DelayMs::default(),
             resize_window: None,
             fail_next: Vec::new(),
+            user_presses: Vec::new(),
             ax_cannot_complete: Vec::new(),
             legacy_capture: false,
+            remote_screens: BTreeMap::new(),
         }
     }
 }
@@ -144,57 +156,6 @@ pub struct ScriptedFailure {
     pub reason: Option<String>,
 }
 
-/// One scripted accessibility element and its subtree.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeAxNode {
-    pub role: String,
-    /// Platform role; defaults to `role`.
-    #[serde(default)]
-    pub native_role: Option<String>,
-    #[serde(default)]
-    pub title: Option<String>,
-    #[serde(default)]
-    pub value: Option<String>,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default = "enabled_by_default")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub focused: bool,
-    /// Global logical bounds.
-    #[serde(default)]
-    pub bounds: Option<FakeBounds>,
-    #[serde(default)]
-    pub actions: Vec<String>,
-    #[serde(default)]
-    pub children: Vec<FakeAxNode>,
-}
-
-/// One scripted menu item and its submenu.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeMenuNode {
-    pub title: String,
-    #[serde(default = "enabled_by_default")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub checked: bool,
-    #[serde(default)]
-    pub shortcut: Option<String>,
-    #[serde(default)]
-    pub children: Vec<FakeMenuNode>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct FakeBounds {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
     #[error("cannot read fake scenario {path}: {source}")]
@@ -233,9 +194,15 @@ struct RawScenario {
     #[serde(default)]
     fail_next: Vec<ScriptedFailure>,
     #[serde(default)]
+    user_presses: Vec<crate::user_input_impl::ScriptedUserPress>,
+    #[serde(default = "crate::scenario_nodes::enabled_by_default")]
+    user_input_feed: bool,
+    #[serde(default)]
     ax_cannot_complete: Vec<AxWrite>,
     #[serde(default)]
     legacy_capture: bool,
+    #[serde(default)]
+    remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -265,8 +232,11 @@ impl TryFrom<RawScenario> for FakeScenario {
             delay_ms: raw.delay_ms,
             resize_window: raw.resize_window,
             fail_next: raw.fail_next,
+            user_presses: raw.user_presses,
+            user_input_feed: raw.user_input_feed,
             ax_cannot_complete: raw.ax_cannot_complete,
             legacy_capture: raw.legacy_capture,
+            remote_screens: raw.remote_screens,
         })
     }
 }
@@ -291,8 +261,4 @@ const fn default_cursor() -> Option<DesktopPoint> {
 
 const fn default_capture_color() -> [u8; 4] {
     DEFAULT_CAPTURE_COLOR
-}
-
-const fn enabled_by_default() -> bool {
-    true
 }

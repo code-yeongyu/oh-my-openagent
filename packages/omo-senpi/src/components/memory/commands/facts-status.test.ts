@@ -1,7 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import type { FactsFailureRecord } from "@oh-my-opencode/memory-core"
 
+import { factsParkedCauseSummary } from "./facts-failure-cause"
 import {
   factsRemediationHint,
   formatFactsAdvisory,
@@ -46,6 +51,32 @@ function parkedRecord(overrides: Partial<FactsFailureRecord> = {}): FactsFailure
 
 function overview(overrides: Partial<FactsOverview> = {}): FactsOverview {
   return { pending: 0, records: [], now: NOW, ...overrides }
+}
+
+const tempFactsDirs: string[] = []
+
+afterEach(async () => {
+  await Promise.all(
+    tempFactsDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  )
+})
+
+/** A real run dir whose ledger names `batchId`; the dir name deliberately differs from it. */
+async function seedFactsRun(factsDir: string, runName: string, batchId: string): Promise<string> {
+  const runDir = join(factsDir, "runs", runName)
+  await mkdir(runDir, { recursive: true })
+  await writeFile(
+    join(runDir, "ledger.json"),
+    `${JSON.stringify({ version: 1, runId: runName, kind: "facts", batchId, queued: [] }, null, 2)}\n`,
+    "utf8",
+  )
+  return runDir
+}
+
+async function tempFactsDir(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "facts-run-path-"))
+  tempFactsDirs.push(dir)
+  return dir
 }
 
 describe("facts status rendering", () => {
@@ -125,6 +156,32 @@ describe("facts status rendering", () => {
     expect(text).toContain("/facts retry")
   })
 
+  test("#given a parked record whose batch id names a surviving run ledger #when rendering the status view #then its row names the real run dir and that dir exists", async () => {
+    // given: the failure id is a batch id, not the run dir name, so the ledger is the lookup key
+    const factsDir = await tempFactsDir()
+    const runDir = await seedFactsRun(factsDir, "facts-deadbeef-2", "batch-abc-2")
+    const state = overview({ records: [parkedRecord({ lastFailureId: "batch-abc-2" })], factsDir })
+
+    // when
+    const text = formatFactsStatus("agent-x", state)
+
+    // then
+    expect(text).toContain(`(last run: ${runDir})`)
+    expect(existsSync(runDir)).toBe(true)
+  })
+
+  test("#given a parked record whose run was pruned #when rendering the status view #then its row names no run path", async () => {
+    // given: no runs/*/ledger.json carries this batch id, so no path may be printed
+    const factsDir = await tempFactsDir()
+    const state = overview({ records: [parkedRecord({ lastFailureId: "batch-pruned" })], factsDir })
+
+    // when
+    const text = formatFactsStatus("agent-x", state)
+
+    // then
+    expect(text).not.toContain("last run:")
+  })
+
   test("#given a healthy queue #when rendering the status view #then no failure section is shown", () => {
     // given
     const state = overview({ pending: 1 })
@@ -140,15 +197,39 @@ describe("facts status rendering", () => {
 })
 
 describe("facts remediation hint", () => {
-  test("#given parked records #when asking for the hint #then it names /facts retry and the parked count", () => {
+  test("#given parked records with a transient cause #when asking for the hint #then the to-do is /facts retry itself", () => {
     // given
     const state = overview({ records: [parkedRecord(), parkedRecord({ end_message_id: "msg-z" })] })
 
     // when
     const hint = factsRemediationHint(state)
 
+    // then: assert only the machine-meaningful part, so wording changes do not break the test
+    expect(hint).toContain("/facts retry")
+  })
+
+  test("#given a parked record whose fix is a setting #when asking for the hint #then the to-do names that setting", () => {
+    // given
+    const state = overview({ records: [parkedRecord({ lastReason: "quick_category_unavailable" })] })
+
+    // when
+    const hint = factsRemediationHint(state)
+
     // then
-    expect(hint).toBe("2 parked facts batches need a manual unpark; run /facts retry after fixing the cause")
+    expect(hint).toContain("memory.facts.model")
+    expect(hint).toContain("/facts retry")
+  })
+
+  test("#given a parked record whose fix has no setting #when asking for the hint #then the to-do names the cause", () => {
+    // given
+    const state = overview({ records: [parkedRecord({ lastReason: "invalid_extraction" })] })
+
+    // when
+    const hint = factsRemediationHint(state)
+
+    // then
+    expect(hint).toContain("parse error")
+    expect(hint).toContain("/facts retry")
   })
 
   test("#given only backoff records #when asking for the hint #then it reports the wait instead of a remedy", () => {
@@ -168,5 +249,51 @@ describe("facts remediation hint", () => {
 
     // when + then
     expect(factsRemediationHint(state)).toBeUndefined()
+  })
+})
+
+describe("facts parked cause summary", () => {
+  test("#given parked batches with known causes #when summarizing #then counts per cause and the newest run path appear", async () => {
+    // given: only the newest batch has a surviving run ledger, keyed by its batch id
+    const factsDir = await tempFactsDir()
+    const runDir = await seedFactsRun(factsDir, "facts-deadbeef-3", "batch-a-3")
+    const records = [
+      parkedRecord({ end_message_id: "msg-1", lastFailureId: "batch-a-1", lastFailureAt: "2026-08-16T10:00:00.000Z" }),
+      parkedRecord({ end_message_id: "msg-2", lastFailureId: "batch-a-2", lastFailureAt: "2026-08-16T10:30:00.000Z" }),
+      parkedRecord({
+        end_message_id: "msg-3",
+        lastReason: "invalid_extraction",
+        lastFailureId: "batch-a-3",
+        lastFailureAt: "2026-08-16T11:00:00.000Z",
+      }),
+    ]
+
+    // when
+    const summary = factsParkedCauseSummary(records, factsDir)
+
+    // then
+    expect(summary).toBe(`causes: timeout x2, parse error x1; last run: ${runDir}`)
+    expect(existsSync(runDir)).toBe(true)
+  })
+
+  test("#given a parked batch with an unknown cause #when summarizing #then the run path still appears with no guessed cause", async () => {
+    // given
+    const factsDir = await tempFactsDir()
+    const runDir = await seedFactsRun(factsDir, "facts-zz-9", "batch-z-7")
+    const records = [parkedRecord({ lastReason: "other", lastFailureId: "batch-z-7" })]
+
+    // when
+    const summary = factsParkedCauseSummary(records, factsDir)
+
+    // then
+    expect(summary).toBe(`last run: ${runDir}`)
+  })
+
+  test("#given only backoff records #when summarizing #then there is no parked summary", () => {
+    // given
+    const records = [backoffRecord()]
+
+    // when + then
+    expect(factsParkedCauseSummary(records, "/ident/facts")).toBeUndefined()
   })
 })

@@ -233,10 +233,16 @@ describe("foreground-control lease in fused computer use (X16 characterization)"
       const session = register()
       await activate(session.pi)
 
-      // when / then
-      await expect(session.call("control.acquire", [{ reason: "   " }])).rejects.toThrow(
-        "control.acquire requires a non-empty reason",
+      // when: settled plainly; `expect(p).rejects` right after the awaited engine replies never wakes on Windows
+      // and wedges the whole bun test process (#11815, oven-sh/bun#37189)
+      const failure = await session.call("control.acquire", [{ reason: "   " }]).then(
+        () => undefined,
+        (error: unknown) => error,
       )
+
+      // then
+      expect(failure).toBeInstanceOf(Error)
+      expect(failure).toMatchObject({ message: expect.stringContaining("control.acquire requires a non-empty reason") })
       expect(session.confirms.asked).toHaveLength(0)
       expect(session.count("control.grant")).toBe(0)
     })
