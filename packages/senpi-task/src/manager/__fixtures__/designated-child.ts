@@ -39,19 +39,38 @@ export async function runCategoryChild(
   input: DesignatedChildInput,
   adopt: (world: ModelChainWorld) => void,
 ): Promise<{ readonly record: TaskRecord; readonly world: ModelChainWorld }> {
-  const world = await createModelChainWorld(input.scripts, {
-    ...(input.userFallbackChains === undefined ? {} : { userFallbackChains: input.userFallbackChains }),
+  const { records, world } = await runCategoryChildren([input], adopt)
+  const [record] = records
+  if (record === undefined) throw new Error("no child record")
+  return { record, world }
+}
+
+/**
+ * Every input is started in the background by one parent, on one runner, in one world, before any is
+ * awaited, so they share one engine (one socket host for `host`). Categories must differ: each one plans
+ * its own chain. Scripts and user chains are taken from the first input.
+ */
+export async function runCategoryChildren(
+  inputs: readonly DesignatedChildInput[],
+  adopt: (world: ModelChainWorld) => void,
+): Promise<{ readonly records: readonly TaskRecord[]; readonly world: ModelChainWorld }> {
+  const [first] = inputs
+  if (first === undefined) throw new Error("no child to run")
+  const chains = new Map(inputs.map((input) => [input.category, input.chain]))
+  if (chains.size !== inputs.length) throw new Error("each child needs its own category")
+  const world = await createModelChainWorld(first.scripts, {
+    ...(first.userFallbackChains === undefined ? {} : { userFallbackChains: first.userFallbackChains }),
   })
   adopt(world)
   const project = tempProject()
   const inProcess = world.runner()
-  const kind = input.runner ?? "in-process"
+  const kind = first.runner ?? "in-process"
   const [parentProvider = "", parentId = ""] = chainIds(kind).parent.split("/")
   const manager = createTaskManager({
     store: createTaskRecordStore({ project_dir: project }),
     runners: { "in-process": inProcess, process: kind === "in-process" ? inProcess : await world.engineRunner(kind) },
-    planner: () => ({ kind: "resolved", plan: chainPlan(input.category, input.chain) }),
-    config: settings({ default_concurrency: 2, max_depth: 1 }),
+    planner: (spec) => ({ kind: "resolved", plan: chainPlan(spec.category ?? "", chains.get(spec.category ?? "") ?? []) }),
+    config: settings({ default_concurrency: inputs.length + 1, max_depth: 1 }),
     cwd: project,
     destruction: { destroyResidentTask: async () => {} },
   })
@@ -59,14 +78,17 @@ export async function runCategoryChild(
     const deps = makeDeps(manager)
     const task = settings({ default_execution_mode: kind === "in-process" ? "in-process" : "process" })
     const execute = buildTaskExecute({ ...deps, omoConfig: { ...deps.omoConfig, task } })
-    const result = await execute("call-1", { prompt: "do the thing", category: input.category, run_in_background: true }, undefined, undefined, {
-      cwd: project,
-      sessionManager: { getSessionId: () => "parent-1" },
-      model: { provider: parentProvider, id: parentId },
-    })
-    const taskId = result.details.task_id
-    if (typeof taskId !== "string" || !taskId.startsWith("st_")) throw new Error(`child did not start: ${JSON.stringify(result.details)}`)
-    return { record: await manager.waitFor(taskId), world }
+    const taskIds = await Promise.all(inputs.map(async (input, index) => {
+      const result = await execute(`call-${index + 1}`, { prompt: "do the thing", category: input.category, run_in_background: true }, undefined, undefined, {
+        cwd: project,
+        sessionManager: { getSessionId: () => "parent-1" },
+        model: { provider: parentProvider, id: parentId },
+      })
+      const taskId = result.details.task_id
+      if (typeof taskId !== "string" || !taskId.startsWith("st_")) throw new Error(`child did not start: ${JSON.stringify(result.details)}`)
+      return taskId
+    }))
+    return { records: await Promise.all(taskIds.map((taskId) => manager.waitFor(taskId))), world }
   } finally {
     manager.workpools.dispose()
   }

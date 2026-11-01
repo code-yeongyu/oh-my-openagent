@@ -185,8 +185,8 @@ export class RpcProcessRunner {
     }
     const reason = outcome === "timeout" ? `no answer within ${this.fallbackChainDeadlineMs} ms` : outcome.refused
     this.onWarning(
-      `task ${spec.task_id}: its fallback chain was not applied (${reason}), so it switches to a fallback model ` +
-        "only when a turn fails before any tool call",
+      `task ${spec.task_id}: its fallback chain was not applied (${reason}), so it is not held to its designated ` +
+        "models (the engine's own fallback settings apply)",
     )
   }
 

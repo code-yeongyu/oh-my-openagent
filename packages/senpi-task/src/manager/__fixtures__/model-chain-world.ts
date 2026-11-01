@@ -10,7 +10,7 @@ import { InProcessRunner } from "../../runners/in-process"
 import { createInProcessManagedRunner } from "../runner"
 import type { ManagedRunner } from "../types"
 import { answer, ALT, CLAUDE, MODELS, type Step, testModel } from "./model-chain-answers"
-import { type EngineRunner, type EngineRunnerKind, startEngineRunner } from "./model-chain-engines"
+import { type EngineRunner, type EngineRunnerKind, engineAgentDir, startEngineRunner } from "./model-chain-engines"
 
 export { ALT, CLAUDE, type Step }
 export const COUNT_TOOL = "count_once"
@@ -28,6 +28,8 @@ export type ModelChainWorld = {
   toolRuns(): number
   runner(): ManagedRunner
   engineRunner(kind: EngineRunnerKind): Promise<ManagedRunner>
+  /** The settings file an engine runner reads, copied byte for byte from `settingsPath` when it starts. */
+  engineSettingsPath(kind: EngineRunnerKind): string
   dispose(): Promise<void>
 }
 
@@ -101,6 +103,7 @@ export async function createModelChainWorld(
       engines.push(engine)
       return engine.runner
     },
+    engineSettingsPath: (kind) => join(engineAgentDir(root, kind), "settings.json"),
     dispose: async () => {
       for (const engine of engines.splice(0)) await engine.stop()
       rmSync(root, { recursive: true, force: true })

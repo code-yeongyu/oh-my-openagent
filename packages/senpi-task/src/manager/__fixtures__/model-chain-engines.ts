@@ -30,10 +30,15 @@ export type EngineRunner = {
   stop(): Promise<void>
 }
 
+/** The engine's own agent dir: its `settings.json` is the user's settings file as that engine reads it. */
+export function engineAgentDir(root: string, kind: EngineRunnerKind): string {
+  return join(root, `${kind}-agent`)
+}
+
 /** A real senpi engine outside the test process: a per-child process, or a socket host's session. */
 export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInput): Promise<EngineRunner> {
   const home = join(input.root, "home")
-  const agentDir = join(input.root, `${kind}-agent`)
+  const agentDir = engineAgentDir(input.root, kind)
   mkdirSync(home, { recursive: true })
   mkdirSync(agentDir, { recursive: true })
   const providers = startHttpProviders(input.scripts)
