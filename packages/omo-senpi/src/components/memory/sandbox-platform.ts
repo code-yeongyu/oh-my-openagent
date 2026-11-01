@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdirSync, realpathSync } from "@oh-my-opencode/
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { attestUsernsRoots, USERNS_ROOTS_ENV } from "../../../../omo-native/trust-userns"
+import { attestUsernsRoots, inheritedTrustPaths, USERNS_ROOTS_ENV } from "../../../../omo-native/trust-userns"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
 
@@ -153,7 +153,10 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
       env: {
         ...spawnArgs.env,
         TMPDIR: "/tmp",
-        [USERNS_ROOTS_ENV]: attestUsernsRoots([join(spawnArgs.env.HOME ?? homedir(), ".omo", "engine-trust")]),
+        [USERNS_ROOTS_ENV]: attestUsernsRoots([
+          join(spawnArgs.env.HOME ?? homedir(), ".omo", "engine-trust"),
+          ...inheritedTrustPaths(spawnArgs.env.SENPI_ENGINE_TRUST),
+        ]),
       },
       command: executable,
       args: [

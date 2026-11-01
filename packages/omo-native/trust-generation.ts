@@ -68,7 +68,7 @@ async function ancestors(path: string): Promise<void> {
       const uid = Number(stat.uid)
       if ((mode & 0o022) !== 0 && (mode & 0o1000) === 0) throw new Error("unsafe trust ancestor")
       if (uid !== 0 && uid !== process.getuid?.()
-        && !(view !== null && attestedOverflowRoot(view, { uid, dev: stat.dev, ino: stat.ino }))) {
+        && !(view !== null && attestedOverflowRoot(view, current, { uid, dev: stat.dev, ino: stat.ino }))) {
         if (view?.namespaced && uid === view.overflowUid) throw new TrustStorageError("trust-userns-unattested")
         throw new Error("unsafe trust ancestor")
       }
@@ -116,7 +116,7 @@ export async function prepareTrustDirectory(requested: string, platform: NodeJS.
     directory = await temporaryTrustDirectory(platform)
     codes.push({ code: "trust-dir-unsafe" })
   }
-  if (directory === requested) {
+  if (directory === requested && platform === "linux") {
     try { await fs.access(requested, constants.W_OK) } catch {
       directory = await temporaryTrustDirectory(platform)
       codes.push({ code: "trust-dir-readonly" })
