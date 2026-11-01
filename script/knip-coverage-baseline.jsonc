@@ -3590,8 +3590,6 @@
         "bin/lib/agent-dir.js": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
         "bin/lib/bun-runtime.js": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodeVersionFloor
-        "bin/lib/claude-code-floor.js": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
         "bin/lib/computer-use-doctor.js": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
