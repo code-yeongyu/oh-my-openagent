@@ -18,6 +18,8 @@ export interface BeforeAgentStartHandlerOptions {
   previewSafe?: boolean
   /** Stable omo subscriber name, retained in bundled settle diagnostics. */
   hookLabel?: string
+  /** Required read-only status delivery before host settlement; never journal writes, reflection or recovery. */
+  settleDelivery?: boolean
 }
 
 export interface SettleObserver {
