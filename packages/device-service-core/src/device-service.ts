@@ -52,7 +52,7 @@ export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Pla
 }
 
 /** How an attach ended: a service-reported reason, the connection closing, or this client's own detach. */
-export type AttachEnd = DetachReason | "closed" | "detached"
+export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
 
 export type RemoteAttachEvent =
   | { readonly kind: "pending"; readonly reason: AttachPendingReason }
@@ -69,12 +69,14 @@ export type RemoteAttach = {
   readonly snapshot: Promise<SnapshotBody>
   /** Settles with the reason once the attach ends, whoever ended it. */
   readonly detached: Promise<AttachEnd>
-  /** Every event of this attach, in order, including those that arrived before the listener was added. */
+  /** Every event of this attach in order, replayed from the latest snapshot for a listener added later. */
   readonly onEvent: (listener: (event: RemoteAttachEvent) => void) => () => void
   /** One page of older history; entries too large to fetch are marked `too_large`. */
   readonly read: (options?: { readonly before?: string; readonly tail?: number }) => Promise<ReadPage>
   /** Detaches; afterwards this attach holds no subscription on the connection and `detached` settles "detached". */
   readonly detach: () => Promise<void>
+  /** The error a listener threw, which ended the attach with "listener_failed"; undefined otherwise. */
+  readonly failure: () => unknown
 }
 
 export type DeviceService = {
@@ -152,6 +154,7 @@ function openAttach(client: LocalApiClient, device: string, sessionId: string): 
     resolveDetached = resolve
   })
   let ended = false
+  let failure: unknown
   const finish = (reason: AttachEnd) => {
     if (ended) return
     ended = true
@@ -160,11 +163,23 @@ function openAttach(client: LocalApiClient, device: string, sessionId: string): 
     rejectSnapshot(new Error(`the attach ended before its snapshot: ${reason}`))
     resolveDetached(reason)
   }
+  // Listeners run inside the connection's data handler: a throw there must end this attach, never the connection.
   const deliver = (event: AttachEvent) => {
     const remote = toRemote(event)
+    if (remote.kind === "snapshot") {
+      history.length = 0
+      resolveSnapshot(remote.snapshot)
+    }
     history.push(remote)
-    if (remote.kind === "snapshot") resolveSnapshot(remote.snapshot)
-    for (const listener of [...listeners]) listener(remote)
+    for (const listener of [...listeners]) {
+      try {
+        listener(remote)
+      } catch (error) {
+        failure = error
+        finish("listener_failed")
+        return
+      }
+    }
     if (remote.kind === "detached") finish(remote.reason)
   }
   const stop = client.onEvent(event => {
@@ -186,9 +201,10 @@ function openAttach(client: LocalApiClient, device: string, sessionId: string): 
         detached,
         onEvent: listener => {
           for (const event of history) listener(event)
-          listeners.add(listener)
+          if (!ended) listeners.add(listener)
           return () => listeners.delete(listener)
         },
+        failure: () => failure,
         read: (options = {}) =>
           client.read(attach, {
             ...(options.before === undefined ? {} : { before_entry_id: options.before }),

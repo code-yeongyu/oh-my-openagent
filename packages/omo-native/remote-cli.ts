@@ -1,6 +1,9 @@
 import { existsSync } from "node:fs"
 
 import {
+  type AccountShowResult,
+  accountStateNotice,
+  classifyAccountShow,
   connectDeviceService,
   type DeviceRow,
   type DeviceService,
@@ -14,7 +17,13 @@ import {
   type Status,
   type StatusState,
 } from "../device-service-core/src/index.ts"
+import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
+import { syncPinDir } from "../memory-core/src/sync/pin-dir"
+import { createCredentialStore, type CredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
+import { serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
+import { runAccountVerb } from "./account-cli"
 import packageJson from "./package.json" with { type: "json" }
+import { serveRemoteAttach } from "./remote-attach"
 
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
 // device-service SDK: every command has a human table and a --json form that prints the SDK's typed value as is.
@@ -25,9 +34,12 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
   devices                                  the devices on this account
   sessions [--device D] [--project P] [--state running|idle|ended]
                                            sessions across the account's devices
-  enable | disable                         turn remote sessions on or off for this device`
+  enable | disable                         turn remote sessions on or off for this device
+  attach <device>/<session>                watch a session on another device (input is not enabled yet)`
 
 export interface RemoteCommandDependencies {
+  /** `omo account show`: the first bootstrap step; nothing else runs unless it reports signed in. */
+  readonly accountShow: () => Promise<AccountShowResult>
   readonly stateDir: string
   readonly connect: () => Promise<DeviceService>
   readonly now: () => number
@@ -185,6 +197,8 @@ export async function runRemoteVerb(dependencies: RemoteCommandDependencies, arg
     dependencies.error(REMOTE_USAGE)
     return REMOTE_EXIT.usage
   }
+  const signedOut = await accountNotice(dependencies)
+  if (signedOut !== undefined) return signedOut
   if (!existsSync(dependencies.stateDir)) {
     dependencies.error("The OmO device service is not set up on this device. Install the OmO desktop app to set it up.")
     return REMOTE_EXIT.unavailable
@@ -212,6 +226,34 @@ export async function runRemoteVerb(dependencies: RemoteCommandDependencies, arg
   }
 }
 
+async function accountNotice(dependencies: RemoteCommandDependencies): Promise<number | undefined> {
+  const notice = accountStateNotice(classifyAccountShow(await dependencies.accountShow()))
+  if (notice === undefined) return undefined
+  dependencies.error(notice)
+  return REMOTE_EXIT.unavailable
+}
+
+async function inProcessAccountShow(): Promise<AccountShowResult> {
+  const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
+  const lines: string[] = []
+  let store: CredentialStore | undefined
+  const exitCode = await runAccountVerb(
+    {
+      api,
+      get store() {
+        store ??= createCredentialStore(api, { wait: SESSION_READ_WAIT })
+        return store
+      },
+      pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
+      readStdin: async () => "",
+      output: line => lines.push(line),
+      error: () => {},
+    },
+    ["show"],
+  )
+  return { exitCode, stdout: lines.join("\n") }
+}
+
 function reportFailure(dependencies: RemoteCommandDependencies, error: unknown): number {
   if (error instanceof LocalApiError) {
     dependencies.error(`omo remote: ${error.reason}`)
@@ -222,16 +264,67 @@ function reportFailure(dependencies: RemoteCommandDependencies, error: unknown):
   return REMOTE_EXIT.failed
 }
 
-export async function runRemoteCommand(args: readonly string[]): Promise<void> {
+export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
+
+/**
+ * `omo remote attach <device>/<session>`: attaches through the device service and serves the session on a private
+ * endpoint for the engine's attach TUI. Returns the engine arguments to launch, or the exit code when it cannot.
+ */
+export async function prepareRemoteAttach(dependencies: RemoteCommandDependencies, args: readonly string[]): Promise<RemoteAttachLaunch | number> {
+  const [target, ...extra] = args
+  const slash = target?.indexOf("/") ?? -1
+  if (target === undefined || extra.length > 0 || slash <= 0 || slash === target.length - 1) {
+    dependencies.error("usage: omo remote attach <device>/<session>   (the SESSION column of omo remote sessions)")
+    return REMOTE_EXIT.usage
+  }
+  const device = target.slice(0, slash)
+  const sessionId = target.slice(slash + 1)
+  const signedOut = await accountNotice(dependencies)
+  if (signedOut !== undefined) return signedOut
+  if (!existsSync(dependencies.stateDir) || !existsSync(deviceServiceEndpointPath(dependencies.stateDir))) {
+    dependencies.error("The OmO device service is not running on this device.")
+    return REMOTE_EXIT.unavailable
+  }
+  let service: DeviceService
+  try {
+    service = await dependencies.connect()
+  } catch (error) {
+    return reportFailure(dependencies, error)
+  }
+  try {
+    const attach = await service.attach(device, sessionId)
+    await attach.snapshot
+    const endpoint = await serveRemoteAttach(attach, { label: target })
+    void service.closed.then(() => endpoint.close())
+    return { engineArgs: ["--attach", endpoint.socketPath, "--session", endpoint.sessionRef, "--no-extensions"] }
+  } catch (error) {
+    service.close()
+    return reportFailure(dependencies, error)
+  }
+}
+
+function remoteDependencies(): RemoteCommandDependencies {
   const stateDir = deviceServiceStateDir()
-  process.exitCode = await runRemoteVerb(
-    {
-      stateDir,
-      connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
-      now: () => Date.now(),
-      output: line => process.stdout.write(`${line}\n`),
-      error: line => process.stderr.write(`${line}\n`),
-    },
-    args.slice(1),
-  )
+  return {
+    accountShow: inProcessAccountShow,
+    stateDir,
+    connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
+    now: () => Date.now(),
+    output: line => process.stdout.write(`${line}\n`),
+    error: line => process.stderr.write(`${line}\n`),
+  }
+}
+
+/** The launchers' entry for `omo remote attach`: the engine argv to run in place of this command, or undefined (exit code set). */
+export async function runRemoteAttachCommand(args: readonly string[]): Promise<readonly string[] | undefined> {
+  const prepared = await prepareRemoteAttach(remoteDependencies(), args.slice(2))
+  if (typeof prepared === "number") {
+    process.exitCode = prepared
+    return undefined
+  }
+  return prepared.engineArgs
+}
+
+export async function runRemoteCommand(args: readonly string[]): Promise<void> {
+  process.exitCode = await runRemoteVerb(remoteDependencies(), args.slice(1))
 }
