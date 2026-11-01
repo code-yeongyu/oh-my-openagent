@@ -181,8 +181,10 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
   }
 }
 
-const isConnectFailure = (error: unknown): boolean =>
-  error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))
+// A stopped service: its socket is gone (POSIX) or its TCP endpoint refuses (Windows keeps endpoint.json).
+const isServiceStopped = (error: unknown): boolean =>
+  (error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
+  (error instanceof LocalApiError && error.code === "handshake_timeout")
 
 export async function runRemoteVerb(dependencies: RemoteCommandDependencies, args: readonly string[]): Promise<number> {
   let parsed: Parsed
@@ -211,7 +213,7 @@ export async function runRemoteVerb(dependencies: RemoteCommandDependencies, arg
   try {
     service = await dependencies.connect()
   } catch (error) {
-    if (isConnectFailure(error) || (error instanceof LocalApiError && error.code === "handshake_timeout")) {
+    if (isServiceStopped(error)) {
       dependencies.error("The OmO device service is not running on this device.")
       return REMOTE_EXIT.unavailable
     }
@@ -289,6 +291,10 @@ export async function prepareRemoteAttach(dependencies: RemoteCommandDependencie
   try {
     service = await dependencies.connect()
   } catch (error) {
+    if (isServiceStopped(error)) {
+      dependencies.error("The OmO device service is not running on this device.")
+      return REMOTE_EXIT.unavailable
+    }
     return reportFailure(dependencies, error)
   }
   try {
