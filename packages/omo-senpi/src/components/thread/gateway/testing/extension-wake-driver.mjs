@@ -16,6 +16,7 @@ if (scenario === "crashBeforeCommit") {
   console.log("READY")
   // The operation enqueues, then never returns: the parent kills this process after the wake
   // marker appears, while the joined transaction is still open.
+  await new Promise((resolve) => process.stdin.once("data", resolve))
   void store.extensionCall("alpha", "hangAfterEnqueue", bind("target"))
 } else if (scenario === "crashAfterCommit") {
   const store = createGatewayStore({ agentDir, resolveTarget: async () => ({ kind: "ok", target: { durable_id: "target", endpoint: null, liveness: "dead" } }) })

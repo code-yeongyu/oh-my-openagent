@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync, watch } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, sep } from "node:path"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
@@ -103,27 +103,34 @@ test("#given a crash between marker and COMMIT #when the store reopens #then rec
   const h = (harness = createGatewayHarness())
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
   const inbox = gatewayInboxDirectory(agentDir, "target")
-  const inboxRoot = join(gatewayRootDirectory(agentDir), "inbox")
-  mkdirSync(inboxRoot, { recursive: true })
-  const markerAppeared = new Promise<string>((resolve, reject) => {
-    const watcher = watch(inboxRoot, { recursive: true }, (_event, filename) => {
-      if (typeof filename !== "string") return
-      const name = filename.split(sep).join("/")
-      if (!name.startsWith("target/") || !existsSync(join(inboxRoot, name)) || !statSync(join(inboxRoot, name)).isFile()) return
-      clearTimeout(deadline)
-      watcher.close()
-      resolve(name)
-    })
-    const deadline = setTimeout(() => {
-      watcher.close()
-      reject(new Error("waited 10s for the joined wake marker, never appeared"))
-    }, 10_000)
-  })
-  const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "crashBeforeCommit", agentDir], { stdout: "pipe", stderr: "pipe" })
-  const watchdog = setTimeout(() => child.kill(), 15_000)
+  const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "crashBeforeCommit", agentDir], { stdin: "pipe", stdout: "pipe", stderr: "pipe" })
+  const markerAppeared = (async () => {
+    const reader = child.stdout.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    try {
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) throw new Error("child exited before the pre-COMMIT marker receipt")
+        buffer += decoder.decode(value, { stream: true })
+        let end: number
+        while ((end = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, end)
+          buffer = buffer.slice(end + 1)
+          if (line === "READY") continue
+          const receipt = JSON.parse(line) as { enqueuedBeforeCommit: boolean }
+          expect(receipt.enqueuedBeforeCommit).toBe(true)
+          return
+        }
+      }
+    } finally { reader.releaseLock() }
+  })()
+  const watchdog = setTimeout(() => child.kill(), 10_000)
   let store: GatewayStore | undefined
   try {
+    child.stdin.write("GO\n")
     await markerAppeared
+    expect(readdirSync(inbox)).toHaveLength(1)
     child.kill()
     await child.exited
     store = h.store({ agentDir })
