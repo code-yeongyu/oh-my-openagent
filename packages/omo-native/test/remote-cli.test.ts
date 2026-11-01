@@ -24,7 +24,9 @@ const privateDir = (): string => {
   return dir
 }
 
-async function run(args: readonly string[], stateDir?: string) {
+const SIGNED_IN = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
+
+async function run(args: readonly string[], stateDir?: string, account = SIGNED_IN) {
   let dir = stateDir
   if (dir === undefined) {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
@@ -36,6 +38,7 @@ async function run(args: readonly string[], stateDir?: string) {
   const target = dir
   const code = await runRemoteVerb(
     {
+      accountShow: async () => account,
       stateDir: target,
       connect: () => connectDeviceService({ version: "5.1.52", stateDir: target }),
       now: () => NOW,
@@ -106,6 +109,22 @@ describe("omo remote", () => {
     const stopped = await run(["status"], privateDir())
     expect(stopped.code).toBe(REMOTE_EXIT.unavailable)
     expect(stopped.err).toEqual(["The OmO device service is not running on this device."])
+  })
+})
+
+describe("omo remote bootstrap: omo account show first", () => {
+  test.each([
+    ["signed out", { exitCode: 0, stdout: '{"signedIn":false}' }, "Sign in to OmO first: run omo login (or sign in from the OmO desktop app)."],
+    ["signed out after omo logout", { exitCode: 0, stdout: '{"signedIn":false,"signedOut":{"at":"2026-10-30T00:00:00.000Z"}}' }, "Sign in to OmO first: run omo login (or sign in from the OmO desktop app)."],
+    ["a locked keychain (exit 7)", { exitCode: 7, stdout: '{"keychain":"locked"}' }, "Your OmO sign-in is behind a locked keychain. Unlock it, then try again."],
+    ["an unavailable store (exit 9)", { exitCode: 9, stdout: '{"error":"store-unavailable"}' }, "The credential store holding your OmO sign-in is not available right now. Try again in a moment."],
+    ["output that is not JSON", { exitCode: 0, stdout: "garbage" }, "Could not read your OmO sign-in (omo account show printed no JSON). Sign in again with omo login."],
+    ["signedIn true with a failing exit", { exitCode: 1, stdout: '{"signedIn":true,"device":{"id":"d","name":"n"}}' }, "Could not read your OmO sign-in (omo account show answered an unexpected shape (exit 1)). Sign in again with omo login."],
+  ])("%s stops before contacting the service", async (_label, account, notice) => {
+    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    owners.push(owner)
+    const { code, err, out } = await run(["status"], owner.stateDir, account)
+    expect([code, err, out]).toEqual([REMOTE_EXIT.unavailable, [notice], []])
   })
 })
 
