@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { readFileSync } from "node:fs"
 
+import { DEFAULT_CATEGORIES } from "../category"
 import { createTaskRecordStore } from "../store"
 import { createTaskRecord, type ResolvedModelRecord, type TaskRecord } from "../state"
 import { createTaskManager } from "./manager"
@@ -106,6 +107,36 @@ describe("a category child whose whole chain is spent runs on its parent's model
     expect(record.parent_model).toBeUndefined()
     expect(record.failure_kind).toBe("provider_lock_exhausted")
     expect(record.error_message).toContain("category \"unspecified-high\"")
+    expect(record.error_message).toContain("until 3:20am")
+  }, 30_000)
+
+  test("#given the shipped deep-high lock and an OpenAI-only chain #when its only vendor hits its usage limit under a Claude parent #then the child fails typed with the reset and never runs on the parent (#12006)", async () => {
+    // given
+    const astra = rung(GPT, "gpt-6-astra")
+    const deepHigh: ResolvedChildPlan = {
+      model: astra.display,
+      category: "deep-high",
+      requested_model: astra,
+      resolved_model: astra,
+      fallback_models: [],
+      providerLock: DEFAULT_CATEGORIES["deep-high"]?.provider_lock,
+    }
+    const claudeParent = `${CLAUDE}/claude-opus-5-5`
+
+    // when
+    const { record, world } = await runChild({
+      scripts: { [astra.display]: ["quota"] },
+      plan: deepHigh,
+      spec: { category: "deep-high", parent_model: claudeParent },
+    })
+
+    // then
+    expect(record.status).toBe("error")
+    expect(world.calls.map((call) => call.model)).toEqual([astra.display])
+    expect(record.parent_model).toBeUndefined()
+    expect(record.provider_lock).toBe("openai")
+    expect(record.failure_kind).toBe("provider_lock_exhausted")
+    expect(record.error_message).toContain("category \"deep-high\"")
     expect(record.error_message).toContain("until 3:20am")
   }, 30_000)
 

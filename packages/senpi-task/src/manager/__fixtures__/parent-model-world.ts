@@ -35,8 +35,8 @@ export type ParentModelWorld = {
 }
 
 const MODELS: Readonly<Record<string, readonly string[]>> = {
-  [CLAUDE]: ["primary", "sibling"],
-  [GPT]: ["parent"],
+  [CLAUDE]: ["primary", "sibling", "claude-opus-5-5"],
+  [GPT]: ["parent", "gpt-6-astra"],
   [ALT]: ["rung"],
 }
 
