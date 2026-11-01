@@ -16,7 +16,7 @@ import type { TelemetrySessionRole } from "./session-role"
  * every other masked id, `custom` included, is its own wire value. Inlined rather than importing the
  * whole semconv map, which would land in the small main entry; a test pins it to the table.
  */
-export const GEN_AI_PROVIDER_WIRE: Readonly<Record<string, string>> = {
+const GEN_AI_PROVIDER_WIRE: Readonly<Record<string, string>> = {
   google: "gcp.gemini",
   "google-vertex": "gcp.vertex_ai",
   xai: "x_ai",
