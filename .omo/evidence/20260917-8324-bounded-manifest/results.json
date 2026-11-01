@@ -1,0 +1,59 @@
+{
+  "platform": "darwin-arm64",
+  "node": "24.12.0",
+  "bun": "1.4.2",
+  "target_test": {
+    "passed": 1,
+    "failed": 0,
+    "assertions": 5,
+    "duration_ms": 516.54
+  },
+  "earlier_checkout_backed_observation_ms": 4872.51,
+  "typecheck": "passed",
+  "isolated_install": {
+    "plugin_cache": true,
+    "enabled": true,
+    "component_bins": 9,
+    "agent_tomls": true,
+    "real_config_unchanged": true
+  },
+  "app_server": {
+    "local_mock_turn_completed": true,
+    "hook_events": [
+      "sessionStart",
+      "userPromptSubmit",
+      "stop"
+    ],
+    "real_config_unchanged": true
+  },
+  "tui": {
+    "boot_render_survived": true,
+    "observed_screen": "trust prompt",
+    "real_config_unchanged": true
+  },
+  "compatibility_final": {
+    "exit_code": 1,
+    "vitest": [
+      {
+        "passed": 97
+      },
+      {
+        "passed": 671
+      }
+    ],
+    "bun": {
+      "passed": 475,
+      "skipped": 1,
+      "failed": 0
+    },
+    "node": {
+      "passed": 497,
+      "failed": 2
+    },
+    "failures": [
+      "startup migration expected one cleanup notice, received zero",
+      "migration-failure path denied creation of default data directory (EPERM)"
+    ],
+    "baseline": "not established"
+  }
+}
