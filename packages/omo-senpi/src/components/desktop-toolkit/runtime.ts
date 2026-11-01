@@ -4,11 +4,14 @@ import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { DESKTOP_TOOLKIT_TOOL_NAME, TOOLKIT_REQUEST_EVENT, TOOLKIT_GRANT_RPC, TOOLKITS_CONTEXT_KEY, type ToolkitGrant } from "./index"
 import { callThreadTool, listThreadTools } from "./thread-tools"
+import { callingSessionId, createHostToolRoutes } from "./host-tool-routes"
+import { type LoadSdk, registerHostToolExecution } from "./host-tool-execution"
 
 const DEFAULT_ACQUIRE_TIMEOUT_MS = 15_000
 // Turns to wait after the 1st, 2nd and 3rd failed attempt before the next background retry. After the 4th failure the
 // session stops asking: an app that never offers the grant costs at most three retries, not one request per turn forever.
 const RETRY_GAPS_IN_TURNS: readonly number[] = [1, 2, 4]
+const DISCOVERY_TOOLKITS = ["thread", "host"] as const
 
 const PARAMETERS = {
   type: "object",
@@ -22,6 +25,7 @@ const PARAMETERS = {
 
 type Settled = { readonly ok: true; readonly grant: ToolkitGrant } | { readonly ok: false; readonly reason: string }
 interface SessionDiscovery {
+  readonly toolkit: (typeof DISCOVERY_TOOLKITS)[number]
   readonly controller: AbortController
   startupPending: boolean
   running?: Promise<void>
@@ -74,16 +78,8 @@ function isPreviewEvent(event: unknown): boolean {
   return typeof event === "object" && event !== null && "preview" in event && event.preview === true
 }
 
-function callingSessionId(context: unknown): string | undefined {
-  if (typeof context !== "object" || context === null || !("sessionManager" in context)) return undefined
-  const manager = context.sessionManager
-  if (typeof manager !== "object" || manager === null || !("getSessionId" in manager) || typeof manager.getSessionId !== "function") return undefined
-  const id: unknown = manager.getSessionId()
-  return typeof id === "string" && id.length > 0 ? id : undefined
-}
-
 /** Asks the app for a toolkit it hosts for this session's thread; only toolkits listed in `omo_toolkits` are requested. */
-export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: number } = {}): OmoSenpiComponent {
+export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: number; readonly loadSdk?: LoadSdk } = {}): OmoSenpiComponent {
   const timeoutMs = options.timeoutMs ?? DEFAULT_ACQUIRE_TIMEOUT_MS
   return {
     name: "desktop-toolkit",
@@ -93,6 +89,19 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
       const sessions = new Map<string, SessionDiscovery>()
       const grants = new Map<string, ToolkitGrant>()
       const registered = new Set<string>()
+      const hostNames = typeof pi.sessionContext === "object" && pi.sessionContext !== null &&
+        "host_tool_names" in pi.sessionContext && typeof pi.sessionContext.host_tool_names === "string"
+        ? new Set(pi.sessionContext.host_tool_names.split(",").map((name) => name.trim()).filter(Boolean))
+        : new Set<string>()
+
+      registerHostToolExecution(pi, hostNames, options.loadSdk)
+      const routes = createHostToolRoutes(pi, {
+        grants, timeoutMs,
+        onLost(sessionId) {
+          const state = sessions.get(`host:${sessionId}`)
+          if (state !== undefined) failAttempt(state)
+        },
+      })
 
       async function acquire(toolkit: string, signal?: AbortSignal): Promise<Settled> {
         if (signal?.aborted) return { ok: false, reason: "cancelled" }
@@ -150,7 +159,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
       })
 
       async function discover(sessionId: string, state: SessionDiscovery): Promise<void> {
-        if (state.controller.signal.aborted || grants.has(sessionId)) return
+        if (state.controller.signal.aborted || grants.has(`${state.toolkit}:${sessionId}`)) return
         if (state.running !== undefined) return state.running
         state.startupPending = false
         const run: Promise<void> = runDiscovery(sessionId, state).finally(() => {
@@ -163,7 +172,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
       async function runDiscovery(sessionId: string, state: SessionDiscovery): Promise<void> {
         const signal = state.controller.signal
         try {
-          const settled = await acquire("thread", signal)
+          const settled = await acquire(state.toolkit, signal)
           if (signal.aborted) return
           if (!settled.ok) {
             failAttempt(state)
@@ -175,8 +184,15 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
           if (signal.aborted) return
           state.failed = false
           state.failures = 0
-          grants.set(sessionId, settled.grant)
+          grants.set(`${state.toolkit}:${sessionId}`, settled.grant)
           for (const tool of tools) {
+            const attachment = tool.attachment
+            if (state.toolkit === "host") {
+              if (attachment === undefined || !hostNames.has(attachment.name)) continue
+              routes.set(attachment.name, tool.name, sessionId)
+              continue
+            }
+            if (attachment !== undefined) continue
             const name = `desktop_${tool.name}`
             if (registered.has(name)) continue
             const inventory: unknown = "getAllTools" in pi && typeof pi.getAllTools === "function" ? pi.getAllTools() : []
@@ -190,7 +206,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
               async execute(_id: string, args: Record<string, unknown>, signal?: AbortSignal, _onUpdate?: unknown, callCtx?: unknown) {
                 const caller = callingSessionId(callCtx)
                 // Never substitute the registering session when the caller has no grant.
-                const grant = caller === undefined ? undefined : grants.get(caller)
+                const grant = caller === undefined ? undefined : grants.get(`thread:${caller}`)
                 return callThreadTool(grant, tool.name, args, timeoutMs, signal)
               },
             })
@@ -205,7 +221,9 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
       }
 
       pi.on("session_start", (_event, eventCtx) => {
-        if (pi.rpc === undefined || !offeredToolkits(pi.sessionContext).has("thread")) {
+        const offered = offeredToolkits(pi.sessionContext)
+        const toolkits = DISCOVERY_TOOLKITS.filter((toolkit) => offered.has(toolkit))
+        if (pi.rpc === undefined || toolkits.length === 0) {
           ctx.logger.debug?.("desktop thread toolkit unavailable", { reason: "not_offered" })
           return
         }
@@ -214,11 +232,14 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
           ctx.logger.info("desktop thread toolkit unavailable", { reason: "missing_session" })
           return
         }
-        if (sessions.has(sessionId)) return
-        const state: SessionDiscovery = { controller: new AbortController(), startupPending: true, failed: false, failures: 0, turnsSinceFailure: 0 }
-        sessions.set(sessionId, state)
-        deferUntilAfterFirstPaint(ctx, "desktop thread toolkit", () =>
-          state.startupPending ? discover(sessionId, state) : undefined)
+        for (const toolkit of toolkits) {
+          const key = `${toolkit}:${sessionId}`
+          if (sessions.has(key)) continue
+          const state: SessionDiscovery = { toolkit, controller: new AbortController(), startupPending: true, failed: false, failures: 0, turnsSinceFailure: 0 }
+          sessions.set(key, state)
+          deferUntilAfterFirstPaint(ctx, "desktop thread toolkit", () =>
+            state.startupPending ? discover(sessionId, state) : undefined)
+        }
       })
       // The first real turn joins the bounded startup attempt. After a failure, retries run in the background without
       // waiting, on the turns RETRY_GAPS_IN_TURNS allows, so an app that never answers cannot hold any prompt for the
@@ -227,17 +248,26 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
       pi.on("before_agent_start", (event, eventCtx) => {
         if (isPreviewEvent(event)) return
         const sessionId = callingSessionId(eventCtx)
-        const state = sessionId === undefined ? undefined : sessions.get(sessionId)
-        if (sessionId === undefined || state === undefined) return
-        if (!state.failed) return discover(sessionId, state)
-        if (state.running === undefined && retryDue(state)) void discover(sessionId, state)
+        if (sessionId === undefined) return
+        const pending: Promise<void>[] = []
+        for (const toolkit of DISCOVERY_TOOLKITS) {
+          const state = sessions.get(`${toolkit}:${sessionId}`)
+          if (state === undefined) continue
+          if (!state.failed) pending.push(discover(sessionId, state))
+          else if (state.running === undefined && retryDue(state)) void discover(sessionId, state)
+        }
+        return Promise.all(pending)
       }, { previewSafe: true })
       pi.on("session_shutdown", (_event, eventCtx) => {
         const sessionId = callingSessionId(eventCtx)
         if (sessionId === undefined) return
-        sessions.get(sessionId)?.controller.abort()
-        sessions.delete(sessionId)
-        grants.delete(sessionId)
+        for (const toolkit of DISCOVERY_TOOLKITS) {
+          const key = `${toolkit}:${sessionId}`
+          sessions.get(key)?.controller.abort()
+          sessions.delete(key)
+          grants.delete(key)
+        }
+        routes.clear(sessionId)
       })
     },
   }

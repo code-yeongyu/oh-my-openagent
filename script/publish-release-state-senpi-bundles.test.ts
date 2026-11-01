@@ -57,4 +57,34 @@ describe("release-state staging of the committed Senpi bundles", () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  // Release contract (#12046): the service-auth bundle inlines packages/omo-native/package.json's
+  // version, so the release commit must rebuild it after the bump and stage it, or the release-state
+  // PR fails build-service-auth.test.ts as stale.
+  test("rebuilds the service-auth bundle after the version bump and stages it", () => {
+    const bundle = "packages/omo-native/bin/lib/service-auth.generated.js"
+    const lines = prepareStep.split("\n")
+    const bump = lines.findIndex((line) => line.includes("packages/omo-native/package.json > tmp.json"))
+    const build = lines.findIndex((line) => /^bun (run )?script\/build-service-auth\.ts\b/.test(line))
+    expect(bump).toBeGreaterThanOrEqual(0)
+    expect(build).toBeGreaterThan(bump)
+
+    const root = mkdtempSync(join(tmpdir(), "omo-release-state-"))
+    try {
+      git(root, "init", "-q")
+      mkdirSync(join(root, dirname(bundle)), { recursive: true })
+      writeFileSync(join(root, bundle), "version 1\n")
+      git(root, "add", "-A")
+      git(root, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "base")
+      writeFileSync(join(root, bundle), "version 2\n")
+      const staging = lines.filter((line) => /^git add\b/.test(line) && line.includes("packages/omo-native/bin"))
+
+      const result = spawnSync("bash", ["-e", "-c", staging.join("\n")], { cwd: root, encoding: "utf8" })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(git(root, "diff", "--cached", "--name-only").trim()).toBe(bundle)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })

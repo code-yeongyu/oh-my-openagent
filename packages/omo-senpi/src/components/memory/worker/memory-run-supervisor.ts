@@ -4,31 +4,25 @@ import { closeSync, openSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { maybeKillAt } from "@oh-my-opencode/memory-core"
 import { runMemoryHook } from "@oh-my-opencode/memory-core/memory-hook"
-
-import {
-  unlinkRunArtifact,
-  updateRunLedger,
-  type RunOutcome,
-} from "./run-artifacts"
-import {
-  getSupervisorProcessStart,
-  getSupervisorRuntimePlatform,
-  parseSupervisorChildExit,
-  readSupervisorClockNow,
-  recordSupervisorGracefulDeadline,
-  scheduleSupervisorDeadline,
-  terminateSupervisorChildGracefully,
-  terminateSupervisorChildHard,
-  type SupervisorChildExit,
-} from "./supervisor-process-identity"
-import { publishRunOutcome } from "./run-outcome-publication"
-import { runChildBootstrap } from "./supervisor-child-bootstrap"
-import { admitSupervisor } from "./supervisor-admission"
-
+import type { RunOutcome } from "./run-artifacts"
+import type { SupervisorChildExit } from "./supervisor-process-identity"
 
 async function runSupervisor(runDir: string): Promise<void> {
+  const { maybeKillAt } = await import("@oh-my-opencode/memory-core")
+  const { unlinkRunArtifact, updateRunLedger } = await import("./run-artifacts")
+  const {
+    getSupervisorProcessStart,
+    getSupervisorRuntimePlatform,
+    parseSupervisorChildExit,
+    readSupervisorClockNow,
+    recordSupervisorGracefulDeadline,
+    scheduleSupervisorDeadline,
+    terminateSupervisorChildGracefully,
+    terminateSupervisorChildHard,
+  } = await import("./supervisor-process-identity")
+  const { publishRunOutcome } = await import("./run-outcome-publication")
+  const { admitSupervisor } = await import("./supervisor-admission")
   const launchPath = join(runDir, "launch.json")
   const ledgerPath = join(runDir, "ledger.json")
   const { manifest, lease } = await admitSupervisor(runDir)
@@ -146,6 +140,7 @@ try {
     process.exitCode = runMemoryHook(args.slice(1), process.cwd())
   } else if (args[0] === "--child-bootstrap") {
     if (args[1] === undefined) throw new TypeError("run directory is required")
+    const { runChildBootstrap } = await import("./supervisor-child-bootstrap")
     await runChildBootstrap(args[1])
   } else {
     if (args[0] === undefined) throw new TypeError("run directory is required")
