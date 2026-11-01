@@ -21,6 +21,7 @@ export function createFakeManager(overrides: Partial<TaskManager>): TaskManager 
     start: () => notImplemented("start"),
     startOwned: () => notImplemented("startOwned"),
     findOwnedTask: () => undefined,
+    findOwnedTasks: () => [],
     continueTask: () => notImplemented("continueTask"),
     sendToTask: () => notImplemented("sendToTask"),
     interruptTask: () => notImplemented("interruptTask"),

@@ -1,6 +1,6 @@
 import { dagRunStartedEvent, dagRunFailedEvent, dagRunCompletedEvent, dagWaveStartedEvent, dagWaveCompletedEvent } from "./events"
 import { countNodes, nodeError, nodeById, transition, TERMINAL_NODE_STATES, type SchedulerContext } from "./scheduler-context"
-import { cancelledSnapshot } from "./scheduler-cancellation"
+import { cancelledSnapshot, disposeSupersededChildren, supersededChildren } from "./scheduler-cancellation"
 import { admitFrontier } from "./scheduler-admission"
 import { settleOne } from "./scheduler-task-attachment"
 import type { DagNode, DagNodeId } from "./types"
@@ -11,6 +11,8 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
   if (context.journal.snapshot().status === "pending") {
     context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
   }
+  const superseded = supersededChildren(context)
+  if (superseded.length > 0) await disposeSupersededChildren(context, superseded)
 
   for (;;) {
     if (context.suspended || context.cancellationStarted) return cancelledSnapshot(context)

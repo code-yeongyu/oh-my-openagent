@@ -66,6 +66,10 @@ class SettledTasks implements TaskManager {
     this.touches.push(owner.runId)
     return [...this.tasks.values()].find((task) => task.owner?.runId === owner.runId && task.owner.nodeId === owner.nodeId)
   }
+  findOwnedTasks(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">) {
+    this.touches.push(owner.runId)
+    return [...this.tasks.values()].filter((task) => task.owner?.runId === owner.runId && task.owner.nodeId === owner.nodeId)
+  }
   async waitFor(id: string) {
     this.touches.push(id)
     const task = this.tasks.get(id)

@@ -100,6 +100,19 @@ export function transition(
   context.journal.append(dagNodeTransitionedEvent({ nodeId, from, to, reason }))
 }
 
+/**
+ * Every owned task of the node that can still do work, whether or not this controller attached it.
+ * Not only the newest: an earlier attempt's finished child can resume on its own after the next
+ * attempt's task exists (#11381).
+ */
+export function liveOwnedTasks(context: SchedulerContext, nodeId: DagNodeId): readonly TaskRecord[] {
+  return context.taskManager.findOwnedTasks({ kind: "dag", runId: context.journal.snapshot().runId, nodeId }).filter(isLiveTask)
+}
+
+export function isLiveTask(task: TaskRecord | null | undefined): boolean {
+  return task?.status === "pending" || task?.status === "running" || task?.status === "paused"
+}
+
 export function failNode(context: SchedulerContext, nodeId: DagNodeId, code: DagNodeErrorCode, message: string): void {
   context.pendingErrors.set(nodeId, nodeError(nodeId, code, message, context.now))
   transition(context, nodeId, "failed", { kind: "failed" })

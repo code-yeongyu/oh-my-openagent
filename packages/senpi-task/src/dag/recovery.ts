@@ -558,6 +558,7 @@ function taskOwner(record: DagRunRecordV1, nodeId: DagNodeId): DagTaskOwner {
     kind: "dag",
     runId: record.runId,
     nodeId,
+    execAttempt: execAttempt ?? 0,
     fingerprint: dagFingerprint(ownerFingerprintInput({
       definitionFingerprint: record.definitionFingerprint,
       nodeId,
@@ -591,6 +592,7 @@ function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "starte
     case "plan_unresolved": return { code: "plan_unresolved", message: result.error.message }
     case "start_failed": return { code: "start_failed", message: result.error_message }
     case "owner_conflict": return { code: "start_failed", message: `DAG task owner conflicts with existing task ${result.task_id}` }
+    case "owner_superseded": return { code: "stale_attempt_alive", message: `task ${result.task_id} of a superseded attempt is still live` }
   }
 }
 

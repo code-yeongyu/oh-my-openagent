@@ -1,6 +1,6 @@
 import type { ResidencyDenied } from "../manager/types"
 import type { OwnedStartResult } from "./owner"
-import { errorMessage, failNode, transition, type SchedulerContext } from "./scheduler-context"
+import { errorMessage, failNode, isLiveTask, transition, type SchedulerContext } from "./scheduler-context"
 import { resolveAdmissionIdle } from "./scheduler-cancellation"
 import { emitWaveAdmissions } from "./scheduler-frontier"
 import { startSpec, owner, isRunnable } from "./scheduler-start"
@@ -33,6 +33,7 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     const awaitingAdmission = [...denied, ...runnable]
     context.admissionInProgress = true
     let results: PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>[]
+    const supersededStops = new Map<string, PromiseSettledResult<unknown>>()
     try {
       results = await Promise.allSettled(awaitingAdmission.map(async (nodeId) => ({
         nodeId,
@@ -41,6 +42,17 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
           ...(context.resumeCredential === undefined ? {} : { resumeCredential: context.resumeCredential }),
         }, owner(context, nodeId)),
       })))
+      // An automatic infrastructure retry raises execAttempt mid-run, so the failed attempt's child
+      // can resume before re-admission (#11381). Stop it inside the admission pass, which cancel and
+      // suspend wait for, before its node fails.
+      const superseded = results.flatMap((settled) =>
+        settled.status === "fulfilled" && settled.value.result.kind === "owner_superseded" ? [settled.value.result.task_id] : [])
+      const stops = await Promise.allSettled(superseded.map((taskId) =>
+        context.taskManager.cancelTask(taskId, "superseded by a newer attempt of its DAG node")))
+      superseded.forEach((taskId, index) => {
+        const stop = stops[index]
+        if (stop !== undefined) supersededStops.set(taskId, stop)
+      })
     } finally {
       context.admissionInProgress = false
       resolveAdmissionIdle(context)
@@ -70,7 +82,7 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
         }
       } else {
         context.residencyQueued.delete(nodeId)
-        attachOrFail(context, nodeId, result)
+        attachOrFail(context, nodeId, result, supersededStops)
       }
     }
     if (context.cancellationStarted) return false
@@ -128,6 +140,7 @@ function attachOrFail(
   context: SchedulerContext,
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
+  supersededStops: ReadonlyMap<string, PromiseSettledResult<unknown>>,
 ): void {
   if (result.kind === "held") {
     context.journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq: result.pauseSeq })
@@ -143,6 +156,14 @@ function attachOrFail(
       status: "running",
       name: result.task_id,
     })
+    return
+  }
+  if (result.kind === "owner_superseded") {
+    const stop = supersededStops.get(result.task_id)
+    const message = isLiveTask(context.taskManager.get(result.task_id))
+      ? `task ${result.task_id} of a superseded attempt is still live and could not be stopped${stop?.status === "rejected" ? `: ${errorMessage(stop.reason)}` : ""}`
+      : `task ${result.task_id} of a superseded attempt was live at admission and has been stopped`
+    failNode(context, nodeId, "stale_attempt_alive", message)
     return
   }
   if (result.kind !== "started") {
@@ -171,6 +192,9 @@ function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "starte
       return { code: "start_failed", message: result.error_message }
     case "owner_conflict":
       return { code: "start_failed", message: `DAG task owner conflicts with existing task ${result.task_id}` }
+    case "owner_superseded":
+      // Handled by attachOrFail, which stops the child first; kept for exhaustiveness (#11381).
+      return { code: "stale_attempt_alive", message: `task ${result.task_id} of a superseded attempt is still live` }
     default:
       return assertNever(result)
   }
