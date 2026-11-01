@@ -7,11 +7,43 @@ import { isRecord, normalizeSDKResponse } from "../../shared"
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 1
 const ERROR_GRACE_CYCLES = 3
+const INTERRUPTED_GRACE_CYCLES = 3
 const MIN_STABILIZATION_MS = 1_000
 const DEFAULT_EVENT_WATCHDOG_MS = 30_000 // 30 seconds
 const DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS = 60_000 // 60 seconds
 
 type SessionStatusMap = Record<string, { type?: string }>
+
+/**
+ * Full session status vocabulary reported by the OpenCode server, aligned with
+ * features/background-agent/session-status-classifier.ts: busy/retry/running
+ * are active, idle/interrupted are settled. #3981: statuses outside the old
+ * idle/busy/retry model left the poller looping forever.
+ */
+const MAIN_SESSION_STATUSES = [
+  "idle",
+  "busy",
+  "retry",
+  "running",
+  "interrupted",
+] as const
+
+type MainSessionStatus = (typeof MAIN_SESSION_STATUSES)[number]
+
+const ACTIVE_MAIN_STATUSES = new Set<string>(["busy", "retry", "running"])
+const SETTLED_MAIN_STATUSES = new Set<string>(["idle", "interrupted"])
+
+function toMainSessionStatus(value: string | undefined): MainSessionStatus | null {
+  return MAIN_SESSION_STATUSES.find((candidate) => candidate === value) ?? null
+}
+
+function isActiveMainStatus(status: MainSessionStatus | null): boolean {
+  return status !== null && ACTIVE_MAIN_STATUSES.has(status)
+}
+
+function isSettledMainStatus(status: MainSessionStatus | null): boolean {
+  return status !== null && SETTLED_MAIN_STATUSES.has(status)
+}
 
 function isIncompleteTodo(value: unknown): boolean {
   if (!isRecord(value)) {
@@ -58,6 +90,7 @@ export async function pollForCompletion(
   const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
+  let interruptedCycleCount = 0
   let firstWorkTimestamp: number | null = null
   let secondaryTimeoutChecked = false
   const pollStartTimestamp = now()
@@ -95,7 +128,7 @@ export async function pollForCompletion(
       errorCycleCount = 0
     }
 
-    let mainSessionStatus: "idle" | "busy" | "retry" | null = null
+    let mainSessionStatus: MainSessionStatus | null = null
     if (eventState.lastEventTimestamp !== null) {
       const timeSinceLastEvent = now() - eventState.lastEventTimestamp
       if (timeSinceLastEvent > eventWatchdogMs) {
@@ -108,9 +141,9 @@ export async function pollForCompletion(
         )
 
         mainSessionStatus = await getMainSessionStatus(ctx)
-        if (mainSessionStatus === "idle") {
+        if (isSettledMainStatus(mainSessionStatus)) {
           eventState.mainSessionIdle = true
-        } else if (mainSessionStatus === "busy" || mainSessionStatus === "retry") {
+        } else if (isActiveMainStatus(mainSessionStatus)) {
           eventState.mainSessionIdle = false
         }
 
@@ -121,11 +154,29 @@ export async function pollForCompletion(
     if (mainSessionStatus === null) {
       mainSessionStatus = await getMainSessionStatus(ctx)
     }
-    if (mainSessionStatus === "busy" || mainSessionStatus === "retry") {
+    if (isActiveMainStatus(mainSessionStatus)) {
       eventState.mainSessionIdle = false
-    } else if (mainSessionStatus === "idle") {
+    } else if (isSettledMainStatus(mainSessionStatus)) {
       eventState.mainSessionIdle = true
     }
+
+    if (mainSessionStatus === "interrupted") {
+      // The worker behind the session died (e.g. WSL "Worker has been
+      // terminated", #3981). Never report success from this state; exit 1
+      // after a short grace window unless runtime fallback rearms the session.
+      interruptedCycleCount++
+      if (interruptedCycleCount >= INTERRUPTED_GRACE_CYCLES) {
+        console.error(
+          pc.red("\n\nSession was interrupted before completion (worker terminated).")
+        )
+        console.error(
+          pc.yellow("Re-run with --session-id to resume this session.")
+        )
+        return 1
+      }
+      continue
+    }
+    interruptedCycleCount = 0
 
     if (!eventState.mainSessionIdle) {
       consecutiveCompleteChecks = 0
@@ -225,7 +276,7 @@ async function hasActiveSessionWork(ctx: RunContext): Promise<boolean> {
 
 async function getMainSessionStatus(
   ctx: RunContext
-): Promise<"idle" | "busy" | "retry" | null> {
+): Promise<MainSessionStatus | null> {
   try {
     const statusesRes = await ctx.client.session.status({
       query: { directory: ctx.directory },
@@ -234,11 +285,8 @@ async function getMainSessionStatus(
     if (!(ctx.sessionID in statuses)) {
       return "idle"
     }
-    const status = statuses[ctx.sessionID]?.type
-    if (status === "idle" || status === "busy" || status === "retry") {
-      return status
-    }
-    return null
+    const status = toMainSessionStatus(statuses[ctx.sessionID]?.type)
+    return status
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error
