@@ -295,7 +295,7 @@ describe("omo.turn span per assistant turn", () => {
           "gen_ai.request.model": "gpt-5.6-sol",
           "gen_ai.response.model": "gpt-5.6-sol",
           "session.id": "hashed:main-1",
-          "omo.session.role": "main",
+          "omo.session.role": "root",
           "omo.turn.index": index,
         })
       }
@@ -347,6 +347,29 @@ describe("omo.turn span per assistant turn", () => {
       expect(traceOnly).toHaveLength(4)
       expect(rows.find(({ attributes }) => attributes["session.id"] === "hashed:child-process")?.spanId).toBe(childSpan?.spanId)
       expect(readTurnTraceparent("parent-raw")).toBeUndefined()
+    })
+  })
+
+  test("#given sessions whose engine role is dag_child or member #then every span carries the pinned role child, never the raw engine name", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      const collector = await otlpCollector()
+      const sessions = await Promise.all([
+        openSession(agentDir, collector.factory, "dag-raw", { sessionContext: { role: "dag_child" } }),
+        openSession(agentDir, collector.factory, "member-raw", { sessionContext: { role: "member" } }),
+      ])
+
+      // when
+      for (const { pi, ctx } of sessions) {
+        await pi.dispatch("turn_start", turnStart(0), ctx)
+        await pi.dispatch("turn_end", turnEnd(0), ctx)
+        await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, ctx)
+      }
+      const { spans } = await collector.drain()
+
+      // then
+      expect(spans).toHaveLength(2)
+      expect(spans.map(({ attributes }) => attributes["omo.session.role"])).toEqual(["child", "child"])
     })
   })
 
