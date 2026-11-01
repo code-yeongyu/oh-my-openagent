@@ -23,6 +23,7 @@ export const SENPI_LOADER_ALIASES = [
   "@earendil-works/pi-ai/compat",
   "@earendil-works/pi-ai/oauth",
   "@code-yeongyu/senpi",
+  "@code-yeongyu/senpi/session-worker-data",
   "@mariozechner/pi-coding-agent",
   "@mariozechner/pi-agent-core",
   "@mariozechner/pi-tui",

@@ -1,6 +1,4 @@
 import { isMainThread } from "node:worker_threads"
-import { privateChannelDeclared, privateTablePresent, takeInheritedPrivateChannel } from "@code-yeongyu/senpi/private-fds"
-import { provideSessionWorkerData, sessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
 import { installLockWorkerObserver } from "@oh-my-opencode/team-core/team-state-store/lock-worker-lifetime"
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
@@ -17,12 +15,7 @@ import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createSessionBinder, readSessionSurface, releaseSession, type SessionState } from "./session-binding"
 import { finalizeIdentityRun } from "./transient-identity"
 import type { DeviceAccountSource } from "./device-session/account-source"
-import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
-import { accountSourceFromSelection } from "./device-session/selected-account-source"
-import { attachDesktopSyncChannel } from "./desktop-sync/channel"
-import {
-  type HostMemorySync, type MemorySyncSelection, MEMORY_SYNC_WORKER_DATA, memorySyncWorkerData, selectHostMemorySyncSource, workerMemorySyncSource,
-} from "./desktop-sync/hostSelection"
+import { selectedDeviceAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
 import { readMemoryRpcSync } from "./memory-rpc-sync"
@@ -35,7 +28,6 @@ const GLOBAL_DISABLED_FLAG = "omo-senpi-disabled"
 const MEMORY_DISABLED_FLAG = "omo-senpi-memory-disabled"
 const CONFIG_WATCH_RELOADED = "config-watch:reloaded"
 const RESTART_REQUIRED_NOTICE = "restart required to apply memory config change"
-let memorySyncHost: HostMemorySync | undefined
 
 export type ResolvedMemoryConfig = OmoMemorySettings
 
@@ -83,25 +75,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
 
       // The runner reports sync status transitions to the wiring, which exists only after the runner.
       const syncStatusChanged: { current?: (repo: string) => void } = {}
-      let deviceAccount = options.deviceAccount
-      if (deviceAccount === undefined) {
-        let selection: Promise<MemorySyncSelection>
-        if (isMainThread) {
-          const host = memorySyncHost ?? selectHostMemorySyncSource({
-            inherited: { declared: privateChannelDeclared, tablePresent: privateTablePresent, take: takeInheritedPrivateChannel },
-            attach: attachDesktopSyncChannel,
-          })
-          // A duplicate/late provider is a bootstrap failure, not an unavailable account.
-          if (memorySyncHost === undefined) {
-            provideSessionWorkerData(MEMORY_SYNC_WORKER_DATA, memorySyncWorkerData(host))
-            memorySyncHost = host
-          }
-          selection = host.selection
-        } else {
-          selection = workerMemorySyncSource(sessionWorkerData(MEMORY_SYNC_WORKER_DATA))
-        }
-        deviceAccount = accountSourceFromSelection({ selection: () => selection, cli: () => lazyCliAccountSource({ env }) })
-      }
+      const deviceAccount = options.deviceAccount ?? selectedDeviceAccountSource({ env })
       const memoryRoot = resolveMemoryRoot(env, cwd)
       const pinDir = syncPinDir(memoryRoot)
       const syncRunner = options.syncRunner ?? createSyncRunner({
