@@ -1182,8 +1182,8 @@
       "packages/omo-senpi/src/components/memory/memory-notice-spec.ts": ["REMEMBERED_TITLE", "LET_GO_TITLE", "ordinal", "formatBytes"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_REFLECTIONS_RPC_METHOD
       "packages/omo-senpi/src/components/memory/memory-rpc-bridge.ts": ["MEMORY_REFLECTIONS_RPC_METHOD"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) readMemoryRpcRepoState, readMemoryRpcJournalState, readMemoryRpcHealth
-      "packages/omo-senpi/src/components/memory/memory-rpc-snapshot-state.ts": ["readMemoryRpcRepoState", "readMemoryRpcJournalState", "readMemoryRpcHealth"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) readMemoryRpcRepoState, readMemoryRpcHealth
+      "packages/omo-senpi/src/components/memory/memory-rpc-snapshot-state.ts": ["readMemoryRpcRepoState", "readMemoryRpcHealth"],
       // pre-existing at origin dev 4686e425b5: unused export(s) IDENTITY
       "packages/omo-senpi/src/components/memory/memory-usage.test-support.ts": ["IDENTITY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) incrementMemoryUsage, readMemoryUsageLedger, extractMemoryUsagePath
