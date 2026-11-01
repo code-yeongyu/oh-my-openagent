@@ -78,9 +78,20 @@ describe("capabilities across releases", () => {
 		expect(wrong.map((value) => isDesktopCapabilities(value))).toEqual([false, false]);
 	});
 
-	it("maps an unknown interventionWatch value to the unknown sentinel, never a known state", () => {
-		expect(normalizeInterventionWatch("paused")).toBe("unknown");
-		expect(normalizeInterventionWatch("on")).toBe("on");
+	it("maps every interventionWatch value through the wire union", () => {
+		const cases: [unknown, unknown][] = [
+			["on", "on"],
+			["off", "off"],
+			["not_started", "not_started"],
+			["paused", "unknown"],
+			["bogus", "unknown"],
+			[42, "unknown"],
+			[true, "unknown"],
+			[{}, "unknown"],
+		];
+		for (const [input, expected] of cases) {
+			expect(normalizeInterventionWatch(input)).toBe(expected);
+		}
 		expect(normalizeInterventionWatch(undefined)).toBeUndefined();
 		expect(normalizeInterventionWatch(null)).toBeNull();
 	});
