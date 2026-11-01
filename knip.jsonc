@@ -2630,6 +2630,8 @@
         "test/local-api/support.ts",
         "test/local-api/support-windows.ts",
         "test/local-api/conformance/*.ts",
+        "test/release-fixture.ts",
+        "test/strict-ed25519/native-control.ts",
       ],
     },
     "packages/memory-core": {

@@ -13,7 +13,7 @@ import { testSecure } from "./local-api/support.ts"
 
 const PIN = "1.4.0"
 const AGENT_DIR = "/home/user/.omo/agent"
-const REFRESHER = { binaryPath: "/home/user/.omo/bin/omo", version: "5.1.52" }
+const REFRESHER = { binaryPath: "/opt/omo/omo-cli", version: "5.1.52" }
 
 const owners: FakeOwner[] = []
 const services: DeviceService[] = []
