@@ -11,12 +11,6 @@ import { readFrames, writeFrame } from "./framing"
 // private-fds.ts -> utils/private-fd-inherit.ts; the spawned-child leak proof is senpi's
 // host-private-fd-inherit.test.ts). The receiver must take that stream as handed: no platform refusal, no
 // descriptor or handle of its own, no second flag clear, and no child process that could carry the stream.
-function asWin32<T>(run: () => Promise<T>): Promise<T> {
-  const actual = process.platform
-  Object.defineProperty(process, "platform", { value: "win32" })
-  return run().finally(() => Object.defineProperty(process, "platform", { value: actual }))
-}
-
 function watchHandleAndProcessCreation() {
   const spies = [
     spyOn(fs, "open"), spyOn(fs, "openSync"),
@@ -32,7 +26,7 @@ function watchHandleAndProcessCreation() {
   }
 }
 
-test("on win32 the receiver bootstraps over the two one-way halves senpi hands it and creates nothing itself", async () => {
+test("the receiver bootstraps over the two one-way halves senpi hands it and creates nothing itself", async () => {
   // given: the desktop->engine pipe (fd 5) and the engine->desktop pipe (fd 6), joined into one stream as senpi does
   const toEngine = new PassThrough()
   const toDesktop = new PassThrough()
@@ -50,9 +44,9 @@ test("on win32 the receiver bootstraps over the two one-way halves senpi hands i
   }, () => {})
   const watch = watchHandleAndProcessCreation()
   try {
-    // when: the engine attaches on win32 and issues one request
-    const result = await asWin32(() => attachDesktopSyncChannel(handed))
-    if (result.kind !== "connected") throw new Error(`win32 receiver answered ${JSON.stringify(result)}`)
+    // when: the engine attaches and issues one request
+    const result = await attachDesktopSyncChannel(handed)
+    if (result.kind !== "connected") throw new Error(`receiver answered ${JSON.stringify(result)}`)
     expect(await result.channel.request({ op: "descriptor" })).toEqual({ accepted: true })
     result.channel.close()
     // then: every frame went out on the engine->desktop half, and the receiver disposed the stream it owns
@@ -68,10 +62,10 @@ test("on win32 the receiver bootstraps over the two one-way halves senpi hands i
   }
 })
 
-test("on win32 a declaration senpi refused (no stream) is unavailable and opens nothing in its place", async () => {
+test("a declaration senpi refused (no stream) is unavailable and opens nothing in its place", async () => {
   const watch = watchHandleAndProcessCreation()
   try {
-    expect(await asWin32(() => attachDesktopSyncChannel(undefined))).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
+    expect(await attachDesktopSyncChannel(undefined)).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
     expect(watch.calls()).toBe(0)
   } finally {
     watch.restore()

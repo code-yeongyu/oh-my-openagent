@@ -17,16 +17,8 @@ async function pair() {
   return { engine, peer }
 }
 
-test("a missing private stream is the same typed unavailable answer on every platform (#11997 row 3)", async () => {
-  const actual = process.platform
-  try {
-    for (const platform of ["darwin", "linux", "win32"] as const) {
-      Object.defineProperty(process, "platform", { value: platform })
-      expect(await attachDesktopSyncChannel(undefined)).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
-    }
-  } finally {
-    Object.defineProperty(process, "platform", { value: actual })
-  }
+test("a missing private stream is the typed unavailable answer, never the CLI source (#11997 row 3)", async () => {
+  expect(await attachDesktopSyncChannel(undefined)).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
 })
 
 test("bootstraps once and sends requests synchronously on the private duplex", async () => {

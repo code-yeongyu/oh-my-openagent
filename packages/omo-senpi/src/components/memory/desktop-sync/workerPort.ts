@@ -8,7 +8,7 @@ import type { DesktopSyncEngineWire } from "./desktopSyncAccount"
 import { DesktopSyncEvent, DesktopSyncRefused, DesktopSyncRequest, decodeSyncHandle } from "./desktopSyncProtocol"
 import type { MemorySyncSelection } from "./hostSelection"
 
-const reason = z.enum(["private_channel_unavailable", "platform_not_supported", "port_absent", "selection_failed", "host_bootstrap_absent"])
+const reason = z.enum(["private_channel_unavailable", "port_absent", "selection_failed", "host_bootstrap_absent"])
 const HostToWorker = z.union([
   z.strictObject({ kind: z.literal("outcome"), outcome: z.union([z.literal("cli"), z.literal("desktop"), reason]) }),
   z.strictObject({ kind: z.literal("reply"), id: z.number().int().positive(), ok: z.boolean(), value: z.unknown().optional() }),

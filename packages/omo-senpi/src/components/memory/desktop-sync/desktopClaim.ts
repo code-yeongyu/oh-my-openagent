@@ -10,7 +10,7 @@ import { MEMORY_SYNC_CHANNEL, type MemorySyncSelection } from "./hostSelection"
 
 export type DesktopSyncAttachment =
   | { readonly kind: "connected"; readonly channel: DesktopSyncEngineWire }
-  | { readonly kind: "unavailable"; readonly reason: "private_channel_unavailable" | "platform_not_supported" }
+  | { readonly kind: "unavailable"; readonly reason: "private_channel_unavailable" }
 
 export async function claimDesktopSync(options: {
   readonly take: (name: string) => Duplex | undefined
