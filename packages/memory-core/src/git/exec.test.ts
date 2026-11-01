@@ -264,6 +264,21 @@ describe("createNodeGitExec", () => {
     expect(inputs).toEqual(["fallback-input", "fallback-input"])
   })
 
+  test("#given a Windows fallback #when bare Git is absent #then every attempt carries the fsmonitor override ahead of the caller argv", async () => {
+    const original = missingGitError()
+    const argvs: Array<readonly string[]> = []
+    const exec = createHermeticExec(async (executable, argv) => {
+      argvs.push(argv)
+      if (executable === "git") throw original
+      return SUCCESS
+    })
+
+    await exec.run(["-c", "user.name=omo", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
+
+    const expected = ["-c", "core.fsmonitor=false", "-c", "user.name=omo", "status", "--porcelain"]
+    expect(argvs).toEqual([expected, expected])
+  })
+
   test("#given bare Git fails with a non-ENOENT error #when Windows roots exist #then the error propagates without fallback", async () => {
     const failure = spawnError("EACCES")
     const attempts: string[] = []
