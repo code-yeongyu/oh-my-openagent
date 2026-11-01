@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - senpi-task: a message sent to a daemon task while its launch is being recorded keeps its input identity; the task record no longer rolls its `effect_seq` back, and a record rewritten to the same size is no longer read stale (#10708). ([#11946](https://github.com/code-yeongyu/oh-my-openagent/pull/11946))
 
-**Rejected automatic collector keys now stop the OTLP sender for the rest of the process.** A collector 401 shuts down that transport instead of repeatedly writing and rejecting local diagnostic batches. PostHog and consent behavior are preserved, and regression coverage verifies both the idle spool after rejection and the full 24-hour registration backoff cap. ([#11882](https://github.com/code-yeongyu/oh-my-openagent/pull/11882))
+- Internal telemetry maintenance. ([#11882](https://github.com/code-yeongyu/oh-my-openagent/pull/11882))
 
 ### Fixed
 
