@@ -879,6 +879,7 @@
     "packages/omo-senpi/src/components/memory/desktop-sync/desktopSyncReplicationPort.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/framing.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/hostSelection.ts",
+    "packages/omo-senpi/src/components/memory/desktop-sync/launchClassification.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/protocol.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/workerPort.ts",
     "packages/omo-senpi/src/components/memory/device-session/account-runtime-loader.ts",

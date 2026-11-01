@@ -9,6 +9,7 @@
 import { isMainThread } from "node:worker_threads"
 import { provideSessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
 import { type HostMemorySync, type MemorySyncSelection, MEMORY_SYNC_WORKER_DATA, selectHostMemorySyncSource } from "../desktop-sync/hostSelection"
+import { launchCarriedPrivateTable } from "../desktop-sync/launchClassification"
 import { SyncSidecarUnavailableError } from "../sync-runner"
 import type { DeviceAccountSource } from "./account-source"
 import type * as AccountRuntime from "./account-runtime"
@@ -17,15 +18,6 @@ export type DeviceAccountRuntimeModule = Pick<typeof AccountRuntime, "claimInher
 
 const importDeviceAccountRuntime = (): Promise<DeviceAccountRuntimeModule> => import("#omo-device-account-runtime")
 let memorySyncHost: HostMemorySync | undefined
-
-/**
- * Whether the launch carried a private-descriptor table at all (a declared memory-sync implies one): senpi's captured
- * table when its CLI captured it, else the launcher's table still in this process's env, which the claim then captures.
- */
-function launchCarriedPrivateTable(): boolean {
-  const table = (globalThis as { [key: symbol]: { readonly present?: unknown } | undefined })[Symbol.for("senpi.private-fds.v3")]
-  return table ? table.present === true : Boolean(process.env.SENPI_PRIVATE_FDS)
-}
 
 /**
  * The thread's one account source: on the main thread it selects once per process and provides the Worker port; in a
