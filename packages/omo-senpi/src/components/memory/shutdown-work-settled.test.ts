@@ -9,6 +9,7 @@ import { join } from "node:path"
 import { GitMemoryRepo, InFlightReads, MemoryBlockCache, RecallCorpusCache, type ReservedRun } from "@oh-my-opencode/memory-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import type { SenpiExtensionAPI } from "../../extension/types"
 import { fixture as dreamFixture } from "./dream-trigger.test-support"
 import { trackMemoryHooks } from "./hook-work"
 import { createMemoryComponent, resolveMemoryConfig } from "./index"
@@ -91,8 +92,22 @@ const cacheRows: readonly Row[] = [
   }),
 ]
 
-function registeredMemory(): { readonly events: readonly string[]; readonly tools: readonly string[] } {
+type MemoryRpc = NonNullable<SenpiExtensionAPI["rpc"]>
+type RpcHandler = Parameters<NonNullable<MemoryRpc["handle"]>>[1]
+
+function recordingRpc(handlers: Map<string, RpcHandler>): MemoryRpc {
+  return {
+    emit: () => undefined,
+    handle: (name, handler) => {
+      handlers.set(name, handler)
+    },
+  }
+}
+
+function registeredMemory(): { readonly events: readonly string[]; readonly tools: readonly string[]; readonly rpcMethods: readonly string[] } {
   const pi = new MemoryFakeExtensionAPI()
+  const rpcHandlers = new Map<string, RpcHandler>()
+  pi.rpc = recordingRpc(rpcHandlers)
   createMemoryComponent({
     env: { OMO_MEMORY_HOME: join("unused-memory-root", "memory") },
     loadConfig: () => loadedMemoryConfig(memorySettings()),
@@ -104,6 +119,7 @@ function registeredMemory(): { readonly events: readonly string[]; readonly tool
   return {
     events: [...new Set(pi.handlers.map((registration) => registration.event))].filter((event) => event !== "session_shutdown").sort(),
     tools: pi.tools.map((tool) => String(tool.name)).sort(),
+    rpcMethods: [...rpcHandlers.keys()].sort(),
   }
 }
 
@@ -126,6 +142,23 @@ const toolRows: readonly Row[] = registered.tools.map((name) => ({
     const execute = api.tools.at(-1)?.execute
     if (typeof execute !== "function") throw new Error(`the ${name} tool registered no execute`)
     return { settle: () => work.settled(), finished: Promise.resolve(Reflect.apply(execute, undefined, [])) }
+  },
+}))
+
+// Registered unbound on purpose: the rpc bridge calls a `handle` it read off `pi.rpc` without its receiver.
+const rpcRows: readonly Row[] = registered.rpcMethods.map((name) => ({
+  name: `an rpc request to ${name}`,
+  async start(held, work) {
+    const handlers = new Map<string, RpcHandler>()
+    const api = new FakeExtensionAPI()
+    api.rpc = recordingRpc(handlers)
+    const tracked: SenpiExtensionAPI = trackMemoryHooks(api, work)
+    const handle = tracked.rpc?.handle
+    if (handle === undefined) throw new Error("the tracked API exposes no rpc.handle")
+    handle(name, gatedStep(held).step)
+    const handler = handlers.get(name)
+    if (handler === undefined) throw new Error(`the ${name} rpc method registered no handler`)
+    return { settle: () => work.settled(), finished: Promise.resolve(handler({}, undefined)) }
   },
 }))
 
@@ -178,7 +211,11 @@ const detachedRows: readonly Row[] = [
 ]
 
 describe("memory shutdown waits for in-flight reads", () => {
-  for (const row of [...cacheRows, ...hookRows, ...toolRows, ...detachedRows]) {
+  it("#given the memory component #when it registers #then it registers its sync rpc methods, so the rpc rows below cover them", () => {
+    expect(registered.rpcMethods).toContain("omo.memory.sync.enable")
+  })
+
+  for (const row of [...cacheRows, ...hookRows, ...toolRows, ...rpcRows, ...detachedRows]) {
     it(`#given ${row.name} #when the settle the shutdown drain awaits runs #then it resolves only after that work`, async () => {
       // given
       const held = gate()
