@@ -19,6 +19,7 @@ function probeAcceptedKeys(schema: { readonly safeParse: (v: unknown) => { reado
   const probes: Record<string, unknown> = {
     permission: { permission: { edit: "deny" } },
     prompt_append: { prompt_append: "x" },
+    models_distribution: { models_distribution: "round_robin" },
   }
   for (const [key, probe] of Object.entries(probes)) {
     if (schema.safeParse(probe).success) accepted.add(key)
@@ -40,6 +41,8 @@ function probeValueFor(key: string): unknown {
       return ["x"]
     case "reasoning":
       return "off"
+    case "models_distribution":
+      return "round_robin"
     case "temperature":
     case "top_p":
     case "max_tokens":
@@ -61,6 +64,19 @@ function probeValueFor(key: string): unknown {
 }
 
 describe("core <-> adapter schema parity", () => {
+  test("both runtimes retain valid distribution policies and reject invalid ones", () => {
+    for (const schema of [OmoAgentDefSchema, OmoCategoryConfigSchema, AgentOverrideConfigSchema, CategoryConfigSchema]) {
+      for (const policy of ["sequential", "round_robin"]) {
+        const result = schema.safeParse({ models_distribution: policy })
+        expect(result.success).toBe(true)
+        if (result.success) expect(result.data.models_distribution).toBe(policy)
+      }
+      expect(schema.safeParse({ models_distribution: "random" }).success).toBe(false)
+      const omitted = schema.safeParse({})
+      expect(omitted.success).toBe(true)
+      if (omitted.success) expect(omitted.data.models_distribution).toBeUndefined()
+    }
+  })
   test("#given core agent schema #when probing permission and prompt_append #then core accepts both keys", () => {
     // given
     const coreKeys = probeAcceptedKeys(OmoAgentDefSchema)
