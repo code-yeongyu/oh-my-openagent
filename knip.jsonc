@@ -2131,6 +2131,7 @@
         "script/build-omo-schema.ts",
         "script/build-omob.ts",
         "script/build-schema.ts",
+        "script/build-service-auth.ts",
         "script/build.ts",
         "script/changelog-section.ts",
         "script/check-cargo-pinned-deps.mjs",
