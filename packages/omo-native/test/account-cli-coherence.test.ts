@@ -7,9 +7,11 @@ test("account token never labels a captured token with a later credential read",
   const A = { ...grant, ...privateKeys }
   const B = { ...A, accessToken: "access-B", device: { id: "device-B", name: "B" } }
   let reads = 0
+  const read = async () => ++reads <= 2 ? A : B
   const store: CredentialStore = {
     // A is the preflight and locked read; the next independently captured snapshot is B.
-    read: async () => ++reads <= 2 ? A : B,
+    read,
+    readAuthoritative: read,
     write: async () => { throw new Error("cached access must not write") },
     clear: async () => { throw new Error("cached access must not clear") },
   }

@@ -13,8 +13,11 @@ function run(): number {
   const actor = process.env["CHANGELOG_GATE_ACTOR"] ?? "";
   const prRaw = process.env["CHANGELOG_GATE_PR"] ?? "";
   const labels: readonly string[] = JSON.parse(process.env["CHANGELOG_GATE_LABELS"] ?? "[]");
-  // The release marker is publish.yml's own title/body/branch triple, never the branch name alone (#10709).
+  // The release-state PR is what only publish.yml produces: a release branch pushed to this repository
+  // (CHANGELOG_GATE_RELEASE) carrying publish.yml's own title/body/branch marker (#10709). Its author is NOT part of it:
+  // publish.yml reuses whatever open PR sits on its fixed branch, so whoever opened that PR first decides nothing (#11704).
   const isReleaseWorkflow = process.env["CHANGELOG_GATE_RELEASE"] === "1"
+    && GATE_CONFIG.releaseBranchPattern.test(branch)
     && isReleaseStatePr({ branch, title: process.env["CHANGELOG_GATE_TITLE"] ?? "", body: process.env["CHANGELOG_GATE_BODY"] ?? "" });
   if (!base) throw new Error("missing CHANGELOG_GATE_BASE");
   if (prRaw && !/^\d+$/.test(prRaw)) throw new Error("CHANGELOG_GATE_PR must be a PR number");
@@ -49,7 +52,13 @@ function run(): number {
     (path) => git("show", `${rev}:${path}`),
   );
   const shipped = [policyAt(head), policyAt(mergeBase)];
-  const policy = { ...GATE_CONFIG, isUserFacing: (path: string) => shipped.some((at) => isShippedPath(path, at)) };
+  // The vendored rules also match the PR author against releaseActors. Here the marker is the release identity, so the
+  // author of a marked release PR is its release actor, and no account list exists for anyone to grow.
+  const policy = {
+    ...GATE_CONFIG,
+    releaseActors: isReleaseWorkflow ? [actor] : [],
+    isUserFacing: (path: string) => shipped.some((at) => isShippedPath(path, at)),
+  };
   const addedFiles = list("A");
   const modifiedFiles = list("M");
   const deletedFiles = list("D");
@@ -97,8 +106,8 @@ function run(): number {
   console.log(`changelog-gate: ${result.pass ? "PASS" : "FAIL"} - ${result.reason}`);
   const packageLogs = checkPackageLogs({
     addedFiles, modifiedFiles, deletedFiles,
-    // The SAME release predicate as the shared gate: the release marker AND the release branch AND the release actor (#10682 review HIGH).
-    isRelease: isReleaseWorkflow && GATE_CONFIG.releaseBranchPattern.test(branch) && GATE_CONFIG.releaseActors.some((releaseActor) => releaseActor === actor),
+    // The SAME release predicate as the shared gate (#10682 review HIGH): the release marker on a release branch.
+    isRelease: isReleaseWorkflow,
     fragment: addedFragment?.content ?? null,
     existsAtHead: (path) => existsAt(head, path),
   });

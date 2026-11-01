@@ -184,6 +184,7 @@ impl Worker {
             Op::AxSetValue(params) => served(self.ax_set_value(&params.ref_, &params.value, cancelled)),
             Op::AxFocus(params) => served(self.ax_focus(&params.ref_, cancelled)),
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
+            Op::AxTypeText(params) => served(self.ax_type_text(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
             Op::ControlGrant(params) => self.control_grant(&params),
