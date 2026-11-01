@@ -5,7 +5,9 @@ import { startHostHeartbeat } from "./handle-heartbeat"
 // #11714: close() called timer.unref() unguarded, so a timer implementation whose unref throws
 // (fake timers, a patched global) let the throw escape from teardown as an uncaught exception.
 // Every timer in this clock throws on unref, so the drive below covers the schedule, deadline and
-// close sites in one pass: if any site is unguarded, construction or an advance throws.
+// close sites in one pass: an unguarded schedule or close site throws from construction or an
+// advance; the deadline site runs in the probe's rejection handler, so it would surface only as
+// an unhandled rejection.
 
 function throwingUnrefClock() {
   let now = 0
