@@ -1,0 +1,12 @@
+writeResult: {"success":true,"configPath":"/tmp/opencode/home6799/.omo/omo.jsonc"}
+target: /tmp/opencode/home6799/.omo/omo.jsonc
+checks: {
+  "containsDeadLiteral": false,
+  "oracleModel": "zai-coding-plan/glm-5.2",
+  "exploreModel": "zai-coding-plan/glm-5.2",
+  "ultrabrainModel": "zai-coding-plan/glm-5.2",
+  "writingModel": "zai-coding-plan/glm-5.2",
+  "visualEngineeringModel": "zai-coding-plan/glm-5.2"
+}
+realHomeUntouched: true
+E2E PASS
