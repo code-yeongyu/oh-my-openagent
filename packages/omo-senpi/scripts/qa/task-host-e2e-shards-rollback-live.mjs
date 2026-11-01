@@ -14,9 +14,13 @@ const IDS = [
   "rollback_without_prepare_parks",
 ]
 
-function stepFor(body, state) {
+export function stepFor(body, state) {
   const text = JSON.stringify(body.messages ?? [])
-  const child = /rollback ([a-z-]+) child/.exec(text)
+  // The full history contains prior child prompts and task results. Route by the current user
+  // turn so a resumed parent is not mistaken for its child.
+  const latestUser = [...(body.messages ?? [])].reverse().find((message) => message.role === "user")
+  const prompt = JSON.stringify(latestUser?.content ?? "")
+  const child = /rollback ([a-z-]+) child/.exec(prompt)
   if (child !== null) {
     const label = child[1]
     if (state.resumePhase) {
@@ -39,7 +43,7 @@ function stepFor(body, state) {
         return ready
       } }
   }
-  const resumed = /resume-parent task=(st_[0-9a-f]+)/.exec(text)
+  const resumed = /resume-parent task=(st_[0-9a-f]+)/.exec(prompt)
   if (resumed !== null) {
     if (/"(?:name|toolName)":"task_output"/.test(text)) {
       return { type: "text", text: "R0 parent resume complete", releaseTimeoutMs: 600_000,
@@ -48,7 +52,7 @@ function stepFor(body, state) {
     return { type: "tool_call", name: "task_output",
       arguments: { task_id: resumed[1], mode: "status" } }
   }
-  const parent = /rollback parent ([a-z-]+)/.exec(text)
+  const parent = /rollback parent ([a-z-]+)/.exec(prompt)
   if (parent !== null) {
     if (/"(?:name|toolName)":"task"/.test(text)) {
       return {
