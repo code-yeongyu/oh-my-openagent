@@ -634,6 +634,7 @@
     "packages/omo-native/bin/lib/sqlite-rows.js",
     "packages/omo-native/bunfig.toml",
     "packages/omo-native/package.json",
+    "packages/omo-native/trust-userns.ts",
     "packages/omo-native/tsconfig.json",
     "packages/omo-opencode/bunfig.toml",
     "packages/omo-opencode/package.json",

@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from "node:path"
 import type { EngineTrustMarker } from "@code-yeongyu/senpi/engine-trust"
 import type { TrustDiagnosticEntry } from "./trust-diagnostics"
 import { pidAnswersSignalZero, sweepTrustRetention } from "./trust-retention"
+import { attestedOverflowRoot, readUsernsView } from "./trust-userns"
 
 const MAX_BYTES = 8 * 1024 * 1024
 const GENERATION_PREFIX = "# omo-engine-trust-generation"
@@ -15,7 +16,7 @@ const leases = new Set<string>()
 const bootAtMs = Date.now() - uptime() * 1000
 
 export class TrustStorageError extends Error {
-  constructor(readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable") {
+  constructor(readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable" | "trust-userns-unattested") {
     super(code)
   }
 }
@@ -58,12 +59,17 @@ function owned(stat: { uid: number; mode: number }, mode: number): boolean {
 /** Ancestors may be system-owned (/home, /tmp); none may redirect through a link. */
 async function ancestors(path: string): Promise<void> {
   let current = resolve(path)
+  const view = process.platform === "linux" ? readUsernsView(process.env) : null
   for (;;) {
-    const stat = await fs.lstat(current)
+    const stat = await fs.lstat(current, { bigint: true })
     if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("unsafe trust directory")
     if (process.platform !== "win32") {
-      const sticky = (stat.mode & 0o1000) !== 0
-      if ((stat.uid !== 0 && stat.uid !== process.getuid?.()) || ((stat.mode & 0o022) !== 0 && !sticky)) {
+      const mode = Number(stat.mode)
+      const uid = Number(stat.uid)
+      if ((mode & 0o022) !== 0 && (mode & 0o1000) === 0) throw new Error("unsafe trust ancestor")
+      if (uid !== 0 && uid !== process.getuid?.()
+        && !(view !== null && attestedOverflowRoot(view, current, { uid, dev: stat.dev, ino: stat.ino }))) {
+        if (view?.namespaced && uid === view.overflowUid) throw new TrustStorageError("trust-userns-unattested")
         throw new Error("unsafe trust ancestor")
       }
     }
@@ -109,6 +115,12 @@ export async function prepareTrustDirectory(requested: string, platform: NodeJS.
   } catch {
     directory = await temporaryTrustDirectory(platform)
     codes.push({ code: "trust-dir-unsafe" })
+  }
+  if (directory === requested && platform === "linux") {
+    try { await fs.access(requested, constants.W_OK) } catch {
+      directory = await temporaryTrustDirectory(platform)
+      codes.push({ code: "trust-dir-readonly" })
+    }
   }
   if (directory.includes(platform === "win32" ? ";" : ":")) throw new TrustStorageError("trust-path-unrepresentable")
   return { directory, codes }
