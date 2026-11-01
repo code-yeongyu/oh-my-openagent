@@ -120,6 +120,7 @@
     "README.pt-br.md: omo doctor"
   ],
   "literal-label": [
-    "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo"
+    "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",
+    "packages/device-service-core/test/local-api/conformance/fixtures/refresher.register.json: /bin/omo x2"
   ]
 }

@@ -1,11 +1,12 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { sha256Of } from "./cli-support.mjs"
+import { CliError, sha256Of } from "./cli-support.mjs"
 import { addRow, readLedger, writeLedger } from "./fact-ledger.mjs"
 import { run } from "./report-tools.mjs"
+import { writeSnapshot } from "./source-snapshot.mjs"
 
 const BRIEF = readFileSync(join(import.meta.dir, "tests/fixtures/fidelity-brief-locked.md"), "utf8")
 const PAGE = '<html><body><p>The main deck spans <span title="9 m">320</span> m in total.</p><table id="sizes"><tr><th>Name</th><th>Length</th></tr><tr><td>Deck</td><td>320 m</td></tr></table></body></html>'
@@ -125,6 +126,42 @@ describe("converted text is never a raw snapshot", () => {
 		await expect(snapshot(dir, "S1", "--html", page, "--raw", page)).rejects.toThrow("--raw goes alone or with --text")
 		await expect(snapshot(dir, "S1", "--url", "https://example.invalid/", "--raw", page)).rejects.toThrow("--raw goes alone or with --text")
 	})
+})
+
+describe("replacement over retained raw bytes", () => {
+	for (const [name, tampered, recaptured] of [
+		["healthy retained bytes", false, false],
+		["tampered retained bytes", true, false],
+		["an explicit new capture after retained drift", true, true],
+	] as const) {
+		test(`#given ${name} #when text replaces the extraction #then only validated retained bytes keep their original observation`, async () => {
+			const dir = session()
+			const observedAt = "2026-01-01T00:00:00.000Z"
+			const { dir: source } = writeSnapshot(join(dir, "sources"), "S1", {
+				url: "https://example.invalid/bridge", html: PLAIN, extractor: "model", observed_at: observedAt,
+			})
+			if (tampered) writeFileSync(join(source, "raw.bin"), PLAIN.replace("320", "330"))
+			const before = Object.fromEntries(readdirSync(source).map((name) => [name, readFileSync(join(source, name))]))
+			const raw = recaptured ? "A new capture says 340 m." : PLAIN
+			const text = recaptured ? raw : "The corrected extraction says 320 m."
+			const replaced = snapshot(dir, "S1", "--text", file(dir, "corrected.txt", text), "--replace",
+				...(recaptured ? ["--raw", file(dir, "recaptured.txt", raw)] : []))
+
+			if (tampered && !recaptured) {
+				await expect(replaced).rejects.toBeInstanceOf(CliError)
+				expect(Object.fromEntries(readdirSync(source).map((name) => [name, readFileSync(join(source, name))]))).toEqual(before)
+				return
+			}
+
+			expect((await replaced).exitCode).toBe(0)
+			expect(readFileSync(join(source, "raw.bin"), "utf8")).toBe(raw)
+			expect(readFileSync(join(source, "text.txt"), "utf8")).toBe(text)
+			const meta = JSON.parse(readFileSync(join(source, "meta.json"), "utf8"))
+			expect(meta).toMatchObject({ sha256: sha256Of(raw), text_source: "declared", text_sha256: sha256Of(text) })
+			if (recaptured) expect(meta.observed_at).not.toBe(observedAt)
+			else expect(meta.observed_at).toBe(observedAt)
+		})
+	}
 })
 
 // chmod 000 does not stop the owner reading a file on Windows (no POSIX mode bits), so there the same
