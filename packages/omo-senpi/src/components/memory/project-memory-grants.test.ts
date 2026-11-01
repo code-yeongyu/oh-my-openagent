@@ -282,3 +282,13 @@ describe("project memory read grants never resolve a macOS automount trigger (#1
     expect(touched).toEqual([])
   })
 })
+
+test("#given a link out of a granted repo, an unresolvable segment and dot-dot #when a read names it #then it is not granted", async () => {
+  const { setup, foreignRepo } = projectGrantFixture()
+  const outside = join(setup.memoryRoot, "agents", "third", "subdir")
+  mkdirSync(outside, { recursive: true })
+  linkDir(outside, join(foreignRepo, "link-to-other"))
+  await grantProjectMemoryRead(setup.own, foreignRepo)
+
+  expect(isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/link-to-other/missing/../secret.md`)).toBe(false)
+})

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
-import { containedRelativePath, isDarwinAutomountTriggerPath, isPathInside } from "./path-containment"
+import { containedRelativePath, isDarwinAutomountTriggerPath, isPathInside, resolveSegmentwise } from "./path-containment"
 
 const shortHome = String.raw`C:\Users\RUNNER~1`
 const longHome = String.raw`C:\Users\runneradmin`
@@ -166,5 +166,29 @@ describe("isDarwinAutomountTriggerPath (#11545)", () => {
   ]
   test.each(cases)("%s %o -> %p", (path, options, expected) => {
     expect(isDarwinAutomountTriggerPath(path, options)).toBe(expected)
+  })
+})
+
+describe("resolveSegmentwise resolves in the order open(2) does", () => {
+  const directory = () => ({ isDirectory: () => true })
+
+  test("a relative target is anchored at the working directory, not at the filesystem root", () => {
+    const realpath = (path: string) => (path === "." ? "/base" : path)
+    // Without the anchor the walk starts at "/" and names "/note.md", which is not the file the opener reaches.
+    expect(resolveSegmentwise("note.md", { realpath, lstat: directory })).toBe("/base/note.md")
+  })
+
+  test("win32 refuses a missing remainder only when the caller needs an existing path", () => {
+    const root = "C:\\"
+    const enoent = (path: string): never => {
+      throw Object.assign(new Error(`missing: ${path}`), { code: "ENOENT" })
+    }
+    const realpath = (path: string) => (path === root ? path : enoent(path))
+    const lstat = (path: string) => (path === root ? directory() : enoent(path))
+    const target = `${root}nope\\note.md`
+    expect(resolveSegmentwise(target, { platform: "win32", realpath, lstat })).toBe(win32.resolve(target))
+    expect(() => resolveSegmentwise(target, { platform: "win32", realpath, lstat, allowMissing: false })).toThrow(
+      /unresolvable remainder/,
+    )
   })
 })
