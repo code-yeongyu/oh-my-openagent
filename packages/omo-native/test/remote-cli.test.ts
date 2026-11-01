@@ -129,7 +129,12 @@ describe("omo remote bootstrap: omo account show first", () => {
 })
 
 describe("omo remote attach", () => {
-  async function attach(target: readonly string[], running = true, account = SIGNED_IN) {
+  async function attach(
+    target: readonly string[],
+    running = true,
+    account = SIGNED_IN,
+    connect?: () => ReturnType<typeof connectDeviceService>,
+  ) {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
     owners.push(owner)
     if (!running) await owner.stop()
@@ -138,7 +143,7 @@ describe("omo remote attach", () => {
       {
         accountShow: async () => account,
         stateDir: owner.stateDir,
-        connect: () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir }),
+        connect: connect ?? (() => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir })),
         now: () => NOW,
         output: () => {},
         error: line => err.push(line),
@@ -176,6 +181,13 @@ describe("omo remote attach", () => {
     const unknown = await attach([`${PEER}/bm8tc3VjaC1zZXNzaW9u`])
     expect(unknown.prepared).toBe(REMOTE_EXIT.failed)
     expect(unknown.err[0]).toStartWith("omo remote: ")
+  })
+
+  // A stopped service on Windows keeps its TCP endpoint file, so the stop shows up as a refused connection.
+  test.each(["ECONNREFUSED", "ECONNRESET", "ENOENT"])("names a stopped service when the endpoint remains but the connection fails with %s", async code => {
+    const refused = () => Promise.reject(Object.assign(new Error(`connect ${code} 127.0.0.1:1`), { code }))
+    const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, SIGNED_IN, refused)
+    expect([prepared, err]).toEqual([REMOTE_EXIT.unavailable, ["The OmO device service is not running on this device."]])
   })
 })
 
