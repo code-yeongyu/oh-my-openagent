@@ -3834,13 +3834,6 @@
       }
      },
      {
-      "type": "extension_ui_request",
-      "id": "<uuid:1>",
-      "method": "notify",
-      "message": "OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States to improve the product. Turn it off with DO_NOT_TRACK=1, or set \"telemetry\": { \"enabled\": false } in ~/.omo/omo.jsonc. Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md",
-      "notifyType": "info"
-     },
-     {
       "type": "entry_appended",
       "entry": {
        "type": "custom",
@@ -3898,7 +3891,7 @@
        "customType": "omo-memory:projection-pin",
        "data": {
         "version": 1,
-        "sessionId": "<uuid:2>",
+        "sessionId": "<uuid:1>",
         "revision": null,
         "noticedThrough": null,
         "compactionId": null,
@@ -3916,7 +3909,7 @@
        "customType": "omo-memory:accepted-turns",
        "data": {
         "version": 1,
-        "sessionId": "<uuid:2>",
+        "sessionId": "<uuid:1>",
         "priorUserTurns": 1,
         "sessionBaselineTurns": 0
        },
@@ -3927,7 +3920,7 @@
      },
      {
       "type": "agent_start",
-      "runId": "<uuid:3>"
+      "runId": "<uuid:2>"
      },
      {
       "type": "turn_start"
@@ -4031,7 +4024,7 @@
       "message": {
        "role": "custom",
        "customType": "omo-onboarding:context",
-       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:4> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
+       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
        "display": false,
        "timestamp": "<ts:message.timestamp:10>"
       }
@@ -4041,7 +4034,7 @@
       "message": {
        "role": "custom",
        "customType": "omo-onboarding:context",
-       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:4> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
+       "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
        "display": false,
        "timestamp": "<ts:message.timestamp:11>"
       }
@@ -5446,7 +5439,7 @@
        "customType": "senpi.hooks.stop-state",
        "data": {
         "count": 0,
-        "sessionId": "<uuid:2>",
+        "sessionId": "<uuid:1>",
         "turnKey": "1:<id:14>"
        },
        "id": "<id:15>",
@@ -5488,7 +5481,7 @@
        {
         "role": "custom",
         "customType": "omo-onboarding:context",
-        "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:4> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
+        "content": "Answer fully; greet in their language; offer a one-line tour. On request/acceptance: Follow <omo-repo>/packages/omo-senpi/plugin/skills//onboarding/SKILL.md. Migration inventory (from the same scan omo setup runs): \n\nOnboarding scan <uuid:3> (the same scan omo setup and the desktop app run; one row per found item):\n- detect senpi [harness: found] - 0 login(s), 0 importable\nValue summary: nothing found to carry over.",
         "display": false,
         "timestamp": "<ts:messages.timestamp:4>"
        },
@@ -5620,15 +5613,15 @@
         "runPaused": false,
         "since": "<ts:data.since:1>",
         "role": "root",
-        "rootSessionId": "<uuid:2>",
+        "rootSessionId": "<uuid:1>",
         "waitingOn": {
          "children": 0,
          "background": [],
          "human": []
         },
         "holds": [],
-        "runId": "<uuid:3>",
-        "sessionId": "<uuid:2>",
+        "runId": "<uuid:2>",
+        "sessionId": "<uuid:1>",
         "attentionSeq": 0,
         "synthetic": [],
         "epochSealed": false,
@@ -5654,9 +5647,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:1>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 0
        },
        "waitingOn": {
@@ -5665,7 +5658,7 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
+       "runId": "<uuid:2>",
        "observedAt": "<ts:lifecycle.observedAt:1>"
       }
      },
@@ -5683,9 +5676,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:2>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 1
        },
        "waitingOn": {
@@ -5694,7 +5687,7 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
+       "runId": "<uuid:2>",
        "activity": {
         "kind": "model",
         "since": "<ts:activity.since:1>"
@@ -5716,9 +5709,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:3>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 2
        },
        "waitingOn": {
@@ -5727,7 +5720,7 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
+       "runId": "<uuid:2>",
        "observedAt": "<ts:lifecycle.observedAt:3>"
       }
      },
@@ -5745,9 +5738,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:4>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 3
        },
        "waitingOn": {
@@ -5756,7 +5749,7 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
+       "runId": "<uuid:2>",
        "activity": {
         "kind": "tool",
         "toolName": "computer",
@@ -5781,9 +5774,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:5>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 4
        },
        "waitingOn": {
@@ -5792,7 +5785,7 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
+       "runId": "<uuid:2>",
        "observedAt": "<ts:lifecycle.observedAt:5>"
       }
      },
@@ -5810,9 +5803,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:6>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 5
        },
        "waitingOn": {
@@ -5821,7 +5814,7 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
+       "runId": "<uuid:2>",
        "activity": {
         "kind": "model",
         "since": "<ts:activity.since:3>"
@@ -5843,9 +5836,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:7>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 6
        },
        "waitingOn": {
@@ -5854,7 +5847,7 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
+       "runId": "<uuid:2>",
        "observedAt": "<ts:lifecycle.observedAt:7>"
       }
      },
@@ -5875,20 +5868,20 @@
         "runPaused": false,
         "since": "<ts:data.since:2>",
         "role": "root",
-        "rootSessionId": "<uuid:2>",
+        "rootSessionId": "<uuid:1>",
         "waitingOn": {
          "children": 0,
          "background": [],
          "human": []
         },
         "holds": [],
-        "runId": "<uuid:3>",
-        "completionId": "<uuid:2>:1",
+        "runId": "<uuid:2>",
+        "completionId": "<uuid:1>:1",
         "completion": {
          "kind": "reply",
          "at": "<ts:completion.at:1>"
         },
-        "sessionId": "<uuid:2>",
+        "sessionId": "<uuid:1>",
         "attentionSeq": 0,
         "synthetic": [],
         "epochSealed": true,
@@ -5919,9 +5912,9 @@
        "runPaused": false,
        "since": "<ts:lifecycle.since:8>",
        "role": "root",
-       "rootSessionId": "<uuid:2>",
+       "rootSessionId": "<uuid:1>",
        "activityRevision": {
-        "instanceId": "<uuid:5>",
+        "instanceId": "<uuid:4>",
         "revision": 0
        },
        "waitingOn": {
@@ -5930,8 +5923,8 @@
         "human": []
        },
        "holds": [],
-       "runId": "<uuid:3>",
-       "completionId": "<uuid:2>:1",
+       "runId": "<uuid:2>",
+       "completionId": "<uuid:1>:1",
        "completion": {
         "kind": "reply",
         "at": "<ts:completion.at:2>"
@@ -5947,7 +5940,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:6>",
+        "id": "<uuid:5>",
         "method": "setWidget",
         "widgetKey": "todo-sidebar"
        }
@@ -5958,13 +5951,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:7>",
+        "id": "<uuid:6>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:8>",
+        "id": "<uuid:7>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        }
@@ -5975,13 +5968,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:9>",
+        "id": "<uuid:8>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:10>",
+        "id": "<uuid:9>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        }
@@ -5992,13 +5985,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:11>",
+        "id": "<uuid:10>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:12>",
+        "id": "<uuid:11>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        }
@@ -6009,13 +6002,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:13>",
+        "id": "<uuid:12>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:14>",
+        "id": "<uuid:13>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        }
@@ -6026,13 +6019,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:15>",
+        "id": "<uuid:14>",
         "method": "setStatus",
         "statusKey": "monitors"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:16>",
+        "id": "<uuid:15>",
         "method": "setStatus",
         "statusKey": "monitors"
        }
@@ -6041,6 +6034,12 @@
      "setStatus:pi-websearch": {
       "count": 3,
       "snapshots": [
+       {
+        "type": "extension_ui_request",
+        "id": "<uuid:16>",
+        "method": "setStatus",
+        "statusKey": "pi-websearch"
+       },
        {
         "type": "extension_ui_request",
         "id": "<uuid:17>",
@@ -6052,18 +6051,18 @@
         "id": "<uuid:18>",
         "method": "setStatus",
         "statusKey": "pi-websearch"
-       },
-       {
-        "type": "extension_ui_request",
-        "id": "<uuid:19>",
-        "method": "setStatus",
-        "statusKey": "pi-websearch"
        }
       ]
      },
      "setWidget:pi-websearch": {
       "count": 3,
       "snapshots": [
+       {
+        "type": "extension_ui_request",
+        "id": "<uuid:19>",
+        "method": "setWidget",
+        "widgetKey": "pi-websearch"
+       },
        {
         "type": "extension_ui_request",
         "id": "<uuid:20>",
@@ -6075,12 +6074,6 @@
         "id": "<uuid:21>",
         "method": "setWidget",
         "widgetKey": "pi-websearch"
-       },
-       {
-        "type": "extension_ui_request",
-        "id": "<uuid:22>",
-        "method": "setWidget",
-        "widgetKey": "pi-websearch"
        }
       ]
      },
@@ -6089,13 +6082,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:23>",
+        "id": "<uuid:22>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:24>",
+        "id": "<uuid:23>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        }
@@ -6106,13 +6099,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:25>",
+        "id": "<uuid:24>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:26>",
+        "id": "<uuid:25>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        }
@@ -6123,13 +6116,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:27>",
+        "id": "<uuid:26>",
         "method": "setStatus",
         "statusKey": "todo-waiting"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:28>",
+        "id": "<uuid:27>",
         "method": "setStatus",
         "statusKey": "todo-waiting"
        }
@@ -6140,13 +6133,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:29>",
+        "id": "<uuid:28>",
         "method": "setStatus",
         "statusKey": "goal"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:30>",
+        "id": "<uuid:29>",
         "method": "setStatus",
         "statusKey": "goal"
        }
@@ -6157,7 +6150,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:31>",
+        "id": "<uuid:30>",
         "method": "setWidget",
         "widgetKey": "prompt-url"
        }
@@ -6168,14 +6161,14 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:32>",
+        "id": "<uuid:31>",
         "method": "setStatus",
         "statusKey": "  omo-native",
         "statusText": "(😺 OmO Native by Q Kim)"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:33>",
+        "id": "<uuid:32>",
         "method": "setStatus",
         "statusKey": "  omo-native",
         "statusText": "(😺 OmO Native by Q Kim)"
@@ -6187,13 +6180,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:34>",
+        "id": "<uuid:33>",
         "method": "setStatus",
         "statusKey": "memory"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:35>",
+        "id": "<uuid:34>",
         "method": "setStatus",
         "statusKey": "memory"
        }
@@ -6204,7 +6197,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:36>",
+        "id": "<uuid:35>",
         "method": "setStatus",
         "statusKey": "loop"
        }
@@ -6269,11 +6262,11 @@
         "runPaused": false,
         "since": "<ts:data.since:3>",
         "role": "root",
-        "rootSessionId": "<uuid:2>",
+        "rootSessionId": "<uuid:1>",
         "restoring": false,
         "persisted": true,
-        "completionId": "<uuid:2>:1",
-        "runId": "<uuid:3>",
+        "completionId": "<uuid:1>:1",
+        "runId": "<uuid:2>",
         "waitingOn": {
          "children": 0,
          "background": [],
@@ -6284,7 +6277,7 @@
          "kind": "reply",
          "at": "<ts:completion.at:3>"
         },
-        "sessionId": "<uuid:2>",
+        "sessionId": "<uuid:1>",
         "attentionSeq": 0,
         "synthetic": [],
         "epochSealed": true,
@@ -6309,7 +6302,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:37>",
+        "id": "<uuid:36>",
         "method": "setWidget",
         "widgetKey": "todo-sidebar"
        }
@@ -6320,13 +6313,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:38>",
+        "id": "<uuid:37>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:39>",
+        "id": "<uuid:38>",
         "method": "setStatus",
         "statusKey": "anthropic-web-search"
        }
@@ -6337,13 +6330,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:40>",
+        "id": "<uuid:39>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:41>",
+        "id": "<uuid:40>",
         "method": "setWidget",
         "widgetKey": "anthropic-web-search"
        }
@@ -6354,13 +6347,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:42>",
+        "id": "<uuid:41>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:43>",
+        "id": "<uuid:42>",
         "method": "setStatus",
         "statusKey": "openai-web-search"
        }
@@ -6371,13 +6364,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:44>",
+        "id": "<uuid:43>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:45>",
+        "id": "<uuid:44>",
         "method": "setWidget",
         "widgetKey": "openai-web-search"
        }
@@ -6388,13 +6381,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:46>",
+        "id": "<uuid:45>",
         "method": "setStatus",
         "statusKey": "monitors"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:47>",
+        "id": "<uuid:46>",
         "method": "setStatus",
         "statusKey": "monitors"
        }
@@ -6405,13 +6398,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:48>",
+        "id": "<uuid:47>",
         "method": "setStatus",
         "statusKey": "pi-websearch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:49>",
+        "id": "<uuid:48>",
         "method": "setStatus",
         "statusKey": "pi-websearch"
        }
@@ -6422,13 +6415,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:50>",
+        "id": "<uuid:49>",
         "method": "setWidget",
         "widgetKey": "pi-websearch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:51>",
+        "id": "<uuid:50>",
         "method": "setWidget",
         "widgetKey": "pi-websearch"
        }
@@ -6439,13 +6432,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:52>",
+        "id": "<uuid:51>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:53>",
+        "id": "<uuid:52>",
         "method": "setStatus",
         "statusKey": "pi-webfetch"
        }
@@ -6456,13 +6449,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:54>",
+        "id": "<uuid:53>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:55>",
+        "id": "<uuid:54>",
         "method": "setWidget",
         "widgetKey": "pi-webfetch"
        }
@@ -6473,7 +6466,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:56>",
+        "id": "<uuid:55>",
         "method": "setStatus",
         "statusKey": "todo-waiting"
        }
@@ -6484,7 +6477,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:57>",
+        "id": "<uuid:56>",
         "method": "setStatus",
         "statusKey": "goal"
        }
@@ -6495,7 +6488,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:58>",
+        "id": "<uuid:57>",
         "method": "setWidget",
         "widgetKey": "prompt-url"
        }
@@ -6506,7 +6499,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:59>",
+        "id": "<uuid:58>",
         "method": "setStatus",
         "statusKey": "  omo-native",
         "statusText": "(😺 OmO Native by Q Kim)"
@@ -6518,13 +6511,13 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:60>",
+        "id": "<uuid:59>",
         "method": "setStatus",
         "statusKey": "memory"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:61>",
+        "id": "<uuid:60>",
         "method": "setStatus",
         "statusKey": "memory"
        }
@@ -6535,7 +6528,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:62>",
+        "id": "<uuid:61>",
         "method": "setStatus",
         "statusKey": "loop"
        }
