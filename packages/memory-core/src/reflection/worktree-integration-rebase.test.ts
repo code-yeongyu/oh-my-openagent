@@ -110,6 +110,75 @@ describe("reflection integration after the parent moved (#12075)", () => {
     expect((await git(worktree.dir, ["rev-parse", "HEAD"])).stdout.trim()).toBe(tip.tipSha)
   })
 
+  it("#given both sides extended a last line that has no trailing newline #when integration runs #then it is refused, not spliced", async () => {
+    const { parentDir, worktree } = await fixture("unterminated")
+    const baseHead = await commitIn(parentDir, "memory.md", "status: draft")
+    await git(worktree.dir, ["reset", "--hard", baseHead])
+    const scoped = { ...worktree, baseSha: baseHead }
+    await commitIn(worktree.dir, "memory.md", "status: drafted")
+    const tip = await validated(scoped)
+    const parentHead = await commitIn(parentDir, "memory.md", "status: draft-final")
+
+    const result = await integrateValidatedReflection(scoped, {
+      mode: "auto", runId: "unterminated", summary: "unterminated", validated: tip, withWriterLock: unlocked,
+    })
+
+    expect(result.outcome).toBe("merge_conflict")
+    expect(result.detail).toContain("memory.md")
+    await expectParentClean(parentDir, parentHead)
+    expect(await readFile(join(parentDir, "memory.md"), "utf8")).toBe("status: draft-final")
+  })
+
+  it("#given finalize crashed after the rebase and before the checkpoint #when it resumes with the old tip #then it rebases again and merges", async () => {
+    const { parentDir, worktree } = await fixture("crash-after-rebase")
+    await commitIn(worktree.dir, FACTS, `${FACTS_BASE}- run fact\n`)
+    const tip = await validated(worktree)
+    await commitIn(parentDir, FACTS, `${FACTS_BASE}- parent fact\n`)
+    const input = { mode: "auto" as const, runId: "crash-after-rebase", summary: "crash", validated: tip, withWriterLock: unlocked }
+
+    await expect(integrateValidatedReflection(worktree, {
+      ...input, onRebased: async () => { throw new Error("crashed before checkpoint") },
+    })).rejects.toThrow("crashed before checkpoint")
+    expect((await git(worktree.dir, ["rev-parse", "HEAD"])).stdout.trim()).not.toBe(tip.tipSha)
+
+    const result = await integrateValidatedReflection(worktree, input)
+
+    expect(result.outcome).toBe("merged")
+    expect(await readFile(join(parentDir, FACTS), "utf8")).toBe(`${FACTS_BASE}- parent fact\n- run fact\n`)
+    expect((await git(parentDir, ["status", "--porcelain"])).stdout).toBe("")
+  })
+
+  it("#given finalize crashed mid-rebase #when it resumes #then the stale rebase is aborted and the run merges", async () => {
+    const { parentDir, worktree } = await fixture("crash-mid-rebase")
+    await commitIn(worktree.dir, FACTS, `${FACTS_BASE}- run fact\n`)
+    const tip = await validated(worktree)
+    const parentHead = await commitIn(parentDir, FACTS, `${FACTS_BASE}- parent fact\n`)
+    expect((await git(worktree.dir, ["rebase", "--onto", parentHead, worktree.baseSha])).code).not.toBe(0)
+
+    const result = await integrateValidatedReflection(worktree, {
+      mode: "auto", runId: "crash-mid-rebase", summary: "crash", validated: tip, withWriterLock: unlocked,
+    })
+
+    expect(result.outcome).toBe("merged")
+    expect(await readFile(join(parentDir, FACTS), "utf8")).toBe(`${FACTS_BASE}- parent fact\n- run fact\n`)
+  })
+
+  it("#given the run worktree gained a commit after validation #when integration recovers #then it refuses and keeps that commit", async () => {
+    const { parentDir, worktree } = await fixture("after-validation")
+    await commitIn(worktree.dir, FACTS, `${FACTS_BASE}- run fact\n`)
+    const tip = await validated(worktree)
+    const extra = await commitIn(worktree.dir, "memory.md", "unvalidated\n")
+    const parentHead = await commitIn(parentDir, FACTS, `${FACTS_BASE}- parent fact\n`)
+
+    const result = await integrateValidatedReflection(worktree, {
+      mode: "auto", runId: "after-validation", summary: "after", validated: tip, withWriterLock: unlocked,
+    })
+
+    expect(result.outcome).toBe("merge_conflict")
+    await expectParentClean(parentDir, parentHead)
+    expect((await git(worktree.dir, ["rev-parse", "HEAD"])).stdout.trim()).toBe(extra)
+  })
+
   it("#given the merge abort leaves the parent mid-merge #when integration recovers #then it reports parent_dirty and never rebases", async () => {
     const { parentDir, worktree } = await fixture("abort-dirty")
     await commitIn(worktree.dir, "memory.md", "run\n")

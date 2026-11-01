@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 import type { GitExec, GitExecResult } from "../git"
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
-import { describeMergeConflict, listLines } from "./merge-conflict-detail"
+import { boundDetail, describeMergeConflict, listLines } from "./merge-conflict-detail"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
 import { rebaseValidatedTip } from "./worktree-rebase-recovery"
 
@@ -106,7 +106,7 @@ export async function integrateValidatedReflection(
     if (mergeHead === input.validated.tipSha) {
       const aborted = await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
       if (aborted.code !== 0) {
-        return { outcome: "failed", detail: aborted.stderr.trim() || "Owned reflection merge could not be aborted" }
+        return { outcome: "failed", detail: boundDetail(aborted.stderr) || "Owned reflection merge could not be aborted" }
       }
     } else if (mergeHead !== null) {
       return { outcome: "parent_dirty", detail: "Parent repository contains another interrupted merge" }
@@ -150,13 +150,13 @@ async function settleFailedMerge(
   const landedMergeHead = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
   const unmerged = listLines((await run(worktree.exec, worktree.parent.dir, ["diff", "--name-only", "--diff-filter=U"])).stdout)
   if (landedMergeHead !== tipSha && unmerged.length === 0) {
-    return { outcome: "failed", detail: merge.stderr.trim() || "Reflection merge failed" }
+    return { outcome: "failed", detail: boundDetail(merge.stderr) || "Reflection merge failed" }
   }
   const detail = describeMergeConflict(unmerged, merge.stdout, merge.stderr)
   if (landedMergeHead === tipSha) {
     const aborted = await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
     if (aborted.code !== 0) {
-      return { outcome: "failed", detail: aborted.stderr.trim() || `Reflection merge conflict could not be aborted; ${detail}` }
+      return { outcome: "failed", detail: boundDetail(aborted.stderr) || `Reflection merge conflict could not be aborted; ${detail}` }
     }
   }
   const residue = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
