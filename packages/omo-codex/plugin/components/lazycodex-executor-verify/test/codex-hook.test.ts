@@ -470,6 +470,124 @@ function isBlockOutput(value: unknown): value is BlockOutput {
 	);
 }
 
+describe("parent-attached operation receipts", () => {
+	function attachedReceipt() {
+		const cwd = realpathSync(createWorkspace());
+		const bindings = join(cwd, "bindings");
+		const operation = join(cwd, ".omo", "operations", "bounded-task");
+		mkdirSync(bindings);
+		mkdirSync(operation, { recursive: true });
+		const receiptPath = ".omo/operations/bounded-task/raw.txt";
+		const file = join(cwd, receiptPath);
+		writeFileSync(file, "Command: verify\nExit code: 0\nOutput: all 106 source hashes match.\n");
+		const task = {
+			id: "verify",
+			role: "lazycodex-worker-medium",
+			status: "running",
+			agentId: "agent_1",
+			spawnCallId: "native-spawn",
+			sourceFingerprint: "source-hash",
+			receiptPath,
+		};
+		const run = {
+			schemaVersion: 1,
+			runId: "bounded-task",
+			workspace: cwd,
+			tasks: [task],
+			hookReceipts: [{ event: "PostToolUse", agentId: "agent_1" }],
+		};
+		const binding = {
+			file: join(operation, "run.json"),
+			taskId: task.id,
+			receiptGrant: {
+				receiptPath,
+				role: task.role,
+				sourceFingerprint: task.sourceFingerprint,
+				spawnCallId: task.spawnCallId,
+			},
+		};
+		const save = () => {
+			writeFileSync(binding.file, JSON.stringify(run));
+			writeFileSync(join(bindings, "agent_1.json"), JSON.stringify(binding));
+		};
+		save();
+		const input = createInput(cwd, { last_assistant_message: `EVIDENCE_RECORDED: ${receiptPath}` });
+		return { cwd, bindings, file, task, run, binding, save, input };
+	}
+
+	it("#given a symlinked operation directory #when its granted receipt is supplied #then rejects it", () => {
+		const f = attachedReceipt();
+		const operation = join(f.cwd, ".omo", "operations", "bounded-task");
+		renameSync(operation, `${operation}-real`);
+		symlinkSync(`${operation}-real`, operation, platform === "win32" ? "junction" : "dir");
+		expect(parseBlockOutput(runSubagentStopHook(f.input, nodeFileSystem, f.bindings)).decision).toBe("block");
+	});
+
+	it("#given a native parent attachment #when its exact scoped receipt is supplied #then accepts without an evidence-root write", () => {
+		const { cwd, bindings, input } = attachedReceipt();
+		expect(runSubagentStopHook(input, nodeFileSystem, bindings)).toBe("");
+		expect(existsSync(join(cwd, ".omo", "evidence"))).toBe(false);
+	});
+
+	it.each([
+		"sibling",
+		"grant drift",
+		"child",
+		"role",
+		"attachment",
+		"traversal",
+		"malformed binding",
+		"placeholder",
+		"stale",
+	])("#given %s #when the scoped worker stops #then rejects the receipt", (failure) => {
+		const f = attachedReceipt();
+		const input = { ...f.input };
+		switch (failure) {
+			case "sibling":
+				writeFileSync(`${f.file}.other`, "Unassigned raw output with more than forty characters.");
+				input.last_assistant_message = `EVIDENCE_RECORDED: ${f.file}.other`;
+				break;
+			case "grant drift":
+				f.task.spawnCallId = "later-spawn";
+				break;
+			case "child":
+				f.task.agentId = "another-child";
+				break;
+			case "role":
+				f.task.role = "lazycodex-worker-high";
+				break;
+			case "attachment":
+				f.run.hookReceipts = [];
+				break;
+			case "traversal":
+				f.task.receiptPath = f.binding.receiptGrant.receiptPath = ".omo/operations/bounded-task/../raw.txt";
+				break;
+			case "placeholder":
+				writeFileSync(f.file, "short");
+				break;
+			case "stale": {
+				const transcript = join(f.cwd, "transcript.jsonl");
+				writeFileSync(transcript, "{}");
+				input.transcript_path = transcript;
+				break;
+			}
+		}
+		f.save();
+		if (failure === "malformed binding") writeFileSync(join(f.bindings, "agent_1.json"), "{");
+		const fileSystem =
+			failure === "stale"
+				? {
+						...nodeFileSystem,
+						statSync: (path: string) =>
+							path === input.transcript_path
+								? { ...statSync(path), birthtimeMs: statSync(f.file).mtimeMs + 1000 }
+								: statSync(path),
+					}
+				: nodeFileSystem;
+		expect(parseBlockOutput(runSubagentStopHook(input, fileSystem, f.bindings)).decision).toBe("block");
+	});
+});
+
 describe("tier worker receipt enforcement", () => {
 	// given the matcher set now covers the difficulty-tier workers
 	const workerTypes = ["lazycodex-worker-low", "lazycodex-worker-medium", "lazycodex-worker-high"] as const;
