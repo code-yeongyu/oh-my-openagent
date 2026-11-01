@@ -19,8 +19,9 @@ type AuthorRoute = { readonly configs: AuthorConfig[]; withdraw: (() => void) | 
 
 // senpi keeps ONE author route per host while a shared daemon runs many sessions, each with the
 // omo.json of its own project. Every registered session adds its config to its host's route; the route
-// answers with the config of the session asking (matched by cwd) and leaves a session it does not know to
-// senpi's fallback, the session model. The route is withdrawn when the last session on that host releases
+// answers with the config of the session asking (matched by cwd); a session it does not know gets no author
+// model, and with senpi#5339 senpi drops its session-model fallback, so that session gets no widget. The
+// route is withdrawn when the last session on that host releases
 // it. State is keyed by host (one per loaded senpi module, see readJobWidgetHost), so a second host never
 // inherits or skips another host's route.
 const routes = new WeakMap<JobWidgetHostApi, AuthorRoute>()

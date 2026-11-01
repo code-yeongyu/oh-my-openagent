@@ -73,7 +73,7 @@ export function resolveKibitzerSidecarModel(input: KibitzerSidecarModelInput): K
       ...(resolution.missingProviders === undefined ? {} : { missingProviders: resolution.missingProviders }),
     }
   }
-  // Category-sourced resolutions carry no `source`; registry_fallback / session_inherit do. Such a
+  // Category-sourced resolutions carry no `source`; registry_fallback does. Such a
   // resolution answers from OUTSIDE the pinned category, which the advisor refuses - and it hides
   // why the category itself came up empty, so the chain is asked again for the providers a `/login`
   // would revive; without them the notice can only offer the config-pin half of the fix.

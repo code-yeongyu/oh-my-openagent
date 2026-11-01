@@ -9,13 +9,13 @@ const OPUS = { input: 5.00, cacheRead: 0.50, output: 25.0 }
 const PARENT_P50 = 156_872
 
 describe("reflection launch route", () => {
-  describe("#given a short job on a cheap-cache session model", () => {
-    test("#when routed #then fork wins and carries the session model", () => {
+  describe("#given a short job on a cheap-cache fork candidate", () => {
+    test("#when routed #then fork wins and carries the fork candidate", () => {
       // when
       const route = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
+        fork: { model: "openai/gpt-5.6-luna-fast", cost: LUNA },
         parentContextTokens: PARENT_P50,
         turns: MEMORY_WORKLOAD_PROFILES.reflection.turns,
         cacheHit: true,
@@ -27,13 +27,13 @@ describe("reflection launch route", () => {
     })
   })
 
-  describe("#given a long job on an expensive session model", () => {
+  describe("#given a long job on an expensive fork candidate", () => {
     test("#when routed #then quick wins", () => {
       // when
       const route = chooseMemoryLaunchRoute({
         surface: "reflection",
         quick: { model: "kimi/kimi-for-coding-highspeed", cost: KIMI },
-        session: { model: "anthropic/claude-opus-5-5", cost: OPUS },
+        fork: { model: "anthropic/claude-opus-5-5", cost: OPUS },
         parentContextTokens: PARENT_P50,
         turns: MEMORY_WORKLOAD_PROFILES.reflection.turns,
         cacheHit: true,
@@ -75,12 +75,60 @@ describe("reflection launch route", () => {
       const route = chooseMemoryLaunchRoute(input)
 
       // then
-      expect(input.session?.contextWindow).toBe(272_000)
+      expect(input.fork?.contextWindow).toBe(256_000)
       expect(input.quick?.contextWindow).toBe(256_000)
       expect(route.route).toBe("quick")
       expect(route.reason).toBe("window_unfit")
       expect(route.model).toBe("kimi/kimi-for-coding-highspeed")
     })
+  })
+})
+
+describe("memoryLaunchRouteInput", () => {
+  const registry = {
+    getAvailable: () => [],
+    find: (provider: string, id: string) =>
+      provider === "openai" && id === "gpt-5.6-luna-fast"
+        ? { provider, id, cost: LUNA, contextWindow: 1_000_000 }
+        : provider === "kimi" && id === "kimi-for-coding-highspeed"
+          ? { provider, id, cost: KIMI, contextWindow: 1_000_000 }
+          : undefined,
+  }
+
+  test("#given a cheaper cache-warm session model #when the fork wins #then it forks the designated model, never the session model", () => {
+    // when
+    const input = memoryLaunchRouteInput({
+      surface: "reflection",
+      quickModel: "kimi/kimi-for-coding-highspeed",
+      registry,
+      sessionModel: { provider: "openai", id: "gpt-5.6-luna-fast" },
+      parentContextTokens: 5_000,
+      payloadTokens: 1_000,
+      cacheHit: true,
+    })
+    const route = chooseMemoryLaunchRoute(input)
+
+    // then
+    expect(input.fork?.model).toBe("kimi/kimi-for-coding-highspeed")
+    expect(input.cacheHit).toBe(false)
+    expect(route.model).toBe("kimi/kimi-for-coding-highspeed")
+  })
+
+  test("#given the parent ran the designated model #when assembled #then the parent's cache counts", () => {
+    // when
+    const input = memoryLaunchRouteInput({
+      surface: "reflection",
+      quickModel: "kimi/kimi-for-coding-highspeed",
+      registry,
+      sessionModel: { provider: "kimi", id: "kimi-for-coding-highspeed" },
+      parentContextTokens: 5_000,
+      payloadTokens: 1_000,
+      cacheHit: true,
+    })
+
+    // then
+    expect(input.cacheHit).toBe(true)
+    expect(input.fork?.model).toBe("kimi/kimi-for-coding-highspeed")
   })
 })
 

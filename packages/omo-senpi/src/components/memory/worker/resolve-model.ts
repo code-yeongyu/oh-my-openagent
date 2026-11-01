@@ -1,4 +1,4 @@
-import { isExcludedModel, type OmoConfig } from "@oh-my-opencode/omo-config-core"
+import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
   builtinCategoryChainCandidates,
   resolveCategory,
@@ -7,13 +7,7 @@ import {
   type SenpiModelRegistryPort,
 } from "@oh-my-opencode/senpi-task"
 
-import { chooseReflectionLaunchModel, type ReflectionLaunchCandidate } from "./model-cost"
-import { readModelPricing, selectRegistryFallbackModels } from "./registry-fallback"
-
-// Reflection reads a bounded transcript slice, so a fixed workload estimate is enough to compare
-// per-token prices. It cancels out while cache reuse is impossible and becomes load-bearing only
-// once a cache-replaying launch path exists.
-const ESTIMATED_WORKLOAD_TOKENS = 50_000
+import { selectRegistryFallbackModels } from "./registry-fallback"
 
 export type ReflectionThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
 
@@ -24,16 +18,12 @@ export type ReflectionModelCandidate = {
   readonly loadExtensions?: true
 }
 
-export type ReflectionModelSource = "registry_fallback" | "session_inherit"
+export type ReflectionModelSource = "registry_fallback"
 
 export type ReflectionSessionModel = {
   readonly provider: string
   readonly id: string
   readonly thinking?: string
-}
-
-export type ReflectionResolveOptions = {
-  readonly sessionModel?: ReflectionSessionModel
 }
 
 export type ReflectionModelResolution =
@@ -49,9 +39,15 @@ export type ReflectionModelResolution =
       readonly kind: "category_unavailable"
       readonly category: string
       readonly cause: "no_registry" | "not_found" | "model_unavailable" | "unknown"
-      readonly attemptedChain?: readonly unknown[]
+      /** Each designated rung the category tried, and why it could not serve the run. */
+      readonly attempts?: readonly ReflectionModelAttempt[]
       readonly missingProviders?: readonly string[]
     }
+
+export type ReflectionModelAttempt = {
+  readonly model: string
+  readonly why: "provider_not_connected" | "model_unavailable"
+}
 
 const THINKING_LEVELS: readonly ReflectionThinkingLevel[] = [
   "off", "minimal", "low", "medium", "high", "xhigh", "max",
@@ -61,20 +57,11 @@ export function resolveReflectionModel(
   category: string,
   config: OmoConfig,
   liveRegistry: SenpiModelRegistryPort<SenpiModelPort> | undefined,
-  options: ReflectionResolveOptions = {},
 ): ReflectionModelResolution {
   // exclude_models reaches every rung below: the category chain, a pin, the builtin rungs appended
   // after it and the beyond-category ladder all read this one filtered view.
   const registry = liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, config.exclude_models)
-  const session = options.sessionModel
-  if (session !== undefined && isExcludedModel(`${session.provider}/${session.id}`, config.exclude_models)) {
-    const { sessionModel: _excluded, ...rest } = options
-    return resolveReflectionModel(category, config, liveRegistry, rest)
-  }
-  if (!registry) {
-    return resolveBeyondCategory(category, undefined, options)
-      ?? { kind: "category_unavailable", category, cause: "no_registry" }
-  }
+  if (!registry) return { kind: "category_unavailable", category, cause: "no_registry" }
   const resolution = resolveCategory(category, config, registry)
   if (resolution.kind !== "resolved") {
     const pinned = config.categories?.[category]?.model
@@ -91,7 +78,7 @@ export function resolveReflectionModel(
     }
     // An explicit categories.<name>.disable=true keeps its meaning: no silent fallback model.
     if (resolution.kind !== "disabled") {
-      const fallback = resolveBeyondCategory(category, registry, options)
+      const fallback = resolveBeyondCategory(category, registry)
       if (fallback !== undefined) return fallback
     }
     return {
@@ -104,7 +91,7 @@ export function resolveReflectionModel(
             ? "model_unavailable"
             : "unknown",
       ...(resolution.kind === "model_unavailable" && resolution.attempted_chain !== undefined
-        ? { attemptedChain: resolution.attempted_chain }
+        ? { attempts: chainAttempts(resolution.attempted_chain, resolution.missing_providers ?? []) }
         : {}),
       ...(resolution.kind === "model_unavailable" && resolution.missing_providers !== undefined
         ? { missingProviders: resolution.missing_providers }
@@ -145,48 +132,21 @@ export function resolveReflectionModel(
 }
 
 // Ladder beyond the category chain (Discord report 1537678248337739826): the builtin quick
-// chain has no rung for several common single-provider setups, so a dead chain must not kill
-// reflection while the runtime registry or the live session still offers a usable model.
+// chain has no rung for several common single-provider setups, so a dead chain falls to the
+// cheapest connected registry model. The parent session's model is never a rung here (#12081):
+// with no registry candidate the run fails typed instead of inheriting the session model.
 function resolveBeyondCategory(
   category: string,
-  registry: SenpiModelRegistryPort<SenpiModelPort> | undefined,
-  options: ReflectionResolveOptions,
+  registry: SenpiModelRegistryPort<SenpiModelPort>,
 ): Extract<ReflectionModelResolution, { readonly kind: "resolved" }> | undefined {
-  const candidates = registry === undefined ? [] : selectRegistryFallbackModels(registry.getAvailable())
-  const fresh = candidates[0]
-  const session = sessionCandidate(options.sessionModel, registry)
-  if (fresh === undefined && session === undefined) return undefined
-
-  const decision = chooseReflectionLaunchModel({
-    ...(fresh === undefined ? {} : { fresh }),
-    ...(session === undefined ? {} : { session }),
-    prefixTokens: 0,
-    workloadTokens: ESTIMATED_WORKLOAD_TOKENS,
-    // The sandboxed reflection child rebuilds its own system prompt, tool list and cwd, so its
-    // request prefix never matches the parent session and no provider cache can be replayed.
-    cacheReusable: false,
-  })
-  const thinking = normalizeThinking(decision.thinking)
+  const [first, ...rest] = selectRegistryFallbackModels(registry.getAvailable())
+  if (first === undefined) return undefined
   return {
     kind: "resolved",
     category,
-    model: decision.model,
-    ...(thinking === undefined ? {} : { thinking }),
-    source: decision.choice === "inherit" ? "session_inherit" : "registry_fallback",
-    fallbacks: decision.choice === "inherit" ? [] : candidates.slice(1).map((entry) => ({ model: entry.model })),
-  }
-}
-
-function sessionCandidate(
-  session: ReflectionSessionModel | undefined,
-  registry: SenpiModelRegistryPort<SenpiModelPort> | undefined,
-): ReflectionLaunchCandidate | undefined {
-  if (session === undefined) return undefined
-  const cost = registry === undefined ? undefined : readModelPricing(registry.find(session.provider, session.id))
-  return {
-    model: `${session.provider}/${session.id}`,
-    ...(session.thinking === undefined ? {} : { thinking: session.thinking }),
-    ...(cost === undefined ? {} : { cost }),
+    model: first.model,
+    source: "registry_fallback",
+    fallbacks: rest.map((entry) => ({ model: entry.model })),
   }
 }
 
@@ -253,6 +213,17 @@ function configuredFallbackModels(
       ...(thinking === undefined ? {} : { thinking }),
     }]
   })
+}
+
+function chainAttempts(
+  chain: readonly { readonly providers: readonly string[]; readonly model: string }[],
+  missingProviders: readonly string[],
+): readonly ReflectionModelAttempt[] {
+  const missing = new Set(missingProviders)
+  return chain.flatMap((rung) => rung.providers.map((provider): ReflectionModelAttempt => ({
+    model: `${provider}/${rung.model}`,
+    why: missing.has(provider) ? "provider_not_connected" : "model_unavailable",
+  })))
 }
 
 function deduplicateCandidates(
