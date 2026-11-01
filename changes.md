@@ -1,3 +1,7 @@
+## 2026-11-01 - Give a timed-out browser template a graceful quit (fixes #12067)
+
+The ultimate-browsing executor runs each Playwright template in its own session. On timeout it sends SIGTERM to the whole process group (node plus the Chrome it launched) and waits up to 5 s, so the template's `ctx.close()` and Chrome's clean quit can run, before sending SIGKILL to the group. Previously only the node process was SIGKILLed, which orphaned Chrome and leaked its macOS code-sign clone and temp profile.
+
 ## 2026-10-30 - Distribute model starts per task child (#11905)
 
 Add the category and agent distribution option to the OpenCode schema and spawn resolvers. Round-robin children retain their resolved chain for reactive fallback, including per-model settings.
