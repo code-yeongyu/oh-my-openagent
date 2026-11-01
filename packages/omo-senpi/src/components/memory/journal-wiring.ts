@@ -94,7 +94,7 @@ interface BranchSurface {
   readonly entries: readonly unknown[]
 }
 
-function readBranchSurface(eventCtx: unknown): BranchSurface | undefined {
+export function readBranchSurface(eventCtx: unknown): BranchSurface | undefined {
   if (!isRecord(eventCtx)) return undefined
   const manager = eventCtx.sessionManager
   if (!isRecord(manager)) return undefined

@@ -105,7 +105,7 @@ export function planProviders(source, agentDir) {
   const result = classify(source, models, auth)
   const notices = [...source.notices]
   if (result.blocked.length > 0) notices.push(`WARN senpi: malformed models.json; these custom providers were not imported: ${result.blocked.join(", ")}`)
-  return { paths, models, authBytes: auth.bytes, notices, result, skipped: source.skipped, present: source.providers.length > 0, pending: result.added.length }
+  return { paths, models, authBytes: auth.bytes, notices, result, skipped: source.skipped, present: source.providers.some((provider) => provider.origin !== "commandcode"), pending: result.added.length }
 }
 
 /**
