@@ -63,6 +63,7 @@ import { createTaskRunPause, type TaskPauseMethods, type ResumeTaskRequest, type
 import { createHeldSend } from "./held-send"
 import { admitRespawn } from "./respawn-admission"
 import { restorePausedChild } from "./paused-restore"
+import { ownerProcessViewFor } from "../lifecycle/owner-process"
 import { defaultSignaller } from "../lifecycle/context"
 import type { ChildCreationPort, RunPauseOwner } from "../pause/ports"
 import { createStagedChildCreation } from "./staged-creation"
@@ -309,6 +310,7 @@ class TaskManagerImpl implements TaskManager {
       liveHandle: taskId => this.#live.get(taskId)?.handle,
       restore: record => restorePausedChild({
         store: options.store, hostPid: this.#hostPid, isProcessAlive: options.isProcessAlive ?? defaultSignaller.isAlive,
+        ownerProcesses: ownerProcessViewFor(options.isProcessAlive, options.ownerProcesses),
         respawn: (paused, sessionPath) => this.respawn(paused, sessionPath, undefined, { paused: true }),
         reattach: (paused, handle) => this.reattach(paused, handle),
         liveHandle: taskId => this.#live.get(taskId)?.handle,

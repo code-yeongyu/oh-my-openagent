@@ -31,6 +31,7 @@ import {
 import { parseOptionalProvisionalExit } from "./provisional-exit-parse"
 import { parseUncertainInputs } from "./input-effects-parse"
 import { parseOptionalRunPause } from "./run-pause-parse"
+import { parseOptionalHostClaim } from "./host-claim-parse"
 import { parseOptionalParentModelFallback } from "./parent-model-fallback-parse"
 import {
   isRecord,
@@ -63,6 +64,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const toolDeny = readOptionalStringArray(value, "tool_deny")
   const pid = readOptionalNumber(value, "pid")
   const hostPid = readOptionalNumber(value, "host_pid")
+  const hostClaim = parseOptionalHostClaim(value)
   const childSessionId = readOptionalString(value, "child_session_id")
   const finalResponse = readOptionalString(value, "final_response")
   const isolation = parseOptionalIsolation(value)
@@ -163,6 +165,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(pendingSteering !== undefined && pendingSteering.length > 0 ? { pending_steering: pendingSteering } : {}),
     ...(pid === undefined ? {} : { pid }),
     ...(hostPid === undefined ? {} : { host_pid: hostPid }),
+    ...(hostClaim === undefined ? {} : { host_claim: hostClaim }),
     ...(childSessionId === undefined ? {} : { child_session_id: childSessionId }),
     ...(finalResponse === undefined ? {} : { final_response: finalResponse }),
     ...(isolation === undefined ? {} : { isolation }),

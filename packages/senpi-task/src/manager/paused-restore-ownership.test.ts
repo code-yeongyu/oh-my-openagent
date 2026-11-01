@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
+import { createOwnerProcessView } from "../lifecycle/owner-process"
 import { AdmissionBarrier } from "../pause/admission-barrier"
 import type { ChildPausePort, RunPauseOwner } from "../pause/ports"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
@@ -23,7 +24,7 @@ class RestoringRunner extends FakeRunner {
   }
 }
 
-async function pausedOnAnotherHost(firstHostAlive: boolean) {
+async function pausedOnAnotherHost(firstHostAlive: boolean, firstHostPidReused = false) {
   const cwd = tempProject()
   const store = createTaskRecordStore({ project_dir: cwd })
   const first = new FakeRunner()
@@ -47,6 +48,7 @@ async function pausedOnAnotherHost(firstHostAlive: boolean) {
   await before.pauseTask(taskId, owner)
   before.forget(taskId, { path: "park" })
   before.workpools.dispose()
+  store.mutate(taskId, fresh => ({ ...fresh, host_claim: { pid: FIRST_HOST, at: new Date().toISOString() } }))
   const directory = resolveChildSessionDir(join(store.stateDir, "children", taskId), taskId)
   mkdirSync(directory, { recursive: true })
   writeFileSync(join(directory, "2026-10-21_child.jsonl"), '{"type":"session","id":"restored-session"}\n')
@@ -64,6 +66,7 @@ async function pausedOnAnotherHost(firstHostAlive: boolean) {
     cwd, store, config: settings({ default_concurrency: 5 }), planner: categoryPlanner(), admissionBarrier: barrier,
     runners: { "in-process": runner, process: runner }, childPausePort, hostPid: 424_242,
     isProcessAlive: pid => pid === FIRST_HOST && firstHostAlive,
+    ...(firstHostPidReused ? { ownerProcesses: createOwnerProcessView(async pid => pid === FIRST_HOST ? Date.now() + 60_000 : null) } : {}),
   })
   return { store, taskId, owner, calls, runner, barrier, manager }
 }
@@ -89,6 +92,16 @@ describe("restoring a paused child never takes it from a live host", () => {
       expect(h.runner.resumed).toEqual([])
       expect(h.calls).toEqual([])
       expect(h.store.load(h.taskId)?.host_pid).toBe(FIRST_HOST)
+    } finally { h.manager.workpools.dispose() }
+  })
+
+  test("#given the recorded host pid is alive but now names a process started after the pause #when guidance is held #then the child is restored under this host", async () => {
+    const h = await pausedOnAnotherHost(true, true)
+    try {
+      expect(await h.manager.holdTaskInput(h.taskId, { inputId: "guide-1", revision: 0, text: "use staging" }))
+        .toEqual({ kind: "held", entryId: "held-1", duplicate: false })
+      expect(h.runner.resumed).toHaveLength(1)
+      expect(h.store.load(h.taskId)?.host_pid).toBe(424_242)
     } finally { h.manager.workpools.dispose() }
   })
 

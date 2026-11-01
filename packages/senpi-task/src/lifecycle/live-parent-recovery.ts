@@ -1,6 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 import type { TaskRecord } from "../state"
-import type { LifecycleContext } from "./context"
+import { claimantAlive, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
 import { retriesStopped } from "./deferred-revival"
 import { PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { isHostSessionRecord } from "./host-session"
@@ -75,8 +76,10 @@ export function startLiveParentRecovery(
       if (expired) episode.deadlineAttempted = true
       // A live foreign owner may release its claim within the budget. Do not start a second run
       // beside it; at expiry the normal stop/close path must end it (or disclose unconfirmed close).
+      const observing = observeRecordOwners(context.ownerProcesses, [record], context.hostPid)
+      if (observing !== undefined) await observing
       if (record.host_pid !== undefined && record.host_pid !== context.hostPid
-        && context.signaller.isAlive(record.host_pid)) {
+        && claimantAlive(context, record)) {
         if (expired) await expireSuspendedChild(context, record, () => owned(record))
         return
       }

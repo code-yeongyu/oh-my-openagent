@@ -1,4 +1,5 @@
 import type { ReattachResult, RespawnResult } from "../lifecycle/port"
+import { observeRecordOwners, recordOwnerAlive, type OwnerProcessView } from "../lifecycle/owner-process"
 import { newestSessionPath } from "../lifecycle/session-path"
 import type { RunPauseOwner } from "../pause/ports"
 import type { TaskRecord } from "../state"
@@ -23,6 +24,7 @@ export type PausedRestorePorts = {
   readonly store: TaskRecordStore
   readonly hostPid: number
   isProcessAlive(pid: number): boolean
+  readonly ownerProcesses: OwnerProcessView
   respawn(record: TaskRecord, sessionPath: string): Promise<RespawnResult>
   reattach(record: TaskRecord, handle: ManagedChildHandle): Promise<ReattachResult>
   liveHandle(taskId: string): ManagedChildHandle | undefined
@@ -42,7 +44,11 @@ export function savedRunOwner(record: TaskRecord): RunPauseOwner | undefined {
 export async function restorePausedChild(ports: PausedRestorePorts, record: TaskRecord): Promise<ManagedChildHandle> {
   const taskId = record.task_id
   const owner = record.host_pid
-  if (owner !== undefined && owner !== ports.hostPid && ports.isProcessAlive(owner)) throw new PausedChildOwnedElsewhereError(taskId, owner)
+  const observing = observeRecordOwners(ports.ownerProcesses, [record], ports.hostPid)
+  if (observing !== undefined) await observing
+  if (owner !== undefined && owner !== ports.hostPid && recordOwnerAlive((pid) => ports.isProcessAlive(pid), ports.ownerProcesses, record)) {
+    throw new PausedChildOwnedElsewhereError(taskId, owner)
+  }
   const sessionPath = newestSessionPath(ports, taskId)
   if (sessionPath === undefined) throw new PausedChildLostError(taskId, "its session transcript is gone")
   let claimed = false

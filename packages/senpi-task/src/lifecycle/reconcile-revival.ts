@@ -2,6 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
 import { nowIso, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
 import { hostSessionResumePath } from "./host-session"
 import { markRevivalDeferred } from "./host-session-record"
 import {
@@ -34,6 +35,11 @@ export async function reconcileScopedRevival(
 
   const outcomes: ReconcileOutcome[] = []
   const sessionRecords = records.filter((record) => record.parent_session_id === parentSessionId)
+  const observing = observeRecordOwners(context.ownerProcesses, sessionRecords, context.hostPid)
+  if (observing !== undefined) {
+    await observing
+    if (!reconciliationActive(context)) return []
+  }
   const expected = new Map<string, TaskRecord>(sessionRecords.filter(isSuspended).map(record => [record.task_id, record]))
   const canClaim = (fresh: TaskRecord) => {
     const observed = expected.get(fresh.task_id)

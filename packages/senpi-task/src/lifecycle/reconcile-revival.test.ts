@@ -13,6 +13,7 @@ import { createTaskLifecycle } from "./create"
 import type { ProcessSignaller, RespawnResult } from "./port"
 import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { createOwnerProcessView } from "./owner-process"
 
 afterEach(cleanupProjects)
 
@@ -59,6 +60,7 @@ function injectedHarness(options: {
   readonly store?: TaskRecordStore
   readonly config?: Record<string, unknown>
   readonly alive?: Set<number>
+  readonly ownerStarts?: ReadonlyMap<number, number>
   readonly onRespawn?: (record: TaskRecord, sessionPath: string | undefined) => Promise<RespawnResult>
 } = {}) {
   const store = options.store ?? tempStore()
@@ -81,6 +83,9 @@ function injectedHarness(options: {
     hostPid,
     now,
     signaller,
+    ...(options.ownerStarts === undefined ? {} : {
+      ownerProcesses: createOwnerProcessView(async (pid) => options.ownerStarts?.get(pid) ?? null),
+    }),
     orphanKillDelayMs: 0,
     respawn: async (record, sessionPath) => {
       launches.push({ taskId: record.task_id, sessionPath })
@@ -158,6 +163,51 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
     expect(harness.store.load(record.task_id)).toEqual({ ...record, terminal_at: record.updated_at })
     expect(harness.signals).toHaveLength(0)
+  })
+
+  // A pid only names its claimant while that process lives; the OS hands a freed pid to the next
+  // process, and a bare signal-0 probe then mistakes the newcomer for the owner forever.
+  for (const kind of ["terminal", "running"] as const) {
+    test(`#given a ${kind} record whose host_pid now belongs to a process started after its owner stamped the claim #when reconciled #then the dead claimant is not deferred to`, async () => {
+      // given
+      const store = tempStore()
+      const record = withV1(store, seedRecord(store, {
+        task_id: kind === "terminal" ? "st_1000001e" : "st_1000001f", parent_session_id: parentSessionId,
+        status: kind === "terminal" ? "completed" : "running",
+        residency_state: "resident", execution_mode: "in-process", host_pid: 3333,
+      }))
+      store.mutate(record.task_id, (fresh) => ({ ...fresh, host_claim: { pid: 3333, at: fresh.updated_at } }))
+      persistSession(store, record.task_id)
+      const reusedAt = Date.parse(record.updated_at) + 60_000
+      const harness = injectedHarness({ store, alive: new Set([3333]), ownerStarts: new Map([[3333, reusedAt]]) })
+
+      // when
+      const result = await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+      // then
+      const outcome = result.outcomes.find((entry) => entry.task_id === record.task_id)
+      expect(outcome?.kind).not.toBe("deferred")
+      expect(outcome?.kind).not.toBe("foreign_live_owner")
+      expect(harness.store.load(record.task_id)?.revival_deferred_reason).toBeUndefined()
+      expect(harness.signals.filter((entry) => entry.pid === 3333)).toHaveLength(0)
+    })
+  }
+
+  test("#given a record whose live host_pid started before its owner stamped the claim #when reconciled #then it stays deferred to that owner", async () => {
+    // given
+    const store = tempStore()
+    const record = seedRecord(store, {
+      task_id: "st_1000001d", parent_session_id: parentSessionId, status: "completed",
+      residency_state: "resident", execution_mode: "process", pid: 7401, host_pid: 3333,
+    })
+    store.mutate(record.task_id, (fresh) => ({ ...fresh, host_claim: { pid: 3333, at: fresh.updated_at } }))
+    const harness = injectedHarness({ store, alive: new Set([3333, 7401]), ownerStarts: new Map([[3333, Date.parse(record.updated_at) - 60_000]]) })
+
+    // when
+    const result = await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+    // then
+    expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
   })
 
   test("#given a host-session record with a live daemon pid but no live session #when reconciled #then session liveness decides ownership", async () => {

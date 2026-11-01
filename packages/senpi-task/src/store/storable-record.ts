@@ -23,8 +23,18 @@ export function storedStatus(status: TaskStatus): { readonly status: Exclude<Tas
   return status === "paused" ? { status: "running", paused: true } : { status }
 }
 
+// Only the owner itself can say when it took a record, and it says so no earlier than it started:
+// a write naming this process as host stamps that moment once, bound to this pid.
+// A stamp under this pid from before this process began came from an earlier holder of the pid.
+function withHostClaim(record: TaskRecord): TaskRecord {
+  if (record.host_pid !== process.pid) return record
+  const claim = record.host_claim
+  if (claim?.pid === process.pid && Date.parse(claim.at) >= performance.timeOrigin) return record
+  return { ...record, host_claim: { pid: process.pid, at: new Date().toISOString() } }
+}
+
 export function toStorableTaskRecord(record: TaskRecord): TaskRecord & StoredPausedMarker {
-  const stored = storableEffectiveModel(record)
+  const stored = storableEffectiveModel(withHostClaim(record))
   return stored.status === "paused" ? { ...stored, ...storedStatus(stored.status) } : stored
 }
 

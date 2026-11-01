@@ -1,6 +1,6 @@
 import type { TaskRecord } from "../state"
 import { isSpawnSpecV1 } from "../state"
-import { reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { destroyResidentTask } from "./destroy"
 import { endClosingFallbackChild } from "./fallback-closing-child"
 import { isFallbackHandoff } from "./fallback-handoff"
@@ -308,7 +308,7 @@ function isSameClaim(context: LifecycleContext, claimed: TaskRecord): boolean {
 
 export function isOrphan(context: LifecycleContext, record: TaskRecord): boolean {
   if (record.host_pid === context.hostPid) return !hasLiveHandle(context, record.task_id)
-  return record.host_pid === undefined || !context.signaller.isAlive(record.host_pid)
+  return !claimantAlive(context, record)
 }
 
 function hasLiveHandle(context: LifecycleContext, taskId: string): boolean {

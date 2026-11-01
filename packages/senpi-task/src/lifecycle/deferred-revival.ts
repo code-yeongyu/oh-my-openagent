@@ -1,5 +1,6 @@
 import { markRecordLostForReconciliation, type TaskRecord } from "../state"
-import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { claimantAlive, nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { observeRecordOwners } from "./owner-process"
 import { LOST_ON_EXHAUSTION, SCOPED_RETRY_REASONS, PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { expireSuspendedChild } from "./suspended-expiry"
 import { destroyResidentTask } from "./destroy"
@@ -54,6 +55,9 @@ export async function retryDeferredScopedChild(
   for (const backoffMs of context.hostRetry.deferredRetryBackoffMs) {
     await context.hostRetry.wait(backoffMs)
     if (retriesStopped(context, parentSessionId)) return
+    const observedOwner = context.store.load(taskId)
+    const observing = observedOwner === null ? undefined : observeRecordOwners(context.ownerProcesses, [observedOwner], context.hostPid)
+    if (observing !== undefined) await observing
     const fresh = context.store.load(taskId)
     if (!canRetry(context, fresh, parentSessionId)) return
     // Another revival can claim a child before it installs its handle. The claim/epoch fence,
@@ -151,5 +155,5 @@ function canRetry(context: LifecycleContext, record: TaskRecord | null, parentSe
 }
 
 function foreignOwnerAlive(context: LifecycleContext, record: TaskRecord): boolean {
-  return record.host_pid !== undefined && record.host_pid !== context.hostPid && context.signaller.isAlive(record.host_pid)
+  return record.host_pid !== undefined && record.host_pid !== context.hostPid && claimantAlive(context, record)
 }
