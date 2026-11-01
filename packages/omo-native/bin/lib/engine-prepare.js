@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { prepareCompileSafeEngine } from "./compile-safe-engine.js"
 import { LAUNCH_SPEC_FILENAME, normalizeLaunchSpecMode } from "./launch-spec-mode.js"
+import { prepareLockfileReleaseRace } from "./lockfile-release-race.js"
 import { prepareRpcStreamErrors } from "./rpc-stream-errors.js"
 
 // Written inside the engine tree, so reinstalling or upgrading the engine drops it with the tree.
@@ -10,6 +11,7 @@ export const ENGINE_PREPARED_STAMP = ".omo-engine-prepared"
 export function prepareInstalledEngine(senpiRoot) {
   prepareCompileSafeEngine(senpiRoot)
   prepareRpcStreamErrors(senpiRoot)
+  prepareLockfileReleaseRace(senpiRoot)
 }
 
 export function writeEnginePreparedStamp(senpiRoot, omoVersion) {
