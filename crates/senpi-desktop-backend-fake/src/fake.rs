@@ -29,6 +29,7 @@ pub struct FakeBackend {
     delays: DelayMs,
     pub(crate) resize_window: Option<ResizeWindow>,
     pub(crate) legacy_capture: bool,
+    pub(crate) remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
     pub(crate) ax_tree: AxTree,
     pub(crate) ax_owner_unknown: bool,
     pub(crate) menus: BTreeMap<String, Vec<FakeMenuNode>>,
@@ -69,6 +70,7 @@ impl FakeBackend {
             delays: scenario.delay_ms,
             resize_window: scenario.resize_window,
             legacy_capture: scenario.legacy_capture,
+            remote_screens: scenario.remote_screens,
             sink: RecordingSink::default(),
             faults,
         }
@@ -116,6 +118,14 @@ impl FakeBackend {
     }
 
     /// Refuses input the scenario's capabilities say this host cannot deliver.
+    /// The window `target` names and the remote screen its process shows, if any.
+    pub(crate) fn remote_window(&self, target: &Target) -> Option<(DesktopWindow, crate::remote_impl::FakeRemoteScreen)> {
+        let Target::Window(id) = target else { return None };
+        let window = self.windows.iter().find(|window| &window.id == id)?;
+        let remote = *self.remote_screens.get(&window.pid?)?;
+        Some((window.clone(), remote))
+    }
+
     pub(crate) fn input_gate(&self, target: &Target, mode: DeliveryMode) -> CoreResult<()> {
         if !self.capabilities.input {
             return Err(DesktopError::input_failed(
