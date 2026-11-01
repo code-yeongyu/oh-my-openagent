@@ -25,14 +25,6 @@ const defaultPathDeps = {
   stat,
 } satisfies PathDeps
 
-function getTeamDirectory(baseDir: string, teamName: string, scope: "user" | "project", projectRoot?: string): string {
-  if (scope === "project") {
-    return path.join(projectRoot ?? "", ".omo", "teams", teamName)
-  }
-
-  return path.join(baseDir, "teams", teamName)
-}
-
 export class TeamPathTraversalError extends Error {
   constructor() {
     super("team path escapes base directory")
@@ -87,7 +79,11 @@ export function getTeamSpecPath(
   scope: "user" | "project",
   projectRoot?: string,
 ): string {
-  return path.join(getTeamDirectory(baseDir, teamName, scope, projectRoot), "config.json")
+  const teamSpecRoot = scope === "project"
+    ? path.join(projectRoot ?? "", ".omo", "teams")
+    : path.join(baseDir, "teams")
+
+  return resolveContainedPath(teamSpecRoot, [teamName, "config.json"])
 }
 
 export function getRuntimeStateDir(baseDir: string, teamRunId: string): string {
