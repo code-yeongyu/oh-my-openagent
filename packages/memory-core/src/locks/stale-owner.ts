@@ -29,22 +29,53 @@ export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean>
   return startIdentitiesConflict(owner.process_start, actualStart)
 }
 
-// The recovery lock's only remover is its holder's nonce-matched releaseLock, so a holder
-// SIGKILLed inside recoverStaleOwner leaks a file that would otherwise block every future
-// eviction of the primary. Apply the same proven-dead test the primary gets; an incomplete
-// record stays held through the same grace period before it can be reclaimed.
-//
-// rename-then-inspect instead of unlink: rename is atomic, so exactly one reaper obtains the
-// inode. If the bytes it obtained are not the dead record it saw, another contender already
-// reaped that record and published a fresh live holder in between, so the file is handed back
-// with link (EEXIST means yet another contender republished first, and nothing is lost).
-// The tombstone name must not match LEAKED_CANDIDATE_NAME in candidate-sweep.ts, otherwise a
-// concurrent stale-candidate sweep could delete it while it is still being inspected.
 async function isRecoverableOwner(owner: OwnerSnapshot, now: number, incompleteLockGraceMs: number): Promise<boolean> {
   if (owner.record !== null) return isLockOwnerProvenDead(owner.record)
   return now - owner.mtimeMs > incompleteLockGraceMs
 }
 
+/**
+ * Removes `filePath` only if it still holds the record `expected` was read from: "reaped" when it
+ * did, "gone" when nothing was there, "kept" when a different (live) record was found and handed back.
+ *
+ * rename-then-inspect instead of unlink: rename is atomic, so exactly one reaper obtains the
+ * inode. If the bytes it obtained are not the dead record it saw, the file was released or reaped
+ * and a fresh live holder published in between, so the file is handed back with link (EEXIST
+ * means yet another contender republished first). A plain unlink here would delete that fresh
+ * holder's lock and let its reaper publish beside it (#11644). The tombstone name must not match
+ * LEAKED_CANDIDATE_NAME in candidate-sweep.ts, otherwise a concurrent stale-candidate sweep could
+ * delete it while it is still being inspected, nor end in `.lock` (dead-owner-sweep.ts).
+ */
+async function reapIfStillOwnedBy(filePath: string, expected: OwnerSnapshot): Promise<"reaped" | "gone" | "kept"> {
+  const tombstonePath = `${filePath}.reaping-${randomUUID()}`
+  try {
+    await rename(filePath, tombstonePath)
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return "gone"
+    // Windows refuses to rename a file another process holds open; leave it to that holder.
+    if (isUnlinkSharingError(error)) return "kept"
+    throw error
+  }
+
+  const moved = await readOwner(tombstonePath)
+  if (moved !== null && isSameOwner(moved, expected)) {
+    await unlink(tombstonePath)
+    return "reaped"
+  }
+
+  try {
+    await link(tombstonePath, filePath)
+  } catch (error) {
+    if (errorCode(error) !== "EEXIST") throw error
+  }
+  await unlink(tombstonePath)
+  return "kept"
+}
+
+// The recovery lock's only remover is its holder's nonce-matched releaseLock, so a holder
+// SIGKILLed inside recoverStaleOwner leaks a file that would otherwise block every future
+// eviction of the primary. Apply the same proven-dead test the primary gets; an incomplete
+// record stays held through the same grace period before it can be reclaimed.
 async function reclaimStaleRecoveryLock(
   recoveryPath: string,
   now: number,
@@ -52,30 +83,7 @@ async function reclaimStaleRecoveryLock(
 ): Promise<boolean> {
   const stale = await readOwner(recoveryPath)
   if (stale === null || !(await isRecoverableOwner(stale, now, incompleteLockGraceMs))) return false
-
-  const tombstonePath = `${recoveryPath}.reaping-${randomUUID()}`
-  try {
-    await rename(recoveryPath, tombstonePath)
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return false
-    // Windows refuses to rename a file another process holds open; leave it to that holder.
-    if (isUnlinkSharingError(error)) return false
-    throw error
-  }
-
-  const moved = await readOwner(tombstonePath)
-  if (moved !== null && isSameOwner(moved, stale)) {
-    await unlink(tombstonePath)
-    return true
-  }
-
-  try {
-    await link(tombstonePath, recoveryPath)
-  } catch (error) {
-    if (errorCode(error) !== "EEXIST") throw error
-  }
-  await unlink(tombstonePath)
-  return false
+  return (await reapIfStillOwnedBy(recoveryPath, stale)) === "reaped"
 }
 
 export async function recoverStaleOwner(
@@ -114,7 +122,14 @@ export async function recoverStaleOwner(
     // a third contender's publish; in that case the critical section is no longer ours.
     const fence = await readOwner(recoveryPath)
     if (fence === null || fence.record?.nonce !== recoveryRecord.nonce) return false
-    await unlink(lockPath)
+    // The fence does not stop the primary's own holder: a live process whose record names a dead
+    // pid (a supervisor that retained its slot for a child which just exited) releases by nonce at
+    // any moment, and any contender may then publish (#11644).
+    const reaped = await reapIfStillOwnedBy(lockPath, current)
+    // Released under us: the lock is free and nothing was taken over; the caller's next exclusive
+    // publish admits exactly one contender.
+    if (reaped === "gone") return true
+    if (reaped === "kept") return false
     // Record the reclaimed previous owner so consumers that gate on dead-owner evidence (the
     // stranded-git-lock sweep) can prove reclamation after the lock file itself is republished;
     // the proof is bound to the contender's acquisition nonce (omo #10199 r5 MEDIUM 3).
