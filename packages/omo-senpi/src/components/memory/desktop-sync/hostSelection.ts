@@ -7,7 +7,7 @@
 import { MessageChannel, type MessagePort } from "node:worker_threads"
 import type { DesktopSyncEngineWire } from "./desktopSyncAccount"
 
-export type UnavailableReason = "private_channel_unavailable" | "platform_not_supported" | "port_absent" | "selection_failed" | "host_bootstrap_absent"
+export type UnavailableReason = "private_channel_unavailable" | "port_absent" | "selection_failed" | "host_bootstrap_absent"
 
 export type MemorySyncSelection =
   | { readonly kind: "cli" }

@@ -17,14 +17,11 @@ async function pair() {
   return { engine, peer }
 }
 
-test("missing private descriptor is unavailable", async () => {
-  expect(await attachDesktopSyncChannel(undefined)).toEqual({
-    kind: "unavailable",
-    reason: process.platform === "win32" ? "platform_not_supported" : "private_channel_unavailable",
-  })
+test("a missing private stream is the typed unavailable answer, never the CLI source (#11997 row 3)", async () => {
+  expect(await attachDesktopSyncChannel(undefined)).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
 })
 
-test.skipIf(process.platform === "win32")("bootstraps once and sends requests synchronously on the private duplex", async () => {
+test("bootstraps once and sends requests synchronously on the private duplex", async () => {
   // given the real private wire protocol, not an HTTP or CLI account source
   const { engine, peer } = await pair()
   let pending = ""
@@ -58,7 +55,7 @@ test.skipIf(process.platform === "win32")("bootstraps once and sends requests sy
   }
 })
 
-test.skipIf(process.platform === "win32")("rejects a malformed bootstrap without exposing its body", async () => {
+test("rejects a malformed bootstrap without exposing its body", async () => {
   const { engine, peer } = await pair()
   peer.once("data", () => peer.write('{"id":1,"ok":true,"value":{"child":"test","secret":"canary"}}\n'))
   try {
@@ -67,7 +64,7 @@ test.skipIf(process.platform === "win32")("rejects a malformed bootstrap without
   } finally { engine.destroy(); peer.destroy() }
 })
 
-test.skipIf(process.platform === "win32")("a bootstrap main never answers is unavailable at the 10 s bound, and a late reply is discarded", async () => {
+test("a bootstrap main never answers is unavailable at the 10 s bound, and a late reply is discarded", async () => {
   const { engine, peer } = await pair()
   // given: main reads the bootstrap frame and never answers it
   const bootstrapped = new Promise((resolve) => peer.once("data", resolve))
@@ -108,7 +105,7 @@ async function connected(answer: (packet: { id: number; op: string }, peer: Sock
   return { channel: result.channel, engine, peer }
 }
 
-test.skipIf(process.platform === "win32")("round-trips binary values through the canonical byte tag", async () => {
+test("round-trips binary values through the canonical byte tag", async () => {
   const bytes = new Uint8Array([0, 1, 254, 255])
   let seen: unknown
   const { channel, engine, peer } = await connected((packet, socket) => {
@@ -122,7 +119,7 @@ test.skipIf(process.platform === "win32")("round-trips binary values through the
   } finally { channel.close(); engine.destroy(); peer.destroy() }
 })
 
-test.skipIf(process.platform === "win32")("a peer disconnect aborts the lifetime and rejects every waiter with the fixed error", async () => {
+test("a peer disconnect aborts the lifetime and rejects every waiter with the fixed error", async () => {
   const { channel, engine, peer } = await connected(() => {})
   try {
     const first = channel.request({ op: "descriptor" })
@@ -137,7 +134,7 @@ test.skipIf(process.platform === "win32")("a peer disconnect aborts the lifetime
   } finally { engine.destroy() }
 })
 
-test.skipIf(process.platform === "win32")("a non-canonical byte encoding closes the channel without echoing it", async () => {
+test("a non-canonical byte encoding closes the channel without echoing it", async () => {
   const { channel, engine, peer } = await connected((packet, socket) => {
     socket.write(`${JSON.stringify({ id: packet.id, ok: true, value: { $omoSyncBytes: "AAH-_w==" } })}\n`)
   })
@@ -148,7 +145,7 @@ test.skipIf(process.platform === "win32")("a non-canonical byte encoding closes 
   } finally { engine.destroy(); peer.destroy() }
 })
 
-test.skipIf(process.platform === "win32")("an event for another child or an unknown reply id retires the channel", async () => {
+test("an event for another child or an unknown reply id retires the channel", async () => {
   for (const frame of [
     { event: "advanced", child: "other-child", handle: "h", head: 1 },
     { id: 999, ok: true, value: null },
@@ -164,7 +161,7 @@ test.skipIf(process.platform === "win32")("an event for another child or an unkn
   }
 })
 
-test.skipIf(process.platform === "win32")("delivers its own child's events and stops at 64 requests in flight", async () => {
+test("delivers its own child's events and stops at 64 requests in flight", async () => {
   const { channel, engine, peer } = await connected(() => {})
   try {
     const events: unknown[] = []

@@ -52,7 +52,8 @@ The rules live in `script/changelog-gate-rules.ts`, vendored byte-identical from
 
 ## Release
 
-Only the release-state pull request (`release/*`, opened by `publish.yml` as `sisyphus-dev-ai`) edits
+Only the release-state pull request (a `release/*` branch in this repository carrying the title and body
+`publish.yml` writes, whoever opened it; `script/release-pr-marker.ts`) edits
 those files. `script/stamp-release-changelog.ts` writes the release section (paragraphs first, newest
 pull request first, then one `### Section` group per name, each entry linking its pull request;
 an entry that already links a pull request, or holds a code block, is kept exactly as written),

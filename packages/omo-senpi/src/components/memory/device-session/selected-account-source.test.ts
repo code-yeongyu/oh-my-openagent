@@ -28,7 +28,7 @@ describe("the account source built from the engine's one selection", () => {
   })
 
   test("an unavailable selection passes its reason through and never builds the CLI source", async () => {
-    for (const reason of ["private_channel_unavailable", "platform_not_supported"] as const) {
+    for (const reason of ["private_channel_unavailable", "selection_failed"] as const) {
       const source = accountSourceFromSelection({ selection: async () => ({ kind: "unavailable", reason }), cli: cliCanary })
       expect(await source()).toEqual({ kind: "unavailable", reason })
     }
