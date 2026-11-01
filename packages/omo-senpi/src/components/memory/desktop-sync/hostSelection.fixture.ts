@@ -4,9 +4,9 @@ import { accountSourceFromSelection } from "../device-session/selected-account-s
 import type { DesktopSyncAccount } from "../device-session/account-source"
 import type { DesktopSyncEngineWire } from "./desktopSyncAccount"
 import type { DesktopSyncEvent, DesktopSyncRequest } from "./desktopSyncProtocol"
-import {
-  type DesktopSyncAttachment, MEMORY_SYNC_WORKER_DATA, memorySyncWorkerData, selectHostMemorySyncSource, workerMemorySyncSource,
-} from "./hostSelection"
+import { claimDesktopSync, type DesktopSyncAttachment } from "./desktopClaim"
+import { MEMORY_SYNC_WORKER_DATA, memorySyncWorkerData, selectHostMemorySyncSource } from "./hostSelection"
+import { serveDesktopWorker, workerMemorySyncSource } from "./workerPort"
 
 // An engine process in miniature, wired the way senpi provideSessionWorkerData hands each session Worker its value:
 // the main thread selects once; each Worker gets workerData.extensionData[name] plus its transfers; dispose on exit.
@@ -72,14 +72,17 @@ async function inMain(scenario: string): Promise<void> {
     inherited: {
       declared: name => { if (scenario === "throwing") throw new Error("stub failure"); return name === "memory-sync" && ["desktop", "declared-null", "late", "hang", "in-process", "late-connected", "memoized"].includes(scenario) },
       tablePresent: () => scenario !== "cli",
+    },
+    claim: () => claimDesktopSync({
       take: name => { claims += 1; return ["desktop", "late", "hang", "in-process", "late-connected", "memoized"].includes(scenario) && name === "memory-sync" ? new PassThrough() : undefined },
-    },
-    ...(scenario === "hang" ? { attachDeadlineMs: 500 } : scenario === "late-connected" ? { attachDeadlineMs: 200 } : {}),
-    attach: async (stream): Promise<DesktopSyncAttachment> => {
-      if (scenario === "late" || scenario === "late-connected") await attachGate
-      if (scenario === "hang") await new Promise(() => {})
-      return stream === undefined ? { kind: "unavailable", reason: "private_channel_unavailable" } : { kind: "connected", channel }
-    },
+      ...(scenario === "hang" ? { attachDeadlineMs: 500 } : scenario === "late-connected" ? { attachDeadlineMs: 200 } : {}),
+      attach: async (stream): Promise<DesktopSyncAttachment> => {
+        if (scenario === "late" || scenario === "late-connected") await attachGate
+        if (scenario === "hang") await new Promise(() => {})
+        return stream === undefined ? { kind: "unavailable", reason: "private_channel_unavailable" } : { kind: "connected", channel }
+      },
+    }),
+    serveDesktop: serveDesktopWorker,
   })
   if (scenario === "late-connected" && host !== undefined) {
     // The attachment connects only AFTER the deadline answered: the late channel must be closed, the answer kept.
@@ -96,8 +99,9 @@ async function inMain(scenario: string): Promise<void> {
   if (scenario === "memoized" && host !== undefined) {
     // A second selection in the same process returns the first one and claims nothing again.
     const again = selectHostMemorySyncSource({
-      inherited: { declared: () => { throw new Error("a second selection must not classify again") }, tablePresent: () => true, take: () => { claims += 1; return undefined } },
-      attach: async () => ({ kind: "unavailable", reason: "private_channel_unavailable" }),
+      inherited: { declared: () => { throw new Error("a second selection must not classify again") }, tablePresent: () => true },
+      claim: () => { claims += 1; return Promise.resolve({ kind: "unavailable", reason: "private_channel_unavailable" }) },
+      serveDesktop: serveDesktopWorker,
     })
     const first = await host.selection
     const second = await again.selection
