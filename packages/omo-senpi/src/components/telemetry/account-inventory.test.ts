@@ -32,12 +32,16 @@ function agentDir(auth?: unknown): string {
 }
 
 const login = (name: string) => ({ name, access: SECRET, refresh: SECRET, expires: 1 })
+// A Claude account as `claude auth login` stores it in the pinned senpi (2026.10.31-2): its login lives in a per-account Claude
+// config dir, never a token in auth.json.
+const cli = (name: string) => ({ name, source: "login", store: "claude-cli", dirId: `dir-${name}`, signedInAt: 1, profile: { email: `${name}@example.com` } })
+const retiredLogin = (name: string) => ({ ...login(name), source: "login" })
 const SENTINEL = { type: "oauth", access: "claude-subscription-managed", refresh: "claude-subscription-managed", expires: 4102444800000 }
 
 describe("readConnectedAccounts (#10919: linked accounts per provider, as the engine lists them)", () => {
   it("#given 3 linked Claude accounts and 3 ChatGPT accounts #then each kind counts 3, and no account name, email or token ships", () => {
     const connected = readConnectedAccounts(agentDir({
-      "anthropic-subscription": { ...SENTINEL, accounts: [login("me@example.com"), login("work"), login("home")] },
+      "anthropic-subscription": { ...SENTINEL, accounts: [cli("me"), cli("work"), cli("home")] },
       "chatgpt-subscription": { type: "oauth", access: SECRET, refresh: SECRET, expires: 1, accounts: [login("a"), login("b"), login("c")] },
     }), NO_ENV)
     expect(connected).toBe("anthropic-subscription:3,chatgpt-subscription:3")
@@ -48,14 +52,19 @@ describe("readConnectedAccounts (#10919: linked accounts per provider, as the en
     expect(readConnectedAccounts(agentDir({ "anthropic-subscription": SENTINEL }), NO_ENV)).toBe("")
   })
 
-  it("#given a Claude credential with an EMPTY account list (written when an env-only user pins) #then the engine lists the flat credential: 1, plus env slots", () => {
-    expect(readConnectedAccounts(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [] } }), NO_ENV)).toBe("anthropic-subscription:1")
-    expect(readConnectedAccounts(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [] } }), { CLAUDE_CODE_OAUTH_TOKEN: SECRET })).toBe("anthropic-subscription:2")
+  it("#given a Claude credential with an EMPTY account list (written when an env-only user pins) #then the flat sentinel is no account: only env slots count", () => {
+    expect(readConnectedAccounts(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [] } }), NO_ENV)).toBe("")
+    expect(readConnectedAccounts(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [] } }), { CLAUDE_CODE_OAUTH_TOKEN: SECRET })).toBe("anthropic-subscription:1")
+  })
+
+  it("#given a slot still holding a token from the retired senpi sign-in #then it is not counted, while a Claude CLI account waiting to sign in again is", () => {
+    const accounts = [retiredLogin("old"), { ...cli("again"), signInRequired: "legacy_sign_in_retired" }]
+    expect(readConnectedAccounts(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts } }), NO_ENV)).toBe("anthropic-subscription:1")
   })
 
   it("#given Claude env-var accounts #then each discovered env slot is counted beside the stored ones", () => {
     const env = { CLAUDE_CODE_OAUTH_TOKEN: SECRET, CLAUDE_CODE_OAUTH_TOKEN_3: SECRET }
-    expect(readConnectedAccounts(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [login("a")] } }), env)).toBe("anthropic-subscription:3")
+    expect(readConnectedAccounts(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [cli("a")] } }), env)).toBe("anthropic-subscription:3")
   })
 
   it("#given a non-Claude provider with an empty account list #then the engine's flat credential counts 1; an env key counts only when nothing is stored", () => {
@@ -65,7 +74,7 @@ describe("readConnectedAccounts (#10919: linked accounts per provider, as the en
 
   it("#given retired, unknown and many-account providers #then current names, unknown summed into custom, and counts capped at 10_plus", () => {
     const connected = readConnectedAccounts(agentDir({
-      "claude-sdk-oauth": { ...SENTINEL, accounts: [login("a"), login("b")] },
+      "claude-sdk-oauth": { ...SENTINEL, accounts: [cli("a"), cli("b")] },
       "acme-gateway": { type: "api_key", key: SECRET, accounts: [login("a"), login("b")] },
       "private-cloud": { type: "api_key", key: SECRET },
       "chatgpt-subscription": { type: "oauth", access: SECRET, refresh: SECRET, expires: 1, accounts: Array.from({ length: 14 }, (_, i) => login(`s${i}`)) },
@@ -76,11 +85,11 @@ describe("readConnectedAccounts (#10919: linked accounts per provider, as the en
 
   it("#given pi-ai cannot be loaded by the host #then only this count is empty and nothing throws", async () => {
     await loadEngineTables(() => Promise.reject(new Error("Cannot find package '@earendil-works/pi-ai'")))
-    expect(readWithTables(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [login("a")] } }), NO_ENV)).toBe("")
+    expect(readWithTables(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [cli("a")] } }), NO_ENV)).toBe("")
     await loadEngineTables(() => Promise.resolve({ normalizeProviderId: "not a function" }))
-    expect(readWithTables(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [login("a")] } }), NO_ENV)).toBe("")
+    expect(readWithTables(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [cli("a")] } }), NO_ENV)).toBe("")
     await loadEngineTables()
-    expect(readWithTables(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [login("a")] } }), NO_ENV)).toBe("anthropic-subscription:1")
+    expect(readWithTables(agentDir({ "anthropic-subscription": { ...SENTINEL, accounts: [cli("a")] } }), NO_ENV)).toBe("anthropic-subscription:1")
   })
 
   it("#given no auth.json or a malformed one #then only env slots count (the provider inventory already reports the malformed file once)", () => {
@@ -110,6 +119,7 @@ describe("parity with the engine's own account listing (senpi getCredentialAccou
     ["1 account", { ...SENTINEL, accounts: [login("a")] }],
     ["3 accounts", { ...SENTINEL, accounts: [login("a"), login("b"), login("c")] }],
     ["api key + 2 accounts", { type: "api_key", key: SECRET, accounts: [login("a"), login("b")] }],
+    ["2 Claude CLI accounts (1 to sign in again) + 1 retired login", { ...SENTINEL, accounts: [cli("a"), { ...cli("b"), signInRequired: "legacy_sign_in_retired" }, retiredLogin("c")] }],
     ["non-array accounts (string)", { ...SENTINEL, accounts: "x" }],
     ["non-array accounts (object)", { type: "api_key", key: SECRET, accounts: {} }],
   ]
