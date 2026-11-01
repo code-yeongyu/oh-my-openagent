@@ -9,6 +9,7 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createSisyphusAgent } from "./sisyphus"
 import { createHephaestusAgent } from "./hephaestus"
+import { createArgusAgent } from "./argus"
 import { getAgentToolRestrictions } from "../shared/agent-tool-restrictions"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
@@ -40,6 +41,7 @@ describe("read-only agent tool restrictions", () => {
       "momus",
       "multimodal-looker",
       "sisyphus-junior",
+      "argus",
       "custom-worker",
     ]
 
@@ -114,6 +116,21 @@ describe("read-only agent tool restrictions", () => {
     test("denies all file-writing tools", () => {
       // given
       const agent = createExploreAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+
+      // then
+      for (const tool of FILE_WRITE_TOOLS) {
+        expect(permission[tool]).toBe("deny")
+      }
+    })
+  })
+
+  describe("Argus", () => {
+    test("denies all file-writing tools", () => {
+      // given
+      const agent = createArgusAgent(TEST_MODEL)
 
       // when
       const permission = agent.permission as Record<string, string>
