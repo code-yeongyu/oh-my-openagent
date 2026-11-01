@@ -32,7 +32,7 @@ import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine, loadCompil
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
-import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
+import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
 import { runRemoteAttachCommand, runRemoteCommand } from "./remote-cli"
@@ -40,7 +40,10 @@ import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
 import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
-import { ExtraCaCertificatesError, installEngineCaTrust } from "./compiled-ca-trust"
+import { ExtraCaCertificatesError, parseExtraCaCertificates } from "./compiled-ca-trust"
+import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/senpi/engine-trust"
+import { runTrustStage } from "./trust-stage"
+import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -178,7 +181,10 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   // node path here would re-enter omo itself and leave a phantom session behind.
   const engine = {
     run(engineArgs: string[], options: { env: Record<string, string | undefined> }) {
-      const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env: options.env, windowsHide: true })
+      const marker = adoptedEngineTrust()
+      const env = marker === undefined ? options.env
+        : buildTrustLaunchEnvironment(options.env, { marker, hop: false, platform: process.platform })
+      const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env, windowsHide: true })
       return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
     },
   }
@@ -262,6 +268,12 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
 
 export { reexecProvisionedRuntime } from "./provisioned-handoff"
 
+const STATIC_HELP = `Usage: omo [options] [message...]
+       omo <command> [args]
+
+Commands: setup, doctor, update, daemon, thread, login, logout, whoami, sync, account
+Options: --version, -v, --help, -p, --print, --mode <json|rpc>, --session <file>`
+
 const HELP_WITHOUT_ENGINE = `Usage: omo [options] [message...]
        omo <command> [args]
 
@@ -298,7 +310,8 @@ async function main(): Promise<void> {
   // exact argv `--version` or `--help` is answered, from static local data, before anything else runs
   // (#10236): the engine's own help loads extensions, which can install packages over the network.
   try {
-    installEngineCaTrust()
+    const extras = process.env.OMO_EXTRA_CA_CERTIFICATES
+    if (extras) parseExtraCaCertificates(extras)
   } catch (error) {
     if (!(error instanceof ExtraCaCertificatesError)) throw error
     if (await answerUnderRefusedTrust(process.argv.slice(2))) {
@@ -312,6 +325,21 @@ async function main(): Promise<void> {
   const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
   if (!embedded?.length) {
     const execDir = dirname(fileURLToPath(import.meta.url))
+    const args = process.argv.slice(2)
+    if (args.length === 1 && args[0] === "--help") {
+      console.log(STATIC_HELP)
+      return
+    }
+    // Design 5.2 step 3: a static answer never reaches the trust stage.
+    if (trustLaunchKind(args) === "static") {
+      await runCompiledLauncher(args, execDir)
+      return
+    }
+    const trust = await runTrustStage({ args, argv: process.argv.slice(1) })
+    if (trust.action !== "adopt") {
+      if (trust.action === "refuse") process.exitCode = 78
+      return
+    }
     if (await runCompiledLauncher(process.argv.slice(2), execDir)) return
     process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
     Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
@@ -334,6 +362,28 @@ async function main(): Promise<void> {
     await provisionEmbeddedRuntime(manifest, embedded, dirname(expected))
     materializeProvisionedExecutable(runningExecutable, expected)
   }
+  const args = process.argv.slice(2)
+  if (args.length === 1 && args[0] === "--help") {
+    console.log(STATIC_HELP)
+    return
+  }
+  // Design 5.2 step 3: a static answer never reaches the trust stage; the rest is a closed account command.
+  if (trustLaunchKind(args) === "static") {
+    if (!answerCompiledFastPath(args, manifest)) await runServiceAuthCommand(args)
+    return
+  }
+  const helperPath = resolveEngineTrustHelperPath({ OMO_PACKAGE_DIR: dirname(expected) })
+  const helperEntry = helperPath === null ? undefined : manifest.entries.find((entry) => join(dirname(expected), entry.relPath) === helperPath)
+  const trust = await runTrustStage({
+    args,
+    executable: launch.handOff ? expected : process.execPath,
+    helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
+    ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env }) } : {}),
+  })
+  if (trust.action !== "adopt") {
+    if (trust.action === "refuse") process.exitCode = 78
+    return
+  }
   if (isSelfUpdate(process.argv.slice(2)) && parseBuildInfo(manifest.buildInfo) === undefined) {
     const result = await compiledUpdate({
       omoAiVersion: manifest.omoAiVersion,
@@ -351,7 +401,11 @@ async function main(): Promise<void> {
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
   if (launch.handOff) {
-    await handOffToProvisionedRuntime(expected)
+    const marker = adoptedEngineTrust()
+    if (marker === undefined) throw new Error("trust stage did not record its adopted generation")
+    await handOffToProvisionedRuntime(expected, {
+      env: buildTrustLaunchEnvironment(process.env, { marker, hop: false, platform: process.platform }),
+    })
     return
   }
   const execDir = launch.execDir

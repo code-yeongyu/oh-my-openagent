@@ -39,7 +39,9 @@ jobs:
           CHANGELOG_GATE_BASE_REF: ${{ github.event.pull_request.base.ref }}
           CHANGELOG_GATE_BRANCH: ${{ github.head_ref }}
           CHANGELOG_GATE_ACTOR: ${{ github.event.pull_request.user.login }}
-          CHANGELOG_GATE_RELEASE: ${{ startsWith(github.head_ref, 'release/') && '1' || '0' }}
+          # A release branch pushed to THIS repository: a fork can name its branch anything, but only a writer
+          # (publish.yml's token) can push here. The marker check in the script does the rest (#11704).
+          CHANGELOG_GATE_RELEASE: ${{ startsWith(github.head_ref, 'release/') && github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}
           CHANGELOG_GATE_PR: ${{ github.event.pull_request.number }}
           CHANGELOG_GATE_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           CHANGELOG_GATE_TITLE: ${{ github.event.pull_request.title }}

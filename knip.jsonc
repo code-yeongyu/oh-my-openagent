@@ -1182,8 +1182,8 @@
       "packages/omo-senpi/src/components/memory/memory-notice-spec.ts": ["REMEMBERED_TITLE", "LET_GO_TITLE", "ordinal", "formatBytes"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_REFLECTIONS_RPC_METHOD
       "packages/omo-senpi/src/components/memory/memory-rpc-bridge.ts": ["MEMORY_REFLECTIONS_RPC_METHOD"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) readMemoryRpcRepoState, readMemoryRpcJournalState, readMemoryRpcHealth
-      "packages/omo-senpi/src/components/memory/memory-rpc-snapshot-state.ts": ["readMemoryRpcRepoState", "readMemoryRpcJournalState", "readMemoryRpcHealth"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) readMemoryRpcRepoState, readMemoryRpcHealth
+      "packages/omo-senpi/src/components/memory/memory-rpc-snapshot-state.ts": ["readMemoryRpcRepoState", "readMemoryRpcHealth"],
       // pre-existing at origin dev 4686e425b5: unused export(s) IDENTITY
       "packages/omo-senpi/src/components/memory/memory-usage.test-support.ts": ["IDENTITY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) incrementMemoryUsage, readMemoryUsageLedger, extractMemoryUsagePath
@@ -2131,6 +2131,7 @@
         "script/build-omo-schema.ts",
         "script/build-omob.ts",
         "script/build-schema.ts",
+        "script/build-service-auth.ts",
         "script/build.ts",
         "script/changelog-section.ts",
         "script/check-cargo-pinned-deps.mjs",
@@ -3913,6 +3914,7 @@
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
         "test/fixtures/senpi-hooks-state-consumer.mjs",
+        "test/fixtures/trust-stage-probe.ts",
         "test/packed-consumer.mjs",
         "test/teardown.test-support.ts",
         "test/trust-certificate-fixtures.ts",
