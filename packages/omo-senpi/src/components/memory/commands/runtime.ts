@@ -18,6 +18,8 @@ import { registerSleeptimeCommand } from "./sleeptime"
 import type { MemoryCommandContext, MemoryCommandDeps, MemoryCommandHandler } from "./types"
 
 export { planFactsMutation, FactsPlanParentDirtyError } from "@oh-my-opencode/memory-core"
+// Dream conversation loading and selection run only when a dream fires, so the entry bundle loads them from here.
+export { computeUnreflectedVolumeFast, loadConversations, selectLoadedConversations } from "../dream-selector"
 
 type CommandRegistrar = (pi: MemoryCommandPort, deps: MemoryCommandDeps) => void
 

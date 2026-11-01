@@ -344,6 +344,8 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/memory-unlock.ts",
       "packages/omo-senpi/src/components/memory/commands/search.ts",
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
+      // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/dream-selector.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
