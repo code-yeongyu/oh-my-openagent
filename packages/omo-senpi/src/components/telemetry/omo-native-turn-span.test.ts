@@ -17,6 +17,10 @@ import {
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { CONSENT_CACHE_MS, createOmoNativeTelemetryComponent } from "./omo-native-component"
+import { createOmoNativeTurnSpans } from "./omo-native-turn-span"
+import { projectOtlpEvent } from "./otlp-projection"
+import { maskProviderAndModel } from "./product-identity"
+import { SEMCONV_MAP } from "./semconv-map"
 import {
   FIXED_NOW,
   createEnabledEnv,
@@ -576,5 +580,67 @@ describe("omo.turn span per assistant turn", () => {
       expect(recorder.messages.map(({ event }) => event)).toContain("turn_completed")
       expect(readTurnTraceparent("posthog")).toBeUndefined()
     })
+  })
+
+  test("#given a turn on google-vertex #then the span's gen_ai.provider.name is the semconv wire value gcp.vertex_ai, not the raw provider id", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      const collector = await otlpCollector()
+      const { pi, ctx } = await openSession(agentDir, collector.factory, "main-vertex")
+      const vertexCtx = { ...ctx, model: { provider: "google-vertex", id: "gpt-5.6-sol" } }
+      const end = turnEnd(0)
+      const message = { ...(end.message as Record<string, unknown>), provider: "google-vertex" }
+
+      // when
+      await pi.dispatch("turn_start", turnStart(0), vertexCtx)
+      await pi.dispatch("turn_end", { ...end, message }, vertexCtx)
+      await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, vertexCtx)
+      const { spans } = await collector.drain()
+
+      // then
+      expect(spans).toHaveLength(1)
+      expect(spans[0]?.attributes["omo.provider"]).toBe("google-vertex")
+      expect(spans[0]?.attributes["gen_ai.provider.name"]).toBe("gcp.vertex_ai")
+    })
+  })
+})
+
+describe("omo.turn span provider wire name", () => {
+  test("#given every provider id in the semconv gen_ai.provider.name table #then the span wire value equals the turn_completed log wire value", () => {
+    const rows = SEMCONV_MAP.values["gen_ai.provider.name"]?.rows ?? []
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      // given: a sink that records the attributes the span is started and ended with
+      const attributes: Record<string, string | number | boolean> = {}
+      const spans = createOmoNativeTurnSpans({
+        traces: () => ({
+          startTurn: (start) => {
+            Object.assign(attributes, start.attributes)
+            return {
+              traceId: "0".repeat(32),
+              spanId: "0".repeat(16),
+              traceparent: `00-${"1".repeat(32)}-${"1".repeat(16)}-01`,
+              run: (fn) => fn(),
+              setAttributes: (next) => Object.assign(attributes, next),
+              end: () => undefined,
+            }
+          },
+        }),
+        isConsented: () => true,
+        isSendAllowed: () => true,
+        sessionRole: "root",
+        inheritedTraceparent: undefined,
+      })
+      const model = { provider: row.id, modelId: "gpt-5.6-sol" }
+
+      // when
+      spans.start({ turnIndex: 0, sessionHash: "hashed", rawSessionId: undefined, model })
+      spans.end({ response: model, responseModelId: undefined, failed: false })
+      const log = projectOtlpEvent("turn_completed", { provider: maskProviderAndModel(row.id, model.modelId).provider })
+
+      // then
+      expect({ id: row.id, wire: attributes["gen_ai.provider.name"] }).toEqual({ id: row.id, wire: log["gen_ai.provider.name"] })
+      expect({ id: row.id, wire: attributes["gen_ai.provider.name"] }).toEqual({ id: row.id, wire: row.wire })
+    }
   })
 })

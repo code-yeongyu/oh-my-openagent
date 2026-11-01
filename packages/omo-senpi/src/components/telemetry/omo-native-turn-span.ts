@@ -12,13 +12,13 @@ import { maskProviderAndModel } from "./product-identity"
 import type { TelemetrySessionRole } from "./session-role"
 
 /**
- * The `gen_ai.provider.name` well-known values for our provider ids (D-P VALUE table); an id with no
- * well-known value keeps our id, and `custom` stays `custom`.
+ * Our provider ids whose `gen_ai.provider.name` wire value differs from the id (semconv VALUE table, D-P);
+ * every other masked id, `custom` included, is its own wire value. Inlined rather than importing the
+ * whole semconv map, which would land in the small main entry; a test pins it to the table.
  */
-const GEN_AI_PROVIDER_NAMES: Readonly<Record<string, string>> = {
-  anthropic: "anthropic",
-  openai: "openai",
+const GEN_AI_PROVIDER_WIRE: Readonly<Record<string, string>> = {
   google: "gcp.gemini",
+  "google-vertex": "gcp.vertex_ai",
   xai: "x_ai",
 }
 
@@ -56,7 +56,7 @@ export type OmoNativeTurnSpans = {
 function modelAttributes(model: TurnModel): TurnSpanAttributes {
   const masked = maskProviderAndModel(model.provider, model.modelId)
   return {
-    "gen_ai.provider.name": GEN_AI_PROVIDER_NAMES[masked.provider] ?? masked.provider,
+    "gen_ai.provider.name": GEN_AI_PROVIDER_WIRE[masked.provider] ?? masked.provider,
     "omo.provider": masked.provider,
     "omo.model_id": pinnedModelId(masked.model_id),
   }
