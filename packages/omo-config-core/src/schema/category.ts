@@ -43,8 +43,15 @@ export const OmoCategoryConfigObjectSchema = z.object({
   warn_unavailable: z.boolean().optional(),
 }).strict()
 
+// `provider_lock` only withheld a parent-session model fallback that no longer exists: a delegated child runs on
+// its designated chain alone. An omo.json that still carries the key loads unchanged and the key is dropped.
+function withoutRetiredCategoryKeys(entry: Record<string, unknown>): Record<string, unknown> {
+  const { provider_lock: _retired, ...rest } = entry
+  return rest
+}
+
 export const OmoCategoryConfigSchema = z.preprocess(
-  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  (value) => isRecord(value) ? withoutRetiredCategoryKeys(normalizeLegacyModelFields(value)) : value,
   OmoCategoryConfigObjectSchema,
 )
 

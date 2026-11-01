@@ -9,7 +9,8 @@ const { fakeHost, runnerOver } = harness
 
 afterEach(harness.release)
 
-const PROFILE_CAPABLE = [...FAKE_HOST_CAPABILITIES, "retry_fallback_profile"]
+const PROFILE_CAPABLE = [...FAKE_HOST_CAPABILITIES]
+const BEFORE_PROFILE = FAKE_HOST_CAPABILITIES.filter((capability) => capability !== "retry_fallback_profile")
 
 function openPayloads(commands: readonly FakeHostCommand[]): readonly Record<string, unknown>[] {
   return commands.filter((command) => command.type === "open_session").map((command) => command.payload)
@@ -29,14 +30,17 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     // then
     expect(openPayloads(host.commands)[0]?.["retryFallback"]).toEqual({
       modelFallback: true,
-      fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol:high", "zai/glm-5.3"] },
+      fallbackChains: {
+        "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol:high", "zai/glm-5.3"],
+        "openai/gpt-5.6-sol": [],
+        "zai/glm-5.3": [],
+      },
     })
     await handle.terminate()
   })
 
-  test("#given a host that honors per-session fallback #when a child without fallback models starts #then open_session carries no profile, so the child keeps the fallback chain the user's settings give it", async () => {
-    // given - the host builds each session's settings from the user's settings files; a child with no
-    // chain of its own must keep falling back through them exactly as it did before #9512
+  test("#given a host that honors per-session fallback #when a child designated one model starts #then open_session turns fallback off for it, so the host's settings never move it to another model (#12006)", async () => {
+    // given - the host builds each session's settings from the user's settings files and senpi's shipped chains
     const host = await fakeHost({ capabilities: PROFILE_CAPABLE })
     const runner = runnerOver(host)
 
@@ -44,13 +48,16 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     const handle = await runner.start(childSpec())
 
     // then
-    expect(openPayloads(host.commands)[0]).not.toHaveProperty("retryFallback")
+    expect(openPayloads(host.commands)[0]?.["retryFallback"]).toEqual({
+      modelFallback: false,
+      fallbackChains: { "anthropic/claude-sonnet-4-5": [] },
+    })
     await handle.terminate()
   })
 
   test("#given an older host without retry_fallback_profile #when two children with fallback models start #then both still open without the field and the user is told once", async () => {
     // given
-    const host = await fakeHost()
+    const host = await fakeHost({ capabilities: BEFORE_PROFILE })
     const warnings: string[] = []
     const runner = runnerOver(host, { onWarning: (message) => void warnings.push(message) })
 
@@ -83,10 +90,8 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     // then
     const opens = openPayloads(host.commands)
     expect(opens).toHaveLength(2)
-    expect(opens.map((payload) => payload["retryFallback"])).toEqual([
-      { modelFallback: true, fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol"] } },
-      { modelFallback: true, fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol"] } },
-    ])
+    const profile = { modelFallback: true, fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol"], "openai/gpt-5.6-sol": [] } }
+    expect(opens.map((payload) => payload["retryFallback"])).toEqual([profile, profile])
     await resumed.terminate()
   })
 })

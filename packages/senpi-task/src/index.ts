@@ -96,7 +96,6 @@ export {
   toolCountSuffix,
 } from "./status-line"
 export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
-export { activeParentModelFallback } from "./manager/parent-model-rung"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,

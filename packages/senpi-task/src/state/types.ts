@@ -172,12 +172,11 @@ export type {
   LiveRunStats,
   TokenCoverageStatus,
 } from "./run-stats-types"
-export { isSpawnSpecV1, PARENT_MODEL_FALLBACK_REASONS } from "./record-types"
+export { isSpawnSpecV1, MODEL_REFUSAL_REASONS } from "./record-types"
 export type {
   LegacyProcessSpawnSpec,
-  ParentModelFallback,
-  ParentModelFallbackPhase,
-  ParentModelFallbackReason,
+  ModelRefusal,
+  ModelRefusalReason,
   PendingSteeringEntry,
   ReviveDeliveryUncertainty,
   SpawnSpecV1,
