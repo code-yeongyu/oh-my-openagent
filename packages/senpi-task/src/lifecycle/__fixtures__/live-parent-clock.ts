@@ -1,3 +1,4 @@
+import { withinTestBudget } from "../../../../../test-support/test-deadline"
 import type { IdleReclaimerScheduler, IdleReclaimerTimer } from "../port"
 
 export function signal<T>() {
@@ -8,18 +9,8 @@ export function signal<T>() {
   return { promise, resolve }
 }
 
-export async function bounded<T>(promise: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("live-parent lifecycle event did not arrive")), 2_000)
-      }),
-    ])
-  } finally {
-    clearTimeout(timer)
-  }
+export function bounded<T>(promise: Promise<T>, phase = "awaited phase"): Promise<T> {
+  return withinTestBudget(promise, `live-parent lifecycle event did not arrive: ${phase}`)
 }
 
 export function recoveryClock() {

@@ -5,6 +5,7 @@ import { runTaskCancel } from "../tools/control/cancel"
 import { runTaskOutput } from "../tools/output/output"
 import { HOST_CHILD_MODEL, startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
 import { manualRecoveryClock, type ManualRecoveryClock } from "./rpc-host/__fixtures__/manual-recovery-clock"
+import { withinTestBudget } from "../../../../test-support/test-deadline"
 
 /**
  * omo#9403: a cancelled child must actually stop. A child whose transport is down when it is
@@ -55,13 +56,7 @@ function commandsFor(world: HostWorld, routingId: string, from: number): readonl
 }
 
 function bounded<T>(work: Promise<T>, label: string): Promise<T> {
-  return Promise.race([
-    work,
-    new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => reject(new Error(`${label} did not settle within 10s`)), 10_000)
-      timer.unref?.()
-    }),
-  ])
+  return withinTestBudget(work, `${label} did not settle`)
 }
 
 describe("task_cancel stops the child", () => {
