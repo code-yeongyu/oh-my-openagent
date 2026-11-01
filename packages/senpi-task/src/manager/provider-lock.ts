@@ -19,7 +19,7 @@ const VENDOR_BY_MODEL_ID: readonly (readonly [RegExp, string])[] = [
   [/minimax/u, "minimax"],
 ]
 
-export function vendorFamily(model: ModelRef): string {
+function vendorFamily(model: ModelRef): string {
   const id = model.model_id.toLowerCase()
   return VENDOR_BY_MODEL_ID.find(([pattern]) => pattern.test(id))?.[1] ?? model.provider
 }
