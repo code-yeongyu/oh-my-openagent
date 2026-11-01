@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { lstatSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { removeTree, removeTreeSync } from "./remove-tree"
 
 function codeError(code: string): Error {
@@ -57,6 +60,41 @@ describe("removeTree", () => {
 })
 
 describe("removeTreeSync", () => {
+  test("#given a vanishing child #when recursively removing #then the fixture parent is gone", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-root-sweep-"))
+    mkdirSync(join(root, "omo-test-run-a.removing"))
+    try {
+      removeTreeSync(root, { maxRetries: 2, retryDelay: 0 })
+      expect(lstatSync(root, { throwIfNoEntry: false })).toBeUndefined()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  for (const stays of [false, true]) {
+    test(`#given a remover silently leaves a path (permanent: ${stays}) #when removing #then it retries or throws at the bound`, () => {
+      const root = mkdtempSync(join(tmpdir(), "omo-remove-tree-"))
+      let calls = 0
+      const remove = () => {
+        calls++
+        if (!stays && calls === 2) rmSync(root, { recursive: true, force: true })
+      }
+      try {
+        const run = () => removeTreeSync(root, { maxRetries: 2, retryDelay: 0 }, remove)
+        if (stays) {
+          expect(run).toThrow(expect.objectContaining({ code: "ENOTEMPTY", path: root }))
+          expect(calls).toBe(3)
+        } else {
+          run()
+          expect(calls).toBe(2)
+          expect(lstatSync(root, { throwIfNoEntry: false })).toBeUndefined()
+        }
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    })
+  }
+
   test("#given a transient EBUSY once #when removing #then it retries and succeeds", () => {
     // given
     let calls = 0
