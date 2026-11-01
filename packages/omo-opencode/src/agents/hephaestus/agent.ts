@@ -80,7 +80,7 @@ export function createHephaestusAgent(
       call_omo_agent: "deny",
       ...getFrontierToolSchemaPermission(model),
     } as AgentConfig["permission"],
-    reasoningEffort: "medium",
+    reasoningEffort: "high",
   };
 }
 createHephaestusAgent.mode = MODE;
