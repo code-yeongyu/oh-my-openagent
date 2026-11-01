@@ -31,6 +31,12 @@ type JsoncParseResult<T> = {
   readonly errors: readonly { readonly message: string; readonly offset: number }[]
 }
 
+function positionAt(content: string, offset: number): { readonly line: number; readonly column: number } {
+  const before = content.slice(0, offset)
+  const lineStart = before.lastIndexOf("\n") + 1
+  return { line: before.split("\n").length, column: offset - lineStart + 1 }
+}
+
 function parseJsoncSafe<T>(content: string): JsoncParseResult<T> {
   const errors: { error: number; length: number; offset: number }[] = []
   const data = parse(content.charCodeAt(0) === 0xfeff ? content.slice(1) : content, errors, {
@@ -91,12 +97,14 @@ function readConfigSource(
   }
 
   const parsed = parseJsoncSafe<unknown>(content)
-  if (parsed.errors.length > 0) {
+  const firstError = parsed.errors[0]
+  if (firstError !== undefined) {
     return {
       diagnostics: [{
         kind: "parse",
         message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
         path,
+        position: positionAt(content.charCodeAt(0) === 0xfeff ? content.slice(1) : content, firstError.offset),
       }],
       source: { exists: true, loaded: false, path, scope },
     }
