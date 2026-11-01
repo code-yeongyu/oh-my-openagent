@@ -132,7 +132,6 @@ export const acquireDeviceService = async (options: AcquireOptions): Promise<Acq
   const [checksums, signature] = await Promise.all([get(CHECKSUMS, CHECKSUMS_MAX_BYTES), get(SIGNATURE, SIGNATURE_BYTES)])
   if (typeof checksums === "string") return downloadRefusal(checksums)
   if (typeof signature === "string") return downloadRefusal(signature)
-  if (signature.length !== SIGNATURE_BYTES) return refuse("malformed")
   const verdict = await verifyReleaseSignature(key, signature, checksums)
   if (!verdict.ok) return refuse(verdict.refusal)
   const digests = parseChecksums(checksums)

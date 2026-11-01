@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from "node:fs"
+import { sign } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import corpus from "../src/strict-ed25519/strict-ed25519-corpus.json"
@@ -124,6 +125,26 @@ describe("verified acquisition of the device service", () => {
     const state = stateDir()
     const served = serveRelease(buildRelease({ key, host: HOST, tamperedBinary: new TextEncoder().encode("not the release") }))
     expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({ ok: false, refusal: "checksum" })
+    expect(existsSync(state)).toBe(false)
+  })
+
+  test("a latest.json that is not the one checksums.txt signed aborts before any write", async () => {
+    const key = releaseKey()
+    const state = stateDir()
+    const files = buildRelease({ key, host: HOST })
+    files.set("latest.json", new TextEncoder().encode(JSON.stringify({ version: PIN_VERSION, min_engine_version: "0.1.0" })))
+    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "checksum" })
+    expect(existsSync(state)).toBe(false)
+  })
+
+  test("a signed checksums.txt that names a file outside the release is malformed", async () => {
+    const key = releaseKey()
+    const files = buildRelease({ key, host: HOST })
+    const checksums = new Uint8Array([...(files.get("checksums.txt") ?? []), ...new TextEncoder().encode(`${"0".repeat(64)}  install.sh\n`)])
+    files.set("checksums.txt", checksums)
+    files.set("checksums.txt.sig", new Uint8Array(sign(null, checksums, key.privateKey)))
+    const state = stateDir()
+    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "malformed" })
     expect(existsSync(state)).toBe(false)
   })
 
