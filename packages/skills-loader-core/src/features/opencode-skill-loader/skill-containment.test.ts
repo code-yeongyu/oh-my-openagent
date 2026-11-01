@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -8,9 +8,21 @@ import { loadSkillsFromDir } from "./skill-directory-loader"
 import { loadSkillFromPathAsync } from "./async-loader"
 import { extractSkillTemplate } from "./loaded-skill-template-extractor"
 import { loadSkillFromPath } from "./loaded-skill-from-path"
+import { discoverGlobalAgentsSkills, discoverUserClaudeSkills, loadGlobalAgentsSkills, loadUserSkills } from "./loader"
+import { subscribeSkillDiagnostics, type SkillDiagnostic } from "./skill-provenance"
 
 const roots: string[] = []
+let originalClaudeConfigDir: string | undefined
+let originalHome: string | undefined
+beforeEach(() => {
+  originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR
+  originalHome = process.env.HOME
+})
 afterEach(() => {
+  if (originalClaudeConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
+  else process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir
+  if (originalHome === undefined) delete process.env.HOME
+  else process.env.HOME = originalHome
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 function fixture() {
@@ -30,6 +42,138 @@ function skill(path: string) {
 }
 
 describe("legacy skill containment at discovery and reread", () => {
+  for (const load of [loadUserSkills, discoverUserClaudeSkills]) {
+    test(`${load.name} reports a missing explicit CLAUDE_CONFIG_DIR root`, async () => {
+      // given
+      const f = fixture()
+      process.env.CLAUDE_CONFIG_DIR = join(f.root, "missing-claude-config")
+      const path = join(process.env.CLAUDE_CONFIG_DIR, "skills")
+      const diagnostics: SkillDiagnostic[] = []
+      const unsubscribe = subscribeSkillDiagnostics((diagnostic) => diagnostics.push(diagnostic))
+      try {
+        // when
+        await load()
+        // then
+        expect(diagnostics).toHaveLength(1)
+        expect(diagnostics[0]?.category).toBe("skill-load-error")
+        expect(diagnostics[0]?.path).toBe(path)
+        expect(diagnostics[0]?.message).toContain("ENOENT")
+      } finally {
+        unsubscribe()
+      }
+    })
+
+    test(`${load.name} silently skips a missing default Claude root when CLAUDE_CONFIG_DIR is unset`, async () => {
+      // given
+      const f = fixture()
+      process.env.HOME = f.root
+      delete process.env.CLAUDE_CONFIG_DIR
+      const diagnostics: SkillDiagnostic[] = []
+      const unsubscribe = subscribeSkillDiagnostics((diagnostic) => diagnostics.push(diagnostic))
+      try {
+        // when
+        const loaded = await load()
+        // then
+        expect(Object.keys(loaded)).toEqual([])
+        expect(diagnostics).toEqual([])
+      } finally {
+        unsubscribe()
+      }
+    })
+  }
+
+  test("missing implicit root returns no skills and no diagnostic", async () => {
+    // given
+    const f = fixture()
+    const diagnostics: SkillDiagnostic[] = []
+    // when
+    const loaded = await loadSkillsFromDir({
+      skillsDir: join(f.root, "does-not-exist", "skills"), scope: "user", skipMissing: true,
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    })
+    // then
+    expect(loaded).toEqual([])
+    expect(diagnostics).toEqual([])
+  })
+
+  test("default Agents entry points skip missing roots without diagnostics", async () => {
+    // given
+    const f = fixture()
+    const diagnostics: SkillDiagnostic[] = []
+    const unsubscribe = subscribeSkillDiagnostics((diagnostic) => diagnostics.push(diagnostic))
+    try {
+      // when / then
+      expect(await discoverGlobalAgentsSkills(f.root)).toEqual([])
+      expect(await loadGlobalAgentsSkills(f.root)).toEqual({})
+      expect(diagnostics).toEqual([])
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  test("shared directory loader reports a missing explicitly configured root", async () => {
+    // given
+    const f = fixture()
+    const path = join(f.root, "missing-configured-root")
+    const diagnostics: SkillDiagnostic[] = []
+    // when
+    const loaded = await loadSkillsFromDir({
+      skillsDir: path, scope: "config",
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    })
+    // then
+    expect(loaded).toEqual([])
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]?.category).toBe("skill-load-error")
+    expect(diagnostics[0]?.path).toBe(path)
+    expect(diagnostics[0]?.message).toContain("ENOENT")
+  })
+
+  test("dangling implicit root symlink reports its real ENOENT error", async () => {
+    // given
+    const f = fixture()
+    const path = join(f.root, "dangling-root")
+    symlinkSync(join(f.root, "missing-target"), path)
+    const diagnostics: SkillDiagnostic[] = []
+    // when
+    const loaded = await loadSkillsFromDir({
+      skillsDir: path, scope: "user", skipMissing: true,
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+    })
+    // then
+    expect(loaded).toEqual([])
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]?.category).toBe("skill-load-error")
+    expect(diagnostics[0]?.path).toBe(path)
+    expect(diagnostics[0]?.message).toContain("ENOENT")
+  })
+
+  test("inaccessible implicit root reports EACCES instead of treating it as absent", async () => {
+    // chmod cannot deny traversal on Windows.
+    if (process.platform === "win32") return
+    // given
+    const f = fixture()
+    const parent = dirname(f.skillsDir)
+    const diagnostics: SkillDiagnostic[] = []
+    fs.chmodSync(parent, 0)
+    try {
+      // when
+      const loaded = await loadSkillsFromDir({
+        skillsDir: f.skillsDir, scope: "user", skipMissing: true,
+        provenance: { kind: "user", selectedRoot: f.skillsDir, projectRoot: f.project },
+        onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+      })
+      // then
+      expect(loaded).toEqual([])
+      expect(diagnostics).toHaveLength(1)
+      expect(diagnostics[0]?.category).toBe("skill-load-error")
+      expect(diagnostics[0]?.path).toBe(f.skillsDir)
+      expect(diagnostics[0]?.message).toContain("EACCES")
+    } finally {
+      fs.chmodSync(parent, 0o700)
+    }
+  })
+
   test("mode-000 skill fails closed with its real EACCES error, not a security block", async () => {
     // chmod 000 denies reads only under POSIX permissions; on Windows the file stays readable, so the case cannot arise.
     if (process.platform === "win32") return

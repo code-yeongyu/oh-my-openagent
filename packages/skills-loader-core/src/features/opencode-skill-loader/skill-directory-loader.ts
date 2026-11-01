@@ -14,6 +14,7 @@ export async function loadSkillsFromDir(options: {
   namePrefix?: string
   depth?: number
   maxDepth?: number
+  skipMissing?: boolean
   skipMalformedFrontmatter?: boolean
   provenance?: SkillProvenance
   onDiagnostic?: SkillDiagnosticSink
@@ -21,6 +22,11 @@ export async function loadSkillsFromDir(options: {
 }): Promise<LoadedSkill[]> {
   const directory = typeof options.skillsDir === "string" ? undefined : options.skillsDir
   const discovered = typeof options.skillsDir === "string" ? options.skillsDir : options.skillsDir.discovered
+  if (options.skipMissing) {
+    try { await fs.lstat(discovered) } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
+    }
+  }
   const provenance = skillProvenance(discovered, options.scope, options.provenance ?? (
     directory ? { kind: "project-auto", selectedRoot: directory.discovered, projectRoot: directory.projectRoot } : undefined
   ))
@@ -62,7 +68,7 @@ export async function loadSkillsFromDir(options: {
           }
           if (!found && depth < maxDepth) {
             const nested = await loadSkillsFromDir({
-              ...options, skillsDir: path, provenance: entryProvenance, ancestry,
+              ...options, skillsDir: path, provenance: entryProvenance, ancestry, skipMissing: false,
               namePrefix: namePrefix ? `${namePrefix}/${entry.name}` : entry.name, depth: depth + 1,
             })
             for (const skill of nested) if (!skillMap.has(skill.name)) skillMap.set(skill.name, skill)
