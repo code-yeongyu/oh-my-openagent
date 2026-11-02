@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { posix } from "node:path"
 
 import {
+  migrationLockPath,
   runMigrations,
   type MigrationBatchRunResult,
   type MigrationFileSystem,
@@ -210,24 +211,20 @@ describe("runSenpiStartupMigration", () => {
     expect(primary.results.filter((entry) => entry.status === "migrated")).toHaveLength(2)
   })
 
-  test("#given a lock whose holder process is gone #when Senpi starts #then it reclaims the lock and migrates instead of reporting a peer", () => {
-    // given a stale lock left by a dead host
+  test("#given an expired lock whose holder process is gone #when Senpi starts #then it reclaims the lock and migrates instead of reporting a peer", () => {
+    // given the lock file a dead host left behind: its lease expired before this start's clock (1_000)
     const fileSystem = memoryFileSystem()
     fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
     const options = migrationOptions(fileSystem)
-    withProcessPlatform("win32", () => runSenpiStartupMigration({
-      ...options,
-      onBoundary: (boundary) => {
-        if (boundary === "journal-written") throw new Error("host died mid-migration")
-      },
-    }))
+    fileSystem.files.set(migrationLockPath(options.env), `${JSON.stringify({ leaseExpiresAt: 1, pid: 99 })}\n`)
 
     // when
-    const result = withProcessPlatform("win32", () => runSenpiStartupMigration({ ...options, isProcessAlive: () => false, pid: 43 }))
+    const result = withProcessPlatform("win32", () => runSenpiStartupMigration({ ...options, isProcessAlive: (pid) => pid !== 99 }))
 
     // then
     expect(result.peerMigrating).toBeUndefined()
-    expect(result.journalResumed).toBe(true)
+    expect(result.error).toBeUndefined()
+    expect(result.results.filter((entry) => entry.status === "migrated")).toHaveLength(2)
   })
 })
 
