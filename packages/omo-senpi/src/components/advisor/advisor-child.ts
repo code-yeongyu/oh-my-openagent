@@ -105,11 +105,13 @@ async function awaitAdvice(handle: Awaited<ReturnType<InProcessRunnerLike["start
       timer = setTimeout(() => resolve("timeout"), timeoutMs)
       timer.unref?.()
     })
-    const finished = await Promise.race([handle.waitForIdle().then(() => "idle" as const), timedOut])
+    const finished = await Promise.race([handle.waitForIdle(), timedOut])
     if (finished === "timeout") {
       await handle.abort().catch(() => undefined)
       return { kind: "failed", reason: "timeout", model }
     }
+    if (finished.status === "error") return { kind: "failed", reason: `${finished.failure.kind}: ${finished.failure.message}`, model }
+    if (finished.status !== "completed") return { kind: "failed", reason: finished.status, model }
     const text = handle.lastAssistantText()?.trim()
     if (text === undefined || text.length === 0) return { kind: "failed", reason: "empty", model }
     return { kind: "advice", text, model, ms: Date.now() - startedAt }

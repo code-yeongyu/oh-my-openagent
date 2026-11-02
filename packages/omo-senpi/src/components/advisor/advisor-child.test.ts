@@ -22,7 +22,7 @@ const REQUEST: AdvisorChildRequest = {
   timeoutMs: 1000,
 }
 
-function fakeRunner(behaviour: { readonly text?: string; readonly hang?: boolean }) {
+function fakeRunner(behaviour: { readonly text?: string; readonly hang?: boolean; readonly error?: string }) {
   const specs: ChildSpec[] = []
   let aborted = false
   let disposed = false
@@ -30,7 +30,11 @@ function fakeRunner(behaviour: { readonly text?: string; readonly hang?: boolean
     start: async (spec: ChildSpec) => {
       specs.push(spec)
       return {
-        waitForIdle: () => (behaviour.hang === true ? new Promise<never>(() => {}) : Promise.resolve()),
+        waitForIdle: () => {
+          if (behaviour.hang === true) return new Promise<never>(() => {})
+          if (behaviour.error !== undefined) return Promise.resolve({ status: "error", failure: { kind: "session_create_failed", message: behaviour.error } })
+          return Promise.resolve({ status: "completed", finalResponse: behaviour.text ?? "" })
+        },
         lastAssistantText: () => behaviour.text,
         abort: async () => {
           aborted = true
@@ -64,6 +68,13 @@ describe("runAdvisorChild", () => {
   it("#given an empty reply #when the child settles #then no advice is produced", async () => {
     const fake = fakeRunner({ text: "   " })
     expect(await runAdvisorChild(REQUEST, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty" })
+  })
+
+  it("#given the provider rejects the advisor model #when the turn ends in error #then the provider message is the reason, not an empty reply", async () => {
+    const fake = fakeRunner({ error: "400: model_not_found" })
+    const outcome = await runAdvisorChild(REQUEST, { createRunner: () => fake.runner })
+    expect(outcome).toEqual({ kind: "failed", reason: "session_create_failed: 400: model_not_found", model: "anthropic/claude-opus-5-5" })
+    expect(fake.disposed()).toBe(true)
   })
 
   it("#given the pinned model cannot start and no category resolves #when asked #then it fails without advice", async () => {
