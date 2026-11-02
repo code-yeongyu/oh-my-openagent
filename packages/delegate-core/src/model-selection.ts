@@ -47,6 +47,31 @@ function modelIDForProvider(provider: string, model: string): string {
   return model.startsWith(prefix) ? model.slice(prefix.length) : model
 }
 
+function modelIDOf(model: string): string {
+  const separator = model.indexOf("/")
+  return separator === -1 ? model : model.slice(separator + 1)
+}
+
+/**
+ * Unavailability must be positively established before an explicit user primary is demoted.
+ * A fuzzy match that returns null is only "inconclusive" (provider alias, format or
+ * normalization edge), so the primary counts as present when it is an exact member of the
+ * available set or when any available model carries the same model id under another
+ * provider prefix (`opencode-go/kimi-k3` vs `opencode/kimi-k3`).
+ */
+function isModelVerifiablyAbsent(primaryModel: string, availableModels: ReadonlySet<string>): boolean {
+  const primaryModelID = modelIDOf(primaryModel)
+  for (const available of availableModels) {
+    if (available === primaryModel) {
+      return false
+    }
+    if (modelIDOf(available) === primaryModelID) {
+      return false
+    }
+  }
+  return true
+}
+
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
 }
@@ -104,7 +129,9 @@ export function resolveModelForDelegateTask(
     ) {
       const providerHint = parsed?.providerHint
       const primaryMatch = fuzzyMatchModel(userResult.model, new Set(input.availableModels), providerHint)
-      if (!primaryMatch) {
+      // The explicit primary wins unless its absence is positively established: a null fuzzy
+      // match alone is inconclusive and must never silently override user intent (#6869 review).
+      if (!primaryMatch && isModelVerifiablyAbsent(userResult.model, input.availableModels)) {
         for (const fallbackModel of userFallbackModels) {
           const parsedFallback = parseUserFallbackModel(fallbackModel)
           if (!parsedFallback) continue

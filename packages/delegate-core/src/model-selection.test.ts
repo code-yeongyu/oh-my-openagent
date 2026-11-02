@@ -52,6 +52,57 @@ describe("resolveModelForDelegateTask", () => {
     })
   })
 
+  test("#given an explicit primary that is an exact available member #when fallbacks are present #then the primary is kept", () => {
+    //#given
+    const input = {
+      userModel: "opencode-go/kimi-k3",
+      userFallbackModels: ["opencode-go/qwen3.7-plus"],
+      availableModels: new Set(["opencode-go/kimi-k3", "opencode-go/qwen3.7-plus"]),
+    }
+
+    //#when
+    const result = resolveModelForDelegateTask(input, noCacheDeps)
+
+    //#then
+    expect(result).toEqual({ model: "opencode-go/kimi-k3" })
+  })
+
+  test("#given an alias-inconclusive primary reachable under another provider #when an exactly reachable fallback exists #then the primary is kept", () => {
+    //#given the primary opencode-go/kimi-k3 is served as opencode/kimi-k3, so the
+    // opencode-go provider hint makes fuzzy matching inconclusive, and the fallback
+    // opencode/qwen3.7-plus is exactly reachable
+    const input = {
+      userModel: "opencode-go/kimi-k3",
+      userFallbackModels: ["opencode/qwen3.7-plus"],
+      availableModels: new Set(["opencode/kimi-k3", "opencode/qwen3.7-plus"]),
+    }
+
+    //#when
+    const result = resolveModelForDelegateTask(input, noCacheDeps)
+
+    //#then inconclusive matching is not absence: the explicit primary still wins
+    expect(result).toEqual({ model: "opencode-go/kimi-k3" })
+  })
+
+  test("#given an alias-inconclusive primary whose model id is absent everywhere #when a fallback is exactly reachable #then the fallback is promoted", () => {
+    //#given the primary model id kimi-k3 is in none of the available entries, so its
+    // absence is positively established rather than merely inconclusive
+    const input = {
+      userModel: "opencode-go/kimi-k3",
+      userFallbackModels: ["opencode/qwen3.7-plus"],
+      availableModels: new Set(["opencode/qwen3.7-plus"]),
+    }
+
+    //#when
+    const result = resolveModelForDelegateTask(input, noCacheDeps)
+
+    //#then
+    expect(result).toEqual({
+      model: "opencode/qwen3.7-plus",
+      matchedFallback: true,
+    })
+  })
+
   test("#given connected providers cache #when fallback chain starts disconnected #then selects first connected provider", () => {
     const result = resolveModelForDelegateTask({
       availableModels: new Set(),
