@@ -81,6 +81,12 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "server_error",
   "an error occurred while processing",
   "upstream request failed",
+  // An authentication failure is fixed by another provider, never by retrying this one; the typed
+  // form is "authenticationerror" above, these are the same failure reported as a generic API error
+  // by bridges such as a Claude Code OAuth lane (#9320). A bare "401 Unauthorized" stays excluded.
+  "failed to authenticate",
+  "authentication failed",
+  "oauth session expired",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
