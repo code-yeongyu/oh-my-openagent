@@ -42,6 +42,7 @@ export interface ReflectionRunReconciliationOptions {
   readonly launch?: (run: ReservedRun) => void
   readonly now?: () => number
   readonly hostname?: () => string
+  readonly machineHash?: () => Promise<string | null>
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
   readonly waitForOutcome?: (path: string, deadlineAt: number, signal?: AbortSignal) => Promise<SentinelWaitResult>

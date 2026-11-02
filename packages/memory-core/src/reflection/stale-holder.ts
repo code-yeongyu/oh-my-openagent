@@ -11,6 +11,7 @@ import { join } from "node:path"
 
 import { readFile } from "../fs/resilient"
 import { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable, type ProcessLiveness } from "../locks/process-identity"
+import { classifyHostIdentity } from "./host-identity-lazy"
 
 export type ReflectionLockVerdict =
   | { readonly state: "none" }
@@ -21,6 +22,7 @@ export type ReflectionLockVerdict =
 export interface ReflectionLockProbe {
   readonly readText?: (path: string) => Promise<string>
   readonly hostname?: () => string
+  readonly machineHash?: () => Promise<string | null>
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
 }
@@ -97,7 +99,18 @@ export async function classifyReflectionLockHolder(
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
   if (launcherPid === undefined || launcherHostname === undefined) return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
-  if (launcherHostname !== (probe.hostname ?? readHostname)()) return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
+  const identity = await classifyHostIdentity({
+    launcherHostname,
+    launcherMachineHash: fields.launcherMachineHash,
+    hostname: (probe.hostname ?? readHostname)(),
+    machineHash: probe.machineHash,
+  })
+  if (identity.state === "foreign") {
+    const owner = identity.viaMachineId
+      ? `a different machine (host ${launcherHostname})` // rule:machine-id
+      : `host ${launcherHostname}` // rule:other-host
+    return stuck(runId, `it is owned by ${owner}, which cannot be checked from here`)
+  }
   const launcher = await launcherLiveness(launcherPid, fields.launcherProcessStart, probe)
   if (launcher === "alive") return { state: "live", runId } // rule:launcher-alive
   if (launcher === "unknown") return stuck(runId, `launcher pid ${launcherPid} could not be checked`) // rule:launcher-unknown

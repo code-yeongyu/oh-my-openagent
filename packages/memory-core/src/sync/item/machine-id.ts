@@ -22,7 +22,7 @@ export function readMachineId(): Promise<string> {
   return cached
 }
 
-async function platformMachineId(): Promise<string | null> {
+export async function platformMachineId(): Promise<string | null> {
   if (process.platform === "linux") {
     for (const path of ["/etc/machine-id", "/var/lib/dbus/machine-id"]) {
       const text = await readFile(path, "utf8").then(

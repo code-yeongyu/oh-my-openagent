@@ -19,6 +19,8 @@ interface Facts {
   readonly files: Readonly<Record<string, FileState>>
   readonly pids: Readonly<Record<number, ProcessLiveness>>
   readonly starts: Readonly<Record<number, string | null>>
+  readonly machineId: string | null
+  readonly failMachineId: boolean
 }
 
 export interface Scenario {
@@ -33,13 +35,25 @@ function lock(fields: Record<string, unknown> = {}): string {
 }
 
 // A provably dead holder: every rule passes. Each scenario below changes exactly one fact of it.
-function deadHolder(change: { files?: Record<string, FileState | undefined>; pids?: Facts["pids"]; starts?: Facts["starts"] } = {}): Facts {
+function deadHolder(change: {
+  files?: Record<string, FileState | undefined>
+  pids?: Facts["pids"]
+  starts?: Facts["starts"]
+  machineId?: string | null
+  failMachineId?: boolean
+} = {}): Facts {
   const files: Record<string, FileState> = { [LOCK]: lock(), [OUTCOME]: VALID_OUTCOME, [CLAIM]: JSON.stringify({ claimantPid: CLAIMANT }) }
   for (const [path, state] of Object.entries(change.files ?? {})) {
     if (state === undefined) delete files[path]
     else files[path] = state
   }
-  return { files, pids: change.pids ?? {}, starts: change.starts ?? {} }
+  return {
+    files,
+    pids: change.pids ?? {},
+    starts: change.starts ?? {},
+    machineId: change.machineId ?? null,
+    failMachineId: change.failMachineId ?? false,
+  }
 }
 
 const stuck = (runId: string, reason: string): ReflectionLockVerdict => ({ state: "stuck", runId, reason })
@@ -53,6 +67,11 @@ export const SCENARIOS: readonly Scenario[] = [
   { name: "active.lock is the JSON literal null", facts: deadHolder({ files: { [LOCK]: "null" } }), expected: stuck("unknown", "its launcher identity is missing") },
   { name: "the launcher pid is missing", rule: "launcher-identity", facts: deadHolder({ files: { [LOCK]: JSON.stringify({ runId: RUN, launcherHostname: HOST }) } }), expected: stuck(RUN, "its launcher identity is missing") },
   { name: "another host owns the lock", rule: "other-host", facts: deadHolder({ files: { [LOCK]: lock({ launcherHostname: "other-host" }) } }), expected: stuck(RUN, "it is owned by host other-host, which cannot be checked from here") },
+  { name: "another machine holds the lock under the same hostname", rule: "machine-id", facts: deadHolder({ machineId: "machine-b", files: { [LOCK]: lock({ launcherMachineHash: "machine-a" }) } }), expected: stuck(RUN, "it is owned by a different machine (host this-host), which cannot be checked from here") },
+  { name: "the same machine with a renamed hostname still owns its dead lock", rule: "machine-id-renamed-host", facts: deadHolder({ machineId: "machine-a", files: { [LOCK]: lock({ launcherMachineHash: "machine-a", launcherHostname: "other-host" }) } }), expected: { state: "dead", runId: RUN } },
+  { name: "a null machine id lookup falls back to hostname equality", rule: "machine-id-null", facts: deadHolder({ machineId: null, files: { [LOCK]: lock({ launcherMachineHash: "machine-a" }) } }), expected: { state: "dead", runId: RUN } },
+  { name: "no machine id is read when active.lock is absent", rule: "machine-id-hot-path", facts: deadHolder({ failMachineId: true, files: { [LOCK]: undefined } }), expected: { state: "none" } },
+  { name: "no machine id is read when the record carries no launcherMachineHash", rule: "machine-id-hot-path", facts: deadHolder({ failMachineId: true }), expected: { state: "dead", runId: RUN } },
   { name: "the launcher is alive", rule: "launcher-alive", facts: deadHolder({ pids: { [LAUNCHER]: "alive" } }), expected: { state: "live", runId: RUN } },
   { name: "the launcher cannot be checked", rule: "launcher-unknown", facts: deadHolder({ pids: { [LAUNCHER]: "unknown" } }), expected: stuck(RUN, `launcher pid ${LAUNCHER} could not be checked`) },
   { name: "the launcher pid was reused by another process", rule: "pid-reused", facts: deadHolder({ files: { [LOCK]: lock({ launcherProcessStart: RECORDED_START }) }, pids: { [LAUNCHER]: "alive" }, starts: { [LAUNCHER]: "linux-proc-start-ticks:999" } }), expected: { state: "dead", runId: RUN } },
@@ -83,6 +102,10 @@ export function probeFor(facts: Facts): ReflectionLockProbe {
       return state
     },
     hostname: () => HOST,
+    machineHash: async () => {
+      if (facts.failMachineId) throw new Error("machine id must not be read")
+      return facts.machineId
+    },
     getPidLiveness: (pid) => facts.pids[pid] ?? "dead",
     getProcessStartIdentity: async (pid) => facts.starts[pid] ?? null,
   }
