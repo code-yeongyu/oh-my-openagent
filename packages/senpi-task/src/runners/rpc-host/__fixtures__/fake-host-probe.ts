@@ -15,6 +15,7 @@ export const FAKE_HOST_CAPABILITIES = [
   "retain_on_disconnect",
   "auto_title_per_session",
   "generation_handoff",
+  "retry_fallback_profile",
 ] as const
 
 export interface FakeHostIdentityOptions {
