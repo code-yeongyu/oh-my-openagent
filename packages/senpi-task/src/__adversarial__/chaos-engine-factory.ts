@@ -35,7 +35,7 @@ function managerRegistry(getManager: () => TaskManager): ResidencyRegistry {
   return {
     get: (taskId) => adapt(getManager().getResidentHandle(taskId)),
     entries: () => getManager().residentTaskIds().map((id) => adapt(getManager().getResidentHandle(id))).filter((handle): handle is ResidentHandle => handle !== undefined),
-    forget: (taskId) => getManager().forget(taskId),
+    forget: (taskId, options) => getManager().forget(taskId, options),
     hasPendingSends: () => false,
   }
 }

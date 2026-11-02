@@ -4,8 +4,8 @@
 // next to the executable, mapped from the npm layout onto the flattened binary layout.
 
 import { createRequire } from "node:module"
-import { dirname, join, resolve } from "node:path"
-import { existsSync, readFileSync, realpathSync } from "node:fs"
+import { dirname, join, relative, resolve, sep } from "node:path"
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -114,6 +114,12 @@ function packageDependencySources(
     if (ancestors.has(realDependencyDir)) continue
     const dependencyTarget = `${targetRoot}/node_modules/${dependencyName}`
     sources.push({ from: dependencyDir, to: dependencyTarget, required: true })
+    for (const entry of readdirSync(dependencyDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".wasm")) continue
+      const from = join(entry.parentPath, entry.name)
+      const assetPath = relative(dependencyDir, from).split(sep).join("/")
+      sources.push({ from, to: `${dependencyTarget}/${assetPath}`, required: true })
+    }
     sources.push(...packageDependencySources(
       dependencyDir,
       dependencyTarget,

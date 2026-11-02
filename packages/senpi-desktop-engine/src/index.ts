@@ -1,4 +1,10 @@
 export {
+	DesktopLaunchContextError,
+	DesktopLaunchRefusal,
+	type DesktopLaunchRefusalReason,
+	type UserFacingErrorInfo,
+} from "./launch-refusal";
+export {
 	DesktopEngineAbiMismatchError,
 	DesktopEngineHandshakeError,
 	type DesktopEngineSpawner,
@@ -23,7 +29,7 @@ export {
 	locateDesktopEngine,
 	QUARANTINE_ATTRIBUTE,
 } from "./locator";
-export { acquireDesktopEngine, launchDesktopEngine, type AcquireDesktopEngineOptions, type AcquiredDesktopEngine } from "./acquire";
+export { acquireDesktopEngine, launchDesktopEngine, findCachedDesktopEngine, type AcquireDesktopEngineOptions, type AcquiredDesktopEngine } from "./acquire";
 export {
 	DESKTOP_ENGINE_CHECKSUMS_ASSET,
 	DESKTOP_ENGINE_RELEASE_HOSTS,

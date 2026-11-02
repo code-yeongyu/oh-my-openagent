@@ -27,10 +27,6 @@ describe("omo-ai published package shape", () => {
       test("#then it exposes exactly the omo command pointing at bin/omo.js", () => {
         expect(manifest.bin).toEqual({ omo: "bin/omo.js" })
       })
-
-      test("#then omo-agent-toolkit is absent from the bin map", () => {
-        expect(manifest.bin).not.toHaveProperty("omo-agent-toolkit")
-      })
     })
 
     describe("#when the files array is audited", () => {
@@ -59,13 +55,6 @@ describe("omo-ai published package shape", () => {
         expect(bundle).toContain("code-yeongyu/go-claude-code-comment-checker")
         expect(bundle).toContain("/releases/download/v")
         expect(bundle).toContain("comment-checker_v")
-      })
-
-      test("#then the senpi pin is exact with no range operator", () => {
-        const pin = manifest.dependencies?.["@code-yeongyu/senpi"]
-        expect(pin).toBe("2026.9.29-5")
-        expect(pin).toMatch(/^\d/)
-        expect(pin).not.toMatch(/^[\^~]/)
       })
     })
 

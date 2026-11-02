@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { describe, expect, onTestFinished, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { daemonReportLines, runDaemonCommand } from "../bin/lib/daemon.js"
@@ -28,6 +28,7 @@ function fakeEngine(result: { exitCode: number; stdout?: string; stderr?: string
 
 function workspace(config?: Record<string, unknown>): { pluginRoot: string; agentDir: string } {
   const root = mkdtempSync(join(tmpdir(), "omo-daemon-cli-"))
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }))
   const pluginRoot = join(root, "plugin")
   const agentDir = join(root, "agent")
   mkdirSync(pluginRoot, { recursive: true })
@@ -148,20 +149,22 @@ describe("omo daemon", () => {
     expect(engine.calls).toHaveLength(0)
   })
 
-  test("attach reports the environment a child needs to reach the daemon", () => {
+  test("attach is no longer a subcommand: usage exit, empty stdout, engine untouched, and stderr points to adopt", () => {
     const { pluginRoot, agentDir } = workspace()
-    const socket = join(agentDir, "rpc", "rpc.sock")
-    const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 5, socket }) })
+    const engine = fakeEngine({ exitCode: 0, stdout: "" })
     const stdout = capture()
+    const stderr = capture()
 
-    const exitCode = runDaemonCommand(["attach", "--json"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+    const exitCode = runDaemonCommand(["attach", "--model", "x"], {
+      engine, pluginRoot, agentDir, env: {}, stdout, stderr, platform: "darwin",
     })
 
-    expect(exitCode).toBe(0)
-    const printed = JSON.parse(stdout.text())
-    expect(printed.env.OMO_ENABLE_SHARED_HOST).toBe("1")
-    expect(printed.env.OMO_RPC_SOCKET).toBe(socket)
+    expect(exitCode).toBe(2)
+    expect(stdout.text()).toBe("")
+    expect(stderr.text()).toContain("unknown subcommand 'attach'")
+    expect(stderr.text()).toContain("omo daemon adopt <session>")
+    expect(stderr.text()).not.toContain("attach ")
+    expect(engine.calls).toHaveLength(0)
   })
 
   test("status exits 3 and says so in prose when no daemon answers", () => {
@@ -245,47 +248,4 @@ describe("omo daemon", () => {
     expect(stdout.text()).toContain("usage: omo daemon")
   })
 
-  test("attach with trailing args hands back a passthrough the launcher continues with", () => {
-    const { pluginRoot, agentDir } = workspace()
-    const socket = join(agentDir, "rpc", "rpc.sock")
-    const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 5, socket }) })
-    const stdout = capture()
-
-    const outcome = runDaemonCommand(["attach", "--model", "x"], {
-      engine, pluginRoot, agentDir, env: { HOME: "/h" }, stdout, stderr: capture(), platform: "darwin",
-    })
-
-    expect(typeof outcome).toBe("object")
-    const passthrough = outcome as { passthrough: true; args: string[]; env: Record<string, string> }
-    expect(passthrough.passthrough).toBe(true)
-    expect(passthrough.args).toEqual(["--model", "x"])
-    expect(passthrough.env.OMO_ENABLE_SHARED_HOST).toBe("1")
-    expect(passthrough.env.OMO_RPC_SOCKET).toBe(socket)
-    expect(passthrough.env.HOME).toBe("/h")
-    expect(stdout.text()).toBe("")
-  })
-
-  test("attach consumes daemon-only value flags with their values", () => {
-    const { pluginRoot, agentDir } = workspace()
-    const socket = join(agentDir, "rpc", "rpc.sock")
-    const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 5, socket }) })
-
-    const outcome = runDaemonCommand(["attach", "--store", "/tmp/store", "--timeout", "9", "--model", "x"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
-    })
-
-    expect(typeof outcome).toBe("object")
-    expect((outcome as { args: string[] }).args).toEqual(["--model", "x"])
-  })
-
-  test("attach that cannot reach a daemon does not pass through", () => {
-    const { pluginRoot, agentDir } = workspace()
-    const engine = fakeEngine({ exitCode: 5, stdout: "", stderr: "refused" })
-
-    const outcome = runDaemonCommand(["attach", "--model", "x"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
-    })
-
-    expect(outcome).toBe(5)
-  })
 })

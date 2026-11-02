@@ -1,10 +1,12 @@
 import { isDirectoryPath, resolveReadablePathInsideContext, withLspClient } from "../lsp/client-wrapper.js";
 import { DEFAULT_MAX_DIAGNOSTICS } from "../lsp/constants.js";
+import type { BunProjectChecksOptions } from "../lsp/bun-project-checks.js";
 import { aggregateDiagnosticsForDirectory } from "../lsp/directory-diagnostics.js";
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "../lsp/formatters.js";
 import { inferExtensionFromDirectory } from "../lsp/infer-extension.js";
 import type { Diagnostic } from "../lsp/types.js";
 import { missingDependencyResult } from "../missing-dependency-result.js";
+import { runBunDirectoryDiagnostics } from "./bun-directory-diagnostics.js";
 import { clientOptions, requireString, severityFilter } from "./parameters.js";
 import { text } from "./result.js";
 import type { LspDiagnosticsDetails, ToolExecutionResult } from "./types.js";
@@ -18,6 +20,7 @@ function asDiagnosticArray(result: { items?: Diagnostic[] } | Diagnostic[] | nul
 export async function executeLspDiagnostics(
 	params: Record<string, unknown>,
 	signal?: AbortSignal,
+	bunOptions: BunProjectChecksOptions = {},
 ): Promise<ToolExecutionResult> {
 	const filePath = requireString(params, "filePath");
 	const severity = severityFilter(params);
@@ -41,13 +44,27 @@ export async function executeLspDiagnostics(
 				return text(message, details);
 			}
 
-				const output = await aggregateDiagnosticsForDirectory(
-					absPath,
-					extension,
+			const bun = await runBunDirectoryDiagnostics(absPath, extension, severity, signal, bunOptions);
+			if (bun !== undefined) {
+				const details: LspDiagnosticsDetails = {
+					filePath,
 					severity,
-					undefined,
-					signal === undefined ? {} : { signal },
-				);
+					mode: "directory",
+					diagnostics: [...bun.diagnostics],
+					totalDiagnostics: bun.diagnostics.length,
+					truncated: bun.diagnostics.length > DEFAULT_MAX_DIAGNOSTICS,
+					projectCommands: [...bun.projectCommands],
+				};
+				return text(bun.output, details);
+			}
+
+			const output = await aggregateDiagnosticsForDirectory(
+				absPath,
+				extension,
+				severity,
+				undefined,
+				signal === undefined ? {} : { signal },
+			);
 			const details: LspDiagnosticsDetails = {
 				filePath,
 				severity,

@@ -193,6 +193,13 @@ export function requestToolNames(body) {
   return tools.map((tool) => tool?.function?.name ?? tool?.name).filter((name) => typeof name === "string")
 }
 
+/** The parameter names one tool declares in a request, so a scenario can prove which schema the model was sent. */
+export function requestToolParameters(body, name) {
+  const tools = Array.isArray(body?.tools) ? body.tools : []
+  const tool = tools.find((entry) => (entry?.function?.name ?? entry?.name) === name)
+  return Object.keys(tool?.function?.parameters?.properties ?? tool?.parameters?.properties ?? {})
+}
+
 export function requestSystemText(body) {
   const messages = Array.isArray(body?.messages) ? body.messages : []
   return messages
@@ -236,7 +243,7 @@ export function createRouter({ lanes = [] } = {}) {
       state[lane.name] = (state[lane.name] ?? 0) + 1
       step = lane.step(body)
     } else if (isSidecarRequest(body)) {
-      state.sidecarRequests.push({ index, toolNames: requestToolNames(body), messageCount: Array.isArray(body?.messages) ? body.messages.length : 0 })
+      state.sidecarRequests.push({ index, toolNames: requestToolNames(body), memoryParameters: requestToolParameters(body, "memory"), messageCount: Array.isArray(body?.messages) ? body.messages.length : 0 })
       step = sidecarSteps[sidecarCursor] ?? { type: "text", text: "sidecar script exhausted" }
       sidecarCursor += 1
       state.sidecar += 1

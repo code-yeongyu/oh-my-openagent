@@ -1,3 +1,5 @@
+import type { PermissionDeniedData } from "@oh-my-opencode/senpi-desktop-protocol";
+import { DesktopEngineRpcError, DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-service";
 import {
 	actionsOf,
 	actionsScript,
@@ -8,7 +10,7 @@ import {
 } from "./cua-actions";
 import { computerActionsToolDefinition } from "./cua-definition";
 import { ComputerArgumentsError } from "./action-schema";
-import { computerFailure } from "./cua-errors";
+import { computerFailure, launchContextFailure } from "./cua-errors";
 import { DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS } from "./params";
 import type { ComputerHostContext } from "./session";
 import { type ComputerToolDeps, type ComputerToolResult, runComputer } from "./tool";
@@ -19,6 +21,7 @@ interface StepOutcome {
 	readonly status: "success" | "error";
 	readonly code?: string;
 	readonly message?: string;
+	readonly permission?: PermissionDeniedData;
 }
 
 interface ActionsOutcome {
@@ -53,7 +56,7 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 			} catch (error) {
 				if (!(error instanceof ComputerArgumentsError)) throw error;
 				const failure = computerFailure(error.code, error.reason, stopHotkey);
-				return { content: [{ type: "text", text: failure.message }], details: { value: failure }, isError: true };
+				return { content: [{ type: "text", text: failure.message }], details: { value: failure, isError: true }, isError: true };
 			}
 			const timeoutSeconds = Math.min(params.timeout ?? DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS);
 			const readOnly = isReadOnlyActions(params);
@@ -63,9 +66,15 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 				result = await runComputer(deps, context, { code, readOnly, timeoutSeconds }, signal);
 			} catch (error) {
 				if (!(error instanceof Error)) throw error;
-				const reason = Reflect.get(error, "reason") ?? Reflect.get(error, "code") ?? error.name;
-				const failure = computerFailure(String(reason), error.message, stopHotkey);
-				return { content: [{ type: "text", text: failure.message }], details: { value: failure }, isError: true };
+				if (error instanceof DesktopLaunchContextError) {
+					const failure = launchContextFailure(error);
+					return { content: [{ type: "text", text: failure.message }], details: { value: failure, isError: true }, isError: true };
+				}
+				const data = error instanceof DesktopEngineRpcError && error.data !== null && "code" in error.data
+					? error.data : undefined;
+				const reason = data?.code ?? Reflect.get(error, "reason") ?? Reflect.get(error, "code") ?? error.name;
+				const failure = computerFailure(String(reason), error.message, stopHotkey, data?.permission);
+				return { content: [{ type: "text", text: failure.message }], details: { value: failure, isError: true }, isError: true };
 			}
 			const outcome = result.details.value;
 			if (!isActionsOutcome(outcome)) return result;
@@ -76,11 +85,13 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 				const text = `${outcome.steps.length} action(s) done: ${outcome.steps.map((step) => step.action).join(", ")}.`;
 				return { ...result, content: [...images, { type: "text", text }] };
 			}
-			const failure = computerFailure(failed.code ?? "Error", failed.message ?? "action failed", stopHotkey);
-			const text = `Action ${failed.index + 1} (${failed.action}) failed. ${failure.message}`;
+			const failure = computerFailure(failed.code ?? "Error", failed.message ?? "action failed", stopHotkey, failed.permission);
+			const text = `Action ${failed.index + 1} (${failed.action}) failed. ${
+				failure.permission === undefined ? failure.message : JSON.stringify(failure)
+			}`;
 			return {
 				content: [...images, { type: "text", text }],
-				details: { ...result.details, value: { ...outcome, failure } },
+				details: { ...result.details, value: { ...outcome, failure }, isError: true },
 				isError: true,
 			};
 		},

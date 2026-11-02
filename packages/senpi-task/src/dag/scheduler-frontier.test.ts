@@ -237,7 +237,7 @@ class FrontierFakeManager implements TaskManager {
   get(taskId: string): TaskRecord | undefined {
     return this.#tasks.get(taskId)?.record
   }
-  forget(): void {}
+  forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   getResidentHandle(): undefined { return undefined }
   subscribeChild(): () => void { return () => undefined }
   residentTaskIds(): readonly string[] { return [] }

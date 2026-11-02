@@ -105,7 +105,11 @@ degrades color and wide-glyph width. In this repo:
 stream). Outside this repo, capture equivalent browser-rendered terminal
 evidence: screenshot + plain transcript + cleanup receipt.
 
-# Bootstrap (DO ALL FOUR BEFORE ANY OTHER WORK — NO SKIPPING)
+# Bootstrap (COMPLETE EVERY SECTION BEFORE ANY OTHER WORK — NO SKIPPING)
+
+## Task resources
+Before the first task command, create one `RUN_TMP=$(mktemp -d)` per task, tracking its paths under section 3 immediately. Export `TMPDIR="$RUN_TMP" NODE_COMPILE_CACHE="$RUN_TMP/node-compile-cache" BUN_RUNTIME_TRANSPILER_CACHE_PATH="$RUN_TMP/bun-transpiler"` for every command; pass the same environment explicitly to children that do not inherit it. Give independent child tasks their own run roots.
+At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
 
 ## 0. Survey the skills, gather context, then size the work
 First, survey the loaded skill list and read the description of each
@@ -199,7 +203,7 @@ steps.
 
 ## 3. Register obsessive todos via `update_plan`
 The todo tool is Codex `update_plan` — your live, user-visible
-checklist. Translate every action from the plan into one `update_plan`
+checklist. Keep resource-cleanup todos registered earlier. Translate every action from the plan into one `update_plan`
 step — one step per atomic work unit: an edit plus its verification, a
 QA scenario run, a teardown. Keep each step small enough to finish
 within a few tool calls.
@@ -211,6 +215,9 @@ behind reality. Add newly discovered steps the moment they surface
 instead of waiting for the next pass. Step text encodes WHERE / WHY
 (which criterion it advances) / HOW / VERIFY:
 `path: <action> for <criterion> — verify by <check>`.
+ALWAYS add a cleanup todo AT CREATION for each worktree, cache directory (including
+the run root), and QA resource (PID, tmux session, browser context, port, container,
+script or temp path); complete it only after a read-back teardown receipt.
 
 GOOD pair (ordered):
   `test/foo.test.ts: read the validateEmail cases for criterion 2 — verify by noting intent / coverage / pass in the notepad`
@@ -273,30 +280,26 @@ Until every success criterion PASSES with its evidence captured:
    above; auxiliary surface for CLI- or data-shaped criteria), end to
    end, yourself, plus the step-2 tests; a reproduction now passes.
    Paste the artifact path into the notepad.
-5. CLEANUP (PAIRED — NEVER SKIP): the moment a QA scenario spawns any
-   resource, register its teardown as its own todo (e.g.
-   `cleanup: kill server pid for criterion 2 — verify kill -0 fails`).
-   Every runtime artifact the QA spawned in step 4 MUST be torn down
-   before this step completes:
-   server PIDs (`kill <pid>`; verify `kill -0` fails), `tmux` sessions
-   (`tmux kill-session -t ulw-qa-<criterion>`; verify with `tmux ls`),
-   browsers / sessions (`browser.close()` / `session.stop()`), containers
-   (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp
-   sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env
-   vars. Append a one-line cleanup receipt to the notepad next to the
-   artifact, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo;
-   rm -rf /tmp/ulw.aB12cD`. No receipt → criterion stays in_progress.
-6. Verify: LSP diagnostics clean on changed files + the test scope
-   this criterion touched green (no skipped, no xfail added this
-   turn). Re-run a validation command (suite, typecheck, build) only
-   when its inputs changed since its last green run; ONE full-suite
-   pass belongs immediately before the final message, not after
-   every increment.
+5. CLEANUP (PAIRED — NEVER SKIP):
+   Before recording QA, tear down owned server PIDs (`kill <pid>`; verify
+   `kill -0` fails), tmux sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`),
+   browsers / sessions (`browser.close()` / `session.stop()`), containers (`docker rm -f`), ports
+   (`lsof -i :<port>` empty), QA scripts, temp paths and QA-only env vars.
+   Remove QA temp paths inside `$RUN_TMP` per criterion; remove the run root
+   and eligible worktrees at task end under Task resources.
+   Append the read-back receipt beside the artifact in the notepad.
+   No receipt → criterion stays in_progress.
+6. Verify: LSP diagnostics clean on changed files; no test skipped or
+   xfail-ed this turn.
 7. Mark completed. Append non-obvious findings / learnings.
-8. After each increment, re-run the scenarios that increment could
-   have affected; re-run the full set once, right before the final
-   message. Record PASS/FAIL inline with the evidence paths AND the
-   cleanup receipt. Loop until all PASS.
+8. Evidence stays valid per target until an input changes; record with
+   each artifact the commit and what it exercised. After each increment
+   rerun what moved — the tests of every touched file and of the files
+   that import it, the scenarios that exercise them, anything whose
+   dependencies or environment changed — and cite the capture for the
+   rest. The full set (scenarios, suite, typecheck, build) runs once
+   more right before the final message. Record PASS/FAIL beside each
+   artifact. Loop until all PASS.
 
 Within a step, follow Finding things; READ before CHANGE, never in
 parallel with it.
@@ -399,13 +402,12 @@ When triggered, follow this procedure (NON-NEGOTIABLE):
    it names a success criterion the evidence fails; record concerns
    that cite no criterion as notes with a one-line reason — fixed or
    declined at your judgment.
-3. Fix every criterion-cited blocker. Re-run ONLY the scenario QA
-   affected by the fix; capture fresh evidence for the delta. Update
-   notepad.
-4. Re-submit to the SAME reviewer at most twice, passing only the
-   delta diff, the blockers it cited, and the already-approved criteria
-   marked out-of-scope. An approval whose only remaining items are
-   notes counts as approval.
+3. Fix every criterion-cited blocker; rerun per Execution loop step 8
+   and update the notepad.
+4. Spawn a NEW reviewer for each re-review, at most twice, passing only
+   the delta diff, the blockers the last one cited, and the
+   already-approved criteria marked out-of-scope. An approval whose only
+   remaining items are notes counts as approval.
 5. On approval, declare done. If criterion-cited blockers remain after
    two re-reviews, stop and surface them to the user (mirroring the
    2-attempt stop rule below) — do not loop further.
@@ -430,7 +432,15 @@ commits this session — then stage + draft the message instead.
   for the regression it names is NOT evidence: mock-call assertions,
   pinned constants, a fixture equal to the default it must override,
   an expected value re-derived from the output under test.
-- Smallest correct change. No drive-by refactors.
+- Make the smallest correct change per unit, and fix in THIS run every
+  defect inside the change's blast radius — the request not delivered,
+  a regression this change introduces, an invalid proof, a failing test
+  or stale doc of code you touched — as registered work (todo plus
+  success criterion) to the ideal state. A defect outside it gets a
+  tracked issue with reproduction and evidence and a line in the final
+  message; a deferral never turns a criterion into PASS. Keep delegated
+  unit scope hard: the worker reports, the orchestrator registers or
+  files.
 - Never suppress lints / errors / test failures. Never delete, skip,
   `.only`, `.skip`, `xfail`, or comment out tests to green the suite.
 - Never claim done from inference — only from captured evidence.
@@ -466,6 +476,9 @@ commits this session — then stage + draft the message instead.
   the receipt, then continue.
 - After 2 identical failed attempts at one step, surface what was tried
   and ask the user before another retry.
+- A permission denial or a refusal by the user is not a blocker to work
+  around: it is final for what that call was meant to do. Never reach that
+  result with another tool, command, path or host; ask the user.
 - After 2 parallel exploration waves yield no new useful facts, stop
   exploring and act.
 

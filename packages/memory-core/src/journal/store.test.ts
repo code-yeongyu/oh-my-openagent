@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { Buffer } from "node:buffer"
 import { spawn } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, readFile, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readdir, readFile, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -264,5 +264,79 @@ describe("stale journal lock recovery", () => {
 
     // then
     expect(existsSync(join(dir, "state.lock"))).toBe(false)
+  })
+})
+
+describe("transcript journal state writes", () => {
+  it("#given the platform refuses the state rename #when state is written #then the write rejects and leaves no temporary file", async () => {
+    // given
+    const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-refused-")))
+    tempDirs.push(dir)
+    const journal = new TranscriptJournal({
+      journalDir: dir,
+      now: () => new Date("2026-08-09T12:00:00.000Z"),
+      renameFile: async () => {
+        throw Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" })
+      },
+    })
+
+    // when
+    const written = journal.setPendingCompaction(true)
+
+    // then
+    await expect(written).rejects.toMatchObject({ code: "EPERM" })
+    expect((await readdir(dir)).filter((name) => name.startsWith("state.json.tmp-"))).toEqual([])
+  })
+})
+
+describe("transcript journal with nothing to record (#9737)", () => {
+  async function missingJournal(): Promise<{ dir: string; journal: TranscriptJournal }> {
+    const parent = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-missing-")))
+    tempDirs.push(parent)
+    const dir = join(parent, "session-without-messages")
+    return { dir, journal: new TranscriptJournal({ journalDir: dir, now: () => new Date("2026-08-09T12:00:00.000Z") }) }
+  }
+
+  it("#given no journal yet #when reconciled or appended with nothing #then nothing is written", async () => {
+    // given
+    const { dir, journal } = await missingJournal()
+
+    // when
+    const reconciled = await journal.reconcile([])
+    const appended = await journal.append([])
+
+    // then
+    expect(reconciled).toEqual({ appended: 0, skipped: 0 })
+    expect(appended).toEqual({ appended: 0, skipped: 0 })
+    expect(existsSync(dir)).toBe(false)
+  })
+
+  it("#given no journal yet #when its state, entries or a reflection snapshot are read #then they are empty and nothing is written", async () => {
+    // given
+    const { dir, journal } = await missingJournal()
+
+    // when
+    const state = await journal.getState()
+    const entries = await journal.readEntries()
+    const snapshot = await journal.captureReflectionSnapshot()
+
+    // then
+    expect(state.total_completed_steps).toBe(0)
+    expect(entries).toEqual([])
+    expect(snapshot).toBeNull()
+    expect(existsSync(dir)).toBe(false)
+  })
+
+  it("#given no journal yet #when the first real message is reconciled #then the journal is created with it", async () => {
+    // given
+    const { dir, journal } = await missingJournal()
+
+    // when
+    const result = await journal.reconcile([{ kind: "user", messageId: "user-1", text: "hello" }])
+
+    // then
+    expect(result).toEqual({ appended: 1, skipped: 0 })
+    expect((await readFile(join(dir, "transcript.jsonl"), "utf8")).trim().split("\n")).toHaveLength(1)
+    expect(existsSync(join(dir, "state.json"))).toBe(true)
   })
 })

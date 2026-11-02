@@ -5,6 +5,7 @@ export {
 	type ComputerCallPolicy,
 	type ComputerCallStep,
 	DESKTOP_METHODS,
+	DISPLAY_METHODS,
 	ELEMENT_METHODS,
 	isReadOnlyComputerCall,
 	WINDOW_METHODS,
@@ -32,6 +33,7 @@ export {
 	type JsonRpcVersion,
 	type MethodRejection,
 	type MethodRejectionData,
+	type PermissionDeniedData,
 	type RequestId,
 	STANDARD_RPC_ERRORS,
 } from "./json-rpc";
@@ -43,4 +45,13 @@ export type {
 	ComputerSessionSnapshot,
 	ComputerTextDisplay,
 } from "./session";
-export type { AuditEvent, DesktopCapabilities, EngineLog, LogLevel, StopPathKind, StopPathStatus } from "./wire";
+export {
+	type AuditEvent,
+	type DesktopCapabilities,
+	type EngineLog,
+	type LogLevel,
+	type StopPathKind,
+	type StopPathStatus,
+	UNKNOWN_AUDIT_VALUE,
+	type UnknownAuditValue,
+} from "./wire";

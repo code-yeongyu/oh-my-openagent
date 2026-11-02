@@ -2,6 +2,7 @@ import { existsSync, rmSync } from "node:fs"
 import { basename, join, resolve } from "node:path"
 
 import { decorateEndpoints, formatEndpointLines, statusPayload } from "./daemon-status.js"
+import { hostStopBudgetMs } from "./daemon-stop-budget.js"
 
 export function parseEngineLine(stdout) {
   const line = stdout.trim().split("\n").filter(Boolean).pop()
@@ -38,13 +39,18 @@ export function runStatus({ engine, agentDir, env, json, stdout, stderr, _test }
   return { legacy: false, exitCode: all.result.exitCode, endpoints: all.endpoints }
 }
 
+/** A terminal (`tui`) endpoint is owned by its terminal: no lifecycle command ensures, hands off, drains, stops or waits on it. */
+function operable(endpoint) {
+  return endpoint.endpoint_kind !== "tui"
+}
+
 function liveEndpoints(endpoints) {
-  return endpoints.filter((endpoint) => endpoint.reachable && typeof endpoint.socket === "string")
+  return endpoints.filter((endpoint) => operable(endpoint) && endpoint.reachable && typeof endpoint.socket === "string")
 }
 
 function ownedEndpoints(endpoints) {
   return endpoints.filter((endpoint) => {
-    if (typeof endpoint.socket !== "string") return false
+    if (!operable(endpoint) || typeof endpoint.socket !== "string") return false
     return endpoint.reachable ||
       (endpoint.generations ?? []).some((generation) => generation.alive) ||
       (endpoint.claims_live ?? 0) > 0
@@ -93,6 +99,9 @@ export function runHandoff({ engine, pluginRoot, agentDir, env, policy, config, 
   }
   let refused = false
   const commandEnv = hostCommandEnvironment(env, agentDir, config)
+  for (const endpoint of all.endpoints) {
+    if (!operable(endpoint) && typeof endpoint.socket === "string") stdout.write(`${endpoint.socket}: skipped (tui endpoint, owned by its terminal)\n`)
+  }
   for (const endpoint of liveEndpoints(all.endpoints)) {
     const daemon = basename(endpoint.socket) === "rpc.sock"
     const args = daemon
@@ -164,7 +173,7 @@ export function runStopAll({ engine, agentDir, env, drain, wait, timeoutSeconds,
 }
 
 function waitForEndpoint(engine, socket, agentDir, env, timeoutSeconds, now, pause) {
-  const deadline = now() + timeoutSeconds * 1_000
+  const deadline = now() + Math.max(timeoutSeconds * 1_000, hostStopBudgetMs(env))
   let polls = 0
   let latest
   while (now() <= deadline) {
@@ -175,7 +184,7 @@ function waitForEndpoint(engine, socket, agentDir, env, timeoutSeconds, now, pau
     if (!alive && (latest?.claims_live ?? 0) === 0) return { done: true, polls }
     pause(250)
   }
-  const pid = latest?.pid ?? "?"
+  const pid = latest?.pid ?? latest?.generations?.find((generation) => generation.alive)?.pid ?? "?"
   const sessions = latest?.sessions?.total ?? 0
   const claims = latest?.claims_live ?? 0
   return { done: false, polls, summary: `pid ${pid}, ${sessions} sessions, ${claims} claims` }

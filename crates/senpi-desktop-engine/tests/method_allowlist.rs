@@ -6,24 +6,33 @@
 mod common;
 
 use common::{fake_backend, Engine, TWO_DISPLAYS};
-use senpi_desktop_core::methods::{Effect, Exposure, Method, METHODS};
+use senpi_desktop_core::methods::{Effect, Exposure, METHODS};
 use serde_json::json;
 
 const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("engine.hello", "read", "public"),
     ("session.open", "exec", "hostOnly"),
     ("session.close", "exec", "hostOnly"),
+    ("control.grant", "exec", "hostOnly"),
+    ("control.revoke", "exec", "hostOnly"),
+    ("control.state", "read", "public"),
     ("capabilities", "read", "public"),
     ("displays", "read", "public"),
     ("windows", "read", "public"),
     ("capture", "read", "public"),
+    ("captureRegion", "read", "public"),
+    ("observe", "read", "public"),
     ("click", "exec", "public"),
     ("moveMouse", "exec", "public"),
     ("drag", "exec", "public"),
     ("scroll", "exec", "public"),
     ("typeText", "exec", "public"),
     ("keyChord", "exec", "public"),
+    ("holdKeys", "exec", "public"),
+    ("holdMouse", "exec", "public"),
     ("raiseWindow", "exec", "public"),
+    ("menus.items", "read", "public"),
+    ("menus.select", "exec", "public"),
     ("clipboard.read", "read", "public"),
     ("clipboard.write", "exec", "public"),
     ("ax.snapshot", "read", "public"),
@@ -38,6 +47,7 @@ const SNAPSHOT: &[(&str, &str, &str)] = &[
     ("ax.setValue", "exec", "public"),
     ("ax.focus", "exec", "public"),
     ("ax.click", "exec", "public"),
+    ("ax.typeText", "exec", "public"),
     ("stopPath.start", "exec", "hostOnly"),
     ("stopPath.status", "read", "public"),
     ("stopPath.heartbeat", "read", "hostOnly"),
@@ -69,11 +79,6 @@ fn the_engine_method_table_equals_the_snapshot() {
         .map(|spec| (spec.name, effect(spec.effect), exposure(spec.exposure)))
         .collect();
     assert_eq!(table, SNAPSHOT);
-}
-
-#[test]
-fn stop_path_resume_is_host_only() {
-    assert_eq!(Method::StopPathResume.spec().exposure, Exposure::HostOnly);
 }
 
 #[test]

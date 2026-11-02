@@ -27,7 +27,7 @@
     "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
     "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
     "deep-low": { "model": "openai/gpt-6.1-sol", "reasoning": "medium" },
-    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
+    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
     "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
   },
 }

@@ -109,7 +109,21 @@ function applyTier1Adaptation(content) {
 }
 
 function applyUlwExecuteOverlay(content) {
-  return content.replace(/codex:<session_id>/g, "senpi:<session_id>").replace(/\bcodex:/g, "senpi:")
+  return content
+    .replace(
+      "## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER",
+      "## ABSOLUTE RULE (root session): YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER",
+    )
+    .replace(
+      "NO EXCEPTIONS.",
+      "NO EXCEPTIONS for the root session that owns the Boulder work; a dispatched executor does its assigned unit itself and does not delegate it again.",
+    )
+    .replace(
+      "Give every dispatched sub-task its completion condition and watch for it per the section below.",
+      "Give every dispatched sub-task its completion condition and its role: the brief names the unit, allowed files, acceptance evidence, and states that the worker is its executor, does it itself, and does not delegate it. Watch for its completion per the section below.",
+    )
+    .replace(/codex:<session_id>/g, "senpi:<session_id>")
+    .replace(/\bcodex:/g, "senpi:")
 }
 
 function applySharedTierAdaptation(skillName, content) {

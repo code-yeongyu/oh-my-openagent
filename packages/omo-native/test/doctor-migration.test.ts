@@ -374,7 +374,7 @@ describe("omo doctor migration checks", () => {
       expect(lines).toHaveLength(1)
       expect(lines[0]).toStartWith(`WARN more than one OmO install is on PATH: ${join(standaloneDir, "omo")} (standalone omo binary 5.0.1) runs when you type omo`)
       expect(lines[0]).toContain("omo-ai@5.0.0-0.beta.89")
-      expect(lines[0]).toContain("bun remove -g omo-ai")
+      expect(lines[0]).toContain(`BUN_INSTALL='${sandbox.bunRoot}' bun remove -g omo-ai`)
     })
 
     test("#then omo-ai ahead of the standalone binary names omo-ai as the one that runs", () => {
@@ -387,7 +387,7 @@ describe("omo doctor migration checks", () => {
 
       expect(lines).toHaveLength(1)
       expect(lines[0]).toContain("(omo-ai@5.0.0-0.beta.89) runs when you type omo")
-      expect(lines[0]).toContain(`remove ${join(standaloneDir, "omo")}`)
+      expect(lines[0]).toContain(`rm -f -- '${join(standaloneDir, "omo")}'`)
     })
 
     test("#then a symlink into binary-runtime is standalone even with no copy elsewhere", () => {

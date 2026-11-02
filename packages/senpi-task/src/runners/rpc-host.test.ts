@@ -83,6 +83,8 @@ describe("RpcHostRunner start", () => {
       sessionPath: session?.sessionPath ?? "",
       instanceId: "fake-instance",
     })
+    // The model the host reports for the fresh session reaches the handle (#9722).
+    expect(handle.reportedModel).toEqual({ provider: "anthropic", id: "claude-sonnet-4-5" })
   })
 
   test("#given a session the daemon still retains #when the child resumes #then it attaches without a second prompt or a switch", async () => {
@@ -228,6 +230,7 @@ describe("RpcHostRunner start failures", () => {
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("child-prompt-failed")
     expect(RunnerError.is(failure) ? failure.failure.rejected_while : undefined).toBe("alive")
     expect(RunnerError.is(failure) ? failure.failure.message : "").toContain("prompt rejected by the host")
+    await runner.settleTeardowns()
     expect(channel.calls).toEqual(["open", "prompt", "abort", "close", "detach"])
   })
 

@@ -1,3 +1,204 @@
+## 2026-10-31 - Drop the Claude Code UA floor rewrite of the installed engine (#11964, part of senpi#5131)
+
+`packages/omo-native/bin/lib/claude-code-floor.js` is deleted and `engine-prepare.js` `prepareInstalledEngine` no longer calls `floorClaudeCodeVersion`. senpi#5131 removes the `anthropic` provider's Claude Code OAuth impersonation path and with it the `claudeCodeVersion` declaration in `@earendil-works/pi-ai/dist/api/anthropic-messages.js` and the engine bundle; against such an engine the floor step threw `omo-ai: unsupported Senpi ...: no claudeCodeVersion declaration` on every launch (reported, never fatal) and had nothing left to protect. `senpi-patch.test.ts` (floor-only) is deleted; `engine-prepare-on-launch.test.ts` proves the stamp and the RPC guard without the UA fixture, and the other fixtures stop writing a fake `anthropic-messages.js`. knip entries for the deleted file are removed. Merge order: this lands before omo pins an engine that contains senpi#5131.
+
+## 2026-10-31 - Forward Windows private pipe pairs (#11955)
+
+The shared private descriptor inspector accepts two distinct open pipe descriptors in 5..64 on Windows, refusing aliases (including those in malformed arrays), non-pipes, and runtime IPC descriptors atomically. Pipe detection checks the file-type mode bits because Node's Windows `Stats.isFIFO()` returns false even for an open pipe. The first launcher import captures and removes the table before helper children run. Explicit engine hops preserve the pair's stdio slots, including when capturing stderr, and close owned Windows copies immediately after spawn or a synchronous spawn failure. Shells receive null declarations without either private slot. Receipt-side inherit clearing stays in senpi; the POSIX socket path from #11786 is unchanged.
+
+## 2026-10-29 - Recover corrupt account credentials (#11832)
+
+Unscoped forget clears the stored credential under the session lock without a read. Scoped forget compares the current device under that lock and reports unreadable ownership as a JSON refusal. Only a well-formed target argument can select scoped deletion; malformed flags are rejected before store access. Explicit adopt replacement tolerates invalid data but not OS storage failures.
+
+## 2026-10-29 - Private descriptors survive the launcher hop (#11772)
+
+`bin/lib/private-fd-table.js` decides whether a launch carries private descriptors: a valid `SENPI_PRIVATE_FDS` table whose integer entries are open, unshared sockets in 5..15 that are not the runtime's IPC channel; every other entry still travels as `null` so the engine keeps the name declared, and named sockets the launcher cannot forward are closed on all three paths (the npm launcher at its first import, the Bun re-exec, and the compiled provisioned-runtime handoff before it spawns), never on Windows. `bin/lib/private-fds.js` captures and removes the table at the npm launcher's first import, so its helper children never see it. `spawnSenpi`, `maybeReexecUnderBun` and `reexecProvisionedRuntime` hand off through the existing signal-aware child with those descriptors in stdio when a table is present, and keep `execve` otherwise. `reexecProvisionedRuntime` reads the table without removing it, because the compiled entry runs the engine in-process and the engine's own capture must still see it. Measured: `execve` does not keep inherited descriptors on Node 24.22 or Bun 1.4.4 in any hop/target pairing, which also dropped fd 4 presenter enrollment through the npm launcher.
+
+## 2026-10-27 - SENPI_BRAND carries the OmO logo (#11445)
+
+`bin/lib/brand-logo.generated.js` (written by `bun script/build-brand-logo.ts` from `.github/assets/omo-icon-light.svg`) exports `OMO_BRAND_LOGO`, the icon as a base64 SVG data URI. `engine-environment.js` `brandProfile()` and `compiled-environment.ts` put it in `SENPI_BRAND.logo`, which the engine renders on the provider sign-in result page once the pinned senpi includes senpi#4432/#4434 (2026.10.27-1 ignores it). `bun run brand-logo:check` (also in CI's committed-bundle step) fails when the module is stale; the generator normalizes the icon to LF and `.gitattributes` keeps `*.svg` LF, so a Windows checkout produces the same module.
+
+## 2026-10-26 - Reinstall and sign-in guidance (#11390)
+
+The launcher sets `OMO_REINSTALL_COMMAND` (`updateTarget().command`) for the engine so the plugin can name the reinstall command after `SENPI_BRAND` is scrubbed. `runThreadCommand` takes a `reinstall` step from its caller (npm: the reinstall command; compiled: the releases page). `omo update` on an install already at the channel version whose engine tree cannot be resolved exits 1 with the reinstall command. `omo sync` reads the account refusal body's code through `ApiRefusal`, using the shared guidance and falling back to HTTP status for unknown or malformed bodies. Forbidden accounts are not told to sign in again; deleted accounts get the account-deleted action both here and during session refresh.
+
+Review #10496 round 2 (#10478). `applySetupStages` now tracks the files its own earlier stages wrote and passes them to `staleGuard`; `staleSetupTargets(plans, ids, written)` ignores those paths. Before this, an apply of every stage with a custom-provider key stopped halfway: the credentials stage rewrote auth.json, then the provider stage compared auth.json against the scan-time bytes and answered `stale` after credentials were written. A skill directory planned as new is now stale when anything exists at its path (it was read as a file, so the check never fired). `omo setup` passes no guard and is unchanged.
+
+## 2026-10-18 - Onboarding apply refuses stale targets and rides the engine's credential store (#10496)
+
+Review #10496 on the onboarding scan RPC (#10478). `omo.onboarding.apply` now re-reads every requested stage's target files and compares content hashes against what the scan read: any change since the scan answers `{kind:"stale", reason, paths}` with nothing written, a change that lands mid-apply refuses that stage instead of writing the scan-time copy, and a retained scan older than ten minutes answers stale with the expiry reason (`setup-stream.js` gains `staleSetupTargets`, `SetupStaleError` and a `staleGuard` option on `applySetupStages`; `omo setup` passes none of it and is unchanged). Credential additions ride the engine's own store: the shell captures `modelRegistry.authStorage` at `session_start` and writes through `modify` under its lock, so a token refresh that lands mid-apply merges instead of reverting, and an apply with no store refuses instead of an unlocked overwrite (`writeAuth` option). The TUI migration scan now loads lazily - once, only after a claim succeeds, never in `register()` - so sessions that never onboard pay none of its 200 ms. The onboarding skill keeps a hand-read fallback for harnesses the scan does not detect (Claude Code, Codex), the scan-failure `done` event documents its `reason`, a model-choice write failure warns through the apply reply's `notices` instead of the engine's stdout, and the one-implementation test asserts the injected inventory sentence equals the shared scan's output instead of grepping `component.ts`.
+
+## 2026-10-18 - `omo setup` detection becomes a per-source stream (#10478)
+
+`bin/lib/setup-stream.js` turns what `planAll` did into `scanSetup`, an async stream that yields each source (`detect`, `providers`, `credentials`, `assets`, `model-choices`) as soon as it is read and classified, with `{id, kind, state, detail?}` rows that never carry a key. `collectSetupPlans` drains it into the inventory and stage plans, and `applySetupStages` runs the existing writers for the stages a caller accepts, re-planning model choices when the provider stage is declined. `omo setup` consumes the stream and `applySetupStages` for both the one-consent and `--ask-each` paths, so its flags and output are unchanged. The engine's onboarding scan RPC (omo-senpi) imports the same module, which makes it the one implementation of setup detection. Custom providers are read only when the caller asks for them (`omo setup` always does), and the model-choice stage is the only one that loads the offline model catalog, after the other sources have been yielded.
+
+## 2026-10-17 - Standalone `omo setup` reads the model catalog and bundled skills from the binary (#10429)
+
+Thanks to @bluet for the report. In the compiled release binary, `bin/lib/package-paths.js` resolves `packageRoot` inside the binary's virtual filesystem and `resolveSenpi()` finds no installed engine, so `omo setup` printed `could not read the engine's model list (ENOENT ... '/package.json')` and never carried the OpenCode default model or agent/category picks. The same root meant the asset stage read no bundled skills, so a user skill named like a bundled one (for example `ultrawork`) was planned for import into the global skills root, where it would shadow the bundled skill.
+
+`runSetup` now takes `loadModelCatalog` and `pluginRoot`. The npm launcher keeps its defaults; the compiled entry passes `loadCompiledModelCatalog` (the pi-ai provider catalog compiled into the binary, read through senpi's `VIRTUAL_MODULES` table) and the provisioned runtime's `plugin/` directory. `test/compiled-setup-binary.test.ts` builds a real `bun build --compile` executable and runs `setup --dry-run` from a directory outside any `node_modules` tree.
+
+## 2026-10-15 - Setup e2e tests keep the child's temp files inside the fixture (#10163)
+
+`setup-opencode-providers.test.ts` runs the real launcher from a copied app that has no `node_modules`, so Bun auto-installs the engine's dependencies on first import and extracts them under the temp dir. On Windows those extraction directories (`.typebox`, `.openai`, `.client-bedrock-runtime`) outlived the child and tripped the #9766 temp-leak guard in other PRs' Windows shard. The child now gets `TMPDIR`/`TEMP`/`TMP`/`BUN_TMPDIR` inside the fixture root, which teardown removes. The Bun install cache stays the host's: a cache is not a temp leak, and a fresh per-file cache made the first engine-importing case install about 52k files cold (6.1 s instead of 0.14 s on macOS), which would have made the #10210 Windows timeout worse. One case asserts that the child's `os.tmpdir()` is the fixture's tmp dir, another that the child keeps the host's Bun install cache.
+
+## 2026-10-14 - omo setup carries OpenCode's catalog providers, not only custom blocks (#10158)
+
+Thanks to @taxilian for the report on #8485. OpenCode serves every provider in its models.dev catalog as soon as it has a key. `omo setup` only carried omo's builtins and `provider.<id>` blocks, so a key for a catalog provider like `neuralwatt` was dropped as "a provider omo does not serve", and an OpenCode default model on it was not carried either.
+
+`planOpencodeProviders` now reads OpenCode's own catalog cache (`$XDG_CACHE_HOME/opencode/models.json`, or `OPENCODE_MODELS_PATH`). Each non-builtin provider that OpenCode holds an API key for, or that a config block names, is looked up there and becomes a catalog entry (name, `npm`, `api` URL, non-deprecated models with their limits, reasoning and modalities). That entry goes through the same converter as a `provider.<id>` block. Its key is then imported by the provider stage, and the default model is carried like any custom provider's. A config block for a catalog provider extends the catalog entry the way OpenCode does: provider fields are overlaid, and each model is deep-merged, so overriding `limit.context` keeps the catalog's `limit.output`. The catalog's `env` variable stays a key fallback. A catalog provider omo cannot carry is reported once, as a catalog provider with its reason. A block that routes a catalog provider through its own endpoint (a proxy `baseURL`) still takes the catalog's models; a broken cache is only warned about when some provider depends on it. A cache written for a custom `OPENCODE_MODELS_URL` (`models-<hash>.json`) is not read; setup then says the catalog was not found. When the cache is missing, setup names the providers and says to run OpenCode once.
+
+## 2026-10-14 - Doctor names leftover app-server daemons; review follow-ups to the retirement (#10033)
+
+An app-server daemon started by an older version keeps running after an upgrade. It has no `--mode` and is reparented to init, so `omo doctor` reported it as a session orphaned by a signaled launcher. Doctor now recognizes the `app-server` subcommand right after the engine entry (npm `senpi/dist[/bundle]/cli.js` or the binary runtime) and says the command was removed and the daemon should be stopped; it is still listed in the explicit `omo doctor --reap <pid>` line. A prompt that merely mentions app-server keeps the orphaned-session line.
+
+`bin/lib/launcher.js` calls `refuseRetiredCommand` once instead of checking the command name first, and the compile-entry test title now says the refusal happens before the engine is imported rather than before any import, since legacy state migration may run first.
+
+Review follow-up: the retired-daemon line keeps the `WARN stale engine pid <n>` prefix every other stale engine prints, so scripts that grep for it still see these daemons. `BINARY_ENGINE` and `RETIRED_APP_SERVER` now build on one `BINARY_RUNTIME_EXECUTABLE` pattern, so a change to the binary-runtime path layout is made once.
+
+## 2026-10-12 - OmO Native retires the Codex-compatible app-server command (#10033)
+
+`omo app-server` is no longer a launch path. The npm launcher and the compiled entry answer the retired command with a diagnostic and exit 2 instead of forwarding it to the engine with the OmO extension appended, so the old invocation cannot become a prompt. OmO Native keeps its RPC host, daemon, thread, doctor and every one-shot engine command dispatch unchanged (#9572/#9573 remain the dispatch contract).
+
+`bin/lib/launcher.js` and `compile-entry.ts` share the refusal in `bin/lib/retired-command.js`; `compile-args.ts` drops the app-server extension placement and banner special case; `bin/lib/engine-commands.js` and `bin/lib/doctor.js` no longer name the retired mode. Protocol-only launcher/compile tests are removed with the behavior, the parity test routes every other argv constant the installed engine exports and keeps excluding `APP_SERVER_COMMAND_ARGV` (asserting `app-server` is never handed to the engine) until the pinned engine is a Senpi release without it, and shared-behavior fixtures that borrowed the app-server mode (doctor stale-engine classification, `--` delimiter handling) use remaining modes instead. Full removal lands when the pinned engine is the Senpi release that removes the compatibility implementation; this change is source-only and keeps the current pin.
+
+## 2026-10-11 - Eval smoke and daemon waits cover the engine stop budget (#9836)
+
+The eval smoke derives its shutdown wait and outer execution deadline from the pinned Senpi stop budget instead of 30/60-second cutoffs. It accounts for every endpoint's serial stop request and observation wait, and a shutdown failure includes the owning pids and command output. A normal stop still returns as soon as the generations and claims end.
+
+`daemon stop --all --wait --timeout` cannot shorten the engine's own shutdown budget, including `SENPI_RPC_CHILD_STALLED_STOP_MAX_MS` overrides. The existing 600-second default remains for draining work; it already covers the ordinary engine budget. Senpi does not publicly export the budget in 2026.10.10-12, so one shared helper mirrors its formula, and a compatibility test checks the installed engine's actual `STOP_WAIT_BUDGET_MS` for default, raised and invalid environment values.
+
+## 2026-10-11 - The never-replies doctor test pins the whole probe timeout message (#9742 follow-up)
+
+The fake engine in `computer-use-doctor-failures.test.ts` never replies, so the phase in the timeout report is deterministic. The test asserted only the message shape with `/(phase: [^)]+)$/`, which accepted any phase label; it now asserts the exact message ending in `(phase: requests sent, awaiting engine.hello and capabilities)`.
+
+## 2026-10-09 - Settle native logout refresh failures and crash recovery (#9833)
+
+The regenerated auth bundle distinguishes refresh refusals from unconfirmed outcomes. Both clear locally and exit successfully. The unconfirmed-revocation warning is skipped only for `account_deleted` and `reauth_required`, where the service has already revoked the device; `unauthorized`, `invalid_grant` and every unconfirmed outcome warn. Crash recovery never replays a refresh token marked uncertain.
+
+## 2026-10-09 - Recover native sign-in after TLS and opener failures (#9831 follow-up)
+
+The refreshed authentication bundle treats certificate and proven connection failures as retryable, refreshes safe expired credentials before logout revocation, and preserves an accepted callback despite browser-opener failure. Secret-output and chooser/C1-control regression tests cover the native command surface.
+
+## 2026-10-09 - Harden native service sign-in recovery (#9831)
+
+The regenerated authentication bundle retains offline credentials, prevents replay of refresh tokens with unknown outcomes, sanitizes terminal output, backs off device polling on rate limits, and attempts server-side device revocation on logout while always clearing local credentials.
+
+## 2026-10-09 - Route CLI service sign-in before launching the engine (#9829)
+
+The npm launcher and compiled entry now handle `omo login`, `omo logout`, and `omo whoami` as standalone service commands. They share the toolkit's PKCE/device flows and OS-only credential storage. The npm payload includes a generated command bundle, checked against source before shipping; a runtime without Bun.secrets reports the requirement instead of saving credentials to disk.
+
+## 2026-10-04 - Every bun is held to the engine's 1.4 floor; a too-old bun you chose says so at startup (#9563)
+
+The engine needs bun 1.4 (`node:sqlite`, and the `worker_threads` compatibility the JS eval kernel uses), and `BUN_MIN_VERSION` said so, but `bin/lib/bun-runtime.js` applied the floor only to a bun it discovered on an npm install. A `bun add -g` install re-exec'd under its bun with no probe, and the POSIX bun-global shim runs bun directly, where "already on bun" stayed put whatever the version. So on bun 1.3.x, `/computer on` failed with `ResolveMessage: No such built-in module: node:sqlite`, the first of several things that could not work there.
+
+Now every path checks the floor. A bun the user chose (a bun-global install or `OMO_RUNTIME=bun`) that is older stops at startup with `omo: OmO needs Bun >= 1.4.0 (found 1.3.14); run \`bun upgrade\`` instead of silently switching runtimes. Any other install keeps using node when the bun it finds is older. A process already running on an older bun that nobody chose hands off to a real node (bun's own `node` shim does not count), pinned with `OMO_RUNTIME=node` so it cannot bounce back. With no real node, it fails with the same message. Bun 1.4+ is unchanged, apart from one `bun --version` probe on the node-launched path of a bun-global install.
+
+## 2026-10-04 - The provisioned-handoff test's teardown no longer fails the Windows shard (#9556)
+
+`packages/omo-native/test/provisioned-handoff.test.ts` removed its temp root with a bare `rmSync` in `afterAll`. On Windows, a file the just-exited compiled `omo` child still held made it throw `EBUSY`; bun reported that as an unnamed failed test and failed `test (windows-latest, 2/2)` on unrelated PRs. The teardown now uses the shared `test-support/remove-tree.ts` `removeTree`, which retries a transient `EBUSY`/`EPERM` within a bounded budget and still throws a persistent one.
+
+## 2026-10-04 - Every one-shot engine command reaches the engine, so `omo models discover` works (#9572)
+
+The engine dispatches its one-shot commands on `argv[0]`, but the launcher handed only a fixed list straight through (`install, remove, list, config, auth, app-server, host`, plus `update`) and put `--extension <plugin>` in front of everything else. So `omo models discover <provider>` started an interactive session instead of discovering models, and `omo schedule ...` and the `uninstall` alias of `remove` did the same.
+
+`bin/lib/engine-commands.js` (`isEngineCommand`) now names every command the engine dispatches before a session starts, including `models discover`, `schedule` and `uninstall`. The npm launcher and the compiled entry (`compile-args.ts`) both hand those over unchanged. `app-server` keeps its plugin after its arguments, and a prompt that merely starts with `models` is still a chat launch with the plugin. `test/engine-commands.test.ts` walks the installed engine's own dispatch (`cli/deferred-commands`, the package verbs, auth, `models discover`), so a command the engine adds fails until the launcher routes it.
+
+## 2026-10-02 - Gate each platform publish on that platform's release-binary smoke (#9385)
+
+In `.github/workflows/publish-platform.yml` the build leg uploaded the npm payload artifact (`binary-<platform>`)
+before `Smoke test release binary` ran, so a failed smoke skipped only the release-binary upload while the payload was
+already uploaded and the publish leg published it. The payload compress + upload now run after the release-binary
+smokes: a failed smoke leaves that platform without a payload, so only its publish leg fails (loudly, at the artifact
+download) and every other leg still publishes. `publish` also needs `smoke-linux-arm64`, and the arm64 publish legs
+refuse to publish unless that smoke succeeded; `smoke-linux-arm64` no longer requires the aggregate build to succeed,
+so an unrelated failed leg cannot block the arm64 publishes. Both publish decisions are expression-free shell steps (inputs
+via env), and `script/publish-platform-smoke-gate.test.ts` runs those exact step bodies: an empty download dir fails with
+the reason, a present payload passes, and the arm64 gate refuses on a failed or skipped smoke for arm64 legs only.
+
+## 2026-10-01 - A `bun add -g` update leaves an `omo` that starts without node (#9293)
+
+`bun add -g omo-ai` links `<bun root>/bin/omo` (and `install/global/node_modules/.bin/omo`) back to `bin/omo.js`,
+whose `#!/usr/bin/env node` cannot start where node is not on PATH: a launchd job, cron, a bun-only machine, or node
+only through nvm. The bun launcher shim that avoids node was only written back by a launch under node, so on such a
+machine `omo` failed with `env: node: No such file or directory` (exit 127) after every update and could not repair
+itself. `ensureBunBinShim` (`bin/lib/bun-bin-shim.js`) no longer skips when it runs on bun, and postinstall
+(`bin/senpi-patch.mjs`) calls it first, before the engine preparation. Bun links the bin and then runs a trusted
+postinstall, on bun itself when node is missing, so the shim is back before anything launches `omo`. A launch on bun
+(`bun .../bin/omo.js`, the shim itself) also repairs a stock link it finds, at the cost of the same lstat and small
+read a node launch already pays. Outside a POSIX bun-global install the call is the same no-op as at launch. A blocked
+(untrusted) postinstall still leaves the stock link until the next launch under node or bun.
+
+## 2026-10-01 - `omo thread` and `omo daemon` close out the gateway review round 3 nits (#9222)
+
+- `bin/lib/thread.js`: an SDK that cannot be imported is `internal_error` (exit 5), printed as one JSON error with
+  `--json` instead of an uncaught import failure with empty stdout; a `dispose()` that rejects after the command is
+  logged on stderr and changes neither the printed result nor the exit code.
+- `bin/lib/daemon-adopt.js`: the queued messages `--interrupt` took out and the relaunch replays as argv are also
+  printed on stderr before the relaunch, as the refusal path already printed them, so a launch that fails after the
+  release does not lose them.
+- `bin/lib/daemon.js`: `omo daemon attach` still exits 2 as an unknown subcommand with nothing on stdout, and its
+  stderr now names `omo daemon adopt <session>`, which replaced it; a `dispose()` that rejects after `adopt` is logged
+  instead of replacing the adopt outcome. `compile-entry.ts` drops the dead `{ args, env }` attach launch branch.
+## 2026-09-30 - host status and thread list share strict unknown-activity semantics (#9222 gate round 2)
+
+Malformed, partial and over-cap final session records now remain `null` through both `last_activity_at` and degraded
+`updated_at`. The public thread list applies the documented known-newest/null-last/id-ascending order after live and
+resumable rows are combined.
+
+## 2026-09-30 - `omo host status --all` never labels older activity as newest (#9222 gate G1)
+
+`last_activity_at` now follows the thread SDK's truthful bounded result: the final complete session entry's timestamp,
+or `null` when that entry is partial, malformed or too large for the 256 KiB final-line cap. The 160 KiB regression
+is covered through the real host-status enrichment path.
+
+## 2026-09-30 - `omo thread` author and mode flags; `omo host status --all` stamps terminal rows with `last_activity_at` (#9143, review of #9222)
+
+`thread.js`: `send --binding` accepts `--mode auto|follow_up` (the SDK caps it by the binding's inbound mode) and
+`--author-id`/`--author-name`/`--author-user-id`. `answer` accepts the same author flags. Author flags without
+`--binding`, or without both `--author-id` and `--author-name`, and `--mode steer` or `--expected-turn` with
+`--binding`, are usage errors (exit 2). The usage text and the `docs/reference/omo-thread.md` synopsis list the same
+flags. New `host-status.js`: `omo host status --all` (npm launcher and compiled entry) runs the engine's inventory,
+passes every row and the exit code through, and adds `last_activity_at` to each `tui` row. That is
+`readSessionFacts(owner.session.path).updated_at` from the plugin's thread SDK, else `null`. The compiled entry reaches
+the engine by re-running itself, so it marks that call with `OMO_HOST_STATUS_RAW=1`, which skips the enrichment.
+Tests: `test/host-status.test.ts` and new cases in `test/thread.test.ts`.
+
+## 2026-09-30 - `omo daemon attach` is removed with the engine's shared-host join (#9143)
+
+senpi 2026.9.29-4 removed the interactive shared-host join, so the environment `omo daemon attach` printed (`OMO_ENABLE_SHARED_HOST=1` plus `OMO_RPC_SOCKET`) and its `attach <launch args>` passthrough no longer put a terminal on a host. `attach` is gone from `daemon.js` (subcommand set, usage, engine mapping, `attachEnv`), from `daemon-args.js` (`attachLaunchArgs` and the flag sets only it read) and from the launcher's passthrough branch; `omo daemon attach` now exits 2 with the unknown-subcommand usage on stderr, prints nothing on stdout and never calls the engine. `omo daemon run` still ensures the operator daemon on `rpc.sock`, and `status`, `stop`, `handoff`, `gc` and `rollback-prepare` are unchanged. `docs/reference/omo-daemon.md` and the package AGENTS.md drop the attach rows, and the dependency-audit sandbox stops setting the two shared-host variables. `test/daemon.test.ts` replaces the four attach cases with one that pins the usage exit, the empty stdout and the untouched engine.
+
+## 2026-09-30 - Eval release smoke covers every executable target (#9291, follow-up to #9250)
+
+### What changed
+
+The packaged-binary RPC smoke now verifies JavaScript and Python arithmetic, cell listing,
+and exactly one real file read through the before/after tool hooks. Its fixture contains a
+random marker; execution runs while the source checkout is renamed, then shuts down the
+isolated task hosts and checks for surviving processes and sockets. The release workflow
+executes it on nine native targets, provisioning Python, Node and process tools inside each
+of the three Alpine musl legs. Seven legs smoke before upload; the linux-arm64 and
+linux-arm64-musl smokes run after build in parallel with the npm platform publish and fail
+the reusable workflow result. Cross-compiled Darwin x64 and Windows arm64 retain digest/manifest
+coverage. Twelve platform manifests are compared against the derived codemode sidecar set.
+Every wasm in the runtime closure also has a required file entry. The build-only
+`OMO_SIDECAR_EXCLUDE` fixture permits a missing-package RED smoke without a dependency list.
+
+### Why
+
+#9250 restored eval registration but tested only one JavaScript cell on Darwin arm64.
+It could not detect a broken Python bridge, host tool pipeline, missing target assets,
+or a release leg bypassing the smoke.
+
+### Why an extension could not handle it
+
+These checks exercise the compiled payload inside the release workflow. An extension
+cannot repair an asset absent from that payload or enforce a gate on another release leg.
+
+### Expected merge conflict zones
+
+The engine-sidecar resolver, binary staging fixture, and release smoke workflow.
+
 ## 2026-09-30 - The compiled binary hands a downloaded Claude Code to the engine at startup (#9276)
 
 `compile-entry.ts` calls `applyCachedClaudeCode` (omo-senpi `claude-code/index.ts`) right after
@@ -159,6 +360,40 @@ different from the agent dir's copy. The rule mirrors the engine's startup notic
 reads the `legacyPiAgentDir.copiedAt` the engine records in `migrations-state.json` and, for installs copied before that
 record existed, falls back to the agent copy's preserved mtime. Unlike the engine notice, doctor reports every such edit
 on every run. `~/.pi/agent` is only read.
+
+## 2026-09-29 - AGENTS: `omo daemon` lists `adopt`, not `attach`
+
+The `omo daemon` row names `run|adopt|status|stop|handoff|gc|rollback-prepare`; `run` alone ensures the operator endpoint, and the note that attach stays spawn-based is gone with the subcommand (removed by the senpi adoption; `adopt` moves a host session into a terminal instead). Docs only; no code changed.
+
+## 2026-09-29 - `omo thread` CLI, `omo daemon adopt`, and terminal rows in `omo daemon status`
+
+- `bin/lib/thread.js` (+ `thread-args.js`, `thread-output.js`): `omo thread list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack [--json]`
+  over the plugin's thread SDK (`plugin/runtime/thread-sdk/sdk.js`) as `cli:<uid>`, wired in `launcher.js` and
+  `compile-entry.ts`. Exit codes: 0 ok, 1 refused as data, 2 usage, 3 `host_unavailable`, 4 win32 or no `node:sqlite`
+  (probed lazily), 5 `internal_error`. `--json` shapes and the connector loop: `docs/reference/omo-thread.md`.
+- `bin/lib/daemon-adopt.js`: `omo daemon adopt <session> [--interrupt] [--force] [--json]` releases a host session
+  (senpi `release_session`, reason `takeover`) and resumes it in this terminal with `--session <path>` in the
+  session's directory; user input an `--interrupt` took out becomes the first prompts, or is printed when the
+  release is refused. Refusals exit 4 (`turn_active`, `attached`, ..., already a terminal session), a session no
+  host serves exits 3, `release_failed` twice exits 5 (`release_failed` then `unknown_session` counts as released).
+- `daemon-status.js`: `endpoint_kind: "tui"` rows print `tui <name> pid <n> cwd <path>` (an unresponsive one with its
+  reason) and count in `aggregate.terminals`, not as live hosts. `daemon-operations.js`: handoff, `stop --all` and its
+  `--wait` never act on a terminal endpoint; handoff lists them as skipped.
+- Tests: `thread.test.ts`, `daemon-adopt.test.ts`, `daemon-operations.test.ts` (mixed host/live tui/dead tui fixture),
+  `sqlite-import-discipline.test.ts` covers `thread.js`.
+- `compile-args.ts` (moved out of `compile-entry.ts`): `buildSenpiArgs`, the banner gate and `isInternalSupervisorLaunch`
+  read only the options before `--`. A queued message replayed by adopt that reads `--no-extensions` no longer starts
+  the compiled binary's adopted session without the plugin. Blank queued messages are not replayed.
+- `omo thread`: `--mode` outside `auto|steer|follow_up`, `--direction` outside `in|out|both` (a typo used to bind both
+  directions) and an empty `send` text exit 2; with `--json`, usage, win32 and no-`node:sqlite` failures print the
+  error JSON on stdout. Adopt no longer tells a user who passed `--interrupt` to pass it.
+- Tests: `compile-entry-adopt.test.ts` (the compiled adopt branch: argv, cwd, flag-shaped messages) and
+  `launcher-adopt.test.ts` (the real `bin/omo.js` adopt launch: plugin, `--session`, cwd).
+- Behavior change for every compiled launch: a flag after `--` is no longer read as a launch option. `--no-extensions`,
+  `-p`, `--print`, `--mode` and `--internal-rpc-host-supervisor` after `--` are message text (as senpi's own parser
+  reads them), so they no longer drop the plugin, silence the banner or take the supervisor route; `app-server` included.
+- `omo thread report <s> completion` reaches a running session: the SDK wakes the session after arming, instead of the
+  arm waiting for the session's next start.
 
 ## 2026-09-28 - The compiled binary enters a shard supervisor without the engine CLI graph
 

@@ -35,12 +35,18 @@
 //   cjk-auto       no recall setting: a Korean prompt that only shares an inflected verb form with a stored
 //                  memory's stem still offers that memory to the sidecar (recall picks bm25 with CJK bigrams on
 //                  its own), and its nudge reaches the parent.
+//   query-expansion
+//                  `memory.recall.query_expansion` is on: the sidecar's memory tool is sent to the provider
+//                  with the four added-term fields, a search whose own words match no memory finds one
+//                  through its synonyms, and that memory - never offered as a candidate - is nudged and
+//                  reaches the parent.
 //
 // Every wait is an RPC event, a filesystem change or a process exit with a bounded timeout. Evidence
 // is structured: the mock's request log, the parent session JSONL and every child transcript.
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
+import { isDeepStrictEqual } from "node:util"
 
 import { startMockCompletionsServer } from "./mock-completions-server.mjs"
 import {
@@ -86,7 +92,13 @@ import {
   writeOmoConfig,
 } from "./kibitzer-sidecar-support.mjs"
 
-export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "cjk-auto"]
+export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "fast-alias-config", "cjk-auto", "query-expansion"]
+/**
+ * #10536: a priority alias declared only in models.json on an openai-codex-responses provider. senpi's
+ * service-tier extension starts such an alias on its base model at session_start, before any request,
+ * so the post-start pin check is exercised without the mock speaking that API.
+ */
+const FAST_ALIAS = { provider: "omo-codex-mock", base: "luna", alias: "luna-fast" }
 /** The pinned model the refused-pinned-model provider refuses, and the builtin quick rung it falls back to. */
 const REFUSED_MODEL = "refused-1"
 const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
@@ -94,7 +106,19 @@ const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
 const CONFIG = {
   "category-unavailable": { categories: {} },
   "refused-pinned-model": { categories: { quick: { description: "QA pin outside the builtin quick chain", model: `omo-mock/${REFUSED_MODEL}` } } },
+  "fast-alias-config": { categories: { quick: { description: "QA pin on a models.json priority alias", model: `${FAST_ALIAS.provider}/${FAST_ALIAS.alias}` } } },
+  "query-expansion": { recall: { query_expansion: true } },
 }
+/** A search whose own words match no seeded memory; only the added terms reach the helm memory. */
+const WIDENED_SEARCH = {
+  operation: "search",
+  query: "locking dependency numbers",
+  synonyms: ["helm", "chart", "pin"],
+  keywords: ["버전"],
+  related: ["package"],
+  note_line: "Pin every chart version.",
+}
+const ADDED_TERM_FIELDS = ["synonyms", "keywords", "related", "note_line"]
 /**
  * A Korean memory whose prompt only shares an inflected verb form with the stored stem:
  * substring matching plans no query that matches it; the automatic strategy meets it through bigrams.
@@ -132,6 +156,19 @@ const SANDBOX = {
     const auth = JSON.parse(readFileSync(authFile, "utf8"))
     auth[BUILTIN_RUNG.provider] = { type: "api_key", key: "mock" }
     writeFileSync(authFile, `${JSON.stringify(auth, null, 2)}\n`)
+  },
+  "fast-alias-config": (sandbox, baseUrl) => {
+    const modelsFile = join(sandbox.agentDir, "models.json")
+    const models = JSON.parse(readFileSync(modelsFile, "utf8"))
+    const template = { ...models.providers["omo-mock"].models[0], contextWindow: 400_000 }
+    models.providers[FAST_ALIAS.provider] = {
+      name: "mock codex responses provider", api: "openai-codex-responses", baseUrl, apiKey: "mock",
+      models: [
+        { ...template, id: FAST_ALIAS.base, name: "Mock Luna" },
+        { ...template, id: FAST_ALIAS.alias, name: "Mock Luna Fast", serviceTier: "priority", upstreamModelId: FAST_ALIAS.base },
+      ],
+    }
+    writeFileSync(modelsFile, `${JSON.stringify(models, null, 2)}\n`)
   },
 }
 /** Refusals to observe before the absence of a gate notice is meaningful: the gate fires at three. */
@@ -508,6 +545,26 @@ async function runRefusedPinnedModel({ session, state, identity, router, facts, 
   }
 }
 
+// ---- fast-alias-config ---------------------------------------------------------------------------------------
+
+async function runFastAliasConfig({ session, state, identity, router, facts, parentTurns, record }) {
+  const recallDir = join(identity, "runtime", "recall")
+  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+
+  await prompt(session, MEMORIES.rollout.prompt)
+  const settled = await watchUntil(recallDir, () => {
+    const lineage = sidecarDirs(identity)[0]
+    const records = lineage === undefined ? [] : wakeRecords(lineage.dir)
+    return records.length === 0 ? undefined : { lineage, records }
+  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "fast-alias-config wake 1: the wake settled" })
+  const wake = settled.records[0]
+  const refusedAsSubstitution = wake?.cause === "start_failed" && String(wake?.reason ?? "").includes("refusing the substitution")
+  const children = childTranscripts(settled.lineage.dir)
+  const childModels = children.flatMap((transcript) => transcript.entries).filter((entry) => entry.type === "model_change").map((entry) => `${entry.provider}/${entry.modelId}`)
+  record("pin-accepted-alias-on-base", !refusedAsSubstitution && children.length >= 1, `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, reason: wake?.reason })} childSessions=${children.length} childModelChanges=[${childModels.join(",")}]`)
+  facts.result = { wakeStatus: wake?.status, wakeCause: wake?.cause, wakeReason: wake?.reason, childSessions: children.length, childModelChanges: childModels, parentRequests: parentTurns() }
+}
+
 // ---- cjk-auto -----------------------------------------------------------------------------------------------------
 
 async function runCjkAuto({ session, state, identity, router, facts, parentTurns, record }) {
@@ -538,7 +595,46 @@ async function runCjkAuto({ session, state, identity, router, facts, parentTurns
   }
 }
 
-const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "cjk-auto": runCjkAuto }
+// ---- query-expansion ----------------------------------------------------------------------------------------------
+
+async function runQueryExpansion({ session, state, identity, router, facts, parentTurns, record }) {
+  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+  router.setSidecarSteps([{ type: "tool_call", name: "memory", arguments: WIDENED_SEARCH }, nudgeStep(MEMORIES.helm)])
+
+  // The rollout prompt wakes the sidecar with the rollout memory only; helm is reachable through the widened search alone.
+  await prompt(session, MEMORIES.rollout.prompt)
+  const held = await waitForAccepted(identity, state, MEMORIES.helm, { description: "query-expansion: the memory found through added terms was nudged" })
+  const lineage = sidecarDirs(identity)[0]
+  const transcript = lineage === undefined ? undefined : childTranscripts(lineage.dir)[0]
+  const candidates = candidatePathsOf(messageText(transcript?.users[0]))
+  const memoryParameters = router.state.sidecarRequests[0]?.memoryParameters ?? []
+  record("schema-offers-added-terms", memoryParameters.length > 0 && ADDED_TERM_FIELDS.every((field) => memoryParameters.includes(field)), memoryParameters.length === 0 ? "memory parameters absent" : `memory parameters=[${memoryParameters.join(",")}]`)
+  const searchCall = transcript?.assistants.flatMap(toolCallsOf).find((call) => call.name === "memory")
+  record("child-searched-with-added-terms", isDeepStrictEqual(searchCall?.arguments, WIDENED_SEARCH), `search=${JSON.stringify(searchCall?.arguments ?? null)}`)
+  const searchResult = transcript?.entries.find((entry) => entry.type === "message" && entry.message?.role === "toolResult" && entry.message.toolName === "memory" && entry.message.toolCallId === searchCall?.id)?.message
+  const results = searchResult === undefined ? [] : JSON.parse(messageText(searchResult)).results
+  record("widened-search-found-memory", searchResult?.isError !== true && Array.isArray(results) && results.some((hit) => hit.path === MEMORIES.helm.path), `memory result=${searchResult === undefined ? "absent" : messageText(searchResult)}`)
+  record("found-memory-was-never-offered", candidates.length === 1 && candidates[0] === MEMORIES.rollout.path, `candidates=${candidates.join(",")}`)
+  record("nudge-accepted", held.nudges.some((nudge) => nudge.path === MEMORIES.helm.path), `held=${JSON.stringify(held)}`)
+
+  // The next turn drains the held nudge into the parent transcript.
+  await prompt(session, MEMORIES.rollout.prompt)
+  const entries = readEntries(state.sessionFile)
+  record("nudge-reached-parent", nudgedPaths(entries).includes(MEMORIES.helm.path) && entries.filter(isRecall).some((entry) => (entry.content ?? "").includes(MEMORIES.helm.body)), `paths=${nudgedPaths(entries).join(",")} recallMessages=${entries.filter(isRecall).length}`)
+  facts.result = {
+    resident: sidecarDirs(identity).length === 1,
+    childSessions: sidecarDirs(identity).length,
+    queryExpansion: true,
+    memoryParameters,
+    candidates,
+    nudged: nudgedPaths(entries).length,
+    nudgedPaths: nudgedPaths(entries),
+    sidecarRequests: router.state.sidecar,
+    parentRequests: parentTurns(),
+  }
+}
+
+const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "fast-alias-config": runFastAliasConfig, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
 
 // ---- main --------------------------------------------------------------------------------------------------------
 

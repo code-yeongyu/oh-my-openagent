@@ -12,6 +12,7 @@ import {
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isGpt6AstraModel,
   isGrok45Model,
   isGrok46Model,
   isKimiK2CodeModel,
@@ -19,11 +20,58 @@ import {
   isKimiK27Model,
   isKimiK28Model,
   isKimiK3Model,
+  isKimiK31Model,
   isMiniMaxModel,
   isSWE2Model,
 } from "./model-family-detectors"
 
 describe("model family detectors", () => {
+  test("#given supported Astra selectors #then the Astra-only prompt gate recognizes their model", () => {
+    for (const model of [
+      "gpt-6-astra",
+      "gpt-6-astra-fast",
+      "openai/gpt-6-astra",
+      "chatgpt-subscription/gpt-6-astra-fast",
+      "github-copilot/gpt-6-astra",
+      "opencode/gpt-6-astra",
+      "vercel/openai/gpt-6-astra-fast",
+      "openrouter/openai/gpt-6-astra",
+      " GPT-6-Astra ",
+      "gpt-6-astra:high",
+      "gpt-6-astra-fast:max",
+      "chatgpt-subscription/gpt-6-astra (high)",
+      "openai/gpt-6-astra-fast xhigh",
+      "vercel/openai/gpt-6-astra: auto",
+    ]) {
+      expect(isGpt6AstraModel(model)).toBe(true)
+    }
+  })
+
+  test("#given other or unknown selectors #then the Astra-only prompt gate stays closed", () => {
+    for (const model of [
+      undefined,
+      "",
+      "unknown",
+      "openai/gpt-6-sol",
+      "openai/gpt-6-sol-fast:high",
+      "chatgpt-subscription/gpt-6.1-sol",
+      "gpt-6.1-sol-fast (high)",
+      "gpt-6-luna",
+      "gpt-6-luna-fast",
+      "gpt-5.6-sol",
+      "anthropic/claude-fable-5",
+      "gpt-6-astra/claude-opus-5-5",
+      "custom-gpt-6-astra",
+      "gpt-6-astra-preview",
+      "gpt-6-astra-fastest",
+      "gpt-6-astra:unrecognized",
+      "gpt-6-astra (unrecognized)",
+      "gpt-6-astra unrelated",
+    ]) {
+      expect(isGpt6AstraModel(model)).toBe(false)
+    }
+  })
+
   test("#given GPT model ids #then detects GPT family only", () => {
     expect(isGptModel("openai/gpt-5.5")).toBe(true)
     expect(isGptModel("github-copilot/gpt-4o")).toBe(true)
@@ -84,11 +132,21 @@ describe("model family detectors", () => {
     expect(isKimiK3Model("opencode-go/kimi-k3")).toBe(true)
     expect(isKimiK3Model("moonshotai/kimi-k3-202607")).toBe(true)
     expect(isKimiK3Model("kimi-for-coding/k3p1")).toBe(true)
+    expect(isKimiK3Model("kimi-coding/k3.1-pro")).toBe(true)
     expect(isKimiK3Model("opencode/k3")).toBe(true)
     expect(isKimiK3Model("opencode-go/kimi-k2.7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p7")).toBe(false)
     expect(isKimiK3Model("kimi-for-coding/k2p5")).toBe(false)
     expect(isKimiK3Model("anthropic/claude-opus-4-7")).toBe(false)
+  })
+
+  test("#given Kimi K3.1 model ids #then detects K3.1 and leaves K3 alone", () => {
+    for (const id of ["kimi-coding/k3.1-pro", "kimi-for-coding/k3.1-pro-highspeed", "moonshotai/kimi-k3.1-pro", "openrouter/moonshotai/kimi-k3.1-pro-highspeed", "venice/kimi-k3-1-pro", "kimi-for-coding/k3p1", "Kimi K3.1 Pro"]) {
+      expect({ id, k31: isKimiK31Model(id) }).toEqual({ id, k31: true })
+    }
+    for (const id of ["opencode-go/kimi-k3", "kimi-coding/k3", "kimi-coding/k3-256k", "moonshotai/kimi-k3-202607", "moonshotai/kimi-k3-128k", "opencode-go/kimi-k2.7"]) {
+      expect({ id, k31: isKimiK31Model(id) }).toEqual({ id, k31: false })
+    }
   })
 
   test("#given Devin selectors #then only an explicit devin SWE-2 id outside the served lanes is unserved", () => {

@@ -256,7 +256,7 @@ describe("transport recovery reattaches ONLY on the recorded socket", () => {
     await handle.terminate()
   })
 
-  posixShardTest("#given a recorded host that fails every ensure for a non-incompatibility reason #when the retries are exhausted #then the child ends crashed with transport_gone", async () => {
+  posixShardTest("#given a recorded host that fails every ensure for a non-incompatibility reason #when the retries are exhausted #then the child parks for contextual recovery on that socket", async () => {
     // given
     const host = await fakeHost()
     const recorded = shardEndpoint(host, "00000000000000c3")
@@ -267,13 +267,16 @@ describe("transport recovery reattaches ONLY on the recorded socket", () => {
     )
     const runner = runnerOver(host, { ...NO_WAIT, ensureDaemon: ensure.ensure, shardResolver: () => recorded.resolution() })
     const handle = await runner.start(childSpec())
+    const parked = parkedOnce(handle)
 
     // when
     host.crash()
 
     // then
-    expect(await handle.waitForExit()).toMatchObject({ kind: "crashed", facts: { stderrTail: "transport_gone" } })
+    expect(await parked).toMatchObject({ reason: "daemon_unavailable" })
+    expect(handle.exitOutcome()).toBeUndefined()
     expect(ensure.inputs.map((input) => input.socket)).toEqual(Array.from({ length: 6 }, () => recorded.socket))
+    await handle.dispose?.()
   })
 
   posixShardTest("#given a recorded host that answers incompatibly after a connection cut #when the child reattaches #then it parks host_incompatible, opens nowhere else, and notices once", async () => {

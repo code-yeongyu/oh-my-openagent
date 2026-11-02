@@ -7,6 +7,8 @@
 mod common;
 #[path = "headless/error_codes.rs"]
 mod error_codes;
+#[path = "headless/input_calls.rs"]
+mod input_calls;
 
 use common::scenario::{capture, headless, make_stop_path_live, snapshot_ref, Scenario};
 use common::{error_code, fake_backend, Engine, TWO_DISPLAYS};
@@ -246,6 +248,45 @@ fn clipboard_write_then_read_roundtrips_through_the_engine_session() {
 }
 
 #[test]
+fn menus_items_and_select_against_the_scripted_tree() {
+    // Given: the menus fixture and a live stop path
+    let scenario = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../senpi-desktop-backend-fake/fixtures/menus.json"
+    );
+    let mut engine = headless(fake_backend(scenario), &[]);
+    make_stop_path_live(&mut engine);
+    // When: the menu bar, a submenu, and one command
+    let root = engine.invoke("menus.items", json!({"windowId": WINDOW, "path": []}));
+    let file = engine.invoke("menus.items", json!({"windowId": WINDOW, "path": ["File"]}));
+    let selected = engine.invoke("menus.select", json!({"windowId": WINDOW, "path": ["File", "Save"]}));
+    // Then
+    let titles = |reply: &Value| {
+        reply["result"]
+            .as_array()
+            .expect("menus.items returns an array")
+            .iter()
+            .map(|item| item["title"].clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(titles(&root), [json!("File"), json!("Edit"), json!("View")]);
+    assert_eq!(root["result"][0]["hasSubmenu"], json!(true), "{root}");
+    assert_eq!(titles(&file), [json!("Save"), json!("Export…")]);
+    assert_eq!(file["result"][0]["path"], json!(["File", "Save"]), "{file}");
+    assert_eq!(selected["result"], Value::Null, "{selected}");
+    // And: an ellipsis-normalized label selects the nested command
+    let normalized = engine.invoke(
+        "menus.select",
+        json!({"windowId": WINDOW, "path": ["File", "Export", "PDF"]}),
+    );
+    assert_eq!(normalized["result"], Value::Null, "{normalized}");
+    // And: a disabled submenu refuses without dispatching anything
+    let refused = engine.invoke("menus.select", json!({"windowId": WINDOW, "path": ["Edit", "Undo"]}));
+    assert_eq!(error_code(&refused), &json!("AxFailed"), "{refused}");
+    assert!(engine.finish().success());
+}
+
+#[test]
 fn without_a_backend_capture_fails_and_every_input_stops_at_the_stop_path() {
     // Given: the selected scenario does not exist, so no backend is constructed
     let mut engine = headless(fake_backend("does/not/exist.json"), &[]);
@@ -253,7 +294,7 @@ fn without_a_backend_capture_fails_and_every_input_stops_at_the_stop_path() {
     engine.invoke("session.open", json!({}));
     // When
     let captured = engine.invoke("capture", json!({"target": "desktop"}));
-    let inputs = error_codes::input_calls().map(|(method, params)| (method, engine.invoke(method, params)));
+    let inputs = input_calls::input_calls().map(|(method, params)| (method, engine.invoke(method, params)));
     // Then: the gate refuses before any backend call
     assert_eq!(capabilities["result"]["backend"], json!("unavailable"));
     assert_eq!(error_code(&captured), &json!("CaptureFailed"));

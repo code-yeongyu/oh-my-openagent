@@ -21,14 +21,21 @@ impl FakeClock {
 
     /// Moves time forward by `ms` (saturating) and returns the new time.
     pub fn advance(&self, ms: u64) -> u64 {
-        let step = |now: u64| Some(now.saturating_add(ms));
-        // `step` always returns `Some`, so `fetch_update` cannot report `Err`;
-        // both arms carry the previous value.
-        let previous = self
-            .millis
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, step)
-            .unwrap_or_else(|previous| previous);
-        previous.saturating_add(ms)
+        // An explicit compare-exchange loop: `fetch_update` is deprecated in favour of
+        // `try_update` on current stable, and the workspace pins no minimum Rust version.
+        let mut previous = self.millis.load(Ordering::SeqCst);
+        loop {
+            let next = previous.saturating_add(ms);
+            match self.millis.compare_exchange_weak(
+                previous,
+                next,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => return next,
+                Err(actual) => previous = actual,
+            }
+        }
     }
 
     pub fn set(&self, ms: u64) {

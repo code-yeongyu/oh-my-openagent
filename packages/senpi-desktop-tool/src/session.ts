@@ -17,6 +17,13 @@ export interface ComputerHostContext {
 	readonly cwd: string;
 	readonly model: ComputerModel | undefined;
 	readonly sessionManager: { getSessionId(): string; getSessionDir(): string };
+	/** False on headless hosts; the foreground-control confirm never prompts (#9651 B5b). */
+	readonly hasUI?: boolean;
+	/** Structural slice of the host's tool-call UI; only `confirm` is used, for `control.acquire`. */
+	readonly ui?: {
+		notify?(message: string, level: "info" | "warning" | "error"): void;
+		confirm?(title: string, body: string, options?: { signal?: AbortSignal; timeout?: number }): Promise<boolean>;
+	};
 }
 
 export const AUDIT_FILE_NAME = ".computer-audit.jsonl";
@@ -44,6 +51,7 @@ export function sessionOpenParams(settings: ComputerSettings, context: ComputerH
 	return {
 		display: settings.display,
 		macosCanary: settings.macosCanary,
+		showCursor: settings.showCursor,
 		allowHostRelayOnlyStop: settings.allowHostRelayOnlyStop,
 		auditPath: auditLog.enabled ? join(context.sessionManager.getSessionDir(), AUDIT_FILE_NAME) : null,
 		artifactDir: tmpdir(),

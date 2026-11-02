@@ -282,9 +282,17 @@ function ownerLabel(owner) {
   return owner.version === null ? owner.name : `${owner.name}@${owner.version}`
 }
 
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", `'"'"'`)}'`
+}
+
 function omoInstallRemoval(entry, bunRoot) {
-  if (entry.kind === "standalone") return `remove ${entry.binPath}`
-  return realPathOf(entry.binPath).startsWith(realPathOf(bunRoot)) ? "bun remove -g omo-ai" : "npm uninstall -g omo-ai"
+  if (entry.kind === "standalone") return `rm -f -- ${shellQuote(entry.binPath)}`
+  const real = realPathOf(entry.binPath)
+  if (real.startsWith(realPathOf(bunRoot))) return `BUN_INSTALL=${shellQuote(bunRoot)} bun remove -g omo-ai`
+  const packageMarker = /[\\/]lib[\\/]node_modules[\\/]omo-ai[\\/]/.exec(real)
+  const prefix = packageMarker === null ? dirname(entry.directory) : real.slice(0, packageMarker.index)
+  return `npm uninstall -g omo-ai --prefix ${shellQuote(prefix)}`
 }
 
 export function formatMigrationLines({ shadowing, nativeDirectory, legacyPackages, registrations, restoreCommand, omoInstalls = [], bunRoot = "", standalone = false }) {

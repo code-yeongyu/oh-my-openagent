@@ -4,8 +4,16 @@
 // path. matchScore is reused over a description+body haystack (the SearchDocument
 // projection does not fit recall files, so the haystack is composed directly).
 
-import { matchScoreNormalized, normalizeText, parseQuery, type ParsedQuery } from "../search"
-import { rankRecallDocumentsBm25, tokenizeRecallText } from "./bm25"
+import { matchScoreNormalized, parseQuery, type ParsedQuery } from "../search"
+import {
+  isHanCharacter,
+  rankRecallDocumentsBm25,
+  recallExpansionWeights,
+  recallTerms,
+  tokenizeRecallText,
+  type RecallQueryExpansions,
+} from "./bm25"
+import { buildExcerpt } from "./excerpt"
 import { normalizedHaystack } from "./haystack"
 import type { RecallDocument } from "./provider"
 import { chooseRecallStrategy, hasCjk, type RecallStrategy } from "./strategy"
@@ -17,8 +25,10 @@ export interface RecallCandidate {
   readonly score: number
 }
 
-/** Excerpt window length. Internal, deliberately not a config knob. */
-const EXCERPT_CHARS = 200
+/** A candidate before selection applies the cap; its excerpt is built only if it is returned. */
+interface RankedCandidate extends Omit<RecallCandidate, "excerpt"> {
+  readonly excerpt: () => string
+}
 
 export interface SelectRecallOptions {
   readonly maxItems: number
@@ -28,10 +38,27 @@ export interface SelectRecallOptions {
   readonly excludePaths?: ReadonlySet<string>
   /** Internal override for tests and the benchmark; chosen by chooseRecallStrategy when omitted. */
   readonly strategy?: RecallStrategy
+  /**
+   * Terms the caller adds to this search, scored below the queries' own words (bm25.ts). Omitted or
+   * empty, the selection is exactly what it is without the option.
+   */
+  readonly expansions?: RecallQueryExpansions
 }
+
+export { RECALL_EXPANSION_WEIGHTS, type RecallQueryExpansions } from "./bm25"
 
 /** Reciprocal rank fusion constant (Cormack et al.); 60 is the customary value. */
 const RRF_K = 60
+
+function expansionTexts(expansions: RecallQueryExpansions | undefined): string[] {
+  if (expansions === undefined) return []
+  return [
+    ...(expansions.synonyms ?? []),
+    ...(expansions.keywords ?? []),
+    ...(expansions.related ?? []),
+    ...(expansions.noteLine === undefined ? [] : [expansions.noteLine]),
+  ].filter((text) => text.trim() !== "")
+}
 
 export function selectRecallCandidates(
   documents: readonly RecallDocument[],
@@ -42,12 +69,63 @@ export function selectRecallCandidates(
   const parsedQueries = queries.map(parseQuery).filter((query) => query.terms.length > 0 || query.phrases.length > 0)
   if (maxItems === 0 || parsedQueries.length === 0) return []
   const strategy = options.strategy ?? chooseRecallStrategy(documents, queries)
-  if (strategy === "bm25") return rankBm25Candidates(documents, queries, options).slice(0, maxItems)
+  const unwidened = rankByStrategy(documents, queries, parsedQueries, options, strategy)
+  const ranked = addsTerms(queries, options.expansions)
+    ? widenCandidates(documents, queries, parsedQueries, options, strategy, unwidened)
+    : unwidened
+  return ranked.slice(0, maxItems).map((candidate) => ({ ...candidate, excerpt: candidate.excerpt() }))
+}
+
+/**
+ * Whether the expansions add a term the queries do not already hold. Expansions that only repeat query
+ * words, or hold no letter or digit, add nothing: the search is then the search as written.
+ */
+function addsTerms(queries: readonly string[], expansions: RecallQueryExpansions | undefined): boolean {
+  if (expansionTexts(expansions).length === 0) return false
+  return recallExpansionWeights(expansions, new Set(queries.flatMap(recallTerms))).size > 0
+}
+
+/** Every candidate of the search as written, best first; callers apply the cap. */
+function rankByStrategy(
+  documents: readonly RecallDocument[],
+  queries: readonly string[],
+  parsedQueries: readonly ParsedQuery[],
+  options: SelectRecallOptions,
+  strategy: RecallStrategy,
+): RankedCandidate[] {
+  if (strategy === "bm25") return rankBm25(documents, queries, options, undefined).candidates
   if (strategy === "hybrid") return pinPhraseLeader(
-    fuseCandidates(rankSubstringCandidates(documents, parsedQueries, options), rankBm25Candidates(documents, queries, options)),
+    fuseCandidates(rankSubstringCandidates(documents, parsedQueries, options), rankBm25(documents, queries, options, undefined).candidates),
     phraseLeaderPath(documents, parsedQueries, options),
-  ).slice(0, maxItems)
-  return rankSubstringCandidates(documents, parsedQueries, options).slice(0, maxItems)
+  )
+  return rankSubstringCandidates(documents, parsedQueries, options)
+}
+
+/**
+ * A widened search. The notes that hold every word of the queries - every unit for bm25, every term
+ * verbatim for the substring scorer - come first, in the order the search has without added terms, so
+ * an exact lookup returns what it returns today. Every other note follows in the widened bm25 order,
+ * where each added term counts for its weight. The substring scorer has no score a weight could apply
+ * to, which is why the added terms reach a small English memory through bm25 as well. The score keeps
+ * the contract (ascending) as a function of the final rank, like the fused hybrid score.
+ */
+function widenCandidates(
+  documents: readonly RecallDocument[],
+  queries: readonly string[],
+  parsedQueries: readonly ParsedQuery[],
+  options: SelectRecallOptions,
+  strategy: RecallStrategy,
+  unwidened: readonly RankedCandidate[],
+): RankedCandidate[] {
+  const widened = rankBm25(documents, queries, options, options.expansions)
+  const holdsEveryWord = new Set(widened.fullMatches)
+  if (strategy !== "bm25") {
+    for (const candidate of rankSubstringCandidates(documents, parsedQueries, options)) holdsEveryWord.add(candidate.path)
+  }
+  const kept = unwidened.filter((candidate) => holdsEveryWord.has(candidate.path))
+  const keptPaths = new Set(kept.map((candidate) => candidate.path))
+  return [...kept, ...widened.candidates.filter((candidate) => !keptPaths.has(candidate.path))]
+    .map((candidate, rank) => ({ ...candidate, score: 1 / (1 + 1 / (RRF_K + rank + 1)) }))
 }
 
 function isExcluded(path: string, options: SelectRecallOptions): boolean {
@@ -59,9 +137,9 @@ function rankSubstringCandidates(
   documents: readonly RecallDocument[],
   parsedQueries: readonly ParsedQuery[],
   options: SelectRecallOptions,
-): RecallCandidate[] {
+): RankedCandidate[] {
   const queryTerms = collectQueryTerms(parsedQueries)
-  const scored: RecallCandidate[] = []
+  const scored: RankedCandidate[] = []
   for (const document of documents) {
     if (isExcluded(document.path, options)) continue
 
@@ -77,7 +155,7 @@ function rankSubstringCandidates(
     scored.push({
       path: document.path,
       description: document.description,
-      excerpt: buildExcerpt(document.body, queryTerms),
+      excerpt: () => buildExcerpt(document.body, queryTerms),
       score: best,
     })
   }
@@ -90,25 +168,36 @@ function rankSubstringCandidates(
  * (ascending, lower is better) as 1 / (1 + bm25), and the excerpt centers on the first query token the
  * body actually contains, so a bigram hit inside a longer Korean word still anchors the window.
  */
-function rankBm25Candidates(
+function rankBm25(
   documents: readonly RecallDocument[],
   queries: readonly string[],
   options: SelectRecallOptions,
-): RecallCandidate[] {
+  expansions: RecallQueryExpansions | undefined,
+): { readonly candidates: RankedCandidate[]; readonly fullMatches: string[] } {
   // One-character tokens (a lone CJK syllable, a version digit) match almost anywhere and would drag the window.
-  const queryTokens = [...new Set(queries.flatMap(tokenizeRecallText))].filter((token) => Array.from(token).length > 1)
-  const candidates: RecallCandidate[] = []
-  for (const { document, score } of rankRecallDocumentsBm25(documents, queries)) {
+  // A Han character is a ranking term of its own, so it anchors the window only when no longer token does.
+  const tokens = [...new Set(queries.flatMap(tokenizeRecallText))]
+  const queryTokens = tokens.filter((token) => Array.from(token).length > 1)
+  const hanCharacters = tokens.filter(isHanCharacter)
+  // A note found only through an added term shows the passage that term matched, not the body head;
+  // the same order as for the query's own tokens, longer tokens before single Han characters.
+  const added = [...new Set(expansionTexts(expansions).flatMap(tokenizeRecallText))]
+  const addedTokens = added.filter((token) => Array.from(token).length > 1)
+  const addedHanCharacters = added.filter(isHanCharacter)
+  const candidates: RankedCandidate[] = []
+  const fullMatches: string[] = []
+  for (const { document, score, fullMatch } of rankRecallDocumentsBm25(documents, queries, expansions)) {
     if (isExcluded(document.path, options)) continue
+    if (fullMatch === true) fullMatches.push(document.path)
     candidates.push({
       path: document.path,
       description: document.description,
       // The tokens are NFKC, so the window is searched in the NFKC body to stay anchored.
-      excerpt: buildExcerpt(document.body.normalize("NFKC"), queryTokens),
+      excerpt: () => buildExcerpt(document.body.normalize("NFKC"), queryTokens, hanCharacters, addedTokens, addedHanCharacters),
       score: 1 / (1 + score),
     })
   }
-  return candidates
+  return { candidates, fullMatches }
 }
 
 /**
@@ -120,9 +209,9 @@ function rankBm25Candidates(
  * on the bm25 rank (a note bm25 does not rank sorts after one it does) and only then on the path. A
  * note keeps its substring excerpt when it has one. The score keeps the contract as 1 / (1 + fused).
  */
-function fuseCandidates(substring: readonly RecallCandidate[], bm25: readonly RecallCandidate[]): RecallCandidate[] {
-  const fused = new Map<string, { candidate: RecallCandidate; weight: number; bm25Rank: number }>()
-  const vote = (candidate: RecallCandidate, weight: number, bm25Rank: number): void => {
+function fuseCandidates(substring: readonly RankedCandidate[], bm25: readonly RankedCandidate[]): RankedCandidate[] {
+  const fused = new Map<string, { candidate: RankedCandidate; weight: number; bm25Rank: number }>()
+  const vote = (candidate: RankedCandidate, weight: number, bm25Rank: number): void => {
     const entry = fused.get(candidate.path)
     if (entry === undefined) fused.set(candidate.path, { candidate, weight, bm25Rank })
     else {
@@ -180,7 +269,7 @@ function phraseLeaderPath(
  * only add notes around it and never demote the note an exact phrase found. It takes the first place's
  * score so the list stays ascending.
  */
-function pinPhraseLeader(fused: readonly RecallCandidate[], leaderPath: string | undefined): RecallCandidate[] {
+function pinPhraseLeader(fused: readonly RankedCandidate[], leaderPath: string | undefined): RankedCandidate[] {
   const leader = fused.find((candidate) => candidate.path === leaderPath)
   const first = fused[0]
   if (leader === undefined || first === undefined || leader === first) return [...fused]
@@ -194,33 +283,4 @@ function collectQueryTerms(parsedQueries: readonly ParsedQuery[]): string[] {
     for (const phrase of parsed.phrases) terms.push(...phrase.split(/\s+/).filter(Boolean))
   }
   return terms
-}
-
-/**
- * Excerpt is a body region centered on the first query-term match, or the body
- * head when no query term matches the body. Whitespace is collapsed to single
- * spaces and the result never exceeds EXCERPT_CHARS.
- */
-function buildExcerpt(body: string, terms: readonly string[]): string {
-  const normalized = body.replace(/\s+/g, " ").trim()
-  if (normalized === "") return ""
-
-  const lowered = normalized.toLowerCase()
-  let matchIndex = -1
-  let matchLength = 0
-  for (const term of terms) {
-    const needle = normalizeText(term)
-    if (needle === "") continue
-    const index = lowered.indexOf(needle)
-    if (index >= 0 && (matchIndex < 0 || index < matchIndex)) {
-      matchIndex = index
-      matchLength = needle.length
-    }
-  }
-  if (matchIndex < 0) return normalized.slice(0, EXCERPT_CHARS)
-
-  const start = Math.max(0, matchIndex - Math.floor((EXCERPT_CHARS - matchLength) / 2))
-  const end = Math.min(normalized.length, start + EXCERPT_CHARS)
-  const clampedStart = Math.max(0, end - EXCERPT_CHARS)
-  return normalized.slice(clampedStart, end).trim()
 }

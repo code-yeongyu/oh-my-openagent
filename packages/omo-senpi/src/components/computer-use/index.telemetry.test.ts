@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process"
 import { dirname, join } from "node:path"
 import { createInterface } from "node:readline"
@@ -120,6 +120,34 @@ async function command(pi: FakeExtensionAPI, args: string): Promise<void> {
 }
 
 describe("computer-use component telemetry", () => {
+  test("#given an inactive engine #when status is requested #then its source is described without spawning", async () => {
+    const pi = new HostApi()
+    let starts = 0
+    createComputerUseComponent({
+      platform: "linux",
+      engineChild: () => () => { starts += 1; throw new Error("status must not spawn") },
+      loadSettings: (_cwd, platform) => resolveComputerSettings({ enginePath: "/task-3/engine" }, platform),
+    }).register(pi, { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } })
+    const messages: string[] = []
+    const printed: string[] = []
+    const registration = pi.commands.find((item) => item.name === "computer")
+    if (registration === undefined) throw new Error("computer command missing")
+    const write = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      printed.push(String(chunk))
+      return true
+    })
+    try {
+      await (registration.options.handler as (args: string, ctx: unknown) => Promise<void>)("status", {
+        ...context(), hasUI: false, ui: { notify: (text: string) => messages.push(text) },
+      })
+    } finally {
+      write.mockRestore()
+    }
+    expect(printed).toEqual([`${messages[0]}\n`])
+    expect(messages.join("\n")).toContain("/task-3/engine: missing")
+    expect(starts).toBe(0)
+  })
+
   test("#given no engine binary #when the tool activates #then native-unavailable is observed", async () => {
     const telemetry = recorder()
     const missing: ChildFactory = () => {

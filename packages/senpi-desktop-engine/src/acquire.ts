@@ -9,7 +9,8 @@ import {
 	isQuarantinedFile,
 	locateDesktopEngine,
 } from "./locator";
-import { DESKTOP_ENGINE_CHECKSUMS_ASSET, DESKTOP_ENGINE_RELEASE_HOSTS, desktopEngineReleaseAssetName } from "./release-assets";
+import { parseDesktopEngineChecksums } from "./checksums";
+import { DESKTOP_ENGINE_CHECKSUMS_ASSET, desktopEngineReleaseAssetName } from "./release-assets";
 import { isDesktopEngineRelease } from "./release-signature";
 
 const RELEASE_BASE = "https://github.com/code-yeongyu/oh-my-openagent/releases/download";
@@ -33,6 +34,40 @@ export interface AcquireDesktopEngineOptions {
 export type AcquiredDesktopEngine =
 	| { readonly path: string; readonly sha256?: string }
 	| { readonly path: null; readonly diagnostic: DesktopEngineLocateDiagnostic };
+
+/** Finds a verified, executable release-cache generation without acquiring or starting an engine. */
+export function findCachedDesktopEngine(
+	options: Pick<AcquireDesktopEngineOptions, "version" | "host" | "cacheDir">,
+	onAttempt?: (path: string) => void,
+): { readonly path: string; readonly sha256: string } | { readonly path: null; readonly attemptedPaths: readonly string[] } {
+	const { host, version } = options;
+	const asset = desktopEngineReleaseAssetName(host);
+	let attemptedPaths: readonly string[] = [];
+	if (asset === null) return { path: null, attemptedPaths };
+	const platform = host.slice(0, host.indexOf("-"));
+	const cacheRoot = options.cacheDir ?? join(homedir(), ".omo", "cache", "senpi-desktop-engine");
+	const hostDir = join(cacheRoot, version, host);
+	if (existsSync(hostDir)) {
+		for (const entry of readdirSync(hostDir)) {
+			const match = /^([0-9a-f]{64})-[0-9a-f-]{36}$/.exec(entry);
+			if (match === null) continue;
+			const cached = join(hostDir, entry, asset);
+			attemptedPaths = [...attemptedPaths, cached];
+			onAttempt?.(cached);
+			if (existsSync(cached)
+				&& createHash("sha256").update(readFileSync(cached)).digest("hex") === match[1]
+				&& !isQuarantinedFile(cached, platform)) {
+				try {
+					accessSync(cached, constants.X_OK);
+					return { path: cached, sha256: match[1] };
+				} catch (error) {
+					if (!(error instanceof Error && "code" in error)) throw error;
+				}
+			}
+		}
+	}
+	return { path: null, attemptedPaths };
+}
 
 /** Async release acquisition leaves the synchronous locator and enginePath override untouched. */
 export async function acquireDesktopEngine(options: AcquireDesktopEngineOptions): Promise<AcquiredDesktopEngine> {
@@ -76,30 +111,20 @@ export async function acquireDesktopEngine(options: AcquireDesktopEngineOptions)
 		if (located.diagnostic.code === "quarantined") return unavailable(located.diagnostic.cause);
 
 		const asset = desktopEngineReleaseAssetName(host);
-		if (asset === null) return unavailable(`No desktop engine release asset exists for ${host}.`);
+		if (asset === null) return { path: null, diagnostic: {
+			...located.diagnostic,
+			reason: "no-release-asset",
+			message: `No senpi-desktop-engine is built for ${host}; computer use is unavailable on this host.`,
+		} };
 		if (!/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
 			return unavailable(`Invalid omo release version: ${version}`);
 		}
 		const cacheRoot = options.cacheDir ?? join(homedir(), ".omo", "cache", "senpi-desktop-engine");
 		const hostDir = join(cacheRoot, version, host);
-		if (existsSync(hostDir)) {
-			for (const entry of readdirSync(hostDir)) {
-				const match = /^([0-9a-f]{64})-[0-9a-f-]{36}$/.exec(entry);
-				if (match === null) continue;
-				const cached = join(hostDir, entry, asset);
-				attemptedPaths = [...attemptedPaths, cached];
-				if (existsSync(cached)
-					&& createHash("sha256").update(readFileSync(cached)).digest("hex") === match[1]
-					&& !isQuarantinedFile(cached, platform)) {
-					try {
-						accessSync(cached, constants.X_OK);
-						return { path: cached, sha256: match[1] };
-					} catch (error) {
-						if (!(error instanceof Error && "code" in error)) throw error;
-					}
-				}
-			}
-		}
+		const cached = findCachedDesktopEngine(options, (path) => {
+			attemptedPaths = [...attemptedPaths, path];
+		});
+		if (cached.path !== null) return cached;
 
 		if (options.allowDownload === false) return unavailable("No installed release engine");
 		const fetchRelease = options.fetch ?? globalThis.fetch;
@@ -112,19 +137,9 @@ export async function acquireDesktopEngine(options: AcquireDesktopEngineOptions)
 		if (!binaryResponse.ok) return unavailable(`${asset}: HTTP ${binaryResponse.status}`);
 		if (!checksumsResponse.ok) return unavailable(`${DESKTOP_ENGINE_CHECKSUMS_ASSET}: HTTP ${checksumsResponse.status}`);
 
-		const checksumLines = (await checksumsResponse.text()).trimEnd().split(/\r?\n/);
-		const seen = new Set<string>();
-		let expected: string | undefined;
-		for (const line of checksumLines) {
-			const match = /^([a-fA-F0-9]{64})  ([A-Za-z0-9.-]+)$/.exec(line);
-			const name = match?.[2];
-			if (name === undefined || !DESKTOP_ENGINE_RELEASE_HOSTS.some((supported) => desktopEngineReleaseAssetName(supported) === name)) {
-				return unavailable("Invalid desktop engine checksum entry or asset name");
-			}
-			if (seen.has(name)) return unavailable(`Duplicate SHA-256 checksum for ${name}`);
-			seen.add(name);
-			if (name === asset) expected = match?.[1];
-		}
+		const parsed = parseDesktopEngineChecksums(await checksumsResponse.text());
+		if (parsed.error !== null) return unavailable(parsed.error);
+		const expected = parsed.checksums.get(asset);
 		if (expected === undefined) return unavailable(`No SHA-256 checksum for ${asset}`);
 		const binary = Buffer.from(await binaryResponse.arrayBuffer());
 		const actual = createHash("sha256").update(binary).digest("hex");

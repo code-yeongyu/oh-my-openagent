@@ -16,6 +16,8 @@ export interface GitMemoryRepoOptions {
   agentId: string
   exec?: GitExec
   installHooks?: (dir: string) => void | Promise<void>
+  /** Budget for one `git commit`, hooks included (default COMMIT_TIMEOUT_MS in repo.ts). */
+  commitTimeoutMs?: number
 }
 
 export interface InitializeGitRepoOptions {
@@ -56,7 +58,27 @@ export interface GitLogOptions {
    * commit into memory first.
    */
   readonly grep?: readonly string[]
+  /**
+   * Only commits newer than this. git stops walking once it reaches older commits, so a caller that
+   * knows when its work began pays for the commits since then, not for the whole history.
+   */
+  readonly since?: Date
+  /** Overrides the default 30 s git timeout, for a caller on a latency-sensitive path. */
+  readonly timeoutMs?: number
 }
+
+export interface GitMaintenanceOptions {
+  /** Run only when git reports at least this many loose objects. */
+  readonly minLooseObjects: number
+  /** Upper bound for the maintenance run itself. */
+  readonly timeoutMs: number
+  /** Stops the run (session exit). git is sent SIGTERM and removes its own temp files. */
+  readonly signal?: AbortSignal
+}
+
+export type GitMaintenanceResult =
+  | { readonly status: "skipped"; readonly looseObjects: number }
+  | { readonly status: "packed"; readonly looseObjectsBefore: number; readonly looseObjectsAfter: number }
 
 export interface GitTreeSizedEntry {
   readonly path: string

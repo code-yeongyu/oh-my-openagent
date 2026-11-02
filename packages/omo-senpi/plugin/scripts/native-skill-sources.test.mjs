@@ -24,6 +24,7 @@ describe("createNativeSkillSources", () => {
     "ultrawork",
     "ulw-plan",
     "ulw-research",
+    "visualize",
   ]
 
   test("#given the registry #when ordered names are extracted #then they match the expected alphabetical sequence including onboarding", () => {
@@ -45,19 +46,12 @@ describe("createNativeSkillSources", () => {
     }
   })
 
-  test("#given onboarding skill #when checked #then it is present in the registry at the correct position", () => {
-    const onboardingEntry = sources.find(({ name }) => name === "onboarding")
-    assert.ok(onboardingEntry, "onboarding must be in the registry")
-    assert.equal(sources.indexOf(onboardingEntry), 5, "onboarding must be at index 5 (alphabetical)")
-    assert.equal(onboardingEntry.source, join(nativeSkillsRoot, "onboarding"))
-  })
-
   test("#given the registry #when sharedAssets are read #then only ulw-research overlays the shared runtime and reference", () => {
     const withSharedAssets = sources.filter((entry) => entry.sharedAssets !== undefined).map(({ name }) => name)
     assert.deepEqual(withSharedAssets, ["ulw-research"])
 
     const ulwResearch = sources.find(({ name }) => name === "ulw-research")
-    assert.deepEqual(ulwResearch?.sharedAssets, ["scripts", "references/report-gates.md", "references/deliverable-phase.md"])
+    assert.deepEqual(ulwResearch?.sharedAssets, ["scripts", "references/report-gates.md", "references/deliverable-phase.md", "references/report-visualization.md", "references/fact-ledger-grammar.md", "references/fidelity-claim-kinds.md", "references/unit-rules.md", "references/fact-ledger.md"])
   })
 
   test("#given each sharedAssets path #when resolved against the shared skill #then it is relative, contained, and exists", () => {

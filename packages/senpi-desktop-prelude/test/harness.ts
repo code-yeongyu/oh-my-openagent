@@ -118,6 +118,9 @@ class _Tool:
         calls.append(args)
         chain = args.get("chain") or []
         last = chain[-1]["method"] if chain else None
+        override = payload.get("responders", {}).get(last)
+        if override is not None:
+            return json.loads(override)
         if len(chain) == 1 and last == "window":
             return {"text": "", "details": {"value": WINDOW}, "images": [], "hasError": False}
         if len(chain) == 1 and last == "ref":
@@ -138,16 +141,23 @@ print(json.dumps({"calls": calls, "displayed": displayed, "out": ns.get("out"), 
 `;
 
 /** Runs `script` in a real Python interpreter after the facade was installed; `script` may assign `out`. */
-export function runPythonFacade(script: string): PythonRun {
+export function runPythonFacade(script: string, responders: Readonly<Record<string, string>> = {}): PythonRun {
 	const input = JSON.stringify({
 		prelude: computerPreludeAssets.python,
 		script,
 		window: JSON.stringify(WINDOW_SNAPSHOT),
 		element: JSON.stringify(ELEMENT_SNAPSHOT),
 		image: JSON.stringify(IMAGE),
+		responders,
 	});
 	const startedAt = performance.now();
-	const result = spawnSync(PYTHON_COMMAND, ["-c", PYTHON_HARNESS], { input, encoding: "utf8", timeout: 30_000 });
+	// UTF-8 mode: Windows Python otherwise decodes the piped payload with the ANSI code page (cp1252),
+	// turning non-ASCII labels such as "Export…" into mojibake before the facade sees them.
+	const result = spawnSync(PYTHON_COMMAND, ["-X", "utf8", "-c", PYTHON_HARNESS], {
+		input,
+		encoding: "utf8",
+		timeout: 30_000,
+	});
 	if (PYTHON_DIAGNOSTICS) {
 		console.error(
 			`PYTHON_FACADE_DIAG ${JSON.stringify({

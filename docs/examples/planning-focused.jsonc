@@ -46,7 +46,7 @@
 
     // Deep research and analysis: the default lane, then the escalation lane
     "deep-low": { "model": "openai/gpt-6.1-sol", "reasoning": "medium" },
-    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
+    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
     // Strategic reasoning
     "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },

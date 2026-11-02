@@ -13,7 +13,7 @@ const roots: string[] = []
 // A fixture engine is a script, and Windows cannot execute a script as a binary (EFTYPE), so the tests start
 // it through the running runtime; the production launcher executes the located binary directly.
 const runEngineScript: EngineLauncher = (enginePath, args, env) =>
-  spawn(process.execPath, [enginePath, ...args], { stdio: "pipe", windowsHide: true, env })
+  spawn(process.execPath, [enginePath, ...args], { stdio: "pipe", windowsHide: true, detached: true, env })
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -55,6 +55,21 @@ function input(root: string) {
 }
 
 describe("computer use doctor probe failures", () => {
+  test.each(["self-responsible", "unresolved"])("preserves the actual child's %s refusal in the public doctor report", async (reason) => {
+    const root = fixtureRoot()
+    const record = `SENPI_DESKTOP_LAUNCH_REFUSED ${JSON.stringify({ version: 1, reason })}\n`
+    const enginePath = writeEngine(root, `
+process.stdin.once("data", () => process.stderr.write(${JSON.stringify(record)}, () => {
+  process.exitCode = 1;
+  process.stdin.destroy();
+}));
+`)
+    writeConfig(root, enginePath)
+    const report = await computerUseDoctorReport({ ...input(root), launchEngine: runEngineScript, timeoutMs: 5_000 })
+    expect(report).toMatchObject({ kind: "failed", code: "launch-context-unavailable", reason })
+    expect(report).toHaveProperty("diagnostic")
+  })
+
   test("#given a mismatched engine ABI #when probed #then the report is an ABI failure with the engine path", async () => {
     // given
     const root = fixtureRoot()
@@ -63,6 +78,7 @@ const replies = {
   "engine.hello": { protocolVersion: "9", engineVersion: "0.0.0", buildSha: "fixture", abi: "other/9" },
   capabilities: {
     backend: "fake", capture: false, input: false, ax: false, backgroundWindowInput: false,
+    cursorOverlay: false,
     deliveryModes: [], capturePermission: "denied", inputPermission: "denied", axPermission: "denied",
     displayCount: 0, focusGuard: false, stopPath: "none", screenLocked: false
   }
@@ -102,7 +118,9 @@ createInterface({ input: process.stdin }).on("line", () => {});
     expect(report.kind).toBe("failed")
     if (report.kind !== "failed") throw new Error(`expected failed report, got ${report.kind}`)
     expect(report.code).toBe("timeout")
-    expect(report.message).toContain("timed out after 25 ms")
+    expect(report.message).toBe(
+      `desktop engine probe timed out after 25 ms at ${enginePath} (phase: requests sent, awaiting engine.hello and capabilities)`,
+    )
   })
 
   test("#given an unsupported platform #when inspected #then no engine process is needed", async () => {

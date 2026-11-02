@@ -2,8 +2,12 @@ use super::round_to_u32;
 use crate::error::{CoreResult, DesktopError};
 use crate::types::{DesktopDisplay, DesktopWindow};
 
+mod zoom;
+
 #[derive(Debug, Clone, PartialEq)]
 struct FrameRegion {
+    id: String,
+    scale: f64,
     x: f64,
     y: f64,
     width: f64,
@@ -33,6 +37,9 @@ enum FrameKind {
     Window {
         captured_width: u32,
         captured_height: u32,
+        /// The captured window's on-Screen state (macOS B9 SCK; `None` when
+        /// the capture path cannot tell).
+        is_on_screen: Option<bool>,
     },
     Identity,
     /// Pixels only: the capture source did not report the displays' logical
@@ -47,9 +54,23 @@ pub struct FrameGeometry {
     height: u32,
     regions: Vec<FrameRegion>,
     kind: FrameKind,
+    /// `true` when the capture ran through the legacy `screencapture`
+    /// fallback, not the ScreenCaptureKit worker (macOS B9).
+    legacy_capture: bool,
 }
 
 impl FrameGeometry {
+    /// Marks this frame as produced by the legacy fallback path.
+    pub fn into_legacy_capture(mut self) -> Self {
+        self.legacy_capture = true;
+        self
+    }
+
+    /// Whether the capture ran through the legacy fallback path.
+    pub fn is_legacy_capture(&self) -> bool {
+        self.legacy_capture
+    }
+
     pub fn for_displays(displays: &[DesktopDisplay]) -> Self {
         let width = displays
             .iter()
@@ -64,6 +85,8 @@ impl FrameGeometry {
         let regions = displays
             .iter()
             .map(|d| FrameRegion {
+                id: d.id.clone(),
+                scale: d.scale,
                 x: f64::from(d.x),
                 y: f64::from(d.y),
                 width: f64::from(d.width),
@@ -79,6 +102,7 @@ impl FrameGeometry {
             height,
             regions,
             kind: FrameKind::Desktop,
+            legacy_capture: false,
         }
     }
 
@@ -87,6 +111,8 @@ impl FrameGeometry {
             width: px_width,
             height: px_height,
             regions: vec![FrameRegion {
+                id: window.id.clone(),
+                scale: 1.0,
                 x: f64::from(window.x),
                 y: f64::from(window.y),
                 width: f64::from(window.width),
@@ -99,7 +125,18 @@ impl FrameGeometry {
             kind: FrameKind::Window {
                 captured_width: window.width,
                 captured_height: window.height,
+                is_on_screen: window.is_on_screen,
             },
+            legacy_capture: false,
+        }
+    }
+
+    /// The captured window's on-Screen state, when this is a window frame
+    /// and the backend reported one.
+    pub fn window_is_on_screen(&self) -> Option<bool> {
+        match self.kind {
+            FrameKind::Window { is_on_screen, .. } => is_on_screen,
+            _ => None,
         }
     }
 
@@ -112,6 +149,7 @@ impl FrameGeometry {
             height,
             regions: Vec::new(),
             kind: FrameKind::PixelsOnly { reason: reason.into() },
+            legacy_capture: false,
         }
     }
 
@@ -132,6 +170,7 @@ impl FrameGeometry {
             height: u32::MAX,
             regions: Vec::new(),
             kind: FrameKind::Identity,
+            legacy_capture: false,
         }
     }
 
@@ -176,6 +215,7 @@ impl FrameGeometry {
             FrameKind::Window {
                 captured_width,
                 captured_height,
+                ..
             } => {
                 let current = current_window
                     .ok_or_else(|| DesktopError::window_not_found("target window is no longer available"))?;

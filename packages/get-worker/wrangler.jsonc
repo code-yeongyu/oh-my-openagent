@@ -1,24 +1,32 @@
 {
+  // The Sisyphus Labs account (moved 2026-10-09, sisyphuslabs/common-infra docs/cutover-workers.md).
+  // get.omo.dev is a CUSTOM DOMAIN on the Sisyphus Labs omo.dev zone: oh-my-openagent-web fetches
+  // get.omo.dev/stats/downloads, and a Worker can reach another Worker on the same zone through a custom
+  // domain but not through a route. /stable/* and /beta/* are omo-desktop-releases' zone routes.
+  // The hourly rollup runs at :17 (the same minute as on the previous account); it needs the ANALYTICS_TOKEN secret.
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "omo-get",
   "main": "src/index.ts",
+  "account_id": "6511ce566bfe27228f536a8fb9448be5",
   "compatibility_date": "2026-09-20",
-  "workers_dev": false,
+  "workers_dev": true,
   "preview_urls": false,
-  "routes": [{ "pattern": "get.omo.dev", "custom_domain": true }],
+  "routes": [{ "pattern": "get.omo.dev", "zone_id": "659a56dc53ddc7f388cd59888ccedaf0", "custom_domain": true }],
   "rules": [{ "type": "Text", "globs": ["**/*.sh", "**/*.ps1"], "fallthrough": false }],
   "r2_buckets": [{ "binding": "RELEASES", "bucket_name": "omo-releases" }],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "omo-get",
-      "database_id": "b092623f-af18-4267-b34f-527005a7949b",
+      "database_id": "755b541b-49f2-47f2-a266-465dd1860d76",
       "migrations_dir": "migrations"
     }
   ],
   "analytics_engine_datasets": [{ "binding": "DOWNLOADS", "dataset": "omo_downloads" }],
   // ANALYTICS_TOKEN (secret) is a read-only Account Analytics token used only by the hourly rollup.
-  "vars": { "ACCOUNT_ID": "c3552546c02ce87ca7c9416aeb53463e", "ANALYTICS_DATASET": "omo_downloads" },
+  // ROLLUP_FIRST_DAY: 2026-10-09 began on the previous account; it is completed by a one-time backfill (both accounts'
+  // Analytics Engine, summed), so the hourly rollup must never overwrite it with this account's part of the day.
+  "vars": { "ACCOUNT_ID": "6511ce566bfe27228f536a8fb9448be5", "ANALYTICS_DATASET": "omo_downloads", "ROLLUP_FIRST_DAY": "2026-10-10" },
   "triggers": { "crons": ["17 * * * *"] },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }

@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto"
 
 import type {
+  FactsFailuresFile,
   FactsFailureTarget,
   FactsQueueEntry,
   RecordFailureRequest,
@@ -12,7 +13,7 @@ import type {
 
 /** The slice of `FactsFailureStore` the terminal writes need; a test double implements it too. */
 export interface FactsFailurePort {
-  recordFailure(request: RecordFailureRequest): Promise<unknown>
+  recordFailure(request: RecordFailureRequest): Promise<FactsFailuresFile>
   clearOnSuccess(targets: readonly FactsFailureTarget[]): Promise<unknown>
 }
 

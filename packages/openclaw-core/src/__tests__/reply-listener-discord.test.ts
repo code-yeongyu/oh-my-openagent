@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -15,6 +15,7 @@ const originalFetch = globalThis.fetch
 const tempHome = mkdtempSync(join(tmpdir(), "openclaw-reply-listener-discord-"))
 const stateDir = join(tempHome, ".omo", "openclaw", "state")
 const stateFilePath = join(stateDir, "reply-listener-state.json")
+afterAll(() => rmSync(tempHome, { recursive: true, force: true }))
 
 function createConfig(): OpenClawConfig {
   return {

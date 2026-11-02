@@ -183,6 +183,27 @@ describe("auto-update-checker hook", () => {
     expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
   })
 
+  test("skips startup checks and toasts on session.created in CLI run mode", async () => {
+    // given
+    resetDeferredState()
+    process.env.OPENCODE_CLI_RUN_MODE = "true"
+    const { hook, mocks } = await createHook({ isSisyphusEnabled: true, autoUpdate: true })
+
+    // when
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
+
+    // then
+    expect(scheduleDeferredStartupCheckCallCount).toBe(0)
+    expect(mocks.showConfigErrorsIfAny).not.toHaveBeenCalled()
+    expect(mocks.updateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
+    expect(mocks.refreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
+    expect(mocks.showModelCacheWarningIfNeeded).not.toHaveBeenCalled()
+    expect(mocks.showLocalDevToast).not.toHaveBeenCalled()
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+  })
+
   test("runs all startup checks after deferred session.created check executes", async () => {
     // given
     resetDeferredState()

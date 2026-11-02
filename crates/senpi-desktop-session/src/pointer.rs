@@ -35,19 +35,26 @@ impl ParsedPointerOptions {
     }
 }
 
+#[derive(Clone)]
 struct CapturedFrame {
     id: String,
     geometry: FrameGeometry,
 }
 
 /// The latest capture of every target; coordinate input maps through it.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct FrameCache {
     captures: u64,
     latest: HashMap<String, CapturedFrame>,
 }
 
 impl FrameCache {
+    /// Restores delivered frames without recycling an abandoned frame id.
+    pub(crate) fn restore(&mut self, mut delivered: Self) {
+        delivered.captures = delivered.captures.max(self.captures);
+        *self = delivered;
+    }
+
     /// Records a new capture of `target` and returns its frame id.
     pub(crate) fn record(&mut self, target: &Target, geometry: FrameGeometry) -> String {
         self.captures = self.captures.saturating_add(1);

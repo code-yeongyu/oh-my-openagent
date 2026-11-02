@@ -14,7 +14,7 @@ export function postEditOutcomeFromDaemonResult(result: DaemonToolResult): PostE
 	if (availability === undefined) return text
 	if (availability["kind"] === "not_configured") {
 		const extension = availability["extension"]
-		return typeof extension === "string" && extension.length > 0 ? { kind: "not_configured", extension } : text
+		return typeof extension === "string" ? { kind: "not_configured", extension } : text
 	}
 	if (availability["kind"] === "not_installed") return notInstalledOutcome(availability, text) ?? text
 	return text

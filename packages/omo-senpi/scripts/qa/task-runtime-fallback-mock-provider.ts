@@ -25,7 +25,7 @@ interface AssistantMessage {
     | { readonly type: "toolCall"; readonly id: string; readonly name: string; readonly arguments: Readonly<Record<string, unknown>> }
   )[]
   readonly api: "openai-completions"
-  readonly provider: "omo-fallback-mock"
+  readonly provider: string
   readonly model: string
   readonly usage: {
     readonly input: number
@@ -77,7 +77,27 @@ const SCENARIO = process.env.OMO_FALLBACK_SCENARIO ?? "user-fallback"
 const LIMIT_ERRORS: Readonly<Record<string, string>> = {
   "limit-account": "You've hit your session limit · resets 3pm (Asia/Seoul)",
   "limit-model": "You've hit your Fable weekly limit · resets Oct 2, 9am",
+  "designated-only-limit": "You've hit your session limit · resets 3pm (Asia/Seoul)",
 }
+// #12006: the parent runs on its own account (omo-fallback-parent) and the child's category names only
+// spent models; the child must fail typed rather than borrow the parent's model. "designated-only-after-tool"
+// spends the child's model after a tool call.
+const DESIGNATED_ONLY_SCENARIOS: Readonly<Record<string, string>> = {
+  "designated-only-limit": "limitsolo",
+  "designated-only-after-tool": "toolsolo",
+}
+// "limit-after-tool" (#9512): the child's primary first makes a tool call, then hits a usage limit on
+// the request that carries the tool result, so the fallback has to happen inside the running turn.
+const LIMIT_AFTER_TOOL = "limit-after-tool"
+const LIMIT_AFTER_TOOL_ERROR = "You've hit your session limit · resets 3pm (Asia/Seoul)"
+// "limit-near-compaction" (#9582): the same tool-then-limit turn, but the tool-call response reports a
+// context past the compaction threshold (window minus the 16384-token compaction reserve), so the engine
+// compacts before it retries. A pre-retry compaction runs on the CURRENT model, which is spent: the child
+// must still reach its fallback. The window stays well above senpi's start minimum (about 52K tokens with
+// the omo tool schemas on macOS, more where more tools load), or the session is refused before the turn.
+const LIMIT_NEAR_COMPACTION = "limit-near-compaction"
+const NEAR_COMPACTION_WINDOW = 128_000
+const NEAR_COMPACTION_INPUT = 114_000
 let parentCalls = 0
 
 export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
@@ -89,28 +109,28 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     models: [
       mockModel("parent", "Parent"),
       mockModel("dead-primary", "Dead primary"),
-      mockModel("healthy-fallback", "Healthy fallback"),
       mockModel("limit-fable", "Usage-limited primary"),
       mockModel("limit-opus", "Same-account sibling"),
+      mockModel("limit-after-tool", "Primary limited after a tool call"),
+      { ...mockModel(LIMIT_NEAR_COMPACTION, "Primary limited near the compaction threshold"), contextWindow: NEAR_COMPACTION_WINDOW },
     ],
     streamSimple(model, context) {
       if (isChild(context)) {
-        return streamMessage(childReply(model.id))
+        return streamMessage(childReply(model.id, context))
       }
-      parentCalls += 1
-      return streamMessage(parentCalls === 1
-        ? assistant(model.id, "toolUse", [{
-            type: "toolCall",
-            id: "fallback-task-call",
-            name: "task",
-            arguments: {
-              category: SCENARIO === "user-fallback" ? "fallbackcat" : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick",
-              prompt: "complete through the configured fallback chain",
-              run_in_background: false,
-              name: "fallback-child",
-            },
-          }])
-        : assistant(model.id, "stop", [{ type: "text", text: "parent observed fallback completion" }]))
+      return streamMessage(parentReply(model.id))
+    },
+  })
+
+  pi.registerProvider("omo-fallback-parent", {
+    name: "omo runtime fallback parent account",
+    baseUrl: "file://omo-runtime-fallback-mock",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [mockModel("parent-gpt", "Parent session model")],
+    streamSimple(model, context) {
+      if (isChild(context)) return streamMessage(assistant(model.id, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, "omo-fallback-parent"))
+      return streamMessage(parentReply(model.id, "omo-fallback-parent"))
     },
   })
 
@@ -126,6 +146,18 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     models: [{ ...mockModel("gpt-6-luna-fast", "Dead chain rung one"), reasoning: true }],
     streamSimple(model, context) {
       return streamMessage(childReply(model.id))
+    },
+  })
+  // The healthy fallback is a second account: senpi 2026.10.12 (#3131) skips every model on a provider
+  // whose account hit its usage limit, so a fallback past an account-wide error lives on another provider.
+  pi.registerProvider("omo-fallback-healthy", {
+    name: "omo runtime fallback healthy account",
+    baseUrl: "file://omo-runtime-fallback-mock",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [mockModel("healthy-fallback", "Healthy fallback")],
+    streamSimple(model, context) {
+      return streamMessage(childReply(model.id, context, "omo-fallback-healthy"))
     },
   })
   pi.registerProvider("omo-fallback-other", {
@@ -168,14 +200,57 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   }
 }
 
-function childReply(modelId: string): AssistantMessage {
+function parentReply(modelId: string, provider = "omo-fallback-mock"): AssistantMessage {
+  parentCalls += 1
+  if (parentCalls > 1) return assistant(modelId, "stop", [{ type: "text", text: "parent observed fallback completion" }], undefined, provider)
+  return assistant(modelId, "toolUse", [{
+    type: "toolCall",
+    id: "fallback-task-call",
+    name: "task",
+    arguments: {
+      category: DESIGNATED_ONLY_SCENARIOS[SCENARIO] ?? (SCENARIO === "user-fallback"
+        ? "fallbackcat"
+        : SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === LIMIT_NEAR_COMPACTION
+          ? "toolcat"
+          : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick"),
+      prompt: "complete through the configured fallback chain",
+      run_in_background: false,
+      name: "fallback-child",
+    },
+  }], undefined, provider)
+}
+
+function childReply(modelId: string, context: Context, provider = "omo-fallback-mock"): AssistantMessage {
+  if (SCENARIO === LIMIT_NEAR_COMPACTION && modelId === LIMIT_NEAR_COMPACTION) {
+    return hasToolResult(context)
+      ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
+      : {
+          ...assistant(modelId, "toolUse", [{
+            type: "toolCall",
+            id: "limit-near-compaction-call",
+            name: "bash",
+            arguments: { command: "printf limit-near-compaction-ran" },
+          }]),
+          usage: { input: NEAR_COMPACTION_INPUT, output: 40, cacheRead: 0, cacheWrite: 0, totalTokens: NEAR_COMPACTION_INPUT + 40, cost: 0 },
+        }
+  }
+  if ((SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === "designated-only-after-tool") && modelId === LIMIT_AFTER_TOOL) {
+    return hasToolResult(context)
+      ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
+      : assistant(modelId, "toolUse", [{
+          type: "toolCall",
+          id: "limit-after-tool-call",
+          name: "bash",
+          arguments: { command: "printf limit-after-tool-ran" },
+        }])
+  }
   const limitError = LIMIT_ERRORS[SCENARIO]
   if (limitError !== undefined) {
     const spent = modelId === "limit-fable" || (modelId === "limit-opus" && SCENARIO === "limit-account")
     return spent ? assistant(modelId, "error", [], limitError) : assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
   }
   if (modelId === "healthy-fallback") {
-    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+    return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, provider)
   }
   if (modelId === "deepseek-flash" && SCENARIO !== "chain-exhausted") {
     return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
@@ -195,11 +270,16 @@ function mockModel(id: string, name: string) {
   }
 }
 
-// The identity line is written by the in-process subagent prompt only. A per-child process and a
-// task daemon session both run senpi in `--mode rpc` while the driver's parent runs `-p`, so the rpc
-// argv is the structural child signal there (the same selector task-e2e-mock-provider.ts uses).
+// The identity line is written by the in-process subagent prompt only. A per-child process carries
+// OMO_SENPI_TASK_RPC_CHILD=1 from the process runner; that env marker is the signal that holds on Windows,
+// where the provider extension does not see the `--mode rpc` argv. A task daemon session still runs in
+// `--mode rpc` while the driver's parent runs `-p`, so the rpc argv stays a second signal there.
 function isChild(context: Context): boolean {
-  return messagesContainChild(context) || process.argv.includes("rpc")
+  return messagesContainChild(context) || process.env.OMO_SENPI_TASK_RPC_CHILD === "1" || process.argv.includes("rpc")
+}
+
+function hasToolResult(context: Context): boolean {
+  return (context.messages ?? []).some((message) => (message as { readonly role?: string }).role === "toolResult")
 }
 
 function messagesContainChild(context: Context): boolean {
@@ -214,12 +294,13 @@ function assistant(
   stopReason: StopReason,
   content: AssistantMessage["content"],
   errorMessage?: string,
+  provider = "omo-fallback-mock",
 ): AssistantMessage {
   return {
     role: "assistant",
     content,
     api: "openai-completions",
-    provider: "omo-fallback-mock",
+    provider,
     model,
     usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: 0 },
     stopReason,

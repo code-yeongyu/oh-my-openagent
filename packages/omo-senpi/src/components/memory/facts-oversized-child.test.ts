@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import type { AgentSession } from "@code-yeongyu/senpi"
-import type { ChildSessionListener } from "@oh-my-opencode/senpi-task"
+import { normalizeContext } from "@earendil-works/pi-ai"
+import type { ChildSessionListener, QueuedInputDisposition } from "@oh-my-opencode/senpi-task"
 
 import { createOversizedFactsGuard } from "./facts-oversized-child"
 import { FACTS_REQUEST_LIMIT } from "./facts-oversized-budget"
@@ -20,7 +21,9 @@ async function fixture() {
   let disposed = false
   const child = {
     agent: { streamFunction }, sessionId: "guard-fixture",
-    prompt: async () => undefined, steer: async () => undefined, followUp: async () => undefined,
+    prompt: async () => undefined,
+    steer: async (): Promise<QueuedInputDisposition> => "handled",
+    followUp: async (): Promise<QueuedInputDisposition> => "handled",
     abort: async () => { aborts += 1 }, abortCompaction: () => { compactionAborts += 1 },
     setAutoCompactionEnabled: (enabled: boolean) => { expect(enabled).toBe(false) },
     subscribe: (listener: ChildSessionListener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
@@ -34,11 +37,11 @@ async function fixture() {
 test("#given a pinned child #when eight requests forward #then output and transport retries are bounded and the ninth cannot forward", async () => {
   const f = await fixture()
   for (let index = 0; index < FACTS_REQUEST_LIMIT; index += 1) {
-    expect(() => f.child.agent.streamFunction(f.model, { messages: [] }, { maxTokens: 99999, maxRetries: 5 })).toThrow(f.forwarded)
+    expect(() => f.child.agent.streamFunction(f.model, normalizeContext({ messages: [] }), { maxTokens: 99999, maxRetries: 5 })).toThrow(f.forwarded)
   }
   expect(f.calls).toHaveLength(FACTS_REQUEST_LIMIT)
   expect(f.calls.every((call) => call[2]?.maxTokens === 4096 && call[2]?.maxRetries === 0)).toBe(true)
-  expect(() => f.child.agent.streamFunction(f.model, { messages: [] })).toThrow("budget")
+  expect(() => f.child.agent.streamFunction(f.model, normalizeContext({ messages: [] }))).toThrow("budget")
   expect(f.calls).toHaveLength(FACTS_REQUEST_LIMIT)
   expect(f.guard.succeeded()).toBe(false)
   expect(f.counts().aborts).toBe(1)
@@ -55,7 +58,7 @@ test("#given a changed model or oversized complete context #when the stream star
     }
     expect(() => f.child.agent.streamFunction(
       model,
-      { messages: [], systemPrompt: failure === "context" ? "x".repeat(1_048_576) : "" },
+      normalizeContext({ messages: [], systemPrompt: failure === "context" ? "x".repeat(1_048_576) : "" }),
     )).toThrow("budget")
     expect(f.calls).toHaveLength(0)
     expect(f.guard.succeeded()).toBe(false)
@@ -68,7 +71,7 @@ test("#given construction-time listeners #when compaction, reduced context, or o
     for (const listener of f.listeners) listener(event)
     expect(f.guard.succeeded()).toBe(false)
     expect(f.counts()).toMatchObject({ aborts: 1, compactionAborts: 1 })
-    expect(() => f.child.agent.streamFunction(f.model, { messages: [] })).toThrow("budget")
+    expect(() => f.child.agent.streamFunction(f.model, normalizeContext({ messages: [] }))).toThrow("budget")
     expect(f.calls).toHaveLength(0)
     expect(f.failures).toHaveLength(1)
     f.child.dispose()

@@ -92,8 +92,8 @@ describe("a capability that advertises invokeScope", () => {
     if (wrapper === undefined) throw new Error("the grant must produce a wrapper")
     const signal = new AbortController().signal
 
-    await wrapper.execute("call-1", { value: "a" } as never, signal, undefined, {} as never)
-    await wrapper.execute("call-2", { value: "b" } as never, undefined, undefined, {} as never)
+    await wrapper.execute("call-1", { value: "a" }, signal)
+    await wrapper.execute("call-2", { value: "b" })
 
     expect(capability.invokeCalls).toEqual([
       {
@@ -139,7 +139,7 @@ describe("a nested host call refused inside the scoped invocation", () => {
     const wrappers = createKernelToolWrappers(granted(await grant(capability, { toolDenylist: ["write"] })))
     const wrapper = wrappers[0]
     if (wrapper === undefined) throw new Error("the grant must produce a wrapper")
-    const result = await wrapper.execute("call-9", {} as never, undefined, undefined, {} as never)
+    const result = await wrapper.execute("call-9", {})
     const first = result.content[0]
     return {
       ...(result.isError === undefined ? {} : { isError: result.isError }),
@@ -196,8 +196,8 @@ describe("a capability WITHOUT the marker keeps today's behavior byte for byte",
     if (wrapper === undefined) throw new Error("the grant must produce a wrapper")
     const signal = new AbortController().signal
 
-    await wrapper.execute("call-1", { value: "a" } as never, signal, undefined, {} as never)
-    await wrapper.execute("call-2", { value: "b" } as never, undefined, undefined, {} as never)
+    await wrapper.execute("call-1", { value: "a" }, signal)
+    await wrapper.execute("call-2", { value: "b" })
 
     expect(capability.invokeCalls.map((call) => ({ options: call.options, argCount: call.argCount }))).toEqual([
       { options: signal, argCount: 2 },

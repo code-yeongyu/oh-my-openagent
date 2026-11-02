@@ -59,6 +59,25 @@ describe("transitionTaskRecord lifecycle graph", () => {
       .not.toHaveProperty("started_at")
   })
 
+  test("#given a running task interrupted by another client #when the interrupt transition carries the partial answer #then it is kept as final_response with no error", () => {
+    // given
+    const started = transitionTaskRecord(pendingRecord(), { type: "start", timestamp: "2026-07-06T00:00:00.000Z" })
+    expect(started.record.status).toBe("running")
+
+    // when
+    const result = transitionTaskRecord(started.record, {
+      type: "interrupt",
+      timestamp: "2026-07-06T00:00:02.000Z",
+      final_response: "partial work before the abort",
+    })
+
+    // then
+    expect(result.applied).toBe(true)
+    expect(result.record.status).toBe("interrupted")
+    expect(result.record.final_response).toBe("partial work before the abort")
+    expect(result.record.error_message).toBeUndefined()
+  })
+
   test("#given pending task #when running-only terminals (complete/fail/interrupt) arrive before start #then they are rejected", () => {
     // given
     // cancel-from-pending is legal (see the w2trans suite below); complete/fail/interrupt stay running-only.

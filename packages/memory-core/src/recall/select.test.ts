@@ -317,6 +317,49 @@ describe("selectRecallCandidates automatic strategy", () => {
     expect(paths(automatic)).toEqual(["reference/publish.md"])
   })
 
+  it("#given a Chinese planner term sharing only single characters with a note #when the strategy is omitted #then the note surfaces", () => {
+    // given
+    const documents = [
+      doc("reference/zh/expenses.md", "报销规定", "差旅报销上限为每天五百元"),
+      doc("reference/zh/meeting.md", "周会安排", "每周一上午开周会"),
+    ]
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["出差能报多少钱"], BASE_OPTS)
+
+    // then
+    expect(paths(candidates)).toEqual(["reference/zh/expenses.md"])
+  })
+
+  it("#given a long note matched only through single Han characters #when the strategy is omitted #then the excerpt centers on the match", () => {
+    // given: the matching sentence sits far past the excerpt length
+    const documents = [
+      doc("reference/zh/expenses.md", "费用说明", `${"intro ".repeat(60)}差旅报销上限为每天五百元`),
+      doc("reference/zh/meeting.md", "周会安排", "每周一上午开周会"),
+    ]
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["出差能报多少钱"], BASE_OPTS)
+
+    // then
+    expect(paths(candidates)).toEqual(["reference/zh/expenses.md"])
+    expect(candidates[0]?.excerpt).toContain("差旅报销上限")
+  })
+
+  it("#given a note holding a longer query token and an earlier single Han character #when the strategy is omitted #then the longer token anchors the excerpt", () => {
+    // given: 报 occurs at the very start, the two-character piece 出差 only at the end
+    const documents = [
+      doc("reference/zh/travel.md", "差旅", `报${" filler".repeat(60)} 出差申请提前三天`),
+      doc("reference/zh/meeting.md", "周会安排", "每周一上午开周会"),
+    ]
+
+    // when
+    const candidates = selectRecallCandidates(documents, ["出差能报多少钱"], BASE_OPTS)
+
+    // then
+    expect(candidates[0]?.excerpt).toContain("出差申请")
+  })
+
   it("#given an NFD-stored Hangul note #when a composed Korean query selects #then the note surfaces", () => {
     // given: text pasted from macOS file names is often NFD
     const documents = [
@@ -354,6 +397,36 @@ describe("selectRecallCandidates with the hybrid strategy", () => {
     doc("c/notes.md", "notes", "a long note that mentions tmux once among many other words"),
   ]
   const queries = ["deploy", "tmux", "targeting"]
+
+  it("#given a Chinese planner term sharing only single characters with a note #when hybrid selects #then the note surfaces", () => {
+    // given: substring matching and the two-character pieces both miss
+    const chinese = [
+      doc("reference/zh/expenses.md", "报销规定", "差旅报销上限为每天五百元"),
+      doc("reference/zh/meeting.md", "周会安排", "每周一上午开周会"),
+    ]
+
+    // when
+    const substring = selectRecallCandidates(chinese, ["出差能报多少钱"], { ...BASE_OPTS, strategy: "substring" })
+    const hybrid = selectRecallCandidates(chinese, ["出差能报多少钱"], HYBRID_OPTS)
+
+    // then
+    expect(paths(substring)).toEqual([])
+    expect(paths(hybrid)).toEqual(["reference/zh/expenses.md"])
+  })
+
+  it("#given a long note matched only through single Han characters #when hybrid selects #then the excerpt centers on the match", () => {
+    // given
+    const chinese = [
+      doc("reference/zh/expenses.md", "费用说明", `${"intro ".repeat(60)}差旅报销上限为每天五百元`),
+      doc("reference/zh/meeting.md", "周会安排", "每周一上午开周会"),
+    ]
+
+    // when
+    const hybrid = selectRecallCandidates(chinese, ["出差能报多少钱"], HYBRID_OPTS)
+
+    // then
+    expect(hybrid[0]?.excerpt).toContain("差旅报销上限")
+  })
 
   it("#given documents only one ranker finds #when hybrid selects #then it returns the union of both rankers", () => {
     // given
@@ -510,5 +583,132 @@ describe("selectRecallCandidates with the bm25 strategy", () => {
     const excerpt = candidates[0]?.excerpt ?? ""
     expect(excerpt).toContain("퍼블리시 토큰")
     expect(excerpt.length).toBeLessThanOrEqual(200)
+  })
+})
+
+describe("selectRecallCandidates with expansions", () => {
+  const lead = Array.from({ length: 60 }, (_, index) => `padding${index}`).join(" ")
+  const small = [
+    doc("notes/revert.md", "Release", `${lead} revert the release when the canary fails`),
+    doc("notes/deploy.md", "Deploy", "deploy rollback steps for the lighthouse service"),
+    doc("notes/lunch.md", "Lunch", "order noodles on friday"),
+  ]
+
+  it("#given a small English memory and a question worded differently #when the caller adds synonyms #then the note is found and the excerpt shows the matched passage", () => {
+    // when
+    const plain = selectRecallCandidates(small, ["undo shipment"], BASE_OPTS)
+    const widened = selectRecallCandidates(small, ["undo shipment"], { ...BASE_OPTS, expansions: { synonyms: ["revert", "release"] } })
+
+    // then
+    expect(plain).toEqual([])
+    expect(paths(widened)).toEqual(["notes/revert.md"])
+    expect(widened[0]?.excerpt).toContain("revert the release")
+  })
+
+  it("#given a note matching every query word #when the search is widened #then it stays ahead of the notes only an added term found", () => {
+    // when
+    const widened = selectRecallCandidates(small, ["deploy rollback"], {
+      ...BASE_OPTS,
+      expansions: { synonyms: ["revert", "release", "canary"], related: ["noodles"] },
+    })
+
+    // then
+    expect(paths(widened)).toEqual(["notes/deploy.md", "notes/revert.md", "notes/lunch.md"])
+    const scores = widened.map((candidate) => candidate.score)
+    expect(scores).toEqual([...scores].sort((left, right) => left - right))
+  })
+
+  it("#given no expansions, empty ones or blank ones #when candidates are selected #then the list equals the one without the option", () => {
+    // given
+    const korean = [...small, doc("notes/ko.md", "배포", "퍼블리시 절차와 배포 체크리스트")]
+
+    // when / then
+    for (const [documents, query] of [[small, "deploy rollback"], [small, "release"], [korean, "퍼블리시할 배포"]] as const) {
+      const plain = selectRecallCandidates(documents, [query], BASE_OPTS)
+      expect(selectRecallCandidates(documents, [query], { ...BASE_OPTS, expansions: {} })).toEqual(plain)
+      expect(selectRecallCandidates(documents, [query], { ...BASE_OPTS, expansions: { synonyms: [], related: ["  "], noteLine: "" } })).toEqual(plain)
+    }
+  })
+
+  it("#given a large memory #when the search is widened #then the hybrid keeps the full match first and adds the note an added term found", () => {
+    // given
+    const fillers = Array.from({ length: 220 }, (_, index) => doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "Filler", `unrelated words number ${index}`))
+    const documents = [...small, ...fillers]
+
+    // when
+    const plain = selectRecallCandidates(documents, ["deploy rollback"], BASE_OPTS)
+    const widened = selectRecallCandidates(documents, ["deploy rollback"], { ...BASE_OPTS, expansions: { synonyms: ["revert", "canary"] } })
+
+    // then
+    expect(paths(plain)).toEqual(["notes/deploy.md"])
+    expect(paths(widened)).toEqual(["notes/deploy.md", "notes/revert.md"])
+  })
+
+  it("#given a small English memory with several verbatim matches #when the search is widened #then today's results come first in today's order", () => {
+    // given (the substring scorer orders by the offset of the match, bm25 would order b before a)
+    const documents = [
+      doc("notes/a.md", "One", `deploy ${"padding ".repeat(100)}`),
+      doc("notes/b.md", "One", "x deploy"),
+      doc("notes/c.md", "One", "rollout"),
+    ]
+
+    // when
+    const plain = selectRecallCandidates(documents, ["deploy"], BASE_OPTS)
+    const widened = selectRecallCandidates(documents, ["deploy"], { ...BASE_OPTS, expansions: { synonyms: ["rollout"] } })
+
+    // then
+    expect(paths(plain)).toEqual(["notes/a.md", "notes/b.md"])
+    expect(paths(widened)).toEqual(["notes/a.md", "notes/b.md", "notes/c.md"])
+    expect(widened.slice(0, 2).map((candidate) => candidate.excerpt)).toEqual(plain.map((candidate) => candidate.excerpt))
+  })
+
+  it("#given a large memory where an added term also matches a verbatim partial match #when one candidate is asked for #then the note holding the whole query word keeps first place", () => {
+    // given ("run" is the whole query word after the English fold; "outrunning" only contains it)
+    const fillers = Array.from({ length: 200 }, (_, index) => doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "", "alpha beta gamma"))
+    const documents = [doc("full.md", "", "run"), doc("partial.md", "", "outrunning rollout"), ...fillers]
+    const one = { maxItems: 1, surfaced: new Set<string>() }
+
+    // when
+    const plain = selectRecallCandidates(documents, ["running"], one)
+    const widened = selectRecallCandidates(documents, ["running"], { ...one, expansions: { synonyms: ["rollout"] } })
+
+    // then
+    expect(paths(plain)).toEqual(["full.md"])
+    expect(paths(widened)).toEqual(["full.md"])
+  })
+
+  it("#given expansions that only repeat the query or hold no word #when candidates are selected #then the list equals the search as written", () => {
+    // given (a verbatim partial match next to the note holding the whole query word, as above)
+    const fillers = Array.from({ length: 200 }, (_, index) => doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "", "alpha beta gamma"))
+    const documents = [doc("full.md", "", "run"), doc("partial.md", "", "outrunning rollout"), ...fillers]
+
+    // when / then
+    const plain = selectRecallCandidates(documents, ["running"], BASE_OPTS)
+    expect(paths(plain)).toEqual(["full.md", "partial.md"])
+    for (const expansions of [{ synonyms: ["running"] }, { synonyms: ["!!!"] }, { related: ["Running", "runs"], noteLine: "..." }]) {
+      expect(selectRecallCandidates(documents, ["running"], { ...BASE_OPTS, expansions })).toEqual(plain)
+    }
+  })
+
+  it("#given a note found only through an added Han character #when selected #then the excerpt shows that character", () => {
+    // given
+    const documents = [doc("notes/key.md", "One", `${"padding ".repeat(60)}鍵`), doc("notes/lost.md", "One", "lost and found box")]
+
+    // when
+    const widened = selectRecallCandidates(documents, ["lost"], { ...BASE_OPTS, strategy: "bm25", expansions: { keywords: ["鍵"] } })
+
+    // then
+    expect(paths(widened)).toEqual(["notes/lost.md", "notes/key.md"])
+    expect(widened[1]?.excerpt).toContain("鍵")
+  })
+
+  it("#given a widened search on any strategy #when candidates are returned #then the scores ascend", () => {
+    for (const strategy of ["substring", "bm25", "hybrid"] as const) {
+      const widened = selectRecallCandidates(small, ["deploy rollback"], { ...BASE_OPTS, strategy, expansions: { synonyms: ["revert", "canary"], related: ["noodles"] } })
+      expect(paths(widened)).toEqual(["notes/deploy.md", "notes/revert.md", "notes/lunch.md"])
+      const scores = widened.map((candidate) => candidate.score)
+      expect(scores).toEqual([...scores].sort((left, right) => left - right))
+      expect(new Set(scores).size).toBe(scores.length)
+    }
   })
 })

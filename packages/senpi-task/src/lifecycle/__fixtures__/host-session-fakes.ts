@@ -82,6 +82,8 @@ export type HostLifecycleFixture = {
   readonly daemon: FakeDaemon
   readonly waits: number[]
   readonly respawned: Array<{ readonly task_id: string; readonly sessionPath: string | undefined }>
+  /** The probe wired into `deps`, so a test can override one method and keep the rest. */
+  readonly hostSessionProbe: NonNullable<LifecycleDeps["hostSessionProbe"]>
 }
 
 export type HostLifecycleInput = {
@@ -96,6 +98,8 @@ export type HostLifecycleInput = {
   readonly deferredRetryBackoffMs?: readonly number[]
   /** Runs inside every recorded wait, so a test can move the daemon between retries. */
   readonly onWait?: (ms: number) => void
+  /** Holds each retry wait until the returned promise settles; tests use it to act between attempts. */
+  readonly gateWait?: (ms: number) => Promise<void>
 }
 
 /** Lifecycle deps wired to a fake daemon, a recorded signaller, and a recorded (never real) wait. */
@@ -110,6 +114,14 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
     return input.respawn === undefined
       ? { ok: false, disposition: "retryable", code: "respawn_failed", reason: "no respawn port" }
       : await input.respawn(record, sessionPath)
+  }
+  const hostSessionProbe: HostLifecycleFixture["hostSessionProbe"] = {
+    daemonAlive: (identity) => daemon.daemonReachable(identity.socket),
+    sessionLive: async (identity) =>
+      (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path),
+    sessionLiveness: async (identity) =>
+      (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path) ? "live" : "gone",
+    refresh: () => undefined,
   }
   const deps: LifecycleDeps = {
     hostEndpoint: NO_HOST_ENDPOINT,
@@ -127,12 +139,7 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
     },
     respawn,
     reattach: () => Promise.resolve({ ok: true }),
-    hostSessionProbe: {
-      daemonAlive: (identity) => daemon.daemonReachable(identity.socket),
-      sessionLive: async (identity) =>
-        (await daemon.liveSessionPaths(identity.socket)).includes(identity.session_path),
-      refresh: () => undefined,
-    },
+    hostSessionProbe,
     hostSessionClose: (request) => daemon.close(request),
     hostRetry: {
       maxDrainAttempts: input.maxDrainAttempts ?? 10,
@@ -142,11 +149,11 @@ export function hostLifecycleDeps(input: HostLifecycleInput): HostLifecycleFixtu
       wait: (ms) => {
         waits.push(ms)
         input.onWait?.(ms)
-        return Promise.resolve()
+        return input.gateWait?.(ms) ?? Promise.resolve()
       },
     },
   }
-  return { deps, registry, daemon, waits, respawned }
+  return { deps, registry, daemon, waits, respawned, hostSessionProbe }
 }
 
 export function hostSessionRecordInput(taskId: string, identity: HostSessionIdentity) {

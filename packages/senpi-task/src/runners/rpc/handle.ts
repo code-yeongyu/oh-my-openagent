@@ -10,16 +10,25 @@ import type {
   RpcTerminalAssistantMessage,
   TerminateOptions,
 } from "../types"
-import { type RpcStreamingBehavior, isBusyChildRejection } from "./delivery-semantics"
-import { RpcCommandError } from "./errors"
+import { RpcCommandError, RpcRequestTimeout } from "./errors"
+import { startHeartbeat, unresponsiveMessage } from "./heartbeat"
 import { recordTaskChildDeath } from "./crash-record"
 import { classifyChildExit } from "./exit-mapping"
+import { createHandleListeners } from "../rpc-host/handle-listeners"
 import { isHarmlessRpcShutdownError, type RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
 import { exitTurnOutcome, extractAssistantText, promptFailureOutcome } from "./turn-outcome"
-import { createTurnSettlement, sessionIsIdle } from "./turn-settlement"
+import { createTurnSettlement, sessionIsIdle, type TurnSettlementScheduler } from "./turn-settlement"
+import { createTurnWakeSources } from "./turn-wake-sources"
+import { createInputEffects } from "../input-effects"
+import { readStdioAdmissions } from "../input-admission-read"
+import { createInputDelivery } from "../input-delivery"
+import { createRpcRunPause } from "./native-run-pause"
+import { createTurnClaim } from "./turn-claim"
+import { createTaskParentControl } from "../task-parent-control"
 
 export type CreateRpcChildHandleOptions = {
+  readonly inputStore?: import("../../store").TaskRecordStore
   readonly client: RpcProtocolClient
   readonly child: ChildProcess
   readonly taskId: string
@@ -27,6 +36,10 @@ export type CreateRpcChildHandleOptions = {
   readonly now: () => number
   /** The child's spawn env: where it keeps its agent dir, so its unexpected death is recorded there. */
   readonly childEnv?: NodeJS.ProcessEnv
+  /** Stops the child process; defaults to terminateRpcChild. A test passes a fake so it never signals a host process. */
+  readonly terminateChild?: (child: ChildProcess, options?: TerminateOptions) => Promise<void>
+  /** Test seam: drives the settle confirmation by hand instead of a real timer. */
+  readonly settlementScheduler?: TurnSettlementScheduler
 }
 
 export type TrackedRpcChildHandle = RpcChildHandle & {
@@ -54,6 +67,7 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   let lastSeenAt: number | undefined
   let outcome: ChildExitOutcome | undefined
   let terminationRequested = false
+  let tornDown = false
   // Wall clock on purpose: the injected `now` is the heartbeat's clock, and tests observe its calls.
   const startedAt = Date.now()
 
@@ -65,20 +79,38 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     for (const waiter of outcomeWaiters.splice(0)) waiter(settled)
   }
 
+  const wakeSources = createTurnWakeSources()
   const settlement = createTurnSettlement({
     settle: settleTurn,
     abortedByUser: () => abortedByUser,
     baseline: () => turnBaseline,
     finalText: () => finalText,
+    probe: async () => {
+      const response = await client.send({ type: "get_state" })
+      // A non-success reply is unreadable state, not a busy session: the settlement bounds its re-arms.
+      return response.success === true && response.command === "get_state" ? (response.data as object) : undefined
+    },
+    settleConfirmMs: heartbeatIntervalMs,
+    wakeSourcesLive: () => wakeSources.hasLiveWakeSources(),
+    disposed: () => tornDown,
+    scheduleConfirmation: options.settlementScheduler,
   })
 
   const resumedListeners = new Set<() => void>()
+  const claims = createTurnClaim()
+  // A child can run its whole first turn (a tool call and an in-session fallback hop included) before
+  // `start` returns and the manager subscribes; those events are kept for the first observers (#9582).
+  const listeners = createHandleListeners({
+    onListenerError: (error) => log("senpi-task rpc child event listener failed", { taskId, error: String(error) }),
+  })
+  let heartbeatActivity = (): void => {}
   client.onEvent((event) => {
+    heartbeatActivity()
     // A run the child starts on its own after its turn settled (a monitor or background job woke it)
     // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
     if (event.type === "agent_start" && turnOutcome !== undefined && outcome === undefined) {
       beginTurn()
-      for (const listener of resumedListeners) listener()
+      if (!claims.consume()) for (const listener of resumedListeners) listener()
     }
     if (event.type === "message_end") {
       const terminal = extractTerminalAssistantMessage(event.message)
@@ -88,34 +120,50 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       }
     }
     settlement.observe(event)
-  })
-
-  const heartbeat = setInterval(() => {
-    if (client.exited || child.stdin?.writableEnded || child.stdin?.destroyed) return
-    try {
-      client
-        .send({ type: "get_state" })
-        .then((response) => {
-          lastSeenAt = now()
-          sessionId = readSessionId(response) ?? sessionId
-        })
-        .catch((error: unknown) => {
-          if (client.exited || isHarmlessRpcShutdownError(error)) return
-          log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
-        })
-    } catch (error) {
-      if (client.exited || isHarmlessRpcShutdownError(error)) return
-      log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+    // Goal/monitor wake records ride the SAME stream as agent events here: the protocol client
+    // only diverts permission-shaped extension events, so a raw `extension_event` reaches this
+    // funnel. The tracker reads `name`; a record that names nothing it tracks is ignored.
+    if ((event as { readonly type?: string }).type === "extension_event") {
+      wakeSources.observe(event)
+      settlement.reconfirmHeld()
     }
-  }, heartbeatIntervalMs)
-  heartbeat.unref?.()
+  })
+  // Subscribers run after the handle has recorded the event (as on dev, and as the host handle does), so a
+  // live observer reads current state and one that throws cannot keep the handle from settling a turn.
+  client.onEvent((event) => listeners.emitEvent(event))
+
+  const stopHeartbeat = startHeartbeat({
+    intervalMs: heartbeatIntervalMs,
+    paused: () => outcome !== undefined || client.exited || child.stdin?.writableEnded === true || child.stdin?.destroyed === true,
+    probe: async () => {
+      const response = await client.send({ type: "get_state" })
+      assertOk(response, "get_state")
+      return response
+    },
+    onState: (response) => {
+      lastSeenAt = now()
+      sessionId = readSessionId(response) ?? sessionId
+    },
+    onFailure: (error) => {
+      if (!isHarmlessRpcShutdownError(error)) log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
+    },
+    onUnresponsive: () => {
+      settleTurn({ status: "error", failure: { kind: "child-unresponsive", message: unresponsiveMessage(taskId) } })
+      settleExit({ kind: "crashed", facts: { pid: child.pid, code: null, signal: null, stderrTail: "child-unresponsive" } })
+      terminationRequested = true
+      void (options.terminateChild ?? terminateRpcChild)(child).catch((error: unknown) => {
+        log("senpi-task unresponsive child termination failed", { taskId, error: String(error) })
+      })
+    },
+  })
+  heartbeatActivity = stopHeartbeat.activity
 
   const settleExit = (built: ChildExitOutcome): void => {
     if (outcome) {
       return
     }
     outcome = built
-    clearInterval(heartbeat)
+    stopHeartbeat()
     flush(idleWaiters)
     if (turnOutcome === undefined) settleTurn(settlement.pending() ?? exitTurnOutcome(built, finalText))
     for (const waiter of exitWaiters.splice(0)) {
@@ -125,17 +173,22 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
 
   child.once("error", (error) => settleExit(classifyChildExit({ code: null, signal: null, error, pid: child.pid, stderr: client.stderrTail })))
   child.once("close", (code, signal) => {
-    const built = classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail })
+    const built = classifyChildExit({ code, signal, pid: child.pid, stderr: client.stderrTail, terminatedByRunner: terminationRequested })
     if (options.childEnv !== undefined) {
       recordTaskChildDeath({ env: options.childEnv, outcome: built, terminationRequested, startedAt, now: Date.now() })
     }
     settleExit(built)
   })
 
-  const runCommand = async (command: Parameters<RpcProtocolClient["send"]>[0], label: string): Promise<void> => {
+  const writeCommand = async (command: Parameters<RpcProtocolClient["send"]>[0], label: string): Promise<void> => {
     const response = await client.send(command)
     assertOk(response, label)
   }
+  const inputEffects = createInputEffects({
+    taskId, store: options.inputStore,
+    send: command => writeCommand(command, command.type),
+    read: ids => readStdioAdmissions(client, ids),
+  })
 
   const beginTurn = (): void => {
     if (outcome !== undefined) return
@@ -146,31 +199,32 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     terminalAssistantMessage = undefined
     abortedByUser = false
     turnBaseline = finalText
+    wakeSources.resetTurn()
   }
 
-  // Deliver with explicit queueing semantics, retrying as followUp when the child answers
-  // "busy". Without this a mid-run delivery is rejected outright and aborts the child.
-  const deliverPrompt = async (text: string, streamingBehavior: RpcStreamingBehavior): Promise<void> => {
-    try {
-      await runCommand({ type: "prompt", message: text, streamingBehavior }, "prompt")
-    } catch (error) {
-      if (streamingBehavior === "followUp" || !isBusyChildRejection(error)) throw error
-      await runCommand({ type: "prompt", message: text, streamingBehavior: "followUp" }, "prompt")
-    }
-  }
+  const delivery = createInputDelivery({
+    effects: inputEffects, beginTurn, promptFailed: error => {
+      // A broken pipe can reject the command before close supplies the process-exit facts.
+      // Let close settle that outcome so the manager can confirm it instead of publishing ERROR.
+      if (!client.exited && !(error instanceof RpcRequestTimeout)) settleTurn(promptFailureOutcome(error))
+    },
+  })
 
-  const runPrompt = async (text: string, streamingBehavior: RpcStreamingBehavior = "steer"): Promise<void> => {
-    beginTurn()
-    try {
-      await deliverPrompt(text, streamingBehavior)
-    } catch (error) {
-      settleTurn(promptFailureOutcome(error))
-      throw error
-    }
-  }
+  const waitForOutcome = (): Promise<RunnerOutcome> =>
+    turnOutcome !== undefined
+      ? Promise.resolve(turnOutcome)
+      : outcome === undefined
+        ? new Promise<RunnerOutcome>((resolve) => outcomeWaiters.push(resolve))
+        : Promise.resolve(exitTurnOutcome(outcome, finalText))
+  const control = createTaskParentControl({ width: 80, send: command => client.sendTaskParent(command) })
+  const runPause = createRpcRunPause({
+    taskId, control: () => control, currentOutcome: waitForOutcome, claimNextTurn: claims.claim,
+  })
 
   return {
+    reconcileInputs: inputEffects.reconcile,
     task_id: taskId,
+    runPause,
     get sessionId() {
       return sessionId
     },
@@ -179,21 +233,17 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     },
     // task_send is documented to ALWAYS steer into the addressed child, so a steer that the
     // host rejects as busy degrades to followUp queueing rather than failing the delivery.
-    steer: async (text) => {
-      beginTurn()
-      try {
-        await runCommand({ type: "steer", message: text }, "steer")
-      } catch (error) {
-        if (!isBusyChildRejection(error)) throw error
-        await deliverPrompt(text, "followUp")
-      }
-    },
-    followUp: (text) => runPrompt(text, "followUp"),
+    steer: (text, identity) => delivery.steer(text, identity?.clientMessageId),
+    followUp: (text, identity) => delivery.runPrompt(text, "followUp", identity?.clientMessageId),
     abort: () => {
       abortedByUser = true
-      return runCommand({ type: "abort" }, "abort")
+      return writeCommand({ type: "abort" }, "abort")
     },
-    subscribe: (listener: ChildEventListener) => client.onEvent(listener),
+    subscribe: (listener: ChildEventListener) => {
+      const unsubscribe = listeners.registrations.subscribe(listener)
+      return () => void unsubscribe()
+    },
+    subscribeExtensionEvents: client.extensionEvents.subscribe,
     adoptFinishedTurn: async (finalResponse) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
       const response = await client.send({ type: "get_state" }).catch(() => undefined)
@@ -206,13 +256,8 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     },
     waitForIdle: () =>
       reachedIdle || outcome ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve)),
-    hasExited: () => client.exited,
-    waitForOutcome: () =>
-      turnOutcome !== undefined
-        ? Promise.resolve(turnOutcome)
-        : outcome === undefined
-          ? new Promise<RunnerOutcome>((resolve) => outcomeWaiters.push(resolve))
-          : Promise.resolve(exitTurnOutcome(outcome, finalText)),
+    hasExited: () => outcome !== undefined || client.exited,
+    waitForOutcome,
     lastAssistantText: () => finalText,
     terminalAssistantMessage: () => terminalAssistantMessage,
     wasAbortedByUser: () => abortedByUser,
@@ -220,7 +265,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     exitOutcome: () => outcome,
     waitForExit: () => (outcome ? Promise.resolve(outcome) : new Promise<ChildExitOutcome>((resolve) => exitWaiters.push(resolve))),
     dispose: async () => {
-      clearInterval(heartbeat)
+      inputEffects.stopRetrying()
+      tornDown = true
+      stopHeartbeat()
+      settlement.cancelConfirmation()
+      listeners.clearActive()
       try {
         await client.detach()
       } catch (error) {
@@ -228,10 +277,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
       }
     },
     terminate: (terminateOptions?: TerminateOptions) => {
+      inputEffects.stopRetrying()
       terminationRequested = true
-      return terminateRpcChild(child, terminateOptions)
+      return (options.terminateChild ?? terminateRpcChild)(child, terminateOptions)
     },
-    startInitialPrompt: (text) => runPrompt(text),
+    startInitialPrompt: (text) => delivery.runPrompt(text),
   }
 }
 
@@ -243,7 +293,7 @@ function flush(waiters: Array<() => void>): void {
 
 function assertOk(response: RpcResponse, label: string): void {
   if (!response.success) {
-    throw new RpcCommandError(label, response.error)
+    throw new RpcCommandError(label, response.error, response)
   }
 }
 

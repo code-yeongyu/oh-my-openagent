@@ -24,6 +24,7 @@ import {
   type FactsFailuresFile,
 } from "./failures-schema"
 import { factsQueuePaths, type FactsQueueLayout } from "./schema"
+import { migrateParkedEntries, moveParkedEntries } from "./parked"
 
 const LOCK_WAIT_MS = 2000
 
@@ -92,7 +93,7 @@ export class FactsFailureStore {
         reason: request.reason,
         ...(request.detail === undefined ? {} : { detail: request.detail }),
         now: at,
-      }),
+      }), false, request.targets,
     )
   }
 
@@ -107,12 +108,14 @@ export class FactsFailureStore {
       const next = clearForRetry(entries, filter)
       removed = entries.length - next.length
       return next
-    })
+    }, true)
     return removed
   }
 
   private async mutate(
     change: (entries: readonly FactsFailureRecord[], at: Date) => readonly FactsFailureRecord[],
+    retry = false,
+    parkTargets: readonly FactsFailureTarget[] = [],
   ): Promise<FactsFailuresFile> {
     return this.locked(async () => {
       const current = await this.readUnlocked()
@@ -123,7 +126,17 @@ export class FactsFailureStore {
         updatedAt: at.toISOString(),
         entries,
       }
+      if (retry) {
+        const retained = new Set(entries)
+        // Restore before clearing the ledger: a crash cannot strand a file in
+        // parked/ without a record identifying it for the next manual retry.
+        await moveParkedEntries(this.layout, current.entries.filter((entry) => !retained.has(entry)), true)
+      }
       await this.writeAtomically(renderFailuresFile(entries, file.updatedAt))
+      const targets = new Set(parkTargets.map((target) => `${target.conversationId}\u0000${target.endMessageId}`))
+      await moveParkedEntries(this.layout, entries.filter((entry) =>
+        targets.has(`${entry.conversationId}\u0000${entry.end_message_id}`),
+      ))
       return file
     })
   }
@@ -165,7 +178,10 @@ export class FactsFailureStore {
     await mkdir(this.layout.queueDir, { recursive: true })
     await mkdir(dirname(this.lockPath), { recursive: true })
     const record = await createLockRecord("facts-queue")
-    return withLock(this.lockPath, record, task, { waitTimeoutMs: this.lockWaitMs })
+    return withLock(this.lockPath, record, async () => {
+      await migrateParkedEntries(this.layout)
+      return task()
+    }, { waitTimeoutMs: this.lockWaitMs })
   }
 }
 

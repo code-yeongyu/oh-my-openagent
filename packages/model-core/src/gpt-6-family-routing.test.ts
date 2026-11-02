@@ -1,17 +1,18 @@
 import { describe, expect, test } from "bun:test"
 
 import { getBuiltInRequirementModelIDs } from "./model-capability-guardrails"
+import { FABLE_55_RELEASED } from "./fable-55-launch"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 const GPT_PROVIDERS = ["openai", "chatgpt-subscription", "github-copilot", "opencode"]
 
 describe("GPT-6 family routing", () => {
-  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast medium on the OpenAI lanes, then gpt-5.6-sol medium on every lane, then gpt-5.6-sol-fast, and nothing after it", () => {
+  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast high on the OpenAI lanes, then gpt-5.6-sol high on every lane, then gpt-5.6-sol-fast, and nothing after it", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
-      { providers: GPT_PROVIDERS, model: "gpt-5.6-sol", variant: "medium" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "high" },
+      { providers: GPT_PROVIDERS, model: "gpt-5.6-sol", variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "high" },
     ])
   })
 
@@ -45,10 +46,12 @@ describe("GPT-6 family routing", () => {
   test.each([
     ["artistry", CATEGORY_MODEL_REQUIREMENTS],
     ["prometheus", AGENT_MODEL_REQUIREMENTS],
-  ] as const)("%s follows its Fable 5.1 lead with claude-opus-5-5 max", (name, table) => {
+  ] as const)("%s follows Fable 5.5 (once released) and 5.1 with claude-opus-5-5 max", (name, table) => {
     const chain = table[name].fallbackChain
-    expect(chain[0]?.model).toBe("claude-fable-5-1")
-    expect(chain[1]).toMatchObject({ model: "claude-opus-5-5", variant: "max" })
-    expect(chain[1]?.providers).toEqual(chain[0]?.providers)
+    // The 5.5 rung exists only once FABLE_55_RELEASED is true.
+    const fableLead = [...(FABLE_55_RELEASED ? ["claude-fable-5-5"] : []), "claude-fable-5-1"]
+    expect(chain.slice(0, fableLead.length).map((rung) => rung.model)).toEqual(fableLead)
+    expect(chain[fableLead.length]).toMatchObject({ model: "claude-opus-5-5", variant: "max" })
+    for (const rung of chain.slice(1, fableLead.length + 1)) expect(rung.providers).toEqual(chain[0]?.providers)
   })
 })

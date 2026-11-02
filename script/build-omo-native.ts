@@ -31,7 +31,7 @@ export { REQUIRED_PLUGIN_ARTIFACTS }
 export const PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
 // Root-level plugin files. The daemon launch spec is the task daemon's only argv source; it is
 // generated at build time and must reach every payload, not just the source tree.
-export const PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json"] as const
+export const PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json", "telemetry-schema.json", "telemetry-schema.omo-cloud.json"] as const
 export const PAYLOAD_SCRIPT = join("scripts", "install.mjs")
 
 // Native-only runtime: `omo doctor` / `omo setup` import it to classify task-category coverage with
@@ -88,6 +88,15 @@ function parseArgs(argv: readonly string[]): BuildOptions {
 const PREBUILT_NATIVE_INPUTS = [
   { artifactPath: join("packages", "lsp-daemon", "dist"), buildScript: "build:lsp-daemon" },
   { artifactPath: join("packages", "ast-grep-mcp", "dist", "cli.js"), buildScript: "build:ast-grep-mcp" },
+  // The browser skill's bundled omowright runtime is gitignored and produced only by
+  // build:materialize-frontend (stage-omowright-runtime.mjs). runSenpiPluginBuild passes
+  // OMO_SKIP_MATERIALIZE=1 to the native chain, which skips that staging, so without this input a
+  // fresh checkout ships the binary payload's browser skill with no runtime and loadOmowright()
+  // always fails (issue #9661). Stage it up front like the other prebuilt inputs.
+  {
+    artifactPath: join("packages", "shared-skills", "skills", "browser", "runtime", "omowright", "index.js"),
+    buildScript: "build:materialize-frontend",
+  },
 ] as const
 
 export interface PrebuiltInputDependencies {
@@ -164,7 +173,7 @@ function buildRuntimeBundle(entry: string, outfile: string, name: string): void 
   if (result.status !== 0) throw new Error(`${name} runtime build failed with exit code ${result.status ?? 1}`)
 }
 
-function buildCategoryCoverageRuntime(outfile: string): void {
+export function buildCategoryCoverageRuntime(outfile: string): void {
   buildRuntimeBundle(CATEGORY_COVERAGE_ENTRY, outfile, "category-coverage")
   copyFileSync(COMPUTER_PRELUDE_ASSET_SOURCE, join(dirname(outfile), "assets.generated.json"))
 }

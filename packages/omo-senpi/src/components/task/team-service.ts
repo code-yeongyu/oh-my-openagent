@@ -24,6 +24,7 @@ import {
   updateTeamTaskStatus,
   type ActiveTeamSummary,
   type PersistedTaskEvent,
+  type ResolveAncestry,
   type StateDirConfig,
   type TaskLifecycle,
   type TaskManager,
@@ -57,9 +58,8 @@ export interface TeamServiceDeps {
   readonly omoConfig: OmoConfig
   readonly cwd: string
   readonly agentNames: ReadonlySet<string>
-  // The lead session's own place in the task tree. Members spawn one level below it, matching the
-  // task tool's (ancestry.depth + 1), so a child session leading a team cannot reset depth (#9036).
-  readonly ancestry?: { readonly depth: number }
+  // Resolve the current lead like the task tool does, including shared in-process child sessions.
+  readonly resolveAncestry?: ResolveAncestry
   // The session's package-aware inherited list, so a team member reproduces the same providers an
   // ordinary child gets (#8492). Absent, member launches fall back to the parent's argv entries.
   readonly resolveInheritedExtensions?: () => Promise<readonly string[]>
@@ -138,13 +138,15 @@ export function createTeamService(deps: TeamServiceDeps): TeamToolsService {
   const service: TeamToolsService = {
     async createTeam(input) {
       const leadSessionId = requireLeadSession(deps)
+      const ancestry = deps.resolveAncestry?.(leadSessionId)
       const { spec, source } = await resolveTeamSpec(input, ports, deps.cwd, omoTeams)
       return createTeam(spec, source, {
         manager: deps.manager,
         stateDir,
         taskSettings: deps.settings,
         leadSessionId,
-        spawnDepth: (deps.ancestry?.depth ?? 0) + 1,
+        rootSessionId: ancestry?.rootSessionId ?? leadSessionId,
+        spawnDepth: (ancestry?.depth ?? 0) + 1,
         ...(deps.now !== undefined ? { now: deps.now } : {}),
         memberExtension: {
           entryPath: memberExtensionEntryPath,

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Standalone feature modules wired into `plugin/` layer. Each is self-contained with own types, implementation, and co-located tests. Several directories now provide OpenCode adapter shims over extracted Core packages; keep those shim paths stable unless the plugin wiring is moved at the same time.
+Standalone feature modules wired into `plugin/` layer. Each is self-contained with own types, implementation, and co-located tests. Several directories now provide OpenCode adapter shims over extracted Core packages; keep the shim paths that production code imports stable unless the plugin wiring is moved at the same time. A shim whose only importers are tests is deleted, not kept alive by an identity test; tests import the Core package directly.
 
 ## MODULE MAP
 

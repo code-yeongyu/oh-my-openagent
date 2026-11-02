@@ -1,4 +1,4 @@
-import { chmodSync, writeFileSync } from "node:fs"
+import { chmodSync, realpathSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { locateDesktopEngine } from "@oh-my-opencode/senpi-desktop-engine"
 import { workDir } from "./fixtures"
@@ -29,9 +29,22 @@ export async function tccDiagnostic(options: RunOptions): Promise<ScenarioResult
   return withSession({ ...options, enginePath: wrapper }, {}, async (session) => {
     const result = await session.call({ action: "call", chain: [{ method: "screenshot" }] })
     const message = toolError(result) ?? ""
-    const identity = /TCC identity: executable=([^,)]+)/.exec(message)?.[1] ?? null
-    return { scenario: "tcc-diagnostic",
-      pass: result.isError && message.includes("TCC identity: executable=") && identity === engine,
+    const { pass, identity } = tccIdentityPasses(message, engine)
+    return { scenario: "tcc-diagnostic", pass: result.isError && pass,
       facts: { launcher: "engine spawned with TCC responsibility disclaimed", engine, message, identity } }
   })
+}
+
+/** The denial must name the engine itself as the TCC responsible process (#9345's message form). */
+export function tccIdentityPasses(message: string, engine: string): { pass: boolean; identity: string | null } {
+  const identity = /TCC identity: responsible=(.+?)(?: bundle=[^,)]+)?, pid=\d+\)/.exec(message)?.[1] ?? null
+  return { pass: identity !== null && canonical(identity) === canonical(engine), identity }
+}
+
+function canonical(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
+  }
 }

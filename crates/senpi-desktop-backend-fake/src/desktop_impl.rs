@@ -1,5 +1,6 @@
 use image::RgbaImage;
-use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::ax::AxHandle;
+use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
@@ -10,37 +11,6 @@ use senpi_desktop_core::types::{
 use crate::fake::FakeBackend;
 use crate::method::FakeMethod;
 use crate::sink::{RecordedPointer, SinkOp};
-
-impl FakeBackend {
-    /// Native-size frame of `target`: the display composite, or the window at
-    /// one pixel per logical point.
-    fn frame(&self, target: &Target) -> CoreResult<(FrameGeometry, u32, u32)> {
-        match target {
-            Target::Desktop => {
-                let extent = |edge: fn(&DesktopDisplay) -> u32| self.displays.iter().map(edge).max();
-                let width = extent(|d| d.pixel_x.saturating_add(d.pixel_width)).unwrap_or(0);
-                let height = extent(|d| d.pixel_y.saturating_add(d.pixel_height)).unwrap_or(0);
-                Ok((FrameGeometry::for_displays(&self.displays), width, height))
-            }
-            Target::Window(id) => {
-                let window = self.window(id)?;
-                let frame = FrameGeometry::for_window(window, window.width, window.height);
-                Ok((frame, window.width, window.height))
-            }
-        }
-    }
-
-    fn apply_scripted_resize(&mut self, target: &Target) {
-        let Target::Window(id) = target else { return };
-        let Some(resize) = self.resize_window.take_if(|resize| &resize.id == id) else {
-            return;
-        };
-        if let Some(window) = self.windows.iter_mut().find(|window| window.id == resize.id) {
-            window.width = resize.width;
-            window.height = resize.height;
-        }
-    }
-}
 
 impl Backend for FakeBackend {
     fn capabilities(&mut self) -> DesktopCapabilities {
@@ -58,7 +28,12 @@ impl Backend for FakeBackend {
     }
 
     /// Returns the native-size solid image; the session applies `caps`.
-    fn capture(&mut self, target: &Target, _caps: &CaptureCaps) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(
+        &mut self,
+        target: &Target,
+        _caps: &CaptureCaps,
+        _exclude_window_titles: &[String],
+    ) -> CoreResult<(RgbaImage, FrameGeometry)> {
         self.begin(FakeMethod::Capture)?;
         if !self.capabilities.capture {
             return Err(DesktopError::capture_failed(
@@ -66,6 +41,11 @@ impl Backend for FakeBackend {
             ));
         }
         let (frame, width, height) = self.frame(target)?;
+        let frame = if self.legacy_capture {
+            frame.into_legacy_capture()
+        } else {
+            frame
+        };
         if width == 0 || height == 0 {
             return Err(DesktopError::capture_failed(
                 "fake scenario has nothing to capture",
@@ -96,8 +76,11 @@ impl Backend for FakeBackend {
         };
         self.begin(method)?;
         self.input_gate(target, mode)?;
+        if matches!(ev, PointerEvent::Click { .. } | PointerEvent::Drag { .. }) {
+            self.press_check(method)?;
+        }
         let event = RecordedPointer::from(ev);
-        if *target == Target::Desktop || mode == DeliveryMode::Foreground {
+        if matches!(target, Target::Desktop | Target::Display(_)) || mode == DeliveryMode::Foreground {
             self.cursor = self.cursor.and(event.end_point());
         }
         self.deliver_focus(target, mode);
@@ -112,6 +95,10 @@ impl Backend for FakeBackend {
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::TypeText)?;
         self.input_gate(target, mode)?;
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
+        self.press_check(FakeMethod::TypeText)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::TypeText {
             target: target.clone(),
@@ -144,6 +131,11 @@ impl Backend for FakeBackend {
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
+        // The whole text is admitted before any chunk goes out, as the macOS
+        // port maps every character before posting.
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
         let mut start = 0;
         for end in text
             .char_indices()
@@ -162,9 +154,21 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
+    fn ax_type_text(
+        &mut self,
+        h: &AxHandle,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        crate::element_input_impl::ax_type_text(self, h, text, mode, check_stop, delivered)
+    }
+
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::KeyChord)?;
         self.input_gate(target, mode)?;
+        self.press_check(FakeMethod::KeyChord)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::KeyChord {
             target: target.clone(),
@@ -182,6 +186,38 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
+    fn hold_keys(
+        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.hold_keys_impl(target, keys, mode, control)
+    }
+
+    fn hold_mouse(
+        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+    ) -> CoreResult<()> {
+        self.hold_mouse_impl(target, hold, mode, control)
+    }
+
+    fn menu_items(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+    ) -> CoreResult<Vec<senpi_desktop_core::menus::MenuItem>> {
+        self.menu_items_impl(window, path)
+    }
+
+    fn menu_select(
+        &mut self,
+        window: &DesktopWindow,
+        path: &[String],
+        delivery: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        self.menu_select_impl(window, path, delivery, check_stop)
+    }
+
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
         if self.capabilities.ax {
             Some(self)
@@ -192,8 +228,13 @@ impl Backend for FakeBackend {
 
     fn release_all(&mut self) -> CoreResult<()> {
         self.begin(FakeMethod::ReleaseAll)?;
+        self.sink.release_held();
         self.record(SinkOp::ReleaseAll);
         Ok(())
+    }
+
+    fn emergency_release(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EmergencyRelease>> {
+        Some(std::sync::Arc::new(self.sink.clone()))
     }
 
     fn cursor_position(&mut self) -> CoreResult<Option<DesktopPoint>> {
@@ -243,5 +284,12 @@ impl Backend for FakeBackend {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         self.begin(FakeMethod::ScreenLocked)?;
         Ok(self.capabilities.screen_locked)
+    }
+
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+        if !self.user_input_feed {
+            return None;
+        }
+        Some(self.user_input())
     }
 }

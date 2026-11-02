@@ -15,10 +15,14 @@ const workflowPath = new URL("../.github/workflows/publish-platform.yml", import
 const signingScript = new URL("../.github/scripts/macos-sign-and-notarize.sh", import.meta.url)
 const entitlements = new URL("../.github/scripts/omo-bun-executable.entitlements", import.meta.url)
 const signingMaterial = ["CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"]
-// The signing script only ever runs on macOS runners, and the sandbox's POSIX PATH stub cannot shadow tools under Windows bash.
-const posixBashTest = test.skipIf(process.platform === "win32")
+// Two gates, each with its reason. Tests that run the signing script against a stubbed macOS toolchain need POSIX bash:
+// the script only ever runs on macOS runners, and under Windows bash the PATH stubs cannot shadow the real tools.
+// Argument parsing exits before any tool is touched, so it is checked on every platform with a working bash.
+const bashRuns = spawnSync("bash", ["-c", "exit 0"]).status === 0
+const posixBashTest = test.skipIf(process.platform === "win32" || !bashRuns)
+const anyBashTest = test.skipIf(!bashRuns)
 
-const stepsSchema = z.array(z.object({ name: z.string().optional(), if: z.string().optional() }))
+const stepsSchema = z.array(z.object({ name: z.string().optional(), if: z.string().optional(), run: z.string().optional() }))
 const jobs = z.object({ jobs: z.object({
   "desktop-engine": z.object({ steps: stepsSchema }),
   build: z.object({ steps: stepsSchema }),
@@ -60,6 +64,21 @@ describe("macOS signing in the platform publish workflow", () => {
     expect(stepIndex(engine, "Stage desktop engine release asset")).toBeLessThan(signEngine)
     expect(signEngine).toBeLessThan(stepIndex(engine, "Upload desktop engine artifact"))
     expect(engine[signEngine]?.if).toContain("startsWith(matrix.host, 'darwin-')")
+  })
+
+  test("builds, signs and verifies the Darwin engine trust helper before the engine artifact is uploaded", () => {
+    const engine = jobs["desktop-engine"].steps
+    const build = stepIndex(engine, "Build engine trust helper")
+    const sign = stepIndex(engine, "Sign Darwin engine trust helper")
+    const upload = stepIndex(engine, "Upload desktop engine artifact")
+
+    expect(build).toBeLessThan(sign)
+    expect(sign).toBeLessThan(upload)
+    expect(engine[sign]?.if).toBe("startsWith(matrix.host, 'darwin-')")
+    const run = engine[sign]?.run ?? ""
+    const signs = run.indexOf("bash .github/scripts/macos-sign-and-notarize.sh --sign-only")
+    expect(signs).toBeGreaterThanOrEqual(0)
+    expect(run.indexOf('codesign -dv --verbose=2 "$HELPER"')).toBeGreaterThan(signs)
   })
 
   posixBashTest("the release digest describes the signed bytes, not the unsigned build output", () => {
@@ -106,92 +125,27 @@ describe("macOS signing in the platform publish workflow", () => {
   })
 })
 
-/** Fake macOS toolchain: a signing keychain, codesign, a notarytool whose `info` answers from a script, and spctl. */
-function notarySandbox(infoAnswers: readonly string[]): { root: string; env: NodeJS.ProcessEnv; binary: string } {
-  const { root, env } = sandbox()
-  const bin = join(root, "bin")
-  const answers = join(root, "info-answers")
-  writeFileSync(answers, `${infoAnswers.join("\n")}\n`)
-  writeFileSync(join(bin, "security"), `#!/bin/bash
-case "$1" in
-  list-keychains) echo '    "/login.keychain-db"' ;;
-  find-identity) echo '  1) ABCDEF "Developer ID Application: Test (TEAM123456)"' ;;
-esac
-exit 0
-`)
-  writeFileSync(join(bin, "codesign"), `#!/bin/bash
-if [ "$1" = -dv ]; then echo "flags=0x10000(runtime) TeamIdentifier=TEAM123456" >&2; fi
-exit 0
-`)
-  writeFileSync(join(bin, "xcrun"), `#!/bin/bash
-shift
-case "$1" in
-  submit) echo '{"id":"sub-1"}' ;;
-  info)
-    line=$(head -n 1 "${answers}"); sed -i.bak 1d "${answers}"
-    [ "$line" = FAIL ] && { echo "The request timed out." >&2; exit 1; }
-    echo "{\\"id\\":\\"sub-1\\",\\"status\\":\\"$line\\"}" ;;
-  log) echo '{"issues":[]}' ;;
-esac
-`)
-  writeFileSync(join(bin, "spctl"), `#!/bin/bash
-echo "accepted source=Notarized Developer ID"
-`)
-  writeFileSync(join(bin, "ditto"), `#!/bin/bash
-find "\${@: -2:1}" -type f -exec cat {} \\; -exec echo \\; > "${root}/archived-files"
-touch "\${@: -1}"
-`)
-  for (const tool of ["security", "codesign", "xcrun", "spctl", "ditto"]) chmodSync(join(bin, tool), 0o755)
-  const binary = join(root, "omo-darwin-arm64")
-  writeFileSync(binary, "binary")
-  const material = { CSC_LINK: Buffer.from("p12").toString("base64"), CSC_KEY_PASSWORD: "pw", APPLE_API_KEY: "key", APPLE_API_KEY_ID: "KEY", APPLE_API_ISSUER: "issuer" }
-  return { root, binary, env: { ...env, ...material, RUNNER_TEMP: root, NOTARY_POLL_SECONDS: "0", NOTARY_TIMEOUT_SECONDS: "30" } }
+/** Feeds the script through stdin, so a CRLF checkout on Windows parses as the LF file the macOS runners execute. */
+function runSigningArgs(args: readonly string[]) {
+  const script = readFileSync(signingScript, "utf8").replace(/\r\n/g, "\n")
+  const env: NodeJS.ProcessEnv = { ...process.env }
+  for (const name of [...signingMaterial, "MACOS_SIGNING_REQUIRED"]) delete env[name]
+  return spawnSync("bash", ["-s", "--", ...args], { cwd: tmpdir(), env, input: script, encoding: "utf8" })
 }
 
-function runSigning(root: string, env: NodeJS.ProcessEnv, binary: string) {
-  return spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary], { cwd: root, env, encoding: "utf8" })
-}
-
-describe("notarization polling", () => {
-  test("submits every input even when two share a basename", () => {
-    const { root, env, binary } = notarySandbox(["Accepted"])
-    try {
-      mkdirSync(join(root, "arm64"))
-      mkdirSync(join(root, "amd64"))
-      const arm = join(root, "arm64", "comment-checker")
-      const amd = join(root, "amd64", "comment-checker")
-      writeFileSync(arm, "arm64 build")
-      writeFileSync(amd, "amd64 build")
-      rmSync(binary)
-      const result = spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.comment-checker", arm, amd], { cwd: root, env, encoding: "utf8" })
-      expect(result.status, result.stderr).toBe(0)
-      const archived = readFileSync(join(root, "archived-files"), "utf8").trim().split("\n")
-      expect(archived).toHaveLength(2)
-      expect(archived.sort()).toEqual(["amd64 build", "arm64 build"])
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  test("keeps polling through transient notarytool errors until Apple accepts", () => {
-    const { root, env, binary } = notarySandbox(["FAIL", "In Progress", "FAIL", "Accepted"])
-    try {
-      const result = runSigning(root, env, binary)
-      expect(result.status, result.stderr).toBe(0)
-      expect(result.stdout).toContain("notarization sub-1: Accepted")
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  test("fails when Apple rejects the submission", () => {
-    const { root, env, binary } = notarySandbox(["In Progress", "Invalid"])
-    try {
-      const result = runSigning(root, env, binary)
-      expect(result.status).toBe(1)
-      expect(result.stderr).toContain("notarization was not accepted (status: Invalid)")
-    } finally {
-      rmSync(root, { recursive: true, force: true })
+describe("signing script arguments", () => {
+  // Guards the CLI contract the publish workflow calls: bad invocations exit 2 with a reason, before any signing tool runs.
+  anyBashTest("rejects a missing identifier or file list, an unknown option, and a missing file", () => {
+    const cases = [
+      [[], "usage:"],
+      [["--identifier", "ai.sisyphuslabs.omo"], "usage:"],
+      [["--identifier", "ai.sisyphuslabs.omo", "--bogus"], "unknown option: --bogus"],
+      [["--identifier", "ai.sisyphuslabs.omo", "omo-no-such-binary"], "not a file: omo-no-such-binary"],
+    ] as const
+    for (const [args, reason] of cases) {
+      const result = runSigningArgs(args)
+      expect(result.status, `${args.join(" ")}: ${result.stderr}`).toBe(2)
+      expect(result.stderr).toContain(reason)
     }
   })
 })

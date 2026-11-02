@@ -9,7 +9,7 @@ async function packFixture(root: string, files: Readonly<Record<string, string>>
 	return path
 }
 
-async function runInstall(tarball: string, root: string) {
+async function runInstall(tarball: string, root: string, localPackages: Readonly<Record<string, string>> = {}) {
 	const requests: string[] = []
 	const registry = Bun.serve({
 		port: 0,
@@ -22,7 +22,7 @@ async function runInstall(tarball: string, root: string) {
 		const installRoot = join(root, "install")
 		const child = Bun.spawn([process.execPath, "-e", `
 			import { installSenpiTarball } from ${JSON.stringify(new URL("./omob-senpi-install.ts", import.meta.url).href)};
-			console.log("PACKAGE_ROOT=" + await installSenpiTarball(${JSON.stringify(tarball)}, ${JSON.stringify(installRoot)}));
+			console.log("PACKAGE_ROOT=" + await installSenpiTarball(${JSON.stringify(tarball)}, ${JSON.stringify(installRoot)}, ${JSON.stringify(localPackages)}));
 		`], {
 			stdout: "pipe",
 			stderr: "pipe",
@@ -98,6 +98,76 @@ describe("installSenpiTarball", () => {
 			for (const [name, value] of [["bundled", "packed"], ["required", "required-sidecar"], ["optional", "optional-sidecar"]]) {
 				expect((await import(join(result.packageRoot, `node_modules/@code-yeongyu/${name}/index.js`))).default).toBe(value)
 			}
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
+	})
+
+	test("installs unpublished lockstep siblings from their local tarballs through alias and transitive edges", async () => {
+		const root = mkdtempSync(join(tmpdir(), "omob-local-siblings-"))
+		try {
+			const sidecar = join(root, "sidecar.tgz")
+			const optionalSidecar = join(root, "optional-sidecar.tgz")
+			for (const [path, name] of [[sidecar, "sidecar"], [optionalSidecar, "optional-sidecar"]] as const) {
+				await Bun.write(path, new Bun.Archive({
+					"package/package.json": JSON.stringify({ name: `@omob-external/${name}`, version: "1.0.0", main: "index.js" }),
+					"package/index.js": `module.exports = '${name}';`,
+				}, { compress: "gzip" }))
+			}
+			const tui = await packFixture(join(root, "tui"), {
+				"package/package.json": JSON.stringify({
+					name: "@omob-source/tui", version: "0.0.0-unpublished", private: true, main: "index.js",
+					dependencies: { "@omob-external/sidecar": `file:${sidecar}` },
+				}),
+				"package/index.js": "exports.nextRenderRevision = () => 'source-' + require('@omob-external/sidecar');",
+			})
+			const core = await packFixture(join(root, "core"), {
+				"package/package.json": JSON.stringify({
+					name: "@omob-source/core", version: "0.0.0-unpublished", private: true, main: "index.js",
+					dependencies: { "@omob-source/tui": "^0.0.0-unpublished" },
+					optionalDependencies: { "@omob-external/optional-sidecar": `file:${optionalSidecar}` },
+					peerDependencies: { "@code-yeongyu/senpi": "*" },
+				}),
+				"package/index.js": "module.exports = require('@omob-source/tui').nextRenderRevision() + '+' + require('@omob-external/optional-sidecar');",
+			})
+			const tarball = await packFixture(root, {
+				"package/package.json": JSON.stringify({
+					name: "@code-yeongyu/senpi", version: "0.0.0-unpublished",
+					dependencies: {
+						"@omob-source/core": "npm:@omob-published/core@0.0.0-unpublished",
+						"@omob-source/tui": "npm:@omob-published/tui@0.0.0-unpublished",
+					},
+				}),
+			})
+			const result = await runInstall(tarball, root, { "@omob-source/core": core, "@omob-source/tui": tui })
+			expect(result.exitCode, result.stderr).toBe(0)
+			expect(result.requests).toEqual([])
+			const entry = join(result.packageRoot, "node_modules/@omob-source/core/index.js")
+			expect((await import(entry)).default).toBe("source-sidecar+optional-sidecar")
+			expect(existsSync(join(result.packageRoot, "node_modules/@code-yeongyu/senpi"))).toBe(false)
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
+	})
+
+	test("rejects siblings that declare different version specs for one external dependency", async () => {
+		const root = mkdtempSync(join(tmpdir(), "omob-sibling-conflict-"))
+		try {
+			const sibling = await packFixture(join(root, "sibling"), {
+				"package/package.json": JSON.stringify({
+					name: "@omob-source/sibling", version: "0.0.0-unpublished", dependencies: { "left-pad": "2.0.0" },
+				}),
+			})
+			const tarball = await packFixture(root, {
+				"package/package.json": JSON.stringify({
+					name: "@code-yeongyu/senpi", version: "0.0.0-unpublished",
+					dependencies: { "@omob-source/sibling": "0.0.0-unpublished", "left-pad": "1.0.0" },
+				}),
+			})
+			const result = await runInstall(tarball, root, { "@omob-source/sibling": sibling })
+			expect(result.exitCode).not.toBe(0)
+			expect(result.stderr).toContain("left-pad")
+			expect(result.requests).toEqual([])
 		} finally {
 			rmSync(root, { recursive: true, force: true })
 		}

@@ -6,6 +6,7 @@ import { describeFrontmatterGrammarViolation } from "./frontmatter-validation"
 import { parseMemoryFile, renderMemoryFile, type MemoryFrontmatter, type ParsedMemoryFile } from "./frontmatter"
 import { resolveCommonGitDir } from "./hooks"
 import { isMemoryContentPath } from "./paths"
+import { PROVENANCE_STRIPPED_TRAILER, stampReceipt, strippedLegacyUserHeader } from "../tools/claim-frontmatter"
 
 export const FRONTMATTER_NORMALIZATION_MARKER = "omo-memory-frontmatter-normalized"
 export const FRONTMATTER_NORMALIZATION_SUBJECT = "chore(memory): normalize frontmatter to strict YAML"
@@ -54,9 +55,10 @@ export async function normalizeMemoryFrontmatter(
 
   const candidates = await candidatePaths(repo, exec, checkedSha, head)
   const rewritten: string[] = []
+  const stripped: string[] = []
   const skipped: NormalizeFrontmatterSkip[] = []
   for (const path of candidates) {
-    const outcome = await normalizeOne(repo.dir, path)
+    const outcome = await normalizeOne(repo.dir, path, stripped)
     if (outcome === "unchanged") continue
     if (outcome === "rewritten") rewritten.push(path)
     else skipped.push({ path, reason: outcome })
@@ -69,7 +71,10 @@ export async function normalizeMemoryFrontmatter(
 
   const commit = await repo.commitWrite(
     rewritten,
-    `${FRONTMATTER_NORMALIZATION_SUBJECT} (${rewritten.length} ${rewritten.length === 1 ? "file" : "files"})`,
+    [
+      `${FRONTMATTER_NORMALIZATION_SUBJECT} (${rewritten.length} ${rewritten.length === 1 ? "file" : "files"})`,
+      ...(stripped.length === 0 ? [] : ["", ...stripped.map((path) => `${PROVENANCE_STRIPPED_TRAILER}: ${path}`)]),
+    ].join("\n"),
     author,
   )
   writeMarker(markerPath, commit.sha)
@@ -86,7 +91,7 @@ function markerPathFor(repo: GitMemoryRepo): string {
   return join(resolveCommonGitDir(repo.dir), FRONTMATTER_NORMALIZATION_MARKER)
 }
 
-async function normalizeOne(root: string, path: string): Promise<"unchanged" | "rewritten" | NormalizeFrontmatterSkip["reason"]> {
+async function normalizeOne(root: string, path: string, stripped: string[]): Promise<"unchanged" | "rewritten" | NormalizeFrontmatterSkip["reason"]> {
   const absolute = join(root, path)
   const content = await readFile(absolute, "utf8")
   if (describeFrontmatterGrammarViolation(content) === null) return "unchanged"
@@ -99,17 +104,21 @@ async function normalizeOne(root: string, path: string): Promise<"unchanged" | "
   }
   if (parsed.frontmatter.read_only === "true") return "read_only"
 
+  // The same header rule as every writer and the commit hook: a legacy user header is dropped (the body is unchanged,
+  // so any other header is kept). The commit records the drop with PROVENANCE_STRIPPED_TRAILER.
+  const target = { frontmatter: stampReceipt(parsed, parsed.frontmatter, parsed.body, undefined), body: parsed.body }
   let rendered: string
   try {
-    rendered = renderMemoryFile(parsed.frontmatter, parsed.body)
+    rendered = renderMemoryFile(target.frontmatter, target.body)
   } catch {
     return "unparseable"
   }
-  if (describeFrontmatterGrammarViolation(rendered) !== null || !sameMemoryFile(parseMemoryFile(rendered), parsed)) {
+  if (describeFrontmatterGrammarViolation(rendered) !== null || !sameMemoryFile(parseMemoryFile(rendered), target)) {
     return "not_reproducible"
   }
 
   await writeFile(absolute, rendered, "utf8")
+  if (strippedLegacyUserHeader(content, rendered)) stripped.push(path)
   return "rewritten"
 }
 

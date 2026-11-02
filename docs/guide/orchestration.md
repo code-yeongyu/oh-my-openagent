@@ -129,7 +129,7 @@ High-accuracy review is the default for every plan `/ulw-plan` produces; the onl
 - QA scenarios name the tool, the steps, and the expected result
 - No missing information would stop execution cold
 
-An approval whose remaining items are notes counts as approval. On a rejection the planner fixes every cited issue and resubmits. Rounds are capped at 5 unless you ask for more.
+An approval whose remaining items are notes counts as approval. On a rejection the planner fixes every cited issue and resubmits. Review keeps going while each round finds something new that matters or confirms an earlier blocker fixed, and stops to ask you when a round does neither but still does not approve. A round that approves with only notes left ends the review.
 
 The spawn is contract-driven: the harness replaces the `plan-reviewer` prompt with the canonical review contract (one `.omo/plans/*.md` path), so anything else in the prompt is discarded.
 
@@ -269,7 +269,7 @@ Team mode is for overlapping lanes that need to exchange discoveries mid-flight.
   },
   "categories": {
     "quick": {
-      "models": ["anthropic/claude-haiku-4-5"]
+      "models": ["anthropic/claude-haiku-5-5"]
     },
     "writing": {
       "models": ["anthropic/claude-opus-5-5"]

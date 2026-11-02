@@ -15,14 +15,14 @@ describe("Senpi category routing policy", () => {
 
     // then
     expect(routing).toEqual({
-      visualEngineering: { model: "anthropic/claude-fable-5-1", variant: "max" },
+      visualEngineering: { model: "google/gemini-4-argon", variant: "low" },
       quick: { model: "chatgpt-subscription/gpt-6-luna-fast", variant: "low" },
-      unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "medium" },
-      unspecifiedLow: { model: "anthropic/claude-sonnet-5-5", variant: "medium" },
+      unspecifiedHigh: { model: "anthropic/claude-opus-5-5", variant: "high" },
+      unspecifiedLow: { model: "anthropic/claude-sonnet-5-5", variant: "high" },
     })
   })
 
-  test("unspecified-low fallback chain is claude-sonnet-5-5 medium first and excludes luna", () => {
+  test("unspecified-low fallback chain is claude-sonnet-5-5 high first and excludes luna", () => {
     // given / when
     const chain = CATEGORY_FALLBACK_CHAINS["unspecified-low"]
 
@@ -32,21 +32,31 @@ describe("Senpi category routing policy", () => {
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5-5",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.6-pro",
-        variant: "max",
+        variant: "high",
       },
       {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
-        variant: "xhigh",
+        variant: "high",
+      },
+      {
+        providers: ["zai", "zai-coding-cn", "opencode-go"],
+        model: "glm-5.3",
+        variant: "high",
+      },
+      {
+        providers: ["chatgpt-subscription", "openai"],
+        model: "gpt-6.1-sol",
+        variant: "high",
       },
       {
         providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
-        model: "gpt-5.6-terra",
+        model: "gpt-5.6-sol",
         variant: "high",
       },
       {
@@ -57,7 +67,7 @@ describe("Senpi category routing policy", () => {
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "qwen-token-plan-cn", "alibaba-token-plan-cn"],
         model: "qwen3.8-max-preview",
-        variant: "max",
+        variant: "high",
       },
       {
         providers: ["deepseek", "opencode-go"],
@@ -67,7 +77,7 @@ describe("Senpi category routing policy", () => {
       {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
-        variant: "max",
+        variant: "high",
       }
     ])
   })

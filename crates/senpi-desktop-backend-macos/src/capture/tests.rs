@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use image::{Rgba, RgbaImage};
-use senpi_desktop_core::error::ErrorCode;
+use senpi_desktop_core::error::{ErrorCode, TccPermission};
 use senpi_desktop_core::types::{DesktopDisplay, DisplaySelector, Target};
 
 use super::displays::composite;
@@ -13,6 +13,67 @@ use super::MacCapture;
 /// Hang guard for fakes that exit immediately; only the deadline test relies
 /// on expiry, so a loaded host cannot flip these results.
 const DEADLINE: Duration = Duration::from_secs(60);
+
+#[test]
+fn window_list_excludes_two_helpers_by_title_without_hiding_reused_pids() {
+    // Given: two overlay windows and two real application windows.
+    let window = |id: &str, title: &str, pid| senpi_desktop_core::types::DesktopWindow {
+        id: id.to_owned(), title: title.to_owned(), app: "fixture".to_owned(), pid,
+        x: 0, y: 0, width: 100, height: 100, focused: false, is_on_screen: None, elevated: None,
+    };
+    let mut windows = vec![
+        window("101", "senpi-desktop-cursor-overlay", Some(77)),
+        window("app", "Document", Some(77)),
+        window("202", "senpi-desktop-cursor-overlay", Some(88)),
+        window("unknown-owner", "Document", None),
+    ];
+    // When: enumeration filters the helpers WindowServer reports (title and level).
+    super::exclude_overlay_windows(&mut windows, Some(&[101, 202]));
+    // Then: sibling-window/focus consumers cannot see either overlay window.
+    let ids: Vec<_> = windows.iter().map(|window| window.id.as_str()).collect();
+    assert_eq!(ids, ["app", "unknown-owner"]);
+}
+
+#[test]
+fn user_window_sharing_the_helper_title_stays_listed() {
+    // Given: a user document titled like the helper, at a normal window level.
+    let window = |id: &str| senpi_desktop_core::types::DesktopWindow {
+        id: id.to_owned(), title: "senpi-desktop-cursor-overlay".to_owned(), app: "TextEdit".to_owned(),
+        pid: Some(5), x: 0, y: 0, width: 100, height: 100, focused: false, is_on_screen: None, elevated: None,
+    };
+    let mut windows = vec![window("303"), window("404")];
+    // When: only 404 is a helper according to WindowServer.
+    super::exclude_overlay_windows(&mut windows, Some(&[404]));
+    // Then: the user's window remains visible to window consumers.
+    let ids: Vec<_> = windows.iter().map(|window| window.id.as_str()).collect();
+    assert_eq!(ids, ["303"]);
+}
+
+#[test]
+fn unknown_helper_list_hides_every_title_match() {
+    let mut windows = vec![senpi_desktop_core::types::DesktopWindow {
+        id: "303".to_owned(), title: "senpi-desktop-cursor-overlay".to_owned(), app: "x".to_owned(),
+        pid: None, x: 0, y: 0, width: 100, height: 100, focused: false, is_on_screen: None, elevated: None,
+    }];
+    super::exclude_overlay_windows(&mut windows, None);
+    assert!(windows.is_empty());
+}
+
+#[test]
+fn permission_error_names_host_app_pane_and_relaunch() {
+    let error = super::permission_denied();
+    println!("{}", error.message);
+    let app = std::env::var("SENPI_DESKTOP_HOST_APP").ok().filter(|app| !app.trim().is_empty()).unwrap_or_else(|| {
+        "the app that launched OmO (for a terminal launch, that terminal app)".to_owned()
+    });
+    assert_eq!(error.code, ErrorCode::PermissionDenied);
+    let data = error.permission.expect("structured permission payload");
+    assert_eq!(data.app, app);
+    assert_eq!(data.permission, TccPermission::ScreenRecording);
+    assert_eq!(data.settings_url,
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+    assert!(data.relaunch_required);
+}
 
 fn display(id: &str, x: i32, width: u32, height: u32) -> DesktopDisplay {
     DesktopDisplay {
@@ -67,7 +128,8 @@ fn nonzero_exit_without_permission_is_permission_denied_with_tcc_identity() {
     };
     assert_eq!(error.code, ErrorCode::PermissionDenied);
     assert!(
-        error.message.contains("TCC identity: executable="),
+        error.message.contains("TCC identity: responsible=")
+            || error.message.contains("TCC identity: unresolved (engine executable="),
         "{}",
         error.message
     );
@@ -139,4 +201,22 @@ fn composite_renders_mixed_scales_at_the_highest_scale() {
     assert_eq!(image.get_pixel(199, 99), &Rgba([255, 0, 0, 255]));
     assert_eq!(image.get_pixel(200, 0), &Rgba([0, 0, 255, 255]));
     assert_eq!(image.get_pixel(399, 99), &Rgba([0, 0, 255, 255]));
+}
+
+#[test]
+fn active_display_composite_preserves_negative_origin_in_its_frame() {
+    let primary = display("1", 0, 100, 50);
+    let left = display("2", -100, 100, 50);
+    let focused = senpi_desktop_core::types::DesktopWindow {
+        id: "window".into(), title: String::new(), app: String::new(), pid: None,
+        x: -90, y: 0, width: 50, height: 40, focused: true, elevated: None,
+        is_on_screen: None,
+    };
+    let selected = DisplaySelector::Active.select(vec![primary, left], Some(&focused)).unwrap();
+    let regions = selected.into_iter().map(|display| {
+        (display, RgbaImage::from_pixel(200, 100, Rgba([1, 2, 3, 255])))
+    }).collect();
+    let (image, frame) = composite(regions).unwrap();
+    assert_eq!(image.dimensions(), (200, 100));
+    assert_eq!(frame.map_point(20.0, 10.0, None).unwrap(), (-90.0, 5.0));
 }

@@ -1,11 +1,28 @@
 import type { ResolvedModelRecord, TaskRecord } from "../state"
 
 // A provider answer that no other model on the SAME provider can fix: the stored credential is
-// rejected (401, an invalid key, a lapsed subscription) or can no longer be refreshed. Every
+// rejected (401, an invalid key, a lapsed subscription), has expired with only a fresh /login to renew it
+// ("Meta session expired (status 403). Run `/login meta` ..."), or can no longer be refreshed. Every
 // remaining rung on that provider would fail the same way, so runtime fallback moves on to another
-// provider.
+// provider. An HTTP proxy's own login ("Proxy Authentication Required (407)") is not the provider's credential:
+// every "authentication" phrasing below skips a word "proxy" right before it.
 const CREDENTIAL_REJECTED =
-  /\b401\b|unauthori[sz]ed|invalid_grant|oauth refresh failed|subscription is required|invalid api key|incorrect api key|authentication (?:failed|error)/i
+  /\b401\b|unauthori[sz]ed|invalid_grant|oauth refresh failed|subscription is required|invalid api key|incorrect api key|(?<!proxy[ _-])authentication (?:failed|error)|\bthe account's oauth token was rejected\b|\bsession expired\b[^.]*\.\s*run\s+\W?\/login\b/i
+// No credential at all for the provider (#10806): senpi refuses the request before it is sent ("No API key
+// found for openai.", "No API key for provider: openai") or a login-only lane says it has no account or token
+// ("no accounts: run /login cursor-cli-oauth", "Cursor access token is required"), a virtual model routes to a
+// provider "which has no credentials", compaction finds "no credentials resolved for provider" on the session
+// model, or the pinned Claude account "is not configured, and account fallback is off". The provider is signed out,
+// so its sibling models fail the same way. A "/login" hint alone is not enough: senpi also names /login in
+// guidance that is not about a missing credential ("No model selected", a Copilot 421 endpoint refresh, a
+// third-party billing note, a model-scoped 403).
+const CREDENTIAL_MISSING =
+  /\bno api key (?:found |provided )?for\b|\bnot logged in\b|\bno (?:[\w-]+ ){0,3}accounts?(?: configured\b|:)|\bno [\w-]+ access token\b|(?<!proxy[ _-])authentication[_ ]failed|\bhas no credentials\b|\bno credentials resolved for provider\b|\baccount '[^'\n]*' for [\w-]+ is not configured\b/i
+// "Cursor access token is required", "Radius authentication is required", "authentication_required": a signed-out
+// provider, unless the text scopes the requirement to a model ("Authentication required for this model", or the
+// failed model's id), which a sibling may not share. The absence phrasings above stay provider-wide even when they
+// name a model: a key or an account belongs to the provider.
+const CREDENTIAL_REQUIRED = /\b(?:access token|(?<!proxy[ _-])authentication) is required\b|(?<!proxy[ _-])authentication[_ ]required/i
 // A 403 is ambiguous: a provider also answers it for ONE model the key may not use (tier, region,
 // preview access, an organization that must be verified for that model), which a sibling model on
 // the same provider does not share. A 403 counts as a credential rejection only when it names the
@@ -20,7 +37,8 @@ const MODEL_SCOPED = /\bmodels?\b/i
 // spent, so its other rungs fail the same way and go last.
 const USAGE_LIMIT =
   /quota|usage[_ ]limit|\bhit\s+your\b[^.]*\blimit\b|\b(?:session|weekly|monthly|daily|hourly|\d+[- ]hour)\s+limit\b|limit\s+exhausted|insufficient[_ ](?:quota|credits?|balance)|credit[_ ]balance|credits?[_ ]required|billing|blocking_limit/i
-const MODEL_SCOPED_LIMIT = /\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
+// A `/model` command hint (senpi's own limit text says "Switch to another provider with /model") names no model.
+const MODEL_SCOPED_LIMIT = /(?<!\/)\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
 
 export type UsageLimitScope = "model" | "account"
 
@@ -29,11 +47,18 @@ export function usageLimitScope(message: string): UsageLimitScope | undefined {
   return MODEL_SCOPED_LIMIT.test(message) ? "model" : "account"
 }
 
+function namesModel(message: string, modelId?: string): boolean {
+  return MODEL_SCOPED.test(message) || (modelId !== undefined && message.toLowerCase().includes(modelId.toLowerCase()))
+}
+
+function isMissingCredential(message: string, modelId?: string): boolean {
+  return CREDENTIAL_MISSING.test(message) || (CREDENTIAL_REQUIRED.test(message) && !namesModel(message, modelId))
+}
+
 export function isCredentialFailure(message: string, modelId?: string): boolean {
-  if (CREDENTIAL_REJECTED.test(message)) return true
+  if (CREDENTIAL_REJECTED.test(message) || isMissingCredential(message, modelId)) return true
   if (!FORBIDDEN.test(message) || !ACCOUNT_SCOPED_403.test(message)) return false
-  if (MODEL_SCOPED.test(message)) return false
-  return modelId === undefined || !message.toLowerCase().includes(modelId.toLowerCase())
+  return !namesModel(message, modelId)
 }
 
 function providerOf(record: TaskRecord): string | undefined {
@@ -51,11 +76,27 @@ function modelIdOf(record: TaskRecord): string | undefined {
 // The task manager has no session surface of its own (a desktop client, a headless run and the
 // terminal all delegate), so the recovery names both re-authentication paths instead of a slash
 // command only the interactive terminal handles.
-/** The terminal error text: a credential failure names the provider and how to restore it. */
+/**
+ * The terminal error text: a credential failure names the provider and how to restore it, and a spent
+ * usage limit says the task stopped on it (and, when nothing was left, that no other model could take
+ * over), so a single-model lane such as deep-high never ends on a bare provider error.
+ */
 export function terminalFailureMessage(record: TaskRecord | null | undefined, failureMessage: string): string {
   const provider = record == null ? undefined : providerOf(record)
-  if (provider === undefined || record == null || !isCredentialFailure(failureMessage, modelIdOf(record))) return failureMessage
-  return `${failureMessage}\nCredentials for ${provider} were rejected; re-authenticate ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or re-add its API key, or pin this category to another provider in omo.json.`
+  if (provider === undefined || record == null) return failureMessage
+  if (isCredentialFailure(failureMessage, modelIdOf(record))) {
+    const missing = !CREDENTIAL_REJECTED.test(failureMessage) && isMissingCredential(failureMessage, modelIdOf(record))
+    const cause = missing
+      ? `No credentials for ${provider} were found; sign in to ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or add its API key`
+      : `Credentials for ${provider} were rejected; re-authenticate ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or re-add its API key`
+    return `${failureMessage}\n${cause}, or pin this category to another provider in omo.json.`
+  }
+  if (usageLimitScope(failureMessage) === undefined) return failureMessage
+  const model = record.resolved_model === undefined ? record.model : `${provider}/${record.resolved_model.model_id}`
+  const exhausted = runtimeFallbackCandidates(record, failureMessage).remaining.length === 0
+    ? " No other model in its fallback chain could take over."
+    : ""
+  return `${failureMessage}\n${model} reached its usage limit, so this task stopped.${exhausted} Retry once the limit resets, or point this category at another provider or model in omo.json.`
 }
 
 export type RuntimeFallbackCandidates = {
@@ -64,7 +105,10 @@ export type RuntimeFallbackCandidates = {
   readonly limit?: UsageLimitScope
 }
 
-/** The fallback list to walk after a failed turn: a dead credential drops the failed provider's rungs, an account-wide usage limit moves them last. */
+/**
+ * The designated fallback list to walk after a failed turn: a dead credential drops the failed provider's
+ * rungs, an account-wide usage limit moves them last. Only the record's own chain is ever walked.
+ */
 export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: string): RuntimeFallbackCandidates {
   const fallbacks = record.fallback_models ?? []
   const provider = providerOf(record)

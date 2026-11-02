@@ -57,7 +57,7 @@ export function managerOver(store: TaskRecordStore, runner: ManagedRunner, proje
     destruction: {
       destroyResidentTask: destroy ?? (async (taskId) => {
         const handle = manager?.getResidentHandle(taskId)
-        manager?.forget(taskId)
+        manager?.forget(taskId, { path: "park" })
         await handle?.dispose()
       }),
     },

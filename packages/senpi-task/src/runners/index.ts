@@ -18,6 +18,7 @@ export type {
   CreateChildSession,
   DepthPolicy,
   InProcessRunnerOptions,
+  QueuedInputDisposition,
   RunnerFailure,
   RunnerOutcome,
   SharedToolFilterOptions,
@@ -42,6 +43,7 @@ export {
   readSessionAncestry,
   readSessionContext,
   readSessionRole,
+  readSessionTraceparent,
   SESSION_ROLES,
 } from "./rpc-host/session-role"
 export { HOST_WARMUP_TASK_ID, HostWarmRefusedError, warmTaskHost } from "./rpc-host/host-warmup"

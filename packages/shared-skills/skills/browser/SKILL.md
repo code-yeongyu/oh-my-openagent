@@ -11,14 +11,37 @@ One library, two engines. omowright ships inside this skill; choose the engine b
 |---|---|---|
 | A site the user is signed into, their open tabs, a form, a click-through, a screenshot, web QA, an extension popup | **attached** — the user's own browser through BrowserSkill | `connectBrowserSkill()` |
 | A throwaway profile, bot-scoring evasion, a CAPTCHA, network interception, a QA flight trace, coordinate control, headless runs | **owned** — a browser your code launches | `connectPipe()` / `connectCloakProfile()` — [references/owned-engine/README.md](references/owned-engine/README.md) |
-| Text out of a URL, a 403 bypass, a platform that blocks fetchers | neither | the `ultimate-browsing` skill |
+| A 403/WAF host the attached engine cannot open, a platform with a native reader, an archive snapshot | neither | the `ultimate-browsing` skill |
 
 **Attached is the default,** because it is the only engine carrying the user's logins and the only
 one where a human is a single call away. Never substitute one engine for the other silently: if
 the attached engine is not set up, run the onboarding script and tell the user its one remaining
 step.
 
-## Step 0 — load omowright and prove the stack
+## Step 0 — inside OmO Desktop: everything above, plus the app's built-in browser
+
+When `OMO_BROWSER_ENGINE` is set (the OmO desktop app sets it for every session), everything above works exactly
+as in the terminal: `connectBrowserSkill()` for the user's own browser, `connectPipe()` / `connectCloakProfile()` /
+`connect()` for a browser of your own, with the same table to choose between them. The app adds one more option:
+
+| Option | What it is | Use it when |
+|---|---|---|
+| `connectBuiltinBrowser()` | OmO's built-in browser for this thread: the tab the user sees beside the chat, which they can watch, take over and share | the user should see the page while you work, the task is QA of something in the app, or a sign-in the user should do themselves in a visible tab |
+
+```js
+const browser = await omowright.connectBuiltinBrowser()
+const [tab] = await browser.listTargets()
+const page = await browser.attachPage(tab.id)
+await page.goto(url)
+```
+
+It is an OmOWright connection like `connect()`. Work in few calls: take `page.snapshot()` once, act on its refs,
+and chain several actions in one eval cell (`page.locator(ref).fill()`, `.click()`, `.selectOption(value)`,
+`.setInputFiles(path)`), snapshotting again only after the page changed. It has one tab: navigate it rather than
+opening new ones. `BuiltinBrowserUnavailableError` permits another engine only for `unavailable`, `timeout`, or
+`invalid_grant`. For `user_stopped` or any other app refusal, stop browser work and report it; do not open another browser.
+
+## Step 1 — load omowright and prove the stack
 
 ```js
 const { loadOmowright } = await import("<skill-root>/scripts/omowright.mjs")
@@ -94,7 +117,7 @@ changing the extension's automation settings.
   out everywhere. No flow here needs it.
 - **`focused: false` by default.** The browser belongs to someone who is probably using it.
 - **One short, named session per task,** always stopped.
-- **Bot-scored or WAF targets go to the owned engine.** The attached engine's daemon enables console
+- **Bot-scored or WAF targets go to the owned engine**, in the terminal and inside OmO Desktop alike. The attached engine's daemon enables console
   capture on every tab it drives, which is a known automation signal; CloakBrowser through
   `connectCloakProfile()` is the stealth path.
 

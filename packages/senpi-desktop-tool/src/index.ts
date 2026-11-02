@@ -50,6 +50,7 @@ export {
 	type ComputerToolDeps,
 	type ComputerToolDetails,
 	type ComputerToolResult,
+	type ControlConfirmRequest,
 	createComputerTool,
 	parseComputerParams,
 	runComputer,

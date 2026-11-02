@@ -1,10 +1,13 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { ManagedChildHandle } from "../manager/child-handle"
-import { getLifecycleDetachedRevival, getLifecycleDetachedRevivalRollback } from "../lifecycle/port"
+import { getLifecycleDetachedRevival } from "../lifecycle/port"
 import type { TaskRecord } from "../state"
-import { buildRevived, deliveryUncertain, lazyRevivalFailure, messageSha256, uncertainDeliveryDenial } from "./engine-policy"
+import { buildRevived, deliveryUncertain, evictionRefusal, lazyRevivalFailure, messageSha256, uncertainDeliveryDenial } from "./engine-policy"
+import { bestEffortRollback } from "./revival-rollback"
+import { reviveRunningOnSend } from "./revive-running"
 import type { ReviveReservation, SendOutcome, SteeringPort } from "./types"
+import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 export async function reviveTerminal(
   port: SteeringPort,
@@ -33,6 +36,9 @@ export async function reviveDetachedTerminalOnSend(
   endSend: (taskId: string) => void,
   granted?: ReviveReservation,
 ): Promise<SendOutcome> {
+  if (record.status === "running" && granted === undefined) {
+    return reviveRunningOnSend(port, record, message, beginSend, endSend)
+  }
   if (!beginSend(record.task_id)) return evictionRefusal(record.task_id)
   try {
     const reservation = granted ?? port.reserveForDetachedRevive?.(record) ?? port.reserveForRevive(record.task_id)
@@ -127,6 +133,15 @@ async function deliverRevivedTerminal(
     reservation.commit()
     return { kind: "revived", task_id: record.task_id, run_epoch: revived.notification.run_epoch }
   } catch (error) {
+    if (error instanceof InputUncertainError) {
+      reservation.commit()
+      return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
+    }
+    if (error instanceof InputConflictError) {
+      reservation.release()
+      return { kind: "failed", task_id: record.task_id, effect_id: error.effectId,
+        reason: error.reason, detail: error.detail, action: error.action }
+    }
     if (poolDeliveryStarted && revived?.revive_delivery_uncertain !== undefined) {
       // A transport exception is not proof of rejection. Keep O9's pre-dispatch marker and
       // captured queue intact; pool recovery will never automatically replay this turn.
@@ -192,36 +207,5 @@ function buildDeliveryRecord(record: TaskRecord, timestamp: string, message: str
   return record.revive_delivery_uncertain !== undefined || (record.pending_steering?.length ?? 0) === 0 ? revived : {
     ...revived,
     revive_delivery_uncertain: { run_epoch: revived.notification.run_epoch, message_sha256: messageSha256(message) },
-  }
-}
-
-async function bestEffortRollback(port: SteeringPort, priorRecord: TaskRecord): Promise<void> {
-  const rollback = port.rollbackDetachedRevival ?? getLifecycleDetachedRevivalRollback(port.store)
-  if (rollback !== undefined) {
-    try {
-      if (rollback(priorRecord) === "not_owner") return
-    } catch (error) {
-      log("senpi-task lazy revival rollback failed", {
-        taskId: priorRecord.task_id,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-  try {
-    await port.destruction.destroyResidentTask(priorRecord.task_id, "revive_failure")
-  } catch (error) {
-    log("senpi-task lazy revival destruction failed", {
-      taskId: priorRecord.task_id,
-      error: error instanceof Error ? error.message : String(error),
-    })
-  }
-}
-
-function evictionRefusal(taskId: string): SendOutcome {
-  return {
-    kind: "not_continuable",
-    task_id: taskId,
-    reason: `Task ${taskId} is being evicted; send was not started.`,
-    suggestion: "Use task_output to read the final result.",
   }
 }

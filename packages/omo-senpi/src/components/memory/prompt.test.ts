@@ -1,3 +1,4 @@
+import { MEMORY_AUTHORITY_RULE } from "@oh-my-opencode/memory-core"
 import { describe, expect, test } from "bun:test"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -201,7 +202,7 @@ describe("createMemoryPromptHandler", () => {
       "BASE PROMPT",
       "",
       `<!-- senpi-memory:${IDENTITY}:begin -->`,
-      "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call.",
+      "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call. " + MEMORY_AUTHORITY_RULE,
       "",
       "<self>",
       "<projection>$MEMORY_DIR/system/persona.md</projection>",
@@ -321,6 +322,57 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.message?.content).not.toContain("compacted out")
   }, 30_000)
 
+  test("#given the nudge check times out in git #when before_agent_start compiles #then the turn proceeds with the memory block, no nudge, nothing thrown, and the failure is reported once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const failures: Array<{ input: string; sessionId: string; message: string }> = []
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async () => {
+        throw new Error("git log --fixed-strings --all-match timed out after 5000ms")
+      },
+      onNoticeInputFailed: (input, sessionId, error) => {
+        failures.push({ input, sessionId, message: error instanceof Error ? error.message : String(error) })
+      },
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    expect(result?.systemPrompt).toContain("BASE PROMPT")
+    // The compiled memory block (persona body "first") is still injected.
+    expect(result?.systemPrompt).toContain("first")
+    expect(result?.message?.content ?? "").not.toContain(MEMORY_NUDGE_METADATA_TOKEN)
+    expect(failures).toEqual([{ input: "nudge", sessionId: "session-1", message: "git log --fixed-strings --all-match timed out after 5000ms" }])
+  }, 30_000)
+
+  test("#given the soul notice read fails while the nudge works #when before_agent_start compiles #then the nudge still lands and only the soul notice is dropped", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const failed: string[] = []
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async () => 3,
+      resolveSoulNotice: async () => {
+        throw new Error("notice lock unreadable")
+      },
+      onNoticeInputFailed: (input) => failed.push(input),
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    expect(result?.message?.content).toContain(MEMORY_NUDGE_METADATA_TOKEN)
+    expect(result?.message?.content).not.toContain(MEMORY_SOUL_METADATA_TOKEN)
+    expect(failed).toEqual(["soul"])
+  }, 30_000)
+
   test("#given a reflection soul notice #when before_agent_start compiles #then the late message carries the soul token and short sha", async () => {
     // given
     const { repo, context } = await fixture()
@@ -394,6 +446,30 @@ describe("createMemoryPromptHandler", () => {
     expect(result?.systemPrompt).toContain(`<!-- senpi-memory:${IDENTITY}:begin -->`)
   }, 30_000)
 
+  test("#given the nudge and soul notices both read HEAD #when one prompt runs #then git is asked for HEAD once", async () => {
+    // given
+    const { repo, context } = await fixture()
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveNudgeTurns: async (noticeRepo) => {
+        await noticeRepo.head()
+        return undefined
+      },
+      resolveSoulNotice: async (noticeRepo) => {
+        await noticeRepo.head()
+        return undefined
+      },
+    }))
+
+    // when
+    await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(1)))
+
+    // then
+    expect(repo.headCalls).toBe(1)
+  }, 30_000)
+
   test("#given an unchanged HEAD #when the handler runs twice #then HEAD is re-checked each run while the block compiles once", async () => {
     // given
     const { repo, context } = await fixture()
@@ -432,6 +508,26 @@ describe("createMemoryPromptHandler", () => {
     // then — same bytes, and the second prompt added no tree listing and no blob reads
     expect(second?.systemPrompt).toBe(first?.systemPrompt)
     expect({ lsTree: repo.lsTreeCalls - afterFirst.lsTree, show: repo.showCalls - afterFirst.show }).toEqual({ lsTree: 0, show: 0 })
+  }, 30_000)
+
+  test("#given a configured per-directory limit #when before_agent_start compiles #then the projection shows that many names and counts the rest", async () => {
+    // given
+    const { repo, context } = await fixture()
+    for (const name of ["a", "b", "c"]) await writeFile(join(repo.dir, `note-${name}.md`), `---\ndescription: ${name}\n---\nx\n`)
+    await repo.commitWrite(["note-a.md", "note-b.md", "note-c.md"], "notes", { agentId: IDENTITY, authorName: "t" })
+    const pi = new FakeExtensionAPI()
+    pi.on("before_agent_start", createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      resolveProjectionLimits: () => ({ maxEntriesPerDirectory: 1, maxBytes: 0 }),
+    }))
+
+    // when
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(2)))
+
+    // then
+    const line = result?.systemPrompt?.split("\n").find((candidate) => candidate.startsWith("$MEMORY_DIR/: "))
+    expect(line).toBe("$MEMORY_DIR/: note-a (+2 more; read $MEMORY_DIR/ to list)")
   }, 30_000)
 
   test("#given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated", async () => {

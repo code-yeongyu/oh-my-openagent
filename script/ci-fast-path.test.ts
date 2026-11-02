@@ -9,6 +9,7 @@ import { load } from "js-yaml"
 const classifierPath = new URL("./ci-fast-path.mjs", import.meta.url)
 const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
 const webWorkflowPath = new URL("../.github/workflows/web-ci.yml", import.meta.url)
+const reviewWorkflowPath = new URL("../.github/workflows/review-claims.yml", import.meta.url)
 
 interface CiMode {
   readonly generatedReleasePush: boolean
@@ -150,6 +151,64 @@ describe("CI fast-path classifier", () => {
 })
 
 describe("CI fast-path workflow wiring", () => {
+  test("merge groups request the same required check identities without review write access", () => {
+    // GitHub ruleset status contexts are a machine-consumed contract.
+    for (const path of [ciWorkflowPath, reviewWorkflowPath]) {
+      const triggers = parseWorkflow(path)["on"]
+      if (!isRecord(triggers)) throw new Error("workflow must define triggers")
+      expect(triggers["merge_group"]).toEqual({ types: ["checks_requested"] })
+    }
+
+    const jobs = workflowJobs(ciWorkflowPath)
+    const contexts: string[] = []
+    for (const id of [
+      "test", "typecheck", "build", "codex-compatibility", "senpi-compatibility",
+      "macos-test-1-status", "macos-test-2-status", "macos-codex-status", "macos-senpi-status",
+    ]) {
+      const job = jobs[id]
+      if (!isRecord(job)) throw new Error(`CI must define ${id}`)
+      const name = String(job["name"] ?? id)
+      if (id.startsWith("macos-")) {
+        expect(job["if"]).toBe("${{ always() && !cancelled() }}")
+      } else {
+        expect(job["if"]).toBeUndefined()
+      }
+      const strategy = job["strategy"]
+      if (!isRecord(strategy)) {
+        contexts.push(name)
+        continue
+      }
+      const matrix = strategy["matrix"]
+      if (!isRecord(matrix)) throw new Error(`${name} must define matrix`)
+      if (Array.isArray(matrix["include"])) {
+        for (const row of matrix["include"]) {
+          if (!isRecord(row)) throw new Error("matrix row must be an object")
+          contexts.push(`${name} (${Object.values(row).join(", ")})`)
+        }
+      } else if (Array.isArray(matrix["os"])) {
+        contexts.push(...matrix["os"].map((os) => `${name} (${os})`))
+      }
+    }
+    const reviewJobs = workflowJobs(reviewWorkflowPath)
+    const gate = reviewJobs["gate"]
+    if (!isRecord(gate)) throw new Error("review workflow must define gate")
+    expect(gate["if"]).toBe("github.event_name == 'merge_group'")
+    expect(gate["permissions"]).toEqual({ contents: "read", "pull-requests": "read" })
+    contexts.push(String(gate["name"]))
+    for (const required of [
+      "test (windows-latest, 1/2)", "test (windows-latest, 2/2)",
+      "test (ubuntu-latest, 1/2)", "test (ubuntu-latest, 2/2)",
+      "test (macos-latest, 1/2)", "test (macos-latest, 2/2)",
+      "typecheck", "build",
+      "codex-compatibility (ubuntu-latest, full)",
+      "codex-compatibility (macos-latest, platform)",
+      "codex-compatibility (windows-latest, platform)",
+      "senpi-compatibility (ubuntu-latest)", "senpi-compatibility (macos-latest)", "Review claim gate",
+    ]) {
+      expect(contexts).toContain(required)
+    }
+  })
+
   test("preserves required job identities while gating expensive work", () => {
     const jobs = workflowJobs(ciWorkflowPath)
     const mode = jobs["ci-mode"]
@@ -171,14 +230,28 @@ describe("CI fast-path workflow wiring", () => {
   })
 
   test("keeps schema generation on master and skips duplicate draft generation", () => {
+    const triggers = parseWorkflow(ciWorkflowPath)["on"]
+    if (!isRecord(triggers) || !isRecord(triggers["push"])) throw new Error("CI must define push triggers")
+    expect(triggers["push"]["branches"]).toEqual(["master", "dev"])
+
     const jobs = workflowJobs(ciWorkflowPath)
     const schema = jobs["auto-commit-schema"]
     const draft = jobs["draft-release"]
     if (!isRecord(schema) || !isRecord(draft)) throw new Error("CI write jobs must exist")
+    expect(schema["needs"]).toContain("lint-ratchet")
+    expect(draft["needs"]).toContain("lint-ratchet")
 
     expect(String(schema["if"])).toContain("refs/heads/master")
     expect(String(schema["if"])).not.toContain("run_heavy")
     expect(String(draft["if"])).toContain("needs.ci-mode.outputs.run_heavy == 'true'")
+  })
+
+  test("retains the typecheck ratchet during the required-check transition", () => {
+    const typecheck = workflowJobs(ciWorkflowPath)["typecheck"]
+    if (!isRecord(typecheck) || !Array.isArray(typecheck["steps"])) throw new Error("typecheck must define steps")
+    const ratchet = typecheck["steps"].filter(isRecord).find((step) => step["run"] === "bun run lint:ratchet")
+    expect(ratchet).toBeDefined()
+    expect(ratchet?.["if"]).toBe("needs.ci-mode.outputs.run_heavy == 'true'")
   })
 
   test("keeps the Web CI path contract aligned with classifier inputs", () => {

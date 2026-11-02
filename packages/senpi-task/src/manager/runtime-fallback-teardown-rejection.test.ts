@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import type { ManagedRunner } from "./types"
 import { baseSpec, cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
-import { managerOver, managerWithLifecycle, PRIMARY, stubbornChild } from "./__fixtures__/fallback-launch-fakes"
+import { managerOver, managerWithLifecycle, NEXT, PRIMARY, stubbornChild } from "./__fixtures__/fallback-launch-fakes"
 
 afterEach(cleanupProjects)
 
@@ -34,6 +34,8 @@ describe("runtime fallback: the failed rung's teardown rejects", () => {
     expect(ended.error_message).toContain(rejection === undefined ? "was not started" : "dispose rejected")
     expect(ended.fallback_handoff_epoch).toBeUndefined()
     expect(starts).toEqual([PRIMARY])
+    // #10797: the next rung never started, so the record must not name it as the model the task ran on.
+    expect(ended.effective_model?.display).not.toBe(NEXT)
     // An in-process child has no pid or session to hand the orphan path: it stays resident as its own cleanup owner.
     expect(manager.getResidentHandle(started.task_id)?.task_id).toBe(started.task_id)
     const other = await manager.start(baseSpec({ name: "after" }))

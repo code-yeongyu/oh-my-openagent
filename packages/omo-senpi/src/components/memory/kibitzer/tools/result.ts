@@ -46,6 +46,7 @@ export type KibitzerRejectionCode =
   | "invalid_pattern"
   | "unsupported_operation"
   | "missing_argument"
+  | "invalid_argument"
 
 export interface KibitzerRejection {
   readonly rejected: KibitzerRejectionCode

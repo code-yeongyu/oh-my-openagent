@@ -14,8 +14,8 @@ function completedSession(): ChildSession {
   return {
     sessionId: "runtime-fallback-child",
     prompt: () => Promise.resolve(),
-    steer: () => Promise.resolve(),
-    followUp: () => Promise.resolve(),
+    steer: () => Promise.resolve("handled"),
+    followUp: () => Promise.resolve("handled"),
     abort: () => Promise.resolve(),
     subscribe: () => () => {},
     getLastAssistantText: () => "done",
@@ -164,7 +164,7 @@ describe("InProcessRunner runtime fallback", () => {
     expect(capturedRetrySettings(captured)).toMatchObject({
       modelFallback: true,
       chains: {
-        "chatgpt-subscription/gpt-6-luna-fast": ["opencode-go/minimax-m3:max"],
+        "chatgpt-subscription/gpt-6-luna-fast": ["opencode-go/minimax-m3"],
       },
     })
   })

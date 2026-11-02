@@ -1,3 +1,15 @@
+#!/bin/sh
+# Keep this wrapper POSIX-sh parseable: the Bash program is data until Bash reads the temp file.
+omo_sourced=
+if [ -n "${BASH_VERSION:-}" ] && eval '[ -n "${BASH_SOURCE[0]:-}" ] && [ "${BASH_SOURCE[0]}" != "$0" ]'; then omo_sourced=1; fi
+omo_bash="$(command -v bash 2>/dev/null || true)"
+if [ -z "$omo_bash" ]; then
+  printf '%s\n' 'omo installer: bash is required; run with: curl -fsSL https://get.omo.dev/install.sh | bash' >&2
+  exit 1
+fi
+omo_bash_script="$(mktemp "${TMPDIR:-/tmp}/omo-install-bash.XXXXXX")" || exit 1
+trap 'rm -f "$omo_bash_script"' EXIT HUP INT TERM
+cat >"$omo_bash_script" <<'OMO_INSTALL_BASH'
 #!/usr/bin/env bash
 # OmO native installer: curl -fsSL https://get.omo.dev/install.sh | bash [-s -- latest|beta|X.Y.Z]
 #   OMO_INSTALL_DIR        launcher directory (default ~/.local/bin)
@@ -37,6 +49,15 @@ sha256_of() {
   fi
 }
 
+is_musl_libc() { # the system libc, not whether a musl loader happens to be installed (#10562)
+  # musl's ldd exits 1 after printing its version, which pipefail would turn into a miss.
+  case "$(ldd --version 2>&1 || true)" in *[Mm][Uu][Ss][Ll]*) return 0 ;; esac
+  # Debian/Ubuntu's optional `musl` package ships /lib/ld-musl-*.so.1 next to glibc,
+  # so the loader file only counts when the system libc is not glibc.
+  if getconf GNU_LIBC_VERSION >/dev/null 2>&1; then return 1; fi
+  [ -f /etc/alpine-release ] || ls /lib/ld-musl-*.so.1 >/dev/null 2>&1
+}
+
 detect_asset() {
   local os arch libc="" cpu=""
   case "$(uname -s)" in
@@ -53,11 +74,7 @@ detect_asset() {
   if [ "$os" = darwin ] && [ "$arch" = x64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = 1 ]; then
     arch=arm64 # a Rosetta shell on Apple silicon gets the native build
   fi
-  if [ "$os" = linux ]; then
-    if [ -f /etc/alpine-release ] || ls /lib/ld-musl-*.so.1 >/dev/null 2>&1 || (ldd --version 2>&1 | grep -qi musl); then
-      libc="-musl"
-    fi
-  fi
+  if [ "$os" = linux ] && is_musl_libc; then libc="-musl"; fi
   if [ "$arch" = x64 ]; then
     if [ "$os" = linux ] && ! grep -qwi avx2 /proc/cpuinfo 2>/dev/null; then cpu="-baseline"; fi
     if [ "$os" = darwin ] && [ "$(sysctl -n hw.optional.avx2_0 2>/dev/null || echo 0)" != 1 ]; then cpu="-baseline"; fi
@@ -109,29 +126,123 @@ ensure_path() { # ensure_path <dir>; prints the edited profile, or nothing
   printf '%s\n' "$profile"
 }
 
-report_other_installs() { # report_other_installs <launcher>
-  local launcher="$1" first="" candidate real owner=""
-  first="$(command -v omo 2>/dev/null || true)"
-  while IFS= read -r candidate; do
-    if [ -z "$candidate" ] || [ "$candidate" = "$launcher" ]; then continue; fi
-    real="$(readlink -f "$candidate" 2>/dev/null || printf '%s' "$candidate")"
-    case "$real" in
-      */node_modules/omo-ai/*) owner="omo-ai (npm or bun global install)" ;;
-      */node_modules/oh-my-opencode/* | */node_modules/oh-my-openagent/*) owner="the legacy oh-my-openagent package" ;;
-      *) owner="another omo binary" ;;
+real_path() { # real_path <path>
+  local path="$1" target dir
+  if [ -L "$path" ]; then
+    target="$(readlink "$path")" || return 1
+    case "$target" in
+      /*) path="$target" ;;
+      *) dir="$(cd "$(dirname "$path")" && pwd -P)" || return 1; path="${dir}/${target}" ;;
     esac
-    say ""
-    say "Note: ${candidate} is ${owner}."
-    if [ "$first" = "$candidate" ]; then
-      say "  It comes first on PATH, so typing 'omo' still runs it instead of ${launcher}."
-    else
-      say "  ${launcher} comes first on PATH; that one is not used."
+  fi
+  dir="$(cd "$(dirname "$path")" 2>/dev/null && pwd -P)" || return 1
+  printf '%s/%s\n' "$dir" "$(basename "$path")"
+}
+
+shell_quote() { printf '%q' "$1"; }
+
+classify_other_install() { # classify_other_install <candidate> <prior standalone launcher>; prints kind, target, command
+  local candidate="$1" prior="$2" real package_root package_name manager root command
+  real="$(real_path "$candidate")" || return 1
+  case "$real" in
+    */node_modules/omo-ai/*) package_name="omo-ai" ;;
+    */node_modules/oh-my-openagent/*) package_name="oh-my-openagent" ;;
+    */node_modules/oh-my-opencode/*) package_name="oh-my-opencode" ;;
+    *) package_name="" ;;
+  esac
+  if [ -n "$package_name" ]; then
+    package_root="${real%%/node_modules/"${package_name}"/*}/node_modules/${package_name}"
+    [ -f "$package_root/package.json" ] || return 1
+    grep -Eq '"name"[[:space:]]*:[[:space:]]*"'"${package_name}"'"' "$package_root/package.json" || return 1
+    case "$package_root" in
+      */install/global/node_modules/${package_name})
+        manager="bun"; root="${package_root%/install/global/node_modules/"${package_name}"}"
+        command="BUN_INSTALL=$(shell_quote "$root") bun remove -g ${package_name}"
+        ;;
+      */lib/node_modules/${package_name})
+        manager="npm"; root="${package_root%/lib/node_modules/"${package_name}"}"
+        command="npm uninstall -g ${package_name} --prefix $(shell_quote "$root")"
+        ;;
+      *) return 1 ;;
+    esac
+    printf 'package\t%s\t%s\t%s\t%s\t%s\n' "$candidate" "$real" "$manager" "$root" "$package_name|$command"
+    return 0
+  fi
+  if [ -n "$prior" ] && [ "$candidate" = "$prior" ] && "$candidate" --version 2>/dev/null | grep -Eq '^omo([[:space:]]|$)'; then
+    printf 'standalone\t%s\t%s\t-\t-\t%s\n' "$candidate" "$real" "standalone|rm -f -- $(shell_quote "$candidate")"
+    return 0
+  fi
+  return 1
+}
+
+find_other_installs() { # find_other_installs <launcher> <output file>
+  local launcher="$1" output="$2" prior="" dir candidate seen=""
+  if [ -f "$HOME/.omo/install.json" ]; then
+    prior="$(sed -n 's/.*"binPath"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$HOME/.omo/install.json" | head -n1)"
+  fi
+  : >"$output"
+  IFS=:
+  for dir in $PATH; do
+    [ -n "$dir" ] || dir=.
+    candidate="${dir%/}/omo"
+    [ -f "$candidate" ] || [ -L "$candidate" ] || continue
+    [ "$candidate" = "$launcher" ] && continue
+    case "\n$seen" in *"\n$candidate\n"*) continue ;; esac
+    seen="${seen}${candidate}\n"
+    classify_other_install "$candidate" "$prior" >>"$output" || {
+      say ""
+      say "Note: ${candidate} is another omo command, but its installation could not be verified, so nothing was removed."
+    }
+  done
+  unset IFS
+}
+
+is_interactive() { [ -t 0 ] && [ -t 2 ]; }
+
+remove_detected_install() { # remove_detected_install <record>
+  local record="$1" kind candidate real manager root details name command current
+  IFS=$'\t' read -r kind candidate real manager root details <<<"$record"
+  unset IFS
+  name="${details%%|*}"; command="${details#*|}"
+  current="$(real_path "$candidate" 2>/dev/null || true)"
+  if [ "$current" != "$real" ]; then say "  Removal refused because ${candidate} changed after detection. Remove it with: ${command}"; return 1; fi
+  if [ "$kind" = package ]; then
+    if [ "$manager" = bun ]; then BUN_INSTALL="$root" bun remove -g "$name" >/dev/null 2>&1 || true
+    else npm uninstall -g "$name" --prefix "$root" >/dev/null 2>&1 || true
     fi
-    case "$owner" in
-      omo-ai*) say "  Nothing was removed. To keep only this install: bun remove -g omo-ai  (or: npm uninstall -g omo-ai)" ;;
-      *) say "  Nothing was removed. Remove it yourself if you no longer need it." ;;
-    esac
-  done < <(type -ap omo 2>/dev/null | awk '!seen[$0]++')
+  else
+    rm -f -- "$candidate" || true
+  fi
+  if [ -e "$candidate" ] || [ -L "$candidate" ]; then
+    say "  Could not remove ${candidate}; the new install still works. Remove the other install with: ${command}"
+    return 1
+  fi
+  say "  Removed the other omo install at ${candidate}."
+}
+
+report_other_installs() { # report_other_installs <launcher> <remove flag> <work dir>
+  local launcher="$1" remove_flag="$2" work="$3" first record candidate command answer
+  find_other_installs "$launcher" "$work/other-installs"
+  [ -s "$work/other-installs" ] || return 0
+  first="$(command -v omo 2>/dev/null || true)"
+  exec 3<&0
+  while IFS= read -r record; do
+    candidate="$(printf '%s' "$record" | cut -f2)"
+    command="$(printf '%s' "$record" | cut -f6- | cut -d'|' -f2-)"
+    say ""
+    say "Another omo install was found at ${candidate}."
+    if [ "$first" = "$candidate" ]; then say "  It currently wins on PATH over ${launcher}."
+    else say "  ${launcher} wins on PATH; ${candidate} is not used."; fi
+    if [ "$remove_flag" = 1 ]; then remove_detected_install "$record" || true; continue; fi
+    if is_interactive; then
+      printf 'Remove the other omo install at %s? [y/N] ' "$candidate" >&2
+      IFS= read -r answer <&3 || answer=""
+      case "$answer" in y | Y | yes | YES | Yes) remove_detected_install "$record" || true ;; *) say "  Kept it. Remove it later with: ${command}" ;; esac
+    else
+      say "  Nothing was removed in this non-interactive run. Re-run with --remove-other-installs, or run: ${command}"
+    fi
+  done <"$work/other-installs"
+  exec 3<&-
 }
 
 write_receipt() { # write_receipt <channel> <version> <asset> <launcher> <profile>
@@ -144,9 +255,20 @@ write_receipt() { # write_receipt <channel> <version> <asset> <launcher> <profil
 }
 
 main() {
-  local want="${1:-latest}" base="${OMO_INSTALL_BASE_URL:-https://get.omo.dev}"
+  local want="" remove_other_installs=0 arg base="${OMO_INSTALL_BASE_URL:-https://get.omo.dev}"
+  for arg in "$@"; do
+    case "$arg" in
+      --remove-other-installs) remove_other_installs=1 ;;
+      latest | beta) [ -z "$want" ] || fail "usage: install.sh [--remove-other-installs] [latest|beta|X.Y.Z]"; want="$arg" ;;
+      *)
+        if [[ "$arg" =~ $VERSION_RE ]] && [ -z "$want" ]; then want="$arg"
+        else fail "usage: install.sh [--remove-other-installs] [latest|beta|X.Y.Z]"
+        fi
+        ;;
+    esac
+  done
+  want="${want:-latest}"
   base="${base%/}"
-  case "$want" in latest | beta) ;; *) [[ "$want" =~ $VERSION_RE ]] || fail "usage: install.sh [latest|beta|X.Y.Z]" ;; esac
   if [ "$(id -u)" = 0 ] && [ "${OMO_INSTALL_ALLOW_SUDO:-}" != 1 ]; then
     fail "refusing to run as root; run it as your user (set OMO_INSTALL_ALLOW_SUDO=1 to override)"
   fi
@@ -186,8 +308,8 @@ main() {
   "$launcher" --version >&2 || fail "${launcher} --version failed"
 
   profile="$(ensure_path "$dir")"
+  report_other_installs "$launcher" "$remove_other_installs" "$work"
   write_receipt "$channel" "$version" "$asset" "$launcher" "$profile"
-  report_other_installs "$launcher"
   say ""
   say "omo ${version} is installed at ${launcher}."
   if [ -n "$profile" ]; then
@@ -195,6 +317,25 @@ main() {
   else
     say "Run: omo"
   fi
+  say ""
+  say "OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product."
+  say "The data goes to PostHog in the United States."
+  say "Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1)."
+  say "Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
+OMO_INSTALL_BASH
+if [ -n "$omo_sourced" ]; then
+  # Sourced by Bash (the installer tests): define the installer functions here without running main.
+  trap - EXIT HUP INT TERM
+  # shellcheck source=/dev/null
+  . "$omo_bash_script"
+  rm -f "$omo_bash_script"
+  return 0
+fi
+"$omo_bash" "$omo_bash_script" "$@"
+omo_bash_status=$?
+rm -f "$omo_bash_script"
+trap - EXIT HUP INT TERM
+exit "$omo_bash_status"

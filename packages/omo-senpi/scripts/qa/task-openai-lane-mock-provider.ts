@@ -84,7 +84,7 @@ const QUOTA_ERROR = `403: {"message":"You've reached your usage limit for this b
 // Scenarios: "both-lanes" (API lane and subscription lane both serve the model - the subscription
 // lane must win), "api-key-only" (only `openai` serves it), "subscription-only" (only
 // chatgpt-subscription serves it), "explore-kimi-fails-api-key-only" (an explore child: the kimi head
-// dies with a quota error, `openai` serves gpt-6-luna-fast, `anthropic` serves claude-haiku-4-5 - the
+// dies with a quota error, `openai` serves gpt-6-luna-fast, `anthropic` serves claude-haiku-5-5 - the
 // runtime fallback must pick the Luna rung, which it skipped while the rung listed only the subscription).
 const LANE_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
   "both-lanes": ["openai", "chatgpt-subscription"],
@@ -95,7 +95,7 @@ const EXPLORE_FALLBACK_SCENARIO = "explore-kimi-fails-api-key-only"
 const EXPLORE_FALLBACK_FIXTURES: readonly { readonly provider: string; readonly modelId: string; readonly dies: boolean }[] = [
   { provider: "kimi-coding", modelId: "kimi-for-coding-highspeed", dies: true },
   { provider: "openai", modelId: "gpt-6-luna-fast", dies: false },
-  { provider: "anthropic", modelId: "claude-haiku-4-5", dies: false },
+  { provider: "anthropic", modelId: "claude-haiku-5-5", dies: false },
 ]
 const SCENARIO = process.env.OMO_OPENAI_LANE_SCENARIO ?? "both-lanes"
 const CATEGORY = process.env.OMO_OPENAI_LANE_CATEGORY ?? "deep-high"

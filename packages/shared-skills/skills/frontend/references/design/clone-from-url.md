@@ -16,7 +16,7 @@ Sweep the page and read, for every meaningful element and every repeated pattern
 - **Interaction states** — capture `default/hover/focus/active` (plus disabled/loading/empty/error where they exist) by DRIVING the state, then re-reading the computed style. A system with only the resting state is incomplete.
 - **Motion** — `transition` (property, duration, timing function, delay), `@keyframes` (walk `document.styleSheets` for `CSSKeyframesRule`), and `transform`. Motion is part of the contract, not decoration.
 - **Assets** — `<img>` and background-image URLs, inline SVG, `@font-face` files, video sources. Download the REAL assets; never substitute stock or placeholders.
-- **Responsive** — re-run the sweep at 375 / 768 / 1280 and record what actually changes per breakpoint.
+- **Responsive** — re-run the sweep at the `/visual-qa` capture widths (390 with mobile emulation, 1440, 1920) and record what actually changes per breakpoint, so the later compare is like for like.
 
 A compact sweep payload to inject through the browser's evaluate action (extend the recorded fields as needed):
 

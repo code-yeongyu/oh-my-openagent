@@ -34,8 +34,8 @@ function touch(path: string, text = ""): string {
 
 const FULL_NUDGE = [
 	"LSP server 'typescript' for .ts is NOT INSTALLED.",
-	"To install in THIS repository (preferred — no global install needed):",
-	"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
+	"To install in THIS repository (preferred, no global install needed):",
+	"ACTION REQUIRED: ASK THE USER whether to install this LSP server.",
 ].join("\n");
 
 function notInstalled(
@@ -93,6 +93,31 @@ describe("classifyPostEditFileLocation", () => {
 		}
 	});
 
+	for (const marker of ["package.json", ".git"] as const) {
+		it(`#given a ${marker} directly in HOME #when a home-level file is classified #then HOME is not its project`, () => {
+			const home = tempRoot("lsp-postedit-home-");
+			if (marker === ".git") mkdirSync(join(home, ".git"));
+			else touch(join(home, marker), "{}\n");
+			const topLevel = touch(join(home, "notes.ts"));
+			const nested = touch(join(home, "scratch", "draft.ts"));
+
+			const options = { cwd: home, agentDirs: [], tempDirs: [], homeDirs: [home] };
+			expect(classifyPostEditFileLocation(topLevel, options)).toBe("outside_project");
+			expect(classifyPostEditFileLocation(nested, options)).toBe("outside_project");
+		});
+	}
+
+	it("#given a marked HOME and a project under it #when a project file is classified #then it is still a project", () => {
+		const home = tempRoot("lsp-postedit-homeproject-");
+		mkdirSync(join(home, ".git"));
+		touch(join(home, "work", "app", "package.json"), "{}\n");
+		const file = touch(join(home, "work", "app", "src", "a.ts"));
+
+		expect(classifyPostEditFileLocation(file, { cwd: home, agentDirs: [], tempDirs: [], homeDirs: [home] })).toBe(
+			"project",
+		);
+	});
+
 	it("#given a project with its own marker inside a temp dir #when classified #then it is a project", () => {
 		const temp = tempRoot("lsp-postedit-tempproject-");
 		const project = join(temp, "checkout");
@@ -127,7 +152,7 @@ describe("collectPostEditDiagnostics not-installed guidance", () => {
 			locateFile: at("project"),
 		});
 
-		expect(result.blocks).toEqual([{ filePath: "src/a.ts", diagnostics: `${FULL_NUDGE} (typescript)` }]);
+		expect(result.blocks).toEqual([{ filePath: "src/a.ts", diagnostics: `${FULL_NUDGE} (typescript)`, blocking: false }]);
 	});
 
 	it("#given no decision tool #when repeated edits hit missing servers #then each server is nudged once per session", async () => {
@@ -194,6 +219,6 @@ describe("collectPostEditDiagnostics not-installed guidance", () => {
 			runDiagnostics: async () => notInstalled("typescript"),
 		});
 
-		expect(result.blocks).toEqual([{ filePath: "a.ts", diagnostics: `${FULL_NUDGE} (typescript)` }]);
+		expect(result.blocks).toEqual([{ filePath: "a.ts", diagnostics: `${FULL_NUDGE} (typescript)`, blocking: false }]);
 	});
 });

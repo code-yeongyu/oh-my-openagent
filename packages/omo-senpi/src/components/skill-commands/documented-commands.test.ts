@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createOmoSenpiComponents } from "../../extension/component-list"
 import { readBundledSkillNames } from "./bare-skill-command"
@@ -12,6 +12,11 @@ import { readBundledSkillNames } from "./bare-skill-command"
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..")
 const repoRoot = join(packageRoot, "../..")
 const senpiDistDir = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
+// The engine's own builtin list, read as data: scraping the dist text broke when an entry
+// gained fields and wrapped onto several lines (senpi #2482).
+const { BUILTIN_SLASH_COMMANDS } = (await import(pathToFileURL(join(senpiDistDir, "core/slash-commands.js")).href)) as {
+  BUILTIN_SLASH_COMMANDS: ReadonlyArray<{ name: string }>
+}
 
 const NATIVE_SKILL_ROOTS = [join(packageRoot, "skills"), join(repoRoot, "packages/shared-skills/skills")]
 const NATIVE_GUIDES = ["docs/guide/overview.md", "docs/guide/orchestration.md", "README.md"].map((path) => join(repoRoot, path))
@@ -41,7 +46,7 @@ function nativeSurfaceFiles(): string[] {
 }
 
 function engineCommandNames(): Set<string> {
-  const builtin = matchesOf(/name: "([a-z-]+)", description/g, readFileSync(join(senpiDistDir, "core/slash-commands.js"), "utf8"))
+  const builtin = BUILTIN_SLASH_COMMANDS.map((command) => command.name)
   const extensionCommands = walkFiles(join(senpiDistDir, "core/extensions/builtin"), (path) => path.endsWith(".js")).flatMap((path) =>
     matchesOf(/registerCommand\("([a-z-]+)"/g, readFileSync(path, "utf8")),
   )

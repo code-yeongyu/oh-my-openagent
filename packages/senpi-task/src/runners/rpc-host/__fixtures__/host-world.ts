@@ -1,3 +1,4 @@
+import { onTestFinished } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -8,6 +9,7 @@ import { createManagerResidencyRegistry } from "../../../../../omo-senpi/src/com
 import { createTaskLifecycle, createHostSessionProbe, type TaskLifecycle } from "../../../lifecycle"
 import { defaultHostSessionProbe } from "../../../lifecycle/host-session-default"
 import { createTaskManager } from "../../../manager/manager"
+import { launchSettled } from "../../../manager/__fixtures__/manager-fakes"
 import { createRpcManagedRunner } from "../../../manager/runner"
 import type { StartResult } from "../../../manager/types"
 import type { TaskRecord } from "../../../state"
@@ -19,7 +21,10 @@ import { HostSessionClient } from "../session-client"
 import { startFakeHost, type FakeHost, type FakeHostOptions } from "./fake-host"
 import { listFakeHostSessions, probeFakeHost } from "./fake-host-probe"
 import { fakeCloseChannel, fakeFallbackRunner } from "./host-world-ports"
+import type { ManualRecoveryClock } from "./manual-recovery-clock"
+import type { HostShardEvents } from "../handle-reattach"
 import { NO_HOST_ENDPOINT } from "../../../lifecycle/host-session"
+import type { hostWorldRecovery } from "./host-world-recovery"
 
 /**
  * A daemon and the parent sessions that share it: one fake host on a private socket, one project
@@ -34,6 +39,7 @@ import { NO_HOST_ENDPOINT } from "../../../lifecycle/host-session"
 export const HOST_CHILD_MODEL = "anthropic/claude-sonnet-4-5"
 
 export interface ParentOptions {
+  readonly liveRecovery?: ReturnType<typeof hostWorldRecovery>
   /** Give the parent a per-child runner the daemon path may fall back to. */
   readonly useFallback?: boolean
   /** How many `open_session` attempts a draining generation gets before the child defers. */
@@ -44,6 +50,16 @@ export interface ParentOptions {
   readonly hostPid?: number
   /** Ask the daemon through the production liveness adapter instead of the fixture's own wire probe. */
   readonly productionProbe?: boolean
+  /** Task settings over the suite defaults, e.g. a one-slot lane. */
+  readonly settings?: Record<string, unknown>
+  /** The runner's backoff between reattach attempts after a lost transport. */
+  readonly reattachDelaysMs?: readonly number[]
+  /** The clock that decides when a lost transport's recovery bound runs out. */
+  readonly recoveryClock?: ManualRecoveryClock
+  /** How long a close the host does not answer may take before it counts as unconfirmed. */
+  readonly hostCloseTimeoutMs?: number
+  /** Observe every child's transport recoveries, as the parent's crash notice does. */
+  readonly shardEvents?: HostShardEvents
 }
 
 export interface ParentSession {
@@ -82,9 +98,26 @@ export function hostSuiteSettings(overrides: Record<string, unknown> = {}): OmoT
 }
 
 export async function startHostWorld(options: FakeHostOptions = {}): Promise<HostWorld> {
-  const host = await startFakeHost(options)
+  const host = await startFakeHost({ transcripts: true, ...options })
   const projectDir = mkdtempSync(join(tmpdir(), "dh-world-"))
   const parents: ParentSession[] = []
+  let cleanedUp: Promise<void> | undefined
+  const cleanup = (): Promise<void> => {
+    cleanedUp ??= (async () => {
+      // Detach every live child BEFORE the daemon goes away, so no late outcome writes into a
+      // store directory this cleanup is about to delete.
+      for (const parent of parents.splice(0)) {
+        await parent.lifecycle.suspendOnSessionShutdown({ parentSessionId: parent.sessionId, reason: "suite_cleanup" })
+        parent.lifecycle.dispose?.()
+      }
+      await host.stop()
+      rmSync(projectDir, { recursive: true, force: true })
+    })()
+    return cleanedUp
+  }
+  // A test that throws before reaching its own cleanup() call still stops the host and removes the
+  // project dir (#9766); the memo makes the test's explicit call and this one the same teardown.
+  onTestFinished(cleanup)
   return {
     host,
     projectDir,
@@ -98,16 +131,7 @@ export async function startHostWorld(options: FakeHostOptions = {}): Promise<Hos
         command.type === "prompt" && typeof command.payload.message === "string" ? [command.payload.message] : [],
       ),
     commandsOfType: (type) => host.commands.filter((command) => command.type === type).length,
-    cleanup: async () => {
-      // Detach every live child BEFORE the daemon goes away, so no late outcome writes into a
-      // store directory this cleanup is about to delete.
-      for (const parent of parents.splice(0)) {
-        await parent.lifecycle.suspendOnSessionShutdown({ parentSessionId: parent.sessionId, reason: "suite_cleanup" })
-        parent.lifecycle.dispose?.()
-      }
-      await host.stop()
-      rmSync(projectDir, { recursive: true, force: true })
-    },
+    cleanup,
   }
 }
 
@@ -120,8 +144,10 @@ interface ConnectParentInput {
 
 function connectParent(input: ConnectParentInput): ParentSession {
   const { sessionId, projectDir, socketPath } = input
-  const store = createTaskRecordStore({ project_dir: projectDir })
-  const config = hostSuiteSettings()
+  const backing = createTaskRecordStore({ project_dir: projectDir })
+  const recovery = input.options.liveRecovery?.attach(backing, sessionId)
+  const store = recovery?.store ?? backing
+  const config = hostSuiteSettings(input.options.settings)
   const warnings: string[] = []
   const waits: number[] = []
   const fallback = fakeFallbackRunner()
@@ -137,7 +163,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ownHostSocket: () => undefined,
     insideHost: () => false,
     onNotice: () => undefined,
-    shardEvents: {},
+    shardEvents: input.options.shardEvents ?? {},
     probeHost: () => probeFakeHost(socketPath),
     env: {},
     ensureDaemon: () =>
@@ -154,6 +180,8 @@ function connectParent(input: ConnectParentInput): ParentSession {
     modelAdmission: () => Promise.resolve(),
     heartbeatIntervalMs: 60_000,
     closeGraceMs: 50,
+    ...(input.options.reattachDelaysMs === undefined ? {} : { reattachDelaysMs: input.options.reattachDelaysMs }),
+    ...(input.options.recoveryClock === undefined ? {} : { transportRecovery: { clock: input.options.recoveryClock } }),
     onWarning: (message) => {
       warnings.push(message)
     },
@@ -170,16 +198,23 @@ function connectParent(input: ConnectParentInput): ParentSession {
       process: createRpcManagedRunner(launch),
     },
     rpcRespawnRunner: launch,
+    ...(recovery === undefined ? {} : { now: recovery.now }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     planner: () => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } }),
-    destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
+    destruction: {
+      destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause),
+      get hostSessionCancel() { return lifecycle.hostSessionCancel },
+    },
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
   })
   const lifecycle = createTaskLifecycle({
+    ...(input.options.hostCloseTimeoutMs === undefined ? {} : { hostCloseTimeoutMs: input.options.hostCloseTimeoutMs }),
+    ...(recovery === undefined ? {} : { hostCloseScheduler: recovery.hostCloseScheduler }),
     hostEndpoint: NO_HOST_ENDPOINT,
     store,
     config,
-    registry: createManagerResidencyRegistry(() => manager),
+    registry: createManagerResidencyRegistry(() => manager, () => recovery === undefined ? undefined : sessionId),
+    ...(recovery === undefined ? {} : { now: recovery.now, onStoreMutation: recovery.onStoreMutation }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
     hostSessionProbe: input.options.productionProbe === true
@@ -202,7 +237,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
       },
     },
     // A suite drives every sweep itself; an unref'd interval would fire inside another test.
-    idleReclaimerScheduler: { setInterval: () => ({ unref: () => undefined }), clearInterval: () => undefined },
+    idleReclaimerScheduler: recovery?.idleReclaimerScheduler ?? { setInterval: () => ({ unref: () => undefined }), clearInterval: () => undefined },
   })
   const records = (): readonly TaskRecord[] =>
     store.list().records.filter((record) => record.parent_session_id === sessionId)
@@ -217,15 +252,16 @@ function connectParent(input: ConnectParentInput): ParentSession {
     startChildren: async (count) => {
       const started: StartResult[] = []
       for (let index = 0; index < count; index += 1) {
-        started.push(
-          await manager.start({
-            prompt: `host child ${sessionId} #${index}`,
-            parent_session_id: sessionId,
-            depth: 1,
-            execution_mode: "process",
-            model: HOST_CHILD_MODEL,
-          }),
-        )
+        const result = await manager.start({
+          prompt: `host child ${sessionId} #${index}`,
+          parent_session_id: sessionId,
+          depth: 1,
+          execution_mode: "process",
+          model: HOST_CHILD_MODEL,
+        })
+        // A slow host returns `starting` (#10042); these scenarios need the child admitted first.
+        await launchSettled(manager, result)
+        started.push(result)
       }
       return started
     },

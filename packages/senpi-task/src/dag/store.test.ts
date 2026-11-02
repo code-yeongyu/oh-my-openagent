@@ -37,6 +37,7 @@ function tempProject(): string {
   for (const name of ["keys", "runs", "events", "results", "locks"]) {
     fs.mkdirSync(join(dagRoot, name), { recursive: true })
   }
+  fs.writeFileSync(join(directory, ".omo", "senpi-task", ".in-project"), "")
   return directory
 }
 
@@ -312,6 +313,63 @@ describe("createDagFileStore checkpoints and layout", () => {
     expect(writeSecond).toThrow("DAG session run limit reached: 1")
     expect(store.readCheckpoint(otherRunId)).toBeNull()
     expect(fs.readdirSync(store.paths.runs)).toEqual([`${runId}.json`])
+  })
+
+  test("#given the session limit is filled by finished runs #when another run checkpoint is created #then it is admitted because only active runs count", () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { max_runs_per_session: 16 } } })
+    const finished = ["completed", "failed", "cancelled"] as const
+    for (let index = 0; index < 16; index += 1) {
+      const id = `finished-${index}` as DagRunId
+      store.writeCheckpoint(id, { ...checkpoint({ id }), status: finished[index % finished.length] })
+    }
+
+    // when
+    store.writeCheckpoint(otherRunId, checkpoint({ id: otherRunId }))
+
+    // then
+    expect(store.readCheckpoint(otherRunId)).toMatchObject({ status: "running" })
+  })
+
+  test("#given the session limit is filled by active runs #when another run checkpoint is created #then it is refused with the way out", () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { max_runs_per_session: 16 } } })
+    const active = ["pending", "running", "paused"] as const
+    for (let index = 0; index < 16; index += 1) {
+      const id = `active-${index}` as DagRunId
+      store.writeCheckpoint(id, { ...checkpoint({ id }), status: active[index % active.length] })
+    }
+
+    // when
+    const writeNext = () => store.writeCheckpoint(otherRunId, checkpoint({ id: otherRunId }))
+
+    // then
+    expect(writeNext).toThrow("DAG session run limit reached: 16 runs are active")
+    expect(writeNext).toThrow("task.dag.max_runs_per_session")
+    expect(store.readCheckpoint(otherRunId)).toBeNull()
+  })
+
+  test("#given 15 active and several finished runs #when two more runs are written one after the other #then only the first is admitted", () => {
+    // given
+    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { max_runs_per_session: 16 } } })
+    for (let index = 0; index < 15; index += 1) {
+      const id = `active-${index}` as DagRunId
+      store.writeCheckpoint(id, checkpoint({ id }))
+    }
+    for (let index = 0; index < 5; index += 1) {
+      const id = `done-${index}` as DagRunId
+      store.writeCheckpoint(id, checkpoint({ id, status: "completed", completedAt: new Date().toISOString() }))
+    }
+    const thirdId = "third-run" as DagRunId
+
+    // when
+    store.writeCheckpoint(otherRunId, checkpoint({ id: otherRunId }))
+    const writeThird = () => store.writeCheckpoint(thirdId, checkpoint({ id: thirdId }))
+
+    // then
+    expect(store.readCheckpoint(otherRunId)).toMatchObject({ status: "running" })
+    expect(writeThird).toThrow("DAG session run limit reached: 16")
+    expect(store.readCheckpoint(thirdId)).toBeNull()
   })
 
   test("#given a parent session and run key #when writing the key #then its filename is the exact nul-delimited sha256", () => {

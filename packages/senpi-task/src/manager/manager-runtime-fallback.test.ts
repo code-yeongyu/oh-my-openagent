@@ -103,7 +103,6 @@ describe("TaskManager runtime fallback visibility", () => {
           source: "category",
           provider: "opencode-go",
           model_id: "minimax-m3",
-          variant: "max",
         },
       ],
     })
@@ -112,7 +111,7 @@ describe("TaskManager runtime fallback visibility", () => {
     const fallbackEvent = {
       type: "retry_fallback_applied",
       from: "chatgpt-subscription/gpt-6-luna-fast",
-      to: "opencode-go/minimax-m3:max",
+      to: "opencode-go/minimax-m3",
       chainKey: "chatgpt-subscription/gpt-6-luna-fast",
       reason: "hard-error",
     }
@@ -126,7 +125,6 @@ describe("TaskManager runtime fallback visibility", () => {
         source: "category",
         provider: "opencode-go",
         model_id: "minimax-m3",
-        reasoning_effort: "max",
       },
     })
     expect(record?.fallback_models).toEqual([])

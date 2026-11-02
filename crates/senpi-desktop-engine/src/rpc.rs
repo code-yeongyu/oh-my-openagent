@@ -38,6 +38,8 @@ impl Failure {
                 data: Some(RpcErrorData::Engine(EngineErrorData {
                     code: error.code,
                     hint: None,
+                    permission: error.permission,
+                    capture_unavailable: error.capture_unavailable.map(|data| *data),
                 })),
             },
             Self::Rejected(reason) => RpcError {
@@ -104,6 +106,29 @@ mod tests {
 
     fn parsed(line: &str) -> Value {
         serde_json::from_str(line).unwrap()
+    }
+
+    #[test]
+    fn permission_denial_preserves_all_guidance_fields_on_the_wire() {
+        use senpi_desktop_core::error::{PermissionDeniedData, TccPermission};
+        let data = PermissionDeniedData {
+            permission: TccPermission::Accessibility,
+            settings_url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility".into(),
+            app: "QA App".into(),
+            relaunch_required: true,
+        };
+        let error = DesktopError::permission_denied_with(data, "marked backend refusal");
+        let line = reply_line(RequestId::Number(9), Err(Failure::Engine(error)));
+        assert_eq!(parsed(&line)["error"], json!({
+            "code": -32000,
+            "message": "marked backend refusal",
+            "data": {
+                "code": "PermissionDenied", "hint": null,
+                "permission": { "permission": "accessibility",
+                    "settingsUrl": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+                    "app": "QA App", "relaunchRequired": true }
+            }
+        }));
     }
 
     #[test]

@@ -7,9 +7,9 @@ use std::ptr::{self, NonNull};
 use std::sync::LazyLock;
 
 use objc2_application_services::{AXError, AXIsProcessTrusted, AXUIElement, AXValue, AXValueType};
-use objc2_core_foundation::{CFArray, CFBoolean, CFRetained, CFString, CFType, CGPoint, CGSize};
+use objc2_core_foundation::{CFArray, CFBoolean, CFDate, CFRange, CFRetained, CFString, CFType, CGPoint, CGSize};
 use senpi_desktop_core::ax::{AxBounds, AxHandle};
-use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 
 const AX_TIMEOUT_SECONDS: f32 = 2.0;
 
@@ -44,9 +44,7 @@ pub(super) fn ensure_trusted() -> CoreResult<()> {
     if is_trusted() {
         Ok(())
     } else {
-        Err(DesktopError::permission_denied(
-            "macOS Accessibility permission is not granted for this process",
-        ))
+        Err(crate::backend::permissions::permission_denied(TccPermission::Accessibility))
     }
 }
 
@@ -55,7 +53,7 @@ pub(super) fn handle(element: CFRetained<AXUIElement>) -> AxHandle {
 }
 
 /// The AXUIElement behind a handle this backend produced.
-pub(super) fn element(handle: &AxHandle) -> CoreResult<&AXUIElement> {
+pub(crate) fn element(handle: &AxHandle) -> CoreResult<&AXUIElement> {
     handle
         .downcast_native::<CFRetained<AXUIElement>>()
         .map(|element| &**element)
@@ -95,7 +93,7 @@ pub(crate) fn window_id(element: &AXUIElement) -> Option<u32> {
 
 /// The CGWindowID of the window owning `element`: the element itself when
 /// it is a window, else its `AXWindow`.
-pub(super) fn owner_window_id(element: &AXUIElement) -> Option<u32> {
+pub(crate) fn owner_window_id(element: &AXUIElement) -> Option<u32> {
     if copy_string(element, "AXRole").as_deref() == Some("AXWindow") {
         return window_id(element);
     }
@@ -126,6 +124,40 @@ pub(crate) fn copy_attribute(element: &AXUIElement, attribute: &str) -> Option<C
     copy_attribute_result(element, attribute).ok().flatten()
 }
 
+/// Reads an optional attribute of an element a ref names: a destroyed element
+/// is a stale ref, any other failure reads as no value.
+pub(crate) fn copy_held_attribute(element: &AXUIElement, attribute: &str) -> CoreResult<Option<CFRetained<CFType>>> {
+    match copy_attribute_result(element, attribute) {
+        Err(AXError::InvalidUIElement) => Err(element_gone()),
+        result => Ok(result.ok().flatten()),
+    }
+}
+
+/// `InvalidUIElement` means the element itself is gone (its view was removed
+/// or its window closed), so the ref that named it is stale.
+pub(super) fn element_gone() -> DesktopError {
+    DesktopError::stale_ref("the element no longer exists; re-run ax()/find()")
+}
+
+/// Whether the app reports `name` as settable on `element`.
+pub(super) fn attribute_settable(element: &AXUIElement, name: &str) -> bool {
+    let attribute = CFString::from_str(name);
+    let mut settable = 0;
+    // SAFETY: The Boolean out parameter is writable and all CF objects outlive
+    // the synchronous AX query.
+    (unsafe { element.is_attribute_settable(&attribute, NonNull::from(&mut settable)) } == AXError::Success)
+        && settable != 0
+}
+
+/// The attribute's value as a `CFRange`, when it is one (`AXSelectedTextRange`).
+pub(super) fn copy_range(element: &AXUIElement, attribute: &str) -> Option<CFRange> {
+    let value = copy_attribute(element, attribute)?.downcast::<AXValue>().ok()?;
+    let mut range = CFRange { location: 0, length: 0 };
+    // SAFETY: The output is a live CFRange and the AXValue accessor validates
+    // the requested type before writing it.
+    unsafe { value.value(AXValueType::CFRange, NonNull::from(&mut range).cast()) }.then_some(range)
+}
+
 pub(crate) fn copy_string(element: &AXUIElement, attribute: &str) -> Option<String> {
     copy_attribute(element, attribute)?
         .downcast::<CFString>()
@@ -142,6 +174,11 @@ pub(crate) fn copy_bool(element: &AXUIElement, attribute: &str) -> Option<bool> 
 
 pub(crate) fn copy_element(element: &AXUIElement, attribute: &str) -> Option<CFRetained<AXUIElement>> {
     copy_attribute(element, attribute)?.downcast::<AXUIElement>().ok()
+}
+
+/// The attribute's value as a `CFAbsoluteTime`, when it is a `CFDate`.
+pub(crate) fn copy_date(element: &AXUIElement, attribute: &str) -> Option<f64> {
+    Some(copy_attribute(element, attribute)?.downcast::<CFDate>().ok()?.absolute_time())
 }
 
 pub(crate) fn copy_elements(element: &AXUIElement, attribute: &str) -> Option<Vec<CFRetained<AXUIElement>>> {

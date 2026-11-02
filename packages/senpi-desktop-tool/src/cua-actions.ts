@@ -174,7 +174,7 @@ for (const [index, a] of actions.entries()) {
 		steps.push({ index, action: a.action, status: "success" });
 	} catch (error) {
 		const code = error?.data?.code ?? error?.reason ?? error?.name ?? "Error";
-		steps.push({ index, action: a.action, status: "error", code, message: String(error?.message ?? error) });
+		steps.push({ index, action: a.action, status: "error", code, message: String(error?.message ?? error), permission: error?.data?.permission });
 		return { steps, bounds, failedIndex: index };
 	}
 }

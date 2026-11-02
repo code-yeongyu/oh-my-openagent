@@ -3,6 +3,8 @@ import { execFileSync, spawn } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
+
 export const OMO_ROOT = new URL("../../../", import.meta.url).pathname
 // Same override seam as the thread-tools harness: the defaults are this author's checkout
 // layout, but every path a foreign machine cannot have is redirectable by env.
@@ -108,7 +110,7 @@ function lsofPath(path) {
 }
 
 export function runChild(script, args = []) {
-  const child = spawn(process.execPath, [script, ...args], { stdio: ["ignore", "pipe", "pipe"] })
+  const child = spawn(process.execPath, [script, ...args], { env: withTelemetryOptOut(process.env), stdio: ["ignore", "pipe", "pipe"] })
   return child
 }
 

@@ -1,0 +1,34 @@
+.hero {
+  border-radius: 16px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+}
+
+.fade {
+  border-radius: 12px;
+  background-image: linear-gradient(to bottom, rgba(99, 102, 241, 0.12), transparent 60%);
+}
+
+.uniform-image {
+  border-radius: 12px;
+  border: 2px solid;
+  border-image: linear-gradient(#6366f1, #a855f7) 1;
+}
+
+.soft-edge {
+  border-radius: 12px;
+  background: linear-gradient(to right, #6366f1 4px, #fff);
+}
+
+.two-tone {
+  border-radius: 12px;
+  background: linear-gradient(to right, #6366f1 40px, #fff 40px);
+}
+
+.grid-texture {
+  border-radius: 12px;
+  background:
+    linear-gradient(rgba(3, 158, 179, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(3, 158, 179, 0.4) 1px, transparent 1px),
+    #0b1220;
+  background-size: 28px 28px, 28px 28px, auto;
+}

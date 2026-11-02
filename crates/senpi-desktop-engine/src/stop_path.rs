@@ -14,8 +14,8 @@ use senpi_desktop_core::protocol_params::StopRequestSource;
 use senpi_desktop_core::protocol_results::{StopPathKind, StopPathStatus};
 use senpi_desktop_core::types::DesktopCapabilities;
 use senpi_desktop_safety::{
-    ActiveStopPath, Chord, HostRelay, ResumeToken, StopPathListener, StopPolicy, StopSource, Supervisor,
-    SupervisorStatus,
+    ActiveStopPath, Chord, HostRelay, ResumeToken, StopPathError, StopPathFailure, StopPathListener,
+    StopPathReason, StopPolicy, StopSource, Supervisor, SupervisorStatus,
 };
 use senpi_desktop_session::BackendSelection;
 
@@ -75,6 +75,7 @@ struct Announced {
     global_live: bool,
     host_relay_live: bool,
     stop_path: ActiveStopPath,
+    global_failure: Option<StopPathFailure>,
 }
 
 impl From<SupervisorStatus> for Announced {
@@ -84,6 +85,7 @@ impl From<SupervisorStatus> for Announced {
             global_live: status.global_live,
             host_relay_live: status.host_relay_live,
             stop_path: status.stop_path,
+            global_failure: status.global_failure,
         }
     }
 }
@@ -108,29 +110,35 @@ struct State {
     host_relay: HostRelay,
     global: Option<Listener>,
     /// Why the Global listener failed to start, when it did.
-    global_failure: Option<String>,
-    /// `computer.allowHostRelayOnlyStop` of the latest `session.open`.
-    policy: StopPolicy,
-    announced: Announced,
+    global_failure: Option<StopPathFailure>,
+    /// Preserve non-permission platform diagnostics such as missing portals.
+    global_failure_reason: Option<String>,
 }
 
 pub struct StopPaths {
     supervisor: Arc<Supervisor>,
     resume: ResumeToken,
-    state: Mutex<State>,
+    state: Arc<Mutex<State>>,
+    policy: Mutex<StopPolicy>,
+    announced: Mutex<Announced>,
+    #[cfg(test)]
+    control_slot: Arc<senpi_desktop_session::ControlSlot>,
 }
 
 impl StopPaths {
     pub fn new(supervisor: Arc<Supervisor>, selection: &BackendSelection, resume: ResumeToken) -> Self {
-        let announced = Announced::from(supervisor.status());
+        let announced = Announced::from(supervisor.published_status());
         Self {
-            state: Mutex::new(State {
+            #[cfg(test)]
+            control_slot: senpi_desktop_session::ControlSlot::new(),
+            state: Arc::new(Mutex::new(State {
                 host_relay: HostRelay::new(),
                 global: global_listener(selection),
                 global_failure: None,
-                policy: StopPolicy::default(),
-                announced,
-            }),
+                global_failure_reason: None,
+            })),
+            policy: Mutex::new(StopPolicy::default()),
+            announced: Mutex::new(announced),
             supervisor,
             resume,
         }
@@ -140,18 +148,50 @@ impl StopPaths {
         self.resume.as_str()
     }
 
+    #[cfg(any(test, target_os = "macos"))]
+    pub(crate) fn session_view(&self) -> Self {
+        Self {
+            supervisor: Arc::clone(&self.supervisor),
+            resume: ResumeToken::new(self.resume.as_str().to_owned()),
+            state: Arc::clone(&self.state),
+            policy: Mutex::new(StopPolicy::default()),
+            announced: Mutex::new(Announced::from(self.supervisor.published_status())),
+            #[cfg(test)]
+            control_slot: Arc::clone(&self.control_slot),
+        }
+    }
+
+    pub fn supervisor(&self) -> Arc<Supervisor> {
+        Arc::clone(&self.supervisor)
+    }
+
+    pub fn control_slot(&self) -> Arc<senpi_desktop_session::ControlSlot> {
+        #[cfg(test)]
+        { Arc::clone(&self.control_slot) }
+        #[cfg(not(test))]
+        { senpi_desktop_session::ControlSlot::process_wide() }
+    }
+
     pub fn set_policy(&self, policy: StopPolicy) {
-        self.state.lock().policy = policy;
+        *self.policy.lock() = policy;
     }
 
     /// `stopPath.start`: (re)starts the Global listener if there is one, then
     /// arms the host relay.
     pub fn start(&self, chord: &Chord) -> StopPathStatus {
         let mut state = self.state.lock();
-        if let Some(global) = state.global.as_mut().filter(|global| !global.is_live()) {
-            let started = global.start(chord, Arc::clone(&self.supervisor));
-            state.global_failure = started.err().map(|error| error.reason().to_owned());
-        }
+        let failure = state.global.as_mut().and_then(|global| {
+            if global.is_live() { None } else { global.start(chord, Arc::clone(&self.supervisor)).err() }
+        });
+        state.global_failure = failure.as_ref().map(|error| match error {
+            StopPathError::PermissionDenied(_) => StopPathFailure::AccessibilityDenied,
+            StopPathError::InvalidChord(_) | StopPathError::Unavailable { .. } => StopPathFailure::Unavailable,
+        });
+        state.global_failure_reason = failure.map(|error| match error {
+            StopPathError::PermissionDenied(_) => "accessibility-denied".to_owned(),
+            other => other.reason().to_owned(),
+        });
+        self.supervisor.note_global_failure(state.global_failure);
         state.host_relay.arm(Arc::clone(&self.supervisor));
         drop(state);
         self.status()
@@ -189,8 +229,8 @@ impl StopPaths {
     }
 
     pub fn status(&self) -> StopPathStatus {
-        let status = self.supervisor.status();
-        let policy = self.state.lock().policy;
+        let status = self.supervisor.published_status();
+        let policy = *self.policy.lock();
         StopPathStatus {
             suspended: status.suspended,
             global_live: status.global_live,
@@ -212,10 +252,15 @@ impl StopPaths {
         let status = self.supervisor.status();
         let stop_reason = match status.stop_path {
             ActiveStopPath::Global => None,
+            ActiveStopPath::HostRelay | ActiveStopPath::None
+                if status.global_failure == Some(StopPathFailure::SecureInput) =>
+            {
+                Some(StopPathReason::SecureInputActive.as_str().to_owned())
+            }
             ActiveStopPath::HostRelay | ActiveStopPath::None => Some(
                 self.state
                     .lock()
-                    .global_failure
+                    .global_failure_reason
                     .clone()
                     .unwrap_or_else(|| NO_GLOBAL_LISTENER.to_owned()),
             ),
@@ -228,13 +273,17 @@ impl StopPaths {
 
     /// The current status when it differs from the last one announced.
     pub fn transition(&self) -> Option<StopPathStatus> {
-        let current = Announced::from(self.supervisor.status());
-        let mut state = self.state.lock();
-        if state.announced == current {
+        if self.supervisor.stop_pending() { return None; }
+        let current = Announced::from(self.supervisor.published_status());
+        let mut announced = self.announced.lock();
+        if *announced == current {
             return None;
         }
-        state.announced = current;
-        drop(state);
+        *announced = current;
+        drop(announced);
         Some(self.status())
     }
 }
+
+#[cfg(test)]
+mod tests;

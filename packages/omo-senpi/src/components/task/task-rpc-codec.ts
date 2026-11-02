@@ -5,7 +5,7 @@ import type {
   TaskSnapshot as TaskOutputSnapshot,
   ToolProgressDetails,
 } from "@oh-my-opencode/senpi-task"
-import { recordSummary } from "@oh-my-opencode/senpi-task"
+import { awaitingInputDetails, recordSummary } from "@oh-my-opencode/senpi-task"
 
 export type TaskLiveProgressSnapshot = ReturnType<typeof liveProgressSnapshot>
 
@@ -25,6 +25,7 @@ export function taskSnapshot(
   const description = bounded(record.description, MAX_SNAPSHOT_TEXT_LENGTH)
   const finalResponse = bounded(record.final_response, MAX_SNAPSHOT_TEXT_LENGTH)
   const errorMessage = bounded(record.error_message, MAX_SNAPSHOT_TEXT_LENGTH)
+  const awaitingInput = awaitingInputDetails(record)
   return {
     ...recordSummary(record, true),
     task_id: boundedRequired(record.task_id, MAX_TASK_ID_LENGTH),
@@ -38,6 +39,8 @@ export function taskSnapshot(
     ...(record.child_session_id === undefined
       ? {}
       : { child_session_id: boundedRequired(record.child_session_id, MAX_TASK_ID_LENGTH) }),
+    // The resumed-onto-aborted-session flag (senpi#3266), in task_output's shape and terminal filter.
+    ...(awaitingInput === undefined ? {} : { awaiting_input: awaitingInput }),
     ...(runStats === undefined ? {} : { run_stats: runStats }),
     ...(finalResponse.value === undefined ? {} : { final_response: finalResponse.value }),
     ...(finalResponse.truncated ? { final_response_truncated: true } : {}),
@@ -135,6 +138,19 @@ export function parseTaskOutput(
       ...(value.tail_lines === undefined ? {} : { tail_lines: Number(value.tail_lines) }),
     },
   }
+}
+
+export function parseTaskList(
+  value: unknown,
+): { readonly value: { readonly parent_session_id: string } } | { readonly error: string } {
+  if (!isRecord(value)) return { error: "Request must be an object." }
+  if (typeof value.parent_session_id !== "string" || value.parent_session_id.trim().length === 0) {
+    return { error: "parent_session_id is required." }
+  }
+  if (value.parent_session_id.length > MAX_TASK_ID_LENGTH) {
+    return { error: `parent_session_id must be at most ${MAX_TASK_ID_LENGTH} characters.` }
+  }
+  return { value: { parent_session_id: value.parent_session_id } }
 }
 
 export function invalidArguments(reason: string) {

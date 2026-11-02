@@ -1,137 +1,88 @@
 #!/usr/bin/env bun
-import { spawn } from "node:child_process"
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
-import { evalSmokeProviderSource } from "./omo-native-eval-smoke-provider.mjs"
+// Drives a packaged omo binary through eval end to end with the source checkout hidden. The pieces live beside it:
+// the sandbox (omo-native-eval-smoke-sandbox), the host processes and source hiding (omo-native-eval-smoke-host),
+// one run and its result readers (omo-native-eval-smoke-run), and the per-leg checks (omo-native-eval-smoke-assertions).
+import { existsSync, readdirSync, realpathSync, renameSync, rmSync } from "node:fs"
+import { basename, dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+import { assertEvalLegs } from "./omo-native-eval-smoke-assertions.mjs"
+import { ownedProcesses, renameAside } from "./omo-native-eval-smoke-host.mjs"
+import { drive } from "./omo-native-eval-smoke-run.mjs"
+import { createSandbox, isolatedEnvironment } from "./omo-native-eval-smoke-sandbox.mjs"
+import { stopSmokeHosts } from "./omo-native-eval-smoke-stop.mjs"
+
+const sourceTree = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), "../.."))
 
 function parseArgs(argv) {
-  if (argv.length === 2 && argv[0] === "--binary") return { binary: resolve(argv[1]) }
-  throw new Error("usage: bun script/qa/omo-native-eval-smoke.mjs --binary <path>")
-}
-
-function isolatedEnvironment(home, agentDir, sessionDir) {
-  const env = {}
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value === undefined) continue
-    if (key.startsWith("SENPI_") || key.startsWith("OMO_") || key.startsWith("PI_")) continue
-    if (key.endsWith("CODING_AGENT_DIR") || key.endsWith("CODING_AGENT_SESSION_DIR")) continue
-    if (/TOKEN|SECRET|PASSWORD|COOKIE|CREDENTIAL|API_KEY/i.test(key)) continue
-    env[key] = value
-  }
-  return {
-    ...env,
-    HOME: home,
-    OMO_CODING_AGENT_DIR: agentDir,
-    SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
-    PI_OFFLINE: "1",
-    PI_TELEMETRY: "0",
-  }
-}
-
-function createSandbox() {
-  const root = mkdtempSync(join(tmpdir(), "omo-eval-smoke-"))
-  const home = join(root, "home")
-  const cwd = join(root, "project")
-  const agentDir = join(root, "agent")
-  const sessionDir = join(root, "sessions")
-  for (const directory of [home, cwd, agentDir, sessionDir]) mkdirSync(directory, { recursive: true })
-  mkdirSync(join(agentDir, "omo-senpi", "omo-native"), { recursive: true })
-  writeFileSync(join(agentDir, "omo-senpi", "omo-native", "onboarding-completed"), '{"version":1}\n')
-  writeFileSync(join(agentDir, "trust.json"), `${JSON.stringify({ [realpathSync(cwd)]: true }, null, 2)}\n`)
-  writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({
-    defaultProjectTrust: "ask",
-    defaultProvider: "openai",
-    defaultModel: "gpt-5.6-sol",
-  }, null, 2)}\n`)
-  writeFileSync(join(agentDir, "models.json"), `${JSON.stringify({
-    providers: {
-      openai: {
-        models: [{ id: "gpt-5.6-sol", name: "Eval Smoke", contextWindow: 200000, maxTokens: 4096 }],
-      },
-    },
-  }, null, 2)}\n`)
-  const providerPath = join(root, "eval-smoke-provider.ts")
-  writeFileSync(providerPath, evalSmokeProviderSource())
-  return { root, home, cwd, agentDir, sessionDir, providerPath }
-}
-
-async function drive(binary, sandbox) {
-  const child = spawn(binary, [
-    "--mode", "rpc", "--offline", "--approve", "--no-context-files",
-    "--session-dir", sandbox.sessionDir,
-    "-e", sandbox.providerPath,
-    "--provider", "openai",
-    "--model", "gpt-5.6-sol",
-  ], {
-    cwd: sandbox.cwd,
-    env: isolatedEnvironment(sandbox.home, sandbox.agentDir, sandbox.sessionDir),
-    stdio: ["pipe", "pipe", "pipe"],
-  })
-  let stdout = ""
-  let stderr = ""
-  const result = await new Promise((resolveRun, rejectRun) => {
-    const watchdog = setTimeout(() => {
-      child.kill("SIGKILL")
-      rejectRun(new Error("eval smoke timed out after 120000ms"))
-    }, 120_000)
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString("utf8")
-      if (stdout.includes('"type":"agent_settled"')) child.stdin.end()
-    })
-    child.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8") })
-    child.once("error", (error) => {
-      clearTimeout(watchdog)
-      rejectRun(error)
-    })
-    child.once("close", (code, signal) => {
-      clearTimeout(watchdog)
-      resolveRun({ code, signal })
-    })
-    child.stdin.write(`${JSON.stringify({ type: "prompt", message: "Run the JavaScript eval smoke." })}\n`)
-  })
-  return { ...result, stderr }
-}
-
-function readEvalResult(sessionDir) {
-  const records = readdirSync(sessionDir)
-    .filter((name) => name.endsWith(".jsonl"))
-    .flatMap((name) => readFileSync(join(sessionDir, name), "utf8").split("\n"))
-    .filter(Boolean)
-    .map((line) => JSON.parse(line))
-  return records
-    .filter((record) => record?.type === "message")
-    .map((record) => record.message)
-    .find((message) => message?.role === "toolResult" && message.toolName === "eval")
+  if (argv.length === 1) return resolve(argv[0])
+  if (argv.length === 2 && argv[0] === "--binary") return resolve(argv[1])
+  throw new Error("usage: bun script/qa/omo-native-eval-smoke.mjs <binary>")
 }
 
 async function main() {
-  const { binary } = parseArgs(process.argv.slice(2))
-  const sandbox = createSandbox()
+  const sandbox = createSandbox(parseArgs(process.argv.slice(2)))
+  const previousCwd = process.cwd()
+  // Windows shells hold the checkout root open; hide every original entry there.
+  const trees = process.platform === "win32"
+    ? readdirSync(sourceTree).map((name) => join(sourceTree, name))
+    : [sourceTree]
+  const hiddenTrees = []
+  const hostSockets = []
+  const controller = new AbortController()
+  const interrupt = () => controller.abort()
+  process.once("SIGINT", interrupt)
+  process.once("SIGTERM", interrupt)
   try {
-    const result = await drive(binary, sandbox)
-    if (result.code !== 0) {
-      throw new Error(`binary exited code=${result.code} signal=${result.signal}\n${result.stderr.slice(-4000)}`)
+    process.chdir(sandbox.root)
+    for (const tree of trees) {
+      const hidden = `${tree}.eval-hidden-${sandbox.marker}`
+      await renameAside(tree, hidden)
+      hiddenTrees.push({ tree, hidden })
     }
-    const evalResult = readEvalResult(sandbox.sessionDir)
-    if (evalResult === undefined) throw new Error("eval tool produced no result")
-    const evalText = Array.isArray(evalResult.content)
-      ? evalResult.content.map((part) => part?.type === "text" ? part.text : "").join("\n")
-      : ""
-    if (evalResult.isError === true || !evalText.split(/\s+/).includes("42")) {
-      const extensionWarning = result.stderr.split("\n").find((line) => line.includes("Failed to load extension"))
-      const extensionCause = extensionWarning?.match(/Failed to load extension .*?: (.*)$/)?.[1]
-      throw new Error(
-        `eval did not return 42: ${evalText}${extensionCause === undefined ? "" : `\nextension load failed: ${extensionCause}`}`,
-      )
+    if (trees.some(existsSync)) throw new Error("source checkout remains accessible")
+    const result = await drive(sandbox, controller.signal)
+    if (process.platform !== "win32") {
+      const supervisors = (await ownedProcesses(sandbox.root))
+        .filter(({ command }) => command.includes("--internal-rpc-host-supervisor"))
+      await stopSmokeHosts(sandbox.binary, {
+        cwd: sandbox.cwd, env: isolatedEnvironment(sandbox), signal: controller.signal,
+      }, {
+        supervisors,
+        onDrained(shutdown) {
+          process.stderr.write(`SHUTDOWN ${shutdown.stdout.trim()}\n`)
+          for (const line of shutdown.stdout.split("\n")) {
+            const socket = line.match(/^(.+\.sock): drained/)?.[1]
+            if (socket) hostSockets.push(socket)
+          }
+        },
+      })
     }
-    process.stdout.write("PASS eval registered and JavaScript cell returned 42\n")
+    if (result.code !== 0) throw new Error(`binary exited code=${result.code}\n${result.stderr.slice(-4000)}`)
+    const passes = assertEvalLegs(sandbox, result)
+    const survivors = await ownedProcesses(sandbox.root)
+    const sockets = readdirSync(sandbox.root, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isSocket())
+    if (survivors.length || sockets.length || hostSockets.some(existsSync)) {
+      throw new Error(`shutdown leaked owned processes/sockets: ${JSON.stringify(survivors)} sockets=${sockets.length}`)
+    }
+    for (const line of passes) process.stdout.write(`${line}\n`)
+    process.stdout.write("PASS renamed source tree; owned workers/interpreters=0 sockets=0\n")
   } finally {
+    for (const { tree, hidden } of hiddenTrees.reverse()) renameSync(hidden, tree)
+    process.chdir(previousCwd)
+    process.removeListener("SIGINT", interrupt)
+    process.removeListener("SIGTERM", interrupt)
+    const survivors = await ownedProcesses(sandbox.root)
+    for (const { pid } of survivors) process.kill(pid, "SIGKILL")
+    for (const namespace of new Set(hostSockets.map(dirname))) {
+      if (basename(namespace).startsWith("omo-rpc-")) rmSync(namespace, { recursive: true, force: true })
+    }
     rmSync(sandbox.root, { recursive: true, force: true })
+    process.stderr.write(`CLEANUP source restored; sandbox removed; owned survivors terminated=${survivors.length}\n`)
   }
 }
 
 main().catch((error) => {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
-  process.exit(1)
+  process.exitCode = 1
 })

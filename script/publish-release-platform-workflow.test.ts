@@ -14,6 +14,13 @@ import { PLATFORMS } from "./build-binaries"
 import { DESKTOP_ENGINE_TARGETS } from "./release-desktop-engine-target"
 import { runBlock, sliceWorkflowSection } from "./release-workflow-test-steps"
 
+// These tests spawn bash or bun children. On 16 windows-latest runs the slowest passed in 2.6 s,
+// while cold runners went past Bun's 5 s default (#9386): the per-test budget absorbs those slow
+// cold-runner spawns. It cannot catch a hang, because spawnSync blocks the timer that enforces it,
+// so each spawn carries its own timeout: a hung child is killed and the test fails on its status.
+const SUBPROCESS_TEST_TIMEOUT_MS = 30_000
+const SUBPROCESS_SPAWN_TIMEOUT_MS = 20_000
+
 const publishWorkflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
 const publishPlatformWorkflowPath = new URL("../.github/workflows/publish-platform.yml", import.meta.url)
 
@@ -103,7 +110,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
       "desktop-engine": z.object({ strategy: z.object({ matrix: z.object({ include: z.array(z.object({
         host: z.string(), rust_target: z.string(), binary: z.string(),
       })) }) }), steps: stepsSchema }),
-      build: z.object({ needs: z.literal("desktop-engine"), steps: stepsSchema }),
+      build: z.object({ needs: z.tuple([z.literal("desktop-engine"), z.literal("keychain-helper")]), steps: stepsSchema }),
     }) }).parse(load(readFileSync(publishPlatformWorkflowPath, "utf8")))
     const engine = workflow.jobs["desktop-engine"]
     const build = workflow.jobs.build
@@ -114,7 +121,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
       return { index, value }
     }
 
-    // When the four artifact producers and the twelve platform consumers are resolved.
+    // When the six artifact producers and the twelve platform consumers are resolved.
     const install = step(engine.steps, "Install pinned Rust toolchain and target")
     const cargo = step(engine.steps, "Build desktop engine")
     const asset = step(engine.steps, "Stage desktop engine release asset")
@@ -153,14 +160,14 @@ describe("release binary asset lane in the platform publish workflow", () => {
   })
 
   test("uploads one engine artifact per canonical host without baseline duplicates", () => {
-    // Given the dedicated four-host build matrix.
+    // Given the dedicated six-host build matrix.
     const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
     const engineJob = sliceWorkflowSection(workflow, "  desktop-engine:\n", "  build:\n")
 
     // When its host list is compared to the release asset contract, each asset has one producer.
     const hosts = [...engineJob.matchAll(/^\s+- \{ host: ([a-z0-9-]+), runner:/gm)].map((match) => match[1])
     expect(hosts).toEqual([...DESKTOP_ENGINE_RELEASE_HOSTS])
-    expect(new Set(hosts).size).toBe(4)
+    expect(new Set(hosts).size).toBe(6)
     expect(engineJob).toContain("name: desktop-engine-${{ matrix.host }}")
   })
 
@@ -181,7 +188,7 @@ describe("release binary asset lane in the platform publish workflow", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-engine-stage-"))
     try {
       const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
-      const stage = runBlock(workflow, "      - name: Stage target-specific Rust engine for compiled payload\n", "      - name: Build release binary\n")
+      const stage = runBlock(workflow, "      - name: Stage target-specific Rust engine for compiled payload\n", "      - name: Download keychain helper\n")
       const source = "target/x86_64-apple-darwin/release/senpi-desktop-engine"
       const asset = "senpi-desktop-engine-darwin-x64"
       const download = join(root, ".omo", "desktop-engine-assets")
@@ -193,13 +200,14 @@ describe("release binary asset lane in the platform publish workflow", () => {
         cwd: root,
         env: { ...process.env, ENGINE_ASSET: asset, ENGINE_SOURCE: source },
         encoding: "utf8",
+        timeout: SUBPROCESS_SPAWN_TIMEOUT_MS,
       })
       expect(result.status, result.stderr).toBe(0)
       expect(readFileSync(join(root, source), "utf8")).toBe("x64 cross-target binary")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  })
+  }, SUBPROCESS_TEST_TIMEOUT_MS)
 
   test("rebuilds a baseline binary when its shared engine asset is absent", () => {
     // Given an existing omo baseline binary but no Darwin x64 engine release asset.
@@ -224,28 +232,31 @@ describe("release binary asset lane in the platform publish workflow", () => {
 
       // When only the executable exists, the real workflow shell must request a build.
       writeFileSync(names, "omo-darwin-x64-baseline\n")
-      const missing = spawnSync("bash", ["-e", "-c", check], { cwd: new URL("..", import.meta.url), env, encoding: "utf8" })
+      const missing = spawnSync("bash", ["-e", "-c", check], { cwd: new URL("..", import.meta.url), env, encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
       expect(missing.status, missing.stderr).toBe(0)
       expect(readFileSync(output, "utf8")).toContain("binary_exists=false")
 
       // When the shared engine is also present, the release bytes are reused.
       writeFileSync(names, "omo-darwin-x64-baseline\nsenpi-desktop-engine-darwin-x64\n")
       writeFileSync(output, "")
-      const complete = spawnSync("bash", ["-e", "-c", check], { cwd: new URL("..", import.meta.url), env, encoding: "utf8" })
+      const complete = spawnSync("bash", ["-e", "-c", check], { cwd: new URL("..", import.meta.url), env, encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
       expect(complete.status, complete.stderr).toBe(0)
       expect(readFileSync(output, "utf8")).toContain("binary_exists=true")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  })
+  }, SUBPROCESS_TEST_TIMEOUT_MS)
 
-  test("verifies precisely twelve launchers and four engines on reruns without publishing", () => {
+  test("verifies precisely twelve launchers, the keychain helper and six engines on reruns without publishing", () => {
     // Given a synthetic release with canonical names and independently computed hashes.
     const root = mkdtempSync(join(tmpdir(), "omo-engine-assets-"))
     try {
       const assets = join(root, "assets")
       mkdirSync(assets)
-      const binaries = PLATFORMS.map(({ platform }) => `omo-${platform}${platform.startsWith("windows-") ? ".exe" : ""}`)
+      const binaries = [
+        ...PLATFORMS.map(({ platform }) => `omo-${platform}${platform.startsWith("windows-") ? ".exe" : ""}`),
+        "omo-keychain-darwin-universal",
+      ]
       const engines = DESKTOP_ENGINE_RELEASE_HOSTS.map((host) => desktopEngineReleaseAssetName(host))
       if (engines.some((asset) => asset === null)) throw new Error("release host without asset name")
       const checksum = (name: string): string => {
@@ -258,23 +269,31 @@ describe("release binary asset lane in the platform publish workflow", () => {
       const gh = join(root, "gh")
       writeFileSync(gh, "#!/bin/bash\n[ \"$1\" = release ] && [ \"$2\" = download ] || exit 1\ncp \"$ASSET_SOURCE_DIR\"/* \"${@: -1}/\"\n")
       chmodSync(gh, 0o755)
-      if (spawnSync("bash", ["-c", "command -v shasum"]).status !== 0) {
+      if (spawnSync("bash", ["-c", "command -v shasum"], { timeout: SUBPROCESS_SPAWN_TIMEOUT_MS }).status !== 0) {
         const shasum = join(root, "shasum")
         writeFileSync(shasum, "#!/bin/bash\n[ \"$1\" = -a ] && [ \"$2\" = 256 ] || exit 2\nshift 2\nexec sha256sum \"$@\"\n")
         chmodSync(shasum, 0o755)
       }
       const workflow = readFileSync(publishWorkflowPath, "utf8")
       const verify = runBlock(workflow, "      - name: Verify uploaded assets\n", "      - name: Delete draft release\n")
+      const checkout = join(root, "checkout")
+      mkdirSync(checkout)
       const execute = () => spawnSync("bash", ["-e", "-c", verify], {
-        cwd: new URL("..", import.meta.url),
+        cwd: checkout,
         env: { ...process.env, PATH: `${root}:${process.env.PATH ?? ""}`, VERSION: "5.0.0", ASSET_SOURCE_DIR: assets },
         encoding: "utf8",
+        timeout: SUBPROCESS_SPAWN_TIMEOUT_MS,
       })
 
       // When every release asset exists, the actual workflow verification passes.
       const complete = execute()
       expect(complete.status, complete.stderr).toBe(0)
-      expect(complete.stdout).toContain("Verified 18/18 release assets")
+      expect(complete.stdout).toContain("Verified 21 release assets")
+
+      // When the keychain helper asset is absent, the release cannot go green either.
+      unlinkSync(join(assets, "omo-keychain-darwin-universal"))
+      expect(execute().status).not.toBe(0)
+      checksum("omo-keychain-darwin-universal")
 
       // When the engine asset is absent, a skip_platform rerun cannot go green.
       unlinkSync(join(assets, "senpi-desktop-engine-darwin-x64"))
@@ -283,5 +302,5 @@ describe("release binary asset lane in the platform publish workflow", () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  })
+  }, SUBPROCESS_TEST_TIMEOUT_MS)
 })

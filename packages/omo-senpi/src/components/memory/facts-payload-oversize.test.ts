@@ -108,11 +108,12 @@ describe("facts oversize payload classification", () => {
     expect(state.entries[0]?.parkedAt).toBe(NOW.toISOString())
     expect(state.entries[0]?.lastFailureId).toMatch(/^preflight-[0-9a-f-]{36}$/)
     // LOSSLESS: the oversize entry's queue file survives; only the shipped one is consumed.
-    expect(await queueFileNames(identity)).toHaveLength(1)
-    expect((await queue.listPending()).map((entry) => entry.conversationId)).toEqual(["session-2"])
+    expect(await queueFileNames(identity)).toHaveLength(0)
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
+    expect(await queue.listPending()).toEqual([])
   }, 30_000)
 
-  test("#given a parked oversize entry #when the same conversation queues a newer entry #then the newer entry stays blocked while others flow", async () => {
+  test("#given a parked oversize entry #when the same conversation queues a newer entry #then the newer entry flows while the parked one stays queued (#10918)", async () => {
     // given: an oversize entry parks, then the same conversation grows.
     const { root, identity, queue } = await fixture()
     await publish(queue, identity, "session-2", [message("m2", oversizeText())])
@@ -121,18 +122,23 @@ describe("facts oversize payload classification", () => {
     expect((await store.readFailures()).entries).toMatchObject([{ conversationId: "session-2", state: "parked" }])
     await publish(queue, identity, "session-2", [message("m2", oversizeText()), message("m3", "Small tail.")])
     await enqueue(queue, identity, "session-3", "m4", "The project uses Bun.")
+    const runsBefore = new Set(await readdir(join(identity.paths.facts, "runs")))
 
     // when
     const result = await launch(root, identity, queue, { now: () => new Date(NOW.getTime() + 60_000) })
 
-    // then: session-2's newer entry is blocked by its parked predecessor; session-3 flows.
+    // then: a parked predecessor no longer holds session-2's newer entry back; it stays queued itself.
     expect(result.status).toBe("committed")
-    const runs = (await readdir(join(identity.paths.facts, "runs"))).sort()
+    // Run dirs are named by a digest of their queue keys, so their sort order says nothing about which
+    // launch made them (#11143); the second launch's run is the one dir that was not there before it.
+    const newRuns = (await readdir(join(identity.paths.facts, "runs"))).filter((name) => !runsBefore.has(name))
+    expect(newRuns).toHaveLength(1)
     const latest = JSON.parse(
-      await readFile(join(identity.paths.facts, "runs", runs[runs.length - 1] ?? "missing", "ledger.json"), "utf8"),
+      await readFile(join(identity.paths.facts, "runs", newRuns[0] ?? "missing", "ledger.json"), "utf8"),
     ) as FactsRunLedger
-    expect(latest.queued.map((key) => key.conversationId)).toEqual(["session-3"])
-    expect((await queue.listPending()).map((entry) => entry.range.end_message_id).sort()).toEqual(["m2", "m3"])
+    expect(latest.queued.map((key) => `${key.conversationId}/${key.end_message_id}`).sort()).toEqual(["session-2/m3", "session-3/m4"])
+    expect(await queue.listPending()).toEqual([])
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 30_000)
 
   test("#given a people payload larger than the cap #when a launch runs #then nothing launches, frontiers take a normal streak, and the warning names bytes vs cap", async () => {
@@ -187,10 +193,11 @@ describe("facts oversize payload classification", () => {
       lastReason: "payload_entry_oversize",
       nextEligibleAt: null,
     })
-    expect((await queue.listPending()).map((entry) => entry.conversationId)).toEqual(["session-2"])
+    expect(await queue.listPending()).toEqual([])
+    expect(await readdir(factsQueuePaths(identity.paths).parkedDir)).toHaveLength(1)
   }, 30_000)
 
-  test("#given only oversize work #when classification runs #then no queue file, watermark, or run dir is written", async () => {
+  test("#given only oversize work #when classification runs #then its file is parked without changing watermarks or starting a run", async () => {
     // given: a single oversize entry and no healthy conversation beside it.
     const { root, identity, queue } = await fixture()
     const layout = factsQueuePaths(identity.paths)
@@ -202,9 +209,10 @@ describe("facts oversize payload classification", () => {
     // when
     const result = await launch(root, identity, queue, { now: () => new Date(NOW.getTime() + 60_000) })
 
-    // then: the classification is ledger-only - no queue file, watermark, or run dir moves.
+    // then: classification moves the file losslessly; no watermark or run is advanced.
     expect(result.status).toBe("empty")
-    expect(await queueFileNames(identity)).toEqual(filesBefore)
+    expect(await queueFileNames(identity)).toEqual([])
+    expect(await readdir(layout.parkedDir)).toEqual(filesBefore)
     expect(await readFile(layout.consumedPath, "utf8")).toBe(consumedBefore)
     expect((await readdir(join(identity.paths.facts, "runs"))).length).toBe(1)
     const state = await new FactsFailureStore({ identityPaths: identity.paths }).readFailures()
