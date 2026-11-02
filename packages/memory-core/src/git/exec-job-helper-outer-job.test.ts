@@ -9,6 +9,7 @@ import { createInterface } from "node:readline"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { memoryWriterLockPath, parseLockRecord } from "../locks"
 import { acquireGitActivityGate, type GitActivityGate } from "./activity-gate"
+import { GIT_ACTIVITY_JOB_PROTOCOL } from "./job-helper"
 import {
   WRITER_SCRIPT,
   compileHelperStub,
@@ -76,7 +77,10 @@ function startWriter(fixture: IdentityRepo, helper: string, argv: readonly strin
 }
 
 async function admit(writer: Writer): Promise<OuterJob> {
-  await writer.line(["ready"], 30_000)
+  // P must have claimed the protocol (its cached `selftest` passed at lock-record creation, design section 6.3) before
+  // it joins the outer job: otherwise its first git run spawns the `selftest` helper inside the job, and helperCreated
+  // can take that short-lived process for the run helper.
+  expect(await writer.line(["ready"], 30_000)).toBe(`ready ${GIT_ACTIVITY_JOB_PROTOCOL}`)
   const outer = OuterJob.create()
   cleanups.push(() => outer.close())
   outer.assign(writer.child.pid ?? 0)

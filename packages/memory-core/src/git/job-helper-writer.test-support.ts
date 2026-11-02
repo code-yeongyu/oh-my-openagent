@@ -26,7 +26,9 @@ if (config.holdWriterLock) {
   await acquireLock(writerLock, record, { waitTimeoutMs: 5_000 })
   process.stdout.write(`locked ${record.nonce}\n`)
 }
-process.stdout.write("ready\n")
+// The record's protocol claim proves whether this process's helper `selftest` already ran (design section 6.3); the
+// outer-job rows read it before they place P in their job.
+process.stdout.write(`ready ${record.git_activity_job ?? "unclaimed"}\n`)
 if ((await nextLine()) !== "start") process.exit(2)
 
 try {
