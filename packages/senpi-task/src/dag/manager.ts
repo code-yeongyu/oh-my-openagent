@@ -14,6 +14,7 @@ import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprint
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
 import { createDagJournal, type DagJournalCheckpoint } from "./journal"
 import { readDagNodeActivityAt } from "./node-activity"
+import { withDefinitionFields } from "./snapshot-definition-fields"
 import { readDagDirectory, type DagEventPage, type DagFileStore } from "./store"
 import { DAG_SETTINGS_DEFAULTS } from "./types"
 import type {
@@ -691,7 +692,7 @@ function projectSnapshot(record: DagRunRecordV1, stateDir: string): DagRunSnapsh
     ...(record.completedAt === undefined ? {} : { completedAt: record.completedAt }),
     definitionFingerprint: record.definitionFingerprint,
     lastSeq: record.checkpointSeq,
-    nodes: withNodeActivity(record.nodes, stateDir),
+    nodes: withDefinitionFields(withNodeActivity(record.nodes, stateDir), record.definition.nodes),
     edges: record.edges,
     waves: record.waves,
     criticalPath: record.criticalPath,

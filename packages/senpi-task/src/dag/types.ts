@@ -233,6 +233,15 @@ export type DagNodeCounts = {
   readonly skipped: number
 }
 
+// A snapshot node carries the definition fields the definition fingerprint reads, so a definition
+// rebuilt from a snapshot fingerprints the same as the persisted one and an amend built from it
+// re-runs only what actually changed (#9992).
+export type DagSnapshotNode = DagNode & {
+  readonly task_summary?: string
+  readonly description?: string
+  readonly load_skills?: readonly string[]
+}
+
 export type DagRunSnapshot = {
   readonly pause?: { readonly reason: "user_stop"; readonly pauseSeq: number }
   readonly schemaVersion: 1
@@ -248,7 +257,7 @@ export type DagRunSnapshot = {
   readonly completedAt?: string
   readonly definitionFingerprint: string
   readonly lastSeq: number
-  readonly nodes: readonly DagNode[]
+  readonly nodes: readonly DagSnapshotNode[]
   readonly edges: readonly DagEdge[]
   readonly waves: readonly DagWave[]
   readonly criticalPath: readonly DagNodeId[]
