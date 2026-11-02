@@ -3555,6 +3555,8 @@
         "test/fixtures/config-migration/opencode-side-effect-import.ts",
         // Test fixtures run as their own process by path (`bun run <dir>/fixtures/<name>.ts`), so nothing imports them.
         "src/hooks/prometheus-md-only/fixtures/*.ts",
+        // The dsh-agent tests spawn these fake servers by path, so nothing imports them.
+        "src/tools/dsh-agent/fixtures/*.mjs",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
