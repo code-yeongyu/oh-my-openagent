@@ -162,6 +162,9 @@ const TERMINAL_SESSION_ERROR_PATTERNS: readonly RegExp[] = [
   /no models available/i,
   /no connected providers/i,
   /all providers (?:are )?(?:unavailable|disconnected|exhausted)/i,
+  /failed to authenticate/i,
+  /authentication failed/i,
+  /oauth session expired/i,
 ]
 
 export function isTerminalSessionError(

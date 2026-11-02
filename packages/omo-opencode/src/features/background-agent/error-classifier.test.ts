@@ -391,6 +391,8 @@ describe("isTerminalSessionError", () => {
       ["all providers unavailable"],
       ["all providers are disconnected"],
       ["all providers exhausted"],
+      ["AI_APICallError: Claude Code returned an error result: Failed to authenticate: OAuth session expired and could not be refreshed"],
+      ["Authentication failed for provider anthropic"],
     ])("classifies %s as terminal", (message) => {
       expect(isTerminalSessionError({ message })).toBe(true)
     })
