@@ -59,10 +59,10 @@ enum Ended {
 /// `AWAIT_GO` (section 7.2): no timer. Ends on `go` after one `exec`, on `cancel`, on any malformed frame, or on EOF.
 fn await_go(control: &mut Control, port: HANDLE, reader: &mut FrameReader) -> Ended {
     let mut request = None;
+    if !control.start_read() {
+        return Ended::Eof;
+    }
     loop {
-        if !control.start_read() {
-            return Ended::Eof;
-        }
         match next_event(port, control, INFINITE) {
             Event::Pipe {
                 ok: true,
@@ -78,6 +78,10 @@ fn await_go(control: &mut Control, port: HANDLE, reader: &mut FrameReader) -> En
                 Frame::Go => return request.map_or(Ended::Cancel, Ended::Go),
                 _ => return Ended::Cancel,
             }
+        }
+        // Only a consumed completion frees the one OVERLAPPED; a job message leaves the read pending.
+        if !control.start_read() {
+            return Ended::Eof;
         }
     }
 }
