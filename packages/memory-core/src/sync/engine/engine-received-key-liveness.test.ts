@@ -23,7 +23,7 @@ test("received keys that cannot name a portable file are dropped and the next ba
   const server = new FakeSyncServer()
   const lines: string[] = []
   const b = await receiver(server, (line) => lines.push(line))
-  const keys = ["", "bad\u0000name.md", "con.md", "Aux.txt", "lpt9", "trailing. /x.md", "space /x.md", "q?.md", "a:b.md", "pipe|.md", "git.cmd", "GIT.EXE", "x\u202e.md", "cafe\u0301.md"]
+  const keys = ["", "bad\u0000name.md", "con.md", "Aux.txt", "lpt9", "trailing. /x.md", "space /x.md", "q?.md", "a:b.md", "pipe|.md", "git.cmd", "GIT.EXE", "COM\u00b3.md", "conout$", "x\u202e.md", "cafe\u0301.md"]
   for (const key of keys) {
     await publish(server, item(key, "bad"))
     expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
