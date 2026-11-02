@@ -1,8 +1,6 @@
 import { readdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import type { ReflectionOutcome } from "@oh-my-opencode/memory-core"
-
 import {
   REFLECTION_COMPLETION_ENTRY_TYPE,
   REFLECTION_SUMMARY_ENTRY_TYPE,
@@ -11,6 +9,8 @@ import {
   type ReflectionLiveSession,
 } from "./completion-contracts"
 import { readCompletionRecord, writeCompletionRecord } from "./completion-records"
+import { failureFingerprint } from "./failure-detail"
+import { readReflectionRecap } from "./reflection-recap"
 
 const DETAILED_DRAIN_LIMIT = 5
 const COMPLETION_MAX_AGE_MS = 7 * 24 * 60 * 60_000
@@ -41,7 +41,7 @@ export async function consumePendingReflectionCompletions(
   const stale = pending.filter((record) => Date.parse(record.finishedAt) < cutoff)
   const consumed: ReflectionCompletionRecord[] = []
   for (const record of fresh.slice(0, DETAILED_DRAIN_LIMIT)) {
-    consumed.push(await deliverReflectionCompletion(completionsDir, record, live, false))
+    consumed.push(await deliverReflectionCompletion(completionsDir, record, live))
   }
 
   const collapsed = fresh.slice(DETAILED_DRAIN_LIMIT)
@@ -50,10 +50,6 @@ export async function consumePendingReflectionCompletions(
     for (const record of collapsed) consumed.push(await markDelivered(completionsDir, record, live.sessionId))
   }
   for (const record of stale) consumed.push(await markDelivered(completionsDir, record, live.sessionId))
-
-  if (fresh.length > 0) {
-    safeNotify(live, drainMessage(fresh), fresh.some(isUnsuccessful) ? "warning" : "info")
-  }
   return consumed
 }
 
@@ -61,11 +57,10 @@ export async function deliverReflectionCompletion(
   completionsDir: string,
   record: ReflectionCompletionRecord,
   live: ReflectionLiveSession,
-  notify = true,
 ): Promise<ReflectionCompletionRecord> {
   const delivered = await markDelivered(completionsDir, record, live.sessionId)
-  live.api.appendEntry(REFLECTION_COMPLETION_ENTRY_TYPE, delivered)
-  if (notify) safeNotify(live, completionMessage(delivered), completionLevel(delivered.outcome))
+  const recap = live.identityContext === undefined ? undefined : await readReflectionRecap(live.identityContext, delivered)
+  live.api.appendEntry(REFLECTION_COMPLETION_ENTRY_TYPE, recap === undefined ? delivered : { ...delivered, recap })
   return delivered
 }
 
@@ -102,15 +97,8 @@ function summarize(records: readonly ReflectionCompletionRecord[]): ReflectionCo
   }
 }
 
-function drainMessage(records: readonly ReflectionCompletionRecord[]): string {
-  const failures = records.filter(isUnsuccessful).length
-  return failures === 0
-    ? `Delivered ${records.length} memory reflection completion${records.length === 1 ? "" : "s"}.`
-    : `Delivered ${records.length} memory reflection completions; ${failures} need attention.`
-}
-
 function completionFingerprint(record: ReflectionCompletionRecord): string {
-  return `${record.reason ?? record.outcome}:${(record.detail ?? "").slice(0, 60)}`
+  return failureFingerprint(record.reason ?? record.outcome, record.detail)
 }
 
 function isUnsuccessful(record: ReflectionCompletionRecord): boolean {
@@ -128,17 +116,6 @@ export function safeNotify(
   } catch (error) {
     live.logger?.warn("memory reflection notification failed", { error: describe(error) })
   }
-}
-
-function completionMessage(record: ReflectionCompletionRecord): string {
-  if (record.outcome === "merged") return `Memory reflection ${record.runId} merged.`
-  if (record.outcome === "no_changes") return `Memory reflection ${record.runId} completed with no changes.`
-  if (record.outcome === "timed_out") return `Memory reflection ${record.runId} timed out; its transcript cursor was not advanced.`
-  return `Memory reflection ${record.runId} ended with ${record.outcome}; its transcript cursor was not advanced.`
-}
-
-function completionLevel(outcome: ReflectionOutcome): "info" | "warning" {
-  return outcome === "merged" || outcome === "no_changes" ? "info" : "warning"
 }
 
 function describe(error: unknown): string {

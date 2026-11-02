@@ -205,6 +205,7 @@ export async function createTeamRun(
             skillContent: resolvedMember.systemContent,
             category: member.kind === "category" ? member.category : undefined,
             sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+            ...(resource.worktreePath ? { cwd: resource.worktreePath } : {}),
             onSessionCreated: async (sessionId) => {
               registerTeamSession(sessionId, {
                 teamRunId: runtimeState.teamRunId,

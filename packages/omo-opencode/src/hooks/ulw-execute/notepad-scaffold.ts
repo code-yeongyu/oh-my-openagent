@@ -39,7 +39,7 @@ function buildHeader(
   void timestamp
   const label = NOTEPAD_LABELS[fileName]
   const purpose = NOTEPAD_PURPOSES[fileName]
-  return `# ${label} \u2014 ${planName}\n\n${purpose}\n\n${NOTEPAD_FOOTER}\n\n---\n`
+  return `# ${label} - ${planName}\n\n${purpose}\n\n${NOTEPAD_FOOTER}\n\n---\n`
 }
 
 export function ensureNotepadScaffold(params: {

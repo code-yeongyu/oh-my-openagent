@@ -19,6 +19,7 @@ export function projectMemberStatus(status: TaskStatus): RuntimeMemberStatus {
     case "running":
       return "running"
     case "interrupted":
+    case "paused":
       return "idle"
     case "completed":
       return "completed"

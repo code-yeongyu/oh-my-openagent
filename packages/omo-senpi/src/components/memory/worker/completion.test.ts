@@ -8,15 +8,12 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { collectReflection } from "../palace/collectors"
 import {
   REFLECTION_COMPLETION_ENTRY_TYPE,
-  REFLECTION_LAUNCHED_ENTRY_TYPE,
   REFLECTION_SUMMARY_ENTRY_TYPE,
   consumePendingReflectionCompletions,
   ensureReflectionCompletion,
   recordReflectionCompletion,
-  reflectionLaunchedText,
   registerReflectionCompletionRenderer,
   type ReflectionCompletionRecord,
-  type ReflectionLaunchedEntry,
 } from "./completion"
 import { CapturedCompletionApi } from "./runner.test-support"
 import { realpathSync } from "node:fs"
@@ -47,26 +44,6 @@ function record(): ReflectionCompletionRecord {
 }
 
 describe("reflection completion flow", () => {
-  test("#given a reflection launch #when its entry renders #then run trigger and backlog are visible", () => {
-    // given
-    const launched: ReflectionLaunchedEntry = {
-      schemaVersion: 1,
-      runId: "run-launched",
-      identity: "agent-test",
-      trigger: "step-count",
-      category: "quick",
-      conversationIds: ["conversation-a"],
-      backlogSteps: 14,
-      startedAt: "2026-08-12T00:00:00.000Z",
-    }
-
-    // when
-    const text = reflectionLaunchedText(launched)
-
-    // then
-    expect(text).toBe("memory reflection started run:run-launched trigger:step-count (+14 steps)")
-  })
-
   test("#given a legacy completion without enrichment fields #when it renders #then backward compatibility is preserved", () => {
     // given
     const legacy = record()
@@ -154,7 +131,7 @@ describe("reflection completion flow", () => {
     }])
   })
 
-  test("#given a pending offline completion #when its source session starts #then appendEntry notify and consumed state happen without a model message", async () => {
+  test("#given a pending offline completion #when its source session starts #then appendEntry and consumed state happen without a model message or a toast", async () => {
     // given
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-completion-")))
     roots.push(root)
@@ -172,13 +149,9 @@ describe("reflection completion flow", () => {
 
     // then
     expect(consumed).toHaveLength(1)
-    expect(api.renderers.map((item) => item.customType)).toEqual([
-      "senpi-memory.reflection-completion",
-      "senpi-memory.reflection-launched",
-      "senpi-memory.reflection-summary",
-    ])
+    expect(api.renderers.map((item) => item.customType)).toEqual(["senpi-memory.reflection-completion"])
     expect(api.entries).toEqual([{ customType: REFLECTION_COMPLETION_ENTRY_TYPE, data: consumed[0] }])
-    expect(notifications).toHaveLength(1)
+    expect(notifications).toEqual([])
     expect(consumed[0]?.delivery).toMatchObject({ status: "consumed", sessionId: "conversation-a" })
   })
 
@@ -240,7 +213,7 @@ describe("reflection completion flow", () => {
 
   describe("#given a throwing reflection UI", () => {
     describe("#when a pending completion is delivered", () => {
-      test("#then the entry is consumed and the UI failure is logged", async () => {
+      test("#then the entry is consumed without ever touching the UI", async () => {
         // given
         const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-completion-")))
         roots.push(root)
@@ -259,14 +232,14 @@ describe("reflection completion flow", () => {
         // then
         expect(consumed[0]?.delivery.status).toBe("consumed")
         expect(api.entries).toHaveLength(1)
-        expect(warnings).toHaveLength(1)
+        expect(warnings).toEqual([])
       })
     })
   })
 
   describe("#given eight pending completions for one identity including two older than seven days", () => {
     describe("#when a different session for that identity drains the backlog twice", () => {
-      test("#then five details one summary and one notify are emitted once while stale records are silently consumed", async () => {
+      test("#then five details and one summary are journaled once, no toast fires, and stale records are silently consumed", async () => {
         // given
         const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-completion-")))
         roots.push(root)
@@ -300,8 +273,7 @@ describe("reflection completion flow", () => {
           customType: REFLECTION_SUMMARY_ENTRY_TYPE,
           data: expect.objectContaining({ schemaVersion: 1, count: 1, failedCount: 1 }),
         }])
-        expect(notifications).toHaveLength(1)
-        expect(notifications[0]?.level).toBe("warning")
+        expect(notifications).toEqual([])
         for (const pending of records) {
           expect(JSON.parse(await readFile(join(root, `${pending.runId}.json`), "utf8"))).toMatchObject({
             conversationIds: pending.conversationIds,

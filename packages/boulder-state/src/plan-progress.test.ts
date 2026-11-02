@@ -63,4 +63,19 @@ describe("getPlanProgress", () => {
     // then
     expect(progress).toEqual({ total: 2, completed: 1, isComplete: false })
   })
+
+  test("#given every open task is blocked with [~] #when progress is read #then the plan is complete without claiming the blocked task done", () => {
+    // given
+    const planPath = writePlan([
+      "## TODOs",
+      "- [x] 1. Build",
+      "- [~] 2. Push, blocked on the user",
+    ].join("\n"))
+
+    // when
+    const progress = getPlanProgress(planPath)
+
+    // then
+    expect(progress).toEqual({ total: 2, completed: 1, isComplete: true })
+  })
 })

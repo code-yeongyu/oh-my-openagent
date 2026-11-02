@@ -48,11 +48,29 @@ async function detachCurrentConsole(): Promise<void> {
   }
 }
 
+/**
+ * Names the phase a probe step died in.
+ *
+ * Both step deadlines are armed before the console host is spawned, so when one expires the other
+ * expires with it and the `finally` rethrows whichever AbortError it happened to touch last. That
+ * produced a bare `AbortError: The operation was aborted` with no indication of whether the parent
+ * never reached ready or never shut down, which is the difference between a starved step and a
+ * hung one (#8323).
+ */
+function withPhase<T>(label: string, mode: ProbeMode, promise: Promise<T>): Promise<T> {
+  return promise.catch((error: unknown) => {
+    throw new Error(
+      `windows console probe phase '${label}' (${mode}) failed within ${String(PROBE_STEP_TIMEOUT_MS)}ms: ${String(error)}`,
+      { cause: error },
+    )
+  })
+}
+
 async function runCase(mode: ProbeMode, root: string): Promise<ProbeCase> {
   const readyPath = join(root, `${mode}-ready.json`)
   const stopPath = join(root, `${mode}-stop`)
   const errorPath = join(root, `${mode}-error.txt`)
-  const ready = waitForFile(readyPath, AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS))
+  const ready = withPhase("ready", mode, waitForFile(readyPath, AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS)))
   const parent = spawn(
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", CONSOLE_HOST_PATH],
@@ -74,7 +92,11 @@ async function runCase(mode: ProbeMode, root: string): Promise<ProbeCase> {
       windowsHide: true,
     },
   )
-  const closed = once(parent, "close", { signal: AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS) })
+  const closed = withPhase(
+    "close",
+    mode,
+    once(parent, "close", { signal: AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS) }),
+  )
 
   let readyPayload: ParentReady | undefined
   let handle = 0

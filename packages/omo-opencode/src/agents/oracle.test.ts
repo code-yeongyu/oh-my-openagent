@@ -14,6 +14,10 @@ describe("createOracleAgent", () => {
     expect(agent.reasoningEffort).toBe("xhigh")
   })
 
+  test("uses xhigh reasoning effort for GPT-6 Astra frontier routing", () => {
+    expect(createOracleAgent("github-copilot/gpt-6-astra").reasoningEffort).toBe("xhigh")
+  })
+
   test("preserves medium reasoning effort for gpt-5.5 fallback", () => {
     // given
     const model = "openai/gpt-5.5"

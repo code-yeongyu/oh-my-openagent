@@ -7,7 +7,11 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { createGitMasterAttributionComponent } from "./index"
 
-const CO_AUTHOR_TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+const TRAILER = "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+
+function occurrences(text: string, needle: string): number {
+  return text.split(needle).length - 1
+}
 
 function createTestContext(pi: FakeExtensionAPI): ComponentContext {
   const logger: ComponentLogger = {
@@ -63,9 +67,10 @@ async function registerWithSettings(
 }
 
 const defaultSettings = (): OmoGitMasterSettings => OmoGitMasterSettingsSchema.parse({})
+const footerOptIn = (): OmoGitMasterSettings => OmoGitMasterSettingsSchema.parse({ commit_footer: true })
 
 describe("omo-senpi git-master attribution component", () => {
-  it("#given default settings #when a git-master SKILL.md read result arrives #then the co-author trailer and footer directive are appended", async () => {
+  it("#given default settings #when a git-master SKILL.md read result arrives #then the env-prefix section rides the skill content and the co-author directive is appended once", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, defaultSettings())
@@ -77,17 +82,67 @@ describe("omo-senpi git-master attribution component", () => {
     expect(transform).toBeDefined()
     if (transform === undefined) return
     expect(transform.content).toHaveLength(2)
+    const text = transform.content[0]?.text ?? ""
+    expect(text).toContain("GIT_MASTER=1 git status")
+    expect(text).not.toContain(TRAILER)
     const appended = appendedTextOf(transform)
-    expect(appended).toContain(CO_AUTHOR_TRAILER)
-    expect(appended).toContain("Ultraworked with")
+    expect(appended).toContain(`--trailer "${TRAILER}"`)
+    expect(appended).toContain("GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit")
   })
 
-  it("#given both attribution settings disabled #when a git-master SKILL.md read result arrives #then the result is untouched", async () => {
+  it("#given a read result that already carries the attribution directive #when it passes the hook again #then the directive is not appended a second time", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerWithSettings(pi, defaultSettings())
+    const first = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+    const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
+    payload.content = first?.content ?? []
+
+    // when
+    const second = await dispatchRead(pi, payload)
+
+    // then
+    expect(second?.content).toHaveLength(2)
+    const allText = (second?.content ?? []).map((item) => item.text ?? "").join("\n")
+    expect(occurrences(allText, `--trailer "${TRAILER}"`)).toBe(1)
+  })
+
+  it("#given the footer opted in #when a git-master SKILL.md read result arrives #then the directive carries the footer and the co-author trailer", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerWithSettings(pi, footerOptIn())
+
+    // when
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+
+    // then
+    expect(transform).toBeDefined()
+    if (transform === undefined) return
+    expect(transform.content).toHaveLength(2)
+    const appended = appendedTextOf(transform)
+    expect(appended).toContain("Ultraworked with")
+    expect(appended).toContain(`--trailer "${TRAILER}"`)
+  })
+
+  it("#given the co-author turned off #when a git-master SKILL.md read result arrives #then no co-author identity reaches the model", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerWithSettings(pi, OmoGitMasterSettingsSchema.parse({ include_co_authored_by: false }))
+
+    // when
+    const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
+
+    // then
+    expect(transform?.content).toHaveLength(1)
+    expect(transform?.content[0]?.text ?? "").not.toContain("sisyphus-dev-ai")
+  })
+
+  it("#given both attribution settings disabled and the env prefix disabled #when a git-master SKILL.md read result arrives #then the result is untouched", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(
       pi,
-      OmoGitMasterSettingsSchema.parse({ commit_footer: false, include_co_authored_by: false }),
+      OmoGitMasterSettingsSchema.parse({ commit_footer: false, include_co_authored_by: false, git_env_prefix: "" }),
     )
 
     // when
@@ -97,10 +152,79 @@ describe("omo-senpi git-master attribution component", () => {
     expect(transform).toBeUndefined()
   })
 
-  it("#given a read of an unrelated file #when the result arrives #then the result is untouched", async () => {
+  it("#given default settings #when the skill body carries bash git commands #then every git command in the bash blocks is prefixed", async () => {
     // given
     const pi = new FakeExtensionAPI()
     await registerWithSettings(pi, defaultSettings())
+    const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
+    payload.content = [
+      {
+        type: "text",
+        text: "# Git Master\n\n```bash\ngit add -A .\ngit commit -m \"x\"\necho done\n```",
+      },
+    ]
+
+    // when
+    const transform = await dispatchRead(pi, payload)
+
+    // then
+    expect(transform).toBeDefined()
+    if (transform === undefined) return
+    const text = transform.content[0]?.text ?? ""
+    expect(text).toContain("GIT_MASTER=1 git add -A .")
+    expect(text).toContain("GIT_MASTER=1 git commit -m \"x\"")
+    expect(text).toContain("\necho done")
+  })
+
+  it("#given senpi started from a non-bash login shell #when a git-master SKILL.md read result arrives #then the prefix uses the bash form senpi's bash tool runs", async () => {
+    // given
+    const saved = { SHELL: process.env["SHELL"], PSModulePath: process.env["PSModulePath"] }
+    try {
+      for (const loginShell of ["/bin/tcsh", "/usr/local/bin/fish", "/bin/zsh"]) {
+        process.env["SHELL"] = loginShell
+        process.env["PSModulePath"] = "C:\\Program Files\\PowerShell\\Modules"
+        const pi = new FakeExtensionAPI()
+        await registerWithSettings(pi, defaultSettings())
+        const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
+        payload.content = [{ type: "text", text: "# Git Master\n\n```bash\ngit status\n```" }]
+
+        // when
+        const transform = await dispatchRead(pi, payload)
+
+        // then
+        const text = transform?.content[0]?.text ?? ""
+        expect(text).toContain("\nGIT_MASTER=1 git status\n```")
+        expect(text).not.toContain("setenv")
+        expect(text).not.toContain("$env:")
+      }
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
+  })
+
+  it("#given a skill file with YAML frontmatter #when a git-master SKILL.md read result arrives #then the prefix section follows the frontmatter", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerWithSettings(pi, defaultSettings())
+    const payload = readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md")
+    payload.content = [{ type: "text", text: "---\nname: git-master\ndescription: x\n---\n# Git Master\n" }]
+
+    // when
+    const transform = await dispatchRead(pi, payload)
+
+    // then
+    const text = transform?.content[0]?.text ?? ""
+    expect(text.startsWith("---\nname: git-master\ndescription: x\n---\n")).toBe(true)
+    expect(text.indexOf("<git_env_prefix>")).toBeGreaterThan(text.indexOf("description: x"))
+  })
+
+  it("#given a read of an unrelated file #when the result arrives #then the result is untouched", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    await registerWithSettings(pi, footerOptIn())
 
     // when
     const transform = await dispatchRead(pi, readResultPayload("/home/user/project/src/index.ts"))
@@ -112,7 +236,7 @@ describe("omo-senpi git-master attribution component", () => {
   it("#given a failed read of the git-master skill #when the result arrives #then the result is untouched", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await registerWithSettings(pi, defaultSettings())
+    await registerWithSettings(pi, footerOptIn())
 
     // when
     const transform = await dispatchRead(
@@ -138,29 +262,29 @@ describe("omo-senpi git-master attribution component", () => {
     const appended = appendedTextOf(transform)
     expect(appended).toContain("Shipped with omo")
     expect(appended).not.toContain("Ultraworked with")
-    expect(appended).toContain(CO_AUTHOR_TRAILER)
   })
 
-  it("#given the footer disabled but the co-author enabled #when a git-master SKILL.md read result arrives #then only the trailer is appended", async () => {
+  it("#given the co-author enabled without the footer or env prefix #when a git-master SKILL.md read result arrives #then only the co-author directive is appended and the skill text is untouched", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await registerWithSettings(pi, OmoGitMasterSettingsSchema.parse({ commit_footer: false }))
+    await registerWithSettings(
+      pi,
+      OmoGitMasterSettingsSchema.parse({ commit_footer: false, include_co_authored_by: true, git_env_prefix: "" }),
+    )
 
     // when
     const transform = await dispatchRead(pi, readResultPayload("/home/user/.omo/agent/skills/git-master/SKILL.md"))
 
     // then
-    expect(transform).toBeDefined()
-    if (transform === undefined) return
-    const appended = appendedTextOf(transform)
-    expect(appended).toContain(CO_AUTHOR_TRAILER)
-    expect(appended).not.toContain("Ultraworked with")
+    expect(transform?.content).toHaveLength(2)
+    expect(transform?.content[0]?.text).toBe("# Git Master\n\nMode Gate...")
+    expect(transform === undefined ? "" : appendedTextOf(transform)).toContain(`git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" --trailer "${TRAILER}"`)
   })
 
-  it("#given a Windows-style skill path #when the read result arrives #then the directive is still appended", async () => {
+  it("#given a Windows-style skill path with the footer opted in #when the read result arrives #then the directive is still appended", async () => {
     // given
     const pi = new FakeExtensionAPI()
-    await registerWithSettings(pi, defaultSettings())
+    await registerWithSettings(pi, footerOptIn())
 
     // when
     const transform = await dispatchRead(
@@ -171,6 +295,6 @@ describe("omo-senpi git-master attribution component", () => {
     // then
     expect(transform).toBeDefined()
     if (transform === undefined) return
-    expect(appendedTextOf(transform)).toContain(CO_AUTHOR_TRAILER)
+    expect(appendedTextOf(transform)).toContain("Ultraworked with")
   })
 })

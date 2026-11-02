@@ -1,0 +1,23 @@
+{
+	"name": "@oh-my-opencode/senpi-desktop-prelude",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"description": "Codemode prelude assets and model documentation for the senpi computer tool",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"scripts": {
+		"generate": "node scripts/generate-assets.ts",
+		"typecheck": "tsgo --noEmit -p tsconfig.json",
+		"test": "vitest --run test"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.2",
+		"vitest": "5.0.1"
+	}
+}

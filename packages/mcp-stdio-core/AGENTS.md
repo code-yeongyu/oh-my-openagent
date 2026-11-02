@@ -22,7 +22,6 @@ The lowest-level core package: JSON-RPC 2.0 transport over stdio (line-mode and 
 - `ast-grep-mcp/src/mcp.ts`: ast-grep MCP server.
 - `git-bash-mcp/src/mcp.ts`: Git Bash MCP server.
 - `lsp-daemon/src/proxy.ts`: stdio MCP proxy; also imports `./record` from `daemon-client.ts`, `request-routing.ts`, `ipc-protocol.ts`.
-- `omo-senpi/src/mcp/memory-server.ts`: Senpi memory MCP server.
 
 ## NOTES
 

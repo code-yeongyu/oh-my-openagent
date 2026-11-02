@@ -104,6 +104,7 @@ function runCaptured(command, args, cwd, label) {
 			cwd,
 			shell: process.platform === "win32",
 			stdio: ["ignore", "pipe", "pipe"],
+			windowsHide: true,
 		});
 		const chunks = [];
 		child.stdout.on("data", (chunk) => chunks.push(chunk));

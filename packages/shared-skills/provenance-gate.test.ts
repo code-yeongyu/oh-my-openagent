@@ -1,10 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { includedDesignpowersSkills } from "./scripts/designpowers-refs-manifest.mjs";
 import { materializeFrontendRefs, normalizeSkillFrontmatter } from "./scripts/materialize-frontend-refs.mjs";
-import { designOriginals, frontendSkillRoot, thirdPartyRelativePaths, upstreamsRoot } from "./scripts/frontend-refs-manifest.mjs";
+import { designOriginals, thirdPartyRelativePaths, upstreamsRoot } from "./scripts/frontend-refs-manifest.mjs";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const frontendSkillRel = "packages/shared-skills/skills/frontend";
@@ -40,6 +41,10 @@ function submoduleHead(name: string): string {
 describe("DMCA provenance gate", () => {
 	const keptDesign = new Set((designOriginals as string[]).map((name) => `references/design/${name}`));
 	const thirdParty: string[] = thirdPartyRelativePaths();
+	// Materialize into a private root so the checkout's shipped references are never deleted
+	// while other test files read them.
+	const materializeRoot = mkdtempSync(join(tmpdir(), "omo-provenance-refs-"));
+	afterAll(() => rmSync(materializeRoot, { recursive: true, force: true }));
 
 	test("no third-party-derived reference file is committed", () => {
 		// given the tracked files under the frontend references tree
@@ -56,17 +61,17 @@ describe("DMCA provenance gate", () => {
 
 	test("materialization makes every third-party reference exist on disk", () => {
 		// given a materialize run from the inited submodules
-		const result = materializeFrontendRefs({ strict: false });
+		const result = materializeFrontendRefs({ strict: false, targetRoot: materializeRoot });
 		if (result.skipped) return;
-		// then every manifest target ships in the package working tree
+		// then every manifest target lands under the materialize root
 		for (const relPath of thirdParty) {
-			expect(existsSync(join(frontendSkillRoot, relPath))).toBe(true);
+			expect(existsSync(join(materializeRoot, relPath))).toBe(true);
 		}
 	});
 
 	test("designpowers skills match upstream after frontmatter normalization", () => {
 		// given a materialize run from the inited designpowers submodule
-		const result = materializeFrontendRefs({ strict: false });
+		const result = materializeFrontendRefs({ strict: false, targetRoot: materializeRoot });
 		if (result.skipped) return;
 		const mismatches: string[] = [];
 
@@ -74,7 +79,7 @@ describe("DMCA provenance gate", () => {
 		for (const skillName of includedDesignpowersSkills) {
 			const upstream = readFileSync(join(upstreamsRoot, "designpowers", "skills", skillName, "SKILL.md"), "utf8");
 			const materialized = readFileSync(
-				join(frontendSkillRoot, "references", "designpowers", "vendor", "skills", skillName, "reference.md"),
+				join(materializeRoot, "references", "designpowers", "vendor", "skills", skillName, "reference.md"),
 				"utf8",
 			);
 			if (normalizeSkillFrontmatter(upstream) !== materialized) mismatches.push(skillName);

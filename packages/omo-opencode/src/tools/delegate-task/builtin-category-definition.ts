@@ -7,5 +7,6 @@ export type BuiltinCategoryDefinition = {
   callerGuidance?: string
   promptAppend: string
   resolvePromptAppend?: (model: string | undefined) => string
-  requiresModel?: string
+  // One model id, or several ids any one of which satisfies the gate (see builtin-categories.ts).
+  requiresModel?: string | readonly string[]
 }

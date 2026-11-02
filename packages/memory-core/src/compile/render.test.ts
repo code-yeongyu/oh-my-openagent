@@ -1,5 +1,25 @@
 import { describe, expect, it } from "bun:test"
+import { renderExternalProjection } from "./external-projection"
+import { NAME_NOTE } from "./external-projection-names"
 import { markMemoryBlock, replaceMemoryBlock, stripMemoryBlock } from "./render"
+
+describe("renderExternalProjection", () => {
+  it("#given nested paths and no root files #when rendered #then each file-holding directory gets one sorted comma line under a bare root", () => {
+    // given
+    const paths = ["reference/project/b.md", "people/ann/card.md", "reference/project/a.md", "reference/top.md"]
+
+    // when / then
+    expect(renderExternalProjection(paths)).toBe([
+      "<external_projection>",
+      NAME_NOTE,
+      "$MEMORY_DIR/",
+      "people/ann/: card",
+      "reference/: top",
+      "reference/project/: a, b",
+      "</external_projection>",
+    ].join("\n"))
+  })
+})
 
 describe("memory block sentinels", () => {
   it("#given an identity and block #when marked #then the exact sentinel wrapper is returned", () => {

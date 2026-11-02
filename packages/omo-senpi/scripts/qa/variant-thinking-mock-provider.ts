@@ -27,26 +27,36 @@ type TaskE2EExtensionAPI = Parameters<typeof registerTaskE2eMockProvider>[0];
 type MockProvider = Parameters<TaskE2EExtensionAPI["registerProvider"]>[1];
 type MockModel = MockProvider["models"][number];
 
-// Only the sol rung is served, so momus lands on its `gpt-5.6-sol` xhigh rung and metis on its
-// `gpt-5.6-sol` medium rung through cross-provider chain matching, without impersonating a builtin
-// provider id (senpi merges a builtin's real baseUrl over any such registration).
+// One model per curated chain head (fallback-chains.ts): plan-reviewer lands on its `gpt-6-astra`
+// xhigh rung and plan-consultant on its `gpt-5.6-sol` medium rung through cross-provider chain
+// matching, without impersonating a builtin provider id (senpi merges a builtin's real baseUrl
+// over any such registration).
 type ReasoningMockModel = MockModel & { readonly thinkingLevelMap: Readonly<Record<string, string>> };
 
-const SOL_FALLBACK_MODEL: ReasoningMockModel = {
-	id: "gpt-5.6-sol",
-	name: "Mock Sol",
-	reasoning: true,
-	thinkingLevelMap: { minimal: "minimal", low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: "max" },
-	input: ["text"],
-	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 200_000,
-	maxTokens: 4096,
-};
+const REASONING_LEVELS = { minimal: "minimal", low: "low", medium: "medium", high: "high", xhigh: "xhigh", max: "max" };
+
+function reasoningModel(id: string, name: string): ReasoningMockModel {
+	return {
+		id,
+		name,
+		reasoning: true,
+		thinkingLevelMap: REASONING_LEVELS,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 200_000,
+		maxTokens: 4096,
+	};
+}
+
+const FALLBACK_MODELS: readonly ReasoningMockModel[] = [
+	reasoningModel("gpt-5.6-sol", "Mock Sol"),
+	reasoningModel("gpt-6-astra", "Mock Astra"),
+];
 
 export default async function registerVariantThinkingMockProvider(
 	pi: TaskE2EExtensionAPI,
 ): Promise<void> {
-	// The curated momus/metis children run IN-PROCESS, and senpi rebuilds an in-process child request
+	// The curated plan-reviewer/plan-consultant children run IN-PROCESS, and senpi rebuilds an in-process child request
 	// from the provider config, so the applied thinking level is only observable on the wire.
 	const server = startMockCompletionsServer({
 		steps: () => loadChildSteps(),
@@ -59,10 +69,10 @@ export default async function registerVariantThinkingMockProvider(
 		if (name === "omo-mock") {
 			pi.registerProvider(FALLBACK_PROVIDER_ID, {
 				...provider,
-				name: "omo mock sol fallback provider",
+				name: "omo mock curated fallback provider",
 				baseUrl: `${baseUrl}/v1`,
 				apiKey: "mock",
-				models: [SOL_FALLBACK_MODEL],
+				models: [...FALLBACK_MODELS],
 			});
 		}
 	};

@@ -47,7 +47,7 @@ export function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
     issues.push({
       title: "Comment checker unavailable",
       description: "Comment checker binary is not installed.",
-      fix: "Install @code-yeongyu/comment-checker",
+      fix: "The hook downloads its pinned GitHub release automatically on first use. Allow access to github.com and restart OpenCode to retry.",
       severity: "warning",
       affects: ["comment-checker hook"],
     })

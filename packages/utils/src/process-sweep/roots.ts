@@ -2,30 +2,23 @@ import { existsSync, readdirSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
-import { CODEGRAPH_INSTALL_DIR_ENV, buildCodegraphEnv } from "../codegraph/env"
-
-export interface CodegraphOwnedRootsOptions {
+export interface OmoOwnedRootsOptions {
   readonly codexHome?: string
   readonly env?: Record<string, string | undefined>
   readonly extraRoots?: readonly string[]
   readonly homeDir?: string
   readonly pluginRoot?: string
-  readonly trustedCodegraphInstallDir?: string
 }
 
 /**
- * OMO-owned plugin roots trusted for process matching: the provisioned
- * codegraph install dir, the Claude OMO install, the plugin root, and the
- * Codex plugin cache. These roots are plugin-wide; every sweep family
- * (codegraph, lsp-daemon proxy)
- * matches its processes against the same set.
+ * OMO-owned plugin roots trusted for process matching: the Claude OMO install,
+ * the plugin root, and the Codex plugin cache. These roots are plugin-wide;
+ * every sweep family matches its processes against the same set.
  */
-export function discoverCodegraphOwnedRoots(options: CodegraphOwnedRootsOptions = {}): string[] {
+export function discoverOmoOwnedRoots(options: OmoOwnedRootsOptions = {}): string[] {
   const env = options.env ?? process.env
   const homeDir = options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir()
   const roots = new Set<string>()
-  addRoot(roots, options.trustedCodegraphInstallDir)
-  addRoot(roots, buildCodegraphEnv({ homeDir })[CODEGRAPH_INSTALL_DIR_ENV])
   addRoot(roots, join(homeDir, ".claude", "omo"))
   addRoot(roots, options.pluginRoot)
   for (const root of options.extraRoots ?? []) addRoot(roots, root)
@@ -34,9 +27,6 @@ export function discoverCodegraphOwnedRoots(options: CodegraphOwnedRootsOptions 
   }
   return [...roots]
 }
-
-/** Family-neutral alias: the same roots guard every sweep family. */
-export const discoverOmoOwnedRoots = discoverCodegraphOwnedRoots
 
 function readCodexPluginCacheRoots(codexHome: string): string[] {
   const cacheRoot = join(codexHome, "plugins", "cache")

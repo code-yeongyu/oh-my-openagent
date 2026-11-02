@@ -1,0 +1,808 @@
+{
+  "description": "ErrorCode amendment 1 (#11461): every ErrorCode, failed through the fake in ordinal order, keeps its numeric code: -32000..-32023 are unchanged and the appended UserIntervened, AxUnconfirmed, SpaceUnsupported and SpaceMoveDenied are -32024..-32027.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/error-codes-amend-1.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32000,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "PermissionDenied",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32001,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "CaptureFailed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "error": {
+              "code": -32002,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "InputFailed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32003,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "BackgroundUnavailable",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "error": {
+              "code": -32004,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "WindowNotFound",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32005,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "InvalidTarget",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "error": {
+              "code": -32006,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "InvalidKey",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "error": {
+              "code": -32007,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "InvalidCoordinateFrame",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "error": {
+              "code": -32008,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "StaleRef",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 11,
+            "error": {
+              "code": -32009,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "AxUnsupported",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 12,
+            "error": {
+              "code": -32010,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "AxFailed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 13,
+            "error": {
+              "code": -32011,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "Timeout",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 14,
+            "error": {
+              "code": -32012,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "Closed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 15,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 15,
+            "error": {
+              "code": -32013,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "Internal",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 16,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 16,
+            "error": {
+              "code": -32014,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "StopPathUnavailable",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 17,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 17,
+            "error": {
+              "code": -32015,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "Suspended",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 18,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 18,
+            "error": {
+              "code": -32016,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "ScreenLocked",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 19,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 19,
+            "error": {
+              "code": -32017,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "Cancelled",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 20,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 20,
+            "error": {
+              "code": -32018,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "CursorRestoreFailed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 21,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 21,
+            "error": {
+              "code": -32019,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "FocusRestoreFailed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 22,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 22,
+            "error": {
+              "code": -32020,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "TransactionFailed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 23,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 23,
+            "error": {
+              "code": -32021,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "InputBusy",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 24,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 24,
+            "error": {
+              "code": -32022,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "ControlRequired",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 25,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 25,
+            "error": {
+              "code": -32023,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "CaptureUnavailable",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 26,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 26,
+            "error": {
+              "code": -32024,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "UserIntervened",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 27,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 27,
+            "error": {
+              "code": -32025,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "AxUnconfirmed",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 28,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 28,
+            "error": {
+              "code": -32026,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "SpaceUnsupported",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 29,
+        "method": "displays",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 29,
+            "error": {
+              "code": -32027,
+              "message": "injected Displays failure",
+              "data": {
+                "code": "SpaceMoveDenied",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message"
+          ]
+        }
+      ]
+    }
+  ]
+}

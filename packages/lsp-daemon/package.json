@@ -30,17 +30,18 @@
 		"test": "vitest --run",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
-		"lint": "biome check .",
-		"lint:fix": "biome check --write .",
-		"check": "tsc --noEmit && biome check . && npm run build"
+		"lint": "biome format .",
+		"lint:fix": "biome format --write .",
+		"check": "tsc --noEmit && biome format . && npm run build"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.16",
+		"@vitest/coverage-v8": "5.0.1",
+		"@biomejs/biome": "2.5.14",
 		"@oh-my-opencode/lsp-core": "file:../lsp-core",
 		"@oh-my-opencode/mcp-stdio-core": "file:../mcp-stdio-core",
-		"@types/node": "^25.9.2",
+		"@types/node": "^26.6.2",
 		"typescript": "^6.0.3",
-		"vitest": "^4.1.8"
+		"vitest": "5.0.1"
 	},
 	"engines": {
 		"node": ">=20.0.0"

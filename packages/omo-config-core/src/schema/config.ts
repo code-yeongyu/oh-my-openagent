@@ -2,63 +2,103 @@ import * as z from "zod"
 
 import { OmoAgentsConfigSchema } from "./agent"
 import { OmoCategoriesConfigSchema } from "./category"
-import { OmoCodegraphSettingsLayerSchema, OmoCodegraphSettingsSchema } from "./codegraph"
+import { OmoComputerSettingsLayerSchema, OmoComputerSettingsSchema } from "./computer"
 import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./git-master"
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
 import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catalog"
+import { OmoModelPadSchema } from "./model-pad"
+import { OmoModelProfilesLayerSchema, OmoModelProfilesSchema } from "./model-profile"
+import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./side-panel"
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
+import { OmoProvenanceSettingsSchema } from "./provenance"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
 
 export const OmoOpenCodeHarnessConfigSchema = z.record(z.string(), z.unknown())
 
+/**
+ * Canonical skill denylist. Names listed here are absent from the run on every harness that
+ * loads the skill; layers (user, project, `[harness]`, profile) are unioned, never replaced.
+ */
+export const OmoDisabledSkillsSchema = z.array(z.string())
+
+/**
+ * Models no category, agent, model profile or task pin may run. An entry is `provider/model` or a
+ * bare model id (any provider), `*` matches any run of characters, case-insensitively. Like
+ * `disabled_skills`, every layer's list is unioned (`collectExcludedModels`).
+ */
+export const OmoExcludedModelsSchema = z.array(z.string())
+
 export const OmoTypedHarnessConfigSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
-  codegraph: OmoCodegraphSettingsLayerSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
+  model_profiles: OmoModelProfilesLayerSchema.optional(),
+  model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
 }).strict()
 
 export const OmoConfigProfileSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
-  codegraph: OmoCodegraphSettingsLayerSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
+  model_profiles: OmoModelProfilesLayerSchema.optional(),
+  model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
 }).strict()
 
 export const OmoConfigSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
-  codegraph: OmoCodegraphSettingsSchema.optional(),
   git_master: OmoGitMasterSettingsSchema.optional(),
   task: OmoTaskSettingsSchema.optional(),
   teams: OmoTeamsConfigSchema.optional(),
   models: OmoModelCatalogSchema.optional(),
+  model_profiles: OmoModelProfilesSchema.optional(),
+  model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
+  side_panel: OmoSidePanelSettingsSchema.optional(),
+  computer: OmoComputerSettingsSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
   profiles: z.record(z.string(), OmoConfigProfileSchema).default({}),
@@ -67,18 +107,26 @@ export const OmoConfigSchema = z.object({
 }).strict()
 
 export const OmoConfigLayerSchema = z.object({
+  provenance: OmoProvenanceSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   $schema: z.string().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
-  codegraph: OmoCodegraphSettingsLayerSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
+  model_profiles: OmoModelProfilesLayerSchema.optional(),
+  model_profile: z.string().optional(),
+  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
+  side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  computer: OmoComputerSettingsLayerSchema.optional(),
+  disabled_skills: OmoDisabledSkillsSchema.optional(),
+  exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
+  "[native]": OmoTypedHarnessConfigSchema.optional(),
   "[senpi]": OmoTypedHarnessConfigSchema.optional(),
   "[codex]": OmoTypedHarnessConfigSchema.optional(),
   profiles: z.record(z.string(), OmoConfigProfileSchema).optional(),

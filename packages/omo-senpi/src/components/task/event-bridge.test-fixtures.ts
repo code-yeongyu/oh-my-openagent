@@ -1,5 +1,7 @@
 import type { SuspendSummary, TaskRecord } from "@oh-my-opencode/senpi-task"
 
+import type { TaskRpcTimers } from "./task-rpc-bridge"
+
 export const fakeSummary: SuspendSummary = {
   suspended_in_process: 0,
   suspended_rpc: 0,
@@ -47,5 +49,32 @@ export function taskSnapshot(record: TaskRecord) {
     created_at: record.created_at,
     updated_at: record.updated_at,
     ...(record.run_stats === undefined ? {} : { run_stats: record.run_stats }),
+  }
+}
+
+// Deterministic clock for the task RPC bridge's progress-coalescing window: nothing fires until
+// the test advances it, so bursts are observed exactly as the bridge queued them.
+export function fakeTaskRpcTimers() {
+  const pending = new Map<number, () => void>()
+  let nextHandle = 1
+  const timers: TaskRpcTimers = {
+    set: (callback, _ms) => {
+      const handle = nextHandle++
+      pending.set(handle, callback)
+      return handle
+    },
+    clear: (handle) => {
+      if (typeof handle === "number") pending.delete(handle)
+    },
+  }
+  return {
+    timers,
+    pendingCount: () => pending.size,
+    // Fires every timer queued so far; a flush that re-arms is left for the next advance() call.
+    advance: () => {
+      const due = [...pending.entries()]
+      pending.clear()
+      for (const [, callback] of due) callback()
+    },
   }
 }

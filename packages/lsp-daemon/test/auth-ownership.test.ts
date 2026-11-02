@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import {
 	chmodSync,
 	existsSync,
@@ -21,7 +22,7 @@ import { callToolViaDaemon } from "../src/daemon-client.js";
 import { DaemonAlreadyRunningError, DaemonStartupDeferredError, startDaemonServer } from "../src/daemon-server.js";
 import { probeDaemon } from "../src/ensure-daemon.js";
 import { ensurePrivateDirectory } from "../src/ipc-protocol.js";
-import { readDaemonOwner, removeDaemonMetadataForOwner } from "../src/ownership.js";
+import { acquireStartupLease, readDaemonOwner, removeDaemonMetadataForOwner } from "../src/ownership.js";
 import { type DaemonPaths, daemonPaths, OMO_LSP_DAEMON_DIR } from "../src/paths.js";
 import { createLineDecoder, encodeJsonLine } from "../src/socket-jsonrpc.js";
 import { daemonTestPaths } from "./daemon-path-fixture.js";
@@ -69,6 +70,42 @@ function existingContext(root: string) {
 		installDecisionsPath: join(cwd, "install-decisions.json"),
 		capabilities: { installDecisionTool: true },
 	};
+}
+
+const DEAD_PID = 9_999_999;
+
+function writeDeadOwner(paths: DaemonPaths, endpoint: Record<string, unknown>): void {
+	mkdirSync(paths.dir, { recursive: true });
+	writeFileSync(paths.auth, "old-token", { mode: 0o600 });
+	writeFileSync(paths.owner, JSON.stringify({ pid: DEAD_PID, nonce: "dead", startedAt: "old", endpoint }), {
+		mode: 0o600,
+	});
+	writeFileSync(paths.pid, `${DEAD_PID}\n`, { mode: 0o600 });
+	writeFileSync(paths.endpoint, paths.socket, { mode: 0o600 });
+}
+
+// Leaves a real unix socket file behind the way a SIGKILLed daemon does: node
+// unlinks the path on a graceful close, so the listener must die uncleanly.
+async function leaveOrphanSocket(socketPath: string): Promise<void> {
+	mkdirSync(dirname(socketPath), { recursive: true });
+	const child = spawn(
+		process.execPath,
+		[
+			"-e",
+			"require('node:net').createServer().listen(process.argv[1], () => process.stdout.write('ready'))",
+			socketPath,
+		],
+		{ stdio: ["ignore", "pipe", "inherit"] },
+	);
+	await new Promise<void>((resolve, reject) => {
+		child.stdout.once("data", () => resolve());
+		child.once("error", reject);
+		child.once("exit", (code) => reject(new Error(`orphan socket child exited early with ${code}`)));
+	});
+	await new Promise<void>((resolve) => {
+		child.once("exit", () => resolve());
+		child.kill("SIGKILL");
+	});
 }
 
 function rawRequest(paths: DaemonPaths, token: string): Promise<Record<string, unknown>> {
@@ -267,6 +304,63 @@ describe("daemon IPC authentication and ownership", () => {
 
 		expect(readFileSync(paths.auth, "utf8").trim()).not.toBe("old-token");
 		expect(readDaemonOwner(paths)?.nonce).not.toBe("dead");
+	});
+
+	it("given a dead owner recorded with a unix endpoint whose socket file is gone when candidate starts then it cleans up and takes ownership", async () => {
+		if (process.platform === "win32") return;
+		const paths = tempPaths();
+		writeDeadOwner(paths, { kind: "unix", path: paths.socket, dev: 1, ino: 1 });
+		expect(existsSync(paths.socket)).toBe(false);
+
+		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
+		openServers.push(server);
+
+		expect(readFileSync(paths.auth, "utf8").trim()).not.toBe("old-token");
+		expect(readDaemonOwner(paths)?.nonce).not.toBe("dead");
+		expect(readDaemonOwner(paths)?.pid).toBe(process.pid);
+		expect(existsSync(paths.socket)).toBe(true);
+	});
+
+	it("given a dead owner whose recorded socket device differs from the live orphan socket when candidate starts then it unlinks the orphan and takes ownership", async () => {
+		if (process.platform === "win32") return;
+		const paths = tempPaths();
+		mkdirSync(paths.dir, { recursive: true });
+		await leaveOrphanSocket(paths.socket);
+		const orphan = statSync(paths.socket);
+		expect(lstatSync(paths.socket).isSocket()).toBe(true);
+		writeDeadOwner(paths, { kind: "unix", path: paths.socket, dev: orphan.dev + 1, ino: orphan.ino });
+
+		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
+		openServers.push(server);
+
+		expect(readFileSync(paths.auth, "utf8").trim()).not.toBe("old-token");
+		expect(readDaemonOwner(paths)?.nonce).not.toBe("dead");
+		expect(readDaemonOwner(paths)?.pid).toBe(process.pid);
+		// A successful probe is the proof that the orphan was replaced: nothing listens on an orphan
+		// socket, and a listener cannot bind over an existing path. Inode inequality is not asserted
+		// because the filesystem may hand the new socket the unlinked orphan's inode number.
+		expect(await probeDaemon(paths)).toBe(true);
+	});
+
+	it("given a dead owner when the owner file is rewritten by another writer during validation then startup defers and leaves the new owner untouched", async () => {
+		const paths = tempPaths();
+		writeDeadOwner(paths, { path: paths.socket });
+		const pingOwner = async () => {
+			writeFileSync(
+				paths.owner,
+				JSON.stringify({ pid: DEAD_PID - 1, nonce: "other", startedAt: "newer", endpoint: { path: paths.socket } }),
+				{ mode: 0o600 },
+			);
+			return null;
+		};
+
+		await expect(acquireStartupLease(paths, pingOwner)).rejects.toMatchObject({
+			code: "daemon_startup_deferred",
+			reason: "owner_changed_during_cleanup",
+		});
+		expect(readDaemonOwner(paths)?.nonce).toBe("other");
+		expect(readFileSync(paths.auth, "utf8").trim()).toBe("old-token");
+		expect(existsSync(paths.lock)).toBe(false);
 	});
 
 	it("given a stale close from an old owner when a new owner exists then winner metadata survives", async () => {

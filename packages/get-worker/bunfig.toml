@@ -1,0 +1,3 @@
+[loader]
+".sh" = "text"
+".ps1" = "text"

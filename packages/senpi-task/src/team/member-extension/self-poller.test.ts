@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -207,5 +207,18 @@ describe("member self-poller", () => {
     expect(harness.injected).toEqual([])
     expect(existsSync(join(harness.inboxDir, `${value.messageId}.json`))).toBe(false)
     expect(existsSync(join(harness.inboxDir, "processed", `${value.messageId}.json`))).toBe(true)
+  })
+
+  test("#given an empty pending queue #when checkPendingAcks runs #then it performs no filesystem work", async () => {
+    // given
+    const harness = createHarness()
+    mkdirSync(harness.inboxDir, { recursive: true })
+    const before = readdirSync(harness.inboxDir).sort()
+
+    // when
+    await poller(harness).checkPendingAcks()
+
+    // then
+    expect(readdirSync(harness.inboxDir).sort()).toEqual(before)
   })
 })

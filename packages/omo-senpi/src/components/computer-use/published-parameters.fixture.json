@@ -1,0 +1,229 @@
+{
+  "computer": {
+    "type": "object",
+    "required": [
+      "action"
+    ],
+    "properties": {
+      "action": {
+        "enum": [
+          "call",
+          "run",
+          "capabilities",
+          "close"
+        ],
+        "type": "string",
+        "description": "call: one desktop helper chain; run: a JavaScript body; capabilities: host report; close: end the session"
+      },
+      "chain": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "method"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "description": "desktop helper name, e.g. screenshot, window, click, clipboard.read"
+            },
+            "args": {
+              "type": "array",
+              "items": {},
+              "description": "positional helper arguments"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "call (required): one desktop helper call, optionally followed by one call on the window/element it returns"
+      },
+      "code": {
+        "type": "string",
+        "description": "run (required): JavaScript async function body; `desktop`, `wait`, `assert`, `tool` in scope; `return` sets the value"
+      },
+      "read_only": {
+        "type": "boolean",
+        "description": "run: true = inspection only: screenshots and AX reads, input/mutation blocked"
+      },
+      "timeout": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 600,
+        "description": "run: budget in seconds (default 60)"
+      }
+    },
+    "additionalProperties": false
+  },
+  "computer_actions": {
+    "type": "object",
+    "required": [
+      "action"
+    ],
+    "properties": {
+      "action": {
+        "enum": [
+          "screenshot",
+          "click",
+          "double_click",
+          "move",
+          "drag",
+          "scroll",
+          "type",
+          "keypress",
+          "wait",
+          "batch"
+        ],
+        "type": "string",
+        "description": "The action to perform, or batch to run `actions` in order"
+      },
+      "actions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "action"
+          ],
+          "properties": {
+            "action": {
+              "enum": [
+                "screenshot",
+                "click",
+                "double_click",
+                "move",
+                "drag",
+                "scroll",
+                "type",
+                "keypress",
+                "wait"
+              ],
+              "type": "string",
+              "description": "The action to perform"
+            },
+            "x": {
+              "type": "number",
+              "description": "click, double_click, move, drag (start), scroll (required): x pixel"
+            },
+            "y": {
+              "type": "number",
+              "description": "click, double_click, move, drag (start), scroll (required): y pixel"
+            },
+            "button": {
+              "enum": [
+                "left",
+                "right",
+                "middle"
+              ],
+              "type": "string",
+              "description": "click, double_click, move, drag: mouse button (default left)"
+            },
+            "to_x": {
+              "type": "number",
+              "description": "drag (required): end x pixel"
+            },
+            "to_y": {
+              "type": "number",
+              "description": "drag (required): end y pixel"
+            },
+            "scroll_x": {
+              "type": "number",
+              "description": "scroll (required): horizontal scroll distance in pixels on every OS (one wheel notch is about 40 px); positive scrolls right"
+            },
+            "scroll_y": {
+              "type": "number",
+              "description": "scroll (required): vertical scroll distance in pixels on every OS (one wheel notch is about 40 px); positive moves the view toward the end of the content (down)"
+            },
+            "text": {
+              "type": "string",
+              "description": "type (required): text to type"
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "description": "keypress (required): keys pressed together"
+            },
+            "ms": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "wait (required): milliseconds"
+            },
+            "timeout": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Maximum time in seconds for this action."
+            },
+            "include_screenshot": {
+              "type": "boolean",
+              "description": "Capture a screenshot after the action."
+            }
+          },
+          "additionalProperties": false
+        },
+        "minItems": 1,
+        "description": "batch (required): actions to execute in order"
+      },
+      "x": {
+        "type": "number",
+        "description": "click, double_click, move, drag (start), scroll (required): x pixel"
+      },
+      "y": {
+        "type": "number",
+        "description": "click, double_click, move, drag (start), scroll (required): y pixel"
+      },
+      "button": {
+        "enum": [
+          "left",
+          "right",
+          "middle"
+        ],
+        "type": "string",
+        "description": "click, double_click, move, drag: mouse button (default left)"
+      },
+      "to_x": {
+        "type": "number",
+        "description": "drag (required): end x pixel"
+      },
+      "to_y": {
+        "type": "number",
+        "description": "drag (required): end y pixel"
+      },
+      "scroll_x": {
+        "type": "number",
+        "description": "scroll (required): horizontal scroll distance in pixels on every OS (one wheel notch is about 40 px); positive scrolls right"
+      },
+      "scroll_y": {
+        "type": "number",
+        "description": "scroll (required): vertical scroll distance in pixels on every OS (one wheel notch is about 40 px); positive moves the view toward the end of the content (down)"
+      },
+      "text": {
+        "type": "string",
+        "description": "type (required): text to type"
+      },
+      "keys": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "description": "keypress (required): keys pressed together"
+      },
+      "ms": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "wait (required): milliseconds"
+      },
+      "timeout": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "description": "Maximum time in seconds for this action."
+      },
+      "include_screenshot": {
+        "type": "boolean",
+        "description": "Capture a screenshot after the action."
+      }
+    },
+    "additionalProperties": false
+  }
+}

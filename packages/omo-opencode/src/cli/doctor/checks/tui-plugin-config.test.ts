@@ -272,6 +272,57 @@ describe("tui-plugin-config check", () => {
     expect(result.message).toContain("not registered")
   })
 
+  it("#given leftover @latest and bare entries #when checking #then it warns about the duplicate", async () => {
+    // given — 4.19.4 installer wrote @latest; a later run appended the bare name
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}@latest`, PLUGIN_NAME])
+
+    // when
+    const result = await checkTuiPluginConfig()
+
+    // then
+    expect(result.status).toBe("warn")
+    expect(result.message).toContain("more than once")
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].title).toContain("more than once")
+    expect(result.issues[0].fix).toContain("install")
+  })
+
+  it("#given leftover @latest and bare entries #when ensureTuiPluginEntry runs #then doctor passes", async () => {
+    // given
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}@latest`, PLUGIN_NAME])
+
+    // when
+    const ensureResult = ensureTuiPluginEntry({ configDir: testConfigDir })
+    const result = await checkTuiPluginConfig()
+
+    // then
+    expect(ensureResult).toEqual({ changed: true, reason: "added" })
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it("#given a tuple server entry and a tuple TUI entry #when checking #then both halves are detected", async () => {
+    // given
+    writeInstalledPackage(PLUGIN_NAME, { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeFileSync(
+      join(testConfigDir, "opencode.json"),
+      JSON.stringify({ plugin: [[PLUGIN_NAME, { verbose: true }]] }, null, 2) + "\n",
+      "utf-8",
+    )
+    writeTuiConfig([[PLUGIN_NAME, { enabled: true }]])
+
+    // when
+    const result = await checkTuiPluginConfig()
+
+    // then
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
+  })
+
   it("passes when legacy server entry is paired with legacy TUI package entry", async () => {
     //#given legacy package names in both configs
     writeOpenCodeConfig(["oh-my-opencode"])

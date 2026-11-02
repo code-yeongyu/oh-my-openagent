@@ -11,10 +11,10 @@ Read this alongside your intent reference, before the first user-facing question
 
 ## Renderers
 
-Three delivery modes over the SAME surviving forks (the two filters and owner-decision rules are unchanged upstream):
+Three delivery modes over the SAME surviving forks (the two filters and owner-decision rules are unchanged upstream). Every question this skill puts to the user goes through the question tool (`ask_user_question` or `request_user_input`, whichever this session lists) with its wait flag set to true, so it raises a prompt and a notification a user away from the screen still sees. When no question tool is listed or a call returns unavailable, put the questions in chat text and say in one line that the prompt is unavailable. Set `required: true` on the call that asks the approval gate (header `Approval`, `승인` in Korean) and on the call that asks the final authorization block (header `Authorize`, `권한` in Korean). A timed-out, dismissed, or unavailable answer to either is not an answer, whatever the tool result says: keep `status: awaiting-approval`, say in one line that the decision is still pending, and end the turn. Leave ordinary forks unflagged: a timed-out or dismissed fork falls to its recommended default.
 
-- **batch** - all surviving forks in one brief, recommended default first; a skipped fork resolves to its default. Fits users who enumerate upfront and delegate the rest.
-- **one-by-one** - one fork per turn. Fits users who own decisions individually.
+- **batch** - all surviving forks in as few calls as the tool's limits allow, recommended default first; a skipped fork resolves to its default. Fits users who enumerate upfront and delegate the rest.
+- **one-by-one** - one fork per call. Fits users who own decisions individually.
 - **examples-first** - no open questions: present 2-3 contrasting concrete approaches and ask which is closest and what is wrong. Fits users who cannot yet externalize what they want - critique is cheaper than generation. Never ask such a user to produce criteria from a blank page.
 
 The user switches renderer at any time by saying so in their own words; honor it immediately.

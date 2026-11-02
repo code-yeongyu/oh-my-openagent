@@ -1,6 +1,7 @@
 ---
 name: hyperplan
-description: "Adversarial multi-agent planning skill for omo-senpi. Self-orchestrates a 5-member hostile team (categories unspecified-low, unspecified-high, deep, ultrabrain, artistry) via the native lead team tools for ruthless cross-critique debate, distills only the insights that survive the attacks, then MANDATORILY hands the distilled bundle to a planner task (load_skills ulw-plan) for executable plan formalization. Use when planning needs maximum rigor and surfacing of weak assumptions, blind spots, and over-engineering. Triggers: 'hyperplan', 'hpp', 'adversarial plan', 'hostile planning', 'cross-critique plan', '하이퍼플랜', '적대적 계획', '교차 비평'."
+description: "Adversarial multi-agent planning: a hostile team cross-critiques a plan before it is formalized. Use when planning needs maximum rigor or the user asks for a hyperplan / adversarial or cross-critique plan."
+argument-hint: "[planning-request]"
 metadata:
   short-description: Adversarial 5-member cross-critique planning, then a planner formalizes the survivors
 ---
@@ -36,14 +37,14 @@ Members receive your rounds as injected follow-ups inside their child process; t
 Before starting, verify:
 
 1. **The lead team tools must be available** — `team_create`, `task_send`, `team_delete`. They register by default with the task component. If they are absent, the task component was disabled; STOP and tell the user:
-   > "Hyperplan needs the omo-senpi team tools, which are disabled. Restart senpi without `--no-omo-task` (the task component is on by default), then retry."
+   > "Hyperplan needs the omo-senpi team tools, which are disabled. Restart without `--no-omo-task` (`omo` on OmO Native, `senpi` on a plain senpi install; the task component is on by default), then retry."
 2. **You are the current top-level lead session** — the team tools are lead-only and never reach a child. If you are yourself a spawned member/child, this skill is the wrong tool; a member cannot lead a team.
 
 ## THE 5 ADVERSARIAL MEMBERS — RnR & CHARACTERISTICS
 
 Each member is a `kind: "category"` team member. The category selects the member's model and prompt shaping; the `prompt` field below is the **system prompt** that establishes its adversarial identity.
 
-Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep` only when that category resolves in this project; if `team_create` rejects `deep` as unresolvable, retry once without only the `researcher` member and state the degraded roster.
+Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`. Include `deep-low` only when that category resolves in this project; if `team_create` rejects `deep-low` as unresolvable, retry once without only the `researcher` member and state the degraded roster.
 
 ### CATEGORY CHARACTERISTICS REFERENCE
 
@@ -51,7 +52,7 @@ Required categories are `unspecified-low`, `unspecified-high`, `ultrabrain`, and
 |----------|----------------|--------------------------------|
 | `unspecified-low` | Mid-tier, simplicity-leaning, structure-demanding | Pragmatist Skeptic — bias toward simplicity makes it the natural enemy of over-engineering |
 | `unspecified-high` | High-effort, broad-impact, coordination-aware | Integration Tester — broad-scope thinking exposes cross-module fragility |
-| `deep` | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
+| `deep-low` | Autonomous, exploration-heavy, evidence-driven | Autonomous Researcher — natural exploration bias attacks unfounded claims |
 | `ultrabrain` | Hard-logic, simplicity-biased, strategic advisor | Architect Strategist — deep reasoning sees structural flaws others miss |
 | `artistry` | Unconventional, pattern-breaking, lateral | Creative Challenger — pattern-breaking bias attacks orthodox thinking |
 
@@ -112,7 +113,7 @@ When you receive others' findings, default position: assume they missed somethin
 Output format: numbered findings/critiques, each <=3 sentences. Cite specific edge cases and integration points. No prose.
 ```
 
-### MEMBER 3: `researcher` (category: `deep`)
+### MEMBER 3: `researcher` (category: `deep-low`)
 
 **Role**: The Autonomous Researcher.
 **Position**: Enemy of unfounded claims. Evidence demander.
@@ -227,7 +228,7 @@ team_create({
     members: [
       { name: "skeptic",    kind: "category", category: "unspecified-low",  prompt: "<full Skeptic system prompt>" },
       { name: "validator",  kind: "category", category: "unspecified-high", prompt: "<full Validator system prompt>" },
-      { name: "researcher", kind: "category", category: "deep",             prompt: "<full Researcher system prompt>" },
+      { name: "researcher", kind: "category", category: "deep-low",         prompt: "<full Researcher system prompt>" },
       { name: "architect",  kind: "category", category: "ultrabrain",       prompt: "<full Architect system prompt>" },
       { name: "creative",   kind: "category", category: "artistry",         prompt: "<full Creative system prompt>" }
     ]
@@ -237,7 +238,7 @@ team_create({
 
 Capture the returned `team_run_id`. You pass it to every subsequent `task_send` and `team_delete` call.
 
-If `team_create` rejects `deep` as unresolvable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
+If `team_create` rejects `deep-low` as unresolvable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
 
 ### Phase 2: Round 1 — Independent analysis
 

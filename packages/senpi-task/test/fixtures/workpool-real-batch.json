@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "senpi_commit": "c31a9c7e6e00690e06eeb13e885694a8f1885c2b",
+  "omo_commit": "c5b76f541ca2c5afc380712cb8cc556431368aa0",
+  "prompt": "Analyze each assigned workpool item. The item input is JSON with path, file_sha256, question, and source (the exact pinned file bytes). Answer only from those source bytes. Yield workpool results as {key, data:{export:<identifier>}} for the exported name the question asks for. If you cannot answer, yield {key, error:{code,message}}. Do not spawn tasks or use other tools.",
+  "prompt_sha256": "e0a142ac40b68269a0f7a46a610c1fd66a40b9675fab75e514e18db487f96a76",
+  "width": 2,
+  "item_order": [
+    "senpi-reserved-agent-tool",
+    "senpi-runtime-badge",
+    "senpi-bridge-timeout",
+    "senpi-stream-fn",
+    "senpi-resolve-tool-path",
+    "senpi-experimental",
+    "omo-once-only",
+    "omo-execution-mode",
+    "omo-yield-tool",
+    "omo-dag-directive",
+    "omo-clamp-wait",
+    "omo-runner-error"
+  ],
+  "items": [
+    {
+      "key": "senpi-reserved-agent-tool",
+      "repo": "senpi",
+      "path": "packages/senpi-codemode/src/bridge/reserved.ts",
+      "file_sha256": "49925f1ac50a0e0900775c4b5ae34b6acc5b48637146253df91fe647a6eb59aa",
+      "question": "Which exported constant names the reserved agent bridge tool?",
+      "expected": {
+        "export": "RESERVED_AGENT_TOOL"
+      },
+      "input": {
+        "path": "packages/senpi-codemode/src/bridge/reserved.ts",
+        "file_sha256": "49925f1ac50a0e0900775c4b5ae34b6acc5b48637146253df91fe647a6eb59aa",
+        "question": "Which exported constant names the reserved agent bridge tool?",
+        "source": "/** Cross-kernel bridge names shared by preludes and host adapters. */\n/** Canonical oh-my-pi agent bridge tool name. */\nexport const RESERVED_AGENT_TOOL = \"__agent__\" as const;\n/** ADAPTATION: senpi delegates output through a reserved kernel-side tool name. */\nexport const RESERVED_OUTPUT_TOOL = \"__output__\" as const;\n/** ADAPTATION: senpi resolves tool parameter schemas through a reserved kernel-side tool name. */\nexport const RESERVED_SCHEMA_TOOL = \"__schema__\" as const;\n/** Canonical oh-my-pi eval-timeout pause operation. */\nexport const TIMEOUT_PAUSE_OP = \"timeout-pause\" as const;\n/** Canonical oh-my-pi eval-timeout resume operation. */\nexport const TIMEOUT_RESUME_OP = \"timeout-resume\" as const;\n/** Status op the JS worker emits the moment it receives `interrupt`; proves its event loop is not blocked. */\nexport const INTERRUPT_ACK_OP = \"interrupt-ack\" as const;\n"
+      },
+      "input_sha256": "e825affa4fb8a3bd46e91aa845e5ac096c4d778e2d7c75bdb269bf79a1254739"
+    },
+    {
+      "key": "senpi-runtime-badge",
+      "repo": "senpi",
+      "path": "packages/senpi-codemode/src/tool/runtime-label.ts",
+      "file_sha256": "8bea26b877afe00185f9b7e7482441365cee2babd5429e7b70364e37ea70aeb0",
+      "question": "Which exported function formats the eval runtime badge?",
+      "expected": {
+        "export": "formatRuntimeBadge"
+      },
+      "input": {
+        "path": "packages/senpi-codemode/src/tool/runtime-label.ts",
+        "file_sha256": "8bea26b877afe00185f9b7e7482441365cee2babd5429e7b70364e37ea70aeb0",
+        "question": "Which exported function formats the eval runtime badge?",
+        "source": "import { homedir } from \"node:os\";\nimport type { EvalLanguage, EvalRuntimeInfo } from \"./types.ts\";\n\nconst MAX_BADGE_PATH_CODE_POINTS = 40;\nconst ELLIPSIS = \"\\u2026\";\n\n/**\n * One-line runtime badge for eval headers, e.g. \"3.14.7, ~/.venv/bin/python3\"\n * or \"node 26.7.0, /opt/…/bin/node\". The js language always carries the\n * runtime name because node and bun are otherwise indistinguishable.\n */\nexport function formatRuntimeBadge(language: EvalLanguage, runtime: EvalRuntimeInfo, home: string = homedir()): string {\n\tconst label = language === \"js\" ? `${runtime.name} ${runtime.version}` : runtime.version;\n\tif (runtime.path === undefined || runtime.path.length === 0) return label;\n\treturn `${label}, ${minifyPath(runtime.path, home)}`;\n}\n\n/** Home-contracts and middle-truncates a path so header badges stay short. */\nexport function minifyPath(path: string, home: string = homedir()): string {\n\tconst contracted = contractHome(path, home);\n\tif (codePointLength(contracted) <= MAX_BADGE_PATH_CODE_POINTS) return contracted;\n\tconst separator = contracted.includes(\"/\") ? \"/\" : \"\\\\\";\n\tconst segments = contracted.split(separator).filter((segment) => segment.length > 0);\n\tconst head = contracted.startsWith(separator) ? `${separator}${segments[0] ?? \"\"}` : (segments[0] ?? \"\");\n\tconst tail: string[] = [];\n\tfor (let index = segments.length - 1; index >= 1; index -= 1) {\n\t\tconst attempt = joinTruncated(head, [segments[index] ?? \"\", ...tail], separator);\n\t\tif (codePointLength(attempt) > MAX_BADGE_PATH_CODE_POINTS) break;\n\t\ttail.unshift(segments[index] ?? \"\");\n\t}\n\tif (tail.length > 0) return joinTruncated(head, tail, separator);\n\tconst suffix = [...contracted].slice(-(MAX_BADGE_PATH_CODE_POINTS - 1)).join(\"\");\n\treturn `${ELLIPSIS}${suffix}`;\n}\n\nfunction joinTruncated(head: string, tail: readonly string[], separator: string): string {\n\treturn `${head}${separator}${ELLIPSIS}${separator}${tail.join(separator)}`;\n}\n\nfunction contractHome(path: string, home: string): string {\n\tif (home.length === 0) return path;\n\tif (path === home) return \"~\";\n\tif (path.startsWith(`${home}/`) || path.startsWith(`${home}\\\\`)) return `~${path.slice(home.length)}`;\n\treturn path;\n}\n\nfunction codePointLength(text: string): number {\n\treturn [...text].length;\n}\n"
+      },
+      "input_sha256": "84e646b779dde10ad22529163496b772cd9c23288ab6fdac381200f6b6b942d3"
+    },
+    {
+      "key": "senpi-bridge-timeout",
+      "repo": "senpi",
+      "path": "packages/senpi-codemode/src/timeouts/bridge-timeout.ts",
+      "file_sha256": "99efc3b0f915efe93f0a868ca24b540b5b8dfc343a09d1c78c6f6e8062ebed98",
+      "question": "Which exported function pauses the bridge timeout around an operation?",
+      "expected": {
+        "export": "withBridgeTimeoutPause"
+      },
+      "input": {
+        "path": "packages/senpi-codemode/src/timeouts/bridge-timeout.ts",
+        "file_sha256": "99efc3b0f915efe93f0a868ca24b540b5b8dfc343a09d1c78c6f6e8062ebed98",
+        "question": "Which exported function pauses the bridge timeout around an operation?",
+        "source": "export { TIMEOUT_PAUSE_OP, TIMEOUT_RESUME_OP } from \"../bridge/reserved.ts\";\n\nimport type { TimeoutPauseHandle } from \"./idle-timeout.ts\";\n\nexport async function withBridgeTimeoutPause<T>(\n\twatchdog: TimeoutPauseHandle | undefined,\n\toperation: () => Promise<T>,\n): Promise<T> {\n\tif (watchdog === undefined) return operation();\n\twatchdog.pause();\n\ttry {\n\t\treturn await operation();\n\t} finally {\n\t\twatchdog.resume();\n\t}\n}\n"
+      },
+      "input_sha256": "b1bfb65b559b0bcbd9f18580ef0f4f1200b1e71b9ef6b6ed9956343f5dc3671b"
+    },
+    {
+      "key": "senpi-stream-fn",
+      "repo": "senpi",
+      "path": "packages/agent/src/stream-fn.ts",
+      "file_sha256": "3b67b99036fce5d878e52f31a9cb38f491e594d94519281bace4733c45311d34",
+      "question": "Which exported function installs the default stream function?",
+      "expected": {
+        "export": "setDefaultStreamFn"
+      },
+      "input": {
+        "path": "packages/agent/src/stream-fn.ts",
+        "file_sha256": "3b67b99036fce5d878e52f31a9cb38f491e594d94519281bace4733c45311d34",
+        "question": "Which exported function installs the default stream function?",
+        "source": "import type { StreamFn } from \"./types.ts\";\n\nlet defaultStreamFn: StreamFn | undefined;\n\n/**\n * Configure the fallback used by Agent and low-level loops when callers omit streamFn.\n *\n * Hosts that provide a default model runtime can install its stream function here\n * without making pi-agent-core depend on a provider catalog or compatibility layer.\n */\nexport function setDefaultStreamFn(streamFn: StreamFn | undefined): void {\n\tdefaultStreamFn = streamFn;\n}\n\nexport function getDefaultStreamFn(): StreamFn {\n\tif (!defaultStreamFn) {\n\t\tthrow new Error(\"No default stream function configured. Pass streamFn explicitly or call setDefaultStreamFn().\");\n\t}\n\treturn defaultStreamFn;\n}\n\nexport { withEmptyAssistantRecovery } from \"./empty-assistant-recovery.ts\";\n"
+      },
+      "input_sha256": "98de178b22793d8bfd8bfcb376ae3cdbd13a943348bdc8fb70f68253c870c19c"
+    },
+    {
+      "key": "senpi-resolve-tool-path",
+      "repo": "senpi",
+      "path": "packages/agent/src/harness/tools/path-utils.ts",
+      "file_sha256": "61fee524375d679759305569fdebc2ed41a3ba06e8cc9ac8bab268c3f99116f5",
+      "question": "Which exported function resolves a tool path through ExecutionEnv.absolutePath?",
+      "expected": {
+        "export": "resolveToolPath"
+      },
+      "input": {
+        "path": "packages/agent/src/harness/tools/path-utils.ts",
+        "file_sha256": "61fee524375d679759305569fdebc2ed41a3ba06e8cc9ac8bab268c3f99116f5",
+        "question": "Which exported function resolves a tool path through ExecutionEnv.absolutePath?",
+        "source": "import type { Context } from \"../context.ts\";\nimport type { ExecutionEnv } from \"../types.ts\";\nimport { getOrThrow } from \"../types.ts\";\n\nconst UNICODE_SPACES = /[\\u00A0\\u2000-\\u200A\\u202F\\u205F\\u3000]/g;\nconst NARROW_NO_BREAK_SPACE = \"\\u202F\";\n\nfunction normalizeToolPath(path: string): string {\n\tconst normalized = path.replace(UNICODE_SPACES, \" \");\n\treturn normalized.startsWith(\"@\") ? normalized.slice(1) : normalized;\n}\n\nexport async function resolveToolPath(env: ExecutionEnv, path: string, context: Context): Promise<string> {\n\treturn getOrThrow(await env.absolutePath(normalizeToolPath(path), context));\n}\n\nexport async function resolveReadToolPath(env: ExecutionEnv, path: string, context: Context): Promise<string> {\n\tconst resolved = await resolveToolPath(env, path, context);\n\tconst variants = [\n\t\tresolved,\n\t\tresolved.replace(/ (AM|PM)\\./gi, `${NARROW_NO_BREAK_SPACE}$1.`),\n\t\tresolved.normalize(\"NFD\"),\n\t\tresolved.replace(/'/g, \"\\u2019\"),\n\t\tresolved.normalize(\"NFD\").replace(/'/g, \"\\u2019\"),\n\t];\n\n\tfor (const variant of new Set(variants)) {\n\t\tif (getOrThrow(await env.exists(variant, context))) return variant;\n\t}\n\treturn resolved;\n}\n"
+      },
+      "input_sha256": "109de31fab0588c9ee44a22eabfed9a90c5d5710b64d95b52c466f1fdd90ba8c"
+    },
+    {
+      "key": "senpi-experimental",
+      "repo": "senpi",
+      "path": "packages/coding-agent/src/core/experimental.ts",
+      "file_sha256": "b08d0a2a2d349f4e383bec05aff0170f25ec21bc80ff73e955dfffb2989a5d68",
+      "question": "Which exported function reports whether experimental features are enabled?",
+      "expected": {
+        "export": "areExperimentalFeaturesEnabled"
+      },
+      "input": {
+        "path": "packages/coding-agent/src/core/experimental.ts",
+        "file_sha256": "b08d0a2a2d349f4e383bec05aff0170f25ec21bc80ff73e955dfffb2989a5d68",
+        "question": "Which exported function reports whether experimental features are enabled?",
+        "source": "import { envValue } from \"./brand.ts\";\n\nconst PREFER_STRICT_TOOL_SAMPLING = { type: \"json_schema\", strict: \"prefer\" } as const;\nexport function areExperimentalFeaturesEnabled(): boolean {\n\treturn envValue(\"EXPERIMENTAL\") === \"1\";\n}\n\nexport function getExperimentalToolSampling() {\n\treturn areExperimentalFeaturesEnabled() ? PREFER_STRICT_TOOL_SAMPLING : undefined;\n}\n"
+      },
+      "input_sha256": "5c0d2f88dc7d656d72ec9d2e3b3947a4eb0b732d2b7416a995fc36c023372912"
+    },
+    {
+      "key": "omo-once-only",
+      "repo": "omo",
+      "path": "packages/senpi-task/src/manager/once-only.ts",
+      "file_sha256": "fca89009d38145420bbc4fe9b2b2b96b59f0b99f1be224777f8d496c760cad88",
+      "question": "Which exported function wraps a release callback so it runs at most once?",
+      "expected": {
+        "export": "onceOnly"
+      },
+      "input": {
+        "path": "packages/senpi-task/src/manager/once-only.ts",
+        "file_sha256": "fca89009d38145420bbc4fe9b2b2b96b59f0b99f1be224777f8d496c760cad88",
+        "question": "Which exported function wraps a release callback so it runs at most once?",
+        "source": "// Releases a subscription at most once. Child subscriptions are released by two owners - the caller\n// that subscribed (a task_output wait may release on settle AND on abort) and the manager's own\n// sweep - so the raw handle detach must never run twice.\nexport function onceOnly(release: () => void): () => void {\n  let released = false\n  return () => {\n    if (released) return\n    released = true\n    release()\n  }\n}\n"
+      },
+      "input_sha256": "f097ed3651a856864888fe41a6b10ec3b2bb4c67d180d26eae2f57b82c1c40f6"
+    },
+    {
+      "key": "omo-execution-mode",
+      "repo": "omo",
+      "path": "packages/senpi-task/src/manager/execution-mode.ts",
+      "file_sha256": "1a15336a952b25f0b8a6838a6580f8c3279a8ff5b302e54e8a9e40c32b6a35de",
+      "question": "Which exported function resolves in-process versus process execution mode?",
+      "expected": {
+        "export": "resolveExecutionMode"
+      },
+      "input": {
+        "path": "packages/senpi-task/src/manager/execution-mode.ts",
+        "file_sha256": "1a15336a952b25f0b8a6838a6580f8c3279a8ff5b302e54e8a9e40c32b6a35de",
+        "question": "Which exported function resolves in-process versus process execution mode?",
+        "source": "export type ExecutionMode = \"in-process\" | \"process\"\n\nexport type ExecutionModeSources = {\n  readonly specMode?: ExecutionMode\n  readonly agentMode?: ExecutionMode\n  readonly configMode?: ExecutionMode\n}\n\n// Precedence: spec.execution_mode ?? agentDef.executionMode ?? omo.json task.default_execution_mode\n// ?? \"in-process\".\nexport function resolveExecutionMode(sources: ExecutionModeSources): ExecutionMode {\n  return sources.specMode ?? sources.agentMode ?? sources.configMode ?? \"in-process\"\n}\n"
+      },
+      "input_sha256": "c465e9ec3b8d54dfce6dcfaecbd2ab9a81faaaf288be0184002609cff5476c53"
+    },
+    {
+      "key": "omo-yield-tool",
+      "repo": "omo",
+      "path": "packages/senpi-task/src/workpool/worker-tool-identity.ts",
+      "file_sha256": "dc51ed10358a85fe0ff2a99737f3dede7ffeb9741d25c576ae1ed9a964de3bfc",
+      "question": "Which exported function marks a tool definition as the engine-owned workpool yield wrapper?",
+      "expected": {
+        "export": "markWorkpoolYieldTool"
+      },
+      "input": {
+        "path": "packages/senpi-task/src/workpool/worker-tool-identity.ts",
+        "file_sha256": "dc51ed10358a85fe0ff2a99737f3dede7ffeb9741d25c576ae1ed9a964de3bfc",
+        "question": "Which exported function marks a tool definition as the engine-owned workpool yield wrapper?",
+        "source": "import type { ToolDefinition } from \"@code-yeongyu/senpi\"\n\n// Runtime-only provenance: a persisted tool name or a parent's scheduler cannot impersonate\n// the engine-created yield wrapper when member tools are reconstructed on cold revival.\nconst yieldTools = new WeakSet<ToolDefinition>()\nexport function markWorkpoolYieldTool(tool: ToolDefinition): ToolDefinition { yieldTools.add(tool); return tool }\nexport function isWorkpoolYieldTool(tool: ToolDefinition): boolean { return yieldTools.has(tool) }\n"
+      },
+      "input_sha256": "e3b90989c2cd2cb32aaaddf8022948a764014052dea8f8f9ffc37d0f56e98708"
+    },
+    {
+      "key": "omo-dag-directive",
+      "repo": "omo",
+      "path": "packages/senpi-task/src/completion/dag-verification-directive.ts",
+      "file_sha256": "7044a3b9634b3da6e437187cee08468c77cfd6cc6c0e3ae132d3b9502512ebaf",
+      "question": "Which exported constant is appended to DAG completion payloads?",
+      "expected": {
+        "export": "DAG_VERIFICATION_DIRECTIVE"
+      },
+      "input": {
+        "path": "packages/senpi-task/src/completion/dag-verification-directive.ts",
+        "file_sha256": "7044a3b9634b3da6e437187cee08468c77cfd6cc6c0e3ae132d3b9502512ebaf",
+        "question": "Which exported constant is appended to DAG completion payloads?",
+        "source": "// Appended to model-facing DAG completion payloads only. A DAG node's own summary is unverified\n// self-report, so the orchestrating parent is told to re-derive the node's scope and prove every\n// deliverable itself before treating the node as done.\nexport const DAG_VERIFICATION_DIRECTIVE = `DAG SUBAGENT COMPLETION - TREAT AS FALSE UNTIL YOU PROVE IT.\nThis completion arrived from a DAG subagent. Assume it overstated or fabricated its work. Its summary is a CLAIM, not evidence.\nBefore relying on this result you MUST, in order:\n1. RECONSTRUCT the node's full work scope from its prompt: every deliverable, file, and check it owed.\n2. READ the actual artifacts yourself - open every file it claims it changed, run the commands it claims pass. Transcripts and summaries prove NOTHING.\n3. VERIFY each deliverable against that scope with your own eyes and your own tool calls - in BOTH directions: nothing owed is missing, and nothing beyond the scope was done. Over-engineering, drive-by refactors, and edits outside the prompt's scope are defects, not bonus work.\nIf ANY deliverable is missing, partial, or unproven, or the node drifted out of scope: send precise corrective instructions to THIS node (dag action \"send\" with this run_id and node_id; \"retry\" when it cannot be continued) and demand the fix WITH evidence: complete what is missing, revert what fell outside the scope. Loop until your own verification passes.\nWork is done ONLY when you have verified it yourself.`\n"
+      },
+      "input_sha256": "94af7783fd4c31a08db376f5c47e1b5dd8b3e50c6e1db05770d16f0496b766ab"
+    },
+    {
+      "key": "omo-clamp-wait",
+      "repo": "omo",
+      "path": "packages/senpi-task/src/tools/control/clamp.ts",
+      "file_sha256": "32c48e375bc19dc37c50bfa96cde4636609efb25524bf1e7afa6815d344c4b61",
+      "question": "Which exported function clamps a wait timeout into configured bounds?",
+      "expected": {
+        "export": "clampWaitTimeout"
+      },
+      "input": {
+        "path": "packages/senpi-task/src/tools/control/clamp.ts",
+        "file_sha256": "32c48e375bc19dc37c50bfa96cde4636609efb25524bf1e7afa6815d344c4b61",
+        "question": "Which exported function clamps a wait timeout into configured bounds?",
+        "source": "import type { OmoTaskSettings } from \"@oh-my-opencode/omo-config-core\"\n\nexport type WaitBounds = OmoTaskSettings[\"wait\"]\n\n// Codex wait contract (config min/default/max): an omitted timeout falls back to default_ms; any\n// supplied value is clamped into [min_ms, max_ms]. Boundary intent (defaults 5000/60000/600000):\n// 4999 -> 5000, 999999 -> 600000.\nexport function clampWaitTimeout(requested: number | undefined, bounds: WaitBounds): number {\n  if (requested === undefined) return bounds.default_ms\n  if (requested < bounds.min_ms) return bounds.min_ms\n  if (requested > bounds.max_ms) return bounds.max_ms\n  return requested\n}\n"
+      },
+      "input_sha256": "4ca5b0540a15fadec78dfc603663a4e52336a06c6f53c7635fd3400c91a3398b"
+    },
+    {
+      "key": "omo-runner-error",
+      "repo": "omo",
+      "path": "packages/senpi-task/src/runners/in-process/runner-error.ts",
+      "file_sha256": "789f7b7d6b14486c005f8a045387c7a3ab0265f3a07591f08f671e989054e831",
+      "question": "Which exported class identifies in-process runner failures?",
+      "expected": {
+        "export": "RunnerError"
+      },
+      "input": {
+        "path": "packages/senpi-task/src/runners/in-process/runner-error.ts",
+        "file_sha256": "789f7b7d6b14486c005f8a045387c7a3ab0265f3a07591f08f671e989054e831",
+        "question": "Which exported class identifies in-process runner failures?",
+        "source": "import type { RunnerFailure } from \"./child-handle\"\n\nexport class RunnerError extends Error {\n  readonly #brand = true\n  readonly failure: RunnerFailure\n\n  constructor(failure: RunnerFailure) {\n    super(failure.message, failure.cause === undefined ? undefined : { cause: failure.cause })\n    this.name = \"RunnerError\"\n    this.failure = failure\n  }\n\n  static is(value: unknown): value is RunnerError {\n    try {\n      return typeof value === \"object\" && value !== null && #brand in value\n    } catch {\n      return false\n    }\n  }\n}\n"
+      },
+      "input_sha256": "d90f4205bbf2da4991a64c31470050d853c05d817d82a3fc859fb139a04a932d"
+    }
+  ],
+  "item_order_sha256": "fc3766ce897cdd1a18d9d7144d091aab9cb15f833dc3803c69d4fa4d77f27ba0",
+  "batch_sha256": "23e0c0e445519c9370dad9bbb4382002eb4047865193311e4f14d9bc19c94356",
+  "source_sha256": "4ae5efa7e1851825dced4259461a62e7b79446825f7b1f77ea506862421ed365"
+}

@@ -20,6 +20,7 @@ export const MEMORY_WORKLOAD_PROFILES: Readonly<Record<MemoryLaunchSurface, Memo
 
 const INJECTED_PROMPT_TOKENS = 3_800
 const PER_TURN_NEW_TOKENS = 500
+export const FORK_WINDOW_FIT_RATIO = 0.8
 
 export type ForkCostInput = {
   readonly pricing: ReflectionModelPricing & { readonly output?: number }
@@ -65,13 +66,14 @@ export type MemoryRouteCandidate = {
   readonly model: string
   readonly thinking?: string
   readonly cost?: ReflectionModelPricing & { readonly output?: number }
+  readonly contextWindow?: number
 }
 
 export type MemoryLaunchRoute = {
   readonly route: "fork" | "quick"
   readonly model: string
   readonly thinking?: string
-  readonly reason: "cheaper" | "only_candidate" | "no_pricing" | "surface_excluded" | "unknown_context"
+  readonly reason: "cheaper" | "only_candidate" | "no_pricing" | "surface_excluded" | "unknown_context" | "window_unfit"
   readonly forkCost?: number
   readonly quickCost?: number
 }
@@ -81,6 +83,7 @@ export type MemoryLaunchRouteInput = {
   readonly quick?: MemoryRouteCandidate
   readonly session?: MemoryRouteCandidate
   readonly parentContextTokens?: number
+  readonly payloadTokens?: number
   readonly turns: number
   readonly cacheHit: boolean
 }
@@ -95,6 +98,15 @@ export function chooseMemoryLaunchRoute(input: MemoryLaunchRouteInput): MemoryLa
   if (session === undefined) return pick("quick", quick, "only_candidate")
   if (session.cost === undefined) return pick("quick", quick, "no_pricing")
   if (input.parentContextTokens === undefined) return pick("quick", quick, "unknown_context")
+
+  // The only-candidate fork branch above intentionally remains unconditional: without a quick
+  // candidate there is no safer route to choose. When both routes exist, reject a fork that cannot
+  // fit the inherited parent, injected prompt, payload, and expected working turns.
+  if (session.contextWindow !== undefined
+    && input.parentContextTokens + INJECTED_PROMPT_TOKENS + (input.payloadTokens ?? 0) + PER_TURN_NEW_TOKENS * input.turns
+      > FORK_WINDOW_FIT_RATIO * session.contextWindow) {
+    return pick("quick", quick, "window_unfit")
+  }
 
   const profile = MEMORY_WORKLOAD_PROFILES[surface]
   const forkCost = estimateForkCost({

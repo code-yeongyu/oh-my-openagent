@@ -88,7 +88,7 @@ describe("omo-native category config capture", () => {
     // then
     const props = captured[0]
     expect(props?.cat_writing).toBe("disabled")
-    expect(props?.cat_deep).toBe("unavailable")
+    expect(props?.cat_deep_low).toBe("unavailable")
     for (const [key, value] of Object.entries(props ?? {})) {
       if (typeof value === "string") expect(value.length, key).toBeLessThanOrEqual(64)
     }
@@ -136,7 +136,7 @@ describe("omo-native category config capture", () => {
 
     // when / then
     expect(() => observe("startup")).not.toThrow()
-    expect(captured.map(({ cat_deep }) => cat_deep)).toEqual(["unavailable"])
+    expect(captured.map(({ cat_deep_low }) => cat_deep_low)).toEqual(["unavailable"])
   })
 })
 

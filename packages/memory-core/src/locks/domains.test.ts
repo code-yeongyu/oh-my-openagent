@@ -8,6 +8,7 @@ import {
   memoryUsageLockPath,
   memoryWriterLockPath,
   noticeLockPath,
+  receiptsLockPath,
   reflectionSchedulerLockPath,
   runFinalizationLockPath,
   skillsUsageLockPath,
@@ -30,6 +31,7 @@ describe("lock domain paths", () => {
       factsRunsLockPath(locksDirectory),
       noticeLockPath(locksDirectory),
       runFinalizationLockPath(locksDirectory, "run-123"),
+      receiptsLockPath(locksDirectory),
     ]
 
     // #then
@@ -43,7 +45,10 @@ describe("lock domain paths", () => {
       "facts-queue",
       "facts-runs",
       "notice",
+      "memory-maintenance",
+      "receipts",
     ])
+    expect(paths[9]).toBe(path.join(locksDirectory, "receipts.lock"))
     expect(paths[0]).toBe(path.join(locksDirectory, "memory-write.lock"))
     expect(paths[1]).toBe(path.join(locksDirectory, "reflection-scheduler.lock"))
     expect(paths[2]).toBe(path.join(locksDirectory, "skills-usage.lock"))

@@ -1,40 +1,45 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
-import { Card, CardContent } from "@/components/ui/card"
-import { Star } from "lucide-react"
-import { REVIEW_KEYS } from "@/components/landing/constants"
 
+import { REVIEW_KEYS } from "@/components/landing/constants"
+import { Reveal } from "@/components/landing/motion-wrappers"
+import { SectionHeader } from "@/components/landing/section-header"
+import { Frame } from "@/components/ledger/frame"
+import { Reel, ReelCell } from "@/components/ledger/reel"
+
+/** Reviews as a Reel (§5): the scroll container owns the scroll, snap-aligned quote cells. */
 export async function ReviewsSection(): Promise<JSX.Element> {
   const t = await getTranslations("landing")
 
   return (
-    <section className="border-t border-white/5 bg-[#0a0a0a] py-24" data-section="reviews">
-      <div className="reveal-on-enter container mx-auto px-4 md:px-6">
-        <div>
-          <h2 className="mb-16 text-center text-4xl font-bold text-white md:text-5xl">
-            {t("reviews.title")}
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {REVIEW_KEYS.map((key) => (
-            <div key={key}>
-              <Card className="h-full border-zinc-800 bg-zinc-900/30">
-                <CardContent className="pt-6">
-                  <div className="mb-4 text-cyan-500">
-                    <Star className="h-5 w-5 fill-cyan-500" />
-                  </div>
-                  <p className="mb-6 leading-relaxed text-zinc-300 italic">
-                    &ldquo;{t(`reviews.${key}.text`)}&rdquo;
-                  </p>
-                  <p className="text-sm font-medium text-zinc-400">
-                    — {t(`reviews.${key}.author`)}
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          ))}
-        </div>
-      </div>
+    <section
+      data-section="reviews"
+      aria-labelledby="reviews-title"
+      className="border-line border-t py-16 lg:py-24"
+    >
+      <Frame>
+        <Reveal>
+          <SectionHeader
+            id="reviews-title"
+            eyebrow={t("reviews.eyebrow")}
+            title={t("reviews.title")}
+          />
+        </Reveal>
+        <Reveal index={1} className="mt-12">
+          <Reel label={t("reviews.title")} aria-labelledby="reviews-title">
+            {REVIEW_KEYS.map((key) => (
+              <ReelCell key={key}>
+                <blockquote className="text-text-hi text-lg leading-[1.6]">
+                  {t(`reviews.${key}.text`)}
+                </blockquote>
+                <p className="text-text-lo text-meta tracking-meta mt-auto pt-6 font-mono">
+                  {t(`reviews.${key}.author`)}
+                </p>
+              </ReelCell>
+            ))}
+          </Reel>
+        </Reveal>
+      </Frame>
     </section>
   )
 }
