@@ -41,7 +41,14 @@ import {
   stageSidecarPayload,
 } from "./build-omo-binary"
 import { PAYLOAD_DIRECTORIES, PAYLOAD_FILES } from "./build-omo-native"
-import { desktopEngineTarget, engineTrustHelperTarget, stageCompiledDesktopEngine, stageCompiledEngineTrustHelper } from "./release-desktop-engine-target"
+import {
+  desktopEngineTarget,
+  engineTrustHelperTarget,
+  gitJobHelperTarget,
+  stageCompiledDesktopEngine,
+  stageCompiledEngineTrustHelper,
+  stageCompiledGitJobHelper,
+} from "./release-desktop-engine-target"
 import { KEYCHAIN_HELPER_SOURCE, keychainHelperPayload } from "./release-keychain-helper-target"
 import * as binaryBuilder from "./build-omo-binary"
 
@@ -621,6 +628,62 @@ describe("engine trust helper payload", () => {
       } finally {
         rmSync(root, { recursive: true, force: true })
       }
+    }
+  })
+})
+
+// Release contract (omo#10391): the git job helper ships on the Windows hosts only, hashed in the runtime manifest, and
+// a promised helper that is missing fails the build before the plugin build.
+describe("git job helper payload", () => {
+  test("#given every release target #when expected paths are resolved #then only Windows promises the helper", () => {
+    for (const target of RELEASE_BINARY_TARGETS) {
+      const promised = resolveExpectedSidecarRelPaths(target).filter((relPath) => relPath.includes("omo-git-job-helper"))
+      const host = target.target === "windows-arm64" ? "win32-arm64" : "win32-x64"
+      const expected = target.target.startsWith("windows-") ? [`native/prebuilds/${host}/omo-git-job-helper.exe`] : []
+      expect(promised, target.target).toEqual(expected)
+    }
+  })
+
+  test("#given a staged Windows helper #when the manifest is built #then it is an executable entry carrying the helper's sha256", async () => {
+    const root = makeTempDir("omo-git-job-helper-manifest-")
+    try {
+      const helper = gitJobHelperTarget("windows-x64-baseline")
+      if (helper.source === null || helper.payload === null) throw new Error("available target expected")
+      stageParityFixture(root, [helper.source])
+      const bytes = readFileSync(join(root, helper.source))
+      const stageDir = join(root, "stage")
+
+      expect(stageCompiledGitJobHelper("windows-x64-baseline", stageDir, root)).toBe(helper.payload)
+      const manifest = await buildRuntimeManifest(stageDir, { omoAiVersion: "1.2.3", enginePin: "2026.8.24" })
+
+      expect(manifest.entries.find((entry) => entry.relPath === helper.payload)).toEqual({
+        relPath: "native/prebuilds/win32-x64/omo-git-job-helper.exe",
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        mode: 0o755,
+        size: bytes.byteLength,
+      })
+      expect(stageCompiledGitJobHelper("darwin-arm64", stageDir, root)).toBeNull()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a Windows target whose helper was not built #when the payload is staged #then the build fails before the plugin build", () => {
+    const root = makeTempDir("omo-git-job-helper-missing-")
+    try {
+      const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "windows-arm64")
+      const engine = desktopEngineTarget("windows-arm64")
+      const trust = engineTrustHelperTarget("windows-arm64")
+      if (target === undefined || engine.source === null || trust.source === null) throw new Error("windows-arm64 target expected")
+      // Every other promised sidecar is present, so the git job helper is the only missing one.
+      stageParityFixture(root, [engine.source, trust.source])
+
+      const stage = (): void => { stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root) }
+
+      expect(stage).toThrow(/missing required git job helper for windows-arm64:.*omo-git-job-helper\.exe/)
+      expect(existsSync(join(root, "stage", "plugin"))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
     }
   })
 })
