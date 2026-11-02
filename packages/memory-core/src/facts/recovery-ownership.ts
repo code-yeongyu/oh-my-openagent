@@ -4,7 +4,7 @@ import type { FactsApplyRecovery } from "./mutation-plan"
 
 export type FactsOwnedState = ReadonlyMap<string, GitPathState>
 
-export function computeForeignParentLines(dirtyStatus: string, allowedPaths: ReadonlySet<string>): string[] {
+function computeForeignParentLines(dirtyStatus: string, allowedPaths: ReadonlySet<string>): string[] {
   const dirty = dirtyStatus.split(/\r?\n/).filter(Boolean)
   return dirty
     .filter((line) => {
