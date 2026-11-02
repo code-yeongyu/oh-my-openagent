@@ -322,7 +322,7 @@ describe("resolveAgent curated explore/librarian chain", () => {
   ])
 
   for (const agent of ["explore", "librarian"] as const) {
-    test(`#given every rung model is available #when ${agent} resolves #then it runs Kimi HighSpeed, Luna Fast, Haiku 5.5 medium, DeepSeek V4.1 Flash, Qwen 3.7 Plus, then M2.7`, () => {
+    test(`#given every rung model is available #when ${agent} resolves #then it runs Kimi HighSpeed, Luna Fast, Haiku 5.5 high, DeepSeek V4.1 Flash, Qwen 3.7 Plus, then M2.7`, () => {
       // when
       const result = expectResolved(resolveAgent(agent, BUILTIN_AGENTS, everyRungModel))
 
@@ -335,7 +335,7 @@ describe("resolveAgent curated explore/librarian chain", () => {
         "opencode-go/qwen3.7-plus",
         "opencode-go/minimax-m2.7",
       ])
-      expect(result.fallback_models?.[1]?.variant).toBe("medium")
+      expect(result.fallback_models?.[1]?.variant).toBe("high")
     })
   }
 })
