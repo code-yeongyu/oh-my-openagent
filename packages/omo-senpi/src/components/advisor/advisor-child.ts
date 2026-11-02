@@ -64,40 +64,41 @@ export async function runAdvisorChild(request: AdvisorChildRequest, seams: Advis
       continue
     }
     const outcome = await awaitAdvice(handle, candidate.model, request.timeoutMs, startedAt)
-    if (!isEmptyReply(outcome) || !thinksAboveLow(candidate.thinking)) return outcome
-    return retryAtLowThinking(runner, request, candidate, runtime)
+    if (!isEmptyReply(outcome) || !canRetryLower(candidate.thinking)) return outcome
+    return retryAtLowerThinking(runner, request, candidate, runtime)
   }
   return { kind: "failed", reason: `start_failed: ${failures.join("; ") || "no candidate"}` }
 }
 
-const LOW_THINKING: ReadonlySet<ThinkingLevel> = new Set(["off", "minimal", "low"])
+const RETRY_THINKING: ThinkingLevel = "off"
 
 function isEmptyReply(outcome: AdvisorChildOutcome): boolean {
   return outcome.kind === "failed" && outcome.reason === "empty"
 }
 
-function thinksAboveLow(thinking: ThinkingLevel | undefined): boolean {
-  return thinking !== undefined && !LOW_THINKING.has(thinking)
+function canRetryLower(thinking: ThinkingLevel | undefined): boolean {
+  return thinking !== undefined && thinking !== RETRY_THINKING
 }
 
-// A high thinking level can spend the whole output budget on reasoning and end the turn with no
-// text (observed: DeepSeek V4.1 Flash at `max`, stopReason `length` after 16,384 reasoning tokens).
-// One retry at `low` leaves room for the plan; a second empty reply is reported as it is.
-async function retryAtLowThinking(
+// A thinking level can spend the whole output budget on reasoning and end the turn with no text
+// (measured on DeepSeek V4.1 Flash: `max` and `low` both stop at `length` after 16,384 reasoning
+// tokens; `off` still reasons but finishes the plan). One retry at `off` leaves the most room; a
+// second empty reply is reported as it is.
+async function retryAtLowerThinking(
   runner: InProcessRunnerLike,
   request: AdvisorChildRequest,
   candidate: AdvisorCandidate,
   runtime: AdvisorTaskRuntime | undefined,
 ): Promise<AdvisorChildOutcome> {
-  const lowered: AdvisorCandidate = { ...candidate, thinking: "low" }
-  const spec = { ...buildSpec(request, lowered, runtime), taskId: `advisor-${request.sessionId}-${request.sequence}-low` }
+  const lowered: AdvisorCandidate = { ...candidate, thinking: RETRY_THINKING }
+  const spec = { ...buildSpec(request, lowered, runtime), taskId: `advisor-${request.sessionId}-${request.sequence}-retry` }
   const startedAt = Date.now()
   try {
     const handle = await runner.start(spec)
     const outcome = await awaitAdvice(handle, candidate.model, request.timeoutMs, startedAt)
-    return outcome.kind === "failed" ? { ...outcome, reason: `empty at ${candidate.thinking}, then ${outcome.reason} at low` } : outcome
+    return outcome.kind === "failed" ? { ...outcome, reason: `empty at ${candidate.thinking}, then ${outcome.reason} at ${RETRY_THINKING}` } : outcome
   } catch (error) {
-    return { kind: "failed", reason: `empty at ${candidate.thinking}, then start_failed at low: ${describe(error)}`, model: candidate.model }
+    return { kind: "failed", reason: `empty at ${candidate.thinking}, then start_failed at ${RETRY_THINKING}: ${describe(error)}`, model: candidate.model }
   }
 }
 

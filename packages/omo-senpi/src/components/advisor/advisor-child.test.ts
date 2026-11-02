@@ -67,16 +67,16 @@ describe("runAdvisorChild", () => {
 
   it("#given an empty reply #when the child settles #then no advice is produced", async () => {
     const fake = fakeRunner({ text: "   " })
-    expect(await runAdvisorChild(REQUEST, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty at medium, then empty at low" })
+    expect(await runAdvisorChild(REQUEST, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty at medium, then empty at off" })
     expect(fake.specs).toHaveLength(2)
   })
 
-  it("#given an empty reply at a high thinking level #when the child settles #then it retries once at low and returns that plan", async () => {
+  it("#given an empty reply at a high thinking level #when the child settles #then it retries once with thinking off and returns that plan", async () => {
     const specs: ChildSpec[] = []
     const runner = {
       start: async (spec: ChildSpec) => {
         specs.push(spec)
-        const text = spec.thinkingLevel === "low" ? "ROOT CAUSE: x" : ""
+        const text = spec.thinkingLevel === "off" ? "ROOT CAUSE: x" : ""
         return {
           waitForIdle: () => Promise.resolve({ status: "completed", finalResponse: text }),
           lastAssistantText: () => text,
@@ -87,12 +87,12 @@ describe("runAdvisorChild", () => {
     } as unknown as InProcessRunnerLike
     const outcome = await runAdvisorChild({ ...REQUEST, thinking: "max" }, { createRunner: () => runner })
     expect(outcome).toMatchObject({ kind: "advice", text: "ROOT CAUSE: x" })
-    expect(specs.map((spec) => spec.thinkingLevel)).toEqual(["max", "low"])
+    expect(specs.map((spec) => spec.thinkingLevel)).toEqual(["max", "off"])
   })
 
-  it("#given an empty reply already at low thinking #when the child settles #then it does not retry", async () => {
+  it("#given an empty reply already with thinking off #when the child settles #then it does not retry", async () => {
     const fake = fakeRunner({ text: "" })
-    expect(await runAdvisorChild({ ...REQUEST, thinking: "low" }, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty" })
+    expect(await runAdvisorChild({ ...REQUEST, thinking: "off" }, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty" })
     expect(fake.specs).toHaveLength(1)
   })
 
