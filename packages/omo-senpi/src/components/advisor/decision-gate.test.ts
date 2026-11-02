@@ -78,4 +78,12 @@ describe("decision gate", () => {
     expect(outcome).toEqual({ kind: "no_key" })
     expect(called).toBe(false)
   })
+
+  it("#given a follow-up prompt #when the state is built #then the gate sees the original task and the latest message", () => {
+    const window = createAdvisorSessionWindow(0)
+    rememberTask(window, "port the parser to Rust")
+    rememberTask(window, "now also add a fuzz test")
+    recordToolResult(window, "bash", { command: "cargo test" }, true, "error", 24)
+    expect(buildGateState(window, 0).task).toBe("port the parser to Rust\n\nLATEST USER MESSAGE:\nnow also add a fuzz test")
+  })
 })

@@ -48,7 +48,7 @@ export function buildGateState(window: AdvisorSessionWindow, now: number): GateS
   const recent = window.calls.slice(-GATE_CALLS)
   const last = recent[recent.length - 1]
   return {
-    task: (window.task ?? "(unknown)").slice(0, GATE_TASK_CHARS),
+    task: gateTask(window),
     recent_calls: recent.map((call) => ({
       tool: call.tool,
       args: call.args.slice(0, GATE_ARGS_CHARS),
@@ -63,6 +63,13 @@ export function buildGateState(window: AdvisorSessionWindow, now: number): GateS
       error_run: trailingRun(window.calls, (a) => a.isError),
     },
   }
+}
+
+function gateTask(window: AdvisorSessionWindow): string {
+  const task = window.task ?? "(unknown)"
+  if (window.latestPrompt === undefined) return task.slice(0, GATE_TASK_CHARS)
+  const half = GATE_TASK_CHARS / 2
+  return `${task.slice(0, half)}\n\nLATEST USER MESSAGE:\n${window.latestPrompt.slice(0, half)}`
 }
 
 export type DecisionGateOutcome =

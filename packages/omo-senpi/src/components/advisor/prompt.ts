@@ -1,5 +1,5 @@
 import type { TroubleKind } from "./decision-gate"
-import type { AdvisorSessionWindow } from "./session-window"
+import { taskText, type AdvisorSessionWindow } from "./session-window"
 
 const ADVISOR_CALLS = 12
 
@@ -31,7 +31,7 @@ export function renderAdvisorPrompt(window: AdvisorSessionWindow, judgement: Adv
   const calls = recent.map((call, index) => `${index + 1}. ${call.tool} ${call.args}`).join("\n")
   const results = recent.map((call, index) => `${index + 1}. ${call.tool} ${call.isError ? "ERROR" : "ok"}: ${call.result}`).join("\n")
   return [
-    `<task>\n${window.task ?? "(unknown)"}\n</task>`,
+    `<task>\n${taskText(window)}\n</task>`,
     `<judge>label=${judgement.trouble} p_stuck=${judgement.stuck.toFixed(2)} tool_calls=${window.toolResults}</judge>`,
     `<recent_tool_calls>\n${calls}\n</recent_tool_calls>`,
     `<recent_tool_results>\n${results}\n</recent_tool_results>`,

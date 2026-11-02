@@ -15,6 +15,7 @@ export interface AdvisorToolEvent {
 
 export interface AdvisorSessionWindow {
   task: string | undefined
+  latestPrompt: string | undefined
   readonly calls: AdvisorToolEvent[]
   toolResults: number
   lastAdviceAt: number | undefined
@@ -24,7 +25,7 @@ export interface AdvisorSessionWindow {
 }
 
 export function createAdvisorSessionWindow(now: number): AdvisorSessionWindow {
-  return { task: undefined, calls: [], toolResults: 0, lastAdviceAt: undefined, advices: 0, inFlight: false, lastMessageAt: now }
+  return { task: undefined, latestPrompt: undefined, calls: [], toolResults: 0, lastAdviceAt: undefined, advices: 0, inFlight: false, lastMessageAt: now }
 }
 
 export function recordToolResult(window: AdvisorSessionWindow, tool: string, input: unknown, isError: boolean, content: unknown, limit: number): void {
@@ -36,9 +37,19 @@ export function recordToolResult(window: AdvisorSessionWindow, tool: string, inp
 }
 
 export function rememberTask(window: AdvisorSessionWindow, prompt: string): void {
-  if (window.task !== undefined) return
-  const text = redactSensitiveOutput(prompt).trim()
-  if (text.length > 0) window.task = text.length > TASK_CHARS ? `${text.slice(0, TASK_CHARS)}...` : text
+  const text = clipTask(redactSensitiveOutput(prompt).trim())
+  if (text.length === 0) return
+  if (window.task === undefined) window.task = text
+  else window.latestPrompt = text === window.task ? undefined : text
+}
+
+export function taskText(window: AdvisorSessionWindow): string {
+  const task = window.task ?? "(unknown)"
+  return window.latestPrompt === undefined ? task : `${task}\n\nLATEST USER MESSAGE:\n${window.latestPrompt}`
+}
+
+function clipTask(text: string): string {
+  return text.length > TASK_CHARS ? `${text.slice(0, TASK_CHARS)}...` : text
 }
 
 export function trailingRun(calls: readonly AdvisorToolEvent[], same: (a: AdvisorToolEvent, b: AdvisorToolEvent) => boolean): number {
