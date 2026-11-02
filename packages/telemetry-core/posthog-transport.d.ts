@@ -1,1 +1,0 @@
-export { createDefaultPostHogTransport } from "./index"

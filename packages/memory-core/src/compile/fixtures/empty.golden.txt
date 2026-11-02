@@ -1,3 +1,0 @@
-<memory_metadata>
-- AGENT_ID: empty-agent
-</memory_metadata>

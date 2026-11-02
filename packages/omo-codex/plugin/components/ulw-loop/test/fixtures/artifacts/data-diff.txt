@@ -1,5 +1,0 @@
---- before.json
-+++ after.json
-@@
--"qualityGate":"legacy"
-+"qualityGate":"unknown-compatible"

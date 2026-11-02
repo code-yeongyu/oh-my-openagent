@@ -1,5 +1,0 @@
-/_next/static/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/__asset-history.json
-  Cache-Control: no-store

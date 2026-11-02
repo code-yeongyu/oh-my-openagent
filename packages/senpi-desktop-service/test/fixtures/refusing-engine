@@ -1,7 +1,0 @@
-#!/usr/bin/env bun
-process.stdin.once("data", () => {
-	process.stderr.write('SENPI_DESKTOP_LAUNCH_REFUSED {"version":1,"reason":"self-responsible"}\n', () => {
-		process.exitCode = 1;
-		process.stdin.destroy();
-	});
-});

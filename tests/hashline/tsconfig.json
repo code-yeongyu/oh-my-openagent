@@ -1,9 +1,0 @@
-{
-  "extends": "../../packages/omo-opencode/tsconfig.json",
-  "include": [
-    "*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
-}

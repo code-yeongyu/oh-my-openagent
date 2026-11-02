@@ -1,1 +1,0 @@
-Screenshot fixture proving path existence and non-empty content.
