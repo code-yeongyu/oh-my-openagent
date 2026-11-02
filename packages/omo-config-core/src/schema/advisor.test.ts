@@ -6,8 +6,10 @@ import { OmoConfigSchema } from "./config"
 import { resolveOmoAdvisorSettings } from "./advisor"
 
 describe("advisor settings", () => {
-  it("#given no advisor block #when resolved #then the advisor is off", () => {
-    expect(resolveOmoAdvisorSettings({}).enabled).toBe(false)
+  it("#given no advisor block #when resolved #then the advisor is off and no model is pinned", () => {
+    const settings = resolveOmoAdvisorSettings({})
+    expect(settings.enabled).toBe(false)
+    expect(settings.model).toBeUndefined()
   })
 
   it("#given a partial layer #when resolved #then defaults fill the rest", () => {

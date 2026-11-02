@@ -6,6 +6,7 @@
 
 import { join } from "node:path"
 
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 import { resolveOmoAdvisorSettings, type OmoAdvisorSettings, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
 
@@ -22,6 +23,7 @@ import { createAdvisorSessionWindow, recordToolResult, rememberTask, textOf, typ
 export const ADVISOR_ADVICE_TYPE = "omo-advisor:advice"
 export const ADVISOR_GATE_ENTRY_TYPE = "omo-advisor:gate"
 const GATE_TIMEOUT_MS = 20_000
+const DEFAULT_ADVISOR_MODEL = `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`
 
 export interface AdvisorComponentOptions {
   readonly env?: Readonly<Record<string, string | undefined>>
@@ -136,7 +138,7 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
           cwd: record.cwd,
           sessionDir: join(agentDir, "advisor", encodeURIComponent(sessionId)),
           agentDir,
-          model: settings.model,
+          model: settings.model ?? DEFAULT_ADVISOR_MODEL,
           thinking: settings.thinking,
           category: settings.category,
           config: record.config,

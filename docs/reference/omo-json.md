@@ -341,7 +341,7 @@ A decision model decides whether to step in; it never writes the advice. From th
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `enabled` | `false` | Run the advisor. |
-| `model` | `"anthropic/claude-opus-5-5"` | Advisor model, `provider/model`. |
+| `model` | the newest Claude Opus on `anthropic` | Advisor model, `provider/model`. |
 | `thinking` | `"medium"` | Advisor thinking level. |
 | `category` | `"ultrabrain"` | Category whose chain answers when `model` cannot start. |
 | `decision_url` | `"https://apis.opengateway.ai/v1/decisions"` | Decision endpoint. |

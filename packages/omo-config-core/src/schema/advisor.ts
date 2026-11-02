@@ -12,7 +12,7 @@ const OmoAdvisorThinkingSchema = z.enum(["off", "minimal", "low", "medium", "hig
 const OmoAdvisorSettingsShape = {
   /** Run the advisor (default: false). */
   enabled: z.boolean(),
-  /** Advisor model, `provider/model` (default: "anthropic/claude-opus-5-5"). */
+  /** Advisor model, `provider/model` (default: the newest Claude Opus on the `anthropic` provider). */
   model: z.string().min(1),
   /** Thinking level of the advisor model (default: "medium"). */
   thinking: OmoAdvisorThinkingSchema,
@@ -46,7 +46,6 @@ export const OmoAdvisorSettingsLayerSchema = z.object(OmoAdvisorSettingsShape).p
 
 export const OmoAdvisorSettingsSchema = OmoAdvisorSettingsLayerSchema.extend({
   enabled: z.boolean().default(false),
-  model: z.string().min(1).default("anthropic/claude-opus-5-5"),
   thinking: OmoAdvisorThinkingSchema.default("medium"),
   category: z.string().min(1).default("ultrabrain"),
   decision_url: z.string().url().default("https://apis.opengateway.ai/v1/decisions"),

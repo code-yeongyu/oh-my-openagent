@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -111,6 +112,14 @@ describe("advisor component", () => {
     expect(h.pi.messages[0]?.options).toEqual({ deliverAs: "steer" })
     await toolResults(h.pi, 6)
     expect(h.fetchBodies).toHaveLength(1)
+  })
+
+  it("#given no advisor model pin #when the gate fires #then the newest Claude Opus is asked", async () => {
+    const h = setup({ advisor: { enabled: true, min_calls: 1 }, key: "k" })
+    const entry = h.nextEntry()
+    await toolResults(h.pi, 1)
+    await entry
+    expect(h.childRequests[0]?.model).toBe(`anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`)
   })
 
   it("#given no key in the environment #when the gate is due #then no request is made and the miss is recorded", async () => {

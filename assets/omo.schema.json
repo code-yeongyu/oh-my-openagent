@@ -2501,7 +2501,6 @@
           "type": "boolean"
         },
         "model": {
-          "default": "anthropic/claude-opus-5-5",
           "type": "string",
           "minLength": 1
         },
