@@ -49,6 +49,7 @@ function createFixture(options?: {
   readonly pendingAsyncWorkLive?: () => boolean
   readonly disposed?: () => boolean
   readonly maxUnreadableProbes?: number
+  readonly maxAsyncWorkProbes?: number
 }) {
   const scheduler = createManualSettlementScheduler()
   let settled: RunnerOutcome | undefined
@@ -64,6 +65,7 @@ function createFixture(options?: {
     probe: options?.probe,
     settleConfirmMs: 60_000,
     maxUnreadableProbes: options?.maxUnreadableProbes,
+    maxAsyncWorkProbes: options?.maxAsyncWorkProbes,
     wakeSourcesLive: options?.wakeSourcesLive,
     pendingAsyncWorkLive: options?.pendingAsyncWorkLive,
     disposed: options?.disposed,
@@ -391,9 +393,9 @@ describe("createTurnSettlement completed with pending async work (senpi#3492, om
     fixture.scheduler.runNext()
     await flushSettlement()
 
-    // then - it holds again: no probe, nothing settled, no confirmation left armed
+    // then - it holds again and re-arms the confirmation while the work is still in flight
     expect(probe.calls()).toBe(0)
-    expect(fixture.scheduler.pending()).toBe(0)
+    expect(fixture.scheduler.pending()).toBe(1)
     expect(fixture.settled()).toBeUndefined()
 
     // when - the work releases and its disarm re-offers the confirmation
@@ -406,6 +408,39 @@ describe("createTurnSettlement completed with pending async work (senpi#3492, om
     // then - the idle probe is the real turn end and the completed outcome settles
     const outcome = await settled
     expect(probe.calls()).toBe(1)
+    expect(outcome).toEqual({ status: "completed", finalResponse: "wrote the report" })
+  })
+
+  test("#given a completed turn held on pending async work #when the work exceeds the max hold probes #then it caps the hold and settles as completed", async () => {
+    // given - work stays live forever
+    const probe = countingProbe(idleState)
+    const fixture = createFixture({
+      probe: probe.probe,
+      wakeSourcesLive: () => false,
+      pendingAsyncWorkLive: () => true,
+      maxAsyncWorkProbes: 3,
+    })
+    fixture.settlement.observe(completedEnd() as never)
+    fixture.settlement.observe({ type: "agent_idle" } as never)
+    await flushSettlement()
+
+    // when - probes 1 and 2 run while work is still live
+    fixture.scheduler.runNext()
+    await flushSettlement()
+    expect(fixture.scheduler.pending()).toBe(1)
+    expect(fixture.settled()).toBeUndefined()
+
+    fixture.scheduler.runNext()
+    await flushSettlement()
+    expect(fixture.scheduler.pending()).toBe(1)
+    expect(fixture.settled()).toBeUndefined()
+
+    // when - third probe runs and reaches the bound
+    const settled = fixture.nextSettled()
+    fixture.scheduler.runNext()
+    const outcome = await settled
+
+    // then - it caps the hold and settles as completed
     expect(outcome).toEqual({ status: "completed", finalResponse: "wrote the report" })
   })
 

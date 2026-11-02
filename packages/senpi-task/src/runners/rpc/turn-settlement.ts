@@ -53,6 +53,9 @@ export type TurnSettlementInput = {
   // keep their existing semantics (they never hold a completed turn); absent predicate = the
   // historical behavior (a completed outcome settles on `agent_idle`).
   readonly pendingAsyncWorkLive?: () => boolean
+  // senpi#3492 / omo#10487: bounds the completed hold when async work never drains (e.g. background sessions).
+  // Default: 60 confirmation checks / heartbeats.
+  readonly maxAsyncWorkProbes?: number
   // Teardown detached/tore down the handle while a probe was in flight: that flight must never
   // report the held error as failed - the exit path owns the outcome from here (senpi#3262 review).
   readonly disposed?: () => boolean
@@ -106,8 +109,10 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   // Unlike the error hold - which arms immediately - the completed hold starts at `agent_idle`,
   // and only then does a confirmation gate on the work draining.
   let asyncWorkHold = false
+  let asyncWorkProbes = 0
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
   const maxUnreadableProbes = input.maxUnreadableProbes ?? 3
+  const maxAsyncWorkProbes = input.maxAsyncWorkProbes ?? 60
   const endOutcome = (event: AgentEndEvent): RunnerOutcome =>
     agentEndOutcome(event, input.baseline(), input.finalText(), input.abortedByUser())
 
@@ -126,7 +131,19 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     if (outcome.status === "error") {
       if (input.wakeSourcesLive?.() === true) return
     } else if (outcome.status === "completed") {
-      if (!asyncWorkHold || input.pendingAsyncWorkLive?.() === true) return
+      if (!asyncWorkHold) return
+      if (input.pendingAsyncWorkLive?.() === true) {
+        asyncWorkProbes += 1
+        if (asyncWorkProbes >= maxAsyncWorkProbes) {
+          held = undefined
+          asyncWorkHold = false
+          asyncWorkProbes = 0
+          input.settle(outcome)
+          return
+        }
+        rearm()
+        return
+      }
     } else {
       return
     }
@@ -192,6 +209,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           clearConfirmation()
           held = undefined
           asyncWorkHold = false
+          asyncWorkProbes = 0
           return
         case "agent_end": {
           if (event.willRetry !== false) return
@@ -201,6 +219,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
             clearConfirmation()
             held = undefined
             asyncWorkHold = false
+            asyncWorkProbes = 0
             input.settle(outcome)
             return
           }
@@ -225,11 +244,13 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
             input.pendingAsyncWorkLive?.() === true
           ) {
             asyncWorkHold = true
+            asyncWorkProbes = 0
             rearm()
             return
           }
           held = undefined
           asyncWorkHold = false
+          asyncWorkProbes = 0
           input.settle(outcome)
           return
         }

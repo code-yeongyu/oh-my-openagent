@@ -159,7 +159,7 @@ import { constants as constants2 } from "node:fs";
 import { access as access2, readFile as readFile2, stat } from "node:fs/promises";
 import { dirname as dirname3, join as join4 } from "node:path";
 
-// packages/memory-core/src/personas/manifest.ts
+// ../../packages/memory-core/src/personas/manifest.ts
 var PERSONA_ASSET_FILENAMES = {
   reflection: "reflection-persona.md",
   dream: "dream-persona.md",

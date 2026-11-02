@@ -248,9 +248,9 @@ describe("createRpcChildHandle pending async work (senpi#3492, omo#10487)", () =
     scheduler.runNext()
     await flushSettlement()
 
-    // then - still held, nothing probed
+    // then - still held, re-armed for next heartbeat
     expect(settled).toBeUndefined()
-    expect(scheduler.pending()).toBe(0)
+    expect(scheduler.pending()).toBe(1)
 
     // when - the cell settles and the source publishes its empty snapshot
     harness.emit(cellSnapshot(0))
