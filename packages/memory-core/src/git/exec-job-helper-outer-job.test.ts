@@ -81,13 +81,15 @@ function startWriter(fixture: IdentityRepo, helper: string, argv: readonly strin
 }
 
 async function admit(writer: Writer): Promise<OuterJob> {
-  // P must have claimed the protocol (its cached `selftest` passed at lock-record creation, design section 6.3) before
-  // it joins the outer job: otherwise its first git run spawns the `selftest` helper inside the job, and helperCreated
-  // can take that short-lived process for the run helper.
-  expect(await writer.line(["ready"], 30_000)).toBe(`ready ${GIT_ACTIVITY_JOB_PROTOCOL}`)
+  // P joins the outer job before it spawns anything, as a writer started inside a job does: adopting P after its
+  // libuv kill-on-close job exists would put the helper in that job, so killing P would kill the helper (#10391).
+  await writer.line(["spawned"], 30_000)
   const outer = OuterJob.create()
   cleanups.push(() => outer.close())
   outer.assign(writer.child.pid ?? 0)
+  writer.child.stdin!.write("assigned\n")
+  // P claimed the protocol: its cached `selftest` passed at lock-record creation (design section 6.3).
+  expect(await writer.line(["ready"], 30_000)).toBe(`ready ${GIT_ACTIVITY_JOB_PROTOCOL}`)
   writer.child.stdin!.write("start\n")
   return outer
 }
@@ -110,10 +112,11 @@ function describeProcess(message: number, pid: number): string {
   return `${message}:${pid}:${basename(processImage(pid) ?? "?")}:${processCommandLine(pid) ?? "?"}`
 }
 
+// The run helper H, by image AND `run --op`: P's claim `selftest` (same image) is created inside the job too.
 async function helperCreated(outer: OuterJob, image: string, seen: string[] = []): Promise<{ readonly pid: number; readonly handle: bigint }> {
   const created = await outer.next(({ message, pid }) => {
     seen.push(describeProcess(message, pid))
-    return message === JOB_MSG_NEW_PROCESS && basename(processImage(pid) ?? "").toLowerCase() === image.toLowerCase()
+    return message === JOB_MSG_NEW_PROCESS && basename(processImage(pid) ?? "").toLowerCase() === image.toLowerCase() && / run --op /.test(processCommandLine(pid) ?? "")
   }, 60_000)
   const handle = watchProcess(created.pid)
   if (handle === null) throw new Error(`helper ${created.pid} exited before the test could watch it`)
@@ -199,10 +202,10 @@ describe.skipIf(!runsJobHelperRows)("T7(c)(d) and T8: the writer never lets git 
     const repo = await fixture("job-helper-t8-")
     const gate = await holdGate(repo.paths.locks)
     const writer = startWriter(repo, jobHelperPath(), ["tag", "t8"], true)
+    const outer = await admit(writer)
     const nonce = (await writer.line(["locked "], 30_000)).slice("locked ".length)
 
     // #when
-    const outer = await admit(writer)
     const helper = await helperCreated(outer, basename(jobHelperPath()))
     const lockPath = memoryWriterLockPath(repo.paths.locks)
     const current = parseLockRecord(await readFile(lockPath, "utf8"))

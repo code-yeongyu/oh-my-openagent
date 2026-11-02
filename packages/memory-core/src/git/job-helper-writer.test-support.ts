@@ -1,7 +1,8 @@
 // Writer P as its own process, for the rows whose test must place P inside a test-owned outer job before P spawns
-// the helper (design v4.2 rows T7(c), T7(d), T8). It optionally takes the memory-write lock, prints `ready`, waits for
-// `start` on stdin, runs ONE git command through createNodeGitExec with the injected helper, and prints the outcome:
-// `result <code>` or `error <name> <message as JSON>`.
+// anything (design v4.2 rows T7(c), T7(d), T8). It prints `spawned` and waits for `assigned`, then creates its lock
+// record, optionally takes the memory-write lock, prints `ready`, waits for `start` on stdin, runs ONE git command
+// through createNodeGitExec with the injected helper, and prints the outcome: `result <code>` or
+// `error <name> <message as JSON>`.
 import { createInterface } from "node:readline"
 
 import { acquireLock, createLockRecord, memoryWriterLockPath, releaseLock } from "../locks"
@@ -19,6 +20,12 @@ type WriterConfig = {
 const config = JSON.parse(process.argv[2] ?? "{}") as WriterConfig
 const lines = createInterface({ input: process.stdin })
 const nextLine = (): Promise<string> => new Promise((resolve) => lines.once("line", resolve))
+
+// P joins the outer job before its first child. A writer inherits its jobs at creation, before libuv's kill-on-close
+// job exists; libuv then nests that job innermost, and the detached helper breaks away from it (SILENT_BREAKAWAY_OK).
+// A job adopted later would sit innermost instead, the helper would inherit libuv's job, and killing P would kill it.
+process.stdout.write("spawned\n")
+if ((await nextLine()) !== "assigned") process.exit(2)
 
 // The same helper at both seams, as production resolves one helper for both: the record's claim runs and caches the
 // `selftest` here, before `ready`, so the first git run spawns only the run helper (design v4.2 sections 3, 6.3).
