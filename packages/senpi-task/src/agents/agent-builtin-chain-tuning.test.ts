@@ -24,7 +24,7 @@ describe("agent tuning on the builtin fallback chain", () => {
   test("#given an agent with only top level effort #when the builtin chain resolves #then the effort still reaches the record", () => {
     // given
     const agents = roster({ name: "explore", reasoningEffort: "minimal" })
-    const models = registry([{ provider: "openai", id: "gpt-5.6-luna-fast" }])
+    const models = registry([{ provider: "openai", id: "gpt-6-luna-fast" }])
 
     // when
     const result = expectResolved(resolveAgent("explore", agents, models))
@@ -33,7 +33,7 @@ describe("agent tuning on the builtin fallback chain", () => {
     expect(result.resolved_model?.reasoning_effort).toBe("minimal")
   })
 
-  // The plan-reviewer chain rung carries its own variant ("xhigh"), so these two cases
+  // The plan-reviewer chain rung carries its own variant ("high"), so these two cases
   // can actually distinguish configured-wins from rung-wins rather than both passing vacuously.
   test("#given an agent with a top level variant #when a variant bearing chain rung resolves #then the configured variant wins", () => {
     // given
@@ -56,7 +56,7 @@ describe("agent tuning on the builtin fallback chain", () => {
     const result = expectResolved(resolveAgent("plan-reviewer", agents, models))
 
     // then
-    expect(result.resolved_model?.variant).toBe("xhigh")
+    expect(result.resolved_model?.variant).toBe("high")
     expect(result.resolved_model?.reasoning_effort).toBeUndefined()
   })
 })

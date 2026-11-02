@@ -1,12 +1,13 @@
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { Marked } from "marked"
-import { DOC_SECTIONS_DATA } from "../lib/docs-sections-data.mjs"
+import { DOC_PAGES_DATA, DOC_SECTIONS_DATA } from "../lib/docs-sections-data.mjs"
 
 const SECTIONS = DOC_SECTIONS_DATA
 const DOCS_ROOT = path.resolve(process.cwd(), "..", "..", "docs")
 const OUTPUT = path.resolve(process.cwd(), "lib", "docs-content.generated.ts")
 const sectionIdByFile = new Map(SECTIONS.map((section) => [section.file, section.id]))
+const pageRouteByFile = new Map(DOC_PAGES_DATA.map((page) => [page.file, page.route]))
 
 function rewriteDocsLink(sourceFile, href) {
   if (!href || href.startsWith("#") || href.startsWith("//")) return href
@@ -17,9 +18,13 @@ function rewriteDocsLink(sourceFile, href) {
 
   const sourceDirectory = path.posix.dirname(sourceFile)
   const targetFile = path.posix.normalize(path.posix.join(sourceDirectory, hrefPath))
-  const sectionId = sectionIdByFile.get(targetFile)
+  const pageRoute = pageRouteByFile.get(targetFile)
+  if (pageRoute) return pageRoute
 
-  return sectionId ? `#${sectionId}` : href
+  const sectionId = sectionIdByFile.get(targetFile)
+  if (!sectionId) return href
+  // Sections live on the single /docs page; a standalone page links to them by route.
+  return pageRouteByFile.has(sourceFile) ? `/docs#${sectionId}` : `#${sectionId}`
 }
 
 function createMarked(sourceFile) {
@@ -34,9 +39,9 @@ function createMarked(sourceFile) {
 }
 
 const sources = {}
-for (const s of SECTIONS) {
-  const md = await readFile(path.join(DOCS_ROOT, s.file), "utf8")
-  sources[s.file] = await createMarked(s.file).parse(md)
+for (const { file } of [...SECTIONS, ...DOC_PAGES_DATA]) {
+  const md = await readFile(path.join(DOCS_ROOT, file), "utf8")
+  sources[file] = await createMarked(file).parse(md)
 }
 
 const out =
@@ -56,9 +61,11 @@ async function outputIsCurrent(content) {
 
 if (await outputIsCurrent(out)) {
   process.stdout.write(
-    "Docs content already current with " + SECTIONS.length + " HTML-compiled docs\n",
+    "Docs content already current with " + Object.keys(sources).length + " HTML-compiled docs\n",
   )
 } else {
   await writeFile(OUTPUT, out)
-  process.stdout.write("Generated " + OUTPUT + " with " + SECTIONS.length + " HTML-compiled docs\n")
+  process.stdout.write(
+    "Generated " + OUTPUT + " with " + Object.keys(sources).length + " HTML-compiled docs\n",
+  )
 }

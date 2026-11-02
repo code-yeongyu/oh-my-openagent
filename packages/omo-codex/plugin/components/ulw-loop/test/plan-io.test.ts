@@ -2,7 +2,6 @@ import { existsSync } from "node:fs";
 import { appendFile, copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { setImmediate as tick } from "node:timers/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ulwLoopDir, ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
 import {
@@ -15,6 +14,7 @@ import {
 } from "../src/plan-io.js";
 import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSteeringAudit } from "../src/types.js";
 import { UlwLoopError } from "../src/types.js";
+import { barrier } from "./fixtures/barrier.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
 const STABLE_OBJECTIVE =
@@ -97,6 +97,12 @@ async function makeRepo(): Promise<string> {
 	return mkdtemp(join(tmpdir(), "ug-io-"));
 }
 
+async function makeLedgerRepo(): Promise<string> {
+	const root = await makeRepo();
+	await writePlan(root, makePlan());
+	return root;
+}
+
 async function writeRawPlan(repoRoot: string, plan: UlwLoopPlan): Promise<void> {
 	await mkdir(ulwLoopDir(repoRoot), { recursive: true });
 	await writeFile(ulwLoopGoalsPath(repoRoot), `${JSON.stringify(plan, null, 2)}\n`, "utf8");
@@ -136,13 +142,17 @@ describe("readUlwLoopPlan", () => {
 		expect(plan.goals[0]?.successCriteria).toHaveLength(3);
 	});
 
-	it("migrates legacy aggregate objective on read + writes aggregate_objective_migrated ledger entry + retains alias", async () => {
+	it("migrates legacy aggregate objective in memory and folds its audit into the enclosing commit", async () => {
 		// given
 		const legacyObjective = "Complete all ulw-loop stories in .omo/ulw-loop/goals.json: G001 Build auth service";
 		await writeRawPlan(repoRoot, makePlan({ codexObjective: legacyObjective }));
 
 		// when: read inside the mutation lock, the way every mutating command does
-		const plan = await withUlwLoopMutationLock(repoRoot, () => readUlwLoopPlan(repoRoot));
+		const plan = await withUlwLoopMutationLock(repoRoot, async () => {
+			const migrated = await readUlwLoopPlan(repoRoot);
+			await writePlan(repoRoot, migrated);
+			return migrated;
+		});
 
 		// then
 		expect(plan.codexObjective).toBe(STABLE_OBJECTIVE);
@@ -157,22 +167,17 @@ describe("readUlwLoopPlan", () => {
 		});
 	});
 
-	it("readUlwLoopPlan refuses to migrate a legacy aggregate plan outside the mutation lock (no unlocked write on a read path)", async () => {
+	it("readUlwLoopPlan migrates a legacy aggregate plan in memory outside the mutation lock without writing", async () => {
 		// given: the same legacy plan, but the read is not wrapped in withUlwLoopMutationLock
 		const legacyObjective = "Complete all ulw-loop stories in .omo/ulw-loop/goals.json: G001 Build auth service";
 		await writeRawPlan(repoRoot, makePlan({ codexObjective: legacyObjective }));
 
 		// when
-		let caught: unknown;
-		try {
-			await readUlwLoopPlan(repoRoot);
-		} catch (error) {
-			caught = error;
-		}
+		const migrated = await readUlwLoopPlan(repoRoot);
 
-		// then: it refuses with a recovery hint and writes nothing
-		expect(caught).toBeInstanceOf(UlwLoopError);
-		expect((caught as UlwLoopError).code).toBe("ULW_LOOP_MIGRATION_REQUIRED");
+		// then: only the returned shape changes
+		expect(migrated.codexObjective).toBe(STABLE_OBJECTIVE);
+		expect(migrated.codexObjectiveAliases).toContain(legacyObjective);
 		const persisted = JSON.parse(await readFile(ulwLoopGoalsPath(repoRoot), "utf8"));
 		expect(persisted.codexObjective).toBe(legacyObjective);
 		expect(existsSync(ulwLoopLedgerPath(repoRoot))).toBe(false);
@@ -211,7 +216,8 @@ describe("writePlan", () => {
 		await writePlan(repoRoot, makePlan({ codexObjective: "first" }));
 
 		// when
-		await writePlan(repoRoot, makePlan({ codexObjective: "second" }));
+		const current = await readUlwLoopPlan(repoRoot);
+		await writePlan(repoRoot, { ...current, codexObjective: "second" });
 
 		// then
 		expect(JSON.parse(await readFile(ulwLoopGoalsPath(repoRoot), "utf8"))).toMatchObject({
@@ -223,7 +229,7 @@ describe("writePlan", () => {
 describe("appendLedger", () => {
 	it("appends a single JSONL line to ledger.jsonl", async () => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		const ledgerEntry = entry("goal_started");
 
 		// when
@@ -236,6 +242,7 @@ describe("appendLedger", () => {
 	it("creates ledger.jsonl if missing", async () => {
 		// given
 		const repoRoot = await makeRepo();
+		await writeRawPlan(repoRoot, makePlan());
 
 		// when
 		await appendLedger(repoRoot, entry("goal_completed"));
@@ -246,7 +253,7 @@ describe("appendLedger", () => {
 
 	it("preserves prior entries", async () => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		const first = entry("goal_started");
 		const second = entry("goal_completed");
 
@@ -262,7 +269,7 @@ describe("appendLedger", () => {
 describe("readSteeringLedgerEntries", () => {
 	it("returns only steering-related event kinds", async () => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		await appendLedger(repoRoot, entry("steering_accepted"));
 		await appendLedger(repoRoot, entry("goal_started"));
 		await appendLedger(repoRoot, entry("steering_rejected"));
@@ -297,7 +304,7 @@ describe("findAcceptedSteeringLedgerEntry", () => {
 		],
 	] as const)("finds an accepted entry by %s", async (_name, target) => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		await appendLedger(repoRoot, steeringEntry("steering_accepted", steeringAudit({ idempotencyKey: "other-key" })));
 		await appendLedger(repoRoot, target);
 
@@ -310,7 +317,7 @@ describe("findAcceptedSteeringLedgerEntry", () => {
 
 	it("skips a rejected entry carrying the same key", async () => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		await appendLedger(
 			repoRoot,
 			steeringEntry("steering_rejected", rejectedSteeringAudit({ idempotencyKey: "needle-key" })),
@@ -322,7 +329,7 @@ describe("findAcceptedSteeringLedgerEntry", () => {
 
 	it("returns the accepted entry even when a rejected one with the same key precedes it", async () => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		const accepted = steeringEntry("steering_accepted", steeringAudit({ idempotencyKey: "needle-key" }));
 		await appendLedger(
 			repoRoot,
@@ -344,7 +351,7 @@ describe("findAcceptedSteeringLedgerEntry", () => {
 
 	it("ignores the key when it only appears in non-steering entries", async () => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		await appendLedger(repoRoot, { at: NOW, kind: "goal_completed", goalId: "G001", idempotencyKey: "needle-key" });
 		await appendLedger(repoRoot, { at: NOW, kind: "evidence_captured", goalId: "G001", evidence: "needle-key" });
 
@@ -354,7 +361,7 @@ describe("findAcceptedSteeringLedgerEntry", () => {
 
 	it("ignores an accepted entry whose key only appears in evidence text", async () => {
 		// given
-		const repoRoot = await makeRepo();
+		const repoRoot = await makeLedgerRepo();
 		await appendLedger(repoRoot, steeringEntry("steering_accepted", steeringAudit({ evidence: "needle-key" })));
 
 		// when/then
@@ -440,13 +447,13 @@ describe("withUlwLoopMutationLock", () => {
 		const body = async (): Promise<void> => {
 			active += 1;
 			maxActive = Math.max(maxActive, active);
-			await tick();
+			await Promise.resolve();
 			active -= 1;
 		};
 
 		// when
 		await Promise.all([1, 2, 3].map(() => withUlwLoopMutationLock(repoRoot, body)));
-		await tick();
+		await Promise.resolve();
 		await Promise.all([1, 2].map(() => withUlwLoopMutationLock(repoRoot, body)));
 
 		// then
@@ -457,7 +464,8 @@ describe("withUlwLoopMutationLock", () => {
 		// given
 		const repoRoot = await makeRepo();
 		const events: string[] = [];
-		let releaseSecond = false;
+		const releaseSecond = barrier();
+		const enteredSecond = barrier();
 
 		// when
 		const first = withUlwLoopMutationLock(repoRoot, async () => {
@@ -465,15 +473,16 @@ describe("withUlwLoopMutationLock", () => {
 		});
 		const second = withUlwLoopMutationLock(repoRoot, async () => {
 			events.push("second:start");
-			while (!releaseSecond) await tick();
+			enteredSecond.resolve();
+			await releaseSecond.promise;
 			events.push("second:end");
 		});
 		await first;
-		await tick();
+		await enteredSecond.promise;
 		const third = withUlwLoopMutationLock(repoRoot, async () => {
 			events.push("third");
 		});
-		releaseSecond = true;
+		releaseSecond.resolve();
 		await Promise.all([second, third]);
 
 		// then
@@ -485,18 +494,21 @@ describe("withUlwLoopMutationLock", () => {
 		const rootA = await makeRepo();
 		const rootB = await makeRepo();
 		const events: string[] = [];
-		let releaseA = false;
+		const releaseA = barrier();
+		const enteredA = barrier();
 
 		// when
 		const held = withUlwLoopMutationLock(rootA, async () => {
 			events.push("a:start");
-			while (!releaseA) await tick();
+			enteredA.resolve();
+			await releaseA.promise;
 			events.push("a:end");
 		});
+		await enteredA.promise;
 		await withUlwLoopMutationLock(rootB, async () => {
 			events.push("b");
 		});
-		releaseA = true;
+		releaseA.resolve();
 		await held;
 
 		// then
@@ -508,21 +520,24 @@ describe("withUlwLoopMutationLock", () => {
 		const repoRoot = await makeRepo();
 		const scoped = { sessionId: "session-a" };
 		const events: string[] = [];
-		let releaseScoped = false;
+		const releaseScoped = barrier();
+		const enteredScoped = barrier();
 
 		// when
 		const heldScoped = withUlwLoopMutationLock(repoRoot, scoped, async () => {
 			events.push("scoped-1:start");
-			while (!releaseScoped) await tick();
+			enteredScoped.resolve();
+			await releaseScoped.promise;
 			events.push("scoped-1:end");
 		});
+		await enteredScoped.promise;
 		const queuedScoped = withUlwLoopMutationLock(repoRoot, scoped, async () => {
 			events.push("scoped-2");
 		});
 		await withUlwLoopMutationLock(repoRoot, async () => {
 			events.push("root-scope");
 		});
-		releaseScoped = true;
+		releaseScoped.resolve();
 		await Promise.all([heldScoped, queuedScoped]);
 
 		// then

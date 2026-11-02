@@ -1,11 +1,18 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 
 import type { loadSkillsFromDir as discoverSkillsFromDir } from "@code-yeongyu/senpi"
+import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
 import { senpiBarrel } from "../../lazy/senpi-barrel"
 import type { LoadedSkill, SkillLoader, SkillResolution } from "./types"
+import { readProjectSkills, type CheckedProjectSkills } from "./checked-project-skills"
+import { readSkillFileChecked } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/checked-skill-read"
+import {
+  checkSkillPath, skillProvenance, reportSkillLoadError,
+  type SkillProvenance,
+} from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
 
 export type FsSkillLoaderOptions = {
   readonly homeDir?: string
@@ -71,18 +78,23 @@ function skillBody(raw: string): string {
   return normalized.slice(closing + 4).replace(/^\n/, "").trim()
 }
 
-function readSkillFile(name: string, path: string): LoadedSkill {
+function readSkillFile(name: string, path: string, provenance: SkillProvenance): LoadedSkill {
   return {
     name,
-    content: skillBody(readFileSync(path, "utf8")),
+    content: skillBody(readSkillFileChecked(path, provenance)),
     location: path,
   }
 }
 
-function directSkill(name: string, dir: string): LoadedSkill | undefined {
+function blockedSkillName(path: string): string {
+  return basename(path) === "SKILL.md" ? basename(dirname(path)) : basename(path, ".md")
+}
+
+function directSkill(name: string, dir: string, provenance: SkillProvenance): LoadedSkill | undefined {
+  if (provenance.kind === "project-auto" && existsSync(join(dir, "SKILL.md"))) return undefined
   const candidates = [join(dir, name, "SKILL.md"), join(dir, `${name}.md`)]
   const path = candidates.find(existsSync)
-  return path === undefined ? undefined : readSkillFile(name, path)
+  return path === undefined ? undefined : readSkillFile(name, path, provenance)
 }
 
 function discoveredSkill(
@@ -90,15 +102,32 @@ function discoveredSkill(
   dir: string,
   discover: typeof discoverSkillsFromDir,
   cache: Map<string, ReturnType<typeof discoverSkillsFromDir>>,
+  provenance: SkillProvenance,
+  projectCache: Map<string, CheckedProjectSkills>,
 ): LoadedSkill | undefined {
   if (!existsSync(dir)) return undefined
+  if (provenance.kind === "project-auto") {
+    let discovery = projectCache.get(dir)
+    if (!discovery) {
+      discovery = readProjectSkills(dir, provenance)
+      projectCache.set(dir, discovery)
+    }
+    const skill = discovery.skills.get(name)
+    // Only a blocked link that belongs to the requested skill explains its absence; another skill's link
+    // would name the wrong file, so an unrelated miss stays "missing" (#10693 review L1).
+    const blocked = skill ? undefined : discovery.blocked.find((error) => blockedSkillName(error.diagnostic.path) === name)
+    if (blocked) throw blocked
+    const failed = skill ? undefined : discovery.errors.find((entry) => blockedSkillName(entry.path) === name)
+    if (failed) throw failed.error
+    return skill === undefined ? undefined : readSkillFile(name, skill.location ?? "", provenance)
+  }
   let discovery = cache.get(dir)
   if (discovery === undefined) {
-    discovery = discover({ dir, source: "project" })
+    discovery = discover({ dir, source: "user" })
     cache.set(dir, discovery)
   }
   const skill = discovery.skills.find((candidate) => candidate.name === name)
-  return skill === undefined ? undefined : readSkillFile(name, skill.filePath)
+  return skill === undefined ? undefined : readSkillFile(name, skill.filePath, provenance)
 }
 
 function readSkill(
@@ -106,11 +135,26 @@ function readSkill(
   dirs: readonly string[],
   discover: typeof discoverSkillsFromDir,
   cache: Map<string, ReturnType<typeof discoverSkillsFromDir>>,
+  userDirs: readonly string[],
+  rejected: { name: string; reason: string }[],
+  projectCache: Map<string, CheckedProjectSkills>,
+  projectRoot: string | undefined,
 ): LoadedSkill | undefined {
   if (!/^[a-z0-9-]+$/.test(name)) return undefined
   for (const dir of dirs) {
-    const skill = directSkill(name, dir) ?? discoveredSkill(name, dir, discover, cache)
-    if (skill !== undefined) return skill
+    const provenance = skillProvenance(dir, userDirs.includes(dir) ? "user" : "project", {
+      kind: userDirs.includes(dir) ? "user" : "project-auto",
+      selectedRoot: dir, userRoots: userDirs,
+      projectRoot: projectRoot ?? skillProvenance(dir, "project").projectRoot,
+    })
+    try {
+      if (existsSync(dir)) checkSkillPath(dir, provenance, true)
+      const skill = directSkill(name, dir, provenance) ?? discoveredSkill(name, dir, discover, cache, provenance, projectCache)
+      if (skill !== undefined) return skill
+    } catch (error) {
+      reportSkillLoadError(error, dir)
+      if (error instanceof Error) rejected.push({ name, reason: error.message })
+    }
   }
   return undefined
 }
@@ -127,18 +171,23 @@ export function createFsSkillLoader(options: FsSkillLoaderOptions = {}): SkillLo
   return (names, cwd): SkillResolution => {
     const dirs = searchDirs(cwd, home, agentDir, extraDirs)
     const discoveryCache = new Map<string, ReturnType<typeof discoverSkillsFromDir>>()
+    const projectCache = new Map<string, CheckedProjectSkills>()
     const skills: LoadedSkill[] = []
     const missing: string[] = []
+    const rejected: { name: string; reason: string }[] = []
+    const userDirs = uniqueDirs([join(agentDir, "skills"), join(home, ".agents", "skills"), ...extraDirs])
+    const projectRoot = detectWorktreePath(cwd)
     for (const name of names) {
-      const skill = readSkill(name, dirs, discover, discoveryCache)
-      if (skill === undefined) missing.push(name)
-      else skills.push(skill)
+      const skill = readSkill(name, dirs, discover, discoveryCache, userDirs, rejected, projectCache, projectRoot)
+      if (skill === undefined && !rejected.some((entry) => entry.name === name)) missing.push(name)
+      else if (skill !== undefined) skills.push(skill)
     }
     return {
       prepend: buildSkillPrepend(skills, ""),
       resolved: skills.map((skill) => skill.name),
       missing,
       skills,
+      rejected: rejected.filter((entry) => !skills.some((skill) => skill.name === entry.name)),
     }
   }
 }

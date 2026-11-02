@@ -1,13 +1,13 @@
 import type { ChildHandle, CreateChildSession, InProcessRunnerLike } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentLogger } from "../../extension/types"
-import { abortAndDispose } from "./kibitzer-lifecycle"
 
 const DEFAULT_DEADLINE_MS = 5 * 60_000
 
 type TaskRuntime = typeof import("#omo-task-runtime")
 export type StartChildInput = Parameters<InProcessRunnerLike["start"]>[0]
-export type InProcessMemoryChildState = { cancelled: boolean; cancel?: () => void }
+/** `released` settles once a child that started (even after the run returned) has been disposed. */
+export type InProcessMemoryChildState = { cancelled: boolean; cancel?: () => void; released?: Promise<void> }
 
 export type MemoryChildResult =
   | { readonly status: "completed" }
@@ -114,17 +114,32 @@ export async function runInProcessMemoryChild(input: RunInProcessMemoryChildInpu
     if (turn.status !== "completed") return { status: "failed", cause: "child_failed" }
     return { status: "completed" }
   } catch (error: unknown) {
-    input.logger?.warn("kibitzer gate child session creation failed", {
-      error: error instanceof Error ? error.message : String(error),
+    input.logger?.warn("memory child session creation failed", {
+      error: describe(error),
       runId: input.runId,
     })
     return { status: "failed", cause: "session_create_failed" }
   } finally {
     clearTimeout(deadlineTimer)
     input.state.cancel = undefined
-    void setup.then(
-      (handle) => { if (handle !== undefined) void disposeOnce(handle, expired()) },
+    input.state.released = setup.then(
+      (handle) => handle === undefined ? undefined : disposeOnce(handle, expired()),
       () => undefined,
     )
   }
+}
+
+/** Abort the child's turn, then dispose it even when the abort itself failed. */
+async function abortAndDispose(handle: ChildHandle, logger: ComponentLogger | undefined, runId: string): Promise<void> {
+  try {
+    await handle.abort()
+  } catch (error) {
+    logger?.warn("memory child abort failed", { error: describe(error), runId })
+  } finally {
+    handle.dispose()
+  }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

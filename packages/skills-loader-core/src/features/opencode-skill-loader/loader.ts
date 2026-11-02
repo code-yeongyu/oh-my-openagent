@@ -16,6 +16,7 @@ import type { LoadedSkill } from "./types"
 import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
 import { deduplicateSkillsByName } from "./skill-deduplication"
 import { loadSkillsFromDir } from "./skill-directory-loader"
+import type { SkillProvenance } from "./skill-provenance"
 
 export async function loadUserSkills(): Promise<Record<string, CommandDefinition>> {
   const userSkillsDir = join(getClaudeConfigDir(), "skills")
@@ -23,12 +24,8 @@ export async function loadUserSkills(): Promise<Record<string, CommandDefinition
   return skillsToCommandDefinitionRecord(skills)
 }
 
-export async function loadProjectSkills(directory?: string): Promise<Record<string, CommandDefinition>> {
-  const projectSkillDirs = findProjectClaudeSkillDirs(directory ?? process.cwd())
-  const allSkills = await Promise.all(
-    projectSkillDirs.map((skillsDir) => loadSkillsFromDir({ skillsDir, scope: "project" })),
-  )
-  return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
+export async function loadProjectSkills(directory?: string, provenance?: SkillProvenance): Promise<Record<string, CommandDefinition>> {
+  return skillsToCommandDefinitionRecord(await discoverProjectClaudeSkills(directory, provenance))
 }
 
 export async function loadOpencodeGlobalSkills(): Promise<Record<string, CommandDefinition>> {
@@ -39,24 +36,12 @@ export async function loadOpencodeGlobalSkills(): Promise<Record<string, Command
   return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
 }
 
-export async function loadOpencodeProjectSkills(directory?: string): Promise<Record<string, CommandDefinition>> {
-  const opencodeProjectSkillDirs = findProjectOpencodeSkillDirs(
-    directory ?? process.cwd(),
-  )
-  const allSkills = await Promise.all(
-    opencodeProjectSkillDirs.map((skillsDir) =>
-      loadSkillsFromDir({ skillsDir, scope: "opencode-project" }),
-    ),
-  )
-  return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
+export async function loadOpencodeProjectSkills(directory?: string, provenance?: SkillProvenance): Promise<Record<string, CommandDefinition>> {
+  return skillsToCommandDefinitionRecord(await discoverOpencodeProjectSkills(directory, provenance))
 }
 
-export async function loadProjectAgentsSkills(directory?: string): Promise<Record<string, CommandDefinition>> {
-  const agentsProjectSkillDirs = findProjectAgentsSkillDirs(directory ?? process.cwd())
-  const allSkills = await Promise.all(
-    agentsProjectSkillDirs.map((skillsDir) => loadSkillsFromDir({ skillsDir, scope: "project" })),
-  )
-  return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
+export async function loadProjectAgentsSkills(directory?: string, provenance?: SkillProvenance): Promise<Record<string, CommandDefinition>> {
+  return skillsToCommandDefinitionRecord(await discoverProjectAgentsSkills(directory, provenance))
 }
 
 export async function loadGlobalAgentsSkills(homeDirectory: string = getHomeDirectory()): Promise<Record<string, CommandDefinition>> {
@@ -138,10 +123,10 @@ export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
   return loadSkillsFromDir({ skillsDir: userSkillsDir, scope: "user" })
 }
 
-export async function discoverProjectClaudeSkills(directory?: string): Promise<LoadedSkill[]> {
+export async function discoverProjectClaudeSkills(directory?: string, provenance?: SkillProvenance): Promise<LoadedSkill[]> {
   const projectSkillDirs = findProjectClaudeSkillDirs(directory ?? process.cwd())
   const allSkills = await Promise.all(
-    projectSkillDirs.map((skillsDir) => loadSkillsFromDir({ skillsDir, scope: "project" })),
+    projectSkillDirs.map((skillsDir) => loadSkillsFromDir({ skillsDir, scope: "project", provenance: provenance && { ...provenance, kind: "project-auto", selectedRoot: skillsDir.discovered, projectRoot: skillsDir.projectRoot } })),
   )
   return deduplicateSkillsByName(allSkills.flat())
 }
@@ -154,13 +139,13 @@ export async function discoverOpencodeGlobalSkills(): Promise<LoadedSkill[]> {
   return deduplicateSkillsByName(allSkills.flat())
 }
 
-export async function discoverOpencodeProjectSkills(directory?: string): Promise<LoadedSkill[]> {
+export async function discoverOpencodeProjectSkills(directory?: string, provenance?: SkillProvenance): Promise<LoadedSkill[]> {
   const opencodeProjectSkillDirs = findProjectOpencodeSkillDirs(
     directory ?? process.cwd(),
   )
   const allSkills = await Promise.all(
     opencodeProjectSkillDirs.map((skillsDir) =>
-      loadSkillsFromDir({ skillsDir, scope: "opencode-project" }),
+      loadSkillsFromDir({ skillsDir, scope: "opencode-project", provenance: provenance && { ...provenance, kind: "project-auto", selectedRoot: skillsDir.discovered, projectRoot: skillsDir.projectRoot } }),
     ),
   )
   return deduplicateSkillsByName(allSkills.flat())
@@ -170,10 +155,10 @@ export async function discoverSharedSkills(): Promise<LoadedSkill[]> {
   return loadSkillsFromDir({ skillsDir: sharedSkillsRootPath(), scope: "shared" })
 }
 
-export async function discoverProjectAgentsSkills(directory?: string): Promise<LoadedSkill[]> {
+export async function discoverProjectAgentsSkills(directory?: string, provenance?: SkillProvenance): Promise<LoadedSkill[]> {
   const agentsProjectSkillDirs = findProjectAgentsSkillDirs(directory ?? process.cwd())
   const allSkills = await Promise.all(
-    agentsProjectSkillDirs.map((skillsDir) => loadSkillsFromDir({ skillsDir, scope: "project" })),
+    agentsProjectSkillDirs.map((skillsDir) => loadSkillsFromDir({ skillsDir, scope: "project", provenance: provenance && { ...provenance, kind: "project-auto", selectedRoot: skillsDir.discovered, projectRoot: skillsDir.projectRoot } })),
   )
   return deduplicateSkillsByName(allSkills.flat())
 }

@@ -1,14 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { rm } from "node:fs/promises"
-
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import { TEST_IDENTITY, fakeCommandContext, fakeDeps, invoke, tempIdentity } from "./commands.test-support"
 import { registerSleeptimeCommand, resolveSleeptimeSettings } from "./sleeptime"
+import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("/sleeptime", () => {

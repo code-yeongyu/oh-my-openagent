@@ -8,6 +8,7 @@ import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, relative, resolve } from "node:path"
 import { pathToFileURL, fileURLToPath } from "node:url"
 import { verifyRuntimeDist } from "../../plugin/scripts/stage-lsp-daemon-runtime.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -241,7 +242,7 @@ function runSenpiLoadProof(input) {
     {
       cwd: input.projectDir,
       env: {
-        ...isolatedHomeEnv(process.env, input.homeDir),
+        ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
         SENPI_CODING_AGENT_DIR: input.agentDir,
         SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
         OMO_SENPI_QA: "1",
@@ -307,7 +308,7 @@ function runSenpiToolProof(input) {
     {
       cwd: input.projectDir,
       env: {
-        ...isolatedHomeEnv(process.env, input.homeDir),
+        ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
         SENPI_CODING_AGENT_DIR: input.agentDir,
         SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
         OMO_SENPI_QA: "1",
@@ -722,7 +723,7 @@ async function runPostEdit(evidenceDir) {
     writePostEditProject(projectDir)
     const install = runChecked("node", [join(extractedPlugin, "scripts", "install.mjs"), "install"], {
       cwd: projectDir,
-      env: { ...isolatedHomeEnv(process.env, homeDir), SENPI_CODING_AGENT_DIR: agentDir },
+      env: { ...isolatedChildEnv(isolatedHomeEnv(process.env, homeDir), agentDir), SENPI_CODING_AGENT_DIR: agentDir },
     })
     allowIsolatedToolPermission(agentDir, "write")
     status = await directStatusTwice(runtimeDist, daemonDir)
@@ -860,7 +861,7 @@ function runSenpiPostEditProof(input) {
     {
       cwd: input.projectDir,
       env: {
-        ...isolatedHomeEnv(process.env, input.homeDir),
+        ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
         SENPI_CODING_AGENT_DIR: input.agentDir,
         SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
         OMO_SENPI_QA: "1",
@@ -911,7 +912,7 @@ async function runRuntimePackage(evidenceDir) {
     spawnSync("mkdir", ["-p", agentDir, homeDir, projectDir, sessionDir, daemonDir])
     const install = runChecked("node", [join(extractedPlugin, "scripts", "install.mjs"), "install"], {
       cwd: projectDir,
-      env: { ...isolatedHomeEnv(process.env, homeDir), SENPI_CODING_AGENT_DIR: agentDir },
+      env: { ...isolatedChildEnv(isolatedHomeEnv(process.env, homeDir), agentDir), SENPI_CODING_AGENT_DIR: agentDir },
     })
     status = await directStatusTwice(runtimeDist, daemonDir)
     senpi = runSenpiLoadProof({ senpiBin: resolvedSenpi, agentDir, homeDir, projectDir, sessionDir, daemonDir })
@@ -1032,7 +1033,7 @@ async function runTools(evidenceDir) {
     )
     const install = runChecked("node", [join(extractedPlugin, "scripts", "install.mjs"), "install"], {
       cwd: projectDir,
-      env: { ...isolatedHomeEnv(process.env, homeDir), SENPI_CODING_AGENT_DIR: agentDir },
+      env: { ...isolatedChildEnv(isolatedHomeEnv(process.env, homeDir), agentDir), SENPI_CODING_AGENT_DIR: agentDir },
     })
     allowIsolatedToolPermission(agentDir, "lsp_goto_definition")
     status = await directStatusTwice(runtimeDist, daemonDir)

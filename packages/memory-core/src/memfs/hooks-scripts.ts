@@ -11,25 +11,79 @@ import { getPostCommitHookScript } from "../sync/mirror"
  */
 
 /**
+ * POSIX-ERE copies of the TypeScript secret pattern classes in `sync/redact.ts`, kept in the
+ * SAME ORDER. The hook is a regex-only defense in depth for hand commits: no zero-width or
+ * format-character normalisation exists here (that is the authoritative TypeScript gates'
+ * job), and ERE has no `\\b`, `(?:...)` or `\\S`, so boundaries and alternations are spelled out.
+ */
+/**
+ * ERE cannot look ahead, so the reference-value exclusion of sync/redact.ts runs as a second stage: each
+ * match printed by grep -o is filtered, case-insensitively, through an exclude expression, and only a match
+ * that survives counts. The exclusion is anchored to the match's OWN keyword and separator and must consume
+ * the whole value, so a reference-looking tail after a real value (password=hunter2:true) or a literal after
+ * a reference (process.env.X||hunter2) is still refused. The token list mirrors REFERENCE_TOKEN in
+ * sync/redact.ts; single-quoted forms are left out because the expression is embedded in single quotes, which
+ * only makes the hook stricter.
+ */
+const END = "[],<>})\"]*$"
+const REFERENCE_TOKEN =
+  "(process\\.env\\.[A-Za-z_][A-Za-z0-9_]*|os\\.environ(\\.get\\(|\\[)?(\"[A-Za-z0-9_]*\")?[])]*|" +
+  "env\\.[A-Za-z_][A-Za-z0-9_]*|\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}|\\$[A-Za-z_][A-Za-z0-9_]*|\\{\\{([^}]*\\}\\})?|\\[(redacted|filtered)\\]|(redacted|filtered)|" +
+  "(bearer|changeme|placeholder|example|none|null|undefined|true|false))"
+const MATCH_START = "^[^A-Za-z0-9_]?"
+
+export const HOOK_SECRET_PATTERNS: ReadonlyArray<{ readonly class: string; readonly ere: string; readonly exclude?: string }> = [
+  { class: "aws_access_key", ere: "(^|[^A-Za-z0-9_])AKIA[0-9A-Z]{16}([^A-Za-z0-9_]|$)" },
+  {
+    class: "credential_assignment",
+    ere: "(^|[^A-Za-z0-9_])([Bb][Ee][Aa][Rr][Ee][Rr]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][-_]?[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd])[[:space:]]*[=:][[:space:]]*[^[:space:]]{1,255}",
+    exclude: `${MATCH_START}[A-Za-z_-]+[[:space:]]*[=:][[:space:]]*${REFERENCE_TOKEN}${END}`,
+  },
+  {
+    class: "authorization_header",
+    ere: "(^|[^A-Za-z0-9_])[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn][[:space:]]*:[[:space:]]*[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]]+[^[:space:]]{1,255}",
+    // TS stops the Bearer value at a quote, bracket or comma, so a value starting with one is never a hit there either.
+    exclude: `${MATCH_START}authorization[[:space:]]*:[[:space:]]*bearer[[:space:]]+([]<>,})"]|${REFERENCE_TOKEN}${END})`,
+  },
+  { class: "openai_key", ere: "(^|[^A-Za-z0-9_])sk-(proj-)?[-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
+  { class: "vendor_token", ere: "(^|[^A-Za-z0-9_])(ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
+]
+
+const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, exclude }) => [
+  exclude === undefined
+    ? `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`
+    : `      if printf '%s' "$blob" | grep -E -o -e '${ere}' | grep -E -v -i -e '${exclude}' | grep -q .; then`,
+  `        printf 'memory pre-commit: %s contains secret-like content (${patternClass})\\n' "$p"`,
+  "      fi",
+].join("\n")).join("\n")
+
+/**
  * Pre-commit validator for staged memory markdown.
  *
- * Rules (letta parity):
- * - Scope is `.md` under `system/` or `reference/`, with an optional legacy
- *   `memory/` prefix. Root markdown is intentionally NOT validated.
+ * Rules (letta parity plus the strict-YAML contract shared with the skill loader):
+ * - Scope is `.md` under `system/`, `reference/` or `people/`, plus
+ *   `skills/<name>/SKILL.md`, with an optional legacy `memory/` prefix. Root
+ *   markdown is intentionally NOT validated.
  * - Frontmatter is required, must open and close with `---`.
  * - `description` is required and must be a non-empty single line.
- * - Known keys are `description`, `read_only`, the legacy `limit`, and the
- *   people-record keys `kind` and `aliases`; any other key fails the commit.
+ * - Every value must be a quoted scalar or a plain scalar that strict YAML
+ *   reads verbatim: no `: `, no ` #`, no trailing `:`, no leading indicator.
+ * - Known keys are `description`, `read_only`, the legacy `limit`, the
+ *   people-record keys `kind` and `aliases`, the claim receipt `provenance`,
+ *   and `expires` (#11450); any other key fails the commit.
+ *   SKILL.md may carry any additional key (`name`, `version`, `deprecated`).
  * - `read_only` is protected: it cannot be added, changed or removed by the
  *   agent, and a file that is `read_only: true` in HEAD cannot be modified.
  * - Skills must be folders: `skills/<name>/SKILL.md`. Flat `skills/<name>.md`
- *   is rejected, and `SKILL.md` files are exempt from frontmatter validation.
+ *   is rejected.
  */
 export const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 # Validate frontmatter in staged memory .md files.
 # Installed by omo memory-core. Do not edit by hand - regenerated on startup.
 
-ALL_KNOWN_KEYS="description read_only limit kind aliases"
+# provenance is the claim receipt the memory tool stamps (#10488); its value is always a quoted JSON string.
+# expires is the instant a file stops being projected (#11450); an unreadable value means no expiry, never a rejection.
+ALL_KNOWN_KEYS="description read_only limit kind aliases provenance expires"
 TAB=$(printf '\\t')
 
 fm_value() {
@@ -41,9 +95,22 @@ fm_value() {
     grep "^$2:" | head -1 | cut -d: -f2- | sed 's/^ *//;s/ *$//'
 }
 
+check_plain_scalar() {
+  # $1 = file, $2 = key, $3 = value. A quoted value is the renderer's own
+  # output; a plain value must be one that strict YAML reads back verbatim.
+  case "$3" in
+    \\"*|\\'*|"") return 0 ;;
+    *": "*|*":"|*" #"*|"#"*|"["*|"]"*|"{"*|"}"*|"&"*|"*"*|"!"*|"|"*|">"*|"%"*|"@"*|"\\\`"*|","*|"?"*|"-"|"- "*)
+      printf "  %s: '%s' is not a safe YAML plain scalar (quote it, or remove ': ' and ' #'): %s\\n" "$1" "$2" "$3"
+      ;;
+  esac
+}
+
 check_keys() {
-  # Prints one error line per offending frontmatter key. Runs in a pipeline
-  # subshell, so it must never rely on assignments leaking to the caller.
+  # $1 = file, $2 = HEAD content, $3 = frontmatter, $4 = key policy
+  # ("contract" = memory key allowlist, "skill" = any key). Prints one error
+  # line per offending frontmatter key. Runs in a pipeline subshell, so it
+  # must never rely on assignments leaking to the caller.
   printf '%s\\n' "$3" | while IFS= read -r line; do
     [ -z "$line" ] && continue
     # Indented lines are YAML continuations of the previous key.
@@ -52,13 +119,19 @@ check_keys() {
     key=$(printf '%s\\n' "$line" | cut -d: -f1 | tr -d ' ')
     value=$(printf '%s\\n' "$line" | cut -d: -f2- | sed 's/^ *//;s/ *$//')
 
-    known=false
-    for k in $ALL_KNOWN_KEYS; do
-      [ "$key" = "$k" ] && known=true && break
-    done
-    if [ "$known" = false ]; then
-      printf "  %s: unknown frontmatter key '%s' (allowed: %s)\\n" "$1" "$key" "$ALL_KNOWN_KEYS"
-      continue
+    if [ "$4" != skill ]; then
+      known=false
+      for k in $ALL_KNOWN_KEYS; do
+        [ "$key" = "$k" ] && known=true && break
+      done
+      if [ "$known" = false ]; then
+        printf "  %s: unknown frontmatter key '%s' (allowed: %s)\\n" "$1" "$key" "$ALL_KNOWN_KEYS"
+        continue
+      fi
+    fi
+
+    if [ "$key" != description ] && [ "$key" != aliases ] && [ "$key" != read_only ]; then
+      check_plain_scalar "$1" "$key" "$value"
     fi
 
     if [ "$key" = read_only ]; then
@@ -77,13 +150,16 @@ check_keys() {
       case "$value" in
         "") printf "  %s: 'description' must not be empty\\n" "$1" ;;
         [\\>\\|]*) printf "  %s: 'description' must be a non-empty single line\\n" "$1" ;;
+        *) check_plain_scalar "$1" description "$value" ;;
       esac
     fi
   done
 }
 
 check_file() {
+  # $1 = file, $2 = key policy ("contract" or "skill")
   file="$1"
+  policy="\${2:-contract}"
   staged=$(git show ":$file")
 
   if [ "$(printf '%s\\n' "$staged" | head -1)" != "---" ]; then
@@ -104,7 +180,7 @@ check_file() {
   fi
 
   frontmatter=$(printf '%s\\n' "$staged" | tail -n +2 | head -n $((closing_line - 1)))
-  check_keys "$file" "$head_content" "$frontmatter"
+  check_keys "$file" "$head_content" "$frontmatter" "$policy"
 
   if ! printf '%s\\n' "$frontmatter" | grep -q '^description:'; then
     printf "  %s: missing required field 'description'\\n" "$file"
@@ -118,24 +194,57 @@ check_file() {
 
 errors=$(
   # Skills must always be directories: skills/<name>/SKILL.md.
-  git diff --cached --name-only --diff-filter=ACMR |
+  git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR |
     grep -E '^(memory/)?skills/[^/]+\\.md$' |
     while IFS= read -r skill_file; do
       printf '  %s: invalid skill path (skills must be folders). Use skills/<name>/SKILL.md\\n' "$skill_file"
     done
 
-  # Frontmatter is validated for system/ and reference/ markdown only.
-  # SKILL.md files live under skills/ and are never matched here.
-  git diff --cached --name-only --diff-filter=ACM |
-    grep -E '^(memory/)?(system|reference)/.*\\.md$' |
+  # Memory content keys are an allowlist under system/, reference/ and people/.
+  git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR |
+    grep -E '^(memory/)?(system|reference|people)/.*\\.md$' |
     while IFS= read -r file; do
-      check_file "$file"
+      check_file "$file" contract
+    done
+
+  # SKILL.md is read by the skill loader as strict YAML: same value rules,
+  # description required, any key allowed.
+  git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR |
+    grep -E '^(memory/)?skills/.+/SKILL\\.md$' |
+    while IFS= read -r file; do
+      check_file "$file" skill
     done
 )
 
 if [ -n "$errors" ]; then
   echo "Frontmatter validation failed:"
   printf '%s\\n' "$errors"
+  exit 1
+fi
+
+
+# Secret-like material backstop for hand commits (regex-only defense in depth;
+# the authoritative gates scan with evasion normalisation before this runs).
+# Content is read by blob id from the raw diff (renames shown as an add, so a
+# moved file is scanned too), so no file name (quoted,
+# non-ASCII or carrying shell metacharacters) decides what gets scanned; the
+# name is only ever printed, as data, in git's own quoting.
+secret_failed=$(
+  git diff --cached --no-renames --diff-filter=AMT --raw --no-abbrev |
+    while IFS= read -r line; do
+      meta=\${line%%"$TAB"*}
+      p=\${line#*"$TAB"}
+      set -- $meta
+      [ "$2" = "160000" ] && continue
+      blob=$(git cat-file blob "$4" 2>/dev/null) || {
+        printf 'memory pre-commit: %s could not be read for secret screening\\n' "$p"
+        continue
+      }
+${SECRET_SCAN_LINES}
+    done
+)
+if [ -n "$secret_failed" ]; then
+  printf '%s\\n' "$secret_failed"
   exit 1
 fi
 

@@ -1,0 +1,683 @@
+import { describe, expect, test } from "bun:test"
+
+import {
+  chooseInstallers,
+  createChannelReader,
+  detectDesktopPlatform,
+  fetchChannelState,
+  formatInstallerSize,
+  parseChannelManifest,
+  type ChannelState,
+  type DesktopClient,
+  type DesktopRelease,
+} from "./desktop-download"
+
+const HASH_A = "a".repeat(64)
+const HASH_B = "b".repeat(64)
+const HASH_C = "c".repeat(64)
+const HASH_D = "d".repeat(64)
+const HASH_E = "e".repeat(64)
+
+const MAC_SAFARI =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"
+const WINDOWS_CHROME =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+const UBUNTU_FIREFOX =
+  "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0"
+const IPHONE_SAFARI =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+
+function stableManifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    channel: "stable",
+    version: "0.1.0",
+    date: "2026-11-10T08:00:00Z",
+    stagingPercentage: 100,
+    notesUrl: "https://get.omo.dev/stable/0.1.0/RELEASE-NOTES.md",
+    platforms: {
+      "mac-arm64": {
+        url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-arm64.dmg",
+        sha256: HASH_A,
+        size: 212_000_000,
+        kind: "dmg",
+      },
+      "mac-x64": {
+        url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-x64.dmg",
+        sha256: HASH_B,
+        size: 224_500_000,
+        kind: "dmg",
+      },
+      "win-x64": {
+        url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-x64.exe",
+        sha256: HASH_C,
+        size: 198_300_000,
+        kind: "exe",
+      },
+      "linux-x64": [
+        {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-x64.AppImage",
+          sha256: HASH_E,
+          size: 205_000_000,
+          kind: "appimage",
+        },
+        {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-amd64.deb",
+          sha256: HASH_D,
+          size: 190_000_000,
+          kind: "deb",
+        },
+      ],
+    },
+    ...overrides,
+  }
+}
+
+function readyRelease(overrides: Record<string, unknown> = {}): DesktopRelease {
+  const state = parseChannelManifest("stable", stableManifest(overrides))
+  if (state.status !== "ready") throw new Error(`fixture manifest is ${state.status}`)
+  return state.release
+}
+
+function client(userAgent: string, extra: Partial<DesktopClient> = {}): DesktopClient {
+  return { userAgent, ...extra }
+}
+
+describe("which installer a visitor is offered first", () => {
+  test("an Apple silicon Mac gets the arm64 disk image", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(
+      client(MAC_SAFARI, { uaPlatform: "macOS", architecture: "arm" }),
+    )
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(choice.primary?.fileName).toBe("OmO-0.1.0-arm64.dmg")
+    expect(choice.archAssumed).toBe(false)
+  })
+
+  test("an Intel Mac gets the x64 disk image", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(
+      client(MAC_SAFARI, { uaPlatform: "macOS", architecture: "x86" }),
+    )
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(choice.primary?.fileName).toBe("OmO-0.1.0-x64.dmg")
+  })
+
+  test("a Mac whose browser hides the CPU gets Apple silicon first and the Intel build is still listed", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(client(MAC_SAFARI, { platform: "MacIntel" }))
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(choice.primary?.arch).toBe("arm64")
+    expect(choice.archAssumed).toBe(true)
+    expect(choice.rest.map((installer) => installer.fileName)).toContain("OmO-0.1.0-x64.dmg")
+  })
+
+  test("a Windows PC gets the exe, even when its browser reports an ARM CPU", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(
+      client(WINDOWS_CHROME, { uaPlatform: "Windows", architecture: "arm" }),
+    )
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(choice.primary?.fileName).toBe("OmO-0.1.0-x64.exe")
+  })
+
+  test("a Linux PC gets the deb before the AppImage and keeps the AppImage in the list", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(client(UBUNTU_FIREFOX, { platform: "Linux x86_64" }))
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(choice.primary?.fileName).toBe("OmO-0.1.0-amd64.deb")
+    expect(choice.rest[0]?.fileName).toBe("OmO-0.1.0-x64.AppImage")
+  })
+
+  test("a Linux visitor is offered the AppImage when no deb is published", () => {
+    // given
+    const release = readyRelease({
+      platforms: {
+        "linux-x64": {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-x64.AppImage",
+          sha256: HASH_E,
+          size: 205_000_000,
+          kind: "appimage",
+        },
+      },
+    })
+
+    // when
+    const choice = chooseInstallers(
+      release,
+      detectDesktopPlatform(client(UBUNTU_FIREFOX, { platform: "Linux x86_64" })),
+    )
+
+    // then
+    expect(choice.primary?.kind).toBe("appimage")
+  })
+
+  test("every other installer stays listed with its checksum and size, the visitor's system first", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(client(WINDOWS_CHROME, { uaPlatform: "Windows" }))
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(choice.rest).toHaveLength(release.installers.length - 1)
+    expect(choice.rest.every((installer) => /^[0-9a-f]{64}$/.test(installer.sha256))).toBe(true)
+    expect(choice.rest.every((installer) => installer.size !== null)).toBe(true)
+    expect(choice.rest.some((installer) => installer.os === "windows")).toBe(false)
+  })
+})
+
+describe("visitors the app cannot serve with one button", () => {
+  test("a Linux visitor gets no primary button when the release has no Linux build yet", () => {
+    // given
+    const release = readyRelease({
+      platforms: {
+        "mac-arm64": {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-arm64.dmg",
+          sha256: HASH_A,
+          size: 212_000_000,
+          kind: "dmg",
+        },
+      },
+    })
+
+    // when
+    const choice = chooseInstallers(
+      release,
+      detectDesktopPlatform(client(UBUNTU_FIREFOX, { platform: "Linux x86_64" })),
+    )
+
+    // then
+    expect(choice.primary).toBeNull()
+    expect(choice.rest.map((installer) => installer.os)).toEqual(["macos"])
+  })
+
+  test("an ARM Linux visitor is never handed an x64 build that would not run", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(
+      client(UBUNTU_FIREFOX, { platform: "Linux aarch64", architecture: "arm" }),
+    )
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(choice.primary).toBeNull()
+  })
+
+  test("a phone visitor is told to use a computer instead of being offered an installer", () => {
+    // given
+    const release = readyRelease()
+    const visitor = detectDesktopPlatform(
+      client(IPHONE_SAFARI, { platform: "iPhone", maxTouchPoints: 5 }),
+    )
+
+    // when
+    const choice = chooseInstallers(release, visitor)
+
+    // then
+    expect(visitor.device).toBe("phone")
+    expect(choice.primary).toBeNull()
+    expect(choice.rest).toHaveLength(release.installers.length)
+  })
+
+  test("an iPad that asks for the desktop site is still treated as a phone or tablet", () => {
+    // when
+    const visitor = detectDesktopPlatform(
+      client(MAC_SAFARI, { platform: "MacIntel", maxTouchPoints: 5 }),
+    )
+
+    // then
+    expect(visitor.device).toBe("phone")
+    expect(visitor.os).toBeNull()
+  })
+})
+
+describe("what the page reads from the manifest", () => {
+  test("a published manifest becomes a release with every installer's size and checksum", () => {
+    // when
+    const state = parseChannelManifest("stable", stableManifest())
+
+    // then
+    expect(state.status).toBe("ready")
+    if (state.status !== "ready") return
+    expect(state.release.version).toBe("0.1.0")
+    expect(state.release.installers).toHaveLength(5)
+    expect(state.release.notesUrl).toBe("https://get.omo.dev/stable/0.1.0/RELEASE-NOTES.md")
+    expect(state.release.checksumsUrl).toBe("https://get.omo.dev/stable/0.1.0/SHA256SUMS")
+  })
+
+  test("an installer hosted on GitHub is never shown, whatever the manifest says", () => {
+    // given
+    const manifest = stableManifest({
+      platforms: {
+        "win-x64": {
+          url: "https://github.com/code-yeongyu/omo-desktop-app/releases/download/v0.1.0/OmO.exe",
+          sha256: HASH_C,
+          size: 198_300_000,
+          kind: "exe",
+        },
+        "mac-arm64": {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-arm64.dmg",
+          sha256: HASH_A,
+          size: 212_000_000,
+          kind: "dmg",
+        },
+      },
+    })
+
+    // when
+    const state = parseChannelManifest("stable", manifest)
+
+    // then
+    expect(state.status).toBe("ready")
+    if (state.status !== "ready") return
+    expect(state.release.installers.map((installer) => installer.os)).toEqual(["macos"])
+  })
+
+  test("release notes that live on GitHub are dropped rather than linked", () => {
+    // when
+    const state = parseChannelManifest(
+      "stable",
+      stableManifest({
+        notesUrl: "https://github.com/code-yeongyu/omo-desktop-app/releases/tag/v0.1.0",
+      }),
+    )
+
+    // then
+    expect(state.status).toBe("ready")
+    if (state.status !== "ready") return
+    expect(state.release.notesUrl).toBeNull()
+  })
+
+  test("an installer with a malformed checksum is not offered", () => {
+    // given
+    const manifest = stableManifest({
+      platforms: {
+        "win-x64": {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-x64.exe",
+          sha256: "not-a-checksum",
+          size: 198_300_000,
+          kind: "exe",
+        },
+        "mac-arm64": {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-arm64.dmg",
+          sha256: HASH_A.toUpperCase(),
+          size: 212_000_000,
+          kind: "dmg",
+        },
+      },
+    })
+
+    // when
+    const state = parseChannelManifest("stable", manifest)
+
+    // then
+    expect(state.status).toBe("ready")
+    if (state.status !== "ready") return
+    expect(state.release.installers.map((installer) => installer.os)).toEqual(["macos"])
+    expect(state.release.installers[0]?.sha256).toBe(HASH_A)
+  })
+
+  test("a release whose every installer is unusable is reported as unavailable, not as a blank page", () => {
+    // when
+    const state = parseChannelManifest(
+      "stable",
+      stableManifest({
+        platforms: {
+          "win-x64": { url: "javascript:alert(1)", sha256: HASH_C, size: 1, kind: "exe" },
+        },
+      }),
+    )
+
+    // then
+    expect(state.status).toBe("unavailable")
+  })
+
+  test("a manifest with a launch date and no release yet becomes a coming-soon state with that date", () => {
+    // when
+    const state = parseChannelManifest("stable", {
+      channel: "stable",
+      launchAt: "2026-12-01T00:00:00Z",
+    })
+
+    // then
+    expect(state).toEqual({ status: "coming", launchAt: "2026-12-01T00:00:00.000Z" })
+  })
+
+  test.each([
+    ["an URL that cannot be decoded", "https://get.omo.dev/stable/0.1.0/OmO-%E0%A4%A.exe"],
+    [
+      "a file name that hides a path",
+      "https://get.omo.dev/stable/0.1.0/x%2F..%2FOmO-0.1.0-x64.exe",
+    ],
+    ["a file name with a space", "https://get.omo.dev/stable/0.1.0/OmO%20setup.exe"],
+    ["a file from another release", "https://get.omo.dev/stable/0.0.9/OmO-0.1.0-x64.exe"],
+    ["a file from another channel", "https://get.omo.dev/beta/0.1.0/OmO-0.1.0-x64.exe"],
+    ["a port on the download host", "https://get.omo.dev:8443/stable/0.1.0/OmO-0.1.0-x64.exe"],
+    ["credentials in the URL", "https://user:pass@get.omo.dev/stable/0.1.0/OmO-0.1.0-x64.exe"],
+  ])("an installer with %s is dropped and the rest of the release stays", (_label, url) => {
+    // given
+    const manifest = stableManifest({
+      platforms: {
+        "win-x64": { url, sha256: HASH_C, size: 198_300_000, kind: "exe" },
+        "mac-arm64": {
+          url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-arm64.dmg",
+          sha256: HASH_A,
+          size: 212_000_000,
+          kind: "dmg",
+        },
+      },
+    })
+
+    // when
+    const state = parseChannelManifest("stable", manifest)
+
+    // then
+    expect(state.status).toBe("ready")
+    if (state.status !== "ready") return
+    expect(state.release.installers.map((installer) => installer.fileName)).toEqual([
+      "OmO-0.1.0-arm64.dmg",
+    ])
+  })
+
+  test("a body that is not a manifest at all is unavailable", () => {
+    expect(parseChannelManifest("stable", "<html>oops</html>").status).toBe("unavailable")
+    expect(parseChannelManifest("stable", null).status).toBe("unavailable")
+    expect(parseChannelManifest("stable", []).status).toBe("unavailable")
+  })
+
+  test("sizes read the way a person would say them", () => {
+    expect(formatInstallerSize(212_000_000, "en")).toBe("212 MB")
+    expect(formatInstallerSize(1_480_000_000, "en")).toBe("1.48 GB")
+    expect(formatInstallerSize(null, "en")).toBe("")
+  })
+})
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  })
+}
+
+describe("loading a channel's manifest from the download host", () => {
+  const baseUrl = "https://get.omo.dev"
+
+  /** SHA256SUMS as the release publisher writes it: `<sha256>  <file name>` per installer. */
+  function sumsFor(manifest: Record<string, unknown>): string {
+    const platforms = manifest.platforms as Record<string, unknown>
+    return Object.values(platforms)
+      .flatMap((value) => (Array.isArray(value) ? value : [value]))
+      .map((entry) => {
+        const { url, sha256 } = entry as { url: string; sha256: string }
+        return `${sha256}  ${url.split("/").pop() ?? ""}\n`
+      })
+      .join("")
+  }
+
+  /** A download host that answers each path from `routes`, and 404 for anything else. */
+  function host(routes: Record<string, () => Response>) {
+    const requested: string[] = []
+    const fetchImpl = async (input: string | URL | Request): Promise<Response> => {
+      const url = String(input)
+      requested.push(url)
+      const path = url.slice(baseUrl.length)
+      return routes[path]?.() ?? new Response("not found", { status: 404 })
+    }
+    return { requested, fetchImpl }
+  }
+
+  function publishedStable(manifest = stableManifest(), sums = sumsFor(manifest)) {
+    return host({
+      "/stable/manifest.json": () => jsonResponse(manifest),
+      "/stable/0.1.0/SHA256SUMS": () => new Response(sums, { status: 200 }),
+    })
+  }
+
+  test("reads the channel's manifest, then that release's SHA256SUMS", async () => {
+    // given
+    const { requested, fetchImpl } = publishedStable()
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    expect(requested).toEqual([
+      "https://get.omo.dev/stable/manifest.json",
+      "https://get.omo.dev/stable/0.1.0/SHA256SUMS",
+    ])
+    expect(state.status === "ready" && state.release.installers.length).toBe(5)
+  })
+
+  test("the beta channel reads beta/manifest.json and the beta release's SHA256SUMS", async () => {
+    // given
+    const manifest = JSON.parse(
+      JSON.stringify(stableManifest({ channel: "beta", version: "0.1.1-beta.2" })).replaceAll(
+        "/stable/0.1.0/",
+        "/beta/0.1.1-beta.2/",
+      ),
+    ) as Record<string, unknown>
+    const { requested, fetchImpl } = host({
+      "/beta/manifest.json": () => jsonResponse(manifest),
+      "/beta/0.1.1-beta.2/SHA256SUMS": () => new Response(sumsFor(manifest)),
+    })
+
+    // when
+    const state = await fetchChannelState("beta", { baseUrl, fetchImpl })
+
+    // then
+    expect(requested).toEqual([
+      "https://get.omo.dev/beta/manifest.json",
+      "https://get.omo.dev/beta/0.1.1-beta.2/SHA256SUMS",
+    ])
+    expect(state.status === "ready" && state.release.channel).toBe("beta")
+  })
+
+  test("an installer whose SHA-256 differs from SHA256SUMS, or is missing from it, is not offered", async () => {
+    // given: the Intel disk image's line carries another hash and the exe's line is gone
+    const manifest = stableManifest()
+    const sums = sumsFor(manifest)
+      .replace(`${HASH_B}  OmO-0.1.0-x64.dmg`, `${"f".repeat(64)}  OmO-0.1.0-x64.dmg`)
+      .replace(`${HASH_C}  OmO-0.1.0-x64.exe\n`, "")
+    const { fetchImpl } = publishedStable(manifest, sums)
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    const files = state.status === "ready" ? state.release.installers.map((i) => i.fileName) : []
+    expect(files.sort()).toEqual([
+      "OmO-0.1.0-amd64.deb",
+      "OmO-0.1.0-arm64.dmg",
+      "OmO-0.1.0-x64.AppImage",
+    ])
+  })
+
+  test("a release whose SHA256SUMS cannot be read offers nothing", async () => {
+    // given
+    const { fetchImpl } = host({
+      "/stable/manifest.json": () => jsonResponse(stableManifest()),
+      "/stable/0.1.0/SHA256SUMS": () => new Response("boom", { status: 503 }),
+    })
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    expect(state).toEqual({ status: "unavailable" })
+  })
+
+  test("a release where no installer matches SHA256SUMS offers nothing", async () => {
+    // given
+    const { fetchImpl } = publishedStable(stableManifest(), `${"0".repeat(64)}  other.dmg\n`)
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    expect(state).toEqual({ status: "unavailable" })
+  })
+
+  test("a SHA256SUMS that names one file twice is not trusted at all", async () => {
+    // given: two lines for the same disk image, the second with another hash
+    const manifest = stableManifest()
+    const sums = `${sumsFor(manifest)}${"f".repeat(64)}  OmO-0.1.0-arm64.dmg\n`
+    const { fetchImpl } = publishedStable(manifest, sums)
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    expect(state).toEqual({ status: "unavailable" })
+  })
+
+  test.each([401, 403, 404])(
+    "a channel the host does not serve publicly (%i) shows the launch date instead of an error",
+    async (status) => {
+      // given: before launch the host has no stable manifest or does not serve it to the public
+      const fetchImpl = async (): Promise<Response> => new Response("no", { status })
+
+      // when
+      const state: ChannelState = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+      // then
+      expect(state).toEqual({ status: "coming", launchAt: "2026-11-10T00:00:00.000Z" })
+    },
+  )
+
+  test("a server error is unavailable, never a made-up release", async () => {
+    // given
+    const fetchImpl = async (): Promise<Response> => new Response("boom", { status: 503 })
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    expect(state).toEqual({ status: "unavailable" })
+  })
+
+  test("an unreachable host is unavailable", async () => {
+    // given
+    const fetchImpl = async (): Promise<Response> => {
+      throw new TypeError("fetch failed")
+    }
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    expect(state).toEqual({ status: "unavailable" })
+  })
+
+  test("a 200 with a broken body is unavailable", async () => {
+    // given
+    const fetchImpl = async (): Promise<Response> => new Response("{not json", { status: 200 })
+
+    // when
+    const state = await fetchChannelState("stable", { baseUrl, fetchImpl })
+
+    // then
+    expect(state).toEqual({ status: "unavailable" })
+  })
+})
+
+describe("reading channels across requests", () => {
+  const baseUrl = "https://get.omo.dev"
+  const manifest = {
+    channel: "stable",
+    version: "0.1.0",
+    date: "2026-11-10T08:00:00Z",
+    platforms: {
+      "mac-arm64": {
+        url: "https://get.omo.dev/stable/0.1.0/OmO-0.1.0-arm64.dmg",
+        sha256: HASH_A,
+        size: 212_000_000,
+        kind: "dmg",
+      },
+    },
+  }
+
+  function countingHost(status = 200) {
+    let requests = 0
+    const fetchImpl = async (input: string | URL | Request): Promise<Response> => {
+      requests += 1
+      if (status !== 200) return new Response("no", { status })
+      return String(input).endsWith("SHA256SUMS")
+        ? new Response(`${HASH_A}  OmO-0.1.0-arm64.dmg\n`)
+        : jsonResponse(manifest)
+    }
+    return { fetchImpl, requests: () => requests }
+  }
+
+  test("a page view within a minute of the last one reuses its answer instead of asking the host again", async () => {
+    // given
+    let now = 1_000_000
+    const host = countingHost()
+    const read = createChannelReader({ baseUrl, fetchImpl: host.fetchImpl, now: () => now })
+
+    // when
+    const first = await read("stable")
+    now += 59_000
+    const second = await read("stable")
+
+    // then
+    expect(first.status).toBe("ready")
+    expect(second).toEqual(first)
+    expect(host.requests()).toBe(2)
+  })
+
+  test("after a minute the host is asked again", async () => {
+    // given
+    let now = 1_000_000
+    const host = countingHost()
+    const read = createChannelReader({ baseUrl, fetchImpl: host.fetchImpl, now: () => now })
+
+    // when
+    await read("stable")
+    now += 61_000
+    await read("stable")
+
+    // then
+    expect(host.requests()).toBe(4)
+  })
+
+  test("an unavailable answer is not kept, so a recovered host is seen on the next view", async () => {
+    // given
+    const host = countingHost(503)
+    const read = createChannelReader({ baseUrl, fetchImpl: host.fetchImpl, now: () => 1_000_000 })
+
+    // when
+    await read("stable")
+    await read("stable")
+
+    // then
+    expect(host.requests()).toBe(2)
+  })
+})

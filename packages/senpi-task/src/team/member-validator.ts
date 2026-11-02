@@ -1,7 +1,7 @@
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import { CURATED_READONLY_AGENT_NAMES, ULW_REVIEWER_AGENT_NAMES } from "../agents/builtin"
-import { canonicalAgentName } from "../agents/legacy-agent-names"
+import { canonicalAgentName } from "../agents/builtin/legacy-agent-names"
 import { SenpiTeamSpecError } from "./errors"
 
 /**
@@ -39,26 +39,18 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
       continue
     }
 
-    // Legacy curated ids canonicalize before the curated/reviewer/known checks so a member
-    // declared under a retired curated id is validated (and later spawned) as its canonical id. The builtin
-    // name sets may still be keyed by the legacy id during the deprecation window, so both the
-    // canonical and the legacy id are checked against them (canonical once the sets are renamed);
-    // every message names the canonical id.
-    const canonical = canonicalAgentName(member.subagent_type)
-    const subagentType = canonical.name
-    const knownAs = (names: ReadonlySet<string>): boolean =>
-      names.has(subagentType) || (canonical.legacy !== undefined && names.has(canonical.legacy))
+    const subagentType = member.subagent_type.trim()
+    const canonicalSubagentType = canonicalAgentName(subagentType)
 
-    if (knownAs(CURATED_READONLY_AGENT_NAMES)) {
-      const requestedAs = canonical.legacy === undefined ? "" : ` (requested as "${canonical.legacy}")`
+    if (CURATED_READONLY_AGENT_NAMES.has(canonicalSubagentType)) {
       throw new SenpiTeamSpecError(
-        `curated read-only agent "${subagentType}"${requestedAs} cannot be a team member; delegate via the task tool instead`,
+        `curated read-only agent "${subagentType}" cannot be a team member; delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
         spec.name,
       )
     }
 
-    if (knownAs(ULW_REVIEWER_AGENT_NAMES)) {
+    if (ULW_REVIEWER_AGENT_NAMES.has(canonicalSubagentType)) {
       throw new SenpiTeamSpecError(
         `ulw reviewer agent "${subagentType}" cannot be a team member; process-mode members drop reviewer instructions and tool allowlists, so delegate via the task tool instead`,
         "UNKNOWN_SUBAGENT_TYPE",
@@ -66,7 +58,7 @@ export function validateSenpiTeamMembers(spec: TeamSpec, ports: SenpiTeamMemberP
       )
     }
 
-    if (!ports.isKnownAgent(subagentType)) {
+    if (!ports.isKnownAgent(canonicalSubagentType)) {
       const available = ports.agentNames !== undefined && ports.agentNames.length > 0
         ? ` Available agents: ${[...ports.agentNames].sort().join(", ")}.`
         : ""

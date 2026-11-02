@@ -67,6 +67,7 @@ export interface ReflectionCompletionUi {
 
 export interface ReflectionLiveSession {
   readonly sessionId: string
+  readonly identityContext?: import("../context").MemoryIdentityContext
   readonly api: ReflectionCompletionApi
   readonly ui?: ReflectionCompletionUi
   readonly onCompletion?: (runId: string) => void | Promise<void>

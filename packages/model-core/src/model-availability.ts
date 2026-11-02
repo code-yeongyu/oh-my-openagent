@@ -13,7 +13,7 @@ function modelIdOf(model: string): string {
 // Tie-break among equally good matches. Provider preference is the caller's `providers` order (a
 // chain rung lists its lanes best-first; every match already passed that filter); after that the
 // shorter MODEL id is the closer match. The provider name never enters the comparison:
-// `opencode/claude-opus-5` must not beat `claude-sdk-oauth/claude-opus-5` just because "opencode"
+// `opencode/claude-opus-5` must not beat `anthropic-subscription/claude-opus-5` just because "opencode"
 // is shorter (#8051). Equal candidates keep their `available` order.
 function closestMatch(matches: readonly string[], providers: readonly string[] | undefined): string {
 	const providerRank = (model: string): number =>

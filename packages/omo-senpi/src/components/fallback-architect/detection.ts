@@ -29,7 +29,8 @@ const REFUSAL_ELIGIBLE_STOP_REASONS = new Set(["error", "toolUse"])
  */
 export const EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC = "empty_tool_use_terminal_state"
 
-export const FABLE_FIVE_MODEL_ID = "claude-fable-5"
+/** Prefix every Fable 5 release id carries (`claude-fable-5`, `claude-fable-5-1`, ...). */
+export const FABLE_FIVE_ID_PREFIX = "claude-fable-5"
 
 export interface FallbackModelDescriptor {
   provider?: string
@@ -84,8 +85,13 @@ export function isDemotedEmptyToolUse(message: Record<string, unknown>, stopReas
   return diagnostics.some((diagnostic) => isRecord(diagnostic) && diagnostic["type"] === EMPTY_TOOL_USE_DEMOTION_DIAGNOSTIC)
 }
 
-export function isFableFiveModel(model: unknown): model is FallbackModelDescriptor {
-  return isModelDescriptor(model) && model.id === FABLE_FIVE_MODEL_ID
+/**
+ * Copy-only predicate. The directive's "the same model that just refused" caveat is true exactly
+ * when the refusing model belongs to the family the architect category consults. It is NOT an
+ * arming gate: every refusal-driven fallback arms the nudge, whichever model refused (#8513).
+ */
+export function isFableFiveSelector(selector: string): boolean {
+  return selector.slice(selector.lastIndexOf("/") + 1).startsWith(FABLE_FIVE_ID_PREFIX)
 }
 
 export function isModelSelectEvent(payload: unknown): payload is FallbackModelSelectEvent {

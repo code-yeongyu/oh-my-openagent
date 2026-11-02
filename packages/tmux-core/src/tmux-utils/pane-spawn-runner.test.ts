@@ -125,6 +125,25 @@ describe("spawnTmuxPane runner integration", () => {
 		expect(getSplitWindowCommand()).not.toContain("opencode attach")
 	})
 
+	it("#given a description holding tmux format syntax #when the pane title is set #then # is doubled so tmux keeps it literal and runs nothing (#10228)", async () => {
+		// given
+		const spawnTmuxPane = await loadSpawnTmuxPane()
+		const directory = "/tmp/omo-project/(pane)"
+
+		// when
+		const result = await spawnTmuxPane("session-1", "#(touch x)#{pane_id} and more", enabledTmuxConfig, "http://127.0.0.1:1234", directory, "%0", "-h", createDeps())
+
+		// then
+		const firstCall = getRunTmuxCommandCall(0)
+		const secondCall = getRunTmuxCommandCall(1)
+		expect(result).toEqual({ success: true, paneId: "%42" })
+		expect(firstCall[1].slice(0, 8)).toEqual(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "-t", "%0"])
+		expect(secondCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-##(touch x)##{pane_id}"])
+		expect(getSplitWindowCommand()).toContain("Focus this pane to attach.")
+		expect(getSplitWindowCommand()).toContain("while :; do sleep 86400; done")
+		expect(getSplitWindowCommand()).not.toContain("opencode attach")
+	})
+
 	it("#given description with spaces #when spawnTmuxPane called #then includes it in the placeholder", async () => {
 		// given
 		const spawnTmuxPane = await loadSpawnTmuxPane()

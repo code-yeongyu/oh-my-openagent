@@ -16,9 +16,10 @@ import {
   resolveMemoryConfig,
 } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, UNAVAILABLE_ENTRY_TYPE } from "./kibitzer/notice"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SOUL_UPDATED_ENTRY_TYPE } from "./soul-notice"
+import { AGREEMENT_FLAGGED_ENTRY_TYPE } from "./agreement-notice"
 
 const roots: string[] = []
 afterEach(() => {
@@ -146,13 +147,14 @@ describe("createMemoryComponent", () => {
 
     expect(pi.entryRenderers.map((entry) => entry.customType)).toEqual([
       "senpi-memory.reflection-completion",
-      "senpi-memory.reflection-launched",
-      "senpi-memory.reflection-summary",
       "senpi-memory.health",
+      "senpi-memory.reflection-parked",
       SOUL_UPDATED_ENTRY_TYPE,
+      AGREEMENT_FLAGGED_ENTRY_TYPE,
       RECALL_CUSTOM_TYPE,
       NUDGED_ENTRY_TYPE,
       GATE_ENTRY_TYPE,
+      UNAVAILABLE_ENTRY_TYPE,
       "omo-memorian:recall",
       "omo-memorian:nudged",
       "omo-memorian:gate",
@@ -164,6 +166,7 @@ describe("createMemoryComponent", () => {
     expect(pi.entries).toEqual([{
       customType: MEMORY_BINDING_CUSTOM_TYPE,
       data: expect.objectContaining({ identity: expect.stringMatching(/^project-[a-f0-9]{8}$/), boundAt: 123 }),
+      options: { startupBookkeeping: true },
     }])
     expect(existsSync(memoryHome)).toBe(false)
     expect(notifications).toEqual([])
@@ -191,6 +194,13 @@ describe("createMemoryComponent", () => {
       entries: [{ type: "custom", customType: MEMORY_BINDING_CUSTOM_TYPE, data: recorded }],
       notifications,
     })
+    const beforeAgentStartHandlers = pi.handlers.filter((registration) => registration.event === "before_agent_start")
+
+    expect(beforeAgentStartHandlers).toHaveLength(4)
+    expect(beforeAgentStartHandlers.every((registration) => registration.options?.previewSafe === true)).toBe(true)
+    await pi.dispatch("before_agent_start", { type: "before_agent_start", preview: true }, resumed)
+    expect(pi.entries).toEqual([])
+    expect(memoryModuleSupervisor.refCount).toBe(before)
 
     await pi.dispatch("before_agent_start", {}, resumed)
     await pi.dispatch("before_agent_start", {}, resumed)
@@ -198,6 +208,7 @@ describe("createMemoryComponent", () => {
     expect(pi.entries).toEqual([{
       customType: MEMORY_BINDING_CUSTOM_TYPE,
       data: { identity: identity.id, repoPathHash: recorded.repoPathHash, boundAt: 456 },
+      options: { startupBookkeeping: true },
     }])
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
     expect(notifications).toEqual([])
@@ -254,6 +265,41 @@ describe("createMemoryComponent", () => {
 
     expect(pi.entries).toHaveLength(1)
     expect(memoryModuleSupervisor.refCount).toBe(before + 1)
+    memoryModuleSupervisor.release()
+  })
+
+  test("#given a session bound at session_start #when later runs start #then the full history is never read (senpi#3110)", async () => {
+    // A reopened compacted session answers getEntries() by re-parsing its whole transcript file and holds
+    // the result until it settles idle, so an eager read here pinned that copy for every run.
+    const { cwd, memoryHome } = fixture()
+    const pi = new MemoryFakeExtensionAPI()
+    createMemoryComponent({
+      env: { OMO_MEMORY_HOME: memoryHome },
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      resolveCwd: () => cwd,
+      createRuntime: () => {
+        throw new Error("bind-only test does not create an identity runtime")
+      },
+    }).register(pi, componentContext())
+    const live = sessionContext()
+    let historyReads = 0
+    const counted = {
+      ...live,
+      sessionManager: {
+        ...live.sessionManager,
+        getEntries: () => {
+          historyReads++
+          return live.sessionManager.getEntries()
+        },
+      },
+    }
+    await pi.dispatch("session_start", {}, counted)
+    historyReads = 0
+
+    await pi.dispatch("before_agent_start", {}, counted)
+    await pi.dispatch("before_agent_start", {}, counted)
+
+    expect(historyReads).toBe(0)
     memoryModuleSupervisor.release()
   })
 

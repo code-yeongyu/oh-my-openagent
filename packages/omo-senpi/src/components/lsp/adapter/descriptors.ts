@@ -136,7 +136,8 @@ export const lsp_diagnostics = defineTool({
   label: "LSP Diagnostics",
   description:
     "Get errors, warnings, and hints from the language server BEFORE running build. " +
-    "Works for both single files and directories - file extension is auto-detected for directories.",
+    "Works for both single files and directories - file extension is auto-detected for directories. " +
+    "In a Bun project, a TypeScript directory is typechecked with `bun check`, plus `bun lint` when the installed Bun has it.",
   parameters: DiagnosticsParams,
   renderCall: renderDiagnosticsCall,
   renderResult: renderDiagnosticsResult,

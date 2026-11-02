@@ -8,6 +8,9 @@ import { PLAN_CONSULTANT_AGENT } from "./plan-consultant"
 import { PLAN_REVIEWER_AGENT } from "./plan-reviewer"
 import { QA_EXECUTOR_AGENT } from "./qa-executor"
 
+// Exposed so the omo-senpi parity guard can compare this hand-mirrored table with model-core.
+export { AGENT_FALLBACK_CHAINS } from "./fallback-chains"
+
 export const CURATED_READONLY_AGENT_DEFAULTS: readonly AgentDefinition[] = [
   EXPLORE_AGENT,
   LIBRARIAN_AGENT,

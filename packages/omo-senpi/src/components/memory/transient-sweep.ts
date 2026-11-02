@@ -13,11 +13,12 @@
 // delete real memory. The sweep creates nothing: a missing area is a no-op, which keeps component
 // registration free of filesystem writes on a machine that never ran a one-shot session.
 
-import { existsSync, mkdir, readdir, rename, stat } from "@oh-my-opencode/memory-core/fs"
+import { existsSync, mkdir, readdir, rename } from "@oh-my-opencode/memory-core/fs"
 import { dirname, join } from "node:path"
 
 import { AGENTS_DIRNAME } from "@oh-my-opencode/memory-core"
 
+import { probeTreeActivity } from "./transient-age"
 import {
   TRANSIENT_DIRNAME,
   isDurableIdentityRoot,
@@ -25,16 +26,10 @@ import {
   removeMemoryTree,
   type TransientWarn,
 } from "./transient-identity"
+import { clearStrandedReport, pruneStrandedReports, reportStrandedOnce, strandedReportPath } from "./transient-stranded"
 
 export const TRANSIENT_RUN_MAX_AGE_MS = 24 * 60 * 60 * 1000
 export const TRANSIENT_IDENTITY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
-
-/**
- * Age probing is bounded: a transient tree is shallow, and a sweep must never walk real memory.
- * Six levels reach a run root's transcript leaves (`agents/<id>/runtime/transcripts/<session>/*`).
- */
-const MAX_AGE_DEPTH = 6
-const MAX_AGE_ENTRIES = 512
 
 export interface TransientSweepResult {
   readonly removedRuns: number
@@ -87,8 +82,7 @@ async function sweepRunRoots(
       totals.kept += 1
       continue
     }
-    const newest = await newestMtimeMs(runRoot, MAX_AGE_DEPTH)
-    if (newest === undefined || now() - newest < maxAgeMs) {
+    if (await probeTreeActivity(runRoot, now() - maxAgeMs) !== "idle") {
       totals.kept += 1
       continue
     }
@@ -99,6 +93,7 @@ async function sweepRunRoots(
     if (await removeMemoryTree(runRoot, input.warn)) totals.removedRuns += 1
     else totals.kept += 1
   }
+  await pruneStrandedReports(area, input.warn)
 }
 
 /** Promotes every identity in an abandoned run that turned out to hold memory. Returns true when one could not be rescued. */
@@ -111,6 +106,7 @@ async function rescueRunMemory(input: TransientSweepInput, totals: Totals, runRo
     const promotion = await promoteIdentityRoot({
       from,
       to: join(input.memoryRoot, AGENTS_DIRNAME, identity),
+      record: strandedReportPath(runRoot, identity),
       ...(input.warn === undefined ? {} : { warn: input.warn }),
     })
     if (promotion === "promoted") totals.promoted += 1
@@ -125,23 +121,22 @@ async function rescueRunMemory(input: TransientSweepInput, totals: Totals, runRo
 /**
  * Moves a transient identity that turned out to hold memory into the durable agents root. A
  * target that already exists is never merged or overwritten: the transient tree is left on disk
- * (and, holding a `repo/`, is exempt from removal) and the caller is warned.
+ * (and, holding a `repo/`, is exempt from removal) and the caller is warned once.
  */
 async function promoteIdentityRoot(input: {
   readonly from: string
   readonly to: string
+  readonly record: string
   readonly warn?: TransientWarn
 }): Promise<"promoted" | "stranded"> {
   if (existsSync(input.to)) {
-    input.warn?.("omo-senpi memory transient run holds memory a durable identity already owns", {
-      from: input.from,
-      to: input.to,
-    })
+    await reportStrandedOnce(input)
     return "stranded"
   }
   try {
     await mkdir(dirname(input.to), { recursive: true })
     await rename(input.from, input.to)
+    await clearStrandedReport(input.record, input.warn)
     return "promoted"
   } catch (error) {
     input.warn?.("omo-senpi memory transient run promotion failed", {
@@ -162,8 +157,7 @@ async function sweepStrayIdentities(input: TransientSweepInput, totals: Totals, 
       totals.kept += 1
       continue
     }
-    const newest = await newestMtimeMs(root, MAX_AGE_DEPTH)
-    if (newest === undefined || now() - newest < maxAgeMs) {
+    if (await probeTreeActivity(root, now() - maxAgeMs) !== "idle") {
       totals.kept += 1
       continue
     }
@@ -178,43 +172,6 @@ async function listDirNames(path: string): Promise<string[]> {
     return entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith(".")).map((entry) => entry.name)
   } catch {
     return []
-  }
-}
-
-/**
- * Newest mtime in a bounded walk. A directory's own mtime only tracks its direct entries, so a
- * run whose transcript grows in a leaf would otherwise look untouched since it started.
- */
-async function newestMtimeMs(root: string, depth: number): Promise<number | undefined> {
-  let newest = await mtimeMs(root)
-  let budget = MAX_AGE_ENTRIES
-  const pending: Array<{ readonly path: string; readonly depth: number }> = [{ path: root, depth }]
-  while (pending.length > 0 && budget > 0) {
-    const current = pending.pop()
-    if (current === undefined) break
-    let entries
-    try {
-      entries = await readdir(current.path, { withFileTypes: true })
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      if (budget <= 0) break
-      budget -= 1
-      const child = join(current.path, entry.name)
-      const stamp = await mtimeMs(child)
-      if (stamp !== undefined && (newest === undefined || stamp > newest)) newest = stamp
-      if (entry.isDirectory() && current.depth > 1) pending.push({ path: child, depth: current.depth - 1 })
-    }
-  }
-  return newest
-}
-
-async function mtimeMs(path: string): Promise<number | undefined> {
-  try {
-    return (await stat(path)).mtimeMs
-  } catch {
-    return undefined
   }
 }
 

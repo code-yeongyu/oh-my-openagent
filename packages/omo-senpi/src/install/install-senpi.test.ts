@@ -282,6 +282,19 @@ describe("runSenpiInstaller", () => {
     await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
   })
 
+  // The browser skill is the only shipped owner of real-browser automation; a payload that drops it
+  // leaves the agent with no path to the user's logged-in browser and no error until a task needs one.
+  test("#given a packed plugin missing the browser skill #when installing #then artifact validation fails before settings change", async () => {
+    const agentDir = await makeAgentDir()
+    const pluginPath = await makePluginFixture()
+    await rm(join(pluginPath, "skills", "browser", "SKILL.md"))
+
+    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+
+    await expect(install).rejects.toThrow("missing required runtime artifacts")
+    await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
+  })
+
 })
 
 describe("runSenpiUninstaller", () => {

@@ -1,20 +1,24 @@
 import { join } from "node:path"
 
-import type { ReservedRun } from "@oh-my-opencode/memory-core"
+import type { ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import { createOncePerSessionGuard } from "../task/usage-guidance"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
+import type { MemoryFactsApplier } from "./facts-apply-rpc"
 import { createMemoryRpcBridge, type MemoryRpcBridge } from "./memory-rpc-bridge"
 import { resolveAgentReflectionSettings } from "./reflection-settings"
+import { isStaleExtensionContextError } from "./stale-extension-context"
 import { MEMORY_STATUS_KEY, refreshMemoryStatus } from "./status"
 import { createActiveReflectionRuns } from "./status-active-runs"
 import { createMemoryFooterStatusLive } from "./status-live-wiring"
+import { createSyncStatusNotifier, deliverSyncStatusChange } from "./sync-status-surface"
 import {
   consumePendingReflectionCompletions,
   emitReflectionHealthAlert,
+  emitReflectionParkAlert,
   type ReflectionCompletionApi,
   type ReflectionLiveSession,
 } from "./worker"
@@ -24,7 +28,7 @@ import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
 export interface MemoryReflectionLiveWiring {
   currentSession(): ReflectionLiveSession | undefined
-  registerRpc(pi: SenpiExtensionAPI, resolveContext: (sessionId: string) => MemoryIdentityContext | undefined): void
+  registerRpc(pi: SenpiExtensionAPI, resolveContext: (sessionId: string) => MemoryIdentityContext | undefined, applyFacts?: MemoryFactsApplier): void
   attach(sessionId: string): void
   bind(
     pi: SenpiExtensionAPI,
@@ -35,27 +39,19 @@ export interface MemoryReflectionLiveWiring {
   ): Promise<void>
   onReflectionLaunched(identity: string, run: ReservedRun): Promise<void>
   onLiveReflectionCompleted(identity: string, runId: string): Promise<void>
-  onSettled(sessionId: string, eventCtx: unknown): Promise<void>
+  onSettled(sessionId: string, eventCtx: unknown, signal?: AbortSignal): Promise<void>
   syncRpc(): Promise<void>
+  syncJournal(sessionId: string, entries: readonly TranscriptProjection[]): Promise<void>
   shutdown(identity?: string): void
+  /** Resolves once every status refresh started by bind or settle has finished (each one runs git in the identity dir). */
+  settled(): Promise<void>
   clearStatus(eventCtx: unknown): void
+  onSyncStatusChanged(repo: string): Promise<void>
 }
 
-// Stale-ctx prefixes thrown by senpi's runner guard when a pi captured at bind is probed after
-// session replacement (newSession/fork/switchSession) or runtime reload. Under --multi-session the
-// RPC host replaces sessions inside one long-lived process, so a reflection run launched off a
-// reservation right at boot can probe a ctx retired before the first fresh bind.
-// See: https://github.com/code-yeongyu/oh-my-openagent/issues/7946
-const STALE_EXTENSION_CONTEXT_ERROR_PREFIXES = [
-  "This extension ctx is stale after session replacement or reload.",
-  "stale extension generation after reload",
-] as const
-
-function isStaleExtensionContextError(error: unknown): boolean {
-  return error instanceof Error
-    && STALE_EXTENSION_CONTEXT_ERROR_PREFIXES.some((prefix) => error.message.startsWith(prefix))
-}
-
+// A pi captured at bind is retired by session replacement or runtime reload. Under --multi-session
+// the RPC host replaces sessions inside one long-lived process, so a reflection run launched off a
+// reservation right at boot can probe a ctx retired before the first fresh bind (#7946).
 export function createReflectionCompletionApi(pi: SenpiExtensionAPI): ReflectionCompletionApi | undefined {
   if (!hasMemoryCapabilities(pi)) return undefined
   return {
@@ -87,11 +83,18 @@ export function createMemoryReflectionLiveWiring(
   const healthAlertOnce = createOncePerSessionGuard()
   const liveSession: { current?: ReflectionLiveSession } = {}
   const rpcBridge: { current?: MemoryRpcBridge } = {}
+  const statusRefreshes = new Set<Promise<unknown>>()
+  const track = (refresh: Promise<unknown>): void => {
+    const tracked: Promise<unknown> = refresh.catch(() => {}).finally(() => statusRefreshes.delete(tracked))
+    statusRefreshes.add(tracked)
+  }
   const footerLive = createMemoryFooterStatusLive({
     resolveContext: (sessionId) => options.sessions.get(sessionId)?.context,
     isActive: (identity) => activeRuns.isActive(identity),
     ...(options.footerTimers === undefined ? {} : { timers: options.footerTimers }),
+    ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
   })
+  const syncNotifier = options.syncStatus === undefined ? undefined : createSyncStatusNotifier(options.syncStatus)
 
   async function onReflectionLaunched(identity: string, run: ReservedRun): Promise<void> {
     activeRuns.start(identity, run.runId, launchDetails(options, identity, run))
@@ -109,10 +112,12 @@ export function createMemoryReflectionLiveWiring(
 
   return {
     currentSession: () => liveSession.current,
-    registerRpc(pi, resolveContext): void {
+    registerRpc(pi, resolveContext, applyFacts): void {
       rpcBridge.current = createMemoryRpcBridge(pi, {
         resolveContext,
         activeRun: (identity) => activeRuns.current(identity),
+        ...(applyFacts === undefined ? {} : { applyFacts }),
+        ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
       })
     },
     attach(sessionId): void {
@@ -120,16 +125,20 @@ export function createMemoryReflectionLiveWiring(
     },
     async bind(pi, sessionId, identity, eventCtx, requestPressureDream): Promise<void> {
       const ui = readUi(eventCtx)
+      // The engine emits transitions only; a failure may have started before this session became active.
+      await syncNotifier?.changed(identity.identityPaths.repo, ui)
       const api = createReflectionCompletionApi(pi)
       liveSession.current = api === undefined
         ? undefined
         : {
             sessionId,
             api,
+            identityContext: identity,
             ...(ui === undefined ? {} : { ui }),
             ...(options.logger === undefined ? {} : { logger: options.logger }),
           }
-      refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
+      const initialStatus = refreshInitialStatus(options, sessionId, identity, ui, requestPressureDream)
+      if (initialStatus !== undefined) track(initialStatus)
       if (liveSession.current !== undefined) {
         try {
           await drainCompletions(
@@ -154,21 +163,52 @@ export function createMemoryReflectionLiveWiring(
     },
     onReflectionLaunched,
     onLiveReflectionCompleted,
-    async onSettled(sessionId, eventCtx): Promise<void> {
-      void footerLive.refresh(sessionId, readUi(eventCtx))
-      await rpcBridge.current?.sync()
+    async onSettled(sessionId, eventCtx, signal): Promise<void> {
+      signal?.throwIfAborted()
+      const ui = readUi(eventCtx)
+      const identity = options.sessions.get(sessionId)?.context
+      track(footerLive.refresh(sessionId, ui === undefined ? undefined : {
+        setStatus(key, text) {
+          if (!signal?.aborted && options.sessions.get(sessionId)?.context === identity) ui.setStatus(key, text)
+        },
+      }))
+      await rpcBridge.current?.sync(signal)
     },
     async syncRpc(): Promise<void> {
       await rpcBridge.current?.sync()
+    },
+    async syncJournal(sessionId, entries): Promise<void> {
+      if (activeSession.current === sessionId) await rpcBridge.current?.syncJournal(entries)
     },
     shutdown(identity): void {
       if (identity !== undefined) activeRuns.clear(identity)
       footerLive.dispose()
       rpcBridge.current?.detach()
     },
+    async settled(): Promise<void> {
+      while (statusRefreshes.size > 0) await Promise.all([...statusRefreshes])
+      await footerLive.settled()
+    },
     clearStatus(eventCtx): void {
       footerLive.stop()
       readUi(eventCtx)?.setStatus(MEMORY_STATUS_KEY, undefined)
+    },
+    async onSyncStatusChanged(repo): Promise<void> {
+      const sessionId = activeSession.current
+      const context = sessionId === undefined ? undefined : options.sessions.get(sessionId)?.context
+      const ui = readUi(lastEventCtx.current)
+      await deliverSyncStatusChange({
+        repo,
+        isActiveRepo: sessionId !== undefined && context?.identityPaths.repo === repo,
+        notifier: syncNotifier,
+        ui,
+        refreshFooter: () => {
+          if (sessionId !== undefined) track(footerLive.refresh(sessionId, ui))
+        },
+        pushRpc: async () => {
+          await rpcBridge.current?.sync()
+        },
+      })
     },
   }
 }
@@ -188,17 +228,18 @@ function refreshInitialStatus(
   identity: MemoryIdentityContext,
   ui: StatusUi | undefined,
   requestPressureDream: () => void,
-): void {
-  if (ui === undefined) return
+): Promise<unknown> | undefined {
+  if (ui === undefined) return undefined
   const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
-  void refreshMemoryStatus({
+  return refreshMemoryStatus({
     context: identity,
     ui,
     compileWarnTokens: settings.compile_warn_tokens,
     alreadyNotified: false,
     requestPressureDream,
     sessionId,
-  }).catch(() => {})
+    ...(options.syncStatus === undefined ? {} : { syncStatus: options.syncStatus }),
+  })
 }
 
 async function drainCompletions(
@@ -218,6 +259,7 @@ async function drainCompletions(
     observedRunIds,
     currentLauncher,
   })
+  await emitReflectionParkAlert(identity.identityPaths.reflection, identity.identity, liveSession, healthAlertOnce)
 }
 
 function describe(error: unknown): string {

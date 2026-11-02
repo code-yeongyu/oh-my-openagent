@@ -42,9 +42,9 @@ describe("toolArgTexts", () => {
   })
 
   test("#given eval code reading a file path #when toolArgTexts harvests it #then the file name and path words are kept", () => {
-    const texts = toolArgTexts("eval", { code: "await Bun.file('/a/b/kibitzer-trigger.ts').text(); if (x) { y() }" })
-    expect(texts).toContain("kibitzer-trigger.ts")
-    expect(texts).toContain("kibitzer")
+    const texts = toolArgTexts("eval", { code: "await Bun.file('/a/b/recall-wiring.ts').text(); if (x) { y() }" })
+    expect(texts).toContain("recall-wiring.ts")
+    expect(texts).toContain("recall")
   })
 
   test("#given a bash command longer than 120 characters #when toolArgTexts harvests it #then the trailing path file name is kept", () => {

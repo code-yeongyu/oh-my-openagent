@@ -1,4 +1,11 @@
-import { appendBlock, findTomlSection, replaceOrInsertRootDottedSetting, replaceOrInsertSetting } from "./toml-section-editor"
+import {
+  appendBlock,
+  findTomlSection,
+  removeRootSetting,
+  removeSetting,
+  replaceOrInsertRootDottedSetting,
+  replaceOrInsertSetting,
+} from "./toml-section-editor"
 import { hasTomlRootDottedKeyPrefix } from "./toml-setting-reader"
 
 export function ensureFeatureEnabled(config: string, featureName: string): string {
@@ -10,4 +17,10 @@ export function ensureFeatureEnabled(config: string, featureName: string): strin
     return appendBlock(config, `[features]\n${featureName} = true\n`)
   }
   return replaceOrInsertSetting(config, section, featureName, "true")
+}
+
+export function removeFeature(config: string, featureName: string): string {
+  const section = findTomlSection(config, "features")
+  if (section !== null) return removeSetting(config, section, featureName)
+  return removeRootSetting(config, `features.${featureName}`)
 }

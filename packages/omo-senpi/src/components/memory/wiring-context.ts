@@ -12,6 +12,11 @@ export function sessionIdFrom(eventCtx: unknown): string | undefined {
 export function branchEntryCount(eventCtx: unknown): number {
   if (!isRecord(eventCtx)) return 0
   const manager = isRecord(eventCtx.sessionManager) ? eventCtx.sessionManager : undefined
+  const getEntryCount = manager?.getEntryCount
+  if (typeof getEntryCount === "function") {
+    const count = Reflect.apply(getEntryCount, manager, [])
+    if (typeof count === "number" && Number.isFinite(count)) return count
+  }
   const getEntries = manager?.getEntries
   if (typeof getEntries !== "function") return 0
   const entries = Reflect.apply(getEntries, manager, [])

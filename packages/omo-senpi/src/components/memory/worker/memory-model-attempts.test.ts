@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import {
   MemoryModelExhaustedError,
+  isModelUnreachableDetail,
   runMemoryModelAttempts,
   type MemoryModelChain,
 } from "./memory-model-attempts"
@@ -24,6 +25,40 @@ function child(overrides: Partial<ReflectionChildResult>): ReflectionChildResult
 }
 
 describe("runMemoryModelAttempts", () => {
+  test("#given every candidate ran with extensions and none was visible #when the chain is exhausted #then the detail is marked unreachable", async () => {
+    // given
+    const loaded: MemoryModelChain = [
+      { model: "extension-only/primary", loadExtensions: true },
+      { model: "builtin/fallback", loadExtensions: true },
+    ]
+
+    // when
+    const error = await runMemoryModelAttempts(loaded, async (candidate) =>
+      child({ stderr: `Error: Model "${candidate.model}" not found. Use --list-models to see available models.` }),
+    ).then(() => undefined, (reason: unknown) => reason)
+
+    // then
+    expect(error).toBeInstanceOf(MemoryModelExhaustedError)
+    expect(isModelUnreachableDetail(error instanceof Error ? error.message : undefined)).toBe(true)
+  })
+
+  test("#given one missing model ran without extensions #when the chain is exhausted #then the detail is not marked unreachable", async () => {
+    // given
+    const mixed: MemoryModelChain = [
+      { model: "extension-only/primary", loadExtensions: true },
+      { model: "builtin/fallback" },
+    ]
+
+    // when
+    const error = await runMemoryModelAttempts(mixed, async (candidate) =>
+      child({ stderr: `Error: Model "${candidate.model}" not found. Use --list-models to see available models.` }),
+    ).then(() => undefined, (reason: unknown) => reason)
+
+    // then
+    expect(error).toBeInstanceOf(MemoryModelExhaustedError)
+    expect(isModelUnreachableDetail(error instanceof Error ? error.message : undefined)).toBe(false)
+  })
+
   test("#given an exact model-not-found startup error #when a fallback exists #then it retries the fallback", async () => {
     // given
     const attempted: string[] = []
@@ -89,20 +124,22 @@ describe("runMemoryModelAttempts", () => {
     expect(result.child.code).toBe(0)
   })
 
-  test("#given a billing exhaustion failure #when a fallback exists #then it does not burn the chain", async () => {
+  test("#given a quota exhaustion failure #when a fallback exists #then the next candidate runs the reflection (#6808)", async () => {
     // given
     const attempted: string[] = []
 
     // when
     const result = await runMemoryModelAttempts(candidates, async (candidate) => {
       attempted.push(candidate.model)
-      return child({ stderr: "Error: quota exceeded for this organization" })
+      return candidate.model === "extension-only/primary"
+        ? child({ stderr: "Error: quota exceeded for this organization" })
+        : child({ code: 0 })
     })
 
     // then
-    expect(attempted).toEqual(["extension-only/primary"])
-    expect(result.candidate.model).toBe("extension-only/primary")
-    expect(result.child.code).toBe(1)
+    expect(attempted).toEqual(["extension-only/primary", "builtin/fallback"])
+    expect(result.candidate.model).toBe("builtin/fallback")
+    expect(result.child.code).toBe(0)
   })
 
   test("#given every candidate overflows #when the chain is exhausted #then context_overflow is carried by a typed signal and message", async () => {

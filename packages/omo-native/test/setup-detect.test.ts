@@ -145,7 +145,7 @@ function createLauncherFixture(fixture: Fixture): string {
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const artifact of [
     "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
-    "plugin/runtime/agent-toolkit/cli.js",
+
   ]) write(join(packageRoot, artifact), "fixture\n")
   return join(packageRoot, "bin", "omo.js")
 }
@@ -254,7 +254,11 @@ describe("omo setup sibling detection", () => {
   describe("#given node:sqlite is unavailable", () => {
     test.skipIf(!SQLITE_AVAILABLE)("#when detected #then sqlite stores degrade to file presence and remain successful", async () => {
       const fixture = createFixture()
-      await populateAll(fixture)
+      write(join(fixture.agentDir, "auth.json"), "{}")
+      write(join(fixture.xdg, "opencode", "auth.json"), "{}")
+      // The throwing loader makes SQLite detection presence-only; real databases add no coverage.
+      write(join(fixture.home, ".omp", "agent", "agent.db"), "sqlite-unavailable")
+      write(join(fixture.home, ".gjc", "agent", "agent.db"), "sqlite-unavailable")
       const inventory = await detect(fixture, { loadSqlite: async () => { throw new Error("not available") } })
       for (const id of ["oh-my-pi", "gajae-code"]) {
         const harness = inventory.harnesses.find((item) => item.id === id)!

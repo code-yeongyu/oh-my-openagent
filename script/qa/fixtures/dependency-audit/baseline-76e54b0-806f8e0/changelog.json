@@ -1,0 +1,54 @@
+{
+  "command": [
+    "$BINARY",
+    "--no-session",
+    "--no-skills",
+    "--no-context-files",
+    "--no-extensions",
+    "--extension",
+    "$SANDBOX/fixtures/extension.ts",
+    "--provider",
+    "audit-local",
+    "--model",
+    "audit-v1"
+  ],
+  "machine": "darwin-arm64-20030cfa6181",
+  "versions": {
+    "bun": "1.4.2",
+    "node": "v26.7.0"
+  },
+  "exitCode": 1,
+  "timestamp": "2026-09-13T10:53:35.231Z",
+  "schemaVersion": 1,
+  "phase": "baseline",
+  "case": "changelog",
+  "binarySha256": "c593321c06beacd0af1a94cda7a93fc5d76608e0f62efeb7fc5bf324c6059d76",
+  "pass": false,
+  "entriesMatchShipped": true,
+  "whatsNew": false,
+  "seededPreviousVersion": "5.0.0-beta.60",
+  "version": "5.0.0-beta.62",
+  "expectedEntries": [
+    "OMO Native now runs on the fully upstream-synced senpi harness. senpi merged the upstream engine (earendil-works/pi) across the session and storage layer, the protocol v8 / Chord transport, the fullscreen TUI renderer, the clipboard natives, and the model catalogs, while every fork invariant — CalVer, the CLI, the JSONL RPC surface, the Astra overlays, themes, gist share, and the held dependency pins — survived the merge. The changes below are the ones you can see.",
+    "Extensions can stream model calls. ctx.modelRegistry.stream() and streamSimple() let an extension drive a configured provider with resolved authentication, so extension-authored tools talk to models the way the core does."
+  ],
+  "pty": {
+    "api": "Bun.spawn(command, { terminal: { cols, rows, data(terminal, bytes) } })",
+    "byteType": "Buffer (Uint8Array)",
+    "cols": 240,
+    "rows": 100
+  },
+  "failure": "The audited dev launcher omits brand.changelog.version; the engine suppresses startup changelog without that version.",
+  "commands": [
+    {
+      "command": [
+        "$SANDBOX/omo",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "omob dev build\nomo   76e54b0a9bfa7bc730afefa877aea03f2c948b08 2026-09-13T12:03:49+09:00 (dev)\nsenpi 806f8e0ab4de7d4237e835c5f3cd4e2378c97f38 2026-09-13T01:17:58Z (main)\n",
+      "stderr": ""
+    }
+  ],
+  "cleanup": "isolated HOME, agent, copied binary, and temporary workspace removed"
+}

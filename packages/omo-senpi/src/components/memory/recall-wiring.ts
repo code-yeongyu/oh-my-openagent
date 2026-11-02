@@ -7,17 +7,18 @@
 // systemPrompt.
 //
 // The lexical auto-injection path is GONE: nothing is injected from a plain corpus match. Candidate
-// collection now runs at SETTLE time (the turn is complete there, so the current-prompt seam
-// disappears) and feeds the kibitzer gate child, whose validated nudges are what a later turn
-// injects. before_agent_start is the delivery half: it only drains the pending file the gate wrote.
-// Every step stays fail-open: an unreadable memory repo or a corrupt corpus drops the collection
-// and logs, and the turn proceeds untouched.
+// collection runs over a plain session snapshot (captured synchronously at a prompt or tool_call
+// hook by the Kibitzer composition) and offers its candidates to the session's resident sidecar,
+// whose validated nudges are what a later turn injects. before_agent_start is the delivery half:
+// it only drains the pending file delivery wrote. Every step stays fail-open: an unreadable memory
+// repo or a corrupt corpus drops the collection and logs, and the turn proceeds untouched.
 
-import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
+import type { OmoMemoryRecall, OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 import {
   GitMemoryRepo,
   PendingNudges,
   RecallCorpusCache,
+  type RecallDocument,
   RecallLedger,
   planRecallQueries,
   selectRecallCandidates,
@@ -29,7 +30,12 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
+import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
+import { withProjectDocuments } from "./project-memory-nudge"
+import { createProjectSourceMentions } from "./project-recall-mentions"
+import { projectDocumentsOf, selectWithProjectSeats, type ProjectRecallCorpus } from "./project-recall-seats"
 import { createRecallDrain, type PendingNudgesPort } from "./recall-drain"
+import { createTranscriptMentionIndex } from "./recall-transcript-mentions"
 import {
   judgeTranscript,
   readSession,
@@ -47,18 +53,20 @@ export {
 } from "./recall-session-read"
 export type { PendingNudgesPort }
 
-export interface ResolvedMemoryRecallSettings {
-  readonly enabled: boolean
-  readonly max_items: number
-}
+export type ResolvedMemoryRecallSettings = OmoMemoryRecall
 
-/** Base recall block under the bound agent's layer override, mirroring the nudge/reflection pattern. */
+/**
+ * Base recall block under the bound agent's layer override, mirroring the nudge/reflection pattern.
+ * `event_caps` merges per field, so an agent that tightens one cap keeps the root's other three.
+ */
 export function resolveAgentRecallSettings(
   settings: OmoMemorySettings | undefined,
   agentId: string,
 ): ResolvedMemoryRecallSettings {
   const resolved = resolveMemorySettings(settings)
-  return { ...resolved.recall, ...resolved.agents[agentId]?.recall }
+  const base = resolved.recall
+  const override = resolved.agents[agentId]?.recall
+  return { ...base, ...override, event_caps: { ...base.event_caps, ...override?.event_caps } }
 }
 
 export interface MemoryRecallWiringOptions {
@@ -68,20 +76,17 @@ export interface MemoryRecallWiringOptions {
   readonly env: Record<string, string | undefined>
   readonly createRepo?: (context: MemoryIdentityContext) => GitMemoryRepo
   readonly corpusCache?: RecallCorpusCache
+  /** Each child project this session touched, its notes under `@project/` paths (#10044); ranked apart from the bound memory. */
+  readonly projectCorpora?: (sessionId: string) => Promise<readonly ProjectRecallCorpus[]>
+  /** The readable file behind a qualified project note path; a note the transcript names there is not recalled again. */
+  readonly projectSource?: (sessionId: string, path: string) => string | undefined
   readonly ledgerFor?: (context: MemoryIdentityContext) => RecallLedger
   readonly pendingFor?: (context: MemoryIdentityContext) => PendingNudgesPort
   readonly drainQueued?: (sessionId: string, context: MemoryIdentityContext) => RecallNudge[]
-  /**
-   * The session's live compaction epoch, owned by the kibitzer gate wiring. A pending payload is
-   * stamped with the epoch its judge ran under, so passing the live one here is what rejects a
-   * verdict about a transcript a compaction has since rewritten. Absent means "never compacted",
-   * matching the gate wiring's own default for an unknown session.
-   */
-  readonly currentCompactionEpoch?: (sessionId: string) => number
   readonly logger?: ComponentLogger
 }
 
-/** Everything the kibitzer gate child needs about one settled turn's lexical candidates. */
+/** Everything the Kibitzer sidecar needs about one hook's lexical candidates. */
 export interface CollectedRecallCandidates {
   readonly sessionId: string
   readonly context: MemoryIdentityContext
@@ -120,12 +125,13 @@ export interface MemoryRecallWiring {
 // A memory worker child must never receive recall hints: it reasons ABOUT memory, and an injected
 // hint would both pollute its transcript and re-enter memory on the next extraction pass. The
 // reflection and facts sentinels are here for the sharper reason: those children must not judge
-// or consume the hints produced by the kibitzer gate.
+// or consume the hints produced by the Kibitzer sidecar.
 const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as const
-const RECALL_PATH_ENTRY_WINDOW = 200
 
 export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): MemoryRecallWiring {
   const corpusCache = options.corpusCache ?? new RecallCorpusCache()
+  const transcriptMentions = createTranscriptMentionIndex()
+  const projectSourceMentions = options.projectSource === undefined ? undefined : createProjectSourceMentions(options.projectSource)
   const createRepo = options.createRepo ?? defaultCreateRepo
   const ledgerFor = options.ledgerFor ?? ((context) => new RecallLedger(context.identityPaths.recallLedger))
   const pendingFor = options.pendingFor ?? ((context) => new PendingNudges(context.identityPaths.recallPending))
@@ -136,7 +142,6 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     ledgerFor,
     pendingFor,
     ...(options.drainQueued === undefined ? {} : { drainQueued: options.drainQueued }),
-    ...(options.currentCompactionEpoch === undefined ? {} : { currentCompactionEpoch: options.currentCompactionEpoch }),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
 
@@ -169,27 +174,30 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     if (queries.length === 0) return undefined
 
     const repo = createRepo(context)
-    const corpus = await corpusCache.load(repo)
-    if (corpus.documents.length === 0) return undefined
+    const own = await corpusCache.load(repo)
+    const projects = await options.projectCorpora?.(session.id) ?? []
+    const projectDocuments = projects.length === 0 ? [] : projectDocumentsOf(projects)
+    const allDocuments = withProjectDocuments(own.documents, projectDocuments)
+    if (allDocuments.length === 0) return undefined
 
-    // Raw entries include tool calls/results that the judge's text-only window omits.
-    // Serialize the bounded window once; the corpus supplies the exact memory paths to check.
-    const recentEntries = JSON.stringify(session.entries.slice(-RECALL_PATH_ENTRY_WINDOW))
-    const excludePaths = new Set<string>()
-    for (const document of corpus.documents) {
-      const path = JSON.stringify(document.path).slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      // Close at transcript delimiters (including JSON-escaped whitespace), not filename suffixes.
-      const mention = new RegExp(`${path}(?=$|[\\s"'\x60\\])}>:;,!?]|\\\\["nrtbf])`)
-      if (mention.test(recentEntries)) excludePaths.add(document.path)
-    }
+    // Raw entries include tool calls/results that the judge's text-only window omits. The index
+    // scans the bounded window per entry and caches by entry id, so a trigger costs only the new
+    // entries; see recall-transcript-mentions.ts for the equivalence with the whole-window scan.
+    const excludePaths = transcriptMentions.excludedPaths({
+      sessionId: session.id,
+      entries: session.entries,
+      documents: allDocuments,
+    })
+    for (const path of projectSourceMentions?.excludedPaths(session.id, session.entries, projectDocuments) ?? []) excludePaths.add(path)
 
     const ledger = ledgerFor(context)
     const surfaced = await ledger.surfacedPaths(session.id)
-    const candidates = selectRecallCandidates(corpus.documents, queries, {
-      maxItems: recall.max_items,
-      surfaced,
-      excludePaths,
-    })
+    const candidates = selectWithProjectSeats(own.documents, projects, recall.max_items, (documents, extraQueries, identityId) =>
+      selectRecallCandidates(documents, [...queries, ...extraQueries], {
+        maxItems: recall.max_items,
+        surfaced: pathsInCorpus(surfaced, identityId),
+        excludePaths: pathsInCorpus(excludePaths, identityId),
+      }))
     if (candidates.length === 0) return undefined
     return {
       sessionId: session.id,
@@ -240,4 +248,22 @@ function defaultCreateRepo(context: MemoryIdentityContext): GitMemoryRepo {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+function pathsInCorpus(paths: ReadonlySet<string>, identityId: string | undefined): ReadonlySet<string> {
+  if (identityId === undefined) return paths
+  const prefix = `@project/${identityId}/`
+  return new Set([...paths].filter((path) => path.startsWith(prefix)).map((path) => path.slice(prefix.length)))
+}
+
+/**
+ * The corpus cache recall and the Kibitzer memory tool share. Shared: every session on a multi-session host
+ * registers this component, and a private cache per session held one parsed corpus and BM25 index per live
+ * session (senpi#3110). A term-store save that fails is logged and never fails recall.
+ */
+export function createSharedRecallCorpusCache(logger: ComponentLogger | undefined): RecallCorpusCache {
+  return new RecallCorpusCache({
+    shared: true,
+    onTermStoreError: (error) => logger?.warn("omo-senpi memory recall term store skipped", { error: String(error) }),
+    termStore: loadRecallStoreRuntime,
+  })
 }

@@ -34,10 +34,7 @@ export const GOVERNED_SURFACES: readonly GovernedSurface[] = [
     glob: "packages/omo-senpi/src/**/*.ts",
     exclude: [/\.test\.ts$/, /^packages\/omo-senpi\/src\/components\/ultrawork\/generated-directive\.ts$/],
   },
-  {
-    glob: "packages/senpi-task/src/**/*.ts",
-    exclude: [/\.test\.ts$/, /^packages\/senpi-task\/src\/agents\/legacy-agent-names\.ts$/],
-  },
+  { glob: "packages/senpi-task/src/**/*.ts", exclude: [/\.test\.ts$/] },
   { glob: "packages/shared-skills/skills/{ulw-execute,refactor,review-work}/**", retiredNamesOnly: true },
 ]
 

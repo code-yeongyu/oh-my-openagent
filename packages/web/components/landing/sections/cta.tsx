@@ -1,7 +1,7 @@
 import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 
-import { InstallCommand } from "@/components/landing/install-command"
+import { InstallTabs } from "@/components/landing/install-tabs"
 import { Reveal } from "@/components/landing/motion-wrappers"
 import { Eyebrow } from "@/components/ledger/eyebrow"
 import { Frame } from "@/components/ledger/frame"
@@ -24,10 +24,10 @@ export async function CtaSection(): Promise<JSX.Element> {
               {t("cta.title")}
             </h2>
             <p className="text-text-mid max-w-xl text-lg leading-[1.6]">{t("cta.subtitle")}</p>
-            <InstallCommand command={t("cta.installCommand")} className="max-w-xl" />
+            <InstallTabs className="max-w-xl" />
             <div className="flex flex-wrap items-center gap-6">
               <Button size="lg" asChild>
-                <Link href="/docs#installation">{t("cta.installNow")}</Link>
+                <Link href="/docs/install">{t("cta.installNow")}</Link>
               </Button>
               <Button variant="secondary" size="lg" asChild>
                 <Link href="/docs">{t("cta.readTheDocs")}</Link>

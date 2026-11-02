@@ -60,8 +60,7 @@ async function createFooterScenario(sessionId: string): Promise<FooterScenario> 
   const calls: StatusCall[] = []
   const pi = new FakeExtensionAPI()
   await createUlwLoopComponent({
-    resolveOmoBin: () => "/tmp/omo",
-    runCommand: async () => ({ code: 0, stdout: activeStatus() }),
+    readStatus: async () => ({ code: 0, stdout: activeStatus() }),
     footerStatus: { timers },
   }).register(pi, {
     logger: createLogger(),

@@ -127,6 +127,28 @@ describe("session-manager tools", () => {
     expect(typeof result).toBe("string")
   })
 
+  test("#given newer sessions outside the to_date window #when session_list runs with to_date and limit #then the limit applies after the date filter", async () => {
+    //#given
+    const newestFirst: SessionMetadata[] = ["ses_new_1", "ses_new_2", "ses_old_1", "ses_old_2"].map((id, index) => ({
+      id,
+      projectID: "project-1",
+      directory: projectDir,
+      time: { created: 4 - index, updated: 4 - index },
+    }))
+    const { session_list } = createSessionManagerTools(mockCtx, {
+      setStorageClient: () => {},
+      getMainSessions: async ({ limit }) => newestFirst.slice(0, limit),
+      filterSessionsByDate: async (sessionIDs) => sessionIDs.filter((id) => id.startsWith("ses_old_")),
+      formatSessionList: async (sessionIDs) => `sessions:${sessionIDs.join(",")}`,
+    })
+
+    //#when
+    const result = await session_list.execute({ to_date: "2025-12-01T00:00:00Z", limit: 2 }, mockContext)
+
+    //#then
+    expect(result).toBe("sessions:ses_old_1,ses_old_2")
+  })
+
   test("session_read handles non-existent session", async () => {
     const { session_read } = createTestTools()
     const result = await session_read.execute({ session_id: "ses_nonexistent" }, mockContext)
@@ -197,6 +219,44 @@ describe("session-manager tools", () => {
     const result = await session_info.execute({ session_id: "ses_nonexistent" }, mockContext)
     
     expect(result).toContain("not found")
+  })
+
+  test("#given a session read that rejects with a plain error body #when session_search targets that session #then the error text is shown, not [object Object] (#5854)", async () => {
+    //#given
+    const { session_search } = createSessionManagerTools(mockCtx, {
+      setStorageClient: () => {},
+      searchInSession: async () => {
+        throw { name: "NotFoundError", data: { message: "Session not found: ses_gone" } }
+      },
+    })
+
+    //#when
+    const result = await session_search.execute({ query: "x", session_id: "ses_gone" }, mockContext)
+
+    //#then
+    expect(result).toBe("Error: NotFoundError: Session not found: ses_gone")
+  })
+
+  test("#given one unreadable session among several #when session_search scans for a query with no match #then the scan finishes and names the skipped session (#5854)", async () => {
+    //#given
+    const scanned: string[] = []
+    const { session_search } = createSessionManagerTools(mockCtx, {
+      setStorageClient: () => {},
+      getAllSessions: async () => ["ses_a", "ses_gone", "ses_b"],
+      searchInSession: async (sessionID): Promise<SearchResult[]> => {
+        scanned.push(sessionID)
+        if (sessionID === "ses_gone") throw { name: "NotFoundError", data: { message: "Session not found: ses_gone" } }
+        return []
+      },
+      formatSearchResults: (results) => `results:${results.length}`,
+    })
+
+    //#when
+    const result = await session_search.execute({ query: "zzqxjnomatch" }, mockContext)
+
+    //#then
+    expect(scanned).toEqual(["ses_a", "ses_gone", "ses_b"])
+    expect(result).toBe("results:0\n\nSkipped 1 session that could not be read: ses_gone (NotFoundError: Session not found: ses_gone)")
   })
 
   test("session_info executes with valid session", async () => {

@@ -7,6 +7,7 @@ import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import { createTaskRecordStore } from "../store"
 import { createTaskLifecycle } from "./create"
 import { cleanupProjects, FakeRegistry, readEvents, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 const taskId = "st_00000031"
 const startedAt = "2026-09-08T01:00:00.000Z"
@@ -29,6 +30,7 @@ describe("legacy reconciliation current-record loss", () => {
       notification: { ...fresh.notification, run_epoch: 7, notified_epoch: 6 },
     }))
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store, registry: new FakeRegistry(), config: settings(), now, hostPid: 101,
       signaller: { isAlive: () => false, signal: () => { throw new Error("unexpected signal") } },
       respawn: async () => {
@@ -60,6 +62,7 @@ describe("legacy reconciliation current-record loss", () => {
     const store = tempStore()
     seedRecord(store, { task_id: taskId, status: "running", execution_mode: "process", pid: 9001 })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store, registry: new FakeRegistry(), config: settings({ reattach_on_reconcile: reattachEnabled }), now, hostPid: 101,
       signaller: {
         isAlive: (pid) => {

@@ -7,7 +7,7 @@ export async function GET() {
     const formatted = formatStats(stats)
 
     return NextResponse.json(
-      { ...formatted, raw: stats },
+      { ...formatted, source: "live", raw: stats },
       {
         headers: {
           "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
@@ -16,10 +16,13 @@ export async function GET() {
     )
   } catch (error) {
     console.warn("Unable to refresh GitHub stats and description; using fallback data", error)
-    return NextResponse.json(FALLBACK_FORMATTED_STATS, {
-      headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+    return NextResponse.json(
+      { ...FALLBACK_FORMATTED_STATS, source: "fallback" },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+        },
       },
-    })
+    )
   }
 }

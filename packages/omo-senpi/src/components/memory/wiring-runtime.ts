@@ -2,6 +2,7 @@ import { join } from "node:path"
 
 import { TranscriptJournal, sanitizeToSlug, type ReservedRun } from "@oh-my-opencode/memory-core"
 
+import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import type { MemoryIdentityContext } from "./context"
 import type { DreamTriggerSession } from "./dream-trigger"
 import { FactsExtractorRunner } from "./facts-runner"
@@ -13,15 +14,9 @@ import {
   type MemoryIdentityRuntimeDeps,
 } from "./identity-runtime"
 import { createMemoryJournalWiring, type MemoryJournalWiring } from "./journal-wiring"
-import { KibitzerGateRunner } from "./kibitzer-runner"
-import type { KibitzerGatePort } from "./kibitzer-wiring"
-import { resolveMemoryModelRegistry } from "./model-registry-resolver"
 import { resolveMemorySessionModel } from "./session-model-resolver"
-import {
-  resolveParentCacheReusable as resolveParentCacheReusableFromCtx,
-  resolveParentContextTokens as resolveParentContextTokensFromCtx,
-  resolveParentSessionFile as resolveParentSessionFileFromCtx,
-} from "./session-context-resolver"
+import { NO_LAUNCH_FACTS, currentLaunchScope, factsForScope, readLaunchFacts, withLaunchScope, type LaunchFacts } from "./launch-facts"
+import { isStaleExtensionContextError } from "./stale-extension-context"
 import { resolveReflectionTriggerConfig, type ReflectionTriggerSession } from "./trigger-wiring"
 import { isRecord, sessionIdFrom } from "./wiring-context"
 import type { MemoryWiringOptions } from "./wiring-types"
@@ -32,8 +27,9 @@ export interface MemoryRuntimeWiring {
   resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]>
   journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring
   factsWiringFor(identity: MemoryIdentityContext): MemoryFactsWiring
-  kibitzerRunnerFor(identity: MemoryIdentityContext): KibitzerGatePort
   runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime
+  /** Resolves once every reflection launch started by this wiring's runtimes has returned. */
+  settled(): Promise<void>
   triggerSessionFor(eventCtx: unknown): ReflectionTriggerSession | undefined
   dreamSessionById(sessionId: string): DreamTriggerSession | undefined
   dreamSessionFor(eventCtx: unknown): DreamTriggerSession | undefined
@@ -55,29 +51,84 @@ export function createMemoryRuntimeWiring(
   const runtimes = new Map<string, MemoryIdentityRuntime>()
   const journals = new Map<string, MemoryJournalWiring>()
   const factsWirings = new Map<string, MemoryFactsWiring>()
-  const kibitzerRunners = new Map<string, KibitzerGatePort>()
 
   const resolveContext = (sessionId: string): MemoryIdentityContext | undefined =>
     options.sessions.get(sessionId)?.context
 
+  // Launch facts are bound to the run (launch-facts.ts): a trigger launch reads only its own
+  // immutable snapshot, any other launch reads the current ctx only when it belongs to the run.
+  function currentLaunchFacts(): LaunchFacts {
+    const scope = currentLaunchScope()
+    if (scope?.snapshot !== undefined) return scope.snapshot
+    const current = lastEventCtx.current
+    let live: LaunchFacts
+    try {
+      live = readLaunchFacts(current)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+      live = NO_LAUNCH_FACTS
+    }
+    // Outside any launch (a facts launch without a captured selection) no session's own details apply:
+    // only the process-wide model registry, never whichever session happens to be current.
+    if (scope === undefined) return { ...NO_LAUNCH_FACTS, modelRegistry: live.modelRegistry }
+    let currentSessionId: string | undefined
+    try {
+      currentSessionId = sessionIdFrom(current)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+    }
+    return factsForScope(scope, currentSessionId, live)
+  }
+
   function resolveModelRegistry(): ReturnType<MemoryIdentityRuntimeDeps["resolveModelRegistry"]> {
-    return resolveMemoryModelRegistry(lastEventCtx.current)
+    return currentLaunchFacts().modelRegistry
   }
 
   function resolveSessionModel(): ReflectionSessionModel | undefined {
-    return resolveMemorySessionModel(lastEventCtx.current)
+    return currentLaunchFacts().sessionModel
   }
 
   function resolveParentContextTokens(): number | undefined {
-    return resolveParentContextTokensFromCtx(lastEventCtx.current)
+    return currentLaunchFacts().parentContextTokens
   }
 
   function resolveParentSessionFile(): string | undefined {
-    return resolveParentSessionFileFromCtx(lastEventCtx.current)
+    return currentLaunchFacts().parentSessionFile
   }
 
   function resolveParentCacheReusable(): boolean {
-    return resolveParentCacheReusableFromCtx(lastEventCtx.current)
+    return currentLaunchFacts().parentCacheReusable
+  }
+
+  function snapshotLaunchFacts(eventCtx: unknown): LaunchFacts | undefined {
+    try {
+      return readLaunchFacts(eventCtx)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) {
+        options.logger?.warn("memory reflection could not read its session details at trigger time; the launch reads them later", { error: error instanceof Error ? error.message : String(error) })
+      }
+      return undefined
+    }
+  }
+
+  function ownSessionModel(identity: MemoryIdentityContext): ReflectionSessionModel | undefined {
+    const current = lastEventCtx.current
+    let sessionId: string | undefined
+    let model: ReflectionSessionModel | undefined
+    try {
+      sessionId = sessionIdFrom(current)
+      model = resolveMemorySessionModel(current)
+    } catch (error) {
+      if (!isStaleExtensionContextError(error)) throw error
+      return undefined
+    }
+    if (sessionId === undefined) return undefined
+    return resolveContext(sessionId)?.identity === identity.identity ? model : undefined
+  }
+
+  /** The engine's own answer for this session; detection is the fallback for hosts without it. */
+  function resolveAgentDir(): string {
+    return currentLaunchFacts().agentDir ?? resolveAgentHome({ env: process.env })
   }
 
   function journalWiringFor(identity: MemoryIdentityContext): MemoryJournalWiring {
@@ -106,6 +157,9 @@ export function createMemoryRuntimeWiring(
       cwd: options.cwd(),
       loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
       resolveModelRegistry,
+      // A facts launch handed no selection (unpark, reconcile, final delta) may use the current
+      // session's model only when that session belongs to this identity: never another agent's.
+      resolveSessionModel: () => ownSessionModel(identity),
       env: options.env,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
     })
@@ -129,25 +183,6 @@ export function createMemoryRuntimeWiring(
     return wiring
   }
 
-  /**
-   * One gate runner per identity: the runner owns the single-launch latch, so a shared instance is
-   * what keeps repeated settles down to one child.
-   */
-  function kibitzerRunnerFor(identity: MemoryIdentityContext): KibitzerGatePort {
-    const cached = kibitzerRunners.get(identity.identity)
-    if (cached !== undefined) return cached
-    // No resolveModelRegistry here on purpose: the gate runner consumes ONLY the registry snapshot
-    // its settle handler captured, because this runner's launches outlive the senpi ctx.
-    const runner = options.createKibitzerRunner?.(identity) ?? new KibitzerGateRunner({
-      identityPaths: identity.identityPaths,
-      loadConfig: () => options.loadConfig({ cwd: options.cwd() }),
-      env: options.env,
-      ...(options.logger === undefined ? {} : { logger: options.logger }),
-    })
-    kibitzerRunners.set(identity.identity, runner)
-    return runner
-  }
-
   function runtimeFor(identity: MemoryIdentityContext): MemoryIdentityRuntime {
     const cached = runtimes.get(identity.identity)
     if (cached !== undefined) return cached
@@ -160,15 +195,17 @@ export function createMemoryRuntimeWiring(
       resolveParentContextTokens,
       resolveParentSessionFile,
       resolveParentCacheReusable,
+      resolveAgentDir,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
       ...(liveSession === undefined
         ? {}
         : {
             liveSession: () => {
               const live = liveSession()
-              if (live === undefined || hooks.onLiveCompletion === undefined) return live
+              if (live === undefined) return live
               return {
                 ...live,
+                identityContext: identity,
                 onCompletion: (runId: string) => hooks.onLiveCompletion?.(identity.identity, runId),
               }
             },
@@ -190,11 +227,19 @@ export function createMemoryRuntimeWiring(
       ledger: identity.ledger,
       enabled: resolveReflectionTriggerConfig(settings, identity.identity).enabled,
       engine: {
-        evaluate: async (conversationId, event) => {
+        evaluate: async (conversationId, event, signal) => {
+          signal?.throwIfAborted()
           lastEventCtx.current = eventCtx
+          // Snapshot this session's facts while its ctx is live; a failed read only loses the snapshot
+          // (the launch then reads the current ctx), it never blocks the reservation.
+          const facts = snapshotLaunchFacts(eventCtx)
           const result = await runtime.store.evaluate(conversationId, event)
           if (result?.status === "active") {
-            runtime.launch(result.run)
+            const run = result.run
+            void withLaunchScope({ conversationIds: run.request.conversationIds, ...(facts === undefined ? {} : { snapshot: facts }) }, () => runtime.launch(run))
+            // Reservation admission transfers ownership to the identity. Its committed launch
+            // must finish even if the observer retires, but a retired observer cannot publish UI.
+            signal?.throwIfAborted()
             await hooks.onLaunch?.(identity.identity, result.run)
           }
           return result
@@ -228,8 +273,10 @@ export function createMemoryRuntimeWiring(
     resolveModelRegistry,
     journalWiringFor,
     factsWiringFor,
-    kibitzerRunnerFor,
     runtimeFor,
+    async settled(): Promise<void> {
+      await Promise.all([...runtimes.values()].map((runtime) => runtime.settled()))
+    },
     triggerSessionFor,
     dreamSessionById,
     dreamSessionFor,

@@ -5,6 +5,7 @@ import { createConnection } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { processSnapshot, cleanupReceipt, waitGone, processAlive, EVIDENCE_ROOT, SENPI_ROOT } from "./common.mjs"
+import { withTelemetryOptOut } from "../telemetry-opt-out-env.mjs"
 
 // These three modules live in the SENPI checkout, not this one, so they are resolved from
 // SENPI_ROOT at runtime. Static specifiers would hard-code one machine's layout and fail
@@ -75,7 +76,7 @@ mkdirSync(evidence, { recursive: true })
 try {
   const script = join(CODING_AGENT, "scripts", "qa-rpc-socket", "ensure-host.mjs")
   const result = await new Promise((resolve) => {
-    const child = spawn(process.execPath, [script], { stdio: ["ignore", "pipe", "pipe"] })
+    const child = spawn(process.execPath, [script], { env: withTelemetryOptOut(process.env), stdio: ["ignore", "pipe", "pipe"] })
     let stdout = "", stderr = ""
     child.stdout.on("data", (v) => { stdout += v })
     child.stderr.on("data", (v) => { stderr += v })
@@ -105,6 +106,8 @@ try {
   let refusal
   let adopted
   try { adopted = await ensureHost({ socket, agentDir: join(root, "agent") }) } catch (error) { refusal = error }
+  // An engine carrying senpi #2242 hands back an attach hold; never keep one past this probe.
+  adopted?.release?.()
 
   // The fixture must still be the socket owner: refusal means "hands off", not "replace".
   const fixtureSurvived = unmanaged.pid !== undefined && processAlive(unmanaged.pid)

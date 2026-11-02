@@ -1,3 +1,5 @@
+import type { GitTermination } from "./exec"
+
 export class GitError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options)
@@ -11,15 +13,28 @@ export class GitCommandError extends GitError {
     readonly code: number,
     readonly stdout: string,
     readonly stderr: string,
+    readonly termination?: GitTermination,
   ) {
-    const detail = stderr.trim() || stdout.trim() || `exit code ${code}`
+    const detail = stderr.trim() || stdout.trim() || silentExitDetail(code, termination)
     super(`git ${argv.join(" ")} failed: ${detail}`)
   }
+}
+
+function silentExitDetail(code: number, termination: GitTermination | undefined): string {
+  if (termination === undefined) return `exit code ${code}`
+  const signal = termination.signal === null ? "no signal" : `signal ${termination.signal}`
+  return `exit code ${code} with no output (${signal}, after ${termination.elapsedMs}ms)`
 }
 
 export class GitTimeoutError extends GitError {
   constructor(readonly argv: readonly string[], readonly timeoutMs: number) {
     super(`git ${argv.join(" ")} timed out after ${timeoutMs}ms`)
+  }
+}
+
+export class GitAbortedError extends GitError {
+  constructor(readonly argv: readonly string[]) {
+    super(`git ${argv.join(" ")} was cancelled`)
   }
 }
 

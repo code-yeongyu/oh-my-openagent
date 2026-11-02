@@ -5,6 +5,7 @@ import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import type { TrustedRespawnLaunchResolver } from "../manager"
 import type { TaskRecord } from "../state"
 import { resolveStateDir, type StateDirConfig } from "../store"
+import { resolveInheritedExtensionList } from "../runners/rpc/parent-extensions"
 import { readMemberTaskMap } from "./member-map"
 import { assembleMemberExtensions } from "./member-extensions"
 import type { TeamMemberExtensionConfig } from "./runtime-types"
@@ -50,10 +51,13 @@ export function createTeamMemberRespawnLaunchResolver(
   options: TeamMemberRespawnLaunchResolverOptions,
 ): TrustedRespawnLaunchResolver {
   const config = toTeamCoreConfig(options.taskSettings, teamStorageBaseDir(options.stateDir))
-  const inheritedExtensions = [...new Set(options.memberExtension.inheritedExtensions ?? [])]
-  const extensions = assembleMemberExtensions(options.memberExtension.entryPath, inheritedExtensions)
 
   return async (record: TaskRecord) => {
+    // Resolved per revival, never snapshotted at construction: a child revived after its session
+    // loaded more extensions must reproduce the set it actually had, not the one this resolver was
+    // built with (#8492).
+    const inheritedExtensions = [...new Set(await resolveInheritedExtensionList(options.memberExtension.inheritedExtensions))]
+    const extensions = assembleMemberExtensions(options.memberExtension.entryPath, inheritedExtensions)
     const identity = parseTeamMemberTaskName(record.name)
     if (identity === undefined) return { extensions: inheritedExtensions }
     let runtime: RuntimeState

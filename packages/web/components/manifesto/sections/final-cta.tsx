@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Link } from "@/i18n/routing"
 
 export async function FinalCtaSection(): Promise<JSX.Element> {
-  const t = await getTranslations("manifesto")
+  const t = await getTranslations("manifestoLegacy")
 
   return (
     <section

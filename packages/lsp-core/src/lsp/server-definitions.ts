@@ -78,10 +78,20 @@ export const LSP_LOCAL_INSTALL_HINTS: Record<string, string> = {
 	"ruby-lsp": "bundle add ruby-lsp --group development",
 };
 
+/**
+ * typescript-language-server starts a second, syntax-only tsserver and a typingsInstaller by
+ * default. The LSP tools only use semantic requests, so both are extra processes per session.
+ */
+const TYPESCRIPT_SERVER_INITIALIZATION: Record<string, unknown> = {
+	tsserver: { useSyntaxServer: "never" },
+	disableAutomaticTypingAcquisition: true,
+};
+
 export const BUILTIN_SERVERS: Record<string, Omit<LspServerConfig, "id">> = {
 	typescript: {
 		command: ["typescript-language-server", "--stdio"],
 		extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
+		initialization: TYPESCRIPT_SERVER_INITIALIZATION,
 	},
 	deno: { command: ["deno", "lsp"], extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs"] },
 	vue: { command: ["vue-language-server", "--stdio"], extensions: [".vue"] },

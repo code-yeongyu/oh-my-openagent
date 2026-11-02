@@ -1,7 +1,10 @@
-const GITHUB_OWNER = "code-yeongyu"
-const GITHUB_REPO = "oh-my-openagent"
-const NPM_PACKAGES = ["oh-my-opencode", "oh-my-openagent"]
-const NPM_FIRST_PUBLISH_YEAR = 2025
+import { GITHUB_REPOSITORY, githubHeaders } from "./github"
+import {
+  fetchInstallerDownloads,
+  resetInstallerDownloadsCacheForTests,
+} from "./installer-downloads"
+import { fetchNativeDownloads, resetNativeDownloadsCacheForTests } from "./native-downloads"
+import { fetchAllTimeDownloads, sumLineageDownloads } from "./npm-downloads"
 
 const CACHE_TTL_MS = 60 * 60 * 1000
 
@@ -9,11 +12,14 @@ export const FALLBACK_DESCRIPTION =
   'OmO: Just type "mass ulw" keyword with your prompt. Now you are the master of graph engineering.'
 
 export const FALLBACK_STATS_DATA: StatsData = {
-  stars: 68_000,
+  stars: 69_000,
   description: FALLBACK_DESCRIPTION,
-  totalDownloads: 1_000_000,
-  monthlyDownloads: 580_000,
-  weeklyDownloads: 90_000,
+  totalDownloads: 3_800_000,
+  npmTotalDownloads: 3_800_000,
+  nativeDownloads: 0,
+  installerDownloads: 0,
+  monthlyDownloads: 200_000,
+  weeklyDownloads: 36_000,
 }
 
 interface StatsCache {
@@ -24,7 +30,11 @@ interface StatsCache {
 export interface StatsData {
   stars: number
   description: string
+  /** npm lineage plus the compiled binaries downloaded from GitHub releases and the get.omo.dev mirror. */
   totalDownloads: number
+  npmTotalDownloads: number
+  nativeDownloads: number
+  installerDownloads: number
   monthlyDownloads: number
   weeklyDownloads: number
 }
@@ -39,9 +49,85 @@ export interface FormattedStatsData {
 
 let cache: StatsCache | null = null
 
+/**
+ * A last-known-good copy shared by every isolate in the data center (the Workers Cache API), so a cold isolate
+ * whose first refresh hits an upstream blip serves the last full aggregate instead of FALLBACK_STATS_DATA. Only a
+ * complete aggregate is ever written (the refresh is all-or-nothing); a store miss or a malformed entry still
+ * rethrows, and callers render the fallback only then (no good value ever stored here).
+ */
+export interface StatsStore {
+  read(): Promise<StatsCache | null>
+  write(entry: StatsCache): Promise<void>
+}
+
+/** A Cache API key is a URL; this one is never fetched from the network. */
+const LAST_KNOWN_GOOD_KEY = "https://omo.dev/__stats/last-known-good/v1"
+const LAST_KNOWN_GOOD_TTL_S = 7 * 24 * 60 * 60
+
+function isStatsData(value: unknown): value is StatsData {
+  if (typeof value !== "object" || value === null) return false
+  const v = value as Record<string, unknown>
+  const counts = [
+    "stars",
+    "totalDownloads",
+    "npmTotalDownloads",
+    "nativeDownloads",
+    "installerDownloads",
+    "monthlyDownloads",
+    "weeklyDownloads",
+  ]
+  return (
+    typeof v.description === "string" &&
+    counts.every((k) => typeof v[k] === "number" && Number.isFinite(v[k]) && (v[k] as number) >= 0)
+  )
+}
+
+function cacheApiStore(): StatsStore | null {
+  const shared = (globalThis as { caches?: { default?: Cache } }).caches?.default
+  if (!shared) return null
+  return {
+    async read() {
+      const hit = await shared.match(LAST_KNOWN_GOOD_KEY)
+      if (!hit) return null
+      const entry = (await hit.json().catch(() => null)) as {
+        data?: unknown
+        timestamp?: unknown
+      } | null
+      return entry && isStatsData(entry.data) && typeof entry.timestamp === "number"
+        ? { data: entry.data, timestamp: entry.timestamp }
+        : null
+    },
+    async write(entry) {
+      await shared.put(
+        LAST_KNOWN_GOOD_KEY,
+        new Response(JSON.stringify(entry), {
+          headers: {
+            "content-type": "application/json",
+            "cache-control": `public, max-age=${LAST_KNOWN_GOOD_TTL_S}`,
+          },
+        }),
+      )
+    },
+  }
+}
+
+let storeOverride: StatsStore | null | undefined
+const sharedStore = (): StatsStore | null =>
+  storeOverride === undefined ? cacheApiStore() : storeOverride
+
+export function setStatsStoreForTests(store: StatsStore | null | undefined): void {
+  storeOverride = store
+}
+
+export function resetStatsCacheForTests(): void {
+  cache = null
+  resetNativeDownloadsCacheForTests()
+  resetInstallerDownloadsCacheForTests()
+}
+
 function formatCount(num: number): string {
   if (num >= 1_000_000) {
-    const formatted = (num / 1_000_000).toFixed(1)
+    const formatted = (Math.floor(num / 100_000) / 10).toFixed(1)
     return `${formatted.replace(/\.0$/, "")}M+`
   }
   if (num >= 1_000) {
@@ -51,91 +137,66 @@ function formatCount(num: number): string {
   return String(num)
 }
 
-async function fetchGitHubStats(): Promise<Pick<StatsData, "stars" | "description">> {
-  const headers: Record<string, string> = {
-    Accept: "application/vnd.github.v3+json",
-    "User-Agent": "oh-my-openagent-web",
-  }
+const REVALIDATE_HOURLY = { next: { revalidate: 3600 } } as RequestInit
 
-  const token = process.env.GITHUB_TOKEN
-  if (token) {
-    headers.Authorization = `Bearer ${token}`
-  }
-
-  const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}`, {
-    headers,
-    next: { revalidate: 3600 },
-  })
-
+async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
+  const res = await fetch(url, { ...init, ...REVALIDATE_HOURLY })
   if (!res.ok) {
-    throw new Error(`GitHub API error: ${res.status}`)
+    throw new Error(`Upstream ${res.status} for ${url}`)
   }
+  return res.json()
+}
 
-  const data = await res.json()
+async function fetchGitHubStats(): Promise<Pick<StatsData, "stars" | "description">> {
+  const data = await fetchJson(`https://api.github.com/repos/${GITHUB_REPOSITORY}`, {
+    headers: githubHeaders(),
+  })
+  if (typeof data !== "object" || data === null) {
+    throw new Error("GitHub repo payload is not an object")
+  }
+  const stars = Reflect.get(data, "stargazers_count")
+  if (typeof stars !== "number") {
+    throw new Error("GitHub repo payload has no stargazers_count")
+  }
+  const description = Reflect.get(data, "description")
   return {
-    stars: data.stargazers_count,
+    stars,
     description:
-      typeof data.description === "string" && data.description.trim()
-        ? data.description
-        : FALLBACK_DESCRIPTION,
+      typeof description === "string" && description.trim() ? description : FALLBACK_DESCRIPTION,
   }
 }
 
-async function fetchNpmDownloadsForPackage(period: string, pkg: string): Promise<number> {
-  try {
-    const res = await fetch(`https://api.npmjs.org/downloads/point/${period}/${pkg}`, {
-      next: { revalidate: 3600 },
-    })
-
-    if (!res.ok) return 0
-
-    const data = await res.json()
-    return data.downloads ?? 0
-  } catch {
-    return 0
+async function fetchFreshStats(now: Date): Promise<StatsData> {
+  const [
+    github,
+    monthlyDownloads,
+    weeklyDownloads,
+    npmTotalDownloads,
+    nativeDownloads,
+    installerDownloads,
+  ] = await Promise.all([
+    fetchGitHubStats(),
+    sumLineageDownloads("last-month", REVALIDATE_HOURLY),
+    sumLineageDownloads("last-week", REVALIDATE_HOURLY),
+    fetchAllTimeDownloads(now, REVALIDATE_HOURLY),
+    fetchNativeDownloads(REVALIDATE_HOURLY),
+    fetchInstallerDownloads(REVALIDATE_HOURLY),
+  ])
+  return {
+    ...github,
+    totalDownloads: npmTotalDownloads + nativeDownloads + installerDownloads,
+    npmTotalDownloads,
+    nativeDownloads,
+    installerDownloads,
+    monthlyDownloads,
+    weeklyDownloads,
   }
 }
 
-async function fetchNpmDownloads(period: string): Promise<number> {
-  const results = await Promise.all(
-    NPM_PACKAGES.map((pkg) => fetchNpmDownloadsForPackage(period, pkg)),
-  )
-  return results.reduce((sum, n) => sum + n, 0)
-}
-
-async function fetchAllNpmDownloadsForPackage(pkg: string): Promise<number> {
-  const now = new Date()
-  let total = 0
-  let year = NPM_FIRST_PUBLISH_YEAR
-
-  while (year <= now.getFullYear()) {
-    const start = `${year}-01-01`
-    const endDate = new Date(year, 11, 31)
-    const end =
-      endDate > now ? (now.toISOString().split("T")[0] ?? `${year}-12-31`) : `${year}-12-31`
-
-    try {
-      const res = await fetch(`https://api.npmjs.org/downloads/point/${start}:${end}/${pkg}`, {
-        next: { revalidate: 3600 },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        total += data.downloads ?? 0
-      }
-    } catch {
-      continue
-    }
-    year++
-  }
-
-  return total
-}
-
-async function fetchAllNpmDownloads(): Promise<number> {
-  const results = await Promise.all(NPM_PACKAGES.map((pkg) => fetchAllNpmDownloadsForPackage(pkg)))
-  return results.reduce((sum, n) => sum + n, 0)
-}
-
+/**
+ * All-or-nothing: any failed sub-request rejects instead of contributing 0, so a partial
+ * aggregate is never returned or cached. An expired cache is served when a refresh fails.
+ */
 export async function getStats(): Promise<StatsData> {
   const now = Date.now()
 
@@ -143,17 +204,34 @@ export async function getStats(): Promise<StatsData> {
     return cache.data
   }
 
-  const [github, monthlyDownloads, weeklyDownloads, totalDownloads] = await Promise.all([
-    fetchGitHubStats(),
-    fetchNpmDownloads("last-month"),
-    fetchNpmDownloads("last-week"),
-    fetchAllNpmDownloads(),
-  ])
-
-  const data: StatsData = { ...github, totalDownloads, monthlyDownloads, weeklyDownloads }
-  cache = { data, timestamp: now }
-
-  return data
+  try {
+    const data = await fetchFreshStats(new Date(now))
+    cache = { data, timestamp: now }
+    await sharedStore()
+      ?.write(cache)
+      .catch((error: unknown) =>
+        console.warn("Stats: could not store the last known-good copy", error),
+      )
+    return data
+  } catch (error) {
+    if (cache) {
+      console.warn("Stats refresh failed; serving last known-good values", error)
+      return cache.data
+    }
+    const stored = await sharedStore()
+      ?.read()
+      .catch(() => null)
+    if (stored) {
+      console.warn(
+        "Stats refresh failed in a cold isolate; serving the shared last known-good values",
+        error,
+      )
+      // Kept with its original time, so the next request in this isolate tries a fresh refresh again.
+      cache = stored
+      return stored.data
+    }
+    throw error
+  }
 }
 
 export function formatStats(stats: StatsData): FormattedStatsData {

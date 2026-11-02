@@ -408,7 +408,7 @@ describe("DAG happy-path end to end", () => {
     const input = definition("linear-three", [
       categoryNode("plan"),
       categoryNode("build", ["plan"]),
-      agentNode("review", ["build"], "momus"),
+      agentNode("review", ["build"], "plan-reviewer"),
     ])
 
     // when
@@ -439,7 +439,7 @@ describe("DAG happy-path end to end", () => {
       categoryNode("root"),
       agentNode("left", ["root"]),
       categoryNode("right", ["root"], "deep"),
-      agentNode("join", ["left", "right"], "momus"),
+      agentNode("join", ["left", "right"], "plan-reviewer"),
     ])
 
     // when
@@ -471,7 +471,7 @@ describe("DAG happy-path end to end", () => {
       categoryNode("budget", ["intake"], "deep"),
       agentNode("build", ["design", "evidence"], "librarian"),
       categoryNode("docs", ["evidence", "budget"], "writing"),
-      agentNode("review", ["build", "docs"], "momus"),
+      agentNode("review", ["build", "docs"], "plan-reviewer"),
     ])
     const waves = [
       ["intake", "research"],

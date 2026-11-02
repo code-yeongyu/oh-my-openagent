@@ -228,7 +228,7 @@ describe("wireSessionStartProcessSweep()", () => {
     expect(sweepCalls).toBe(0)
     expect(logger.entries).toContainEqual({
       level: "info",
-      message: "omo-senpi process sweep skipped: running inside a senpi-task RPC child",
+      message: "omo-senpi process sweep skipped: running as a senpi-task child session",
     })
   })
 

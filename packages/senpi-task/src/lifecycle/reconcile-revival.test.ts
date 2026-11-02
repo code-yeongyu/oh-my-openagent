@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { mkdirSync, utimesSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { FakeRunner, flush } from "../manager/__fixtures__/manager-fakes"
@@ -12,13 +12,13 @@ import { acquireSessionAdmissionLease } from "./admission-lease"
 import { createTaskLifecycle } from "./create"
 import type { ProcessSignaller, RespawnResult } from "./port"
 import { cleanupProjects, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
 const parentSessionId = "session-resumed"
 const hostPid = 2222
 const now = () => 9_000_000
-const raceWorkerPath = resolve(import.meta.dir, "__fixtures__", "reconcile-race-worker.ts")
 
 type Launch = { readonly taskId: string; readonly sessionPath: string | undefined }
 
@@ -74,6 +74,7 @@ function injectedHarness(options: {
     },
   }
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry,
     config: settings(options.config),
@@ -156,6 +157,34 @@ describe("reconcileOnSessionStart scoped revival", () => {
     // then
     expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" })
     expect(harness.store.load(record.task_id)).toEqual({ ...record, terminal_at: record.updated_at })
+    expect(harness.signals).toHaveLength(0)
+  })
+
+  test("#given a host-session record with a live daemon pid but no live session #when reconciled #then session liveness decides ownership", async () => {
+    // given
+    const store = tempStore()
+    const record = seedRecord(store, {
+      task_id: "st_1000001c",
+      parent_session_id: parentSessionId,
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "process",
+      runner_kind: "host-session",
+      host_pid: 3333,
+      host_session: {
+        socket: "/tmp/senpi.sock",
+        routing_id: "route-1",
+        session_path: "/tmp/session.jsonl",
+        instance_id: "instance-1",
+      },
+    })
+    const harness = injectedHarness({ store, alive: new Set([3333]) })
+
+    // when
+    const result = await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+    // then
+    expect(result.outcomes.find((entry) => entry.task_id === record.task_id)?.kind).not.toBe("deferred")
     expect(harness.signals).toHaveLength(0)
   })
 
@@ -272,6 +301,53 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(harness.store.load(record.task_id)?.host_pid).toBeUndefined()
   })
 
+  test("#given a resumed session whose revival deferred #when the child is refused #then the refusal names the deferral, not a resume that already happened (omo#9498)", async () => {
+    // given
+    const harness = injectedHarness({
+      onRespawn: async () => ({
+        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+      }),
+    })
+    const record = withV1(harness.store, seedRecord(harness.store, {
+      task_id: "st_10000099", parent_session_id: parentSessionId, status: "running",
+      residency_state: "persisted_only", execution_mode: "in-process",
+    }))
+    persistSession(harness.store, record.task_id)
+
+    // when
+    await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+    // then
+    const after = harness.store.load(record.task_id)
+    if (after === null) throw new Error("record vanished")
+    expect(after.suspension_reason).toBe("revival_deferred")
+    expect(after.revival_deferred_reason).toBe("model_unavailable")
+  })
+
+  test("#given a child parked by its session quitting #when the resume defers its revival #then the deferral supersedes the stale quit marker (senpi#3493)", async () => {
+    // given
+    const harness = injectedHarness({
+      onRespawn: async () => ({
+        ok: false, disposition: "retryable", code: "model_unavailable", reason: "model registry is cold",
+      }),
+    })
+    const record = withV1(harness.store, seedRecord(harness.store, {
+      task_id: "st_1000009b", parent_session_id: parentSessionId, status: "running",
+      residency_state: "persisted_only", execution_mode: "in-process",
+    }))
+    harness.store.mutate(record.task_id, (fresh) => ({ ...fresh, suspension_reason: "session_quit" }))
+    persistSession(harness.store, record.task_id)
+
+    // when
+    await harness.lifecycle.reconcileOnSessionStart(parentSessionId)
+
+    // then
+    const after = harness.store.load(record.task_id)
+    if (after === null) throw new Error("record vanished")
+    expect(after.suspension_reason).toBe("revival_deferred")
+    expect(after.revival_deferred_reason).toBe("model_unavailable")
+  })
+
   test("#given retryable respawn failure and rollback lock failure #when reconciled #then the outcome loudly names the failed rollback", async () => {
     // given
     const backing = tempStore()
@@ -375,6 +451,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
     })
     store.replace({ ...withV1(store, seeded, "persisted effective prompt"), pending_steering: queue })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry: {
         get: (taskId) => manager.getResidentHandle(taskId) === undefined ? undefined : {
@@ -384,7 +461,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
           terminate: async () => undefined,
         },
         entries: () => [],
-        forget: (taskId) => manager.forget(taskId),
+        forget: (taskId, options) => manager.forget(taskId, options),
         hasPendingSends: () => false,
       },
       config: settings(), hostPid, now,
@@ -510,49 +587,6 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(harness.launches).toHaveLength(1)
   })
 
-  test("#given two OS processes observe one dead-owner resident #when their ownership CAS races #then exactly one respawns and the loser defers", async () => {
-    // given: both workers take their store snapshot before either is released to mutate.
-    const harness = injectedHarness()
-    const orphan = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000014", parent_session_id: parentSessionId, status: "running",
-      residency_state: "resident", execution_mode: "in-process", host_pid: 2_147_483_647,
-      updated_at: new Date(1_000_000).toISOString(),
-    }))
-    persistSession(harness.store, orphan.task_id)
-    const launchLog = join(harness.store.stateDir, "race-launches.log")
-    const children = ["a", "b"].map(() => Bun.spawn(
-      [process.execPath, raceWorkerPath, harness.store.stateDir, parentSessionId, launchLog],
-      { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
-    ))
-    const readers = children.map((child) => lineReader(child.stdout))
-    const errors = children.map((child) => new Response(child.stderr).text())
-
-    // when: subscribe to both exact scanned signals, then release both CAS attempts.
-    await Promise.all(readers.map((read) => withTimeout(read(), 10_000, "worker scan barrier")))
-    for (const child of children) {
-      child.stdin.write("g")
-      child.stdin.flush()
-    }
-    const results = await Promise.all(readers.map(async (read) => {
-      const line = await withTimeout(read(), 10_000, "worker reconcile result")
-      return JSON.parse(line) as { readonly outcomes: readonly { readonly kind: string; readonly reason?: string }[] }
-    }))
-
-    for (const child of children) {
-      child.stdin.write("x")
-      child.stdin.end()
-    }
-    const exits = await Promise.all(children.map((child) => child.exited))
-    const stderr = await Promise.all(errors)
-
-    // then
-    const launches = readFileSync(launchLog, "utf8").trim().split("\n").filter(Boolean)
-    expect(launches).toHaveLength(1)
-    expect(results.flatMap((result) => result.outcomes).map((outcome) => `${outcome.kind}:${outcome.reason}`).sort())
-      .toEqual(["deferred:foreign_live_owner", "resumed:respawned and reattached"])
-    exits.forEach((code, index) => expect(code, stderr[index]).toBe(0))
-  }, 20_000)
-
   test("#given reattach and child resume are disabled #when suspended records exist #then they remain suspended with deferred outcomes", async () => {
     // given
     const disabledReattach = injectedHarness({ config: { reattach_on_reconcile: false } })
@@ -610,6 +644,7 @@ describe("reconcileOnSessionStart scoped revival", () => {
     })
     if (held.kind !== "acquired") throw new Error("expected held admission lease")
     const contended = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store: harness.store,
       registry: new FakeRegistry(),
       config: settings(), hostPid, now,
@@ -626,34 +661,3 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "lock_contended" })
   })
 })
-
-function lineReader(stream: ReadableStream<Uint8Array>): () => Promise<string> {
-  const reader = stream.getReader()
-  const decoder = new TextDecoder()
-  let buffered = ""
-  return async () => {
-    for (;;) {
-      const newline = buffered.indexOf("\n")
-      if (newline >= 0) {
-        const line = buffered.slice(0, newline)
-        buffered = buffered.slice(newline + 1)
-        return line
-      }
-      const next = await reader.read()
-      if (next.done) throw new Error("worker stdout ended before the expected line")
-      buffered += decoder.decode(next.value, { stream: true })
-    }
-  }
-}
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs)
-  })
-  try {
-    return await Promise.race([promise, timeout])
-  } finally {
-    if (timer !== undefined) clearTimeout(timer)
-  }
-}

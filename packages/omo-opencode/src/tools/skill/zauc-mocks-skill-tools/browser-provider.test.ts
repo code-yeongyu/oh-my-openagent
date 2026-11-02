@@ -4,29 +4,30 @@ import { describe, expect, it } from "bun:test"
 import { createMockSkill, createSkillTool, mockContext } from "./test-support"
 
 describe("skill tool - browserProvider forwarding", () => {
-  it("passes browserProvider to getAllSkills during execution", async () => {
-    const agentBrowserSkill = createMockSkill("agent-browser")
+  it("returns selected browser skill content during execution", async () => {
+    // Given: the selected browser skill in the registry.
+    const browserSkill = createMockSkill("dev-browser")
     const tool = createSkillTool({
-      skills: [agentBrowserSkill],
-      browserProvider: "agent-browser",
+      skills: [browserSkill],
+      browserProvider: "dev-browser",
       includeSkillsInDescription: true,
     })
-
-    const result = await tool.execute({ name: "agent-browser" }, mockContext)
-
-    expect(result).toContain(agentBrowserSkill.definition.template)
-
+    // When: requesting the selected skill.
+    const result = await tool.execute({ name: "dev-browser" }, mockContext)
+    // Then: the registered template reaches the caller unchanged.
+    expect(result).toContain(browserSkill.definition.template)
   })
 
-  it("description includes agent-browser when browserProvider is agent-browser", () => {
-    const agentBrowserSkill = createMockSkill("agent-browser")
-
+  it("advertises the selected browser skill id", () => {
+    // Given: an explicit alternate provider.
+    const browserSkill = createMockSkill("dev-browser")
+    // When: building the skill tool.
     const tool = createSkillTool({
-      skills: [agentBrowserSkill],
-      browserProvider: "agent-browser",
+      skills: [browserSkill],
+      browserProvider: "dev-browser",
       includeSkillsInDescription: true,
     })
-
-    expect(tool.description).toContain("agent-browser")
+    // Then: the machine-routable skill name is advertised.
+    expect(tool.description).toContain(browserSkill.name)
   })
 })

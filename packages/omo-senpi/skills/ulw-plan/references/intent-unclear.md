@@ -20,7 +20,7 @@ TOPOLOGY LOCK still applies: enumerate the 1-6 independently-succeed/fail compon
 </research_protocol>
 
 <default_selection>
-For each open decision - including the extrinsic axes the sweep names (budget, mandated stack, expected scale, target audience / compliance) - adopt the defensible best-practice default (industry standard or repo convention), RECORD it in the draft's Open-assumptions ledger with rationale and reversibility, and proceed. NO numeric scoring - the ledger IS the audit trail. The ONLY default escalated to a single focused question is one that is irreversible, destructive, or safety-critical, or commits real spend the user never authorized, and research cannot settle.
+For each open decision - including the extrinsic axes the sweep names (budget, mandated stack, expected scale, target audience / compliance) - adopt the default the ideal state for the affected user demands (industry standard and repo convention are evidence for it, never the default itself), RECORD it in the draft's Open-assumptions ledger with rationale and reversibility, and proceed. NO numeric scoring - the ledger IS the audit trail. The ONLY default escalated to a single focused question is one that is irreversible, destructive, or safety-critical, or commits real spend the user never authorized, and research cannot settle.
 
 Fold a contrarian self-grill into the Plan Consultant spawn: challenge the single highest-leverage adopted assumption - is this constraint real or habitual; does any adopted default add complexity the request never asked for? - and return concrete reframes. The grill targets incidental complexity (unneeded abstraction, speculative capacity), NEVER the feature set: reducing, phasing, or deferring part of the request is not a reframe. Fold a reframe into the plan only as a recommended default plus rationale, never as a forced change.
 </default_selection>
@@ -38,7 +38,7 @@ Still present a brief and wait for the user's explicit okay - approval is not ex
 <worked_example>
 Request: "make auth better".
 1. Research waves -> current auth at `src/auth/*` and evidence for the requested improvement; best-practice baselines via librarian.
-2. Topology lock as an ANNOUNCEMENT, not a question: components refine the evidenced auth intent in full, such as session hardening, brute-force protection, and password policy when the repository supports them. MFA is an adjacent capability and stays in Scope OUT unless the user asks for it or evidence establishes it as part of the requested outcome.
+2. Affected user and ideal state, announced: the people who sign in and the operators who read auth logs; IS rows the evidence supports - a legitimate user is never locked out, brute force is stopped, a session is never reusable after a privilege change. Topology lock as an ANNOUNCEMENT, not a question: components refine the evidenced auth intent in full, such as session hardening, brute-force protection, and password policy when the repository supports them. MFA is an adjacent capability and stays in Scope OUT unless the user asks for it or evidence establishes it as part of the requested outcome.
 3. Adopted-defaults table (assumption | default | rationale | reversible?): bcrypt rounds 8 -> 12 (reversible), add 5/min-per-IP login limit (reversible), rotate session id on privilege change (reversible).
 4. Plan Consultant folded -> auto plan-reviewer review (fix eligible gaps under the bounded convergence contract) -> brief LEADING with the approach and the defaults, surfaced in the human TL;DR for veto.
 </worked_example>

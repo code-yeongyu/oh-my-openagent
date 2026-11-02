@@ -31,6 +31,7 @@ import {
   writeMockModelsJson,
 } from "./lib/harness.mjs"
 import { loadMirror, startDesktopShell } from "./lib/desktop-shell.mjs"
+import { isolatedChildEnv } from "../sandbox-child-env.mjs"
 
 const report = createReport("terminal-to-ui")
 installCleanupHooks()
@@ -73,7 +74,7 @@ try {
       binaryPath,
       cwd: scratch.cwd,
       socketPath,
-      env: { ...scratch.env, SENPI_CODING_AGENT_DIR: scratch.agentDir, OMO_CODING_AGENT_DIR: scratch.agentDir },
+      env: { ...isolatedChildEnv(scratch.env, scratch.agentDir), SENPI_CODING_AGENT_DIR: scratch.agentDir, OMO_CODING_AGENT_DIR: scratch.agentDir },
     })
     const mirror = yield* makeOmoSessionMirror({
       shared,
@@ -91,6 +92,10 @@ try {
     yield* Effect.promise(() =>
       terminal.request({ type: "set_session_name", sessionId: opened.routingId, name: "terminal-session" }),
     )
+    // The mirror creates a row only for a session that holds a conversation (desktop
+    // `sessionHasConversation`: an empty session is a probe, not a user), so the terminal user
+    // says something first. The turn settles before the mirror starts observing.
+    yield* Effect.promise(() => terminal.promptAndSettle(opened.routingId, "t13c-terminal-first-turn"))
     const durableId = opened.state.sessionId
     const expectedThreadId = deriveMirrorThreadId(durableId)
     const expectedProjectId = deriveMirrorProjectId(terminalCwd)
@@ -107,7 +112,12 @@ try {
       ).pipe(Effect.timeout("30 seconds")),
     )
     yield* Effect.forkScoped(
-      mirror.refresh.pipe(Effect.repeat(Schedule.spaced("200 millis")), Effect.ignore),
+      mirror.refresh.pipe(
+        Effect.repeat(Schedule.spaced("200 millis")),
+        // A failed refresh ends the loop and would surface only as the 30 s timeout above; name it.
+        Effect.tapError((error) => Effect.sync(() => report.log(`mirror-refresh-failed ${error?._tag ?? "error"} ${JSON.stringify(error)}`))),
+        Effect.ignore,
+      ),
     )
     const createdEvent = yield* Fiber.join(created)
     report.log(`terminal durable=${durableId} derived_thread=${expectedThreadId}`)

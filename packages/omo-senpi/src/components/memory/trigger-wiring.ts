@@ -17,7 +17,7 @@ export type ResolvedTriggerConfig = TriggerConfig & { readonly enabled: boolean 
 
 /** Narrow view of memory-core's ReflectionReservationStore used by the wiring. */
 export interface ReflectionTriggerEngine {
-  evaluate(conversationId: string, event: ReflectionEvent): Promise<ReservationResult | null>
+  evaluate(conversationId: string, event: ReflectionEvent, signal?: AbortSignal): Promise<ReservationResult | null>
 }
 
 /** Per-session memory state the wiring evaluates against. */
@@ -47,7 +47,7 @@ export interface ReflectionTriggerWiringOptions {
   /** Launch action. Todo 23's detached worker plugs in here; the default is a no-op. */
   readonly onLaunch?: (request: ReflectionRequest) => void
   /**
-   * Accepted-compaction observer. The kibitzer gate drops that session's pending nudges here: they
+   * Accepted-compaction observer. Kibitzer delivery drops that session's held nudges here: they
    * judged a transcript the compaction has just replaced. Kept on THIS seam rather than a second
    * session_compact handler so both consumers see exactly the same accepted events.
    */
@@ -79,8 +79,10 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
     inFlight.add(promise)
   }
 
-  async function evaluateAndLaunch(session: ReflectionTriggerSession, event: ReflectionEvent): Promise<void> {
-    const result = await session.engine.evaluate(session.conversationId, event)
+  async function evaluateAndLaunch(session: ReflectionTriggerSession, event: ReflectionEvent, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
+    const result = await session.engine.evaluate(session.conversationId, event, signal)
+    signal?.throwIfAborted()
     // Only the run that won the active slot launches now; a pending reservation launches when the
     // active run completes (todo 23), which is what keeps repeated settles down to a single run.
     if (result?.status !== "active") return
@@ -103,7 +105,7 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
         outcomes.set(session.conversationId, readOutcome(payload))
       })
 
-      pi.on("agent_settled", async (_payload, eventCtx) => {
+      pi.on("agent_settled", async (_payload, eventCtx, observer) => {
         const session = options.resolveSession(eventCtx)
         if (!session) return
         const outcome = outcomes.get(session.conversationId)
@@ -117,14 +119,18 @@ export function createReflectionTriggerWiring(options: ReflectionTriggerWiringOp
         // Not tracked through whenIdle: the host already awaits this handler.
         try {
           if (session.ledger.pendingCompaction) {
-            await session.engine.evaluate(session.conversationId, { kind: "compaction_accepted" })
+            observer?.phase("reflection.compaction.evaluate")
+            await session.engine.evaluate(session.conversationId, { kind: "compaction_accepted" }, observer?.signal)
+            observer?.signal.throwIfAborted()
             session.ledger.pendingCompaction = false
           }
-          await evaluateAndLaunch(session, { kind: "settled", success: true })
+          observer?.phase("reflection.settled.evaluate")
+          await evaluateAndLaunch(session, { kind: "settled", success: true }, observer?.signal)
         } catch (error: unknown) {
+          if (observer?.signal.aborted) return
           options.logger?.warn("omo-senpi memory reflection trigger failed", { error: describe(error) })
         }
-      })
+      }, { hookLabel: "reflection.evaluate" })
 
       pi.on("session_compact", (payload, eventCtx) => {
         if (!isAcceptedCompaction(payload)) return

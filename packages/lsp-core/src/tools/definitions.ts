@@ -21,7 +21,8 @@ export const LSP_MCP_TOOLS: LspMcpTool[] = [
 		name: "diagnostics",
 		aliases: ["lsp_diagnostics"],
 		title: "LSP Diagnostics",
-		description: "Get errors, warnings, and hints for a source file or directory.",
+		description:
+			"Get errors, warnings, and hints for a source file or directory. In a Bun project, a TypeScript directory is typechecked with `bun check`, plus `bun lint` when the installed Bun has it.",
 		inputSchema: objectSchema(
 			{
 				filePath: { type: "string", description: "File or directory path to check." },

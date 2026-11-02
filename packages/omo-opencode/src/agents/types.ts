@@ -1,39 +1,35 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
 import {
-  isClaudeFable5Model,
   isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
-  isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
-  isClaudeOpus48Model,
-  isClaudeOpus5Model,
   isGeminiModel,
   isGlmModel,
   isGptModel,
   isGrok45Model,
   isGrok46Model,
+  isKimiK2CodeModel,
   isKimiK2Model,
   isKimiK27Model,
+  isKimiK28Model,
   isKimiK3Model,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
 export {
-  isClaudeFable5Model,
   isClaudeFableOrMythosModel,
   isClaudeOpus46Model,
-  isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
-  isClaudeOpus48Model,
-  isClaudeOpus5Model,
   isGeminiModel,
   isGlmModel,
   isGptModel,
   isGrok45Model,
   isGrok46Model,
+  isKimiK2CodeModel,
   isKimiK2Model,
   isKimiK27Model,
+  isKimiK28Model,
   isKimiK3Model,
   isMiniMaxModel,
 };

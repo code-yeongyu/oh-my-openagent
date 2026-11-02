@@ -64,7 +64,10 @@ export async function isServerRunning(serverUrl: string, options: IsServerRunnin
 			}).catch(() => null)
 			clearTimeout(timeout)
 
-			if (response?.ok) {
+			// 401/403 means a server is listening and requires auth (omo run sets a per-run password,
+			// omo#11367); this probe only asks whether the server is alive, and a sweeping process
+			// never holds another run's password.
+			if (response?.ok || response?.status === 401 || response?.status === 403) {
 				if (state) {
 					state.serverCheckUrl = serverUrl
 					state.serverAvailable = true

@@ -55,3 +55,64 @@ export async function readDarwinProcessStartSeconds(pid: number): Promise<number
   const startSeconds = Number(view.getBigUint64(START_TVSEC_OFFSET, true))
   return startSeconds > 0 ? startSeconds : null
 }
+
+// Windows used to answer the same question by spawning `powershell.exe Get-Process` under a 2 s
+// execFile budget. On a loaded runner PowerShell start-up alone crosses that budget, every probe is
+// killed and reports null, and a null own identity is deliberately never memoized - so every lock
+// record creation paid the full 2 s and the two-process takeover test starved (#8294). kernel32's
+// GetProcessTimes answers in-process in microseconds for our own pid and for foreign owners alike.
+
+const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+type ProcessHandle = import("bun:ffi").Pointer | bigint
+
+type Kernel32ProcessTimes = {
+  readonly OpenProcess: (access: number, inheritHandle: number, pid: number) => ProcessHandle | null
+  readonly GetProcessTimes: (
+    handle: ProcessHandle,
+    creation: BigUint64Array,
+    exit: BigUint64Array,
+    kernel: BigUint64Array,
+    user: BigUint64Array,
+  ) => number
+  readonly CloseHandle: (handle: ProcessHandle) => number
+}
+
+let kernel32Lookup: Promise<Kernel32ProcessTimes | null> | null = null
+
+async function openKernel32(): Promise<Kernel32ProcessTimes | null> {
+  if (process.platform !== "win32") return null
+  try {
+    const { dlopen, FFIType } = await import("bun:ffi")
+    const library = dlopen("kernel32.dll", {
+      OpenProcess: { args: [FFIType.u32, FFIType.i32, FFIType.u32], returns: FFIType.ptr },
+      GetProcessTimes: { args: [FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr], returns: FFIType.i32 },
+      CloseHandle: { args: [FFIType.ptr], returns: FFIType.i32 },
+    })
+    return library.symbols
+  } catch {
+    return null
+  }
+}
+
+/**
+ * FILETIME (100 ns ticks since 1601-01-01 UTC) at which `pid` was created, read without spawning a
+ * process, or `null` when win32 cannot answer it (dead pid, inaccessible process, FFI unavailable).
+ */
+export async function readWin32ProcessCreationFiletime(pid: number): Promise<bigint | null> {
+  if (process.platform !== "win32") return null
+  if (!Number.isSafeInteger(pid) || pid <= 0) return null
+  kernel32Lookup ??= openKernel32()
+  const kernel32 = await kernel32Lookup
+  if (kernel32 === null) return null
+  const handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
+  if (handle === null || handle === 0 || handle === 0n) return null
+  try {
+    const creation = new BigUint64Array(1)
+    const ok = kernel32.GetProcessTimes(handle, creation, new BigUint64Array(1), new BigUint64Array(1), new BigUint64Array(1))
+    const filetime = creation[0] ?? 0n
+    return ok === 0 || filetime === 0n ? null : filetime
+  } finally {
+    kernel32.CloseHandle(handle)
+  }
+}

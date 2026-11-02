@@ -5,8 +5,6 @@
 // neutral document, discarding all caller prose. This module owns the policy data and the pure
 // lookup; behavior wiring lives at the manager/tool boundary, exactly like invocation-guard.ts.
 
-import { canonicalAgentName } from "./legacy-agent-names"
-
 export type AgentInteractionPolicy = {
   readonly oneShot: true
   readonly promptContract: "plan-review"
@@ -37,9 +35,8 @@ export const ONE_SHOT_AGENT_NAMES: ReadonlySet<string> = new Set(
     .map(([name]) => name),
 )
 
-// Canonicalized so a retired id (a task record persisted before the rename still carries it as
-// agent_type) resolves onto the canonical policy and keeps refusing task_send for the alias's
-// release window; the denial still names the record's own agent_type to the caller.
+// Exact-name lookup: a record whose agent_type is not a policy-carrying agent has no policy.
 export function interactionPolicyForAgent(agentName: string): AgentInteractionPolicy | undefined {
-  return POLICIES[canonicalAgentName(agentName).name]
+  const trimmed = agentName.trim()
+  return Object.hasOwn(POLICIES, trimmed) ? POLICIES[trimmed] : undefined
 }

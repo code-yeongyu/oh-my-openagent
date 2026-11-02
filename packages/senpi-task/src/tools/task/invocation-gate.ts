@@ -1,4 +1,4 @@
-import { EMPTY_SKILL_INVOCATIONS, canonicalAgentName, evaluateInvocationGuard, invocationConditionForAgent } from "../../agents"
+import { EMPTY_SKILL_INVOCATIONS, evaluateInvocationGuard, invocationConditionForAgent } from "../../agents"
 
 import type { TaskToolDeps } from "./types"
 
@@ -7,11 +7,9 @@ import type { TaskToolDeps } from "./types"
 // may proceed. A missing resolver fails CLOSED - without session state there is no proof the
 // required skill was invoked.
 export function invocationGateDenial(deps: TaskToolDeps, subagentType: string, sessionId: string): string | undefined {
-  // The gate runs on the canonical id (todo 1's alias table): a legacy curated id is gated
-  // identically to its canonical replacement and the denial names the canonical agent.
-  const canonical = canonicalAgentName(subagentType).name
-  if (invocationConditionForAgent(canonical) === undefined) return undefined
+  const name = subagentType.trim()
+  if (invocationConditionForAgent(name) === undefined) return undefined
   const state = deps.resolveSkillInvocations?.(sessionId) ?? EMPTY_SKILL_INVOCATIONS
-  const verdict = evaluateInvocationGuard(canonical, state)
+  const verdict = evaluateInvocationGuard(name, state)
   return verdict.kind === "deny" ? verdict.message : undefined
 }

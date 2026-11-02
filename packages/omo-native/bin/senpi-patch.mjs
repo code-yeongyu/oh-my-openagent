@@ -1,10 +1,16 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
-import { prepareCompileSafeEngine } from "./lib/compile-safe-engine.js"
+import { ensureBunBinShim } from "./lib/bun-bin-shim.js"
+import { prepareInstalledEngine, preparePluginLaunchSpec, writeEnginePreparedStamp } from "./lib/engine-prepare.js"
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
+
+// Prepare the package-owned entrypoint before a Bun-only machine's first launch (#9293).
+// Bun owns the global bin symlinks; this restores only our legacy marked regular wrappers.
+// It cannot undo a link error Bun recorded before postinstall began (#11019).
+ensureBunBinShim({ scriptPath: join(packageRoot, "bin", "omo.js") })
 const require = createRequire(join(packageRoot, "package.json"))
 let senpiRoot = process.env.OMO_SENPI_PATCH_ROOT
 try {
@@ -23,25 +29,6 @@ try {
   throw new Error("omo-ai: unable to resolve the installed @code-yeongyu/senpi package", { cause: error })
 }
 
-const claudeCodeVersionRelative = "node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.js"
-const claudeCodeVersionPattern = /const claudeCodeVersion = "(\d+)\.(\d+)\.(\d+)";/
-const claudeCodeVersionFloor = "2.1.251"
-
-const claudeCodeVersionPath = join(senpiRoot, claudeCodeVersionRelative)
-if (!existsSync(claudeCodeVersionPath)) throw new Error(`omo-ai: installed Senpi target is missing: ${claudeCodeVersionRelative}`)
-const claudeCodeSource = readFileSync(claudeCodeVersionPath, "utf8")
-const claudeCodeMatch = claudeCodeVersionPattern.exec(claudeCodeSource)
-if (claudeCodeMatch === null) throw new Error(`omo-ai: unsupported Senpi ${claudeCodeVersionRelative}`)
-const [floorMajor, floorMinor, floorPatch] = claudeCodeVersionFloor.split(".").map(Number)
-const [major, minor, patch] = claudeCodeMatch.slice(1).map(Number)
-const belowFloor =
-  major < floorMajor ||
-  (major === floorMajor && (minor < floorMinor || (minor === floorMinor && patch < floorPatch)))
-if (belowFloor) {
-  writeFileSync(
-    claudeCodeVersionPath,
-    claudeCodeSource.replace(claudeCodeVersionPattern, `const claudeCodeVersion = "${claudeCodeVersionFloor}";`),
-  )
-}
-
-prepareCompileSafeEngine(senpiRoot)
+preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
+prepareInstalledEngine(senpiRoot)
+writeEnginePreparedStamp(senpiRoot, JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")).version)

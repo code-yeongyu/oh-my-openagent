@@ -4,11 +4,8 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import {
-  fetchNpmDistTagsSync,
-  latestFromDistTags,
-  runDoctor,
-} from "../bin/lib/doctor.js"
+import { latestFromDistTags, runDoctor } from "../bin/lib/doctor.js"
+import { fetchNpmDistTagsSync } from "../bin/lib/npm-dist-tags.js"
 import { packageManifest, updateTarget } from "../bin/lib/package-paths.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
@@ -17,7 +14,6 @@ const artifacts = [
   ["plugin manifest", "plugin/package.json"],
   ["extension", "plugin/extensions/omo.js"],
   ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-  ["agent-toolkit runtime", "plugin/runtime/agent-toolkit/cli.js"],
 ] as const
 
 type Fixture = { root: string; packageRoot: string; launcher: string; agentDir: string }

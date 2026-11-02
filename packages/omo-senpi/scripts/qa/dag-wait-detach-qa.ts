@@ -24,13 +24,14 @@ import {
 import { IdleInjectionCoordinator } from "../../src/extension/idle-injection-coordinator"
 import { runDagTool, type DagToolResult } from "../../src/components/task/dag-tool"
 import { createDagWake } from "../../src/components/task/dag-wake"
+import { resolveOutDirArg } from "./out-dir-arg"
 
 const PARENT_SESSION = "session-detach-qa"
 const ROOT_SESSION = "session-detach-qa"
 const RUN_ID = "run-wait-detach" as DagRunId
 const RUN_NAME = "wait detach qa"
 
-const outDir = process.argv[2] ?? join(tmpdir(), "dag-wait-detach-qa")
+const outDir = resolveOutDirArg(process.argv.slice(2), join(tmpdir(), "dag-wait-detach-qa"))
 const failures: string[] = []
 const report: Record<string, unknown> = {}
 

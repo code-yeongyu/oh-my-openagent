@@ -44,7 +44,7 @@ flowchart TB
     subgraph Delegation["task tool"]
         Worker["Category worker<br/>task(category=...)"]
         Curated["Curated read-only agents<br/>explore / librarian /<br/>plan-consultant / plan-reviewer"]
-        Reviewers["ulw-loop reviewers<br/>omo-senpi-code-reviewer /<br/>omo-senpi-qa-executor /<br/>omo-senpi-gate-reviewer"]
+        Reviewers["ulw-loop reviewers<br/>omo-native-code-reviewer /<br/>omo-native-qa-executor /<br/>omo-native-gate-reviewer"]
     end
 
     Kibitzer["Kibitzer<br/>(memory recall nudges)"]
@@ -70,7 +70,7 @@ Every spawn provides exactly one of `category` or `subagent_type`:
 - `task(category="...")` routes to **the category worker**: a fresh worker session configured by the category's model and skills. This is how implementation, tests, and QA get done. A category-routed task always takes its model from `omo.json` (`categories.<name>.models`); passing `model` alongside `category` is rejected.
 - `task(subagent_type="...")` invokes a named agent directly. The builtin roster is:
   - Curated read-only agents (in-process, cannot write files): `explore` (codebase grep: "where is X?"), `librarian` (remote repos, official docs, OSS examples), `plan-consultant` (pre-planning gap analysis), `plan-reviewer` (plan review). `plan-consultant` and `plan-reviewer` are **plan-gated**: spawnable only after you explicitly asked for the ulw-plan workflow, a `.omo/plans/*.md` file was touched this session, and `/ulw-execute` hasn't run.
-  - ulw-loop reviewers (they write report artifacts, so they aren't in the read-only set): `omo-senpi-code-reviewer` (diff, tests, risk), `omo-senpi-qa-executor` (runs real scenarios, records surface evidence), `omo-senpi-gate-reviewer` (approves unless it can cite a failed success criterion).
+  - ulw-loop reviewers (they write report artifacts, so they aren't in the read-only set): `omo-native-code-reviewer` (diff, tests, risk), `omo-native-qa-executor` (runs real scenarios, records surface evidence), `omo-native-gate-reviewer` (approves unless it can cite a failed success criterion). The pre-rename `omo-senpi-*` spellings still resolve.
 
 Useful spawn options: `run_in_background: true` for parallel waves (the default posture), `load_skills` to prepend skills to the child's prompt, `name` for a stable handle, `task_summary` for the one-line footer label. Continue a child with `task_send`, peek with `task_output`, end it with `task_cancel`; `/tasks` lists what this session spawned. `plan-reviewer` is one-shot: `task_send` to it is always refused.
 
@@ -78,7 +78,7 @@ Curated agents are rejected as team members. Route them through `task`, never `t
 
 ### Kibitzer memory nudges
 
-Kibitzer is the memory component's read-only recall judge. At tool-call boundaries and at settle it looks at the turn's lexical candidates and, when a stored memory is relevant, injects one notice reading `recalled memory: <hint>`. It never edits anything and never wakes an idle session; it just reminds the main agent of what it already knows. `/search` is the manual recall surface.
+Kibitzer is the memory component's read-only recall judge: one resident sidecar session per main agent session, started lazily and kept for the life of that session. Every prompt, tool call and tool result of the main session is fed to it as a bounded, redacted event (tool arguments, result heads, assistant text and prompts are all capped; secrets are masked before anything is stored). It only spends a model turn when a prompt or tool call surfaces a stored memory it has not judged yet, and at most two such wakes run at once per machine. Inside a wake it can `read` and `grep` the workspace, page the parent transcript with `session_entries`, and `search`/`read` memory - eight tool calls per wake, read-only, nothing that writes memory or files - and its only output is `nudge`, which becomes a notice reading `recalled memory: <hint>` on the main agent's side. When its own context fills up it reseeds itself with what it has already delivered or rejected; when its model fails it backs off and comes back later. It never edits anything and never wakes an idle session; it just reminds the main agent of what it already knows. `/search` is the manual recall surface, and `memory.recall.enabled: false` turns Kibitzer off.
 
 ---
 
@@ -129,7 +129,7 @@ High-accuracy review is the default for every plan `/ulw-plan` produces; the onl
 - QA scenarios name the tool, the steps, and the expected result
 - No missing information would stop execution cold
 
-An approval whose remaining items are notes counts as approval. On a rejection the planner fixes every cited issue and resubmits. Rounds are capped at 5 unless you ask for more.
+An approval whose remaining items are notes counts as approval. On a rejection the planner fixes every cited issue and resubmits. Review keeps going while each round finds something new that matters or confirms an earlier blocker fixed, and stops to ask you when a round does neither but still does not approve. A round that approves with only notes left ends the review.
 
 The spawn is contract-driven: the harness replaces the `plan-reviewer` prompt with the canonical review contract (one `.omo/plans/*.md` path), so anything else in the prompt is discarded.
 
@@ -232,7 +232,7 @@ Some categories gate on a model being present in your registry (`ultrabrain` and
 
 ```typescript
 task({ category: "visual-engineering", load_skills: ["frontend"], prompt: "..." });
-task({ category: "deep", load_skills: ["playwright"], prompt: "..." });
+task({ category: "deep-low", load_skills: ["playwright"], prompt: "..." });
 ```
 
 The main agent's own skills (`ulw-plan`, `ulw-execute`, `ulw-loop`, `mass-ulw`, `hyperplan`, `ultrawork`, `ulw-research`) are invoked by name; workers get skills only through `load_skills`.
@@ -257,7 +257,7 @@ Team mode is for overlapping lanes that need to exchange discoveries mid-flight.
 {
   "agents": {
     "plan-consultant": {
-      "models": ["anthropic/claude-opus-5"]
+      "models": ["anthropic/claude-opus-5-5"]
     },
     "plan-reviewer": {
       "models": ["openai/gpt-5.6-sol"],
@@ -269,10 +269,10 @@ Team mode is for overlapping lanes that need to exchange discoveries mid-flight.
   },
   "categories": {
     "quick": {
-      "models": ["anthropic/claude-haiku-4-5"]
+      "models": ["anthropic/claude-haiku-5-5"]
     },
     "writing": {
-      "models": ["anthropic/claude-opus-5"]
+      "models": ["anthropic/claude-opus-5-5"]
     }
   }
 }

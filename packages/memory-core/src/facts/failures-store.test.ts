@@ -9,6 +9,7 @@ import { createLockRecord, factsQueueLockPath, withLock } from "../locks"
 import { factsQueuePaths } from "./schema"
 import { FactsFailuresCorruptError } from "./failures-schema"
 import { FactsFailureStore } from "./failures-store"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-failures-agent"
 const CONVERSATION = "conversation-alpha"
@@ -17,7 +18,7 @@ const tempDirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
   )
 })
 

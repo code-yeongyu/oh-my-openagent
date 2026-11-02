@@ -8,11 +8,11 @@ describe("resolveMemorySessionModel", () => {
       // given: the same context object that already carries modelRegistry also carries model
       const eventCtx = {
         modelRegistry: { getAvailable: () => [], find: () => undefined },
-        model: { provider: "anthropic", id: "claude-opus-5", name: "Claude Opus 5", contextWindow: 200_000 },
+        model: { provider: "anthropic", id: "claude-opus-5-5", name: "Claude Opus 5", contextWindow: 200_000 },
       }
 
       // when / then
-      expect(resolveMemorySessionModel(eventCtx)).toEqual({ provider: "anthropic", id: "claude-opus-5" })
+      expect(resolveMemorySessionModel(eventCtx)).toEqual({ provider: "anthropic", id: "claude-opus-5-5" })
     })
   })
 
@@ -26,7 +26,7 @@ describe("resolveMemorySessionModel", () => {
       expect(resolveMemorySessionModel({})).toBeUndefined()
       expect(resolveMemorySessionModel({ model: undefined })).toBeUndefined()
       expect(resolveMemorySessionModel({ model: { provider: "anthropic" } })).toBeUndefined()
-      expect(resolveMemorySessionModel({ model: { id: "claude-opus-5" } })).toBeUndefined()
+      expect(resolveMemorySessionModel({ model: { id: "claude-opus-5-5" } })).toBeUndefined()
       expect(resolveMemorySessionModel({ model: { provider: "", id: "x" } })).toBeUndefined()
       expect(resolveMemorySessionModel({ model: { provider: "x", id: "" } })).toBeUndefined()
       expect(resolveMemorySessionModel({ model: { provider: 1, id: 2 } })).toBeUndefined()

@@ -8,7 +8,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
-import { NUDGED_ENTRY_TYPE } from "./kibitzer-notice"
+import { NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
 import { RECALL_CUSTOM_TYPE, createMemoryRecallWiring } from "./recall-wiring"
 import { createRecallDrain } from "./recall-drain"
 import { rmEfaultTolerant } from "./teardown.test-support"
@@ -43,7 +43,6 @@ interface WiringInput {
   readonly env?: Record<string, string | undefined>
   readonly logs?: Array<{ message: string; details?: unknown }>
   readonly ledgerFor?: (context: MemoryIdentityContext) => RecallLedgerType
-  readonly currentCompactionEpoch?: (sessionId: string) => number
 }
 
 function wiringFor(input: WiringInput) {
@@ -57,9 +56,6 @@ function wiringFor(input: WiringInput) {
     createRepo: () => input.repo,
     env: input.env ?? {},
     ...(input.ledgerFor === undefined ? {} : { ledgerFor: input.ledgerFor }),
-    ...(input.currentCompactionEpoch === undefined
-      ? {}
-      : { currentCompactionEpoch: input.currentCompactionEpoch }),
     ...(input.logs === undefined
       ? {}
       : {
@@ -84,10 +80,10 @@ async function dispatch(
 const NUDGE = { path: ROLLOUTS_PATH, hint: "Drain kubernetes nodes before a rollout." }
 
 describe("createMemoryRecallWiring pending-nudge injection", () => {
-  test("#given a pending nudge from the gate #when before_agent_start dispatches #then the hidden sourced block is injected", async () => {
+  test("#given a pending nudge from delivery #when before_agent_start dispatches #then the hidden sourced block is injected", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)
-    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 0 })
+    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE])
     const pi = new MemoryFakeExtensionAPI()
     wiringFor({ repo, identity: context }).register(pi)
 
@@ -103,11 +99,34 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     expect(result?.message?.content).toContain(`<recalled-memory source="[[${ROLLOUTS_PATH}]]">`)
   }, 30_000)
 
+  test("#given a pending nudge #when a preview dispatch runs before a real turn #then preview consumes nothing and the real turn still injects it", async () => {
+    // given
+    const { repo, context } = await fixture(tempDirs)
+    const pending = new PendingNudges(context.identityPaths.recallPending)
+    await pending.write(SESSION_ID, [NUDGE])
+    const pi = new MemoryFakeExtensionAPI()
+    wiringFor({ repo, identity: context }).register(pi)
+
+    // when
+    const preview = await pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: KUBERNETES_PROMPT, systemPrompt: "SYSTEM", preview: true },
+      eventContext([userEntry("m1", KUBERNETES_PROMPT)]),
+    )
+    expect(preview).toEqual([undefined])
+    expect(pi.entries).toEqual([])
+    const real = await dispatch(pi, eventContext([userEntry("m1", KUBERNETES_PROMPT)]), KUBERNETES_PROMPT)
+
+    // then
+    expect(real?.message?.content).toBe(renderNudgeBlock(NUDGE))
+    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
+  }, 30_000)
+
   test("#given an injected nudge #when the turn starts #then the path is ledgered and the pending file is consumed", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)
     const pending = new PendingNudges(context.identityPaths.recallPending)
-    await pending.write(SESSION_ID, [NUDGE], { epoch: 0 })
+    await pending.write(SESSION_ID, [NUDGE])
     const pi = new MemoryFakeExtensionAPI()
     wiringFor({ repo, identity: context }).register(pi)
 
@@ -118,13 +137,13 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     expect(await new RecallLedger(context.identityPaths.recallLedger).surfacedPaths(SESSION_ID)).toEqual(
       new Set([ROLLOUTS_PATH]),
     )
-    expect(await pending.take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
+    expect(await pending.take(SESSION_ID)).toEqual([])
   }, 30_000)
 
   test("#given an injected nudge #when the turn starts #then the visible trace entry names the surfaced path", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)
-    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 0 })
+    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE])
     const pi = new MemoryFakeExtensionAPI()
     wiringFor({ repo, identity: context }).register(pi)
 
@@ -138,7 +157,7 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
   test("#given a failing ledger #when a nudge is injected #then the injection still lands and the failure is logged", async () => {
     // given: bookkeeping is advisory, so it must never consume an already-composed nudge
     const { repo, context } = await fixture(tempDirs)
-    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 0 })
+    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE])
     const logs: Array<{ message: string; details?: unknown }> = []
     class BrokenLedger extends RecallLedger {
       override async markSurfaced(): Promise<void> {
@@ -164,7 +183,7 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
   test("#given a host whose appendEntry throws #when a nudge is injected #then the model still receives it", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)
-    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 0 })
+    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE])
     const logs: Array<{ message: string; details?: unknown }> = []
     const pi = new MemoryFakeExtensionAPI()
     pi.appendEntry = (): void => {
@@ -194,42 +213,10 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     expect(pi.entries).toEqual([])
   }, 30_000)
 
-  test("#given a pending nudge from a superseded epoch #when the turn starts #then nothing is injected and the payload is dropped", async () => {
-    // given: a compaction bumped the session's epoch after the gate wrote its verdict, so the
-    // nudge describes a transcript that no longer exists. The consumption point is what rejects it.
-    const { repo, context } = await fixture(tempDirs)
-    const pending = new PendingNudges(context.identityPaths.recallPending)
-    await pending.write(SESSION_ID, [NUDGE], { epoch: 0 })
-    const pi = new MemoryFakeExtensionAPI()
-    wiringFor({ repo, identity: context, currentCompactionEpoch: () => 1 }).register(pi)
-
-    // when
-    const result = await dispatch(pi, eventContext([userEntry("m1", "anything at all")]))
-
-    // then
-    expect(result).toBeUndefined()
-    expect(pi.entries).toEqual([])
-    expect(await pending.take(SESSION_ID, { currentEpoch: 0 })).toEqual([])
-  }, 30_000)
-
-  test("#given a pending nudge stamped with the live epoch #when the turn starts #then it is injected", async () => {
-    // given: the epoch the gate stamped is still the session's live epoch
-    const { repo, context } = await fixture(tempDirs)
-    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 3 })
-    const pi = new MemoryFakeExtensionAPI()
-    wiringFor({ repo, identity: context, currentCompactionEpoch: () => 3 }).register(pi)
-
-    // when
-    const result = await dispatch(pi, eventContext([userEntry("m1", "anything at all")]))
-
-    // then
-    expect(result?.message?.content).toBe(renderNudgeBlock(NUDGE))
-  }, 30_000)
-
   test("#given recall disabled by config #when a nudge is pending #then nothing is injected", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)
-    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 0 })
+    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE])
     const pi = new MemoryFakeExtensionAPI()
     wiringFor({ repo, identity: context, recall: { enabled: false } }).register(pi)
 
@@ -264,9 +251,9 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
   }, 30_000)
 
   test("#given a memory worker child sentinel #when a nudge is pending #then the child receives nothing", async () => {
-    // given: a gate child must never be handed the very hints it exists to produce
+    // given: a memory child must never be handed the very hints the sidecar exists to produce
     const { repo, context } = await fixture(tempDirs)
-    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE], { epoch: 0 })
+    await new PendingNudges(context.identityPaths.recallPending).write(SESSION_ID, [NUDGE])
 
     for (const sentinel of ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"]) {
       const pi = new MemoryFakeExtensionAPI()

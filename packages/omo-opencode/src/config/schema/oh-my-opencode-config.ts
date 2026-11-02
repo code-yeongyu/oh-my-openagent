@@ -89,7 +89,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.default({
-    commit_footer: true,
+    commit_footer: false,
     include_co_authored_by: true,
     git_env_prefix: "GIT_MASTER=1",
   }),

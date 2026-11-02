@@ -84,21 +84,21 @@ describe("compileDag structure", () => {
     })
   })
 
-  it("#given a node with a legacy subagent_type #when compiled #then the route stores only the canonical agent and keeps the DagRoute shape", () => {
+  it("#given a node with a retired curated subagent_type #when compiled #then the route stores the submitted id verbatim and keeps the DagRoute shape", () => {
     // given
-    const withLegacy = definition([
-      { id: "legacy", prompt: "review", subagent_type: "momus", model: "gpt-5.6" },
+    const withRetired = definition([
+      { id: "retired", prompt: "review", subagent_type: "momus", model: "gpt-5.6" },
       { id: "canonical", prompt: "review", subagent_type: "plan-reviewer", model: "gpt-5.6" },
       { id: "custom", prompt: "build", subagent_type: "custom-agent" },
     ])
 
     // when
-    const result = compileDag(withLegacy, { at: AT })
+    const result = compileDag(withRetired, { at: AT })
 
     // then
     expect(result.ok).toBe(true)
-    expect(result.nodes[0]?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" })
-    expect(result.nodes[0]?.route).toEqual(result.nodes[1]?.route)
+    expect(result.nodes[0]?.route).toEqual({ kind: "agent", agent: "momus", model: "gpt-5.6" })
+    expect(result.nodes[1]?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "gpt-5.6" })
     expect(Object.keys(result.nodes[0]?.route ?? {}).sort()).toEqual(["agent", "kind", "model"])
     expect(result.nodes[2]?.route).toEqual({ kind: "agent", agent: "custom-agent" })
   })
@@ -237,6 +237,27 @@ describe("compileDag validation", () => {
     const second = compileDag(definition([node("a", ["c"]), node("c", ["b"]), node("b", ["a"])]), { at: AT })
 
     expect(second.errors[0]?.nodeIds).toEqual(first.errors[0]?.nodeIds ?? [])
+  })
+
+  it.each([
+    ["a parent-directory segment", "../../../etc/pwn"],
+    ["a forward slash", "a/b"],
+    ["a backslash", "a\\b"],
+    ["a colon", "a:b"],
+    ["a NUL byte", "a\0b"],
+    ["a lone dot", "."],
+    ["a double dot", ".."],
+    ["an empty id", ""],
+  ])("#given a node id with %s #when compiled #then rejected as invalid_node_id and no graph produced", (_label, unsafeId) => {
+    const result = compileDag(definition([node(unsafeId)]), { at: AT })
+
+    expect(result.ok).toBe(false)
+    expect(result.nodes).toEqual([])
+    expect(result.errors.map((error) => error.code)).toEqual(["invalid_node_id"])
+  })
+
+  it("#given a dot-only three-character id #when compiled #then it is accepted, because only the traversal segments are refused", () => {
+    expect(compileDag(definition([node("...")]), { at: AT }).ok).toBe(true)
   })
 })
 

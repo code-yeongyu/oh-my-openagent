@@ -1,4 +1,34 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, type Page } from "@playwright/test"
+
+import { scrollSecret } from "./secret-reading-state"
+
+const UNIX_COMMAND = "curl -fsSL https://get.omo.dev/install.sh | bash"
+const POWERSHELL_COMMAND = "irm https://get.omo.dev/install.ps1 | iex"
+const CMD_COMMAND =
+  'powershell -ExecutionPolicy Bypass -c "irm https://get.omo.dev/install.ps1 | iex"'
+const IPHONE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+
+/** Chromium reports the host OS through userAgentData whatever the UA says; pin it per test. */
+async function pretendPlatform(page: Page, platform: string | null): Promise<void> {
+  await page.addInitScript((value) => {
+    Object.defineProperty(Navigator.prototype, "userAgentData", {
+      configurable: true,
+      get: () => (value === null ? undefined : { platform: value, mobile: false }),
+    })
+  }, platform)
+}
+
+const STORY_SECTIONS = [
+  "secret",
+  "ultrawork",
+  "multi-model",
+  "mass-ulw",
+  "kibitzer",
+  "skills",
+  "crafted",
+  "platforms",
+] as const
 
 test.describe("Landing Page", () => {
   test("renders hero section with title and CTA", async ({ page }) => {
@@ -6,175 +36,338 @@ test.describe("Landing Page", () => {
     await page.goto("/")
 
     // when
-    const heading = page.getByRole("heading", { name: /Type mass ulw\./, level: 1 })
+    const heading = page.getByRole("heading", { name: /Your tool for real work\./, level: 1 })
     const getStarted = page.getByRole("link", { name: "Get started" })
     const readManifesto = page.getByRole("link", { name: "Read the manifesto" })
 
     // then
-    await expect(page).toHaveTitle(/Oh My OpenAgent/)
+    await expect(page).toHaveTitle(/OmO/)
     await expect(heading).toBeVisible()
-    await expect(heading).toContainText("Own the graph.")
+    await expect(heading).toContainText("But it's an agent.")
     await expect(getStarted).toBeVisible()
-    await expect(getStarted).toHaveAttribute("href", /\/docs#installation$/)
+    await expect(getStarted).toHaveAttribute("href", /\/docs\/install$/)
     await expect(readManifesto).toBeVisible()
   })
 
-  test("renders install command with host tabs", async ({ page }) => {
+  test("shows the macOS/Linux install command first on a Mac", async ({ page }) => {
     // given
+    await pretendPlatform(page, "macOS")
     await page.goto("/")
     const hero = page.locator('[data-section="hero"]')
 
-    // when
-    const installCommand = hero.getByText("bunx oh-my-openagent install")
-
     // then
-    await expect(installCommand).toBeVisible()
+    await expect(hero.getByRole("tab")).toHaveCount(3)
+    await expect(hero.getByRole("tab", { name: "macOS, Linux, WSL" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+    await expect(hero.getByTestId("command-bar").filter({ visible: true })).toHaveCount(1)
+    await expect(hero.getByText(UNIX_COMMAND, { exact: true })).toBeVisible()
     await expect(hero.getByRole("button", { name: "Copy install command" })).toBeVisible()
-
-    // when
-    await hero.getByRole("tab", { name: "Codex" }).click()
-
-    // then
-    await expect(hero.getByText("npx lazycodex-ai install")).toBeVisible()
-
-    // when
-    await hero.getByRole("tab", { name: "Senpi" }).click()
-
-    // then
-    await expect(hero.getByText("npm i -g omo-ai@beta")).toBeVisible()
+    await expect(hero.getByText("Then open a new terminal and run omo.")).toBeVisible()
   })
 
-  test("renders the agent bento cells", async ({ page }) => {
+  test("shows PowerShell first on Windows and moves between tabs with the arrow keys", async ({
+    page,
+  }) => {
+    // given
+    await pretendPlatform(page, "Windows")
+    await page.goto("/")
+    const hero = page.locator('[data-section="hero"]')
+    const powershell = hero.getByRole("tab", { name: "Windows PowerShell" })
+    await expect(powershell).toHaveAttribute("aria-selected", "true")
+    await expect(hero.getByText(POWERSHELL_COMMAND, { exact: true })).toBeVisible()
+
+    // when
+    await powershell.focus()
+    await page.keyboard.press("ArrowRight")
+
+    // then
+    const cmd = hero.getByRole("tab", { name: "Windows CMD" })
+    await expect(cmd).toBeFocused()
+    await expect(cmd).toHaveAttribute("aria-selected", "true")
+    await expect(powershell).toHaveAttribute("tabindex", "-1")
+    await expect(hero.getByText(CMD_COMMAND, { exact: true })).toBeVisible()
+    await expect(hero.getByText(POWERSHELL_COMMAND, { exact: true })).toBeHidden()
+
+    // when
+    await page.keyboard.press("Home")
+
+    // then
+    await expect(hero.getByRole("tab", { name: "macOS, Linux, WSL" })).toBeFocused()
+    await expect(hero.getByText(UNIX_COMMAND, { exact: true })).toBeVisible()
+  })
+
+  test("tells a phone visitor to run the command on a computer", async ({ browser }) => {
+    // given
+    const context = await browser.newContext({
+      userAgent: IPHONE_UA,
+      viewport: { width: 375, height: 812 },
+    })
+    const page = await context.newPage()
+    await pretendPlatform(page, null)
+    await page.goto("/")
+    const hero = page.locator('[data-section="hero"]')
+
+    // then
+    await expect(hero.getByText(UNIX_COMMAND, { exact: true })).toBeVisible()
+    await expect(hero.getByText("Run this on your Mac, Linux or Windows computer.")).toBeVisible()
+    await expect(hero.getByText("Then open a new terminal and run omo.")).toBeHidden()
+    await context.close()
+  })
+
+  test("keeps every install command reachable without JavaScript", async ({ browser }) => {
+    // given
+    const context = await browser.newContext({ javaScriptEnabled: false })
+    const page = await context.newPage()
+    await page.goto("/")
+    const hero = page.locator('[data-section="hero"]')
+
+    // then
+    for (const command of [UNIX_COMMAND, POWERSHELL_COMMAND, CMD_COMMAND]) {
+      await expect(hero.getByText(command, { exact: true })).toBeVisible()
+    }
+    await expect(hero.getByRole("tablist")).toBeHidden()
+    await context.close()
+  })
+
+  test("carries no legacy brand, edition or host names", async ({ page }) => {
     // given
     await page.goto("/")
-    const grid = page.locator("#agents ul")
 
-    // when / then
-    await expect(grid.locator("li[id^='agent-']")).toHaveCount(12)
-    const agentNames = [
-      "Orchestrator",
-      "Ultrawork Planner",
-      "Plan Consultant",
-      "Plan Reviewer",
-      "Kibitzer",
-      "Architect",
-      "Deep",
-      "Quick",
-      "Visual Engineering",
-      "Explore",
-      "Librarian",
-      "Dynamic Agent",
-    ]
-    for (const name of agentNames) {
-      await expect(grid.getByRole("heading", { name, exact: true })).toBeVisible()
-    }
-    await expect(grid.getByText("Profiles: Capable · Simple work · Deep work")).toBeVisible()
+    // when
+    const text = await page.locator("body").innerText()
+
+    // then
+    expect(text).not.toMatch(/oh[ -]?my[ -]?open[ -]?agent/i)
+    expect(text).not.toMatch(/senpi/i)
+    expect(text).not.toMatch(/three editions/i)
+    await expect(page.getByRole("banner").getByRole("link", { name: "OmO" })).toBeVisible()
   })
 
-  test("keeps the agent bento grid hole-free at desktop and phone widths", async ({ page }) => {
-    const viewports = [
-      { width: 1440, height: 900 },
-      { width: 390, height: 844 },
-    ]
+  test("renders the story sections in order without numeric labels", async ({ page }) => {
+    // given
+    await page.goto("/")
 
-    for (const viewport of viewports) {
-      // given
-      await page.setViewportSize(viewport)
-      await page.goto("/")
-      const grid = page.locator("#agents ul")
-      const cells = grid.locator("li[id^='agent-']")
+    // when
+    const order = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("[data-section]")).map((node) =>
+        node.getAttribute("data-section"),
+      ),
+    )
 
-      // when
-      await expect(cells).toHaveCount(12)
-      await grid.scrollIntoViewIfNeeded()
-      await page.evaluate(() => document.fonts.ready)
-      for (let i = 0; i < 12; i += 1) {
-        const cell = cells.nth(i)
-        await expect(cell).toBeVisible()
-        const box = await cell.boundingBox()
-        if (!box) {
-          throw new Error(
-            `agent cell ${i} has no bounding box at ${viewport.width}x${viewport.height}`,
-          )
-        }
-      }
-
-      // then: no two cells share area (the gapless bento has no overlaps and no holes).
-      // One synchronous snapshot: the scroll-driven reveal transform would otherwise
-      // shift cells between separate boundingBox() round-trips.
-      const rects = await cells.evaluateAll((nodes) =>
-        nodes.map((node) => {
-          const rect = node.getBoundingClientRect()
-          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
-        }),
-      )
-      for (let i = 0; i < rects.length; i += 1) {
-        const a = rects[i]
-        if (!a) continue
-        for (let j = i + 1; j < rects.length; j += 1) {
-          const b = rects[j]
-          if (!b) continue
-          const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)
-          const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y)
-          const overlapArea = Math.max(0, overlapX) * Math.max(0, overlapY)
-          if (overlapArea > 0) {
-            throw new Error(
-              `agent cells ${i} and ${j} overlap by ${overlapArea}px^2 at ${viewport.width}x${viewport.height}`,
-            )
-          }
-        }
-      }
-    }
-  })
-
-  test("renders the model profiles ledger at desktop and phone widths", async ({ page }) => {
-    const viewports = [
-      { width: 1440, height: 900 },
-      { width: 390, height: 844 },
-    ]
-
-    for (const viewport of viewports) {
-      // given
-      await page.setViewportSize(viewport)
-      await page.goto("/")
-      const section = page.locator("#profiles")
-
-      // when
+    // then
+    const storyOrder = order.filter((name): name is (typeof STORY_SECTIONS)[number] =>
+      (STORY_SECTIONS as readonly string[]).includes(name ?? ""),
+    )
+    expect(storyOrder).toEqual([...STORY_SECTIONS])
+    for (const name of STORY_SECTIONS) {
+      const section = page.locator(`[data-section="${name}"]`)
       await section.scrollIntoViewIfNeeded()
-      await page.evaluate(() => document.fonts.ready)
-
-      // then: the section heading and all three builtin profile names are visible.
-      await expect(
-        section.getByRole("heading", { name: "Pick the intent, not the model.", level: 2 }),
-      ).toBeVisible()
-      const profileNames = ["Capable", "Simple work", "Deep work"]
-      for (const name of profileNames) {
-        await expect(section.getByRole("heading", { name, exact: true })).toBeVisible()
-      }
-
-      // and: the ledger sits strictly after the agent bento grid - no shared area at either width.
-      // One synchronous snapshot, same as the grid-integrity case: the scroll-driven reveal
-      // transform would otherwise shift boxes between separate boundingBox() round-trips.
-      const overlapArea = await page.evaluate(() => {
-        const grid = document.querySelector("#agents ul")
-        const profiles = document.querySelector("#profiles")
-        if (!(grid instanceof HTMLElement) || !(profiles instanceof HTMLElement)) {
-          throw new Error("landing must render #agents ul and #profiles")
-        }
-        const gridRect = grid.getBoundingClientRect()
-        const profilesRect = profiles.getBoundingClientRect()
-        const overlapX =
-          Math.min(gridRect.right, profilesRect.right) - Math.max(gridRect.left, profilesRect.left)
-        const overlapY =
-          Math.min(gridRect.bottom, profilesRect.bottom) - Math.max(gridRect.top, profilesRect.top)
-        return Math.max(0, overlapX) * Math.max(0, overlapY)
-      })
-      if (overlapArea > 0) {
-        throw new Error(
-          `profiles section overlaps the agents grid by ${overlapArea}px^2 at ${viewport.width}x${viewport.height}`,
-        )
+      await expect(section.getByRole("heading", { level: 2 })).toBeVisible()
+      const eyebrows = await section.locator(".eyebrow").allInnerTexts()
+      for (const eyebrow of eyebrows) {
+        expect(eyebrow).not.toMatch(/^\d{2}\b/)
       }
     }
+  })
+
+  test("lists every messaging platform once", async ({ page }) => {
+    // given
+    await page.goto("/")
+    const list = page.getByTestId("platform-list")
+
+    // when
+    await list.scrollIntoViewIfNeeded()
+    const names = await list.locator("li").allInnerTexts()
+
+    // then
+    expect(names).toHaveLength(13)
+    expect(new Set(names.map((n) => n.trim())).size).toBe(13)
+  })
+
+  test("scrubs the secret words continuously across the full view range", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const litText = page.locator('[data-section="secret"] .lit-progress')
+    await page.locator('[data-section="secret"] .lit-progress.lit-scroll').waitFor()
+    await page.evaluate(() => document.fonts.ready)
+
+    const sampleAt = async (target: number) => {
+      const top = await litText.evaluate((node, progress) => {
+        const rect = node.querySelector(".lit-text")!.getBoundingClientRect()
+        const startTop = innerHeight * 0.8
+        const endTop = innerHeight * 0.5 - rect.height
+        return scrollY + rect.top - startTop + progress * (startTop - endTop)
+      }, target)
+      await page.evaluate(scrollSecret, top)
+      return litText.evaluate((node) => ({
+        progress: Number.parseFloat(getComputedStyle(node).getPropertyValue("--lit-p")),
+        partialWords: Array.from(node.querySelectorAll(".lit-word")).filter((word) => {
+          const position = Number.parseFloat(getComputedStyle(word).backgroundPositionX)
+          return position > 0 && position < 100
+        }).length,
+      }))
+    }
+
+    const early = await sampleAt(0.25)
+    const middle = await sampleAt(0.6)
+    const complete = await sampleAt(1)
+    const rangeEnd = await litText.evaluate((node) => getComputedStyle(node).animationRangeEnd)
+
+    expect(early.progress).toBeLessThan(middle.progress)
+    expect(middle.progress).toBeLessThan(complete.progress)
+    expect(middle.progress).toBeGreaterThan(0.1)
+    expect(middle.progress).toBeLessThan(0.9)
+    expect(middle.partialWords).toBeGreaterThan(0)
+    expect(rangeEnd).not.toBe("entry 0px")
+  })
+
+  test("keeps the story readable under reduced motion", async ({ page }) => {
+    // given
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.goto("/")
+
+    // when
+    const marquee = page.getByTestId("model-marquee").locator(".marquee-track").first()
+    await marquee.scrollIntoViewIfNeeded()
+    const animation = await marquee.evaluate((node) => getComputedStyle(node).animationName)
+    const litText = page.locator('[data-section="secret"] .lit-progress')
+    await litText.scrollIntoViewIfNeeded()
+    const litProgress = await litText.evaluate((node) =>
+      getComputedStyle(node).getPropertyValue("--lit-p").trim(),
+    )
+
+    // then
+    expect(animation).toBe("none")
+    expect(litProgress).toBe("1")
+  })
+
+  test("runs independent Kibitzer loops and inserts a static nudge under reduced motion", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const stage = page.getByTestId("kibitzer-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "true")
+    await expect(stage.locator("[data-kib-nudge]")).toHaveCount(1)
+    for (const column of ["side", "main"]) {
+      const names = await stage
+        .locator(`[data-kib-column="${column}"] *`)
+        .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).animationName))
+      expect(names.some((name) => name !== "none")).toBe(true)
+    }
+
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    const names = await stage
+      .locator("*")
+      .evaluateAll((nodes) =>
+        nodes.flatMap((node) => [
+          getComputedStyle(node).animationName,
+          getComputedStyle(node, "::before").animationName,
+          getComputedStyle(node, "::after").animationName,
+        ]),
+      )
+    expect(names.every((name) => name === "none")).toBe(true)
+    await expect(stage.locator("[data-kib-nudge]")).toBeVisible()
+    await expect(stage.locator("[data-kib-nudge]")).toHaveCSS("opacity", "1")
+    await expect(stage.locator(".kib-after")).toHaveCSS("opacity", "1")
+    await expect(stage.locator(".kib-before")).toBeHidden()
+  })
+
+  test("moves the crafted stage to the item the reader picks and keeps it moving on its own", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const stage = page.getByTestId("crafted-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "true")
+
+    const fill = stage.locator(".morph-fill")
+    const before = await fill.evaluate((node) => getComputedStyle(node).transform)
+    await expect
+      .poll(async () => fill.evaluate((node) => getComputedStyle(node).transform), {
+        timeout: 8000,
+      })
+      .not.toBe(before)
+
+    const team = page.getByTestId("crafted-list").locator('[data-crafted-index="3"]')
+    await team.click()
+    await expect(stage).toHaveAttribute("data-state", "team")
+    await expect(team).toHaveAttribute("aria-current", "true")
+    await expect(page.getByTestId("crafted-list").locator('[aria-current="true"]')).toHaveCount(1)
+  })
+
+  test("re-entering a live crafted state waits for its live moment again", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" })
+    await page.goto("/")
+    const stage = page.getByTestId("crafted-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "true")
+    const list = page.getByTestId("crafted-list")
+
+    await list.locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).toHaveClass(/is-live/, { timeout: 5000 })
+
+    await list.locator('[data-crafted-index="3"]').click()
+    await expect(stage).toHaveAttribute("data-state", "team")
+    await list.locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).not.toHaveClass(/is-live/)
+    await expect(stage).toHaveClass(/is-live/, { timeout: 5000 })
+  })
+
+  test("holds the crafted stage still under reduced motion and still follows the list", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.goto("/")
+    const stage = page.getByTestId("crafted-stage")
+    await stage.scrollIntoViewIfNeeded()
+    await expect(stage).toHaveAttribute("data-running", "false")
+    await expect(stage.locator(".morph-cursor")).toHaveCount(0)
+
+    const fill = stage.locator(".morph-fill")
+    const first = await fill.evaluate((node) => getComputedStyle(node).transform)
+    await page.waitForTimeout(3200)
+    expect(await fill.evaluate((node) => getComputedStyle(node).transform)).toBe(first)
+
+    await page.getByTestId("crafted-list").locator('[data-crafted-index="4"]').click()
+    await expect(stage).toHaveAttribute("data-state", "monitor")
+    await expect(stage).toHaveClass(/is-live/)
+
+    await page.getByTestId("crafted-list").locator('[data-crafted-index="7"]').click()
+    await expect(stage).toHaveAttribute("data-state", "computer")
+    await expect(stage).toHaveClass(/is-live/)
+  })
+
+  test("confirms a copied install command with a check and a status message", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"])
+    await pretendPlatform(page, "macOS")
+    await page.goto("/")
+    const bar = page
+      .locator('[data-section="hero"]')
+      .getByTestId("command-bar")
+      .filter({ visible: true })
+    await bar.getByRole("button", { name: "Copy install command" }).click()
+
+    await expect(bar.getByRole("button", { name: "Copy install command" })).toHaveAttribute(
+      "data-copied",
+      "true",
+    )
+    await expect(bar.getByRole("status")).toHaveText("Install command copied")
+    const check = bar.getByTestId("copy-check")
+    await expect(check).toBeVisible()
+    await expect
+      .poll(async () => check.evaluate((node) => getComputedStyle(node).transform))
+      .toBe("matrix(1, 0, 0, 1, 0, 0)")
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(UNIX_COMMAND)
   })
 
   test("renders the desktop DAG view in the hero with 10 nodes across 5 waves", async ({

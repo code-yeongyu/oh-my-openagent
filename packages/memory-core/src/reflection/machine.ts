@@ -60,6 +60,7 @@ export interface ReservationState {
 }
 
 export interface MachineState {
+  readonly now?: string
   readonly journal: JournalSnapshot
   readonly reservation: ReservationState
   readonly config: TriggerConfig
@@ -125,6 +126,9 @@ export function evaluateTransitions(state: MachineState, event: ReflectionEvent)
     return { state, action: { kind: "reserve", request: makeRequest(state.journal, "manual", ids, event) } }
   }
   if (!event.success) return { state, action: { kind: "none" } }
+  const eligible = state.journal.state.next_eligible_at === undefined ||
+    (state.now !== undefined && state.now >= state.journal.state.next_eligible_at)
+  if (!eligible) return { state, action: { kind: "none" } }
 
   const compactionReady =
     state.config.onCompaction === true &&

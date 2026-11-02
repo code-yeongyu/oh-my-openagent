@@ -25,14 +25,14 @@ export function SectionHeader({
 }: SectionHeaderProps): JSX.Element {
   return (
     <header className={cn("max-w-3xl", className)}>
-      <Eyebrow rule dot={dot}>
+      <Eyebrow rule dot={dot} className="[&_.pulse-dot]:animate-none">
         {eyebrow}
       </Eyebrow>
-      <h2 id={id} className="type-title text-text-hi mt-4">
+      <h2 id={id} className="type-feature text-text-hi mt-4">
         {title}
       </h2>
       {intro ? (
-        <p className="text-text-mid mt-6 text-lg leading-[1.6] md:text-xl">{intro}</p>
+        <p className="text-text-mid prose-cjk mt-6 max-w-[60ch] text-lg leading-[1.7]">{intro}</p>
       ) : null}
     </header>
   )

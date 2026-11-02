@@ -1,9 +1,25 @@
-// allow: SIZE_OK - single public type contract for the dag subsystem; splitting it would fragment one cohesive domain vocabulary across imports.
 import type { TaskRunStats } from "../state/types"
 import type { TaskTargetErrorCode } from "../tools/task/validation"
 
 export type DagRunId = string & { readonly __brand: "DagRunId" }
 export type DagNodeId = string & { readonly __brand: "DagNodeId" }
+
+// A run id or node id is used verbatim as ONE path segment under the DAG state directory
+// (<stateDir>/dag/results/<runId>/<nodeId>.txt), so it must not be empty, a traversal segment
+// ("." / ".."), or contain a separator, a NUL byte, or ":" (an NTFS alternate-data-stream
+// separator on Windows). This is the single owner of that contract: the graph compiler rejects an
+// unsafe node id at the boundary, and the store refuses one at the sink so no caller can
+// reintroduce the write/read primitive by bypassing the checked accessors. The store also adds a
+// containment check after the join, so the rule does not rest on this deny-list alone.
+export function isSafeDagPathSegment(value: string): boolean {
+  return value.length > 0
+    && value !== "."
+    && value !== ".."
+    && !value.includes("/")
+    && !value.includes("\\")
+    && !value.includes("\0")
+    && !value.includes(":")
+}
 
 export const DAG_RUN_STATUSES = [
   "pending",
@@ -16,11 +32,21 @@ export const DAG_RUN_STATUSES = [
 
 export type DagRunStatus = (typeof DAG_RUN_STATUSES)[number]
 
+// A run in one of these statuses holds no scheduler or lease and does not count against the session's
+// active-run cap; it waits for retention. `send` may still revive a child of a failed run.
+export const TERMINAL_DAG_RUN_STATUSES: ReadonlySet<string> = new Set<DagRunStatus>(["completed", "failed", "cancelled"])
+
+/** True for a persisted status string naming a terminal run; unknown or missing statuses are not terminal. */
+export function isTerminalDagRunStatus(status: string | undefined): boolean {
+  return status !== undefined && TERMINAL_DAG_RUN_STATUSES.has(status)
+}
+
 export const DAG_NODE_STATES = [
   "pending",
   "blocked",
   "scheduled",
   "running",
+  "paused",
   "completed",
   "failed",
   "cancelled",
@@ -100,6 +126,8 @@ export const DAG_NODE_ERROR_CODES = [
   "task_lost",
   "task_cancelled",
   "resume_task_missing",
+  "resume_task_orphaned",
+  "lost_while_paused",
   "journal_corrupt",
 ] as const
 
@@ -156,7 +184,26 @@ export type DagNode = {
   readonly createdAt: string
   readonly startedAt?: string
   readonly completedAt?: string
+  // Terminal node's final child text, bounded to DAG_NODE_OUTPUT_PREVIEW_CHARS. `outputBytes` is
+  // always the FULL persisted size, so a shorter `output` means the preview was truncated and a
+  // completed node reading `outputBytes: 0` is durable evidence the child returned nothing. Without
+  // this the only surface carrying node output was the blocking wait, which the detached midpoint
+  // peek never reaches (#8674).
+  readonly output?: string
+  readonly outputBytes?: number
+  // When the backing child last wrote a transcript event. Present only while the node is running,
+  // because it describes a LIVE child: a node running with no recent activity is either
+  // finished-but-unreaped or genuinely stalled, and `running` alone cannot tell those apart (#8674).
+  readonly lastActivityAt?: string
 }
+
+// Per-node output budget in the checkpoint. A node's final message is normally far shorter; the cap
+// only stops one pathological child from dominating every checkpoint rewrite for the whole run.
+export const DAG_NODE_OUTPUT_PREVIEW_CHARS = 2000
+
+// How long a running node's child may write nothing before a status surface calls the silence out.
+// It is a reporting threshold, never an execution one: nothing is cancelled or failed by it.
+export const DAG_NODE_QUIET_AFTER_MS = 600_000
 
 export type DagEdge = {
   readonly from: DagNodeId
@@ -174,6 +221,7 @@ export type DagBottleneck = {
 }
 
 export type DagNodeCounts = {
+  readonly paused?: number
   readonly total: number
   readonly pending: number
   readonly blocked: number
@@ -186,6 +234,7 @@ export type DagNodeCounts = {
 }
 
 export type DagRunSnapshot = {
+  readonly pause?: { readonly reason: "user_stop"; readonly pauseSeq: number }
   readonly schemaVersion: 1
   readonly runId: DagRunId
   readonly runKey: string
@@ -226,150 +275,5 @@ export type AmendRecord = {
   readonly invalidatedNodeIds: readonly DagNodeId[]
 }
 
-export const DAG_NODE_TRANSITION_REASONS = [
-  { kind: "unblocked" },
-  { kind: "scheduled" },
-  { kind: "started" },
-  { kind: "succeeded" },
-  { kind: "failed" },
-  { kind: "cancelled" },
-  { kind: "skipped" },
-  { kind: "interrupted" },
-  { kind: "lost" },
-  { kind: "resumed" },
-  { kind: "retried" },
-  { kind: "amend_invalidated" },
-  { kind: "revived" },
-] as const
-
-export type DagNodeTransitionReason =
-  | (typeof DAG_NODE_TRANSITION_REASONS)[number]
-  | { readonly kind: "task_queued"; readonly queuePosition: number }
-
-// The journaled payload union. EXACTLY 17 members; every member is written to the WAL with a
-// WAL-assigned seq. Live activity telemetry is NOT here - see DagActivityEvent below.
-export const DAG_RUN_EVENT_TYPES = [
-  "dag.run.created",
-  "dag.run.started",
-  "dag.run.paused",
-  "dag.run.resumed",
-  "dag.run.completed",
-  "dag.run.failed",
-  "dag.run.cancelled",
-  "dag.wave.started",
-  "dag.wave.completed",
-  "dag.node.transitioned",
-  "dag.node.task-attached",
-  "dag.node.reused",
-  "dag.node.retried",
-  "dag.node.steered",
-  "dag.definition.amended",
-  "dag.diagnostic.added",
-  "dag.stream.overflow",
-] as const
-
-export type DagRunEventPayload =
-  | {
-      readonly type: "dag.run.created"
-      readonly runKey: string
-      readonly name: string
-      readonly definitionFingerprint: string
-      readonly nodeCount: number
-      readonly edgeCount: number
-    }
-  | { readonly type: "dag.run.started"; readonly generation: number }
-  | { readonly type: "dag.run.paused"; readonly reason?: string }
-  | { readonly type: "dag.run.resumed"; readonly generation: number }
-  | { readonly type: "dag.run.completed"; readonly counts: DagNodeCounts }
-  | {
-      readonly type: "dag.run.failed"
-      readonly error: DagNodeError
-      readonly counts: DagNodeCounts
-    }
-  | { readonly type: "dag.run.cancelled"; readonly reason?: string; readonly counts: DagNodeCounts }
-  | {
-      readonly type: "dag.wave.started"
-      readonly waveIndex: number
-      readonly nodeIds: readonly DagNodeId[]
-    }
-  | {
-      readonly type: "dag.wave.completed"
-      readonly waveIndex: number
-      readonly nodeIds: readonly DagNodeId[]
-    }
-  | {
-      readonly type: "dag.node.transitioned"
-      readonly nodeId: DagNodeId
-      readonly from: DagNodeState
-      readonly to: DagNodeState
-      readonly reason: DagNodeTransitionReason
-    }
-  | {
-      readonly type: "dag.node.task-attached"
-      readonly nodeId: DagNodeId
-      readonly taskId: string
-      readonly attempt: number
-    }
-  | {
-      readonly type: "dag.node.reused"
-      readonly nodeId: DagNodeId
-      readonly taskId: string
-      readonly sourceRunId: DagRunId
-    }
-  | {
-      readonly type: "dag.node.retried"
-      readonly nodeId: DagNodeId
-      readonly priorTaskId?: string
-      readonly execAttempt: number
-      readonly promptChanged: boolean
-    }
-  | {
-      readonly type: "dag.node.steered"
-      readonly nodeId: DagNodeId
-      readonly taskId: string
-      readonly delivery: "steer" | "revive"
-    }
-  | {
-      readonly type: "dag.definition.amended"
-      readonly previousFingerprint: string
-      readonly fingerprint: string
-      readonly changedNodeIds: readonly DagNodeId[]
-      readonly addedNodeIds: readonly DagNodeId[]
-      readonly invalidatedNodeIds: readonly DagNodeId[]
-    }
-  | { readonly type: "dag.diagnostic.added"; readonly diagnostic: DagDiagnostic }
-  | {
-      readonly type: "dag.stream.overflow"
-      readonly droppedCount: number
-      readonly recoverAfterSeq: number
-    }
-
-export type DagRunEventEnvelope = {
-  readonly schemaVersion: 1
-  readonly runId: DagRunId
-  readonly seq: number
-  readonly at: string
-  readonly lane: DagEventLane
-}
-
-// The wire event is the FLAT intersection of envelope and payload: type, seq, and the payload
-// fields are siblings on one object (viewer catch-up dedupes on event.seq + event.type).
-export type DagRunEvent = DagRunEventEnvelope & DagRunEventPayload
-
-// Live activity telemetry: UNSEQUENCED, never journaled, emitted on its own channel. It must
-// never be added to DagRunEventPayload - an unsequenced event inside the sequenced WAL union
-// corrupts replay.
-export const DAG_ACTIVITY_CHANNEL = "omo.dag.activity"
-
-export type DagActivityEvent = {
-  readonly schemaVersion: 1
-  readonly runId: DagRunId
-  readonly nodeId: DagNodeId
-  readonly taskId: string
-  readonly at: string
-  readonly activity: string
-  readonly currentTool?: string
-  readonly lastAssistantLine?: string
-  readonly turns: number
-  readonly toolCalls?: number
-}
+export { DAG_NODE_TRANSITION_REASONS, DAG_RUN_EVENT_TYPES, DAG_ACTIVITY_CHANNEL } from "./event-types"
+export type { DagNodeTransitionReason, DagRunEventPayload, DagRunEventEnvelope, DagRunEvent, DagActivityEvent } from "./event-types"
