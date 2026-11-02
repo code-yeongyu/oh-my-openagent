@@ -35,6 +35,7 @@ export interface FactsKnownPerson {
 
 export interface FactsPayload {
   readonly version: 1
+  readonly agreementEventVersion?: 1
   readonly identity: string
   readonly today: string
   readonly entries: readonly FactsQueueEntry[]
@@ -85,8 +86,11 @@ export async function applyFactsBatch(
   if (count === 0) return { outcome: "no_facts", affectedPaths: [] }
   try {
     const recovery = await planFactsMutation(repo, batch, options.people, options.onAliasTie, options.agreements)
+    if (recovery.paths.length === 0) return { outcome: "no_facts", affectedPaths: [] }
     await options.publishRecovery?.(recovery)
-    return applyFactsRecovery(repo, recovery, count, author)
+    return applyFactsRecovery(repo, recovery, count, author, {
+      batch, agreementsPolicy: options.agreements, publishRecovery: options.publishRecovery,
+    })
   } catch (error) {
     if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty" }
     throw error
@@ -99,6 +103,7 @@ export function validateFactsRecovery(
 ): void {
   validateFactsBatchId(batch.batchId)
   if (recovery.version !== 1
+    || (recovery.agreementEventVersion !== undefined && recovery.agreementEventVersion !== 1)
     || recovery.batchId !== batch.batchId
     || recovery.recordsHash !== factsRecordsHash(batch.records, batch.agreements)
     || recovery.paths.some((entry, index) => index > 0 && recovery.paths[index - 1]!.path >= entry.path)) {

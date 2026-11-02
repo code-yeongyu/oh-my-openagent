@@ -16,7 +16,10 @@ import type { DeviceAccountSource } from "./device-session/account-source"
 import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
+import { readMemoryRpcSync } from "./memory-rpc-sync"
+import { wireSyncRpc } from "./sync-rpc-wiring"
 import { sweepTransientMemoryRuns, type TransientSweep } from "./transient-sweep"
+import { registerRecallMemoryReporter } from "./memory-reporter"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 
 const GLOBAL_DISABLED_FLAG = "omo-senpi-disabled"
@@ -67,13 +70,29 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         return
       }
 
+      // The runner reports sync status transitions to the wiring, which exists only after the runner.
+      const syncStatusChanged: { current?: (repo: string) => void } = {}
+      const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env })
+      const memoryRoot = resolveMemoryRoot(env, cwd)
+      const pinDir = syncPinDir(memoryRoot)
       const syncRunner = options.syncRunner ?? createSyncRunner({
         logger: ctx.logger,
+        onStatusChange: (repo) => syncStatusChanged.current?.(repo),
         resolveSession: createDeviceSessionResolver({
-          source: options.deviceAccount ?? lazyCliAccountSource({ env }),
-          pinDir: syncPinDir(resolveMemoryRoot(env, cwd)),
+          source: deviceAccount,
+          pinDir,
           loadRuntime: () => import("#omo-memory-sync-runtime"),
         }),
+      })
+      const syncLifetime = new AbortController()
+      let syncSessionId: string | undefined
+      const rpcHandle = pi.rpc?.handle?.bind(pi.rpc)
+      const syncRpc = rpcHandle === undefined ? undefined : wireSyncRpc({
+        rpc: { handle: rpcHandle }, source: deviceAccount, memoryRoot, pinDir, signal: syncLifetime.signal,
+        syncStatus: async () => {
+          const repo = syncSessionId === undefined ? undefined : sessions.get(syncSessionId)?.context?.identityPaths.repo
+          return repo === undefined ? undefined : readMemoryRpcSync((path) => syncRunner.status(path), repo)
+        },
       })
       primeMemoryPersonaAssets({ logger: ctx.logger })
       // Reclaim runs an abnormal exit left behind (#7765). Detached from registration on purpose:
@@ -93,6 +112,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         now,
         logger: ctx.logger,
         deviceName: (principal) => syncRunner.deviceName(principal),
+        syncStatus: (repo) => syncRunner.status(repo),
         ...(options.createRuntime === undefined ? {} : { createRuntime: options.createRuntime }),
         ...(options.refreshStatus === undefined ? {} : { refreshStatus: options.refreshStatus }),
         // Reuse the boot snapshot: registration must not add a loadConfig() call, because the
@@ -111,6 +131,11 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         isEnabled: (config) => isEnabled(config, ctx, env),
         resolveConfig: resolveMemoryConfig,
       })
+      syncStatusChanged.current = (repo) => {
+        void wiring.onSyncStatusChanged(repo).catch((error: unknown) => {
+          ctx.logger.warn("memory sync status refresh failed", { error: describeError(error) })
+        })
+      }
       wiring.registerStatic(pi, ctx)
       // A session that reaches a turn without session_start in this runner generation (a host
       // restart or reload that resumed an open conversation) is bound here from its own recorded
@@ -124,6 +149,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         const state = sessions.get(surface.id)
         if (state?.context !== undefined) return undefined
         if (state !== undefined && !state.enabled) return undefined
+        syncRpc?.retireBinding()
+        syncSessionId = surface.id
         bindSession(surface, eventCtx, { existing: state, verifyRepository: true })
         return undefined
       }, { previewSafe: true })
@@ -136,6 +163,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         logger: ctx.logger,
       })
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
+      registerRecallMemoryReporter(pi)
       const unsubscribeReload = pi.events?.on(CONFIG_WATCH_RELOADED, (payload) => {
         if (!isOmoConfigReload(payload)) return
         const enabled = isEnabled(resolveMemoryConfig(loadConfig({ cwd })), ctx, env)
@@ -148,6 +176,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
 
       pi.on("session_start", (_payload, eventCtx) => {
         const surface = readSessionSurface(eventCtx)
+        syncRpc?.retireBinding()
+        syncSessionId = surface.id
         wiring.clearStatus(eventCtx)
         releaseSession(sessions.get(surface.id), syncRunner)
         bindSession(surface, eventCtx, { existing: undefined, verifyRepository: false })
@@ -155,6 +185,10 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
 
       pi.on("session_shutdown", async (payload, eventCtx) => {
         const sessionId = readSessionSurface(eventCtx).id
+        if (syncSessionId === sessionId) {
+          syncRpc?.retireBinding()
+          syncSessionId = undefined
+        }
         // The drain runs BEFORE the session is released: its steps read the bound identity.
         await wiring.onSessionShutdown({
           reason: readShutdownReason(payload),

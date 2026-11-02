@@ -1,8 +1,57 @@
 import { lstatSync, readdirSync, realpathSync, rmdirSync, type Stats, unlinkSync } from "node:fs"
 import { isAbsolute, join, relative } from "node:path"
 
-import { isSpoolFileName, QUARANTINE_DIR } from "./otlp-spool-names"
+import { isPidAlive } from "./otlp-pid-alive"
+import { isSpoolFileName, ownersDir, parseSpoolName, QUARANTINE_DIR } from "./otlp-spool-names"
 import type { TelemetryDiagnosticInput, TelemetrySpoolEntryKind } from "./types"
+import type { CreateOtlpTelemetryTransportInput } from "./otlp-transport-types"
+
+/**
+ * Startup cleanup for a lazy adapter whose caller decided the persisted setting is off. The spool is shared by
+ * every process of the product, so it is left alone while any writer is alive (a writer's owner marker or active
+ * WAL file with a running pid, or an unexpired send claim): an idle writer whose batches are all sealed still holds
+ * its marker, and that consented session sweeps its own spool when its consent ends.
+ */
+export function purgeIdleOtlpSpool(
+  input: Pick<CreateOtlpTelemetryTransportInput, "diagnostics" | "source" | "spoolDir" | "spoolRoot" | "isPidAlive" | "nowMs">,
+): void {
+  const alive = input.isPidAlive ?? isPidAlive
+  const now = (input.nowMs ?? Date.now)()
+  let names: string[]
+  try {
+    names = readdirSync(input.spoolDir)
+  } catch {
+    return
+  }
+  const owners = ownersDir(input.spoolDir)
+  const live = [...names, ...listNames(owners)].some((name) => {
+    const entry = parseSpoolName(name)
+    return ((entry.kind === "active" || entry.kind === "owner") && alive(entry.pid))
+      || (entry.kind === "sending" && entry.leaseExpiresMs > now)
+  })
+  if (live) return
+  purgeOnOptOut(input)
+  purgeOnOptOut({ ...input, spoolDir: owners })
+}
+
+function listNames(dir: string): string[] {
+  try {
+    return readdirSync(dir)
+  } catch {
+    return []
+  }
+}
+
+export function purgeOnOptOut(input: Pick<CreateOtlpTelemetryTransportInput, "diagnostics" | "source" | "spoolDir" | "spoolRoot">): void {
+  const source = input.source ?? "otlp"
+  try {
+    if (purgeSpool(input.spoolDir, input.spoolRoot, purgeReport(input.diagnostics, source)) === "refused") {
+      input.diagnostics?.({ event: "telemetry_spool_purge_refused", source })
+    }
+  } catch (error) {
+    input.diagnostics?.({ event: "telemetry_spool_sweep_failed", source, error, errorKind: error instanceof Error ? "error" : "non_error" })
+  }
+}
 
 /**
  * `refused`: the directory failed verification and nothing was deleted. `incomplete`: the sweep ran

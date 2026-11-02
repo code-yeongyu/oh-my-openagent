@@ -144,6 +144,8 @@ function optionalToken(label: string, value: string | undefined): string | undef
 
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
+    case "unresponsive":
+      return { color: "muted", text: `task_send unresponsive ${details.task_id}: ${details.reason}` }
     case "uncertain":
       return { color: "warning", text: `task_send ${details.reason} Effect id: ${details.effect_id}` }
     case "failed":
@@ -163,6 +165,8 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
       return { color: "warning", text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}` }
     case "queued":
       return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
+    case "held":
+      return { color: "muted", text: `task_send held ${details.task_id} until the run resumes` }
     case "redispatched":
       return { color: "success", text: `task_send redispatched ${details.task_id} epoch ${details.run_epoch}` }
     case "invalid_state":

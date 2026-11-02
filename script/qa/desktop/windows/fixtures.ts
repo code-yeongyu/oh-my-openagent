@@ -11,6 +11,7 @@ import { asObject, type Engine, type Json } from "./engine"
 import { imageOf, stillTracked } from "./process-identity"
 import { hangGuard, probeUntil } from "./until"
 import { removeTreeSync } from "../../../../test-support/remove-tree"
+import { windowsTreeKillArgs } from "../../../../packages/memory-core/src/concurrency/windows-process-tree.mjs"
 
 const WPF_HOST_SCRIPT = fileURLToPath(new URL("./wpf-host.ps1", import.meta.url))
 const SCROLL_HOST_SCRIPT = fileURLToPath(new URL("./scroll-host.ps1", import.meta.url))
@@ -149,7 +150,10 @@ export class QaWorkspace {
 
   teardown(): string[] {
     for (const [pid, image] of this.pids) {
-      if (stillTracked(pid, image)) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" })
+      if (stillTracked(pid, image)) {
+        const args = windowsTreeKillArgs(pid)
+        if (args.length > 0) spawnSync("taskkill", args, { encoding: "utf8", windowsHide: true })
+      }
     }
     const alive = [...this.pids].filter(([pid, image]) => stillTracked(pid, image)).map(([pid]) => pid)
     this.receipt(`killed tracked pids ${[...this.pids.keys()].join(",") || "(none)"}`)

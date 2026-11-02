@@ -86,8 +86,12 @@ function counts(nodes: readonly DagNode[]): DagNodeCounts {
     cancelled: 0,
     skipped: 0,
   }
-  for (const entry of nodes) tally[entry.state] += 1
-  return tally
+  let paused = 0
+  for (const entry of nodes) {
+    if (entry.state === "paused") paused += 1
+    else tally[entry.state] += 1
+  }
+  return paused === 0 ? tally : { ...tally, paused }
 }
 
 function within<T>(promise: Promise<T>, ms = 200): Promise<T> {

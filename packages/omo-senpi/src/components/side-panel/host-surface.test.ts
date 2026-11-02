@@ -88,7 +88,7 @@ function context(ui: PanelUi, overrides: Partial<PanelHostContext> = {}): PanelH
   return { ui, mode: "tui", hasUI: true, ...overrides }
 }
 
-function surfaceFor(ui: FakeUi, ctx: PanelHostContext, width = 40) {
+function surfaceFor(ui: FakeUi, ctx: PanelHostContext, width = 40, onRegularModeFallback?: () => void) {
   const warnings: string[] = []
   const surface = createPanelHostSurface({
     context: ctx,
@@ -98,6 +98,7 @@ function surfaceFor(ui: FakeUi, ctx: PanelHostContext, width = 40) {
     clickable: false,
     logger: { warn: (message) => warnings.push(message), debug: () => {} },
     defer: (callback) => callback(),
+    ...(onRegularModeFallback === undefined ? {} : { onRegularModeFallback }),
   })
   return { surface, warnings }
 }
@@ -211,6 +212,42 @@ describe("side panel host surface", () => {
     // then
     expect(surface.kind()).toBe("widget")
     expect(tui.layoutRoot).toBeUndefined()
+  })
+
+  test("#given a renderer without the layout seam #when the anchor renders twice #then the regular-mode callback fires once", () => {
+    // given
+    const ui = fakeUi()
+    const calls: number[] = []
+    const { surface } = surfaceFor(ui, context(ui), 40, () => {
+      calls.push(calls.length)
+    })
+    surface.mount()
+
+    // when
+    ui.factoryFor(SIDE_PANEL_ANCHOR_WIDGET_KEY)?.({ notARenderer: true }, {})
+    ui.factoryFor(SIDE_PANEL_ANCHOR_WIDGET_KEY)?.({ notARenderer: true }, {})
+
+    // then
+    expect(surface.kind()).toBe("widget")
+    expect(calls).toHaveLength(1)
+  })
+
+  test("#given a viewport renderer whose root is not built yet #when the anchor renders #then the regular-mode callback stays silent", () => {
+    // given
+    const ui = fakeUi()
+    const tui = fakeTui({ root: undefined })
+    let calls = 0
+    const { surface } = surfaceFor(ui, context(ui), 40, () => {
+      calls += 1
+    })
+    surface.mount()
+
+    // when
+    ui.factoryFor(SIDE_PANEL_ANCHOR_WIDGET_KEY)?.(tui, {})
+
+    // then: a lazily built root is fullscreen, not regular mode, so no notice is owed
+    expect(surface.kind()).toBe("widget")
+    expect(calls).toBe(0)
   })
 
   test("#given an installed column #when disposed #then the original root returns and widgets are cleared", () => {

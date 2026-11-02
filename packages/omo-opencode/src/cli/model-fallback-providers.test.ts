@@ -322,7 +322,7 @@ describe("generateModelConfig provider routes", () => {
       const result = generateModelConfig(config)
 
       // then OpenCode Go remains ahead of the Coding Plan fallback
-      expect(result.agents?.atlas?.model).toBe("opencode-go/kimi-k3")
+      expect(result.agents?.atlas?.model).toBe("opencode-go/kimi-k3.1-pro")
       expect(result.agents?.atlas?.fallback_models?.[0]?.model).toBe("opencode-go/minimax-m3")
       expect(result.agents?.atlas?.fallback_models?.[1]?.model).toBe("minimax-coding-plan/MiniMax-M3")
       expect(result.agents?.atlas?.fallback_models?.[2]?.model).toBe("opencode-go/minimax-m2.7")

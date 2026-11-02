@@ -58,12 +58,15 @@ report.assert("agent-called-thread-list", threadListCalls.length > 0, `thread_li
 // real result arrives on every run, so there is no host limitation left to skip for.
 const deliveryOk = toolResult !== undefined && parsedResult?.kind === "ok" && Array.isArray(parsedResult.threads) && parsedResult.scope === "all"
 report.assert("thread-list-tool-result", deliveryOk, `tool_result=${resultText}`)
-await cleanupAllAndWait()
 // The plugin's task component pre-warms a detached `p-*` shard for this session; stop it and prove
-// it gone, so a green run leaves nothing behind for the engine's idle window.
+// it gone, so a green run leaves nothing behind for the engine's idle window. It runs before the
+// scratch removal in cleanupAllAndWait: the shard's agent dir is inside scratch and it writes there on exit.
 const shardSockets = stopOwnedShardHosts(scratch.dir)
-const shardSurvivors = shardSockets.flatMap((socket) => pgrepPids(socket))
-report.assert("shard-hosts-stopped", shardSurvivors.length === 0, `shards=${JSON.stringify(shardSockets)} survivor_pids=${JSON.stringify(shardSurvivors)}`)
+await cleanupAllAndWait()
+// The main host ran until cleanup; a shard it re-ensured after the first stop would escape `shardSockets`.
+const lateShards = stopOwnedShardHosts(scratch.dir)
+const shardSurvivors = [...shardSockets, ...lateShards].flatMap((socket) => pgrepPids(socket))
+report.assert("shard-hosts-stopped", shardSurvivors.length === 0 && lateShards.length === 0, `shards=${JSON.stringify(shardSockets)} late_shards=${JSON.stringify(lateShards)} survivor_pids=${JSON.stringify(shardSurvivors)}`)
 verifyCleanup(report, { scratchDir: scratch.dir, socketPaths: [socketPath, ...shardSockets] })
 // Match the other lanes: run-all passes the out path as `--out <file>`, and it parses that file
 // for SKIP lines to build the summary's skipped count. Reading process.env.OUT instead left the

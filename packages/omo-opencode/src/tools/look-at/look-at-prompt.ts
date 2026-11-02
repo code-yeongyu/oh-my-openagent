@@ -18,7 +18,7 @@ export function buildLookAtPrompt(goal: string, fileParts: LookAtFilePart[]): st
     : ""
   const sourceClause = READ_ENABLED
     ? "Use the Read tool on the provided file path to load its contents, then analyze it."
-    : `The attached ${subjectNoun} ${isPlural ? "are" : "is"} already included in this message. Analyze ${pronoun} directly from the attachment. Do NOT attempt to load by path — the ${subjectNoun} cannot be loaded by path.`
+    : `The attached ${subjectNoun} ${isPlural ? "are" : "is"} already included in this message. Analyze ${pronoun} directly from the attachment. Do NOT attempt to load by path: the ${subjectNoun} cannot be loaded by path.`
 
   return `Analyze ${isPlural ? "these files/images" : "this file/image"} and extract the requested information.${labels}
 

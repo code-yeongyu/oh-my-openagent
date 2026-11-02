@@ -11,6 +11,7 @@ import {
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
 import { handleCompletedBoulderIdle } from "./idle-completion-nudge"
+import { scheduleRetryWithTimer } from "./idle-continuation"
 import { handleAtlasSessionIdle } from "./idle-event"
 import type { SessionState } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -235,7 +236,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
         },
       },
     })
-    const retryTimer = setTimeout(() => {}, 60_000)
+    const retryTimer = scheduleRetryWithTimer(async () => {}, 60_000)
     const sessionStateById = new Map<string, SessionState>([
       [SESSION_ID, { promptFailureCount: 0, pendingRetryTimer: retryTimer }],
     ])
@@ -481,7 +482,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(promptAsyncMock).not.toHaveBeenCalled()
     expect(sessionState.pendingRetryTimer).toBeDefined()
     if (sessionState.pendingRetryTimer) {
-      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer.cancel()
       sessionState.pendingRetryTimer = undefined
     }
   })

@@ -1,3 +1,4 @@
+import { FABLE_55_LAUNCH, launchRungs } from "./fable-55-launch"
 import type { ModelRequirement } from "./model-requirement-types"
 import { LATEST_MODEL_BY_FAMILY } from "./latest-models"
 
@@ -10,8 +11,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode", "bailian-coding-plan", "moonshotai-cn", "firmware", "ollama-cloud", "aihubmix"],
+        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "moonshotai-cn"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
+      },
+      {
+        providers: ["opencode", "bailian-coding-plan", "firmware", "ollama-cloud", "aihubmix"],
+        model: LATEST_MODEL_BY_FAMILY.kimiK3,
       },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
@@ -90,7 +95,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   prometheus: {
-    fallbackChain: [
+    fallbackChain: launchRungs([
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: FABLE_55_LAUNCH.id,
+        variant: "xhigh",
+      },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeFable,
@@ -102,14 +112,20 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+        providers: ["opencode-go", "kimi-for-coding", "moonshotai"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      }
-    ],
+      },
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+    ]),
   },
   metis: {
-    fallbackChain: [
+    fallbackChain: launchRungs([
+      {
+        providers: ["anthropic", "github-copilot", "opencode"],
+        model: FABLE_55_LAUNCH.id,
+        variant: "max",
+      },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeFable,
@@ -121,11 +137,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["opencode-go", "kimi-for-coding", "moonshotai", "opencode"],
+        providers: ["opencode-go", "kimi-for-coding", "moonshotai"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      }
-    ],
+      },
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+    ]),
   },
   momus: {
     fallbackChain: [

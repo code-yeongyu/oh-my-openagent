@@ -1,7 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord } from "../state"
-import { nowIso, TERMINAL_STATUSES, type LifecycleContext } from "./context"
+import { nowIso, reconciliationActive, TERMINAL_STATUSES, type LifecycleContext } from "./context"
 import { hostSessionResumePath } from "./host-session"
 import { markRevivalDeferred } from "./host-session-record"
 import {
@@ -30,10 +30,18 @@ export async function reconcileScopedRevival(
   records: readonly TaskRecord[],
   sessionPathFor: SessionPathResolver,
 ): Promise<readonly ReconcileOutcome[]> {
-  if (context.config.resume_children === false) return []
+  if (!reconciliationActive(context) || context.config.resume_children === false) return []
 
   const outcomes: ReconcileOutcome[] = []
   const sessionRecords = records.filter((record) => record.parent_session_id === parentSessionId)
+  const expected = new Map<string, TaskRecord>(sessionRecords.filter(isSuspended).map(record => [record.task_id, record]))
+  const canClaim = (fresh: TaskRecord) => {
+    const observed = expected.get(fresh.task_id)
+    return observed !== undefined && context.reconcileAdmission.canClaim?.(fresh) !== false
+      && fresh.host_pid === observed.host_pid && fresh.residency_claim === observed.residency_claim
+      && fresh.notification.run_epoch === observed.notification.run_epoch
+      && fresh.residency_state === observed.residency_state
+  }
   // A daemon-hosted child NAMES its transcript on the record. The disk scan below only knows the
   // child's own session dir, so without this a parked host session reads as "terminal with no
   // transcript" and gets disposed - throwing away a session the daemon can still reopen.
@@ -45,7 +53,15 @@ export async function reconcileScopedRevival(
   for (const observed of sessionRecords) {
     if (observed.residency_state !== "resident") continue
     if (!isOrphan(context, observed)) continue
-    outcomes.push(await reclaimResident(context, observed, sessionPathFor))
+    const outcome = await reclaimResident(context, observed, sessionPathFor)
+    outcomes.push(outcome)
+    if (!reconciliationActive(context)) return outcomes
+    // Our terminal reclamation can detach a transcript-bearing resident for admission below.
+    // A lost ownership race never authorizes a fresh claim on the winner's record.
+    if (outcome.kind === "resumed") {
+      const fresh = context.store.load(observed.task_id)
+      if (fresh !== null && isSuspended(fresh)) expected.set(fresh.task_id, fresh)
+    }
   }
 
   // A terminal record without a transcript is not a revival candidate at all. Dispose it before
@@ -70,7 +86,7 @@ export async function reconcileScopedRevival(
   }
 
   const candidates = suspendedCandidates(context, parentSessionId)
-    .filter(({ record }) => !excludedFromAdmission.has(record.task_id))
+    .filter(({ record }) => !excludedFromAdmission.has(record.task_id) && canClaim(record))
   if (context.config.reattach_on_reconcile === false) {
     outcomes.push(...candidates.map(({ record }) => deferred(record.task_id, "reattach_disabled")))
     return recordDeferrals(context, outcomes)
@@ -80,6 +96,7 @@ export async function reconcileScopedRevival(
   const admission = await admitSuspendedBatch(context, parentSessionId, {
     ...context.reconcileAdmission,
     excludeTaskIds: excludedFromAdmission,
+    canClaim,
   })
   const reported = new Set<string>()
   for (const outcome of admission.outcomes) {
@@ -113,8 +130,11 @@ export async function reconcileScopedRevival(
 // The session is resumed now, so a child this pass deferred no longer "resumes with its session":
 // its record carries the deferral, which task_send and task_output then state (omo#9498).
 function recordDeferrals(context: LifecycleContext, outcomes: ReconcileOutcome[]): ReconcileOutcome[] {
+  if (!reconciliationActive(context)) return outcomes
   for (const outcome of outcomes) {
     if (outcome.kind !== "deferred" || outcome.reason === undefined) continue
+    const fresh = context.store.load(outcome.task_id)
+    if (fresh === null || context.reconcileAdmission.canClaim?.(fresh) === false) continue
     // Annotating one record must not fail the pass: a contended record lock leaves that record's
     // generic suspension text, and every other outcome still stands.
     try {
@@ -133,6 +153,8 @@ function disposeSuspendedTerminalWithoutTranscript(
   let applied = false
   try {
     context.store.mutate(observed.task_id, (fresh) => {
+      if (!reconciliationActive(context) || fresh.residency_claim !== observed.residency_claim
+        || fresh.host_pid !== observed.host_pid || fresh.notification.run_epoch !== observed.notification.run_epoch) return fresh
       if (!isSuspendedResidency(fresh.residency_state) || !TERMINAL_STATUSES.has(fresh.status)) return fresh
       applied = true
       const { host_pid: _hostPid, ...rest } = fresh

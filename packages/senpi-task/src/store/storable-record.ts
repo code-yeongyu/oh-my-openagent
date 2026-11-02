@@ -1,4 +1,4 @@
-import type { EffectiveModelChange, EffectiveModelChangeKind, EffectiveModelSource, TaskRecord } from "../state"
+import type { EffectiveModelChange, EffectiveModelChangeKind, EffectiveModelSource, TaskRecord, TaskStatus } from "../state"
 import { EFFECTIVE_MODEL_CHANGE_KINDS } from "../state"
 
 function liveChangeKind(source: EffectiveModelSource): EffectiveModelChangeKind | undefined {
@@ -14,7 +14,21 @@ function liveChangeKind(source: EffectiveModelSource): EffectiveModelChangeKind 
 // a nested `change` block those parsers drop, while `source` stores the child's original spawn
 // source. In-memory records keep the live kind in `source`; only the persisted bytes change.
 
-export function toStorableTaskRecord(record: TaskRecord): TaskRecord {
+// The same rule for `status` (senpi#3811): R0 rejects a status outside its closed set, so a paused
+// task is stored as `running` with the additive `paused: true` marker R0 ignores; readers of this
+// build map the pair back to `paused`.
+export type StoredPausedMarker = { readonly paused?: true }
+
+export function storedStatus(status: TaskStatus): { readonly status: Exclude<TaskStatus, "paused"> } & StoredPausedMarker {
+  return status === "paused" ? { status: "running", paused: true } : { status }
+}
+
+export function toStorableTaskRecord(record: TaskRecord): TaskRecord & StoredPausedMarker {
+  const stored = storableEffectiveModel(record)
+  return stored.status === "paused" ? { ...stored, ...storedStatus(stored.status) } : stored
+}
+
+function storableEffectiveModel(record: TaskRecord): TaskRecord {
   const effective = record.effective_model
   if (effective === undefined) return record
   const kind = liveChangeKind(effective.source)

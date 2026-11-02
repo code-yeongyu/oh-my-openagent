@@ -1,10 +1,5 @@
 import type { TelemetryDiagnosticErrorKind, TelemetryDiagnosticEvent } from "@oh-my-opencode/telemetry-core";
-import {
-	createPluginPostHog,
-	getPostHogDistinctId,
-	type PostHogActivityReason,
-	type PostHogClient,
-} from "./posthog.js";
+import { createPluginPostHog, type PostHogActivityReason, type PostHogClient } from "./posthog.js";
 import { writeComponentTelemetryDiagnostic } from "./product-identity.js";
 
 export type CodexSessionStartInput = {
@@ -19,7 +14,6 @@ export type CodexSessionStartInput = {
 
 export type CodexTelemetryHookOptions = {
 	createClient?: () => PostHogClient | Promise<PostHogClient>;
-	getDistinctId?: () => string;
 };
 
 const SESSION_START_REASON: PostHogActivityReason = "session_start";
@@ -42,7 +36,6 @@ export async function runSessionStartHook(
 	options: CodexTelemetryHookOptions = {},
 ): Promise<string> {
 	const createClient = options.createClient ?? createPluginPostHog;
-	const getDistinctId = options.getDistinctId ?? getPostHogDistinctId;
 
 	let client: PostHogClient;
 	try {
@@ -53,7 +46,7 @@ export async function runSessionStartHook(
 	}
 
 	try {
-		client.trackActive(getDistinctId(), SESSION_START_REASON);
+		client.trackActive(SESSION_START_REASON);
 	} catch (error) {
 		writeHookDiagnostic("telemetry_capture_failed", error, error instanceof Error ? "error" : "non_error");
 		await safeShutdown(client);

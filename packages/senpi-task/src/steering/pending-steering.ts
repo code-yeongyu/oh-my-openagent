@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { log } from "@oh-my-opencode/utils"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
-import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
+import { HostSessionDetachedError, HostSessionUnresponsiveError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
 import type { SendDelivery, SendOutcome, SteeringPort } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
@@ -115,17 +115,24 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       || fresh.residency_state !== "resident" || queue === undefined || queue.length === 0) return false
     const handle = port.liveHandle(taskId)
     if (handle === undefined) return false
+    const liveness = handle.liveness?.()
+    if (liveness !== undefined && liveness.state !== "running") return false
     const delivered = new Set<string>()
     for (const entry of queue) {
       try {
-        if (entry.deliver_as === "steer") await handle.steer(entry.message)
-        else await handle.followUp(entry.message)
+        // The entry's own id travels with it, so the child holds it under the id it was queued with and a
+        // drain repeated after a lost acknowledgment or a parent restart replays it instead of sending a
+        // second copy (#2838 step 4).
+        const identity = { clientMessageId: entry.id }
+        if (entry.deliver_as === "steer") await handle.steer(entry.message, identity)
+        else await handle.followUp(entry.message, identity)
         port.store.appendEvent(taskId, {
           type: "steered",
           payload: { delivered: entry.deliver_as, queued: true, run_epoch: fresh.notification.run_epoch },
         })
         delivered.add(entry.id)
       } catch (error) {
+        if (error instanceof HostSessionUnresponsiveError) break
         log("senpi-task steering queued delivery failed", {
           taskId,
           error: error instanceof Error ? error.message : String(error),

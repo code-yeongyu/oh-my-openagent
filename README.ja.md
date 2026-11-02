@@ -13,11 +13,6 @@
 > | :-----| :----- |
 
 
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO は上記の Jobdori によってメンテナンスされています。あなた専用の Jobdori、Dori に会いましょう。 <br />[こちら](https://sisyphuslabs.ai) からウェイトリストにご登録ください。**
-
 > [!TIP]
 > 私たちと一緒に！
 >

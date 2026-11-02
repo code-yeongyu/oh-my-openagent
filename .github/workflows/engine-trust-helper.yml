@@ -1,0 +1,103 @@
+name: Engine trust helper
+
+# The Windows native fact helper of the engine CA importer (omo#10762, design 9.2): real Crypt32 on
+# in-memory stores in the crate's tests, then the release helper's real output through the TypeScript
+# decoder and selectEngineTrust. Synthetic certificates only; no trust store is modified.
+on:
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "crates/omo-engine-trust-helper/**"
+      - "packages/omo-native/engine-trust-policy.ts"
+      - "packages/omo-native/windows-trust-helper.ts"
+      - "packages/omo-native/test/windows-trust-helper*.ts"
+      - "packages/omo-native/test/trust-certificate-fixtures.ts"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/engine-trust-helper.yml"
+  push:
+    branches: [master, dev]
+    paths:
+      - "crates/omo-engine-trust-helper/**"
+      - "packages/omo-native/engine-trust-policy.ts"
+      - "packages/omo-native/windows-trust-helper.ts"
+      - "packages/omo-native/test/windows-trust-helper*.ts"
+      - "packages/omo-native/test/trust-certificate-fixtures.ts"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/engine-trust-helper.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  windows-helper:
+    name: windows trust helper (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, rust_target: x86_64-pc-windows-msvc }
+          - { os: windows-11-arm, rust_target: aarch64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal --component clippy
+          rustup default "$toolchain"
+          rustup target add "${{ matrix.rust_target }}"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        shell: bash
+        run: cargo clippy -p omo-engine-trust-helper --all-targets --locked -- -D warnings
+
+      # Git Bash puts the OpenSSL CLI on PATH for the synthetic certificates.
+      - name: Crypt32 adapter tests
+        shell: bash
+        run: openssl version && cargo test -p omo-engine-trust-helper --locked -- --nocapture
+
+      - name: Build release helper
+        shell: bash
+        run: cargo build --release -p omo-engine-trust-helper --locked --target "${{ matrix.rust_target }}"
+
+      - name: Install JavaScript dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Helper output through the decoder and the policy
+        shell: bash
+        working-directory: packages/omo-native
+        env:
+          OMO_ENGINE_TRUST_HELPER_TARGET_DIR: ${{ github.workspace }}\target\${{ matrix.rust_target }}\release
+          OMO_ENGINE_TRUST_HELPER_REQUIRED: "1"
+        run: bun test --timeout 60000 test/windows-trust-helper.test.ts test/windows-trust-helper.windows.test.ts
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Engine trust helper (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Clippy (-D warnings) and the Crypt32 adapter tests on in-memory stores with synthetic certificates.
+            - Release build of omo-engine-trust-helper, then its real output through the decoder and selectEngineTrust.
+          JOB_SUMMARY_NEXT: Start with the first failing adapter test; each one names the Crypt32 behaviour it pins.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

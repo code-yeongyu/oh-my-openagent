@@ -12,11 +12,6 @@
 > | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)**가 OmO를 후원하고 있습니다. 여러 모델 제공사를 하나의 API로 쓸 수 있는 OpenAI 호환 게이트웨이입니다. 오픈소스를 응원해주셔서 감사합니다. |
 > | :-----| :----- |
 
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO는 위의 Jobdori에 의해 메인테이닝되고 있습니다. 당신의 Jobdori, Dori를 만나세요. <br />대기 명단은 [여기](https://sisyphuslabs.ai)에서 받습니다.**
-
 > [!TIP]
 > 함께해요!
 >

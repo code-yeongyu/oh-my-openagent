@@ -15,6 +15,8 @@ export interface ReservationRunLedger {
   readonly category?: string
   readonly conversationIds?: readonly string[]
   readonly launching?: boolean
+  /** Waiting for machine admission; deadlines are not active until queued becomes false. */
+  readonly queued?: boolean
   readonly kind: "reflection" | "dream"
   readonly trigger: "step-count" | "compaction" | "manual" | "dream"
   readonly origin?: "manual" | "idle" | "shutdown" | "pressure"
@@ -100,6 +102,9 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
   }
   if (value.launching !== undefined && typeof value.launching !== "boolean") {
     throw new Error("Invalid reservation run launching state")
+  }
+  if (value.queued !== undefined && typeof value.queued !== "boolean") {
+    throw new Error("Invalid reservation run queued state")
   }
   if (value.cleanupIncomplete !== undefined && typeof value.cleanupIncomplete !== "boolean") {
     throw new Error("Invalid reservation run cleanup state")

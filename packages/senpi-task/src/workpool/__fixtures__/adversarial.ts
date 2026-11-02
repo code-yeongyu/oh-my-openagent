@@ -138,6 +138,7 @@ export function runAdversarialCases(): void {
     expect(f.starts).toHaveLength(1)
     expect(f.concurrency.getRetainedKeyCounts().leases).toBe(0)
     expect(f.manager.workpools.ownsTask(worker.task_id)).toBe(true)
+    expect(f.manager.workpools.ownedTaskIds().has(worker.task_id)).toBe(true)
     expect(f.starts[0]?.prompt).toBe(pool.worker_spec.start.prompt)
   })
 }

@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { mkdirSync, writeFileSync } from "node:fs"
+import { frontendSkill } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/frontend"
+import { playwrightSkill } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/playwright"
 import {
 	clearSkillCache,
 	resolveSkillContent,
@@ -95,10 +97,12 @@ describe("resolveMultipleSkills", () => {
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
-		// then: all skills resolved, none not found
-		expect(result.resolved.size).toBe(2)
+		// then: all skills resolve to their source templates in request order, none not found
+		expect([...result.resolved.entries()]).toEqual([
+			["frontend", frontendSkill.template],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual([])
-		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
 	})
 
 	it("should handle partial success - some skills not found", () => {
@@ -108,10 +112,12 @@ describe("resolveMultipleSkills", () => {
 		// when: resolving multiple skills
 		const result = resolveMultipleSkills(skillNames)
 
-		// then: resolves existing skills, lists not found skills
-		expect(result.resolved.size).toBe(2)
+		// then: resolves the existing skills to their source templates and lists the missing names in order
+		expect([...result.resolved.entries()]).toEqual([
+			["frontend", frontendSkill.template],
+			["playwright", playwrightSkill.template],
+		])
 		expect(result.notFound).toEqual(["nonexistent", "another-missing"])
-		expect(result.resolved.get("frontend")).toContain("router, not a rulebook")
 	})
 
 	it("should handle empty array", () => {

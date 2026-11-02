@@ -79,8 +79,8 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
       `${direction}-sender-workspace-project`,
       envelope.provenance?.workspace === "QA workspace" && envelope.provenance?.project === "qa-project"
         && envelope.provenance?.lane === "qa-review" && envelope.provenance?.session === sender.label
-        && deliveredText.split("\n")[0] === expectedFirstLine
-        && deliveredText.split("\n")[1]?.includes('workspace="QA workspace" project="qa-project"'),
+        && deliveredText.split("\n")[0].startsWith(`${expectedFirstLine} [OMO_GATEWAY v=1 `)
+        && deliveredText.split("\n")[0].includes('workspace="QA workspace" project="qa-project"'),
       deliveredText.split("\n").slice(0, 2).join("\n"),
     )
     // The human display omits the machine header; verify that above from the target transcript.

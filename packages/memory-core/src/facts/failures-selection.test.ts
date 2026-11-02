@@ -171,6 +171,14 @@ describe("facts launch selection", () => {
     expect(selection.skipped).toEqual({})
   })
 
+  test("#given a parked predecessor whose file moved to the dead-letter store #when selecting its successor #then the successor still flows (#10918)", () => {
+    // The parked record has no pending entry once its file sits in parked/; it must not hold the conversation back.
+    const entries = [entry("alpha", "m2", 4), entry("beta", "m9", 2)]
+    const selection = selectLaunchable(entries, failures([parked("alpha", "m1", 2)]), T0)
+    expect([...endpoints(selection)].sort()).toEqual(["alpha/m2", "beta/m9"])
+    expect(selection.skipped).toEqual({})
+  })
+
   test("#given an out-of-order pending list #when a dropped entry has a lower snapshot boundary #then gating follows the boundary, not the list order", () => {
     // given: the successor is listed first; prefix gating is defined by the snapshot boundary.
     const eligibleAt = new Date(T0.getTime() + 60_000)

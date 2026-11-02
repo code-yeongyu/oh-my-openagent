@@ -10,6 +10,7 @@ import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
 
@@ -141,7 +142,7 @@ describe("sisyphus-task", () => {
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
         anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-        google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3", "kimi-for-coding-highspeed"],
+        google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3.1-pro", "kimi-for-coding-highspeed"],
         openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-6-luna-fast", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai", "kimi-for-coding"],
@@ -854,7 +855,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe("anthropic/claude-fable-5-1")
+      expect(result?.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
     })
 
     test("allows artistry when availability is empty", () => {
@@ -870,7 +871,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe("anthropic/claude-fable-5-1")
+      expect(result?.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
     })
 
     test("returns null for deep-high when neither gpt-6-astra nor gpt-5.6-sol is available and no user config overrides it", () => {
@@ -1247,10 +1248,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - Kimi K3 should be passed with max variant
+      // then - Kimi K3.1 Pro should be passed with max variant
       expect(launchInput.model).toEqual({
         providerID: "kimi-for-coding",
-        modelID: "k3",
+        modelID: "k3.1-pro",
         variant: "max",
       })
     }, { timeout: 20000 })
@@ -1308,10 +1309,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - Kimi K3 should be passed with max variant
+      // then - Kimi K3.1 Pro should be passed with max variant
       expect(promptBody.model).toEqual({
         providerID: "kimi-for-coding",
-        modelID: "k3",
+        modelID: "k3.1-pro",
       })
       expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })

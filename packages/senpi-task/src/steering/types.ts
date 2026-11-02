@@ -1,5 +1,6 @@
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { ColdRevivalFailureCode, DetachedRevivalResult, DetachedRevivalRollbackResult } from "../lifecycle/port"
+import type { HostSessionCancelPort } from "../lifecycle/host-session"
 import type { TeardownStepDeadline } from "../lifecycle/teardown-budget"
 import type { HostSessionIdentity, TaskRecord, TaskRunStats, TaskStatus } from "../state"
 import type { TaskRecordStore } from "../store"
@@ -14,6 +15,9 @@ export type DestructionPort = {
   destroyResidentTask(taskId: string, cause: DestructionCause): Promise<void>
   // Releases a finished child still resident here; false when there is none (omo#9785).
   parkTerminalResident?(taskId: string): Promise<boolean>
+  // Ends a daemon-hosted child this process holds no handle for, and re-drives it; absent, such a cancel
+  // stays pending on its record (omo#11765).
+  hostSessionCancel?: HostSessionCancelPort
 }
 
 // The seam steering consumes from the manager. The manager owns concurrency + live handles + the
@@ -30,6 +34,8 @@ export type SteeringPort = {
   // True while the task's launch is still being admitted by its host (#10042): no live handle yet, and
   // the launch drains whatever is queued once the child starts.
   isLaunching?(taskId: string): boolean
+  // The child's run admission is stopped: the send is held in the child (no turn). Undefined: send normally.
+  sendWhileRunHeld?(record: TaskRecord, message: string): Promise<SendOutcome> | undefined
   liveHandle(taskId: string): ManagedChildHandle | undefined
   dequeuePending(taskId: string): boolean
   reserveForRevive(taskId: string): ReviveReservation
@@ -73,6 +79,7 @@ export type SendInput = {
 export const DEFAULT_SEND_DELIVERY: SendDelivery = "followUp"
 
 export type SendOutcome =
+  | { readonly kind: "unresponsive"; readonly task_id: string; readonly retryable: true; readonly reason: string }
   | { readonly kind: "uncertain"; readonly task_id: string; readonly effect_id: string; readonly reason: string }
   | { readonly kind: "failed"; readonly task_id: string; readonly effect_id: string; readonly reason: string; readonly detail: string; readonly action: string }
   | { readonly kind: ColdRevivalFailureCode; readonly task_id: string; readonly reason: string }
@@ -87,6 +94,8 @@ export type SendOutcome =
     }
   | { readonly kind: "capacity_deferred"; readonly task_id: string; readonly reason: string }
   | { readonly kind: "queued"; readonly task_id: string; readonly queue_position: number }
+  // The child's run is stopped: the message is held in the child and delivered when the run resumes.
+  | { readonly kind: "held"; readonly task_id: string; readonly pause_seq: number; readonly entry_id: string }
   | { readonly kind: "not_continuable"; readonly task_id: string; readonly reason: string; readonly suggestion: string }
   /** The caller named an earlier run (`expectedRunEpoch`) and the task has moved on; nothing was delivered. */
   | { readonly kind: "stale"; readonly task_id: string; readonly run_epoch: number; readonly reason: string }

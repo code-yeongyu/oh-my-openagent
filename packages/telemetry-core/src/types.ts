@@ -15,6 +15,7 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_event_property_rejected"
   | "telemetry_event_rejected"
   | "telemetry_events_dropped_by_consent"
+  | "telemetry_legacy_rollups_removed"
   | "telemetry_otlp_partial_success"
   | "telemetry_otlp_send_failed"
   | "telemetry_posthog_import_failed"
@@ -55,7 +56,6 @@ export type TelemetryProductConfig = {
   readonly defaultApiKey: string
   readonly defaultHost: string
   readonly eventName: string
-  readonly machineIdPrefix: string
   readonly packageName: string
   readonly packageVersion: string
   readonly platform: string
@@ -119,6 +119,11 @@ export type TurnTracing = {
 
 export type TelemetryTransport = {
   readonly capture: (message: TelemetryCaptureMessage) => void
+  /**
+   * Sends one event now; resolves only on a 2xx answer and rejects otherwise (the default PostHog transport
+   * rejects with `TelemetryDeliveryError`, whose `permanent` flag says a retry can never succeed).
+   */
+  readonly captureImmediate?: (message: TelemetryCaptureMessage) => Promise<void>
   readonly flush?: () => Promise<void>
   readonly shutdown: () => Promise<void>
   readonly traces?: TurnTracing

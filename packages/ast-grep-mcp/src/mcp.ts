@@ -77,16 +77,16 @@ const STRICTNESS = ["cst", "smart", "ast", "relaxed", "signature"] as const;
 // BYTES) while JSON Schema `maxLength` counts Unicode CODE POINTS, so a maxLength keyword
 // cannot express these budgets faithfully — a 10k-code-point CJK pattern is 30k bytes.
 // The budget is therefore published in the description and the parser stays authoritative.
-const PATTERN_BYTES_NOTE = "Max 16 KiB (16384 BYTES, UTF-8) — the limit counts bytes, not characters.";
-const REWRITE_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8) — the limit counts bytes, not characters.";
-const INLINE_RULES_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8) — the limit counts bytes, not characters.";
+const PATTERN_BYTES_NOTE = "Max 16 KiB (16384 BYTES, UTF-8): the limit counts bytes, not characters.";
+const REWRITE_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8): the limit counts bytes, not characters.";
+const INLINE_RULES_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8): the limit counts bytes, not characters.";
 
 const pathsSchema = {
   type: "array",
   minItems: 1,
   maxItems: 64,
   items: { type: "string", minLength: 1, maxLength: 4096 },
-  description: "Files or directories to search. Required — there is no implicit '.' default.",
+  description: "Files or directories to search. Required: there is no implicit '.' default.",
 } as const;
 
 const globsSchema = {
@@ -127,7 +127,7 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
     inputSchema: {
       type: "object",
       properties: {
-        pattern: { type: "string", minLength: 1, description: `ast-grep pattern — code, not regex. ${PATTERN_BYTES_NOTE}` },
+        pattern: { type: "string", minLength: 1, description: `ast-grep pattern: code, not regex. ${PATTERN_BYTES_NOTE}` },
         language: { type: "string", enum: [...LANGUAGES], description: "Language the pattern must parse in." },
         paths: pathsSchema,
         workdir: workdirSchema,
@@ -150,7 +150,7 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
     inputSchema: {
       type: "object",
       properties: {
-        pattern: { type: "string", minLength: 1, description: `ast-grep pattern — code, not regex. ${PATTERN_BYTES_NOTE}` },
+        pattern: { type: "string", minLength: 1, description: `ast-grep pattern: code, not regex. ${PATTERN_BYTES_NOTE}` },
         rewrite: { type: "string", description: `Replacement code; empty deletes the match. ${REWRITE_BYTES_NOTE}` },
         language: { type: "string", enum: [...LANGUAGES], description: "Language the pattern must parse in." },
         paths: pathsSchema,

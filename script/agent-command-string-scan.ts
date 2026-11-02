@@ -19,6 +19,7 @@ export function isExcluded(filePath: string): boolean {
     || filePath === SCAN_TEST_RELATIVE_PATH
     || filePath === "CHANGELOG.md"
     || filePath.endsWith("/CHANGELOG.md")
+    || filePath.startsWith("changes/unreleased/")
     || filePath === ".omo"
     || filePath.startsWith(".omo/")
     || filePath.split("/").some((part) => part === "node_modules" || part === "install-dist" || part === "dist")

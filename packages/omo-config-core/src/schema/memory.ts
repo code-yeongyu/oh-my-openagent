@@ -19,6 +19,7 @@ export const OmoMemoryReflectionSchema = z.object({
   merge: z.enum(["auto", "integration"]).default("auto"),
   category: z.string().min(1).default("quick"),
   timeout_minutes: z.number().int().positive().default(15),
+  max_concurrent_runs: z.number().int().positive().default(1),
   sandbox: z.enum(["auto", "required", "off"]).default("auto"),
 }).strict()
 
@@ -146,6 +147,7 @@ export const OmoMemoryReflectionLayerSchema = z.object({
   merge: z.enum(["auto", "integration"]).optional(),
   category: z.string().min(1).optional(),
   timeout_minutes: z.number().int().positive().optional(),
+  max_concurrent_runs: z.number().int().positive().optional(),
   sandbox: z.enum(["auto", "required", "off"]).optional(),
 }).strict()
 
@@ -216,8 +218,8 @@ export const OmoMemoryWriteNoticeLayerSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const OmoMemoryProjectionSchema = z.object({
-  max_entries_per_directory: z.number().int().min(0).default(40),
-  max_bytes: z.number().int().min(0).default(24576),
+  max_entries_per_directory: z.number().int().min(0).default(0),
+  max_bytes: z.number().int().min(0).default(40960),
 }).strict()
 
 export const OmoMemoryProjectionLayerSchema = z.object({
@@ -232,7 +234,7 @@ export const OmoMemoryProjectionLayerSchema = z.object({
 export const OmoMemoryAgentOverridesSchema = z.object({
   enabled: z.boolean().optional(),
   agent: z.string().min(1).optional(),
-  reflection: OmoMemoryReflectionLayerSchema.optional(),
+  reflection: OmoMemoryReflectionLayerSchema.omit({ max_concurrent_runs: true }).optional(),
   nudge: OmoMemoryNudgeLayerSchema.optional(),
   facts: OmoMemoryFactsLayerSchema.optional(),
   dream: OmoMemoryDreamLayerSchema.optional(),
@@ -267,6 +269,7 @@ export const OmoMemorySettingsSchema = z.object({
     merge: "auto",
     category: "quick",
     timeout_minutes: 15,
+    max_concurrent_runs: 1,
     sandbox: "auto",
   }),
   nudge: OmoMemoryNudgeSchema.default({ enabled: true, every_user_turns: 10 }),
@@ -296,7 +299,7 @@ export const OmoMemorySettingsSchema = z.object({
     query_expansion: false,
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
-  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
+  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()

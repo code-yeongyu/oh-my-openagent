@@ -92,7 +92,13 @@ import {
   writeOmoConfig,
 } from "./kibitzer-sidecar-support.mjs"
 
-export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "cjk-auto", "query-expansion"]
+export const SCENARIOS = ["happy", "provider-429", "context-reseed", "category-unavailable", "refused-pinned-model", "fast-alias-config", "cjk-auto", "query-expansion"]
+/**
+ * #10536: a priority alias declared only in models.json on an openai-codex-responses provider. senpi's
+ * service-tier extension starts such an alias on its base model at session_start, before any request,
+ * so the post-start pin check is exercised without the mock speaking that API.
+ */
+const FAST_ALIAS = { provider: "omo-codex-mock", base: "luna", alias: "luna-fast" }
 /** The pinned model the refused-pinned-model provider refuses, and the builtin quick rung it falls back to. */
 const REFUSED_MODEL = "refused-1"
 const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
@@ -100,6 +106,7 @@ const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
 const CONFIG = {
   "category-unavailable": { categories: {} },
   "refused-pinned-model": { categories: { quick: { description: "QA pin outside the builtin quick chain", model: `omo-mock/${REFUSED_MODEL}` } } },
+  "fast-alias-config": { categories: { quick: { description: "QA pin on a models.json priority alias", model: `${FAST_ALIAS.provider}/${FAST_ALIAS.alias}` } } },
   "query-expansion": { recall: { query_expansion: true } },
 }
 /** A search whose own words match no seeded memory; only the added terms reach the helm memory. */
@@ -149,6 +156,19 @@ const SANDBOX = {
     const auth = JSON.parse(readFileSync(authFile, "utf8"))
     auth[BUILTIN_RUNG.provider] = { type: "api_key", key: "mock" }
     writeFileSync(authFile, `${JSON.stringify(auth, null, 2)}\n`)
+  },
+  "fast-alias-config": (sandbox, baseUrl) => {
+    const modelsFile = join(sandbox.agentDir, "models.json")
+    const models = JSON.parse(readFileSync(modelsFile, "utf8"))
+    const template = { ...models.providers["omo-mock"].models[0], contextWindow: 400_000 }
+    models.providers[FAST_ALIAS.provider] = {
+      name: "mock codex responses provider", api: "openai-codex-responses", baseUrl, apiKey: "mock",
+      models: [
+        { ...template, id: FAST_ALIAS.base, name: "Mock Luna" },
+        { ...template, id: FAST_ALIAS.alias, name: "Mock Luna Fast", serviceTier: "priority", upstreamModelId: FAST_ALIAS.base },
+      ],
+    }
+    writeFileSync(modelsFile, `${JSON.stringify(models, null, 2)}\n`)
   },
 }
 /** Refusals to observe before the absence of a gate notice is meaningful: the gate fires at three. */
@@ -525,6 +545,26 @@ async function runRefusedPinnedModel({ session, state, identity, router, facts, 
   }
 }
 
+// ---- fast-alias-config ---------------------------------------------------------------------------------------
+
+async function runFastAliasConfig({ session, state, identity, router, facts, parentTurns, record }) {
+  const recallDir = join(identity, "runtime", "recall")
+  router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+
+  await prompt(session, MEMORIES.rollout.prompt)
+  const settled = await watchUntil(recallDir, () => {
+    const lineage = sidecarDirs(identity)[0]
+    const records = lineage === undefined ? [] : wakeRecords(lineage.dir)
+    return records.length === 0 ? undefined : { lineage, records }
+  }, { timeoutMs: WAKE_TIMEOUT_MS, description: "fast-alias-config wake 1: the wake settled" })
+  const wake = settled.records[0]
+  const refusedAsSubstitution = wake?.cause === "start_failed" && String(wake?.reason ?? "").includes("refusing the substitution")
+  const children = childTranscripts(settled.lineage.dir)
+  const childModels = children.flatMap((transcript) => transcript.entries).filter((entry) => entry.type === "model_change").map((entry) => `${entry.provider}/${entry.modelId}`)
+  record("pin-accepted-alias-on-base", !refusedAsSubstitution && children.length >= 1, `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, reason: wake?.reason })} childSessions=${children.length} childModelChanges=[${childModels.join(",")}]`)
+  facts.result = { wakeStatus: wake?.status, wakeCause: wake?.cause, wakeReason: wake?.reason, childSessions: children.length, childModelChanges: childModels, parentRequests: parentTurns() }
+}
+
 // ---- cjk-auto -----------------------------------------------------------------------------------------------------
 
 async function runCjkAuto({ session, state, identity, router, facts, parentTurns, record }) {
@@ -594,7 +634,7 @@ async function runQueryExpansion({ session, state, identity, router, facts, pare
   }
 }
 
-const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
+const RUNNERS = { happy: runHappy, "provider-429": runProvider429, "context-reseed": runContextReseed, "category-unavailable": runCategoryUnavailable, "refused-pinned-model": runRefusedPinnedModel, "fast-alias-config": runFastAliasConfig, "cjk-auto": runCjkAuto, "query-expansion": runQueryExpansion }
 
 // ---- main --------------------------------------------------------------------------------------------------------
 

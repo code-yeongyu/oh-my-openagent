@@ -3,6 +3,7 @@ import { once } from "node:events"
 import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { expect, test } from "bun:test"
+import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 const isWin32 = process.platform === "win32"
 const probePath = fileURLToPath(
@@ -50,7 +51,9 @@ async function terminateProcessTree(child: ChildProcess): Promise<void> {
     child.kill("SIGKILL")
     return
   }
-  const killer = spawn("taskkill.exe", ["/pid", String(pid), "/T", "/F"], {
+  const args = windowsTreeKillArgs(pid)
+  if (args.length === 0) return
+  const killer = spawn("taskkill.exe", args, {
     stdio: "ignore",
     windowsHide: true,
   })

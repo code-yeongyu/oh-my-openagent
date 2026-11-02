@@ -79,8 +79,10 @@ export type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
   StateDirConfig,
+  ResidentTaskRecordStore,
   TaskRecordDiagnostic,
   TaskRecordStore,
+  TaskRecordStoreResidentFigures,
 } from "./store"
 export {
   buildLiveStatsTokens,
@@ -94,7 +96,6 @@ export {
   toolCountSuffix,
 } from "./status-line"
 export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
-export { activeParentModelFallback } from "./manager/parent-model-rung"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,
@@ -242,6 +243,7 @@ export {
   terminateRpcChild,
 } from "./runners"
 export { resolveInheritedExtensionList, selectPackageExtensionPaths } from "./runners/rpc/parent-extensions"
+export { createHostGenerationView } from "./runners/rpc-host/generation-view"
 export type { InheritedExtensions } from "./runners/rpc/parent-extensions"
 export type {
   ChildEventListener,
@@ -673,4 +675,4 @@ export type {
 
 export * from "./tools/team"
 export { createEvalHandleHost, type EvalHandleHostDeps } from "./eval-handles"
-export { isPriorityAliasOf } from "./runners/pinned-model-equivalence"
+export { isPriorityAliasOf, type PriorityPairingRegistry } from "./runners/pinned-model-equivalence"

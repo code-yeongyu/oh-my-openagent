@@ -13,10 +13,6 @@
       "types": "./src/cli/service-auth/index.ts",
       "import": "./src/cli/service-auth/index.ts"
     },
-    "./config-migration/dori-section-rename": {
-      "types": "./src/config-migration/dori-section-rename.ts",
-      "import": "./src/config-migration/dori-section-rename.ts"
-    },
     "./binary-downloader": {
       "types": "./src/shared/binary-downloader.ts",
       "import": "./src/shared/binary-downloader.ts"
@@ -27,6 +23,8 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",
+    "@code-yeongyu/senpi": "2026.11.2-1",
+    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.2-1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",

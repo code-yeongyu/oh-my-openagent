@@ -9,6 +9,7 @@ import { clearSkillCache, resolveMultipleSkills } from "../features/opencode-ski
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import * as modelAvailability from "../shared/model-availability"
 import * as shared from "../shared"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const TEST_DEFAULT_MODEL = "anthropic/claude-opus-5-5"
 let createBuiltinAgents: (typeof import("./builtin-agents"))["createBuiltinAgents"]
@@ -1130,7 +1131,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
       // #then
       expect(agents.atlas).toMatchObject({ model: "openai/gpt-5.6-sol", variant: "medium" })
       expect(agents.metis).toBeDefined()
-      expect(agents.metis.model).toBe("anthropic/claude-fable-5-1")
+      expect(agents.metis.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
       expect(agents.metis.variant).toBe("max")
     } finally {
       fetchSpy.mockRestore()

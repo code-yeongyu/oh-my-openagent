@@ -1,5 +1,5 @@
 import { isOtlpTransportAllowed } from "./otlp-gate"
-import { purgeReport, purgeSpool } from "./otlp-spool-purge"
+import { purgeOnOptOut } from "./otlp-spool-purge"
 import type { InspectedLogRecord, InspectedSpan } from "./otlp-inspect"
 import type { Signal } from "./otlp-spool-file"
 import type { CreateOtlpTelemetryTransportInput, OtlpTelemetryTransport } from "./otlp-transport-types"
@@ -28,17 +28,6 @@ export async function createOtlpTelemetryTransport(input: CreateOtlpTelemetryTra
   }
   const { startOtlpTransport } = await import("./otlp-sender")
   return startOtlpTransport(input)
-}
-
-function purgeOnOptOut(input: CreateOtlpTelemetryTransportInput): void {
-  const source = input.source ?? "otlp"
-  try {
-    if (purgeSpool(input.spoolDir, input.spoolRoot, purgeReport(input.diagnostics, source)) === "refused") {
-      input.diagnostics?.({ event: "telemetry_spool_purge_refused", source })
-    }
-  } catch (error) {
-    input.diagnostics?.({ event: "telemetry_spool_sweep_failed", source, error, errorKind: error instanceof Error ? "error" : "non_error" })
-  }
 }
 
 /** Decodes one captured OTLP request body (tests and tooling); the protobuf code loads only when this is called. */

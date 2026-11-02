@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { createNodeGitExec, type GitExec } from "../../../git/exec"
+import { StrandedGitLockError } from "../../../git/repo-lock-sweep"
 import { createGitSyncRepo } from "./git-sync-repo"
 import { initGitSyncTestRepo } from "./git-sync-repo.test-support"
 
@@ -39,6 +40,7 @@ test("the sync commit takes exactly its paths, as OmO Sync, leaving unrelated ed
   await writeFile(join(root, "draft.md"), "untracked draft\n")
   const tree = await sync.stageTree(["synced.md"])
   await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 1-1\nSync-Principals: device:a")
+  await sync.syncIndex(["synced.md"])
   expect(await git(root, "rev-parse", "HEAD^{tree}")).toBe(tree)
   expect(await git(root, "log", "-1", "--format=%an <%ae>|%cn")).toBe("OmO Sync <sync@omo.invalid>|OmO Sync")
   expect(await git(root, "show", "--name-only", "--format=", "HEAD")).toBe("synced.md")
@@ -73,7 +75,33 @@ test("an agent commit landing while the sync commits is kept: HEAD moves by comp
   const sync = createGitSyncRepo({ root, exec: racing })
   await writeFile(join(root, "synced.md"), "from sync\n")
   await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 3-3")
+  await sync.syncIndex(["synced.md"])
   expect(await git(root, "log", "--format=%s", "-3")).toBe("sync: 1 memories updated\nagent: write\ninit")
   expect((await git(root, "ls-tree", "--name-only", "HEAD")).split("\n").sort()).toEqual(["agent.md", "base.md", "synced.md"])
   expect(await porcelain(root)).toBe("")
+})
+
+test("a stranded .git/HEAD.lock whose owner cannot be proven dead stops the sync commit as StrandedGitLockError naming it, and HEAD does not move (omo #10637)", async () => {
+  const root = await repo()
+  const sync = createGitSyncRepo({ root })
+  const head = await git(root, "rev-parse", "HEAD")
+  await writeFile(join(root, "synced.md"), "from sync\n")
+  const lock = join(root, ".git", "HEAD.lock")
+  await writeFile(lock, "")
+  const failure = await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 1-1").then(() => null, (error: unknown) => error)
+  expect(failure).toBeInstanceOf(StrandedGitLockError)
+  expect((failure as StrandedGitLockError).paths).toContain(lock)
+  expect(await git(root, "rev-parse", "HEAD")).toBe(head)
+})
+
+test("a stranded .git/index.lock whose owner cannot be proven dead stops the index update as StrandedGitLockError naming it (omo #10637)", async () => {
+  const root = await repo()
+  const sync = createGitSyncRepo({ root })
+  await writeFile(join(root, "synced.md"), "from sync\n")
+  const lock = join(root, ".git", "index.lock")
+  await writeFile(lock, "")
+  await sync.commit(["synced.md"], "sync: 1 memories updated\n\nSync-Seq: 1-1")
+  const failure = await sync.syncIndex(["synced.md"]).then(() => null, (error: unknown) => error)
+  expect(failure).toBeInstanceOf(StrandedGitLockError)
+  expect((failure as StrandedGitLockError).paths).toContain(lock)
 })

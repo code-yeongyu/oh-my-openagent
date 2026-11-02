@@ -79,7 +79,7 @@ export class AtlasLifecycleStore {
   cleanupSession(sessionID: string): void {
     const state = this.sessions.get(sessionID)
     if (state) state.lifecycleActive = false
-    if (state?.pendingRetryTimer) clearTimeout(state.pendingRetryTimer)
+    state?.pendingRetryTimer?.cancel()
     this.sessions.delete(sessionID)
     this.lastAccessedAt.delete(sessionID)
     for (const callID of this.sessionCallIDs.get(sessionID) ?? []) this.clearPendingCall(callID)

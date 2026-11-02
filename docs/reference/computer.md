@@ -49,7 +49,7 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 |------|---------|------------|
 | `PermissionDenied` | The OS permission for capture, input or accessibility is missing | Grant it to the app that launches OmO; see [Set up your operating system](../guide/computer-use.md#set-up-your-operating-system) |
 | `Suspended` | The user pressed the stop chord (on macOS and X11 only a physical press counts; a posted or XTEST chord is ignored) or ran `/computer stop` | Stop acting; only the user runs `/computer resume` |
-| `StopPathUnavailable` | The global stop chord could not be armed, so input is refused | Use a host where the chord arms, or `allow_host_relay_only_stop` |
+| `StopPathUnavailable` | The global stop chord could not be armed, or cannot hear keys (`secure-input-active`: macOS Secure Event Input is on), so input is refused; an in-flight `typeText` stops at the next character, and a menu walk at the next menu level, with this code; no stop latches | Use a host where the chord arms, or `allow_host_relay_only_stop`; for `secure-input-active`, wait for the user to leave the password field |
 | `ScreenLocked` | The screen is locked | Unlock the session |
 | `BackgroundUnavailable` | The target refuses background delivery | Use accessibility actions or `delivery: "foreground"` |
 | `ControlRequired` | Foreground delivery, `raiseWindow`, or input on the desktop or a display without this session's live control grant | A consent-capable host confirms with the human, then calls `control.grant`; a bridge client (`--oneshot`, MCP) cannot grant, so target a window for background delivery |
@@ -59,6 +59,9 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `WindowNotFound`, `InvalidTarget` | The window closed, or the filter matched nothing or several windows | List windows again and pick one |
 | `AxUnsupported`, `AxFailed` | The element or platform does not support that accessibility operation | Fall back to pointer input |
 | `FocusRestoreFailed`, `CursorRestoreFailed` | Foreground delivery could not put the previous window or cursor back | Tell the user; nothing is hidden |
+| `UserIntervened` | The user was using the target app, or brought another window forward, so the action stopped; the message says whether any input was sent | Read the window again once the user pauses; never repeat the action as it was |
+| `AxUnconfirmed` | An accessibility request was made but the app did not confirm it (no reply in time, or a modal dialog opened). On macOS, `ax.perform` (press and the other named actions), `ax.setValue` and `ax.focus` report it when the app answers `kAXErrorCannotComplete`; a refused request stays `AxFailed`, and so does a value the app answered but did not take | It may already have taken effect: read the element back before any retry |
+| `SpaceUnsupported`, `SpaceMoveDenied` | A window could not be moved to the current Space (macOS), because the platform lacks support or the window server refused or could not verify the move | Ask the user to bring the window to the current Space |
 | `CaptureFailed`, `InputFailed`, `Timeout`, `Cancelled`, `Closed`, `TransactionFailed`, `Internal` | The platform call failed, took too long, was aborted, or the session ended | Observe again before retrying; stop after repeated failures |
 
 Engine start failures are reported by `/computer status` as `engine: native-unavailable`, `quarantined` or `abi-mismatch`, and are described in [Troubleshooting](../guide/computer-use.md#troubleshooting).

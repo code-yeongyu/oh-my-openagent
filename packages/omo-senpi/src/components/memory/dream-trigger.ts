@@ -171,7 +171,7 @@ export function createDreamTriggerWiring(options: DreamTriggerWiringOptions): Dr
         const session = options.resolveSession(eventCtx)
         if (session === undefined) return
         arm(session, eventCtx)
-      })
+      }, { hookLabel: "dream.armIdle" })
       pi.on("input", (_payload, eventCtx) => resetFor(eventCtx))
       pi.on("agent_start", (_payload, eventCtx) => resetFor(eventCtx))
       pi.on("session_compact", (_payload, eventCtx) => resetFor(eventCtx))
