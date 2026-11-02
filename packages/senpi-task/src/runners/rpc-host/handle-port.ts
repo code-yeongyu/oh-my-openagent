@@ -12,6 +12,7 @@ import type { HostSessionReattach } from "./reattach"
 import type { HostSessionClosed, HostSessionCommand, HostSessionParked, HostSessionReplaced } from "./session-client"
 import type { TransportRecoveryOptions } from "./transport-recovery"
 import type { CatalogModelIdentity } from "../pinned-model-equivalence"
+import type { TurnSettlementScheduler } from "../rpc/turn-settlement"
 import type { TaskRecord } from "../../state"
 import type { HostTurnReconciliation, InputEffectStatus, ReconciledTurnNotice } from "./reconcile-turn"
 import type { TaskParentWire } from "../task-parent-control"
@@ -35,6 +36,8 @@ export interface HostSessionLiveness {
   // check compares it with the requested provider/modelId (#9722).
   readonly model?: CatalogModelIdentity
   readonly serviceTier?: string
+  // The engine's SessionLifecycle; its `waitingOn` is the child's pending async work (omo#10487).
+  readonly lifecycle?: unknown
 }
 
 /** `HostSessionClient` satisfies this structurally. The transport error itself is never read. */
@@ -97,6 +100,8 @@ export type HostSessionHandleOptions = {
   readonly shardEvents?: HostShardEvents
   /** How long a lost transport may take to come back before the child ends `transport lost`. */
   readonly transportRecovery?: TransportRecoveryOptions
+  /** Test seam: drives the settle confirmation by hand instead of a real timer. */
+  readonly settlementScheduler?: TurnSettlementScheduler
 }
 
 export type HostSessionChildHandle = RpcChildHandle & {

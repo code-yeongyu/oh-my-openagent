@@ -1,6 +1,8 @@
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
+import { createAsyncWorkHold } from "../async-work-hold"
+import type { PendingAsyncWork } from "../pending-async-work"
 import { agentEndOutcome } from "./turn-outcome"
 
 type AgentEndEvent = Extract<AgentSessionEvent, { readonly type: "agent_end" }>
@@ -45,6 +47,15 @@ export type TurnSettlementInput = {
   // forever.
   readonly maxUnreadableProbes?: number
   readonly wakeSourcesLive?: () => boolean
+  // senpi#3492 / omo#10487: the child's own async work (a detached eval cell, a background terminal
+  // job, a monitor, a goal timer, a child task it still owns) as the engine's lifecycle reports it.
+  // senpi still emits `agent_idle` while that work runs, so a COMPLETED outcome is not terminal then:
+  // the work's completion wakes the child into the turn that produces its real answer. The outcome is
+  // held from that `agent_idle` (createAsyncWorkHold) and settles once the work drains and the probe
+  // reads an idle session, or as the typed `async_work_pending` failure if the work stops
+  // progressing for `asyncWorkStaleLimitMs`. Absent: a completed outcome settles on `agent_idle`.
+  readonly pendingAsyncWork?: () => PendingAsyncWork | undefined
+  readonly asyncWorkStaleLimitMs?: number
   // Teardown detached/tore down the handle while a probe was in flight: that flight must never
   // report the held error as failed - the exit path owns the outcome from here (senpi#3262 review).
   readonly disposed?: () => boolean
@@ -53,6 +64,8 @@ export type TurnSettlementInput = {
 
 export type TurnSettlement = {
   readonly observe: (event: AgentSessionEvent) => void
+  // While a completed turn is held on pending async work this is what the turn amounts to if it ends
+  // now (exit, park): the typed failure naming the abandoned work, never the interim note.
   readonly pending: () => RunnerOutcome | undefined
   readonly cancelConfirmation: () => void
   // A wake source the handle tracks just dropped: re-offer the held error a confirmation chance.
@@ -95,6 +108,26 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   let unreadableProbes = 0
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
   const maxUnreadableProbes = input.maxUnreadableProbes ?? 3
+  const probe = input.probe
+  const asyncWork =
+    input.pendingAsyncWork === undefined || probe === undefined || input.settleConfirmMs === undefined
+      ? undefined
+      : createAsyncWorkHold({
+          pending: input.pendingAsyncWork,
+          idle: async () => {
+            const state = await probe()
+            return state === undefined ? undefined : sessionIsIdle(state)
+          },
+          settle: (outcome) => {
+            held = undefined
+            input.settle(outcome)
+          },
+          schedule: scheduleConfirmation,
+          intervalMs: input.settleConfirmMs,
+          staleLimitMs: input.asyncWorkStaleLimitMs,
+          maxUnreadable: maxUnreadableProbes,
+          disposed: input.disposed,
+        })
   const endOutcome = (event: AgentEndEvent): RunnerOutcome =>
     agentEndOutcome(event, input.baseline(), input.finalText(), input.abortedByUser())
 
@@ -150,6 +183,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   }
 
   const clearConfirmation = (): void => {
+    asyncWork?.cancel()
     if (confirmation === undefined) return
     confirmation.cancel()
     confirmation = undefined
@@ -157,6 +191,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
 
   return {
     observe: (event) => {
+      asyncWork?.activity()
       switch (event.type) {
         case "agent_start":
           clearConfirmation()
@@ -180,6 +215,11 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_idle": {
           clearConfirmation()
           const outcome = held
+          const work = outcome?.status === "completed" ? input.pendingAsyncWork?.() : undefined
+          if (asyncWork !== undefined && outcome?.status === "completed" && work !== undefined) {
+            asyncWork.begin(outcome, work)
+            return
+          }
           held = undefined
           if (outcome !== undefined) input.settle(outcome)
           return
@@ -188,7 +228,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
       }
     },
-    pending: () => held,
+    pending: () => asyncWork?.abandoned() ?? held,
     cancelConfirmation: clearConfirmation,
     reconfirmHeld: rearm,
   }
