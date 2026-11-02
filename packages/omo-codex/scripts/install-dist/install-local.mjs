@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:f9d966895834ccbb30b87f2feac3469e2553840c76085902db6d2c057265dacb:eb31483ed4e0b921befcd030b1b8d42b1a2dc92395c15660b619b943877bb314
+// omo-codex-install:fa35e8ab40c8f7085d400adec57b7aef71514fe63bac75abb085a7547850e2f3:d50e2a8cbb33cdf626e88311d3b52748bd4957b43c4db16fb224f53a731b0f27
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19485,6 +19485,44 @@ function preprocess(fn, schema) {
   });
 }
 
+// packages/omo-config-core/src/schema/advisor.ts
+var OmoAdvisorEnvNameSchema = string2().regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+var OmoAdvisorThinkingSchema = _enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+var OmoAdvisorSettingsShape = {
+  enabled: boolean2(),
+  model: string2().min(1),
+  thinking: OmoAdvisorThinkingSchema,
+  category: string2().min(1),
+  decision_url: string2().url(),
+  decision_model: string2().min(1),
+  api_key_env: OmoAdvisorEnvNameSchema,
+  threshold: number2().min(0).max(1),
+  kind_confidence: number2().min(0).max(1),
+  min_calls: number2().int().min(1).max(100),
+  check_every: number2().int().min(1).max(100),
+  cooldown: number2().int().min(0).max(1000),
+  max_per_session: number2().int().min(0).max(50),
+  window: number2().int().min(12).max(200),
+  timeout_seconds: number2().int().min(10).max(900)
+};
+var OmoAdvisorSettingsLayerSchema = object(OmoAdvisorSettingsShape).partial().strict();
+var OmoAdvisorSettingsSchema = OmoAdvisorSettingsLayerSchema.extend({
+  enabled: boolean2().default(false),
+  thinking: OmoAdvisorThinkingSchema.default("high"),
+  category: string2().min(1).default("ultrabrain"),
+  decision_url: string2().url().default("https://apis.opengateway.ai/v1/decisions"),
+  decision_model: string2().min(1).default("sionic-ai/jev-omni"),
+  api_key_env: OmoAdvisorEnvNameSchema.default("OMO_ADVISOR_API_KEY"),
+  threshold: number2().min(0).max(1).default(0.7),
+  kind_confidence: number2().min(0).max(1).default(0.4),
+  min_calls: number2().int().min(1).max(100).default(3),
+  check_every: number2().int().min(1).max(100).default(1),
+  cooldown: number2().int().min(0).max(1000).default(5),
+  max_per_session: number2().int().min(0).max(50).default(10),
+  window: number2().int().min(12).max(200).default(24),
+  timeout_seconds: number2().int().min(10).max(900).default(180)
+}).strict();
+
 // packages/omo-config-core/src/schema/reasoning-vocabulary.ts
 var REASONING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 var REASONING_AUTO = "auto";
@@ -20313,6 +20351,7 @@ var OmoTypedHarnessConfigSchema = object({
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  advisor: OmoAdvisorSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional()
@@ -20332,6 +20371,7 @@ var OmoConfigProfileSchema = object({
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  advisor: OmoAdvisorSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
@@ -20356,6 +20396,7 @@ var OmoConfigSchema = object({
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
+  advisor: OmoAdvisorSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
@@ -20383,6 +20424,7 @@ var OmoConfigLayerSchema = object({
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  advisor: OmoAdvisorSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),

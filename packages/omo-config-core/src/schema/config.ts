@@ -10,6 +10,7 @@ import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catal
 import { OmoModelPadSchema } from "./model-pad"
 import { OmoModelProfilesLayerSchema, OmoModelProfilesSchema } from "./model-profile"
 import { OmoSidePanelSettingsLayerSchema, OmoSidePanelSettingsSchema } from "./side-panel"
+import { OmoAdvisorSettingsLayerSchema, OmoAdvisorSettingsSchema } from "./advisor"
 import { OmoTaskSettingsLayerSchema, OmoTaskSettingsSchema } from "./task"
 import { OmoTeamsConfigLayerSchema, OmoTeamsConfigSchema } from "./team"
 import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./telemetry"
@@ -49,6 +50,7 @@ export const OmoTypedHarnessConfigSchema = z.object({
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  advisor: OmoAdvisorSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
@@ -69,6 +71,7 @@ export const OmoConfigProfileSchema = z.object({
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  advisor: OmoAdvisorSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
@@ -94,6 +97,7 @@ export const OmoConfigSchema = z.object({
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
+  advisor: OmoAdvisorSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
@@ -122,6 +126,7 @@ export const OmoConfigLayerSchema = z.object({
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
+  advisor: OmoAdvisorSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),

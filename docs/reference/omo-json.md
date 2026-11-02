@@ -107,6 +107,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "memory": {},         // MemorySettings (Native harness)
   "git_master": { "include_co_authored_by": true, "commit_footer": false }, // sisyphus-dev-ai co-author trailer (on by default) and opt-in commit footer (Native harness)
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
+  "advisor": { "enabled": false }, // decision-model gate + stronger-model plan for stuck sessions (Native harness), off by default
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
@@ -330,6 +331,40 @@ keyboard chord is registered by default.
 
 The block may live at the shared top level, in `[native]`, or in profile layers, and follows the
 normal resolution order.
+
+### `advisor` (Native harness)
+
+The optional `advisor` block (`schema/advisor.ts`) brings in a stronger model when a session gets stuck. While off it registers no hook at all; `enabled` is read once when omo starts, from the config that applies to the starting directory, so turning it on takes effect in the next omo process. It is **off by default** because, once on, it sends an excerpt of the session (the task prompt and recent tool calls with an argument head and a result tail) to two remote endpoints.
+
+A decision model decides whether to step in; it never writes the advice. From the `min_calls`-th tool result on, every `check_every` tool results the advisor posts the session's last 8 tool calls to `decision_url` (the `/v1/decisions` request shape: a `state` object and two questions, `stuck` as a `noul` probability and `kind` as a `choice` among `same_call`, `repoll_unchanged`, `wait_misuse`, `error_streak`, `wandering` and `none`), with the model `decision_model` and a bearer key read from the environment variable named in `api_key_env`. The key is never stored in `omo.json`; without it the gate makes no request. When `stuck` reaches `threshold`, the kind is not `none` and its confidence reaches `kind_confidence`, a tool-less child on the advisor model (`model` at `thinking`; the `category` chain if that model cannot start) reads the full task and the last 12 calls with their results and writes a plan in a fixed shape: ROOT CAUSE, TARGET STATE, DO THIS (exact commands and code), VERIFY. The plan is held and steered in as a hidden message at the next tool result, the way a Kibitzer recall hint is delivered, so it rides a turn that is executing tools; if the run settles or a new prompt arrives first, the held plan is dropped, and a plan that finishes after the next prompt started is discarded (recorded as an `omo-advisor:delivery` entry). After a delivered plan the gate waits `cooldown` tool results, a session gets at most `max_per_session` advices, and `timeout_seconds` bounds one advice including its retry. A reply that ends with no text (a model can spend its whole output budget on reasoning) is retried once with thinking `off`. Every gate call is recorded in the session transcript as an `omo-advisor:gate` entry (probability, kind, whether it triggered, the plan or the reason there was none). Tool arguments, results and the task prompt pass through the same secret redaction as Kibitzer before they are kept or sent. Ending the session cancels the gate call and the advisor child in flight. A failing endpoint, a missing key, a failed child or a failed delivery never interrupts the session; each is logged, and an unreachable gate is reported once per session and backs off by `cooldown`.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `enabled` | `false` | Run the advisor. |
+| `model` | the newest Claude Opus on `anthropic` | Advisor model, `provider/model`. |
+| `thinking` | `"high"` | Advisor thinking level. |
+| `category` | `"ultrabrain"` | Category whose chain answers when `model` cannot start. |
+| `decision_url` | `"https://apis.opengateway.ai/v1/decisions"` | Decision endpoint. |
+| `decision_model` | `"sionic-ai/jev-omni"` | Decision model id. |
+| `api_key_env` | `"OMO_ADVISOR_API_KEY"` | Environment variable holding the decision endpoint's key. |
+| `threshold` | `0.7` | `stuck` probability at or above which the advisor is asked. |
+| `kind_confidence` | `0.4` | Minimum confidence of the `kind` label. |
+| `min_calls` | `3` | Tool results before the first gate call. |
+| `check_every` | `1` | Ask the gate on every Nth tool result. |
+| `cooldown` | `5` | Tool results after an advice before the gate runs again. |
+| `max_per_session` | `10` | Advice cap per session (`0` keeps the gate observing only). |
+| `window` | `24` | Recent tool calls kept per session (at least 12). |
+| `timeout_seconds` | `180` | Upper bound for one advice, including the empty-reply retry. |
+
+```jsonc
+{
+  "advisor": {
+    "enabled": true,
+    "model": "anthropic/claude-opus-5-5",
+    "thinking": "high"
+  }
+}
+```
 
 ### `models` (shared catalog)
 

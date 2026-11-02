@@ -2493,6 +2493,101 @@
       },
       "additionalProperties": false
     },
+    "advisor": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thinking": {
+          "default": "high",
+          "type": "string",
+          "enum": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        },
+        "category": {
+          "default": "ultrabrain",
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_url": {
+          "default": "https://apis.opengateway.ai/v1/decisions",
+          "type": "string",
+          "format": "uri"
+        },
+        "decision_model": {
+          "default": "sionic-ai/jev-omni",
+          "type": "string",
+          "minLength": 1
+        },
+        "api_key_env": {
+          "default": "OMO_ADVISOR_API_KEY",
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "threshold": {
+          "default": 0.7,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "kind_confidence": {
+          "default": 0.4,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "min_calls": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "check_every": {
+          "default": 1,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cooldown": {
+          "default": 5,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "max_per_session": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50
+        },
+        "window": {
+          "default": 24,
+          "type": "integer",
+          "minimum": 12,
+          "maximum": 200
+        },
+        "timeout_seconds": {
+          "default": 180,
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 900
+        }
+      },
+      "additionalProperties": false
+    },
     "computer": {
       "type": "object",
       "properties": {
@@ -4857,6 +4952,87 @@
                 }
               },
               "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "advisor": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thinking": {
+              "type": "string",
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1
+            },
+            "decision_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "decision_model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "api_key_env": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "kind_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "check_every": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "cooldown": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "max_per_session": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "window": {
+              "type": "integer",
+              "minimum": 12,
+              "maximum": 200
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 900
             }
           },
           "additionalProperties": false
@@ -7229,6 +7405,87 @@
           },
           "additionalProperties": false
         },
+        "advisor": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thinking": {
+              "type": "string",
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1
+            },
+            "decision_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "decision_model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "api_key_env": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "kind_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "check_every": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "cooldown": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "max_per_session": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "window": {
+              "type": "integer",
+              "minimum": 12,
+              "maximum": 200
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 900
+            }
+          },
+          "additionalProperties": false
+        },
         "computer": {
           "type": "object",
           "properties": {
@@ -9593,6 +9850,87 @@
                 }
               },
               "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "advisor": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thinking": {
+              "type": "string",
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1
+            },
+            "decision_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "decision_model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "api_key_env": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "kind_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "check_every": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "cooldown": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "max_per_session": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "window": {
+              "type": "integer",
+              "minimum": 12,
+              "maximum": 200
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 900
             }
           },
           "additionalProperties": false
@@ -11971,6 +12309,87 @@
             },
             "additionalProperties": false
           },
+          "advisor": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "thinking": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
+              "category": {
+                "type": "string",
+                "minLength": 1
+              },
+              "decision_url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "decision_model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "api_key_env": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "threshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "kind_confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "min_calls": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "check_every": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "cooldown": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              },
+              "max_per_session": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50
+              },
+              "window": {
+                "type": "integer",
+                "minimum": 12,
+                "maximum": 200
+              },
+              "timeout_seconds": {
+                "type": "integer",
+                "minimum": 10,
+                "maximum": 900
+              }
+            },
+            "additionalProperties": false
+          },
           "computer": {
             "type": "object",
             "properties": {
@@ -14335,6 +14754,87 @@
                       }
                     },
                     "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "advisor": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "thinking": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "decision_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "decision_model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "api_key_env": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "kind_confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "min_calls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "check_every": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "cooldown": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "max_per_session": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 50
+                  },
+                  "window": {
+                    "type": "integer",
+                    "minimum": 12,
+                    "maximum": 200
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 900
                   }
                 },
                 "additionalProperties": false
@@ -16707,6 +17207,87 @@
                 },
                 "additionalProperties": false
               },
+              "advisor": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "thinking": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "decision_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "decision_model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "api_key_env": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "kind_confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "min_calls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "check_every": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "cooldown": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "max_per_session": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 50
+                  },
+                  "window": {
+                    "type": "integer",
+                    "minimum": 12,
+                    "maximum": 200
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 900
+                  }
+                },
+                "additionalProperties": false
+              },
               "computer": {
                 "type": "object",
                 "properties": {
@@ -19071,6 +19652,87 @@
                       }
                     },
                     "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "advisor": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "thinking": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "decision_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "decision_model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "api_key_env": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "kind_confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "min_calls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "check_every": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "cooldown": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "max_per_session": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 50
+                  },
+                  "window": {
+                    "type": "integer",
+                    "minimum": 12,
+                    "maximum": 200
+                  },
+                  "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 900
                   }
                 },
                 "additionalProperties": false

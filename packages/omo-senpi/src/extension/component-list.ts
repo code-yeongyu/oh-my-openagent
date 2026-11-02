@@ -1,3 +1,4 @@
+import { createAdvisorComponent } from "../components/advisor"
 import { createAstGrepComponent } from "../components/ast-grep"
 import { createBrowserBridgeComponent } from "../components/browser-bridge"
 import { createDesktopToolkitComponent } from "../components/desktop-toolkit"
@@ -58,6 +59,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createClaimReceiptComponent(),
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
+    createAdvisorComponent(),
     createAstGrepComponent(),
     createBuiltinMcpsComponent(),
     createLspComponent(),

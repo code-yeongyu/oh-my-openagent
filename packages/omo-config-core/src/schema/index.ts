@@ -1,3 +1,4 @@
+export * from "./advisor"
 export * from "./agent"
 export * from "./category"
 export * from "./config"
