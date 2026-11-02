@@ -5,6 +5,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { childFailureCause, failureFingerprint } from "./failure-detail"
+import { isModelUnreachableDetail } from "./memory-model-attempts"
 
 export interface ReflectionFailureDecision {
   readonly outcome: ReflectionOutcome
@@ -18,6 +19,7 @@ const NON_RETRYABLE_REASONS = new Set([
   "completion_validation",
   "missing_validated_tip",
   "missing_worktree",
+  "secret_like_content",
 ])
 
 // Outcomes the child did not cause: the parent repo was busy or drifted while the run merged.
@@ -33,6 +35,7 @@ export function classifyReflectionFailure(decision: ReflectionFailureDecision): 
   return {
     fingerprint: failureFingerprint(decision.reason, decision.detail),
     retryable: isRetryable(decision),
+    ...(isModelUnreachableDetail(decision.detail) ? { definitive: true } : {}),
     ...(decision.reason === undefined ? {} : { reason: decision.reason }),
     ...(detail === undefined ? {} : { detail }),
   }

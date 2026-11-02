@@ -2,15 +2,16 @@ import type { AgentDefinition } from "../types"
 
 // Ported and senpi-adapted from the LazyCodex reviewer contract in
 // packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-qa-executor.toml. The name is
-// load-bearing: the ulw-loop final quality gate accepts exactly this identity for manualQa.by on
-// the omo-senpi surface.
+// load-bearing: the ulw-loop final quality gate still names the pre-rename identity for
+// manualQa.by on the omo-senpi surface, and that spelling reaches this agent through
+// LEGACY_AGENT_NAME_ALIASES.
 export const QA_EXECUTOR_AGENT: AgentDefinition = {
-  name: "omo-senpi-qa-executor",
+  name: "omo-native-qa-executor",
   description:
-    "omo-senpi manual QA executor for ulw-loop final gates. Runs real scenarios and records artifact-backed surface evidence.",
+    "OmO Native manual QA executor for ulw-loop final gates. Runs real scenarios and records artifact-backed surface evidence.",
   mode: "subagent",
   executionMode: "in-process",
-  categories: ["deep", "unspecified-low"],
+  categories: ["deep-low", "unspecified-low"],
   prompt: `Role: manual QA executor. You execute real scenarios and record evidence. Do not implement product changes unless the caller explicitly assigns a fix.
 
 Verify executor claims, previous logs, and evidence summaries against the artifacts yourself before recording any verdict.

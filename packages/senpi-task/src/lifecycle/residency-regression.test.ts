@@ -14,6 +14,7 @@ import {
   settings,
   tempStore,
 } from "./__fixtures__/lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "./host-session"
 
 afterEach(cleanupProjects)
 
@@ -65,6 +66,7 @@ function lifecycleFor(
     },
   }
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry: new FakeRegistry(),
     config: settings(overrides),
@@ -124,6 +126,7 @@ describe("terminal resident reconciliation", () => {
       },
     }
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store,
       registry,
       config: settings(),

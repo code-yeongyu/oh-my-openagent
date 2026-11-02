@@ -4,11 +4,8 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import {
-  fetchNpmDistTagsSync,
-  latestFromDistTags,
-  runDoctor,
-} from "../bin/lib/doctor.js"
+import { latestFromDistTags, runDoctor } from "../bin/lib/doctor.js"
+import { fetchNpmDistTagsSync } from "../bin/lib/npm-dist-tags.js"
 import { packageManifest, updateTarget } from "../bin/lib/package-paths.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))

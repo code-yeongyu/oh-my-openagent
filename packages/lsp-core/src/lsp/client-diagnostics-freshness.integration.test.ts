@@ -378,4 +378,94 @@ describe("LspClient diagnostics freshness", () => {
 		expect(second.items).toEqual([diagnostic("cached-full")]);
 	});
 
+	// #9476: the server delays whichever message must come second, so the arrival order at the client
+	// is fixed by the fake server instead of scheduler luck. The controlled clock keeps the freshness
+	// window from firing: only the matching push publish may resolve the call.
+	it("#given the unsupported-pull error response arrives before the matching push publish #when diagnostics run #then the client resolves to that publish", async () => {
+		const clock = new ControlledClock();
+		const context = await harness.makeClient(
+			{
+				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+				publishDiagnostics: [
+					{
+						trigger: "diagnosticRequest",
+						version: 1,
+						delayMs: 150,
+						diagnostics: [diagnostic("error-first")],
+						awaitClientDelivery: true,
+					},
+				],
+				diagnosticResponses: [{ error: { code: -32601, message: "Method not found" } }],
+			},
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+		);
+
+		const result = await context.client.diagnostics(context.source);
+
+		expect(result.items).toEqual([diagnostic("error-first")]);
+		expect(result.transientError).toBeUndefined();
+	});
+
+	it("#given the matching push publish arrives before the unsupported-pull error response #when diagnostics run #then the client resolves to that publish", async () => {
+		const clock = new ControlledClock();
+		const context = await harness.makeClient(
+			{
+				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+				publishDiagnostics: [
+					{
+						trigger: "diagnosticRequest",
+						version: 1,
+						diagnostics: [diagnostic("publish-first")],
+						awaitClientDelivery: true,
+					},
+				],
+				diagnosticResponses: [{ delayMs: 150, error: { code: -32601, message: "Method not found" } }],
+			},
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+		);
+
+		const result = await context.client.diagnostics(context.source);
+
+		expect(result.items).toEqual([diagnostic("publish-first")]);
+		expect(result.transientError).toBeUndefined();
+	});
+
+	it("#given the matching push publish arrived while the pull was in flight and the freshness window elapsed before the unsupported-pull error response #when diagnostics run #then the client resolves to that publish instead of clean", async () => {
+		const clock = new ControlledClock();
+		let skewMs = 0;
+		const skewedClock = {
+			now: () => clock.now() + skewMs,
+			setTimeout: clock.setTimeout,
+			clearTimeout: clock.clearTimeout,
+		};
+		const context = await harness.makeClient(
+			{
+				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+				publishDiagnostics: [
+					{
+						trigger: "diagnosticRequest",
+						version: 1,
+						diagnostics: [diagnostic("publish-before-deadline")],
+						awaitClientDelivery: true,
+					},
+				],
+				diagnosticResponses: [{ delayMs: 150, error: { code: -32601, message: "Method not found" } }],
+			},
+			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: skewedClock },
+		);
+
+		const pending = context.client.diagnostics(context.source);
+		await waitForEventCountBySubscription(
+			context.events,
+			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+			1,
+		);
+		// The publish is recorded; the freshness window now elapses before the error response lands.
+		skewMs = 500;
+		const result = await pending;
+
+		expect(result.items).toEqual([diagnostic("publish-before-deadline")]);
+		expect(result.transientError).toBeUndefined();
+	});
+
 });

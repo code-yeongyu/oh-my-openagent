@@ -86915,9 +86915,9 @@
           "original": "../jsdom/living/css/properties/backgroundImage.js"
         },
         {
-          "path": "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundOrigin.js",
+          "path": "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroun\u0064Origin.js",
           "kind": "require-call",
-          "original": "../jsdom/living/css/properties/backgroundOrigin.js"
+          "original": "../jsdom/living/css/properties/backgroun\u0064Origin.js"
         },
         {
           "path": "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundPosition.js",
@@ -88227,9 +88227,9 @@
           "original": "./backgroundRepeat"
         },
         {
-          "path": "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundOrigin.js",
+          "path": "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroun\u0064Origin.js",
           "kind": "require-call",
-          "original": "./backgroundOrigin"
+          "original": "./backgroun\u0064Origin"
         },
         {
           "path": "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundClip.js",
@@ -88437,7 +88437,7 @@
       ],
       "format": "cjs"
     },
-    "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundOrigin.js": {
+    "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroun\u0064Origin.js": {
       "bytes": 1549,
       "imports": [
         {
@@ -102377,7 +102377,7 @@
         "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundRepeat.js": {
           "bytesInOutput": 1609
         },
-        "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundOrigin.js": {
+        "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroun\u0064Origin.js": {
           "bytesInOutput": 1081
         },
         "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundClip.js": {
@@ -114720,7 +114720,7 @@
         "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundRepeat.js": {
           "bytesInOutput": 1609
         },
-        "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundOrigin.js": {
+        "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroun\u0064Origin.js": {
           "bytesInOutput": 1081
         },
         "node_modules/.bun/@code-yeongyu+senpi@2026.9.13+3fa0ac541081a5d9/node_modules/@code-yeongyu/senpi/node_modules/jsdom/lib/jsdom/living/css/properties/backgroundClip.js": {

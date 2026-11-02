@@ -36,6 +36,8 @@ test("#given all operation schemas #when valid machine requests are parsed #then
     { op: "yield", results: [{ key: "k", data: null }, { key: "e", error: { code: "failed", message: "fixture" } }] },
   ]
   // when / then
+  expect(WorkpoolParams.type).toBe("object")
+  expect("anyOf" in WorkpoolParams).toBe(false)
   for (const request of requests) { expect(Value.Check(WorkpoolParams, request)).toBe(true); expect(WorkpoolCommandSchema.safeParse(request).success).toBe(true) }
   expect(Value.Check(WorkpoolYieldParams, requests[0])).toBe(false)
 })

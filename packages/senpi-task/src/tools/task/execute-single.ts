@@ -7,7 +7,7 @@ import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import { buildStartSpec } from "./execute-spec"
 import type { ForegroundWaitOptions } from "./foreground-wait"
 import { waitForForegroundTask } from "./foreground-wait"
-import { partialDetails, recordDetails, startedDetails, type SingleSpawnParams } from "./result-details"
+import { partialDetails, recordDetails, startedDetails, withLiveSpawnFacts, type SingleSpawnParams } from "./result-details"
 import { appendMissingSkills } from "./skill-result"
 import { evaluateSpawnPolicy } from "./spawn-policy"
 import { backgroundConversionText, backgroundStartText, type StartLabels } from "./start-presentation"
@@ -84,7 +84,7 @@ export async function runSpawn(
     const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
     const categorySuffix = categories && categories.length > 0
       ? started.error.code === "model_unavailable"
-        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+        ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
         : ` Available categories: ${categories.join(", ")}.`
       : ""
     return result(started.error.message + agentSuffix + categorySuffix, {
@@ -94,6 +94,9 @@ export async function runSpawn(
       reason: started.error.message,
     })
   }
+  if (started.kind === "held") return result("Task admission is held by your Stop. Resume the run to continue.", {
+    task_id: started.task_id, status: "paused", mode: "spawn", pause_seq: started.pauseSeq,
+  })
   if (started.kind === "depth_denied") {
     return result(started.reason, { task_id: "", status: "denied", mode: "spawn", reason: started.reason })
   }
@@ -110,6 +113,7 @@ export async function runSpawn(
       ...(started.resolved_model !== undefined && { resolved_model: started.resolved_model }),
       run_in_background: started.run_in_background,
       ...(started.failure_kind === undefined ? {} : { failure_kind: started.failure_kind }),
+      ...(started.failure_reason === undefined ? {} : { failure_reason: started.failure_reason }),
       reason: started.error_message,
       ...(spec.skills === undefined ? {} : { skills: spec.skills }),
     })
@@ -117,10 +121,13 @@ export async function runSpawn(
   if (started.kind === "residency_denied") {
     return result(started.reason, { task_id: "", status: "residency_denied", mode: "spawn", reason: started.reason })
   }
+  // What the started child actually runs as. The spec names no mode only when omo.json says `auto`
+  // and this wiring has no daemon gate at all, which IS in-process.
+  const executionMode = spec.execution_mode ?? "in-process"
   if (params.run_in_background === true) {
     return result(
       appendMissingSkills(backgroundStartText(started, startLabels), spec.skills),
-      startedDetails(started, params, spec.execution_mode, spec.skills),
+      startedDetails(started, params, executionMode, spec.skills),
     )
   }
 
@@ -142,16 +149,18 @@ export async function runSpawn(
   let emittedAt = 0
   let receivedChildEvent = false
   let closed = false
+  const launch = started.starting === true ? deps.manager.whenLaunched?.(started.task_id) : undefined
+  let launching = launch !== undefined
   const emit = (): void => {
-    if (closed || onUpdate === undefined) return
+    if (closed || launching || onUpdate === undefined) return
     emittedAt = Date.now()
     onUpdate({
       content: [{ type: "text", text: progress.contentText() }],
-      details: partialDetails(started, params, spec.execution_mode, progress.details(), spec.skills),
+      details: partialDetails(withLiveSpawnFacts(started, deps.manager.get(started.task_id)), params, executionMode, progress.details(), spec.skills),
     })
   }
   const schedule = (): void => {
-    if (closed || onUpdate === undefined) return
+    if (closed || launching || onUpdate === undefined) return
     if (!receivedChildEvent) {
       receivedChildEvent = true
       emit()
@@ -174,7 +183,7 @@ export async function runSpawn(
   if (started.status === "pending") {
     onUpdate?.({
       content: [{ type: "text", text: "" }],
-      details: partialDetails(started, params, spec.execution_mode, {
+      details: partialDetails(withLiveSpawnFacts(started, deps.manager.get(started.task_id)), params, executionMode, {
         progress: { activity: "queued · waiting for slot", startedAt },
         childId: started.task_id,
         turns: 0,
@@ -183,6 +192,18 @@ export async function runSpawn(
   } else {
     emit()
   }
+  // Do not publish running partials with incomplete facts while the launch is still in flight.
+  // whenLaunched is optional and may reject: a failed launch releases the partials too, and the wait below reports it.
+  if (launch !== undefined) {
+    const launchSettled = (): void => {
+      launching = false
+      emit()
+    }
+    void launch.then(launchSettled, launchSettled)
+  }
+  const parent = deps.manager.findTaskByChildSession?.(ctx.sessionManager.getSessionId())
+  const parked = parent === undefined ? undefined : deps.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
+  let promoted = false
   try {
     const waited = await waitForForegroundTask({
       manager: deps.manager,
@@ -193,11 +214,12 @@ export async function runSpawn(
       ...(scheduleDeadline !== undefined && { scheduleDeadline }),
     })
     if (waited.kind === "promoted") {
+      promoted = true
       return result(appendMissingSkills(
         backgroundConversionText(started, startLabels, waited.budgetSeconds),
         spec.skills,
       ), {
-        ...startedDetails(started, params, spec.execution_mode, spec.skills),
+        ...startedDetails(started, params, executionMode, spec.skills),
         run_in_background: true,
       })
     }
@@ -212,7 +234,7 @@ export async function runSpawn(
     const reason = "parent turn aborted"
     await deps.manager.cancelTask(started.task_id, reason)
     return result(`Task ${started.task_id} cancelled: ${reason}.${continuationFooter(started.task_id)}`, {
-      ...startedDetails(started, params, spec.execution_mode, spec.skills),
+      ...startedDetails(started, params, executionMode, spec.skills),
       status: "cancelled",
       reason,
     })
@@ -220,5 +242,6 @@ export async function runSpawn(
     closed = true
     if (timer !== undefined) clearTimeout(timer)
     unsubscribe()
+    await deps.manager.concurrency?.unpark(parked, signal, { overflow: promoted })
   }
 }

@@ -32,6 +32,7 @@ import {
   taskSettings,
   tempProjectDir,
 } from "./__fixtures__/runtime-fakes"
+import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 afterEach(() => {
   cleanupProjects()
@@ -143,6 +144,7 @@ async function givenTeamWithSuspendedMember() {
     }),
   })
   const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
     store,
     registry: new FakeRegistry(),
     config: settings(),
@@ -162,6 +164,7 @@ describe("team member revival across session resume", () => {
       return { ...withoutHost, status: "completed", residency_state: "resident", pid: 9_001 }
     })
     const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
       store: h.store,
       registry: new FakeRegistry(),
       config: settings({ reattach_on_reconcile: false }),

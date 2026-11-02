@@ -1,7 +1,7 @@
 import { Type, type Static } from "typebox"
 
 import { EXCLUDED_CUSTOM_TYPES, readSession, textOf } from "../../recall-session-read"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE } from "../notice"
+import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, UNAVAILABLE_ENTRY_TYPE } from "../notice"
 import type { WakeToolBudget } from "./budget"
 import type { KibitzerToolCaps } from "./caps"
 import { boundedText, budgeted, okJson, type KibitzerSidecarTool } from "./result"
@@ -16,6 +16,7 @@ export const HIDDEN_SESSION_CUSTOM_TYPES: ReadonlySet<string> = new Set([
   ...EXCLUDED_CUSTOM_TYPES,
   NUDGED_ENTRY_TYPE,
   GATE_ENTRY_TYPE,
+  UNAVAILABLE_ENTRY_TYPE,
 ])
 
 /**

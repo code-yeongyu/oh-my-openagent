@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
-import { createTaskLifecycle } from "../../packages/senpi-task/src/lifecycle"
+import { createTaskLifecycle, NO_HOST_ENDPOINT } from "../../packages/senpi-task/src/lifecycle"
 import type { ResidencyRegistry } from "../../packages/senpi-task/src/lifecycle/port"
 import { createTaskManager } from "../../packages/senpi-task/src/manager/manager"
 import { TaskConcurrency } from "../../packages/senpi-task/src/manager/concurrency"
@@ -47,10 +47,10 @@ export async function runInvalid(out: string) {
     return { task_id: spec.taskId, sessionId: `worker-${spec.taskId}`, pid: undefined, waitForOutcome: () => new Promise<never>(() => {}), followUp: async () => undefined, steer: async () => undefined, abort: async () => undefined, dispose: async () => undefined, subscribe: () => () => undefined, lastAssistantText: () => undefined }
   } }
   const registry: ResidencyRegistry = {
-    get: () => undefined, entries: () => [], forget: () => undefined, hasPendingSends: () => false,
+    get: () => undefined, entries: () => [], forget: (_taskId, _options) => undefined, hasPendingSends: () => false,
     tryClaimEviction: () => false, releaseEviction: () => undefined,
   }
-  const lifecycle = createTaskLifecycle({ store, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
   const manager = createTaskManager({
     store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
     planner: spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }),

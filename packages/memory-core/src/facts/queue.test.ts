@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from "bun:test"
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { realpathSync } from "node:fs"
@@ -12,13 +12,14 @@ import {
   type FactsEnqueueRequest,
   type FactsQueueEntry,
 } from "./queue"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const IDENTITY = "facts-queue-agent"
 const CONVERSATION = "conversation-alpha"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function identityFixture(): Promise<MemoryIdentityPaths> {
@@ -245,3 +246,31 @@ describe("facts queue enqueue", () => {
     const cursor = await queue.readCursor(CONVERSATION)
     expect(cursor.enqueued_through_message_id).toBeNull()
   })
+
+describe("facts queue consent lead", () => {
+  test("#given a second settle #when it is enqueued #then the queue entry keeps the assistant message right before it as lead and the file round-trips", async () => {
+    // given
+    const paths = await identityFixture()
+    const queue = new FactsQueue({ identityPaths: paths, now: clockFrom(Date.parse("2026-01-01T00:00:00.000Z")) })
+    const first = journal(1)
+    await queue.enqueue(request(first))
+
+    // when
+    const result = await queue.enqueue(request([...first, entry("user", "m2", "ok"), entry("assistant", "m2", "done")]))
+
+    // then
+    expect(result.enqueued && result.entry.lead).toEqual(entry("assistant", "m1", "answer 1"))
+    const pending = await queue.listPending()
+    expect(pending.at(-1)?.lead).toEqual(entry("assistant", "m1", "answer 1"))
+    expect(pending[0]?.lead).toBeUndefined()
+  })
+
+  test("#given an image-only user message right before the reply #when it is enqueued #then the lead is that user message", async () => {
+    const paths = await identityFixture()
+    const queue = new FactsQueue({ identityPaths: paths, now: clockFrom(Date.parse("2026-01-01T00:00:00.000Z")) })
+    const first = journal(1)
+    await queue.enqueue(request(first))
+    const result = await queue.enqueue(request([...first, entry("user", "m2", ""), entry("user", "m3", "ok")]))
+    expect(result.enqueued && result.entry.lead).toEqual(entry("user", "m2", ""))
+  })
+})

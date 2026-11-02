@@ -87,12 +87,15 @@ describe("terminateRpcChild", () => {
     const [chunk] = await once(child.stdout!, "data")
     const descendantPid = Number.parseInt(String(chunk).trim(), 10)
     expect(Number.isSafeInteger(descendantPid)).toBe(true)
+    const exited = onExit(child)
 
     try {
       // when
       await terminateRpcChild(child, { sigkillDelayMs: 150 })
 
       // then
+      const { signal } = await exited
+      if (!isWin32) expect(signal).toBe("SIGKILL")
       await waitUntilStopped(descendantPid)
       expect(isRunning(descendantPid)).toBe(false)
     } finally {

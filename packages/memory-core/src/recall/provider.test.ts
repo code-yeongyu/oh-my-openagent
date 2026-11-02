@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
 import { RecallCorpusCache, loadRecallCorpus } from "./provider"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const GIT_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
@@ -42,7 +43,7 @@ async function createBareDir(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
   )
 })
 

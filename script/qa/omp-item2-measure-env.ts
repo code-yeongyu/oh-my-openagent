@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
-import { createTaskLifecycle } from "../../packages/senpi-task/src/lifecycle"
+import { createTaskLifecycle, NO_HOST_ENDPOINT } from "../../packages/senpi-task/src/lifecycle"
 import { createTaskManager } from "../../packages/senpi-task/src/manager/manager"
 import { TaskConcurrency } from "../../packages/senpi-task/src/manager/concurrency"
 import { createInProcessManagedRunner } from "../../packages/senpi-task/src/manager/runner"
@@ -48,11 +48,11 @@ export async function openMeasureEnv() {
       return child === undefined ? undefined : { task_id: taskId, kind: "in-process", pid: undefined, abort: () => child.abort(), dispose: () => child.dispose(), terminate: async () => undefined }
     },
     entries: () => manager.residentTaskIds().flatMap(id => { const child = registryPort.get(id); return child === undefined ? [] : [child] }),
-    forget: taskId => manager.forget(taskId), hasPendingSends: taskId => manager.hasPendingSends?.(taskId) ?? false,
+    forget: (taskId, options) => manager.forget(taskId, options), hasPendingSends: taskId => manager.hasPendingSends?.(taskId) ?? false,
     tryClaimEviction: taskId => manager.tryClaimEviction?.(taskId) ?? false,
     releaseEviction: taskId => manager.releaseEviction?.(taskId),
   }
-  const lifecycle = createTaskLifecycle({ store, registry: registryPort, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: registryPort, config })
   const manager = createTaskManager({
     store, concurrency, config, cwd: root,
     runners: { "in-process": runner, process: runner },

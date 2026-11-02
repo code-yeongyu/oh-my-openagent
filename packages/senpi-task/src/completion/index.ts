@@ -1,4 +1,4 @@
-export { DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
+export { ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE, ASTRA_DAG_VERIFICATION_DIRECTIVE, DAG_VERIFICATION_DIRECTIVE } from "./dag-verification-directive"
 export { buildCompletionDetails, buildCompletionMessage, completionMessageLines } from "./notification"
 export type { BuildDetailsOptions } from "./notification"
 export { routeCompletion, shouldNotifyStatus } from "./routing"

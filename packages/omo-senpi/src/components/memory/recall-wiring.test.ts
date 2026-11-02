@@ -107,6 +107,7 @@ describe("resolveAgentRecallSettings", () => {
       sidecar_max_tokens: 48000,
       max_concurrent_wakes: 2,
       tool_budget: 4,
+      query_expansion: false,
     })
     expect(other).toEqual({
       enabled: true,
@@ -116,6 +117,7 @@ describe("resolveAgentRecallSettings", () => {
       sidecar_max_tokens: 48000,
       max_concurrent_wakes: 2,
       tool_budget: 8,
+      query_expansion: false,
     })
   })
 })
@@ -295,6 +297,24 @@ describe("createMemoryRecallWiring collectCandidates", () => {
 
     // then
     expect(collected?.candidates).toHaveLength(1)
+  }, 30_000)
+
+  test("#given an inflected Korean prompt and no recall setting #when candidates are collected #then the stem memory is collected", async () => {
+    // given
+    const { repo, context } = await fixture(tempDirs, [
+      {
+        relativePath: "reference/publish.md",
+        content: "---\ndescription: npm 퍼블리시 절차\n---\n배포 토큰은 키체인에 저장한다\n",
+      },
+    ])
+    const prompt = "퍼블리시할 때 막히면 어디서 꺼내 써"
+    const wiring = wiringFor({ repo, identity: context })
+
+    // when
+    const collected = await wiring.collectCandidates(eventContext([userEntry("m1", prompt)]))
+
+    // then
+    expect(collected?.candidates.map((candidate) => candidate.path)).toEqual(["reference/publish.md"])
   }, 30_000)
 
   test("#given a path already surfaced in the session #when candidates are collected #then it never repeats", async () => {

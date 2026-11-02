@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -53,6 +53,32 @@ describe("reflection health alert", () => {
     expect(typeof entry.recommendation).toBe("string")
   })
 
+  test("#given completions beside the newest failing run's log #when the alert fires #then the remediation names that log's absolute path", async () => {
+    // given: production keeps completions at <reflectionDir>/completions next to <reflectionDir>/runs
+    const reflection = await mkdtemp(join(tmpdir(), "reflection-health-alert-dir-"))
+    roots.push(reflection)
+    const completions = join(reflection, "completions")
+    await mkdir(completions)
+    for (let index = 0; index < 3; index += 1) {
+      await writeFile(
+        join(completions, `run-${index}.json`),
+        JSON.stringify(completion(`run-${index}`, minutesAgo(60 - index * 10), "stable")),
+      )
+    }
+    const log = join(reflection, "runs", "run-2", "child-stderr.log")
+    await mkdir(join(reflection, "runs", "run-2"), { recursive: true })
+    await writeFile(log, "stable\n")
+    const harness = liveHarness()
+
+    // when
+    await emitReflectionHealthAlert(completions, "agent-test", harness.live, harness.once)
+
+    // then
+    const entry = harness.api.entries.find((item) => item.customType === REFLECTION_HEALTH_ENTRY_TYPE)?.data as ReflectionHealthEntry
+    expect(entry.recommendation).toBe(`inspect ${log}`)
+    expect(harness.notifications[0]).toContain(log)
+  })
+
   test("#given a child that died inside a Bun code frame #when the alert fires #then neither the notice nor the entry carries source lines", async () => {
     // given: the stderr tail of a crashed Bun child leads with a code frame, a caret and property rows
     const root = await failureStreak(3, BUN_CRASH_STDERR)
@@ -72,6 +98,18 @@ describe("reflection health alert", () => {
       "ENOENT: no such file or directory, open '/opt/omo-runtime/dist/modes/interactive/theme/dark.json'",
     )
     expect(entry.fingerprint).not.toMatch(/\d+\s\|\s/)
+  })
+
+  test("#given a streak of model misses no child can see even with extensions #when alerting runs #then the park alert stays its only notice", async () => {
+    // given
+    const root = await failureStreak(3, "model_unreachable_with_extensions; model_not_visible:gw/model; attempted:gw/model")
+    const harness = liveHarness()
+
+    // when
+    const emitted = await emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once)
+
+    // then
+    expect({ emitted, notifications: harness.notifications }).toEqual({ emitted: false, notifications: [] })
   })
 
   test("#given only two consecutive failures #when alerting runs #then the streak threshold suppresses the alert", async () => {

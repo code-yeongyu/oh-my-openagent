@@ -3,9 +3,10 @@ import {
   isGeminiModel,
   isGlmModel,
   isGptModel,
+  isKimiK2CodeModel,
   isKimiK2Model,
-  isKimiK27Model,
   isKimiK3Model,
+  isKimiK31Model,
   isMiniMaxModel,
   isSWE2Model,
 } from "@oh-my-opencode/model-core"
@@ -24,9 +25,10 @@ const PLANNER_AGENT_NAMES: ReadonlySet<string> = new Set(["prometheus"] as const
 const MODEL_MATCHERS: Readonly<Record<string, ModelMatcher>> = {
   gpt: isGptModel,
   gemini: isGeminiModel,
+  "kimi-k3-1": isKimiK31Model,
   "kimi-k3": isKimiK3Model,
   "swe-2": isSWE2Model,
-  "kimi-k2-7": isKimiK27Model,
+  "kimi-k2-7": isKimiK2CodeModel,
   kimi: isKimiK2Model,
   glm: isGlmModel,
   "opus-4-7": isClaudeOpus47Model,

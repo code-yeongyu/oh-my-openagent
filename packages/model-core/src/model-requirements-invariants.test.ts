@@ -18,7 +18,8 @@ const expectedAgents = [
 const expectedCategories = [
   "visual-engineering",
   "ultrabrain",
-  "deep",
+  "deep-low",
+  "deep-high",
   "artistry",
   "quick",
   "unspecified-low",

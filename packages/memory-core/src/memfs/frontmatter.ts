@@ -16,6 +16,7 @@
  * - CRLF normalized on read; render emits LF only
  */
 
+import { frontmatterEntries } from "./frontmatter-entries"
 import { FRONTMATTER_RE, decodeScalarSource, renderRawScalar, renderStringScalar } from "./frontmatter-scalar"
 import { describeHeaderGrammarViolation } from "./frontmatter-validation"
 
@@ -39,10 +40,23 @@ export class FrontmatterError extends Error {
 const CONTRACT_KEYS: ReadonlySet<string> = new Set(["description", "read_only", "kind", "aliases", "limit"])
 const EXTRA_KEY_RE = /^[A-Za-z0-9_-]+$/
 
+const MISSING_FRONTMATTER_MESSAGE = "frontmatter: target file is missing required frontmatter"
+const MISSING_DESCRIPTION_MESSAGE = "frontmatter: target file frontmatter is missing 'description'"
+
+/** True only for the "no frontmatter block at all" failure, so callers can offer the one repair that adds it. */
+export function isMissingFrontmatterError(error: unknown): boolean {
+  return error instanceof FrontmatterError && error.message === MISSING_FRONTMATTER_MESSAGE
+}
+
+/** True only for the "a header parsed but it carries no description" failure. */
+export function isMissingDescriptionError(error: unknown): boolean {
+  return error instanceof FrontmatterError && error.message === MISSING_DESCRIPTION_MESSAGE
+}
+
 export function parseMemoryFile(content: string): ParsedMemoryFile {
   const match = content.match(FRONTMATTER_RE)
   if (!match) {
-    throw new FrontmatterError("frontmatter: target file is missing required frontmatter")
+    throw new FrontmatterError(MISSING_FRONTMATTER_MESSAGE)
   }
 
   const frontmatterText = match[1] ?? ""
@@ -54,12 +68,7 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
   let aliases: readonly string[] | undefined
   const extra: Record<string, string> = {}
 
-  for (const line of frontmatterText.split(/\r?\n/)) {
-    const idx = line.indexOf(":")
-    if (idx <= 0) continue
-
-    const key = line.slice(0, idx).trim()
-    const value = line.slice(idx + 1).trim()
+  for (const { key, value, line } of frontmatterEntries(frontmatterText)) {
 
     if (key === "description") {
       description = decodeScalarSource(value)
@@ -75,7 +84,7 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
   }
 
   if (!description || !description.trim()) {
-    throw new FrontmatterError("frontmatter: target file frontmatter is missing 'description'")
+    throw new FrontmatterError(MISSING_DESCRIPTION_MESSAGE)
   }
 
   return {

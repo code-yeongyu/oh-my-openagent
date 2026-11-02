@@ -1,4 +1,4 @@
-# Phase 6 + 7 — Root Cause Confirmation & TDD Fix
+# Phase 6 + 7 — Root Cause Confirmation & Reproduction-Locked Fix
 
 A cause is not "confirmed" until you can toggle the bug by toggling the cause. Every other level of evidence is correlation, and correlation-driven fixes ship bugs.
 
@@ -51,7 +51,15 @@ The "mechanism" field is the acid test. If you can't write the causal chain from
 
 Red, green, refactor. No shortcuts.
 
-### 1. Red — failing-first test
+### 0. Look for the owner test first
+
+Before writing a reproduction test, find the test that already owns this contract at the strongest boundary. Run it on the pre-fix code:
+
+- **It already fails for this bug.** It is the red proof. Record its failure and skip step 1.
+- **It passes but covers the path.** Extend it with the failing case (a table row, a fixture case) instead of adding a parallel test.
+- **No owner exists.** Write the new reproduction test in step 1, and apply the repository's test-authoring gate if it has one.
+
+### 1. Red — the reproduction as a test
 
 Write a test that fails *specifically because of this bug*. Requirements:
 
@@ -117,6 +125,6 @@ Full suite: <N tests, <M failures — should be 0>
 
 ## The red-green discipline summary
 
-No red test → no proof the fix addresses the reported bug. Only proof it doesn't break tests that already existed.
+No captured failure → no proof the fix addresses the reported bug. Only proof it doesn't break tests that already existed. Keep the reproduction as a test where the repository keeps tests for this behavior; otherwise the captured before/after run is the proof.
 
 A test written *after* the fix might still pass with the fix reverted. If that's the case, the test doesn't lock the bug — it locks something else. Always verify the test fails without the fix and passes with it. The journal should show both outputs.

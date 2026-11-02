@@ -5,6 +5,9 @@ import { join } from "node:path"
 import {
   GitMemoryRepo,
   cleanupReflectionWorktree,
+  createNodeGitExec,
+  parseMemoryFile,
+  renderMemoryFile,
 } from "@oh-my-opencode/memory-core"
 
 import { finalizeRecordedOutcome } from "./run-finalization"
@@ -19,6 +22,68 @@ import type { ReservationRunLedger } from "./reservation-run-ledger"
 afterEach(cleanupFinalizationFixtures)
 
 describe("reflection finalization crash recovery", () => {
+  test("#given a secret-bearing tip with an oversized description #when finalized #then the note is dropped, nothing lands, and no exception escapes", async () => {
+    const item = await fixture(false)
+    const warnings: Readonly<Record<string, unknown>>[] = []
+    await writeFile(join(item.worktree.dir, "system/learned.md"),
+      renderMemoryFile({ description: `${"summary ".repeat(139)}ending` }, "token=synthetic-fixture-value\n"))
+    // Maintenance children use normal git; the completion gate screens their full history.
+    const exec = createNodeGitExec()
+    for (const argv of [
+      ["add", "--", "system/learned.md"],
+      ["-c", "user.name=Reflection Agent", "-c", "user.email=fixture@omo.local", "commit", "-m", "reflection expanded summary"],
+    ]) {
+      const result = await exec.run(argv, { cwd: item.worktree.dir, timeoutMs: 30_000 })
+      if (result.code !== 0) throw new Error(result.stderr)
+    }
+
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      withWriterLock: async (operation) => operation(),
+      warn: (_message, fields) => { warnings.push(fields) },
+    }, item.runDir, item.ledger)
+
+    // The run's only entry is invalid, so the gate drops it and the run settles with nothing to merge (#10528).
+    expect(result).toMatchObject({ outcome: "no_changes" })
+    expect(result?.detail).toContain("Dropped 1 invalid memory entry: system/learned.md")
+    expect(result?.detail).not.toContain("synthetic-fixture-value")
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]?.error).toContain("secret-like content")
+    expect(JSON.parse(await readFile(join(item.runDir, "final.json"), "utf8"))).toMatchObject({ outcome: "no_changes" })
+    expect((await item.store.readState()).active).toBeUndefined()
+    // git grep exits 1 for "not found"; any other code is a git error, not proof.
+    const landed = await createNodeGitExec().run(["grep", "-q", "synthetic-fixture-value", "HEAD"], { cwd: item.worktree.parent.dir, timeoutMs: 30_000 })
+    expect(landed.code).toBe(1)
+    // The refused run still advances the cursor, so this conversation is not replayed into the same refusal.
+    expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
+  })
+
+  test("#given a committed oversized description #when the recorded outcome finalizes #then preflight runs before validation and the gate passes", async () => {
+    const item = await fixture(false)
+    const body = "learned\n"
+    await writeFile(join(item.worktree.dir, "system/learned.md"),
+      renderMemoryFile({ description: `${"summary ".repeat(139)}ending` }, body))
+    await new GitMemoryRepo({ dir: item.worktree.dir, agentId: item.identity.id }).commitWrite(
+      ["system/learned.md"], "reflection expanded summary",
+      { agentId: item.identity.id, authorName: "Reflection Agent" },
+    )
+
+    const result = await finalizeRecordedOutcome({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      withWriterLock: async (operation) => operation(),
+    }, item.runDir, item.ledger)
+
+    expect(result?.outcome).toBe("merged")
+    const parsed = parseMemoryFile(await readFile(join(item.repo.dir, "system/learned.md"), "utf8"))
+    expect(parsed.frontmatter.description).toBe(`${"summary ".repeat(127)}summary…`)
+    expect(parsed.body).toBe(body)
+    expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
+  })
+
   test("#given integration landed before its checkpoint #when finalization retries #then receipt recovery settles exactly once", async () => {
     // given
     const item = await fixture()

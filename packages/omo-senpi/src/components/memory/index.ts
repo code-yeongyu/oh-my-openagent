@@ -1,30 +1,25 @@
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { resolveMemoryIdentity, resolveMemoryRoot } from "@oh-my-opencode/memory-core"
+import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig, type SenpiOmoConfigResult } from "../config-resolution"
-import {
-  MEMORY_BINDING_CUSTOM_TYPE,
-  createMemoryBinding,
-  findLatestMemoryBinding,
-  type SessionEntryLike,
-} from "./binding"
-import { logBindReconcileFailure } from "./bind-reconcile-log"
+import { MEMORY_BINDING_CUSTOM_TYPE } from "./binding"
 import { renderMemoryBindingEntry } from "./bindings/entry-renderer"
 import { hasMemoryCapabilities, missingMemoryCapabilities } from "./capabilities"
 import { primeMemoryPersonaAssets } from "./persona-prime"
-import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { shutdownDeadlineAt, type ShutdownReason } from "./shutdown-drain"
 import { resolveMemorySettings } from "./identity-runtime"
-import { memoryModuleSupervisor } from "./supervisor"
 import { registerMemoryReadClassifier } from "./read-classifier-wiring"
-import {
-  finalizeIdentityRun,
-  isOneShotSurface,
-  resolveIdentityRunPaths,
-  type IdentityRunPaths,
-} from "./transient-identity"
+import { createSessionBinder, readSessionSurface, releaseSession, type SessionState } from "./session-binding"
+import { finalizeIdentityRun } from "./transient-identity"
+import type { DeviceAccountSource } from "./device-session/account-source"
+import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
+import { createDeviceSessionResolver } from "./device-session/resolver"
+import { createSyncRunner, type SyncRunner } from "./sync-runner"
+import { readMemoryRpcSync } from "./memory-rpc-sync"
+import { wireSyncRpc } from "./sync-rpc-wiring"
 import { sweepTransientMemoryRuns, type TransientSweep } from "./transient-sweep"
+import { registerRecallMemoryReporter } from "./memory-reporter"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 
 const GLOBAL_DISABLED_FLAG = "omo-senpi-disabled"
@@ -43,24 +38,10 @@ export interface MemoryComponentOptions {
   readonly refreshStatus?: MemoryWiringOptions["refreshStatus"]
   /** Seam for the registration-time transient sweep (transient-sweep.ts). */
   readonly sweepTransientRuns?: TransientSweep
-}
-
-type SessionUi = { notify(message: string, level: "error" | "warning"): void }
-type SessionSurface = {
-  readonly entries: readonly SessionEntryLike[]
-  readonly id: string
-  readonly ui?: SessionUi
-  readonly hasUI?: boolean
-}
-type SessionState = {
-  readonly enabled: boolean
-  readonly ui?: SessionUi
-  context?: MemoryIdentityContext
-  /** Where this session's identity storage lives; finalized (transient root reclaimed) at shutdown. */
-  run?: IdentityRunPaths
-  memoryStatusAttempted: boolean
-  restartNotified: boolean
-  conflictNotified: boolean
+  /** Seam for the end-to-end encrypted sync runner (sync-runner.ts). */
+  readonly syncRunner?: SyncRunner
+  /** The host's signed-in device; the default reads the credentials `omo login` keeps. */
+  readonly deviceAccount?: DeviceAccountSource
 }
 
 export { MEMORY_BINDING_CUSTOM_TYPE } from "./binding"
@@ -70,7 +51,6 @@ export { memoryModuleSupervisor } from "./supervisor"
 
 export function createMemoryComponent(options: MemoryComponentOptions = {}): OmoSenpiComponent {
   const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
-  const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   const now = options.now ?? Date.now
   const env = options.env ?? process.env
   const sweepTransientRuns = options.sweepTransientRuns ?? sweepTransientMemoryRuns
@@ -79,6 +59,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
   return {
     name: "memory",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      const resolveCwd = options.resolveCwd ?? (() => extensionCwd(pi))
       const cwd = resolveCwd()
       const bootConfig = resolveMemoryConfig(loadConfig({ cwd }))
       if (!isEnabled(bootConfig, ctx, env)) return
@@ -89,6 +70,30 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         return
       }
 
+      // The runner reports sync status transitions to the wiring, which exists only after the runner.
+      const syncStatusChanged: { current?: (repo: string) => void } = {}
+      const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env })
+      const memoryRoot = resolveMemoryRoot(env, cwd)
+      const pinDir = syncPinDir(memoryRoot)
+      const syncRunner = options.syncRunner ?? createSyncRunner({
+        logger: ctx.logger,
+        onStatusChange: (repo) => syncStatusChanged.current?.(repo),
+        resolveSession: createDeviceSessionResolver({
+          source: deviceAccount,
+          pinDir,
+          loadRuntime: () => import("#omo-memory-sync-runtime"),
+        }),
+      })
+      const syncLifetime = new AbortController()
+      let syncSessionId: string | undefined
+      const rpcHandle = pi.rpc?.handle?.bind(pi.rpc)
+      const syncRpc = rpcHandle === undefined ? undefined : wireSyncRpc({
+        rpc: { handle: rpcHandle }, source: deviceAccount, memoryRoot, pinDir, signal: syncLifetime.signal,
+        syncStatus: async () => {
+          const repo = syncSessionId === undefined ? undefined : sessions.get(syncSessionId)?.context?.identityPaths.repo
+          return repo === undefined ? undefined : readMemoryRpcSync((path) => syncRunner.status(path), repo)
+        },
+      })
       primeMemoryPersonaAssets({ logger: ctx.logger })
       // Reclaim runs an abnormal exit left behind (#7765). Detached from registration on purpose:
       // it is pure maintenance, and a slow or failing sweep must never delay or break binding.
@@ -106,87 +111,49 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         env,
         now,
         logger: ctx.logger,
+        deviceName: (principal) => syncRunner.deviceName(principal),
+        syncStatus: (repo) => syncRunner.status(repo),
         ...(options.createRuntime === undefined ? {} : { createRuntime: options.createRuntime }),
         ...(options.refreshStatus === undefined ? {} : { refreshStatus: options.refreshStatus }),
         // Reuse the boot snapshot: registration must not add a loadConfig() call, because the
         // enablement latch depends on the ORDER of reads across boot -> session_start -> reload.
       })
-      const bindSession = (
-        surface: SessionSurface,
-        eventCtx: unknown,
-        options: { readonly existing: SessionState | undefined; readonly verifyRepository: boolean },
-      ): void => {
-        const sessionConfig = resolveMemoryConfig(loadConfig({ cwd }))
-        const state: SessionState = options.existing ?? {
-          enabled: isEnabled(sessionConfig, ctx, env),
-          memoryStatusAttempted: false,
-          restartNotified: false,
-          conflictNotified: false,
-          ...(surface.ui === undefined ? {} : { ui: surface.ui }),
-        }
-        sessions.set(surface.id, state)
-        if (!state.enabled) return
-
-        const identity = resolveMemoryIdentity(sessionConfig.agent, cwd, env)
-        const previous = findLatestMemoryBinding(surface.entries)
-        const binding = createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: now() })
-        // A rebind has no session_start behind it, so the recorded entry is the only evidence of what
-        // this session was: it must agree on the memory repository too, not only on the identity.
-        const conflict = previous !== undefined
-          && (previous.identity !== identity.id || (options.verifyRepository && previous.repoPathHash !== binding.repoPathHash))
-        if (conflict) {
-          if (!state.conflictNotified) {
-            state.conflictNotified = true
-            surface.ui?.notify(
-              `memory identity conflict: session is bound to ${previous.identity}, but config resolved ${identity.id}; restart with the original identity or fork a new session`,
-              "error",
-            )
-            ctx.logger.warn("omo-senpi memory binding failed closed", {
-              sessionId: surface.id,
-              bound: previous.identity,
-              resolved: identity.id,
-            })
-          }
-          return
-        }
-
-        const run = resolveIdentityRunPaths({
-          identity: identity.id,
-          identityPaths: identity.paths,
-          memoryRoot: resolveMemoryRoot(env, cwd),
-          oneShot: isOneShotSurface({ hasUI: surface.hasUI, env }),
-        })
-        state.run = run
-        state.context = createMemoryIdentityContext({
-          identity: identity.id,
-          identityPaths: run.paths,
-          durableRoot: run.durableRoot,
-          binding,
-        })
-        memoryModuleSupervisor.acquire()
-        pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding)
-        // Bind-time reconcile floats past the bind by design, but its rejection must not
-        // float: an unhandled rejection is attributed to whatever code is running when it lands.
-        void wiring.afterBind(pi, surface.id, state.context, eventCtx).catch((error: unknown) => {
-          logBindReconcileFailure(ctx.logger, error)
+      const bindSession = createSessionBinder({
+        pi,
+        ctx,
+        env,
+        now,
+        cwd,
+        loadConfig,
+        sessions,
+        wiring,
+        syncRunner,
+        isEnabled: (config) => isEnabled(config, ctx, env),
+        resolveConfig: resolveMemoryConfig,
+      })
+      syncStatusChanged.current = (repo) => {
+        void wiring.onSyncStatusChanged(repo).catch((error: unknown) => {
+          ctx.logger.warn("memory sync status refresh failed", { error: describeError(error) })
         })
       }
-
       wiring.registerStatic(pi, ctx)
       // A session that reaches a turn without session_start in this runner generation (a host
       // restart or reload that resumed an open conversation) is bound here from its own recorded
       // binding. Registered after the static handlers so their projection-first result order holds:
       // the memory tool is live on this turn (afterBind marks the session active) and the prompt
       // block follows on the next one.
-      pi.on("before_agent_start", (_payload, eventCtx) => {
+      pi.on("before_agent_start", (payload, eventCtx) => {
+        if (isRecord(payload) && payload.preview === true) return undefined
         const surface = readSessionSurface(eventCtx)
         if (surface.id === "unknown-session") return undefined
         const state = sessions.get(surface.id)
         if (state?.context !== undefined) return undefined
         if (state !== undefined && !state.enabled) return undefined
+        syncRpc?.retireBinding()
+        syncSessionId = surface.id
         bindSession(surface, eventCtx, { existing: state, verifyRepository: true })
         return undefined
-      })
+      }, { previewSafe: true })
       const unregisterReadClassifier = registerMemoryReadClassifier(pi, {
         resolveRepos: function* () {
           for (const state of sessions.values()) {
@@ -196,6 +163,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         logger: ctx.logger,
       })
       pi.registerEntryRenderer(MEMORY_BINDING_CUSTOM_TYPE, renderMemoryBindingEntry)
+      registerRecallMemoryReporter(pi)
       const unsubscribeReload = pi.events?.on(CONFIG_WATCH_RELOADED, (payload) => {
         if (!isOmoConfigReload(payload)) return
         const enabled = isEnabled(resolveMemoryConfig(loadConfig({ cwd })), ctx, env)
@@ -208,13 +176,19 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
 
       pi.on("session_start", (_payload, eventCtx) => {
         const surface = readSessionSurface(eventCtx)
+        syncRpc?.retireBinding()
+        syncSessionId = surface.id
         wiring.clearStatus(eventCtx)
-        releaseSession(sessions.get(surface.id))
+        releaseSession(sessions.get(surface.id), syncRunner)
         bindSession(surface, eventCtx, { existing: undefined, verifyRepository: false })
       })
 
       pi.on("session_shutdown", async (payload, eventCtx) => {
         const sessionId = readSessionSurface(eventCtx).id
+        if (syncSessionId === sessionId) {
+          syncRpc?.retireBinding()
+          syncSessionId = undefined
+        }
         // The drain runs BEFORE the session is released: its steps read the bound identity.
         await wiring.onSessionShutdown({
           reason: readShutdownReason(payload),
@@ -224,8 +198,10 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         })
         wiring.clearStatus(eventCtx)
         const state = sessions.get(sessionId)
+        const syncRelease = state?.syncRepo === undefined ? undefined : syncRunner.release(state.syncRepo)
         releaseSession(state)
         sessions.delete(sessionId)
+        await syncRelease
         if (state?.run !== undefined) {
           await finalizeIdentityRun({ run: state.run, warn: (message, fields) => ctx.logger.warn(message, fields) })
         }
@@ -258,30 +234,8 @@ function isEnabled(
     && ctx.config.getFlag(MEMORY_DISABLED_FLAG) !== true
 }
 
-function releaseSession(state: SessionState | undefined): void {
-  if (state?.context === undefined) return
-  memoryModuleSupervisor.release()
-  state.context = undefined
-}
-
-function readSessionSurface(value: unknown): SessionSurface {
-  if (!isRecord(value)) return { entries: [], id: "unknown-session" }
-  const manager = isRecord(value.sessionManager) ? value.sessionManager : undefined
-  const getSessionId = manager?.getSessionId
-  const getEntries = manager?.getEntries
-  const id = typeof getSessionId === "function" ? Reflect.apply(getSessionId, manager, []) : "unknown-session"
-  const entries = typeof getEntries === "function" ? Reflect.apply(getEntries, manager, []) : []
-  const ui = isSessionUi(value.ui) ? value.ui : undefined
-  return {
-    entries: Array.isArray(entries) ? entries : [],
-    id: typeof id === "string" && id.length > 0 ? id : "unknown-session",
-    ...(ui === undefined ? {} : { ui }),
-    ...(typeof value.hasUI === "boolean" ? { hasUI: value.hasUI } : {}),
-  }
-}
-
-function isSessionUi(value: unknown): value is SessionUi {
-  return isRecord(value) && typeof value.notify === "function"
+function extensionCwd(pi: SenpiExtensionAPI): string {
+  return typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : process.cwd()
 }
 
 const SHUTDOWN_REASONS: readonly ShutdownReason[] = ["quit", "reload", "new", "resume", "fork"]

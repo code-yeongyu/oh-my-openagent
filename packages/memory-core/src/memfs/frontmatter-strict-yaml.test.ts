@@ -158,6 +158,12 @@ describe("describeDescriptionViolation", () => {
     expect(violation).toMatch(/malformed|split/i)
   })
 
+  it("#given scaffolding that also makes the description long and multi-line #then the scaffolding is what is named", () => {
+    const leaked = `Real text</description>\n<parameter name="file_text">${"body\n".repeat(MAX_DESCRIPTION_LENGTH)}`
+
+    expect(describeDescriptionViolation(leaked)).toMatch(/tool-call scaffolding/)
+  })
+
   it("#given a multi-line description #then it is rejected", () => {
     expect(describeDescriptionViolation("line one\nline two")).toContain("single line")
   })

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test"
-import { matchSkillByName } from "./skill-matcher"
+import { matchCommandByName, matchSkillByName } from "./skill-matcher"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
+import type { CommandInfoLike } from "../../types"
 
 function createLoadedSkill(name: string, scope: LoadedSkill["scope"]): LoadedSkill {
 	return {
@@ -54,5 +55,38 @@ describe("matchSkillByName", () => {
 		const match = matchSkillByName(skills, "debugging")
 
 		expect(match).toBeUndefined()
+	})
+})
+
+interface TestCommand extends CommandInfoLike {
+	readonly name: string
+	readonly scope: string
+	readonly origin: string
+}
+
+function createCommand(name: string, scope: string, origin: string): TestCommand {
+	return { name, scope, origin }
+}
+
+describe("matchCommandByName", () => {
+	const commands = [
+		createCommand("handoff", "builtin", "builtin handoff"),
+		createCommand("init-deep", "builtin", "builtin init-deep"),
+		createCommand("init-deep", "project", "project init-deep"),
+		createCommand("cancel-loop", "user", "user cancel-loop"),
+	]
+
+	it("resolves a command by its exact name in any discovery order", () => {
+		for (const order of [commands, commands.toReversed()]) {
+			expect(matchCommandByName(order, "handoff")?.origin).toBe("builtin handoff")
+			expect(matchCommandByName(order, "Cancel-Loop")?.origin).toBe("user cancel-loop")
+			expect(matchCommandByName(order, "cancel")).toBeUndefined()
+		}
+	})
+
+	it("lets the higher-priority scope win a shared name in any discovery order", () => {
+		for (const order of [commands, commands.toReversed()]) {
+			expect(matchCommandByName(order, "init-deep")?.origin).toBe("project init-deep")
+		}
 	})
 })

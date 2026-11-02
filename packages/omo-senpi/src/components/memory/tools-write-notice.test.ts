@@ -281,11 +281,11 @@ describe("memory tool result rendering", () => {
     ]) as { render(width: number): string[] }).render(200)
 
     // then
-    expect(collapsed[1]).toContain("memory create knowledge/render.md")
-    const collapsedText = collapsed.slice(2, -1).join("\n")
-    expect(collapsedText).toContain("Memory updated")
+    expect(collapsed[1]).toContain("● Remembered")
+    const collapsedText = collapsed.slice(1, -1).join("\n")
+    expect(collapsedText).toMatch(/Added \d+ lines? to knowledge\/render\.md\./u)
     expect(collapsedText).not.toContain("committed locally")
-    expect(collapsedText).not.toContain("create")
+    expect(collapsedText).not.toContain("memory create")
     expect(expanded.join("\n")).toContain(created.details.writeNotice?.sha.slice(0, 7) ?? "MISSING")
   }, 60_000)
 })

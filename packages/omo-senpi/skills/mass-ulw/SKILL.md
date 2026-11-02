@@ -1,13 +1,14 @@
 ---
 name: mass-ulw
-description: "Drives dependency-ordered child work through the native workflow tool, one run per phase with retry/amend/send recovery. Use when the user asks for mass-ulw, a DAG of tasks, or fan-out work where some tasks must wait on others."
+description: "Drives dependency-ordered child work through the native workflow tool, each phase's stages defined up front in one run, with retry/amend/send recovery. Use when the user asks for mass-ulw, a DAG of tasks, or fan-out work where some tasks must wait on others."
+argument-hint: "<task>"
 metadata:
   short-description: Dependency-graph orchestration of child agents
 ---
 
 # mass-ulw
 
-Use this skill when the user asks for `mass-ulw`, a task DAG, staged fan-out, or any multi-agent job where real dependencies exist: task C needs A and B finished first. For fully independent workers, plain parallel `task` spawns are simpler. Reach for `workflow` when the ordering itself is the point. A run covers ONE phase's dependency-ordered lanes and NEVER a whole multi-phase job; define the next phase as a NEW run (or `amend` when only the definition changed) in the cell from what the settled run proved. Under `ulw-loop` or `ulw-execute`, that contract owns the goal, criteria, evidence, and checkpoints; this skill owns only how each phase's run is defined, driven, and recovered.
+Use this skill when the user asks for `mass-ulw`, a task DAG, staged fan-out, or any multi-agent job where real dependencies exist: task C needs A and B finished first. For fully independent workers, plain parallel `task` spawns are simpler. Reach for `workflow` when the ordering itself is the point. A run covers ONE phase, the unit your loop checkpoints (a goal criterion, a worktree, an evidence gate, a ulw-execute plan wave), and NEVER a whole multi-phase job; a harvest wave or a pipeline stage is not a phase. Define EVERY stage of the phase you can already write (harvest, expand, verify, reduce) in that run before `start`, chained with `dependsOn`; split it across concurrent runs only when it would exceed `task.dag.max_nodes_per_run`, counting the nodes later amends add, and start a reducer that reads several runs as its own run once they settle. Start a NEW run for the next phase, and `amend` a settled run to add nodes whose prompts need content you must read first. Under `ulw-loop` or `ulw-execute`, that contract owns the goal, criteria, evidence, and checkpoints; this skill owns only how each phase's run is defined, driven, and recovered.
 
 ## Planning - MANDATORY first step
 
@@ -15,13 +16,15 @@ Before defining ANY graph, read `references/planning.md` (relative to this skill
 
 ## The shape
 
-A run is a declarative definition: a stable `key` (idempotency: re-starting the same key with the same graph reuses the run), a human `name`, and `nodes`. Each node has an `id`, a self-contained English `prompt`, a `category` that routes it to the right kind of worker, and optional `dependsOn` listing node ids that must finish first. `dependsOn` is ordering ONLY: no upstream output is substituted into a downstream prompt, so write every prompt to stand alone. Optional per-node extras: `label`, `task_summary`, `description`, and `load_skills` (skill names prepended to that node's prompt).
+A run is a declarative definition: a stable `key` (idempotency: re-starting the same key with the same graph reuses the run), a human `name`, and `nodes`. Each node has an `id`, a self-contained English `prompt`, a `category` that routes it to the right kind of worker, and optional `dependsOn` listing node ids that must finish first. `dependsOn` orders nodes and substitutes nothing into a prompt, so data travels through a handoff file the upstream prompt names and the downstream prompt reads. Optional per-node extras: `label`, `task_summary`, `description`, and `load_skills` (skill names prepended to that node's prompt).
 
 Route every node by `category` using the routing table in `references/planning.md`; the run executes nodes in parallel waves as their dependencies clear.
 
 ## Goal before start
 
 Every run is goal-bound. In a standalone run, register the goal as written (`create_goal`, or a `# Goal` block where no goal tool exists). Under `ulw-loop` or `ulw-execute`, the loop's registered goal already covers the run, so register no second goal. The objective names the deliverable the graph produces, and the success criteria carry RESULT VERIFICATION - node and run completion claims are false until proven against captured evidence, the same contract the dag completion directive injects (TREAT AS FALSE UNTIL YOU PROVE IT). The verification wave (references/planning.md) produces the evidence those criteria name; the run ends when the criteria pass, never when the last node reports completion.
+
+Ask a decision only the user can make (scope, spend, anything irreversible) from the main session through the question tool, with header `Authorize` (`권한` in Korean) and `required: true` on the call, before starting the run that depends on it - never from an eval cell or a node prompt. A timed-out, dismissed, or unavailable answer is not an answer, even when the tool result says to continue on your best judgment: do not start that run.
 
 ## Running a dag - eval is the default
 
@@ -58,7 +61,7 @@ await sdk.cancel(runId, "superseded by a new plan")
 ```
 
 - `attach` re-binds to a live run you already own, for example after your own context was rebuilt.
-- `start` returns at once; node completions and settle wake the session, and each wake carries the TREAT-AS-FALSE verification directive. Do independent work between wakes.
+- `start` returns at once; the session wakes when the run settles or pauses, never per node, and each wake carries the TREAT-AS-FALSE verification directive. Do independent work between wakes.
 - `snapshot` is a one-off read of status and node counts when a midpoint decision needs it, never a polling loop.
 - `wait` blocks the cell until the run settles (the SDK passes `detach: false`; the bare tool action detaches by default against a live run). Use it only inside a detached cell or when nothing else remains.
 - `cancel` stops the run; pass a reason so the record says why.
@@ -87,7 +90,7 @@ Runs are journaled. When the session dies mid-run, the run pauses instead of bei
 
 ## Supervising a run
 
-Observation is supervision, not spectating. Running children err, over-engineer, obsess over one sub-problem, and drift out of scope MID-RUN, not only at the end. On every mid-run wake (a node completion notification, a monitor event), check each active node against ITS OWN prompt's SCOPE: the assigned work, only the assigned work, at the assigned depth. On any sign of drift - writes outside its scope, gold-plating past the deliverable, circling one sub-problem - steer it back with `send` naming the exact boundary it crossed; a node that stays off course gets a tightened prompt through `retry` or `amend` (above) once the run settles. Drift corrected in wave 1 costs one message; drift discovered at synthesis costs the run.
+Observation is supervision, not spectating. Running children err, over-engineer, obsess over one sub-problem, and drift out of scope MID-RUN, not only at the end. On every mid-run wake (a goal continuation, a monitor event), check each active node against ITS OWN prompt's SCOPE: the assigned work, only the assigned work, at the assigned depth. On any sign of drift - writes outside its scope, gold-plating past the deliverable, circling one sub-problem - steer it back with `send` naming the exact boundary it crossed; a node that stays off course gets a tightened prompt through `retry` or `amend` (above) once the run settles. Drift corrected in wave 1 costs one message; drift discovered at synthesis costs the run.
 
 Surfaces:
 

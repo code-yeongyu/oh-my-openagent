@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises"
 import type { TeamSpec } from "@oh-my-opencode/team-core/types"
 
 import type { ManagerStartSpec, PlanResolutionError, StartResult } from "../manager"
+import { resolveInheritedExtensionList } from "../runners/rpc/parent-extensions"
 import type { ResolvedModelRecord } from "../state"
 import { assembleMemberExtensions } from "./member-extensions"
 import { projectMemberStatus, type RuntimeMemberStatus } from "./member-projection"
@@ -26,6 +27,7 @@ export type SpawnMembersInput = {
   readonly teamRunId: string
   readonly manager: TeamRuntimeManagerPort
   readonly leadSessionId: string
+  readonly rootSessionId?: string
   readonly spawnDepth: number
   readonly maxParallel: number
   readonly deadlineAt: number
@@ -97,7 +99,12 @@ function toSpawnFailure(teamRunId: string, memberName: string, error: unknown): 
 async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Promise<SpawnedMember> {
   if (member.worktreePath !== undefined) await mkdir(member.worktreePath, { recursive: true })
 
-  const result = await input.manager.start(buildMemberStartSpec(input, member))
+  const launch = input.memberExtension
+  const extensions = launch === undefined
+    ? undefined
+    : assembleMemberExtensions(launch.entryPath, await resolveInheritedExtensionList(launch.inheritedExtensions))
+  const result = await input.manager.start(buildMemberStartSpec(input, member, extensions))
+  if (result.kind === "held") return { taskId: result.task_id, status: "pending" }
   if (result.kind !== "started") {
     throw new SenpiTeamRuntimeError(
       `member '${member.name}' failed to start: ${describeStartResult(result)}`,
@@ -106,7 +113,16 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
     )
   }
 
+  // A member must be live to be addressable: wait out a start the task host is still admitting (#10042).
+  if (result.starting === true) await input.manager.whenLaunched?.(result.task_id)
   const record = input.manager.get(result.task_id)
+  if (result.starting === true && record !== undefined && record.status !== "running" && record.status !== "pending") {
+    throw new SenpiTeamRuntimeError(
+      `member '${member.name}' failed to start: ${record.error_message ?? record.status}`,
+      "member_start_rejected",
+      input.teamRunId,
+    )
+  }
   const sessionId = input.manager.getResidentHandle(result.task_id)?.sessionId ?? record?.child_session_id
   const status = projectMemberStatus(record?.status ?? (result.status === "pending" ? "pending" : "running"))
   const resolvedModel = result.resolved_model ?? record?.resolved_model
@@ -118,15 +134,16 @@ async function spawnOneMember(input: SpawnMembersInput, member: TeamMember): Pro
   }
 }
 
-function buildMemberStartSpec(input: SpawnMembersInput, member: TeamMember): ManagerStartSpec {
+function buildMemberStartSpec(
+  input: SpawnMembersInput,
+  member: TeamMember,
+  extensions: readonly string[] | undefined,
+): ManagerStartSpec {
   const launch = input.memberExtension
-  const extensions = launch === undefined
-    ? undefined
-    : assembleMemberExtensions(launch.entryPath, launch.inheritedExtensions)
   return {
     prompt: buildMemberPrompt(input.spec, member),
     parent_session_id: input.leadSessionId,
-    root_session_id: input.leadSessionId,
+    root_session_id: input.rootSessionId ?? input.leadSessionId,
     depth: input.spawnDepth,
     name: memberTaskName(input.teamRunId, member.name),
     execution_mode: "process",
@@ -170,13 +187,15 @@ function describePlanError(error: PlanResolutionError): string {
   const categorySuffix = categories.length === 0
     ? ""
     : error.code === "model_unavailable"
-      ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+      ? ` Valid category names: ${categories.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
       : ` Available categories: ${categories.join(", ")}.`
   return error.message + agentSuffix + categorySuffix
 }
 
 function describeStartResult(result: Exclude<StartResult, { kind: "started" }>): string {
   switch (result.kind) {
+    case "held":
+      return `held by user Stop at pause sequence ${result.pauseSeq}`
     case "depth_denied":
       return result.reason
     case "plan_unresolved":

@@ -16,6 +16,7 @@ import {
   createTaskLifecycle,
   createTaskManager,
   createTaskRecordStore,
+  NO_HOST_ENDPOINT,
   type ChildPlanner,
   type ManagedChildHandle,
   type ManagedRunner,
@@ -35,12 +36,13 @@ import {
 } from "@oh-my-opencode/senpi-task/dag"
 
 import { admitAdapter } from "../../src/components/task/engine"
+import { resolveOutDirArg } from "./out-dir-arg"
 
 const PARENT_SESSION = "session-cross-run-qa"
 const ROOT_SESSION = "session-cross-run-qa"
 const RESIDENCY_CAP = 2
 
-const outDir = process.argv[2] ?? join(tmpdir(), "dag-cross-run-residency-qa")
+const outDir = resolveOutDirArg(process.argv.slice(2), join(tmpdir(), "dag-cross-run-residency-qa"))
 const failures: string[] = []
 const report: Record<string, unknown> = { residency_cap: RESIDENCY_CAP }
 
@@ -160,10 +162,10 @@ try {
       const handle = toResidentHandle(manager().getResidentHandle(taskId))
       return handle === undefined ? [] : [handle]
     }),
-    forget: (taskId) => manager().forget(taskId),
+    forget: (taskId, options) => manager().forget(taskId, options),
     hasPendingSends: (taskId) => manager().hasPendingSends?.(taskId) ?? false,
   }
-  const lifecycle = createTaskLifecycle({ store: taskStore, registry, config })
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: taskStore, registry, config })
   lifecycleDispose = () => lifecycle.dispose?.()
   managerRef = createTaskManager({
     store: taskStore,

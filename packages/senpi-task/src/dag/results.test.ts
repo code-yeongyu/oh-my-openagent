@@ -234,4 +234,53 @@ describe("persistDagNodeResult durable node artifacts", () => {
     const resultDir = dirname(store.paths.result(runId, nodeId))
     expect(fs.readdirSync(resultDir).sort()).toEqual([`${nodeId}.stats.json`, `${nodeId}.txt`])
   })
+
+  test("#given a node id that escapes the results directory #when persisted #then it is refused, nothing is written outside the state dir, and the diagnostic names a path", () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+    const record = terminalRecord(projectDir, "ESCAPED-CONTENT")
+    // The result path is <stateDir>/dag/results/<runId>/<nodeId>.txt; three parent hops land the
+    // write at <stateDir>/escaped.txt, i.e. outside dag/results.
+    const escapedPath = join(store.stateDir, "escaped.txt")
+    fs.rmSync(escapedPath, { force: true })
+    const escapeId = "../../../escaped" as DagNodeId
+
+    // when
+    const outcome = persistDagNodeResult({ store, runId, nodeId: escapeId, record })
+
+    // then
+    expect(outcome.kind).toBe("failed")
+    if (outcome.kind !== "failed") throw new Error("expected failed outcome")
+    expect(outcome.diagnostic.kind).toBe("journal_corrupt")
+    // `path` is documented as a filesystem path, so a refused id must not leak into it.
+    expect(outcome.diagnostic.path).toBe(store.paths.results)
+    expect(fs.existsSync(escapedPath)).toBe(false)
+  })
+
+  test("#given a node id that escapes the results directory #when read #then it returns null instead of reading outside the state dir", () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+    // A file planted at the escaped location: pre-fix, the read would return its body.
+    const escapedPath = join(store.stateDir, "escaped.txt")
+    fs.mkdirSync(store.stateDir, { recursive: true })
+    fs.writeFileSync(escapedPath, "SECRET-OUTSIDE-RESULTS")
+    const escapeId = "../../../escaped" as DagNodeId
+
+    // when
+    const reused = readDagNodeResult({ store, runId, nodeId: escapeId })
+
+    // then
+    expect(reused).toBeNull()
+  })
+
+  test("#given a node id containing an NTFS alternate-data-stream separator #when the store builds its path #then it refuses instead of naming a stream", () => {
+    // given
+    const projectDir = tempProject()
+    const store = createDagFileStore({ project_dir: projectDir })
+
+    // when / then
+    expect(() => store.paths.result(runId, "build:secret" as DagNodeId)).toThrow()
+  })
 })

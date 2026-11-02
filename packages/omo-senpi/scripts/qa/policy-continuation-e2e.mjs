@@ -9,6 +9,8 @@ import { dirname, join, resolve } from "node:path"
 import { createInterface } from "node:readline"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSandbox, seedSandbox, credentialDigest } from "./drive.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
+import { engineDependencyDir } from "../../../omo-native/bin/lib/engine-dependency.js"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, "../../../..")
@@ -147,16 +149,13 @@ export async function selfTest() {
   return { ok: true, lanes: LANES, failures: FAILURES }
 }
 
-/** The pinned host ships pi-ai as its own dependency; both bun layouts are checked, then it fails. */
+/** The pi-ai the pinned host itself resolves, bundled inside it or installed beside it. */
 function resolvePinnedPiAi() {
   const senpiRoot = join(root, "node_modules", "@code-yeongyu", "senpi")
-  const candidates = [
-    join(senpiRoot, "node_modules", "@earendil-works", "pi-ai", "dist", "index.js"),
-    join(root, "node_modules", "@earendil-works", "pi-ai", "dist", "index.js"),
-  ]
-  const found = candidates.find((candidate) => existsSync(candidate))
-  if (!found) throw new Error(`pinned @earendil-works/pi-ai not found; looked in:\n${candidates.join("\n")}`)
-  return found
+  const piAiRoot = engineDependencyDir(senpiRoot, "@earendil-works/pi-ai")
+  const entry = piAiRoot === undefined ? undefined : join(piAiRoot, "dist", "index.js")
+  if (entry === undefined || !existsSync(entry)) throw new Error(`pinned @earendil-works/pi-ai is not resolvable from ${senpiRoot}`)
+  return entry
 }
 
 /** Exactly one batched wake carrying this lane's continuation, and nothing else. */
@@ -204,7 +203,7 @@ async function scenario(lane, failure, context) {
     const address = server.address()
     assert(address && typeof address === "object")
     // Deliberate allowlist: provider credentials, caller agent dirs and task/session env never inherit.
-    const env = {
+    const env = withTelemetryOptOut({
       PATH: process.env.PATH, HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir,
       TMPDIR: sandbox.root, XDG_CONFIG_HOME: sandbox.xdgConfigHome, XDG_DATA_HOME: sandbox.xdgDataHome,
       XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "state"),
@@ -212,7 +211,7 @@ async function scenario(lane, failure, context) {
       OMO_AGENT_TOOLKIT_BIN: toolkit, OMO_POLICY_QA_TRACE: traceFile, OMO_POLICY_QA_LANE: lane,
       OMO_POLICY_QA_ENDPOINT: `http://127.0.0.1:${address.port}`, PI_OFFLINE: "1", OMO_SENPI_QA: "1",
       OMO_POLICY_QA_CONTEXT_WINDOW: String(contextWindowFor(failure)),
-    }
+    })
     child = spawn(process.execPath, [cli, "--mode", "rpc", "--no-extensions", "--no-skills", "--no-prompt-templates",
       "-e", extension, "--provider", "omo-policy-qa", "--model", "qa"], { cwd: sandbox.cwd, env, stdio: "pipe" })
     const bus = new EventEmitter()

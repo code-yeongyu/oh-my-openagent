@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 
 const REQUIRED_SKILL_NAMES = [
   "ast-grep",
+  "browser",
   "coding-agent-sessions",
   "debugging",
   "frontend",
@@ -29,9 +30,30 @@ export async function createPluginFixture(options: { readonly runtime?: boolean 
   await writeFixtureFile(join(pluginPath, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
   await writeFixtureFile(join(pluginPath, "extensions", "omo.js"), "export default {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-computer-use.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-doctor.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-memfs.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-palace.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-device-account.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-commands.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-session-history.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-recall-store.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-posthog.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-otlp.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-sync.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "loro_wasm_bg.wasm"), "")
+  await writeFixtureFile(join(pluginPath, "extensions", "CaseFolding.txt"), "")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-thread-client.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-recovery.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-feedback.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-desktop-toolkit.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-claim-receipt.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "assets.generated.json"), "{}\n")
   await writeFixtureFile(join(pluginPath, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-member.js"), "export default {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "memory-run-supervisor.mjs"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "gateway-store-worker.mjs"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "dream-persona.md"), "# dream persona fixture\n")
   await writeFixtureFile(join(pluginPath, "extensions", "facts-persona.md"), "# facts persona fixture\n")
@@ -39,9 +61,16 @@ export async function createPluginFixture(options: { readonly runtime?: boolean 
   for (const skillName of REQUIRED_SKILL_NAMES) {
     await writeFixtureFile(join(pluginPath, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
   }
+  // The browser skill's bundled omowright runtime is a required payload artifact (issue #9661);
+  // the fixture mirrors the required set so the installer's integrity check passes.
+  await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "index.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "page-bundle.js"), "\n")
   // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
   await writeFixtureFile(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
   await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
+  // The task daemon's launch spec is a required root-level artifact; the installer's integrity
+  // check refuses a payload without it.
+  await writeFixtureFile(join(pluginPath, "daemon-launch-spec.json"), '{"spec_version":1,"core":{"session_runtime":"in-process","multi_session":true,"extensions":["."]},"tunables":{},"env":{}}\n')
   if (options.runtime !== false) {
     const astGrepRuntime = join(pluginPath, "runtime", "ast-grep-mcp", "cli.js")
     await writeFixtureFile(astGrepRuntime, "console.log('ast-grep')\n")

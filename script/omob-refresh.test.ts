@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -6,6 +6,7 @@ import { delimiter, join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { writeTestExecutable } from "./omob-test-executable"
 import { installOmobLauncher, parseOmobArgs } from "./build-omob"
+import { removeTempRoot } from "./remove-temp-root"
 
 const builder = resolve(import.meta.dir, "build-omob.ts")
 const canonical = "https://github.com/code-yeongyu/oh-my-openagent.git"
@@ -13,6 +14,7 @@ const canonical = "https://github.com/code-yeongyu/oh-my-openagent.git"
 // Replace only the expensive package/compiler boundary. Git, cache selection,
 // update decisions, installs and the installed launcher all run the real code.
 const compiler = `
+(async () => {
 const fs = require('node:fs'), path = require('node:path'), cp = require('node:child_process');
 const args = process.argv.slice(2), cwd = process.cwd();
 if (args[0]?.endsWith(path.join('script', 'build-omob.ts'))) {
@@ -24,7 +26,9 @@ if (args.includes(path.join('script', 'build-omo-binary.ts'))) {
  fs.appendFileSync(process.env.OMOB_TEST_BUILDS, 'compile\\n');
  if (process.env.OMOB_TEST_FAIL === '1') process.exit(23);
  const info = JSON.parse(args[args.indexOf('--build-info')+1]);
- const version = [info.command+' dev build', 'omo   '+info.omo.commit+' '+info.omo.committedAt+' ('+info.omo.branch+')', 'senpi '+info.engine.commit+' '+info.engine.committedAt+' ('+info.engine.branch+')'].join('\\n');
+ // The real \`--version\` text, from the production module: the refresh decides "same build" by
+ // comparing this output with versionLines(info), so a hand-copied format here would drift.
+ const version = require(process.env.OMOB_TEST_BUILD_INFO).versionLines(info).join('\\n');
  const out = args[args.indexOf('--out-dir')+1], target = args[args.indexOf('--target')+1];
  fs.mkdirSync(out,{recursive:true});
  const binary = path.join(out,'omo-'+target+(target.startsWith('windows-')?'.exe':''));
@@ -34,7 +38,9 @@ if (args.includes(path.join('script', 'build-omo-binary.ts'))) {
  if (result.error) throw result.error;
  if (result.status !== 0) process.exit(result.status ?? 1);
 } else if (args[0] === 'pm') {
- fs.writeFileSync(path.join(args[args.indexOf('--destination')+1],'senpi.tgz'),'fixture');
+ await Bun.write(path.join(args[args.indexOf('--destination')+1],'senpi.tgz'), new Bun.Archive({
+  'package/package.json': JSON.stringify({name:'@code-yeongyu/senpi',version:'0.0.0-fixture',bundleDependencies:[]}),
+ }, {compress:'gzip'}));
 } else if (args[0] === 'install') {
  fs.mkdirSync(path.join(cwd,'node_modules'),{recursive:true});
  if (path.basename(cwd)==='senpi-install') {
@@ -42,13 +48,35 @@ if (args.includes(path.join('script', 'build-omo-binary.ts'))) {
   fs.mkdirSync(pkg,{recursive:true}); fs.writeFileSync(path.join(pkg,'package.json'),'{}');
  }
 }
+})().catch((error) => { console.error(error); process.exitCode = 1; });
 `
+
+// The stand-in reads everything from env and cwd, so one compiled copy serves every fixture.
+// Compiled per case, a fresh ~100 MB executable's first run landed inside each build's 30 s
+// spawn budget and blew it on serial Windows runs (#11558).
+let sharedTools: string | undefined
+
+function compileSharedTools(): void {
+	const directory = mkdtempSync(join(tmpdir(), "omob-refresh-tools-"))
+	sharedTools = directory
+	const stub = join(directory, process.platform === "win32" ? "bun.exe" : "bun")
+	writeTestExecutable(stub, compiler)
+	// Pay the first execution of the freshly written binary here, outside every build budget.
+	const warm = spawnSync(stub, [], { encoding: "utf8", timeout: 30_000 })
+	if (warm.error) throw warm.error
+	if (warm.status !== 0) throw new Error(`fixture tools warm-up failed: ${warm.stderr}`)
+}
+
+function fixtureTools(): string {
+	if (sharedTools === undefined) throw new Error("fixture tools are compiled once in beforeAll")
+	return sharedTools
+}
 
 function fixture() {
 	const root = mkdtempSync(join(tmpdir(), "omob-refresh-"))
 	const omo = join(root, "upstream-omo"), senpi = join(root, "upstream-senpi")
-	const cache = join(root, "cache"), tools = join(root, "tools"), builds = join(root, "builds")
-	const env = { ...process.env, PATH: `${tools}${delimiter}${process.env.PATH}`, OMOB_TEST_BUN: process.execPath, OMOB_TEST_BUILDER: builder, OMOB_TEST_BUILDS: builds,
+	const cache = join(root, "cache"), tools = fixtureTools(), builds = join(root, "builds")
+	const env = { ...process.env, PATH: `${tools}${delimiter}${process.env.PATH}`, OMOB_TEST_BUN: process.execPath, OMOB_TEST_BUILDER: builder, OMOB_TEST_BUILDS: builds, OMOB_TEST_BUILD_INFO: resolve(import.meta.dir, "../packages/omo-native/build-info.ts"),
 		GIT_CONFIG_COUNT: "5", GIT_CONFIG_KEY_0: "user.name", GIT_CONFIG_VALUE_0: "Test", GIT_CONFIG_KEY_1: "user.email", GIT_CONFIG_VALUE_1: "test@example.com",
 		GIT_CONFIG_KEY_2: `url.${pathToFileURL(omo).href}.insteadOf`, GIT_CONFIG_VALUE_2: canonical, GIT_CONFIG_KEY_3: "protocol.file.allow", GIT_CONFIG_VALUE_3: "always", GIT_CONFIG_KEY_4: `url.${pathToFileURL(senpi).href}.insteadOf`, GIT_CONFIG_VALUE_4: "https://github.com/code-yeongyu/senpi.git" }
 	const git = (cwd: string, args: string[]) => {
@@ -59,9 +87,10 @@ function fixture() {
 	for (const [repo, branch] of [[omo, "dev"], [senpi, "main"]]) {
 		mkdirSync(join(repo, "scripts"), { recursive: true })
 		mkdirSync(join(repo, "packages", "coding-agent"), { recursive: true })
-		writeFileSync(join(repo, "packages", "coding-agent", "package.json"), '{}')
+		writeFileSync(join(repo, "packages", "coding-agent", "package.json"), '{"name":"@code-yeongyu/senpi"}')
 		writeFileSync(join(repo, "package-lock.json"), '{"packages":{}}')
 		writeFileSync(join(repo, "scripts", "prepare-senpi-bundled-workspaces.mjs"), "")
+		writeFileSync(join(repo, "scripts", "registry-packages.mjs"), 'export const registrySourcePackageNames = new Set(["@code-yeongyu/senpi"]);\n')
 		git(repo, ["init", "-q", "-b", branch])
 		git(repo, ["add", "."])
 		git(repo, ["commit", "-qm", "initial"])
@@ -70,8 +99,6 @@ function fixture() {
 	git(root, ["clone", "-q", canonical, join(cache, "omo")])
 	git(omo, ["switch", "-qc", "feature"])
 	writeFileSync(join(omo, "uncommitted"), "keep me")
-	mkdirSync(tools)
-	writeTestExecutable(join(tools, process.platform === "win32" ? "bun.exe" : "bun"), compiler)
 	writeFileSync(builds, "")
 	const options = parseOmobArgs(["--cache-dir", cache, "--install-dir", join(root, "install")], process.platform, process.arch, root)
 	const args = [builder, "--if-changed", "--binary-only", "--cache-dir", cache, "--install-dir", join(cache, "bin")]
@@ -81,6 +108,9 @@ function fixture() {
 }
 
 describe("omob refresh integration", () => {
+	beforeAll(compileSharedTools, 60_000)
+	afterAll(() => { if (sharedTools !== undefined) removeTempRoot(sharedTools) })
+
 	test.skipIf(process.platform === "win32")("#given an ordinary managed install #when ordinary install repeats #then auto-refresh remains installed", () => {
 		const f = fixture()
 		try {
@@ -100,7 +130,7 @@ describe("omob refresh integration", () => {
 				expect(readFileSync(installed, "utf8").split("\n")[0]).toBe("#!/bin/sh")
 			}
 			expect(readFileSync(f.builds, "utf8")).toBe(process.platform === "win32" ? "compile\ncompile\n" : "compile\n")
-		} finally { rmSync(f.root, { recursive: true, force: true }) }
+		} finally { removeTempRoot(f.root) }
 	}, 60_000)
 
 	for (const name of ["omob", "omob-custom", "omob-custom.exe", "omob-custom.EXE"]) {
@@ -120,7 +150,7 @@ describe("omob refresh integration", () => {
 				expect(version.error).toBeUndefined()
 				expect(version.status).toBe(0)
 				expect(version.stdout.split("\n")[0]).toBe(`${name} dev build`)
-			} finally { rmSync(f.root, { recursive: true, force: true }) }
+			} finally { removeTempRoot(f.root) }
 		}, 60_000)
 	}
 
@@ -176,7 +206,7 @@ describe("omob refresh integration", () => {
 				}
 				expect(f.git(f.omo, ["branch", "--show-current"])).toBe("feature")
 				expect(readFileSync(join(f.omo, "uncommitted"), "utf8")).toBe("keep me")
-			} finally { rmSync(f.root, { recursive: true, force: true }) }
+			} finally { removeTempRoot(f.root) }
 		}, 60_000)
 	}
 })

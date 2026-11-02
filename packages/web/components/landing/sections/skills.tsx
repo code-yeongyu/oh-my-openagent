@@ -36,7 +36,7 @@ export async function SkillsSection(): Promise<JSX.Element> {
             />
           </Reveal>
           <Reveal index={1} className="lg:col-span-6">
-            <Ticker rows={rows} className="border-line bg-ink-1 max-h-[22rem] border px-5" />
+            <Ticker rows={rows} maxHeight="22rem" className="border-line bg-ink-1 border px-5" />
           </Reveal>
         </div>
       </Frame>

@@ -1,9 +1,9 @@
-import { afterEach } from "bun:test"
+import { onTestFinished } from "bun:test"
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { GitMemoryRepo, renderMemoryFile, type GitCommitAuthor, type RecallNudge } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, RecallCorpusCache, renderMemoryFile, type GitCommitAuthor, type RecallNudge } from "@oh-my-opencode/memory-core"
 
 import { rmEfaultTolerant } from "../../teardown.test-support"
 import { createWakeToolBudget, type WakeToolBudget } from "./budget"
@@ -14,15 +14,17 @@ import { createSessionBranchSnapshot } from "./session-read"
 export const IDENTITY = "agent-kibitzer-tools-test"
 export const AUTHOR: GitCommitAuthor = { agentId: IDENTITY, authorName: "Kibitzer Tools Test Agent" }
 
-const roots: string[] = []
-
-afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })))
-})
+// The recall cache saves a repository's terms into its `.git` after the tool call returns; removing the root
+// while that save runs leaves the root behind, so every root waits for this test's caches first.
+const caches = new Set<RecallCorpusCache>()
 
 export async function tempRoot(prefix = "omo-kibitzer-tools-"): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), prefix))
-  roots.push(root)
+  onTestFinished(async () => {
+    await Promise.all([...caches].map((cache) => cache.settled()))
+    caches.clear()
+    await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
+  })
   return root
 }
 
@@ -44,6 +46,15 @@ export async function commitMemory(repo: GitMemoryRepo, path: string, body: stri
   await repo.commitWrite([path], `seed ${path}`, AUTHOR)
 }
 
+/** Commits through raw git with no hook, the way content written before secret screening existed sits in a repo. */
+export async function commitLegacyMemory(repo: GitMemoryRepo, path: string, body: string): Promise<void> {
+  await writeMemory(repo, path, body)
+  for (const argv of [["add", "--", path], ["commit", "--no-verify", "-m", `legacy ${path}`]]) {
+    const result = Bun.spawnSync(["git", ...argv], { cwd: repo.dir })
+    if (result.exitCode !== 0) throw new Error(`git ${argv[0]} failed: ${result.stderr.toString()}`)
+  }
+}
+
 export interface Harness {
   readonly tools: readonly AnyKibitzerSidecarTool[]
   readonly searchedPaths: ReadonlySet<string>
@@ -61,6 +72,7 @@ export interface HarnessOptions {
   readonly budgetLimit?: number
   readonly maxItems?: number
   readonly caps?: KibitzerSidecarToolsInput["caps"]
+  readonly queryExpansion?: boolean
 }
 
 export function harness(options: HarnessOptions): Harness {
@@ -69,10 +81,12 @@ export function harness(options: HarnessOptions): Harness {
   const offered = new Set<string>()
   const surfaced = new Set<string>()
   const snapshot = createSessionBranchSnapshot()
+  const cache = new RecallCorpusCache()
+  caches.add(cache)
   const created = createKibitzerSidecarTools({
     workspaceRoot: options.workspaceRoot,
     session: snapshot,
-    memory: { repo: options.repo },
+    memory: { repo: options.repo, cache, ...(options.queryExpansion === undefined ? {} : { queryExpansion: options.queryExpansion }) },
     nudge: { offered, surfaced, maxItems: options.maxItems ?? 2, accepted: () => accepted },
     budget: () => budget,
     ...(options.caps === undefined ? {} : { caps: options.caps }),

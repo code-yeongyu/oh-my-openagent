@@ -11,13 +11,9 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
-import {
-  DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS,
-  releaseAllPromptAsyncReservationsForTesting,
-} from "../../shared/prompt-async-gate"
-import { DEFAULT_SESSION_STATUS_TIMEOUT_MS } from "../../shared/session-idle-settle"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
-import type { AtlasHookOptions, PendingTaskRef } from "./types"
+import type { AtlasHookOptions, AtlasRetryScheduler, PendingTaskRef } from "./types"
 import { createAtlasHook } from "./index"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
@@ -1551,48 +1547,36 @@ session_id: ses_untrusted_999
       }
       writeBoulderState(TEST_DIR, state)
 
-      const originalSetTimeout = globalThis.setTimeout
-      const originalClearTimeout = globalThis.clearTimeout
-      const activeTimers = new Map<ReturnType<typeof setTimeout>, number>()
-      globalThis.setTimeout = ((_handler: Parameters<typeof setTimeout>[0], timeout?: number, ..._args: unknown[]) => {
-        const id = originalSetTimeout(() => undefined, 0)
-        activeTimers.set(id, timeout ?? 0)
-        return id
-      }) as typeof setTimeout
-      globalThis.clearTimeout = ((id: ReturnType<typeof setTimeout>) => {
-        activeTimers.delete(id)
-        originalClearTimeout(id)
-      }) as typeof clearTimeout
-
-      try {
-        const mockInput = createMockPluginInput()
-        const hook = createTestAtlasHook(mockInput)
-
-        // when - runtime error resumes immediately and OpenCode later emits stale idle
-        await hook.handler({
-          event: {
-            type: "session.error",
-            properties: {
-              sessionID: MAIN_SESSION_ID,
-              error: { name: "RuntimeError", message: "provider overloaded" },
-            },
-          },
-        })
-        await hook.handler({
-          event: {
-            type: "session.idle",
-            properties: { sessionID: MAIN_SESSION_ID },
-          },
-        })
-
-        // then - stale idle is consumed, not converted into another scheduled continuation
-        const scheduledDelays = Array.from(activeTimers.values())
-        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
-        expect(scheduledDelays.filter((delay) => delay >= 5_000 && delay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS && delay !== DEFAULT_SESSION_STATUS_TIMEOUT_MS)).toHaveLength(0)
-      } finally {
-        globalThis.setTimeout = originalSetTimeout
-        globalThis.clearTimeout = originalClearTimeout
+      const pendingRetries = new Set<symbol>()
+      const retryScheduler: AtlasRetryScheduler = () => {
+        const retry = Symbol("retry")
+        pendingRetries.add(retry)
+        return { cancel: () => { pendingRetries.delete(retry) } }
       }
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput, { retryScheduler })
+
+      // when - runtime error resumes immediately and OpenCode later emits stale idle
+      await hook.handler({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: MAIN_SESSION_ID,
+            error: { name: "RuntimeError", message: "provider overloaded" },
+          },
+        },
+      })
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then - stale idle is consumed, not converted into another scheduled continuation
+      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      expect(pendingRetries.size).toBe(0)
     })
 
     test("#given boulder retried a runtime error #when assistant activity arrives #then next idle can continue", async () => {
@@ -2465,58 +2449,49 @@ session_id: ses_untrusted_999
     })
 
     describe("delayed retry timer (abort-stuck fix)", () => {
-      const capturedTimers = new Map<ReturnType<typeof setTimeout>, { callback: () => void | Promise<void>; cleared: boolean }>()
-      const originalSetTimeout = globalThis.setTimeout
-      const originalClearTimeout = globalThis.clearTimeout
+      // The hook's retry runs on an injected scheduler, so the group drives only the hook's own timers; patching
+      // the global setTimeout here would also capture timers other modules schedule in the same process (#11617).
+      const capturedTimers = new Map<number, { callback: () => Promise<void> }>()
       const originalDateNow = Date.now
       let fakeNow = 0
+      let nextTimerID = 0
+      const retryScheduler: AtlasRetryScheduler = (callback) => {
+        const timerID = nextTimerID++
+        capturedTimers.set(timerID, { callback })
+        return { cancel: () => { capturedTimers.delete(timerID) } }
+      }
+
+      function createRetryTestHook(input = createMockPluginInput()): ReturnType<typeof createAtlasHook> {
+        return createTestAtlasHook(input, { retryScheduler })
+      }
 
       beforeEach(() => {
         capturedTimers.clear()
-        fakeNow = 10000
+        // Start on the real clock: the prompt gate's module-wide semantic-dedupe record is stamped with
+        // Date.now(), and one written on the real clock by an earlier dispatch that settled late never
+        // expires on a clock that starts in 1970 (#10474).
+        fakeNow = originalDateNow()
         Date.now = () => fakeNow
-
-        globalThis.setTimeout = ((callback: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]) => {
-          const normalized = typeof delay === "number" ? delay : 0
-          if (normalized >= 5000 && normalized !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS) {
-            const timerID = originalSetTimeout(() => undefined, 0)
-            const capturedCallback = typeof callback === "function"
-              ? () => callback(...args)
-              : () => undefined
-            capturedTimers.set(timerID, { callback: capturedCallback, cleared: false })
-            return timerID
-          }
-          return typeof callback === "function"
-            ? originalSetTimeout(callback, delay, ...args)
-            : originalSetTimeout(() => undefined, delay)
-        }) as typeof setTimeout
-
-        globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
-          const timerEntry = id ? capturedTimers.get(id) : undefined
-          if (id !== undefined && timerEntry) {
-            timerEntry.cleared = true
-            capturedTimers.delete(id)
-            return
-          }
-          if (id !== undefined) {
-            originalClearTimeout(id)
-          }
-        }) as typeof clearTimeout
       })
 
       afterEach(() => {
-        globalThis.setTimeout = originalSetTimeout
-        globalThis.clearTimeout = originalClearTimeout
         Date.now = originalDateNow
       })
 
+      // A timer that reschedules itself lands back in capturedTimers, which this loop is iterating, so a
+      // self-rescheduling chain would never end; fail at the cap instead of spinning until the host runs
+      // out of memory (#10474).
+      const MAX_TIMERS_PER_FIRE = 20
+
       async function firePendingTimers(): Promise<void> {
+        let fired = 0
         for (const [id, entry] of capturedTimers) {
-          if (!entry.cleared) {
-            capturedTimers.delete(id)
-            fakeNow += 6000
-            await entry.callback()
+          if (++fired > MAX_TIMERS_PER_FIRE) {
+            throw new Error(`runaway: more than ${MAX_TIMERS_PER_FIRE} captured timers fired in one pass`)
           }
+          capturedTimers.delete(id)
+          fakeNow += 6000
+          await entry.callback()
         }
         await flushMicrotasks()
       }
@@ -2535,7 +2510,7 @@ session_id: ses_untrusted_999
         writeBoulderState(TEST_DIR, state)
 
         const mockInput = createMockPluginInput()
-        const hook = createTestAtlasHook(mockInput)
+        const hook = createRetryTestHook(mockInput)
 
         // when - first idle injects, second idle within cooldown schedules retry timer
         await hook.handler({
@@ -2564,7 +2539,7 @@ session_id: ses_untrusted_999
         writeBoulderState(TEST_DIR, state)
 
         const mockInput = createMockPluginInput()
-        const hook = createTestAtlasHook(mockInput)
+        const hook = createRetryTestHook(mockInput)
 
         // when - first idle injects, then 3 rapid idles within cooldown
         await hook.handler({
@@ -2599,7 +2574,7 @@ session_id: ses_untrusted_999
         writeBoulderState(TEST_DIR, state)
 
         const mockInput = createMockPluginInput()
-        const hook = createTestAtlasHook(mockInput)
+        const hook = createRetryTestHook(mockInput)
 
         // when - first idle injects, second schedules retry, then plan completes before timer fires
         await hook.handler({
@@ -2630,7 +2605,7 @@ session_id: ses_untrusted_999
         writeBoulderState(TEST_DIR, state)
 
         const mockInput = createMockPluginInput()
-        const hook = createTestAtlasHook(mockInput)
+        const hook = createRetryTestHook(mockInput)
 
         await hook.handler({
           event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
@@ -2649,6 +2624,72 @@ session_id: ses_untrusted_999
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       })
 
+      test("gate state stamped on the real clock by earlier work does not trap the retry loop", async () => {
+        // given - an earlier hook (a previous test whose dispatch settled late) dispatched on the real
+        // clock, leaving a real-time semantic-dedupe record in the shared prompt gate
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+        writeBoulderState(TEST_DIR, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        })
+        const earlierInput = createMockPluginInput()
+        Date.now = originalDateNow
+        await createRetryTestHook(earlierInput).handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        Date.now = () => fakeNow
+        expect(earlierInput._promptMock).toHaveBeenCalledTimes(1)
+
+        // when - a fresh hook hits idle on the test clock and its gated continuation is retried
+        const mockInput = createMockPluginInput()
+        const hook = createRetryTestHook(mockInput)
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await firePendingTimers()
+
+        // then - the earlier records expire as the test clock advances and the retry dispatches once
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      })
+
+      test("timers that other modules schedule during the group are neither captured nor fired", async () => {
+        // given - another module in the same process (an earlier file's leftover work, a poller) has long
+        // timers pending while the hook schedules its retry
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+        writeBoulderState(TEST_DIR, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        })
+        const foreignFired: number[] = []
+        const foreignTimers = Array.from({ length: MAX_TIMERS_PER_FIRE + 5 }, (_, index) =>
+          setTimeout(() => foreignFired.push(index), 10_000))
+        const mockInput = createMockPluginInput()
+        const hook = createRetryTestHook(mockInput)
+
+        try {
+          // when - first idle injects, second idle within cooldown schedules the hook's retry
+          await hook.handler({
+            event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+          })
+          await hook.handler({
+            event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+          })
+          await firePendingTimers()
+        } finally {
+          for (const timer of foreignTimers) clearTimeout(timer)
+        }
+
+        // then - only the hook's own retry fired
+        expect(foreignFired).toEqual([])
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
+      })
+
       test("should cleanup pending retry timer on session.compacted", async () => {
         // given - boulder with incomplete plan, schedule retry timer
         const planPath = join(TEST_DIR, "test-plan.md")
@@ -2663,7 +2704,7 @@ session_id: ses_untrusted_999
         writeBoulderState(TEST_DIR, state)
 
         const mockInput = createMockPluginInput()
-        const hook = createTestAtlasHook(mockInput)
+        const hook = createRetryTestHook(mockInput)
 
         await hook.handler({
           event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },

@@ -176,7 +176,7 @@ Everything else is parallel. Fire one `task()` per independent checkbox in the s
 
 ```typescript
 task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
-task(category="deep", load_skills=["programming"], run_in_background=false, prompt="...task B...")
+task(category="deep-low", load_skills=["programming"], run_in_background=false, prompt="...task B...")
 task(category="quick", load_skills=["git-master"], run_in_background=false, prompt="...task C...")
 ```
 

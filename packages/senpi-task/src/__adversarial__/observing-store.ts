@@ -78,9 +78,13 @@ export function createObservingStore(backing: TaskRecordStore, shared?: StoreObs
       await backing.remove(taskId)
       observeResidentCounts(backing, observations)
     },
-    tombstoneIfExpired: (taskId, shouldRetain) => backing.tombstoneIfExpired(taskId, shouldRetain),
-    completeExpunge: (taskId) => backing.completeExpunge(taskId),
+    tombstoneIfExpired: (taskId, shouldRetain, owner) => backing.tombstoneIfExpired(taskId, shouldRetain, owner),
+    completeExpunge: (taskId, owner) => backing.completeExpunge(taskId, owner),
     listExpunging: () => backing.listExpunging(),
+    loadExpunging: (taskId) => backing.loadExpunging(taskId),
+    restoreExpunging: (taskId, owner) => backing.restoreExpunging(taskId, owner),
+    readExpungeOwner: (taskId) => backing.readExpungeOwner(taskId),
+    takeOverExpunging: (taskId, from, to) => backing.takeOverExpunging(taskId, from, to),
     replace: (record) => {
       const before = backing.load(record.task_id)
       observeReplace(backing, observations, record)

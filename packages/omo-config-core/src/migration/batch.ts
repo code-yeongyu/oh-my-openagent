@@ -83,6 +83,15 @@ function directoryPath(path: string): string {
   return path.startsWith("/") ? posix.dirname(path) : dirname(path)
 }
 
+/** The exact, unused path the target's pre-write copy will take, or undefined when there is no target yet. */
+function plannedTargetBackupPath(targetPath: string, clock: MigrationClock, fileSystem: MigrationFileSystem): string | undefined {
+  if (!fileSystem.existsSync(targetPath)) return undefined
+  const base = `${targetPath}.bak.${new Date(clock.now()).toISOString().replace(/[:.]/g, "-")}`
+  let candidate = base
+  for (let attempt = 1; fileSystem.existsSync(candidate); attempt += 1) candidate = `${base}.${attempt}`
+  return candidate
+}
+
 function ensureBackupDirectories(moves: readonly MigrationBackupMove[], fileSystem: MigrationFileSystem): void {
   for (const move of moves) fileSystem.mkdirSync(directoryPath(move.to), { recursive: true })
 }
@@ -116,6 +125,9 @@ function executePlan(input: {
   const existingSources = plan.sources.filter((source) => fileSystem.existsSync(source.path))
   const target = targetDocument(plan.targetPath, fileSystem)
   const replaceTarget = plan.mode === "replace-target"
+  if (plan.shouldRun !== undefined && !plan.shouldRun(target)) {
+    return { diagnostics: [], journalResumed, status: "skipped" }
+  }
   if (!shouldRunMigration({
     legacySourcesExist: replaceTarget ? fileSystem.existsSync(plan.targetPath) : existingSources.length > 0,
     migrationId: plan.id,
@@ -137,11 +149,13 @@ function executePlan(input: {
   if (input.dryRun) return { diagnostics, journalResumed, preview, status: "planned" }
 
   ensureBackupDirectories(moves, fileSystem)
+  const targetBackupPath = plannedTargetBackupPath(plan.targetPath, input.clock, fileSystem)
   const journal = {
     backupMoves: moves,
     completedMoves: [],
     diagnostics,
     migrationId: plan.id,
+    ...(targetBackupPath === undefined ? {} : { targetBackupPath }),
     targetPath: plan.targetPath,
     targetWrite: {
       additions: transformed.document,
@@ -153,7 +167,7 @@ function executePlan(input: {
   writeMigrationJournal(journal, fileSystem, env, input.process, input.clock)
   input.onBoundary?.("journal-written")
   input.renewLock()
-  writePreparedTarget({ env, fileSystem, prepared, targetPath: plan.targetPath, writeTarget: input.writeTarget })
+  writePreparedTarget({ ...(targetBackupPath === undefined ? {} : { backupPath: targetBackupPath }), env, fileSystem, prepared, targetPath: plan.targetPath, writeTarget: input.writeTarget })
   input.onBoundary?.("target-written")
   const targetRecorded = { ...journal, targetWritten: true }
   writeMigrationJournal(targetRecorded, fileSystem, env, input.process, input.clock)
@@ -168,7 +182,7 @@ function executePlan(input: {
     input.onBoundary?.("source-recorded")
   }
   removeMigrationJournal(fileSystem, env)
-  return { diagnostics, journalResumed, preview, status: "migrated" }
+  return { diagnostics, journalResumed, preview, status: "migrated", ...(targetBackupPath === undefined ? {} : { targetBackupPath }) }
 }
 
 export function runMigrations(options: RunMigrationsOptions): MigrationBatchRunResult {
@@ -183,7 +197,8 @@ export function runMigrations(options: RunMigrationsOptions): MigrationBatchRunR
   if (lock === null) return { journalResumed: false, results: [], status: "locked" }
 
   try {
-    const journalResumed = resumeMigrationJournal({ clock, env, fileSystem, process, renewLock: lock.renew, writeTarget })
+    const resumed = resumeMigrationJournal({ clock, env, fileSystem, process, renewLock: lock.renew, writeTarget })
+    const journalResumed = resumed.resumed
     lock.renew()
     const results = options.discover().map((plan) => executePlan({
       clock,
@@ -198,7 +213,7 @@ export function runMigrations(options: RunMigrationsOptions): MigrationBatchRunR
       writeTarget,
     }))
     if (options.dryRun !== true) options.afterMigrations?.(results)
-    return { journalResumed, results, status: "completed" }
+    return { journalResumed, ...(resumed.targetBackupPath === undefined ? {} : { resumedTargetBackupPath: resumed.targetBackupPath }), results, status: "completed" }
   } finally {
     lock.release()
   }

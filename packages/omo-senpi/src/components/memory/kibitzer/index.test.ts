@@ -146,7 +146,7 @@ describe("createKibitzerComposition", () => {
     expect(f.warnings).toEqual([])
   })
 
-  test("#given a resident child that nudges #when its turn settles #then the nudge is ledger-marked, steered into the running turn once, and the accepted cooldown parks the third wake", async () => {
+  test("#given a resident child that nudges #when its turn settles #then the nudge is ledger-marked, steered into the running turn once at a tool boundary, and the accepted cooldown parks the third wake", async () => {
     const f = await harness()
     f.script(SESSION_A, [K8S])
 
@@ -162,9 +162,9 @@ describe("createKibitzerComposition", () => {
     expect(await ledger.surfacedPaths(SESSION_A)).toEqual(new Set([K8S]))
     const ledgerFile = JSON.parse(await readFile(join(f.context.identityPaths.recallLedger, `${SESSION_A}.json`), "utf8")) as { surfaced: Record<string, { hash: string }> }
     expect(ledgerFile.surfaced[K8S]?.hash).toBe(GATE_SURFACE_HASH)
-    // The main turn is still running (before_agent_start marked it), so delivery steers at once and
-    // the next tool_result has nothing left to steer.
-    expect(f.pi.messages).toHaveLength(1)
+    // The main turn is running but executes no tool, so a steer now would start an extra assistant
+    // turn after its answer: delivery holds the nudge and the next tool_result steers it.
+    expect(f.pi.messages).toHaveLength(0)
     await f.dispatch("tool_result", { toolName: "read", content: [{ type: "text", text: "ok" }] }, SESSION_A, 2)
     expect(f.pi.messages).toHaveLength(1)
     expect(f.pi.messages[0]?.options).toEqual({ deliverAs: "steer" })
@@ -174,10 +174,10 @@ describe("createKibitzerComposition", () => {
     expect(nudged).toHaveLength(1)
     expect(nudged[0]?.data).toEqual({ version: 1, nudges: [{ path: K8S, hint: HINT }], via: "steer" })
 
-    // Second accepted wake inside the window: still delivered.
+    // Second accepted wake inside the window, while that tool call executes: steered at accept time.
     f.script(SESSION_A, [HELM])
     const revived = f.nextFollowUp()
-    await f.dispatch("tool_call", { toolName: "read", input: { path: "charts/values.yaml" } }, SESSION_A, 3)
+    await f.dispatch("tool_call", { toolName: "read", toolCallId: "call-helm", input: { path: "charts/values.yaml" } }, SESSION_A, 3)
     await revived
     expect(child.followUps).toHaveLength(1)
     expect((await child.nudge(HELM, "Pin chart versions in values.")).isError).not.toBe(true)

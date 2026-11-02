@@ -1,0 +1,22 @@
+declare const xs: number[];
+declare const o: Record<string, number>;
+declare function make(): AsyncIterable<number>;
+let a;
+var v;
+let typed: string;
+let init = 1;
+let anyTyped: any;
+let undef = undefined;
+let p, q: number;
+let d1, e1 = 1;
+declare let ambient;
+export declare let exportedAmbient;
+declare module "m" { let inModule; }
+declare global { var inGlobal; }
+for (let x of xs) void x;
+for (let k in o) void k;
+for (var y of xs) void y;
+async function f() { for await (let z of make()) void z; }
+for (let i; ; ) break;
+const c = 1;
+export { a, v, typed, init, anyTyped, undef, p, q, d1, e1, ambient, c, f };

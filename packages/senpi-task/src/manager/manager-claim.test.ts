@@ -10,6 +10,7 @@ import type { PersistedTaskEvent, TaskRecordStore } from "../store"
 import { collisionStore } from "./__fixtures__/collision-store"
 import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, flush, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { SUBPROCESS_DEADLINE_MS, describeChild, runSignalledChild } from "./__fixtures__/signalled-child"
 
 function firstAllocationFailsStore(inner: TaskRecordStore): TaskRecordStore {
   let armed = true
@@ -73,14 +74,9 @@ function managerWithStore(
 const seedFloorChildFixturePath = resolve(import.meta.dir, "__fixtures__", "seed-floor-child.ts")
 
 async function expectSeedFloorChildModeToSucceed(mode: string): Promise<void> {
-  const child = Bun.spawn([process.execPath, seedFloorChildFixturePath, mode], { stdout: "pipe", stderr: "pipe" })
-  const [exitCode, stdout, stderr] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ])
+  const result = await runSignalledChild([seedFloorChildFixturePath, mode])
 
-  expect(exitCode, `stdout:\n${stdout}\nstderr:\n${stderr}`).toBe(0)
+  expect({ phase: result.phase, exitCode: result.exitCode }, describeChild(result)).toEqual({ phase: "exited", exitCode: 0 })
 }
 
 afterEach(cleanupProjects)
@@ -213,6 +209,7 @@ describe("TaskManager claim characterization", () => {
     async (mode) => {
       await expectSeedFloorChildModeToSucceed(mode)
     },
+    SUBPROCESS_DEADLINE_MS + 5_000,
   )
 
   test("#given a foreign winner for the first candidate #when started #then it claims the next id", async () => {

@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-const serialization = 'return JSON.stringify(value.type === "message_update" ? toJsonEvent(value) : value);'
-const guardedSerialization = `try {
+export const serialization = 'return JSON.stringify(value.type === "message_update" ? toJsonEvent(value) : value);'
+export const guardedSerialization = `try {
                     ${serialization}
                 } catch (error) {
                     if (!(error instanceof Error)) throw error;

@@ -1,77 +1,127 @@
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+import { FABLE_55_LAUNCH, launchRungs } from "@oh-my-opencode/model-core"
 
 /**
- * A model profile is a named, ordered model chain a human picks by INTENT ("Capable", "Deep work")
- * instead of by model id. It is not the `profiles` key in omo.json: that one is a VSCode-style
- * config-layer overlay activated by `OMO_PROFILE`.
+ * A model profile is a named, ordered model chain a human picks by lane
+ * ("Daily · Normal", "Obsessive · Heavy") instead of by model id. It is not the
+ * `profiles` key in omo.json: that one is a VSCode-style config-layer overlay
+ * activated by `OMO_PROFILE`.
  *
- * Every rung is a `DelegateFallbackEntry` - `{ providers, model, variant? }`, the exact shape
- * `packages/senpi-task/src/category/fallback-chains.ts` uses - and NOT a single `provider/model`
- * string, so a Copilot-only, Bedrock-only or gateway-only user still resolves the model instead of
- * reading "unavailable" while the model sits right there in the registry. Provider spellings are
- * copied from those chains, including the senpi-only `kimi-coding` id.
+ * Every rung is a `DelegateFallbackEntry` - `{ providers, model, variant? }`, the
+ * exact shape `packages/senpi-task/src/category/fallback-chains.ts` uses - and NOT
+ * a single `provider/model` string, so a Copilot-only, Bedrock-only or gateway-only
+ * user still resolves the model instead of reading "unavailable" while the model
+ * sits right there in the registry. Provider spellings are copied from those
+ * chains: senpi-only `kimi-coding` plus the leftover OpenCode `kimi-for-coding`
+ * alias those chains keep, and the engine GLM ids `zai` / `zai-coding-cn` (not
+ * OpenCode's `zai-coding-plan`; #8824).
  *
- * The table is additive data: an `omo.json` `model_profiles.<name>` entry replaces the builtin of
- * the same name WHOLESALE (see `resolve.ts`), so a later change here can never silently override a
- * chain a user wrote.
+ * The table is additive data: an `omo.json` `model_profiles.<name>` entry replaces
+ * the builtin of the same name WHOLESALE (see `resolve.ts`), so a later change
+ * here can never silently override a chain a user wrote.
+ *
+ * There is no alias, migration, or compatibility shim for retired ids (`capable`,
+ * `deep-work`, `simple-work`). A stale `model_profile` value is `unknown`.
+ *
+ * Builtin GPT rungs rank providers exactly like the `deep-low` / `deep-high`
+ * category chains (#8737): the ChatGPT subscription first, then the `openai`
+ * API/proxy lane, then Copilot and OpenCode where they serve the model. A user
+ * overlay that names `openai/` is scoped to that provider.
+ *
+ * Unset sessions start on Daily · Normal, or on the first lane in `DEFAULT_MODEL_PROFILE_ORDER`
+ * that resolves (#10029). Daily is OmO's recommendation, so every builtin is a lane and there
+ * is no separate "Recommended" profile: the retired `recommended` id (`RETIRED_MODEL_PROFILE_IDS`)
+ * starts the same default. Every builtin rung is served ONLY by its listed providers: a gateway
+ * aggregator's vendor-prefixed copy (`opengateway/anthropic/claude-opus-5-5`) never becomes the
+ * session model (#9146).
  */
+export type ModelProfileFamily = "daily" | "geeky"
+export type ModelProfileTier = "normal" | "heavy"
+
 export type BuiltinModelProfile = {
   readonly displayName: string
   readonly description: string
+  /** One-line warning a picker renders in bold; set only where a lane must warn the user off. */
+  readonly caution?: string
+  /** Picker axes: every builtin is a lane. */
+  readonly family: ModelProfileFamily
+  readonly tier: ModelProfileTier
   readonly models: readonly DelegateFallbackEntry[]
 }
 
-// Key order is the order a picker renders. `deep` is deliberately NOT an id: a builtin delegation
-// category already carries that name, and the two axes never compete (a profile picks the MAIN
-// session model; categories keep their own chains).
+/**
+ * Fresh-session default when `model_profile` is unset, in the order tried: the first lane that
+ * resolves on the connected providers wins; when none does, the first is reported unavailable.
+ * Not written back to config.
+ */
+export const DEFAULT_MODEL_PROFILE_ORDER = ["daily-normal", "daily-heavy", "geeky-normal", "geeky-heavy"] as const
+export const DEFAULT_MODEL_PROFILE_ID = DEFAULT_MODEL_PROFILE_ORDER[0]
+
+/**
+ * Builtin ids that no longer exist but that a saved config may still name (#10029). A config
+ * naming one starts the unset default with a one-time log line, never the unknown-profile
+ * notice, unless the user's own `model_profiles` defines that name.
+ */
+export const RETIRED_MODEL_PROFILE_IDS: ReadonlySet<string> = new Set(["recommended"])
+
+const CLAUDE_PROVIDERS = ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"] as const
+const KIMI_PROVIDERS = ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"] as const
+// Engine Z.AI ids. `omo setup` imports OpenCode's `zai-coding-plan` key as `zai` (#8799).
+const GLM_PROVIDERS = ["zai", "zai-coding-cn", "opencode-go"] as const
+const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as const
+// GPT-6.1 Sol and its Fast tier are served only on the two OpenAI lanes (not Copilot or OpenCode Zen),
+// so their rungs list just those; Obsessive · Normal heads with GPT-6 Astra on every GPT provider and
+// falls back through those two-lane rungs to GPT-5.6 Sol, which keeps the profile on every GPT provider.
+const GPT_6_1_PROVIDERS = ["chatgpt-subscription", "openai"] as const
+
+// Key order is the order a picker renders. `deep` is deliberately NOT an id: builtin
+// delegation categories already carry that name, and the two axes never compete (a
+// profile picks the MAIN session model; categories keep their own chains).
+//
+// Every Claude rung is headed by `anthropic-subscription`, senpi's Claude subscription
+// lane, exactly like the category chains (#8051): rung provider order IS the ranking.
 export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile>> = Object.freeze({
-  capable: {
-    displayName: "Capable",
-    description: "The strongest generalist available - the default pick when you do not want to think about models.",
+  "daily-normal": {
+    family: "daily",
+    tier: "normal",
+    displayName: "Daily · Normal",
+    description: "Gets any task done without fuss.",
     models: [
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-1",
-        variant: "max",
-      },
-      {
-        providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-opus-5",
-        variant: "max",
-      },
-      {
-        providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
-        model: "kimi-k3",
-        variant: "max",
-      },
-      { providers: ["zai-coding-plan", "opencode-go"], model: "glm-5.3", variant: "max" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeOpus, variant: "high" },
+      { providers: [...KIMI_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.kimi, variant: "max" },
+      { providers: [...GLM_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
     ],
   },
-  "simple-work": {
-    displayName: "Simple work",
-    description: "Fast and cheap for small, well-specified edits - provider lists copied from the explore chain.",
+  "daily-heavy": {
+    family: "daily",
+    tier: "heavy",
+    displayName: "Daily · Heavy",
+    description: "Gets any task done, after thinking it over from more sides.",
+    models: launchRungs([
+      { providers: [...CLAUDE_PROVIDERS], model: FABLE_55_LAUNCH.id, variant: "high" },
+      { providers: [...CLAUDE_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.claudeFable, variant: "high" },
+    ]),
+  },
+  "geeky-normal": {
+    family: "geeky",
+    tier: "normal",
+    displayName: "Obsessive · Normal",
+    description: "Obsessive focus on one hard task.",
+    caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
     models: [
-      { providers: ["openai-codex"], model: "gpt-5.6-luna-fast", variant: "low" },
-      { providers: ["deepseek"], model: "deepseek-v4-flash" },
-      { providers: ["anthropic", "github-copilot"], model: "claude-haiku-4-5" },
+      { providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "high" },
+      { providers: [...GPT_6_1_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "high" },
+      { providers: [...GPT_PROVIDERS], model: "gpt-5.6-sol", variant: "high" },
     ],
   },
-  // Verbatim copy of CATEGORY_FALLBACK_CHAINS.deep; `builtin-profiles.test.ts` deep-equals the two
-  // so the profile can never drift away from the category the product already ships.
-  "deep-work": {
-    displayName: "Deep work",
-    description: "Maximum reasoning for hard problems - the same chain the deep delegation category runs.",
-    models: [
-      {
-        providers: ["openai-codex", "github-copilot", "opencode"],
-        model: "gpt-6-astra",
-        variant: "high",
-      },
-      {
-        providers: ["openai-codex", "github-copilot", "opencode"],
-        model: "gpt-5.6-sol",
-        variant: "medium",
-      },
-    ],
+  "geeky-heavy": {
+    family: "geeky",
+    tier: "heavy",
+    displayName: "Obsessive · Heavy",
+    description: "Obsessive focus on one hard task, checked from every side.",
+    caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
+    models: [{ providers: [...GPT_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" }],
   },
 })

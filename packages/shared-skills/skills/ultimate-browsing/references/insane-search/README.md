@@ -2,7 +2,7 @@
 # Insane Search
 
 > Part of the **ultimate-browsing** skill (Tier 1). Routing and tier-escalation live in [../../SKILL.md](../../SKILL.md).
-> The engine package it drives is at [../../engine/](../../engine/), invoked from the skill directory as `python3 -m engine "<URL>"`.
+> The engine package it drives is at [../../engine/](../../engine/), invoked from the skill directory as `python3 -B -m engine "<URL>"` (`-B` keeps bytecode caches out of a signed app bundle).
 > Deep-dives in this folder: TLS impersonation, Playwright routing, fallback, metadata, Jina, cache/archive, RSS, JSON/public APIs, Twitter, Naver, media.
 
 
@@ -16,7 +16,7 @@
 1. WebFetch, 즉흥 curl, 수동 헤더 조합 **시도 금지**
 2. 즉시 다음을 실행:
    ```bash
-   python3 -m engine "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace] \
+   python3 -B -m engine "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace] \
                               [--no-retry] [--no-extract]
    ```
 3. 종료코드 0(ok) 또는 1(fail) 받은 뒤 판단. trace를 먼저 읽고 재시도 결정.
@@ -49,7 +49,7 @@
 **MCP 정찰 루트**:
 1. `mcp__playwright__browser_navigate` → 대상 페이지 로드 (브라우저 렌더링)
 2. `mcp__playwright__browser_network_requests` → XHR/fetch 호출 목록 수집, `/api/`·`/graphql`·`\.json` 필터로 내부 엔드포인트 식별
-3. 식별된 JSON API URL을 `python3 -m engine <API_URL>`로 재호출 (백그라운드 engine과는 별개 호출). 대부분 API 레이어는 페이지 HTML보다 WAF 보호가 얕아 curl_cffi로 바로 수집됨
+3. 식별된 JSON API URL을 `python3 -B -m engine <API_URL>`로 재호출 (백그라운드 engine과는 별개 호출). 대부분 API 레이어는 페이지 HTML보다 WAF 보호가 얕아 curl_cffi로 바로 수집됨
 4. 응답 스키마 파악 후 pagination / query parameter 조합해 반복 수집
 
 **왜**: SPA + WAF 사이트(쇼핑몰·커머스 다수)는 마케팅 페이지(HTML)만 WAF로 중투자하고 내부 API는 gateway 레벨 기본 방어만 쓰는 경우가 많다. HTML 격자 전수 낭비(50회 × 0.5s + Playwright fallback 40s ≈ 65초)보다 **MCP 정찰 1회(5~10초) + API 재호출(0.5초)**가 훨씬 경제적이고 성공률 높음.
@@ -62,7 +62,7 @@
 
 이 스킬의 핵심 불변식:
 
-- **단일 진입점**: 일반 웹 페이지는 항상 `python3 -m engine <URL>` 또는 `from engine import fetch; fetch(...)`.
+- **단일 진입점**: 일반 웹 페이지는 항상 `python3 -B -m engine <URL>` 또는 `from engine import fetch; fetch(...)`.
 - **편향 금지**: `engine/**`, `waf_profiles.yaml`에 특정 사이트 하드코딩 금지.
 - **힌트는 런타임에만**: 사이트 고유 정보는 CLI/`user_hint` 경유.
 
@@ -223,17 +223,11 @@ result = fetch(
 python3 -c "import curl_cffi, bs4, yaml" 2>/dev/null || pip install curl_cffi beautifulsoup4 pyyaml -q
 ```
 
-브라우저를 직접 제어할 때는 js eval에서 Bun >= 1.4의 `new Bun.WebView()`를
-사용한다(macOS 기본; Linux/Windows는 설치된 Chrome/Chromium/Edge 필요).
-그 외 또는 Chrome 동작·stealth·trace·인증이 필요하면 `playwright-core` 스크립트를
-작성해 js eval에서 로컬 Chrome(`channel: "chrome"`)으로 실행한다.
-사용자가 엔진 디렉터리에서 한 번 설치할 스크립트 의존성:
-```bash
-cd "$SKILL_DIR/engine"
-test -f package.json || cp templates/package.json package.json
-bun add playwright-core@1.62.1 playwright-extra@4.3.6 puppeteer-extra-plugin-stealth@2.11.2
-```
-Chrome은 이미 설치되어 있어야 한다. 인증 프로필은 먼저 복제하고 복제본만 사용한다.
+브라우저를 직접 제어할 때는 js eval에서 omowright를 쓴다(`browser` 스킬에 스테이징됨):
+직접 띄우는 브라우저는 `connectPipe` / 스텔스는 `connectCloakProfile`(CloakBrowser),
+사용자가 로그인해 둔 브라우저는 `connectBrowserSkill`. 이 엔진의 Playwright 템플릿은
+Tier 1 추출 폴백 전용이며 에이전트가 직접 브라우저를 다루는 경로가 아니다.
+인증이 필요한 페이지는 사용자 프로필을 복제하지 말고 attached 엔진으로 간다.
 
 ## 빠른 참조 — Phase 0 명령어
 

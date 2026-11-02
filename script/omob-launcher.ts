@@ -3,13 +3,19 @@ import { existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { versionLines, type OmoBuildInfo } from "../packages/omo-native/build-info"
 import type { OmobOptions } from "./build-omob"
+import { readProvenanceMarker } from "./omob-provenance"
 
 export function isCurrentOmobBuild(binary: string, info: OmoBuildInfo, target: string): boolean {
 	const host = `${process.platform === "win32" ? "windows" : process.platform}-${process.arch}`
 	if (target !== host || !existsSync(binary)) return false
-	// Read provenance from the executable, not a sidecar that can outlive a failed install.
+	const expected = versionLines(info).join("\n")
+	// Provenance still comes from the executable itself: the marker is only trusted while it
+	// still describes the exact file on disk, so a sidecar cannot outlive a failed install.
+	// Spawning the binary costs ~120ms, which every managed launch paid before this cache.
+	const recorded = readProvenanceMarker(binary)
+	if (recorded !== undefined) return recorded === expected
 	const result = spawnSync(binary, ["--version"], { encoding: "utf8", timeout: 30_000 })
-	return result.status === 0 && result.stdout.trim() === versionLines(info).join("\n")
+	return result.status === 0 && result.stdout.trim() === expected
 }
 
 export function installOmobLauncher(options: OmobOptions): string {

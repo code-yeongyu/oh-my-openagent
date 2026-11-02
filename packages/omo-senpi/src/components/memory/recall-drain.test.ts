@@ -99,6 +99,29 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     expect(result?.message?.content).toContain(`<recalled-memory source="[[${ROLLOUTS_PATH}]]">`)
   }, 30_000)
 
+  test("#given a pending nudge #when a preview dispatch runs before a real turn #then preview consumes nothing and the real turn still injects it", async () => {
+    // given
+    const { repo, context } = await fixture(tempDirs)
+    const pending = new PendingNudges(context.identityPaths.recallPending)
+    await pending.write(SESSION_ID, [NUDGE])
+    const pi = new MemoryFakeExtensionAPI()
+    wiringFor({ repo, identity: context }).register(pi)
+
+    // when
+    const preview = await pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: KUBERNETES_PROMPT, systemPrompt: "SYSTEM", preview: true },
+      eventContext([userEntry("m1", KUBERNETES_PROMPT)]),
+    )
+    expect(preview).toEqual([undefined])
+    expect(pi.entries).toEqual([])
+    const real = await dispatch(pi, eventContext([userEntry("m1", KUBERNETES_PROMPT)]), KUBERNETES_PROMPT)
+
+    // then
+    expect(real?.message?.content).toBe(renderNudgeBlock(NUDGE))
+    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
+  }, 30_000)
+
   test("#given an injected nudge #when the turn starts #then the path is ledgered and the pending file is consumed", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)

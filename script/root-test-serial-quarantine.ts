@@ -67,6 +67,18 @@ export const ROOT_TEST_SERIAL_QUARANTINE: readonly SerialQuarantineEntry[] = [
     path: "script/release-version.test.ts",
     reason: "five sequential Git Bash spawns of the publish workflow's metadata step; one spawn exhausted its 10s budget under Windows --parallel while the test's own work is string parsing (run 34962017319)",
   },
+  {
+    path: "packages/senpi-task/src/store/record-lock.test.ts",
+    reason: "task record lock waits are timed (a 1s per-holder budget, a 100ms hand-on chain) against real live and dead child processes; run alone so the kernel32/libproc start-identity proof runs on every OS without --parallel CPU starvation",
+  },
+  {
+    path: "packages/senpi-task/src/store/record-lock-reap-window.test.ts",
+    reason: "steps the record lock reaper against live child processes and a 1s per-holder wait; same timing sensitivity as record-lock.test.ts",
+  },
+  {
+    path: "packages/senpi-task/src/runners/rpc-host/durable-json.test.ts",
+    reason: "spies the node:fs module namespace (openSync/renameSync/fsyncSync) process-wide while it runs; kept out of the shared pool so no concurrent file observes the spies, and so the win32 no-directory-fsync branch runs on windows-latest",
+  },
 ] as const
 
 /** Quarantined paths in workflow/bunfig order. */

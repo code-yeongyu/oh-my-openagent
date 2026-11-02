@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec } from "../git"
@@ -9,6 +9,7 @@ import {
   selectReflectionOrphans,
   sweepReflectionOrphans,
 } from "./orphan-sweep"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
 const INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 30_000 : 10_000
@@ -19,7 +20,7 @@ setDefaultTimeout(INTEGRATION_TEST_TIMEOUT)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) =>
-    rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+    removeTree(root, { maxRetries: 10, retryDelay: 200 })
   ))
 })
 

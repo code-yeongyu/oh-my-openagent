@@ -42,12 +42,12 @@ export const SKILLS: readonly SkillEntry[] = [
   { name: "git-master", blurb: "atomic commits, rebase, bisect" },
   { name: "ultimate-browsing", blurb: "JS pages, logins, screenshots" },
   { name: "imagegen", blurb: "photos, mockups, transparent assets" },
-  { name: "visual-qa", blurb: "375 / 768 / 1280 screenshot gate" },
+  { name: "visual-qa", blurb: "HIG checklist, light and dark, phone and desktop" },
   { name: "ast-grep", blurb: "structural search and codemods" },
   { name: "review-work", blurb: "one reviewer, real QA evidence" },
   { name: "prompt-engineering", blurb: "smallest correct edit to a prompt" },
   { name: "lsp-setup", blurb: "language servers wired for the agent" },
 ]
 
-export const CRAFTED_ITEM_COUNT = 7
+export const CRAFTED_ITEM_COUNT = 8
 export const KIBITZER_STEP_COUNT = 4

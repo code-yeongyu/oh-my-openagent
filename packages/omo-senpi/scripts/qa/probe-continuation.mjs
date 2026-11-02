@@ -6,6 +6,7 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createSandbox, digestDirectory, seedSandbox } from "./drive.mjs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const realSenpiAgentDir = join(homedir(), ".senpi", "agent")
@@ -96,8 +97,14 @@ function main() {
       "new-session",
       "-e",
       `PATH=${tmuxPath}`,
+      // A running tmux server hands the session ITS global env, so every agent-dir lane is pinned
+      // here: an inherited OMO_CODING_AGENT_DIR would outrank SENPI_CODING_AGENT_DIR.
+      "-e",
+      `OMO_CODING_AGENT_DIR=${sandbox.agentDir}`,
       "-e",
       `SENPI_CODING_AGENT_DIR=${sandbox.agentDir}`,
+      "-e",
+      `PI_CODING_AGENT_DIR=${sandbox.agentDir}`,
       "-e",
       `SENPI_CODING_AGENT_SESSION_DIR=${sessionDir}`,
       "-d",
@@ -149,7 +156,7 @@ function print({ result, reason, continuationQaPath, beforeDigest }) {
 
 function senpiEnv(sandbox, binDir, sessionDir) {
   return {
-    ...process.env,
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
     PATH: `${binDir}:${process.env.PATH ?? ""}`,
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,

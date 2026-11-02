@@ -7,7 +7,6 @@ Project reality check:
 - Name: oh-my-openagent (renamed from oh-my-opencode; both npm packages still publish in tandem during the transition)
 - Domain: https://omo.dev (legacy https://ohmyopenagent.com, https://ohmyopencode.org, https://ulw.dev, https://ultrawork.ai, https://ultrawork.dev, https://ultrawork.engineer all 301 to omo.dev)
 - Building in Public: https://discord.gg/PUwSMR9XNk
-- Maintained by Jobdori, an AI assistant running on a heavily customized OpenClaw fork
 - Sisyphus Labs: https://sisyphuslabs.ai
 
 ---
@@ -64,7 +63,7 @@ That's a worthwhile investment when it means 10x, 20x, or 100x productivity gain
 **However:**
 
 Unnecessary token waste is not pursued. The system optimizes for:
-- Using cheaper, faster models for simple tasks (the `quick` category: Kimi highspeed, or GPT-5.6 Luna Fast on OpenAI-only)
+- Using cheaper, faster models for simple tasks (the `quick` category: GPT-6 Luna Fast, then DeepSeek V4.1 Flash and the other speed rungs)
 - Avoiding redundant exploration
 - Caching learnings across sessions
 - Stopping research when sufficient context is gathered

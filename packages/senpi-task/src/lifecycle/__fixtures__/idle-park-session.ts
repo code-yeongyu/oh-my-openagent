@@ -6,6 +6,7 @@ import { InProcessRunner } from "../../runners/in-process"
 import { createTaskLifecycle } from "../create"
 import { runTaskOutput } from "../../tools/output/output"
 import { FakeRegistry, seedRecord, settings, tempStore } from "./lifecycle-fakes"
+import { NO_HOST_ENDPOINT } from "../host-session"
 
 /** Restores a deterministic real AgentSession; never sends a prompt or calls a provider. */
 export async function parkRealSession() {
@@ -44,7 +45,7 @@ export async function parkRealSession() {
   const settled = once(events, "suspended", { signal: AbortSignal.timeout(5000) })
   let tick: () => void = () => { throw new Error("scheduler not registered") }
   let now = 1000
-  const lifecycle = createTaskLifecycle({ store: { ...store, appendEvent: (taskId, event) => {
+  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store: { ...store, appendEvent: (taskId, event) => {
     const path = store.appendEvent(taskId, event)
     if (event.type === "suspended") events.emit("suspended")
     return path

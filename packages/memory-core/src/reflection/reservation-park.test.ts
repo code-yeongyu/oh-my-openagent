@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -14,9 +14,10 @@ import {
   type ReflectionFailureSignal,
 } from "./park"
 import { ReflectionReservationStore } from "./reservation"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 }))))
 
 const T0 = Date.parse("2026-09-15T06:00:00.000Z")
 const deterministic: ReflectionFailureSignal = { fingerprint: "spawn_failed:Model not found", retryable: false, reason: "spawn_failed", detail: "Model not found" }

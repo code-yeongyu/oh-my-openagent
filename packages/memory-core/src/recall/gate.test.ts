@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { PendingNudges, validateNudges } from "./gate"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 
@@ -15,7 +16,7 @@ async function createPendingDir(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
   )
 })
 
@@ -99,6 +100,17 @@ describe("validateNudges", () => {
 })
 
 describe("PendingNudges", () => {
+  it("#given a project nudge with a readable source #when restored from disk #then its source and qualified ledger key survive", async () => {
+    const dir = await createPendingDir()
+    const source = join(dir, "project", "reference", "deploy.md")
+    const nudge = { path: "@project/child-1234abcd/reference/deploy.md", hint: "Nightly deployment.", source }
+    await new PendingNudges(dir).write("project-session", [nudge])
+
+    const restored = await new PendingNudges(dir).take("project-session")
+
+    expect(restored).toEqual([nudge])
+  })
+
   it("#given written nudges #when taken #then they return once and the file is gone", async () => {
     // given
     const dir = await createPendingDir()

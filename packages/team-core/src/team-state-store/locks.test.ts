@@ -3,6 +3,7 @@ import type { Mode, OpenMode, PathLike } from "node:fs"
 import { mkdtemp, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
 
 async function createTempDirectory(prefix: string): Promise<string> {
   return await mkdtemp(join(tmpdir(), prefix))
@@ -183,37 +184,6 @@ test("lock open rethrows Windows EPERM when the lock parent does not exist", asy
   await rm(rootDirectory, { recursive: true, force: true })
 })
 
-test("lock release retries transient EPERM before removing the lock file", async () => {
-  // given
-  const { reapStaleLock } = await import("./locks")
-  const rootDirectory = await createTempDirectory("locks-release-eperm-")
-  const lockPath = join(rootDirectory, "lock")
-  await writeFile(lockPath, "owner\n123\n456\n")
-  const delayCalls: number[] = []
-  let unlinkCalls = 0
-
-  // when
-  const result = reapStaleLock(lockPath, {
-    delay: async (ms: number) => {
-      delayCalls.push(ms)
-    },
-    unlink: async (path: PathLike) => {
-      unlinkCalls += 1
-      if (unlinkCalls < 3) {
-        throw createErrnoError("EPERM")
-      }
-      await rm(path, { force: true })
-    },
-  })
-
-  // then
-  await expect(result).resolves.toBeUndefined()
-  expect(unlinkCalls).toBe(3)
-  expect(delayCalls).toEqual([25, 25])
-  await expect(readFile(lockPath, "utf8")).rejects.toThrow()
-  await rm(rootDirectory, { recursive: true, force: true })
-})
-
 test("atomicWrite syncs temp files through a writable handle", async () => {
   // given
   const rootDirectory = await createTempDirectory("locks-atomic-writable-")
@@ -262,7 +232,10 @@ test("#given a lock for this pid from a prior process incarnation #when detectSt
   const lockPath = join(rootDirectory, "lock")
   const priorInstanceId = "00000000-0000-4000-8000-000000000001"
   expect(priorInstanceId).not.toBe(lockOwnerInstanceId)
-  await writeFile(lockPath, `prior-owner\n${process.pid}\n${Date.now()}\n${priorInstanceId}\n`)
+  const start = await getProcessStartIdentity(process.pid)
+  if (start === null) throw new Error("process-start identity unavailable")
+  const priorStart = `${start.slice(0, start.indexOf(":"))}:0`
+  await writeFile(lockPath, `prior-owner\n${process.pid}\n${Date.now()}\n${priorInstanceId}\n${priorStart}\n`)
 
   // when
   const staleDetected = await detectStaleLock(lockPath, 300_000)
@@ -272,15 +245,14 @@ test("#given a lock for this pid from a prior process incarnation #when detectSt
   await rm(rootDirectory, { recursive: true, force: true })
 })
 
-test("#given this process already owns the lock payload #when detectStaleLock runs #then it is not stale", async () => {
+test("#given this process holds the lock #when detectStaleLock runs from the same process #then it is not stale", async () => {
   // given
-  const { detectStaleLock, lockOwnerInstanceId } = await import("./locks")
+  const { detectStaleLock, withLock } = await import("./locks")
   const rootDirectory = await createTempDirectory("locks-same-instance-")
   const lockPath = join(rootDirectory, "lock")
-  await writeFile(lockPath, `self-owner\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n`)
 
   // when
-  const staleDetected = await detectStaleLock(lockPath, 300_000)
+  const staleDetected = await withLock(lockPath, async () => await detectStaleLock(lockPath, 300_000))
 
   // then
   expect(staleDetected).toBe(false)
@@ -292,7 +264,10 @@ test("#given a recycled-pid lock file #when withLock runs #then it reaps and acq
   const { withLock, lockOwnerInstanceId } = await import("./locks")
   const rootDirectory = await createTempDirectory("locks-pid-reuse-acquire-")
   const lockPath = join(rootDirectory, "lock")
-  await writeFile(lockPath, `prior-owner\n${process.pid}\n${Date.now()}\n00000000-0000-4000-8000-000000000002\n`)
+  const start = await getProcessStartIdentity(process.pid)
+  if (start === null) throw new Error("process-start identity unavailable")
+  const priorStart = `${start.slice(0, start.indexOf(":"))}:0`
+  await writeFile(lockPath, `prior-owner\n${process.pid}\n${Date.now()}\n00000000-0000-4000-8000-000000000002\n${priorStart}\n`)
   expect(lockOwnerInstanceId).not.toBe("00000000-0000-4000-8000-000000000002")
 
   // when

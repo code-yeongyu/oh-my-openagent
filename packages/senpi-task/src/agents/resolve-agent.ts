@@ -4,6 +4,7 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
 import { firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
+import { withoutExcludedModels } from "../model-exclusion"
 import type { ResolvedModelRecord } from "../state"
 import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
 import {
@@ -13,11 +14,13 @@ import {
 } from "./agent-model-registry"
 import { agentToolPolicy } from "./agent-tool-policy"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
+import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
 
 export type ResolveAgentOptions = {
   readonly modelOverride?: string
   readonly omoConfig?: OmoConfig
+  readonly distributeModels?: import("@oh-my-opencode/omo-config-core").ModelDistributor
 }
 
 type AgentPersona = {
@@ -66,10 +69,11 @@ type AgentResolutionContext = {
 export function resolveAgent<TModel extends SenpiModelPort>(
   requestedName: string,
   agents: Readonly<Record<string, AgentDefinition>>,
-  registry: SenpiModelRegistryPort<TModel> | undefined,
+  liveRegistry: SenpiModelRegistryPort<TModel> | undefined,
   options: ResolveAgentOptions = {},
 ): AgentResolutionResult {
-  const name = requestedName.trim()
+  const registry = liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, options.omoConfig?.exclude_models)
+  const name = canonicalAgentName(requestedName.trim())
   const availableAgents = Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
     .map(([agentName]) => agentName)
@@ -114,7 +118,14 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     ...(definition.variant === undefined ? {} : { variant: definition.variant }),
     ...(definition.reasoningEffort === undefined ? {} : { reasoningEffort: definition.reasoningEffort }),
   }
-  const directModels = agentModelCandidates(definition.model, definition.models, configuredTuning)
+  const configuredModels = agentModelCandidates(
+    definition.models_distribution === "round_robin" && definition.models?.length ? undefined : definition.model,
+    definition.models,
+    configuredTuning,
+  )
+  const directModels = definition.models?.length && options.distributeModels
+    ? options.distributeModels(`agent:${name}`, configuredModels, definition.models_distribution)
+    : configuredModels
   for (const candidate of directModels) {
     attemptedModel = candidate.model
     const found = findExactAgentModel(candidate.model, registry)
@@ -140,6 +151,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       omoConfig: options.omoConfig ?? {},
       registry,
       configuredTuning,
+      distributeModels: options.distributeModels,
     })
     if (selection !== undefined) {
       return resolvedAgent(

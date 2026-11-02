@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { AtlasLifecycleStore } from "./atlas-lifecycle-store"
+import { scheduleRetryWithTimer } from "./idle-continuation"
 
 describe("AtlasLifecycleStore", () => {
   test("keeps pending work until its matching after event or terminal session boundary", () => {
@@ -43,7 +44,7 @@ describe("AtlasLifecycleStore", () => {
     // given
     const store = new AtlasLifecycleStore()
     const state = store.getOrCreateState("session-1")
-    state.pendingRetryTimer = setTimeout(() => store.getOrCreateState("session-1"), 60_000)
+    state.pendingRetryTimer = scheduleRetryWithTimer(async () => { store.getOrCreateState("session-1") }, 60_000)
     store.trackFileCall("call-1", "session-1", "plan.md")
 
     // when

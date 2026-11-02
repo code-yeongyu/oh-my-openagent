@@ -8,7 +8,7 @@ A `DESIGN.md` whose every token, interaction state, and motion value was read fr
 
 ## Phase 1 — Extract the runtime truth (never guess a value)
 
-Drive a real browser from js eval: `new Bun.WebView()` on Bun >= 1.4 (macOS default; Linux/Windows need installed Chrome/Chromium/Edge), otherwise write and run a `playwright-core` script against local Chrome (`channel: "chrome"`). Use that script lane for Chrome semantics, stealth, trace, or auth, with persistent contexts on CLONED profiles only. Codex: `browser:control-in-app-browser`. Do NOT parse CSS files — minification, CORS, CSS-in-JS, and Tailwind utilities make source unreliable. `getComputedStyle` returns what the browser ACTUALLY rendered, so it is the only source of truth.
+Drive a real browser with omowright from js eval (staged in the `browser` skill): `connectPipe` on a task-owned profile for a public page, `connectCloakProfile` when the source is bot-scored, `connectBrowserSkill()` when it needs the user's login — then `page.evaluate` / `session.evaluate` for `getComputedStyle`. Do NOT parse CSS files — minification, CORS, CSS-in-JS, and Tailwind utilities make source unreliable. `getComputedStyle` returns what the browser ACTUALLY rendered, so it is the only source of truth.
 
 Sweep the page and read, for every meaningful element and every repeated pattern:
 
@@ -16,7 +16,7 @@ Sweep the page and read, for every meaningful element and every repeated pattern
 - **Interaction states** — capture `default/hover/focus/active` (plus disabled/loading/empty/error where they exist) by DRIVING the state, then re-reading the computed style. A system with only the resting state is incomplete.
 - **Motion** — `transition` (property, duration, timing function, delay), `@keyframes` (walk `document.styleSheets` for `CSSKeyframesRule`), and `transform`. Motion is part of the contract, not decoration.
 - **Assets** — `<img>` and background-image URLs, inline SVG, `@font-face` files, video sources. Download the REAL assets; never substitute stock or placeholders.
-- **Responsive** — re-run the sweep at 375 / 768 / 1280 and record what actually changes per breakpoint.
+- **Responsive** — re-run the sweep at the `/visual-qa` capture widths (390 with mobile emulation, 1440, 1920) and record what actually changes per breakpoint, so the later compare is like for like.
 
 A compact sweep payload to inject through the browser's evaluate action (extend the recorded fields as needed):
 

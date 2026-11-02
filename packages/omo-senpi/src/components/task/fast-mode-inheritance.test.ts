@@ -9,7 +9,7 @@ type CatalogModel = SenpiModelPort & {
   readonly serviceTier?: "auto" | "flex" | "priority"
 }
 
-const CODEX = "openai-codex"
+const CODEX = "chatgpt-subscription"
 const LUNA = "gpt-5.6-luna"
 const LUNA_FAST = `${LUNA}-fast`
 
@@ -69,6 +69,23 @@ describe("delegated task inherits the parent's fast mode", () => {
     expect(plan.category).toBe("quick")
     expect(plan.resolved_model?.model_id).toBe(LUNA_FAST)
     expect(plan.resolved_model?.variant).toBe("low")
+  })
+
+  test("#given a -fast alias whose pairing only the registry accessors report (models.json) #when a fast parent plans #then the child runs the alias (#10536)", () => {
+    // given: senpi's ModelRegistry resolves serviceTier/upstreamModelId from provider config, not the entry
+    const models: readonly CatalogModel[] = [{ provider: CODEX, id: LUNA }, { provider: CODEX, id: LUNA_FAST }]
+    const configured: TaskModelRegistry & { getServiceTier(model: SenpiModelPort): string | undefined; getUpstreamModelId(model: SenpiModelPort): string | undefined } = {
+      ...registry(models),
+      getServiceTier: (model) => (model.id === LUNA_FAST ? "priority" : undefined),
+      getUpstreamModelId: (model) => (model.id === LUNA_FAST ? LUNA : undefined),
+    }
+    const planner = createTaskChildPlanner({}, {}, () => configured, () => "priority")
+
+    // when
+    const plan = expectResolved(planner({ prompt: "x", parent_session_id: "p", depth: 0, model: `${CODEX}/${LUNA}` }))
+
+    // then
+    expect(plan.model).toBe(`${CODEX}/${LUNA_FAST}`)
   })
 
   test("#given a parent that is not fast #when planned #then the child keeps the planned model", () => {

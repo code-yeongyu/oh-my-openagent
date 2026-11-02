@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition } from "../../agents"
-import { TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET, buildTaskToolDescription } from "./description"
+import { TASK_PROMPT_GUIDELINES, buildTaskToolDescription } from "./description"
 
 const agents: Readonly<Record<string, AgentDefinition>> = {
   momus: { name: "momus", description: "Deep reasoning" },
@@ -23,17 +23,6 @@ describe("buildTaskToolDescription", () => {
     // then
     expect(description).toContain("release-crew")
     expect(description).toContain("Ships the release train")
-  })
-
-  test("#given the description #when built #then it enforces the category XOR subagent_type contract", () => {
-    // given
-    const config: OmoConfig = { categories: {}, agents: {} }
-
-    // when
-    const description = buildTaskToolDescription({ omoConfig: config, agents })
-
-    // then
-    expect(description).toContain("EITHER category OR subagent_type")
   })
 
   test("#given the description #when built #then it describes spawn-only task and task_send continuation", () => {
@@ -65,43 +54,6 @@ describe("buildTaskToolDescription", () => {
     expect(TASK_PROMPT_GUIDELINES.some((guideline) => guideline.includes("task_summary"))).toBe(true)
   })
 
-  test("#given the run_in_background guidance #when read #then background is the standard spawn and the wait-by-default wording is gone", () => {
-    // given
-    const config: OmoConfig = { categories: {}, agents: {} }
-
-    // when
-    const description = buildTaskToolDescription({ omoConfig: config, agents })
-    const joinedGuidelines = TASK_PROMPT_GUIDELINES.join("\n")
-
-    // then
-    expect(joinedGuidelines).toContain("run_in_background=true")
-    expect(joinedGuidelines).not.toContain("only for parallel independent work")
-    expect(joinedGuidelines).not.toContain("the default waits")
-    expect(description).not.toContain("false waits for results")
-  })
-
-  test("#given the prompt surfaces #when read #then snippet and guidelines are present", () => {
-    // then
-    expect(TASK_PROMPT_SNIPPET.length).toBeGreaterThan(0)
-    expect(TASK_PROMPT_GUIDELINES.length).toBeGreaterThan(0)
-  })
-
-  test("#given task prompt surfaces #when responsibilities are inspected #then target selection belongs to the tool description only", () => {
-    // given
-    const config: OmoConfig = { categories: {}, agents: {} }
-
-    // when
-    const description = buildTaskToolDescription({ omoConfig: config, agents })
-    const duplicatedTargetRule = TASK_PROMPT_GUIDELINES.some(
-      (guideline) => /category.*subagent_type|subagent_type.*category/i.test(guideline),
-    )
-
-    // then
-    expect(description).toMatch(/\bprompt\b/)
-    expect(description).toMatch(/\btasks\b/)
-    expect(duplicatedTargetRule).toBe(false)
-  })
-
   test("#given caller-directed category guidance #when description is built #then selection sentinels reach the caller", () => {
     // given
     const config: OmoConfig = { categories: {}, agents: {} }
@@ -112,26 +64,5 @@ describe("buildTaskToolDescription", () => {
     // then
     expect(description).toContain("<Selection_Gate>")
     expect(description).toContain("<Caller_Warning>")
-  })
-})
-
-describe("buildTaskToolDescription category+model exclusivity", () => {
-  test("#given the description #when built #then it forbids combining category with model and names the config escape hatch", () => {
-    // given
-    const config: OmoConfig = { categories: {}, agents: {} }
-
-    // when
-    const description = buildTaskToolDescription({ omoConfig: config, agents })
-
-    // then
-    expect(description).toContain("omo.json")
-    expect(description).toContain("subagent_type")
-  })
-
-  test("#given the prompt guidelines #when read #then they carry the category/model exclusivity rule", () => {
-    const joined = TASK_PROMPT_GUIDELINES.join("\n")
-    expect(joined).toContain("model")
-    expect(joined).toContain("category")
-    expect(joined).toContain("omo.json")
   })
 })

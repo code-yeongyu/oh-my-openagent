@@ -52,12 +52,26 @@ export async function runMemoryModelAttempts(
   throw new MemoryModelExhaustedError(misses)
 }
 
+/**
+ * Leads an exhaustion detail when every candidate was invisible to a child that already loaded
+ * extensions: no memory child can see those models until the configuration changes (#9175). It
+ * leads so the 512-char park-detail cap cannot cut it off.
+ */
+export const MODEL_UNREACHABLE_MARKER = "model_unreachable_with_extensions"
+
+export function isModelUnreachableDetail(detail: string | undefined): boolean {
+  return detail?.startsWith(MODEL_UNREACHABLE_MARKER) === true
+}
+
 function formatMemoryModelExhaustion(attempts: readonly ExhaustedMemoryModelAttempt[]): string {
+  const unreachable = attempts.every(({ candidate, miss }) =>
+    miss.kind === "model_not_visible" && candidate.loadExtensions === true)
   const modelIds = attempts.flatMap(({ miss }) => miss.kind === "model_not_visible" ? [miss.id] : [])
   const providers = attempts.flatMap(({ miss }) => miss.kind === "auth_missing" ? [miss.provider] : [])
   const overflows = attempts.flatMap(({ miss }) => miss.kind === "context_overflow" ? [miss.detail] : [])
   const outages = attempts.flatMap(({ miss }) => miss.kind === "provider_unavailable" ? [miss.detail] : [])
   return [
+    unreachable ? MODEL_UNREACHABLE_MARKER : undefined,
     modelIds.length === 0 ? undefined : `model_not_visible:${modelIds.join(",")}`,
     overflows.length === 0 ? undefined : `context_overflow:${overflows.join(" | ")}`,
     providers.length === 0 ? undefined : `auth_missing:${providers.join(",")}`,

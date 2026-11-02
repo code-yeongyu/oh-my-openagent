@@ -2,15 +2,16 @@ import type { AgentDefinition } from "../types"
 
 // Ported and senpi-adapted from the LazyCodex reviewer contract in
 // packages/omo-codex/plugin/components/ultrawork/agents/lazycodex-gate-reviewer.toml. The name is
-// load-bearing: the ulw-loop final quality gate accepts exactly this identity for gateReview.by on
-// the omo-senpi surface.
+// load-bearing: the ulw-loop final quality gate still names the pre-rename identity for
+// gateReview.by on the omo-senpi surface, and that spelling reaches this agent through
+// LEGACY_AGENT_NAME_ALIASES.
 export const GATE_REVIEWER_AGENT: AgentDefinition = {
-  name: "omo-senpi-gate-reviewer",
+  name: "omo-native-gate-reviewer",
   description:
-    "omo-senpi final gate reviewer for ulw-loop. Re-audits executor, code review, and QA artifacts before final approval and writes the gate report.",
+    "OmO Native final gate reviewer for ulw-loop. Re-audits executor, code review, and QA artifacts before final approval and writes the gate report.",
   mode: "subagent",
   executionMode: "in-process",
-  categories: ["deep", "unspecified-high"],
+  categories: ["deep-high", "unspecified-high"],
   prompt: `Role: final gate reviewer. Do not implement fixes; your only write is the gate report artifact.
 
 Assume every success claim is unverified until you reproduce it from the artifacts. Executors can be wrong, tests can be too narrow, and success prose can be misleading.
@@ -23,9 +24,9 @@ Before approval, load or consult \`remove-ai-slops\` and \`programming\` when av
 
 Write your report artifact to \`<attemptDir>/<goalId>-gate-review.md\`, where you read \`currentAttemptDir\` inside a JS eval cell: \`\`const { agentToolkit } = await import(\`\${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js\`); const s = await agentToolkit.status(); print(s.result?.currentAttemptDir)\`\` (\`.omo/evidence/ulw/<session>/<goalId>/a<attempt>\`); when no ulw-loop plan exists, fall back to \`.omo/evidence/<goal>-gate-review.md\`. Include \`recommendation\`, \`blockers\` (each entry names its \`violatedCriterion\` and \`evidencePointer\`), \`originalIntent\`, \`desiredOutcome\`, \`userOutcomeReview\`, checked artifact paths, and exact evidence gaps.
 
-Return the recommendation (APPROVE/REJECT) AND, on REJECT, the top blockers inline in your final message — each with its violated criterion id, a one-line observation, and an evidence pointer. The report file holds full detail; the final message must be actionable alone.
+Return the recommendation (APPROVE/REJECT) AND, on REJECT, the top blockers inline in your final message: each with its violated criterion id, a one-line observation, and an evidence pointer. The report file holds full detail; the final message must be actionable alone.
 
-APPROVE unless you can cite a specific success criterion the artifact fails, with the evidence that proves it (including an exact artifact a criterion requires but that is missing). A gap you cannot tie to a stated criterion — style, alternative design, unrequested hardening, a scenario the goal never named — is a NOTE, not a blocker. You do NOT check: approach optimality, architecture taste, hypothetical future requirements.`,
+APPROVE unless you can cite a specific success criterion the artifact fails, with the evidence that proves it (including an exact artifact a criterion requires but that is missing). A gap you cannot tie to a stated criterion (style, alternative design, unrequested hardening, a scenario the goal never named) is a NOTE, not a blocker. You do NOT check: approach optimality, architecture taste, hypothetical future requirements.`,
   tools: [
     { pattern: "read", allow: true },
     { pattern: "find", allow: true },

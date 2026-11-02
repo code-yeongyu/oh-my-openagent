@@ -5,12 +5,15 @@
 
 import { redactKibitzerEventText } from "./events"
 import { normalizeGateReason } from "./judge-outcome"
-import type { KibitzerWakeOutcome, KibitzerWakeStatus, KibitzerWakeUsage } from "./sidecar-outcome"
+import type { KibitzerWakeConfiguration, KibitzerWakeOutcome, KibitzerWakeStatus, KibitzerWakeUsage } from "./sidecar-outcome"
 
 /** Hard bound of one serialized `wakes.ndjson` line, newline included. */
 export const KIBITZER_WAKE_RECORD_MAX_CHARS = 4096
 export const WAKE_MODEL_MAX_CHARS = 128
 const WAKE_PATH_MAX_CHARS = 256
+/** Bounds for the configuration fields of a category-refusal line. */
+const WAKE_PROVIDER_MAX_CHARS = 64
+const WAKE_PROVIDER_MAX_COUNT = 16
 
 /** One line of `wakes.ndjson`. Every string is bounded and masked; the whole line is bounded again. */
 export interface KibitzerWakeRecord {
@@ -24,6 +27,8 @@ export interface KibitzerWakeRecord {
   readonly cause?: string
   /** Masked, frame-free, at most `GATE_REASON_MAX_CHARS`. */
   readonly reason?: string
+  /** The configuration state of a category refusal: bounded category, cause and provider names. */
+  readonly configuration?: KibitzerWakeConfiguration
   readonly model?: string
   readonly candidateCount: number
   /** Paths of the nudges the parent re-validated and handed to delivery. */
@@ -52,6 +57,7 @@ export function redactKibitzerWakeReason(reason: string | undefined): string | u
 
 export function kibitzerWakeRecord(outcome: KibitzerWakeOutcome, at: number): KibitzerWakeRecord {
   const reason = redactKibitzerWakeReason(outcome.reason)
+  const configuration = recordConfiguration(outcome.configuration)
   const record: KibitzerWakeRecord = {
     version: 1,
     at: new Date(at).toISOString(),
@@ -61,6 +67,7 @@ export function kibitzerWakeRecord(outcome: KibitzerWakeOutcome, at: number): Ki
     status: outcome.status,
     ...(outcome.cause === undefined ? {} : { cause: outcome.cause }),
     ...(reason === undefined ? {} : { reason }),
+    ...(configuration === undefined ? {} : { configuration }),
     ...(outcome.model === undefined ? {} : { model: capped(redactKibitzerEventText(outcome.model), WAKE_MODEL_MAX_CHARS) }),
     candidateCount: outcome.candidateCount,
     nudged: outcome.nudges.map((nudge) => capped(nudge.path, WAKE_PATH_MAX_CHARS)),
@@ -80,4 +87,16 @@ export function kibitzerWakeRecord(outcome: KibitzerWakeOutcome, at: number): Ki
 
 export function capped(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max)
+}
+
+/** The configuration as it may be written: provider names masked and bounded like the model field. */
+function recordConfiguration(configuration: KibitzerWakeConfiguration | undefined): KibitzerWakeConfiguration | undefined {
+  if (configuration === undefined) return undefined
+  return {
+    category: capped(redactKibitzerEventText(configuration.category), WAKE_MODEL_MAX_CHARS),
+    cause: configuration.cause,
+    ...(configuration.missingProviders === undefined
+      ? {}
+      : { missingProviders: configuration.missingProviders.slice(0, WAKE_PROVIDER_MAX_COUNT).map((provider) => capped(redactKibitzerEventText(provider), WAKE_PROVIDER_MAX_CHARS)) }),
+  }
 }

@@ -80,3 +80,16 @@ describe("composeReleaseBody", () => {
     expect(composeReleaseBody("notes", "", "footer")).toBe("notes\n\nfooter\n")
   })
 })
+
+describe("installFooter", () => {
+  test("#given a stable version #then the footer installs the bare package", async () => {
+    const { installFooter } = await import("./print-release-notes")
+    expect(installFooter("5.0.0")).toContain("bun add -g omo-ai\n")
+    expect(installFooter("5.0.0")).not.toContain("@beta")
+  })
+
+  test("#given a prerelease version #then the footer installs the beta tag", async () => {
+    const { installFooter } = await import("./print-release-notes")
+    expect(installFooter("5.0.0-beta.91")).toContain("bun add -g omo-ai@beta")
+  })
+})

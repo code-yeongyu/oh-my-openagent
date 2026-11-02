@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import type { PluginInput } from "@opencode-ai/plugin"
 import { afterAll, describe, expect, mock, test } from "bun:test"
 import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
@@ -27,10 +29,6 @@ const scheduleDeferredStartupCheckMock = (runCheck: () => void) => {
 
 let scheduledCheck: (() => void) | null = null
 
-mock.module("./checker/latest-version", () => ({
-  getLatestVersion: latestVersionMock,
-}))
-
 mock.module("./hook/deferred-startup-check", () => ({
   scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
 }))
@@ -45,6 +43,7 @@ const createPluginInput = (): PluginInput => ({
   directory: "/tmp/project",
   project: {} as PluginInput["project"],
   worktree: "/tmp/project",
+  experimental_workspace: { register: () => undefined },
   serverUrl: new URL("https://example.com"),
   $: {} as PluginInput["$"],
 } satisfies PluginInput)
@@ -180,6 +179,27 @@ describe("auto-update-checker hook", () => {
 
     // then
     expect(scheduleDeferredStartupCheckCallCount).toBe(0)
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  test("skips startup checks and toasts on session.created in CLI run mode", async () => {
+    // given
+    resetDeferredState()
+    process.env.OPENCODE_CLI_RUN_MODE = "true"
+    const { hook, mocks } = await createHook({ isSisyphusEnabled: true, autoUpdate: true })
+
+    // when
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
+
+    // then
+    expect(scheduleDeferredStartupCheckCallCount).toBe(0)
+    expect(mocks.showConfigErrorsIfAny).not.toHaveBeenCalled()
+    expect(mocks.updateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
+    expect(mocks.refreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
+    expect(mocks.showModelCacheWarningIfNeeded).not.toHaveBeenCalled()
+    expect(mocks.showLocalDevToast).not.toHaveBeenCalled()
     expect(mocks.showVersionToast).not.toHaveBeenCalled()
     expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
   })

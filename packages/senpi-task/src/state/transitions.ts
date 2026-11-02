@@ -5,6 +5,7 @@ import type {
   TaskTransition,
   TaskTransitionResult,
 } from "./types"
+import { fenceRun } from "./run-fence"
 
 const terminalStatuses = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
 const residencyTransitionTypes = new Set<TaskTransition["type"]>([
@@ -18,6 +19,10 @@ const residencyTransitionTypes = new Set<TaskTransition["type"]>([
 function transitionStatus(transition: TaskTransition, current: TaskStatus): TaskStatus {
   switch (transition.type) {
     case "start":
+      return "running"
+    case "pause":
+      return "paused"
+    case "unpause":
       return "running"
     case "complete":
       return "completed"
@@ -53,6 +58,8 @@ function transitionResidency(transition: TaskTransition, current: ResidencyState
     case "mark_resident":
       return "resident"
     case "start":
+    case "pause":
+    case "unpause":
     case "complete":
     case "fail":
     case "cancel":
@@ -75,22 +82,39 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
       }
     case "complete":
       return { ...record, final_response: transition.final_response, ...runStatsField(transition.run_stats) }
-    case "fail":
+    case "fail": {
+      const {
+        failure_kind: _failureKind,
+        failure_reason: _failureReason,
+        ...withoutFailureFacts
+      } = record
       return {
-        ...record,
+        ...withoutFailureFacts,
         error_message: transition.error_message,
+        ...(transition.failure_kind === undefined ? {} : { failure_kind: transition.failure_kind }),
+        ...(transition.failure_reason === undefined ? {} : { failure_reason: transition.failure_reason }),
         ...(transition.killed === true ? { killed: true } : {}),
         ...runStatsField(transition.run_stats),
       }
+    }
     case "lose":
       return { ...record, error_message: transition.error_message }
     case "cancel":
-    case "interrupt":
       return {
         ...record,
         ...(transition.error_message === undefined ? {} : { error_message: transition.error_message }),
         ...runStatsField(transition.run_stats),
       }
+    case "interrupt": {
+      const { interrupt_cause: _staleCause, ...withoutCause } = record
+      return {
+        ...withoutCause,
+        ...(transition.error_message === undefined ? {} : { error_message: transition.error_message }),
+        ...(transition.final_response === undefined ? {} : { final_response: transition.final_response }),
+        ...(transition.interrupt_cause === undefined ? {} : { interrupt_cause: transition.interrupt_cause }),
+        ...runStatsField(transition.run_stats),
+      }
+    }
     case "persist_only": {
       // In-process suspension: the owning engine is gone, so host_pid AND the last child pid are
       // both meaningless. Status, epochs, terminal fields, and run stats ride through untouched.
@@ -106,6 +130,8 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "evict":
     case "dispose":
     case "mark_resident":
+    case "pause":
+    case "unpause":
       return record
     default:
       return assertNever(transition)
@@ -113,6 +139,13 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
 }
 
 export function transitionTaskRecord(record: TaskRecord, transition: TaskTransition): TaskTransitionResult {
+  if (transition.type === "cancel" && transition.expected_run_epoch !== undefined && fenceRun(record, transition.expected_run_epoch) !== "live") {
+    return {
+      applied: false,
+      record,
+      audit: { type: "epoch_mismatch_ignored", expected_run_epoch: transition.expected_run_epoch, run_epoch: record.notification.run_epoch },
+    }
+  }
   const nextStatus = transitionStatus(transition, record.status)
   const changesOnlyResidency = residencyTransitionTypes.has(transition.type)
   if (terminalStatuses.has(record.status) && !changesOnlyResidency) {
@@ -142,8 +175,9 @@ export function transitionTaskRecord(record: TaskRecord, transition: TaskTransit
   const nextResidency = transitionResidency(transition, record.residency_state)
   const withFields = applyTransitionFields(record, transition)
   const entersTerminal = terminalStatuses.has(nextStatus) && !terminalStatuses.has(record.status)
+  const { provisional_exit: _provisionalExit, ...confirmedFields } = withFields
   const nextRecord = {
-    ...withFields,
+    ...(entersTerminal || transition.type === "start" ? confirmedFields : withFields),
     status: nextStatus,
     residency_state: nextResidency,
     updated_at: transition.timestamp,
@@ -190,8 +224,9 @@ export function markRecordLostForReconciliation(
     }
   }
 
+  const { provisional_exit: _provisionalExit, ...withoutProvisionalExit } = record
   const nextRecord = {
-    ...record,
+    ...withoutProvisionalExit,
     status: "lost" as const,
     error_message: input.error_message,
     updated_at: input.timestamp,
@@ -213,12 +248,17 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
   switch (transition.type) {
     case "start":
       return current === "pending"
+    case "pause":
+      return current === "running"
+    case "unpause":
+      return current === "paused"
     case "cancel":
-      return current === "running" || current === "pending"
+      return current === "running" || current === "pending" || current === "paused"
     case "complete":
-    case "fail":
     case "interrupt":
       return current === "running"
+    case "fail":
+      return current === "running" || (current === "pending" && transition.failure_kind === "suspended_unresumable")
     case "lose":
       return false
     case "evict":

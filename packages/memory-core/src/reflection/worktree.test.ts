@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
@@ -10,6 +10,7 @@ import {
   finalizeReflectionWorktree,
   type ReflectionWorktree,
 } from "./worktree"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
 const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
@@ -42,7 +43,7 @@ async function assertCleaned(worktree: ReflectionWorktree, parentDir: string) {
 }
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 describe("reflection worktree finalization", () => {

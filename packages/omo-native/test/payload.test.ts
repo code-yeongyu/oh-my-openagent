@@ -88,12 +88,20 @@ describe("build:omo-native staged payload", () => {
             join("extensions", "kibitzer-persona.md"),
             join("runtime", "ast-grep-mcp", "cli.js"),
             join("runtime", "lsp-daemon", "dist", "cli.js"),
+            join("runtime", "category-coverage", "index.js"),
+            join("runtime", "category-coverage", "assets.generated.json"),
+            join("runtime", "task-config", "index.js"),
             join("scripts", "install.mjs"),
             "package.json",
           ]
           for (const artifact of required) {
             expect(existsSync(join(outputDir, artifact))).toBe(true)
           }
+
+          // The doctor runtime and the computer-use extension read the same prelude assets (#9193).
+          expect(readFileSync(join(outputDir, "runtime", "category-coverage", "assets.generated.json"), "utf8")).toBe(
+            readFileSync(join(outputDir, "extensions", "assets.generated.json"), "utf8"),
+          )
 
           const manifest = JSON.parse(readFileSync(join(outputDir, "package.json"), "utf8")) as {
             name?: string

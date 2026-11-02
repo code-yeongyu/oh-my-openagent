@@ -1,3 +1,0 @@
-copilot-only: PASS
-copilot-vercel: PASS
-PASS: both real OpenCode scenarios, the custom-provider resolver probe, and host isolation checks passed.

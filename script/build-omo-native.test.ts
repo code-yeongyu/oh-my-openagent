@@ -3,14 +3,18 @@
 // 33586966744 hit ENOENT on packages/lsp-daemon/dist in every platform leg.
 
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
 import {
+  buildCategoryCoverageRuntime,
   ensurePrebuiltNativeInputs,
+  NATIVE_REQUIRED_ARTIFACTS,
   PAYLOAD_DIRECTORIES,
   PAYLOAD_FILES,
   PAYLOAD_SCRIPT,
@@ -52,10 +56,12 @@ function recordingDependencies(input: {
 }
 
 describe("ensurePrebuiltNativeInputs", () => {
-  test("#given both prebuilt artifacts present #when ensuring #then no root build script runs", () => {
+  const omowrightRuntime = ["packages", "shared-skills", "skills", "browser", "runtime", "omowright", "index.js"].join(sep)
+
+  test("#given every prebuilt artifact present #when ensuring #then no root build script runs", () => {
     // given
     const { dependencies, probed, built } = recordingDependencies({
-      existing: ["packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist/cli.js"],
+      existing: ["packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist/cli.js", omowrightRuntime],
     })
 
     // when
@@ -65,6 +71,7 @@ describe("ensurePrebuiltNativeInputs", () => {
     expect(built).toEqual([])
     expect(probed.some((path) => path.endsWith(["packages", "lsp-daemon", "dist"].join(sep)))).toBe(true)
     expect(probed.some((path) => path.endsWith(["packages", "ast-grep-mcp", "dist", "cli.js"].join(sep)))).toBe(true)
+    expect(probed.some((path) => path.endsWith(omowrightRuntime))).toBe(true)
   })
 
   test("#given no prebuilt artifacts #when ensuring #then each input builds via its root script in order", () => {
@@ -75,13 +82,13 @@ describe("ensurePrebuiltNativeInputs", () => {
     ensurePrebuiltNativeInputs(dependencies)
 
     // then
-    expect(built).toEqual(["build:lsp-daemon", "build:ast-grep-mcp"])
+    expect(built).toEqual(["build:lsp-daemon", "build:ast-grep-mcp", "build:materialize-frontend"])
   })
 
   test("#given only the daemon dist missing #when ensuring #then only build:lsp-daemon runs", () => {
     // given
     const { dependencies, built } = recordingDependencies({
-      existing: ["packages/ast-grep-mcp/dist/cli.js"],
+      existing: ["packages/ast-grep-mcp/dist/cli.js", omowrightRuntime],
     })
 
     // when
@@ -89,6 +96,22 @@ describe("ensurePrebuiltNativeInputs", () => {
 
     // then
     expect(built).toEqual(["build:lsp-daemon"])
+  })
+
+  // Regression (issue #9661): the binary release pipeline runs the native staging chain with
+  // OMO_SKIP_MATERIALIZE=1, so stage-omowright-runtime.mjs never ran and the published binary's
+  // browser skill had no runtime. Only the omowright runtime missing must trigger its staging.
+  test("#given only the omowright runtime missing #when ensuring #then only build:materialize-frontend runs", () => {
+    // given
+    const { dependencies, built } = recordingDependencies({
+      existing: ["packages/lsp-daemon/dist", "packages/ast-grep-mcp/dist/cli.js"],
+    })
+
+    // when
+    ensurePrebuiltNativeInputs(dependencies)
+
+    // then
+    expect(built).toEqual(["build:materialize-frontend"])
   })
 
   test("#given a root build script exits nonzero #when ensuring #then the exit code surfaces", () => {
@@ -135,9 +158,96 @@ describe("plugin payload allowlist parity", () => {
     expect(uncopied).toEqual([])
   })
 
+  test("#given the daemon launch spec #when checking the payload #then it is both copied and required", () => {
+    // The spec is a root-level plugin file, so the directory copies never reach it; it has to be on
+    // the root-file list to be copied and on the required list so a payload without it fails the
+    // build instead of shipping an `omo daemon run` that exits 5.
+    expect(PAYLOAD_FILES).toContain("daemon-launch-spec.json")
+    expect(REQUIRED_PLUGIN_ARTIFACTS).toContain("daemon-launch-spec.json")
+  })
+
   test("#given the conditional x-search skill #when checking the payload #then it is both copied and required", () => {
     // when / then
     expect(PAYLOAD_DIRECTORIES).toContain("skills-conditional")
     expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(join("skills-conditional", "x-search", "SKILL.md"))
   })
+
+  // Regression (issue #9661): the browser skill's bundled omowright runtime is staged into the
+  // payload and must be required, or a binary built without it ships a browser skill that always
+  // fails to load omowright.
+  test("#given the browser skill omowright runtime #when checking the payload #then it is required", () => {
+    expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(join("skills", "browser", "runtime", "omowright", "index.js"))
+    expect(REQUIRED_PLUGIN_ARTIFACTS).toContain(join("skills", "browser", "runtime", "omowright", "page-bundle.js"))
+  })
+})
+
+describe("payload completeness gate", () => {
+  const scriptPath = join(dirname(fileURLToPath(import.meta.url)), "build-omo-native.ts")
+  const pageBundle = join("skills", "browser", "runtime", "omowright", "page-bundle.js")
+
+  function stagedPayload(): string {
+    const root = mkdtempSync(join(tmpdir(), "omo-native-gate-"))
+    for (const artifact of NATIVE_REQUIRED_ARTIFACTS) {
+      mkdirSync(dirname(join(root, artifact)), { recursive: true })
+      writeFileSync(join(root, artifact), "staged\n")
+    }
+    return root
+  }
+
+  function checkOnly(outputDir: string) {
+    return spawnSync("bun", [scriptPath, "--check-only", "--output", outputDir], { encoding: "utf8" })
+  }
+
+  // Regression (issue #9661): the bundled omowright index.js reads page-bundle.js beside itself at
+  // import time, so a payload that carries index.js without it ships the same broken browser skill.
+  test("#given a staged payload missing only the omowright page bundle #when the completeness gate runs #then it fails naming that file", () => {
+    // given
+    const root = stagedPayload()
+    try {
+      rmSync(join(root, pageBundle))
+
+      // when
+      const result = checkOnly(root)
+
+      // then
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain(`missing required artifact: ${pageBundle}`)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a complete staged payload #when the completeness gate runs #then it passes", () => {
+    // given
+    const root = stagedPayload()
+    try {
+      // when
+      const result = checkOnly(root)
+
+      // then
+      expect(result.status).toBe(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("category-coverage runtime bundle", () => {
+  // Regression: a runner-only import reached through the category resolver pulled the senpi engine's
+  // wasm and skill assets into this --outfile bundle, and bun refused to write more than one output.
+  test("#given the category-coverage entry #when the runtime bundle is built #then it emits one self-contained index.js", () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "omo-category-coverage-bundle-"))
+    try {
+      const outfile = join(root, "runtime", "category-coverage", "index.js")
+
+      // when
+      buildCategoryCoverageRuntime(outfile)
+
+      // then
+      expect(readFileSync(outfile, "utf8").length).toBeGreaterThan(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 })

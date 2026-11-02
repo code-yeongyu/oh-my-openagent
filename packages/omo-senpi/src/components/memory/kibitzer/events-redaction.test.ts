@@ -46,7 +46,7 @@ describe("kibitzer event redaction", () => {
     expect(resultEvent?.body.length).toBeLessThanOrEqual(DEFAULT_KIBITZER_EVENT_CAPS.resultHead)
     expect(resultEvent?.body).not.toContain(BEARER)
     expect(resultEvent?.body).not.toContain(GITHUB_TOKEN)
-    expect(resultEvent?.body).toContain("[REDACTED]")
+    expect(resultEvent?.body).toMatch(/\*\*\*|\[REDACTED\]/)
 
     for (let index = 0; index < KIBITZER_EVENT_BUFFER_SIZE; index += 1) stream.onToolCall(toolCall("read", { path: `file-${index}.ts` }, `call-${index}`), branchOf(2 + index))
 
@@ -71,12 +71,13 @@ describe("kibitzer event redaction", () => {
     expect(fitting.onToolCall(toolCall("bash", { command: `${"x".repeat(370)} ${token}` }), branchOf(1))).toBe(true)
     const [fits] = fitting.peek().events
     expect(fits?.body).not.toContain("ghp_")
-    expect(fits?.body).toContain("[REDACTED]")
+    expect(fits?.body).toMatch(/\*\*\*|\[REDACTED\]/)
     expect(fits?.truncated).toBe(false)
 
-    // The same token starting at 392: once redacted the text still exceeds the cap and is cut.
+    // The same token starting at 399, past the cut a truncate-first pass would make: once redacted (the
+    // memory-core mask is "***") the text still exceeds the cap and is cut.
     const overflowing = createKibitzerEventStream()
-    expect(overflowing.onToolCall(toolCall("bash", { command: `${"x".repeat(379)} ${token}` }), branchOf(1))).toBe(true)
+    expect(overflowing.onToolCall(toolCall("bash", { command: `${"x".repeat(386)} ${token}` }), branchOf(1))).toBe(true)
     const [cut] = overflowing.peek().events
     expect(cut?.body).not.toContain("ghp_")
     expect(cut?.truncated).toBe(true)
@@ -109,7 +110,7 @@ describe("kibitzer event redaction", () => {
 
     expect(redacted).not.toContain(BEARER)
     expect(redacted).not.toContain(GITHUB_TOKEN)
-    expect(redacted).toContain("[REDACTED]")
+    expect(redacted).toMatch(/\*\*\*|\[REDACTED\]/)
     expect(redacted).toContain("https://***:***@host/x")
     expect(redacted).toContain("plain text")
   })

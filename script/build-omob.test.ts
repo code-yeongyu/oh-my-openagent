@@ -10,10 +10,15 @@ import {
 	acquireCacheLock,
 	deriveOmobAiVersion,
 	ensureCacheClone,
+	fetchCacheClones,
+	fetchRefArgs,
+	parseCommitLog,
 	hostTargetFor,
+	packSenpiSiblingTarballs,
 	packSoleSenpiTarball,
 	parseOmobArgs,
 	resolveCachedSenpiPackage,
+	SENPI_ARTIFACT_ASSEMBLY,
 } from "./build-omob"
 import { planRuntimePrune, selectPruneEntries } from "./omob-runtime-prune"
 
@@ -205,12 +210,67 @@ describe("resolveCachedSenpiPackage", () => {
 			mkdirSync(artifactRoot, { recursive: true })
 			writeFileSync(
 				join(cacheDir, "artifacts", "senpi", "aaa1111", "manifest.json"),
-				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz" }),
+				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz", assembly: SENPI_ARTIFACT_ASSEMBLY }),
 			)
 			expect(resolveCachedSenpiPackage(cacheDir, "bbb2222")).toBeUndefined()
 			expect(resolveCachedSenpiPackage(cacheDir, "aaa1111")).toBe(artifactRoot)
 		} finally {
 			rmSync(cacheDir, { recursive: true, force: true })
+		}
+	})
+
+	// Storage contract: an install assembled with registry siblings must never be reused.
+	test("#given a same-commit artifact from an older assembly scheme #when resolving #then it is rebuilt", () => {
+		const cacheDir = tempDir("omob-artifact-legacy-")
+		try {
+			const artifactRoot = join(cacheDir, "artifacts", "senpi", "aaa1111", "install", "package")
+			mkdirSync(artifactRoot, { recursive: true })
+			writeFileSync(
+				join(cacheDir, "artifacts", "senpi", "aaa1111", "manifest.json"),
+				JSON.stringify({ commit: "aaa1111", packageRoot: artifactRoot, tarballName: "senpi.tgz" }),
+			)
+			expect(resolveCachedSenpiPackage(cacheDir, "aaa1111")).toBeUndefined()
+		} finally {
+			rmSync(cacheDir, { recursive: true, force: true })
+		}
+	})
+})
+
+describe("packSenpiSiblingTarballs", () => {
+	function writeSenpiFixture(root: string, workspaces: Readonly<Record<string, string>>): void {
+		mkdirSync(join(root, "scripts"), { recursive: true })
+		writeFileSync(
+			join(root, "scripts", "registry-packages.mjs"),
+			`export const registrySourcePackageNames = new Set(${JSON.stringify(["@fixture/main", "@fixture/tui", "@fixture/ai"])});\n`,
+		)
+		for (const [directory, name] of Object.entries(workspaces)) {
+			mkdirSync(join(root, "packages", directory), { recursive: true })
+			writeFileSync(join(root, "packages", directory, "package.json"), JSON.stringify({ name, version: "0.0.0-dev" }))
+		}
+	}
+
+	test("#given every lockstep workspace #when packing #then each sibling except the engine maps to its own tarball", async () => {
+		const root = tempDir("omob-siblings-")
+		try {
+			writeSenpiFixture(join(root, "senpi"), { "coding-agent": "@fixture/main", tui: "@fixture/tui", ai: "@fixture/ai", chord: "@fixture/chord" })
+			const tarballs = await packSenpiSiblingTarballs(join(root, "senpi"), join(root, "tarballs"), (workspaceDir, destination) => {
+				const { name } = JSON.parse(readFileSync(join(workspaceDir, "package.json"), "utf8")) as { name: string }
+				writeFileSync(join(destination, `${name.replace("@", "").replace("/", "-")}.tgz`), name)
+			})
+			expect(Object.keys(tarballs).sort()).toEqual(["@fixture/ai", "@fixture/tui"])
+			for (const [name, tarball] of Object.entries(tarballs)) expect(readFileSync(tarball, "utf8")).toBe(name)
+		} finally {
+			rmSync(root, { recursive: true, force: true })
+		}
+	})
+
+	test("#given a lockstep sibling missing from the checkout #when packing #then it fails instead of using a registry copy", async () => {
+		const root = tempDir("omob-siblings-missing-")
+		try {
+			writeSenpiFixture(join(root, "senpi"), { "coding-agent": "@fixture/main", ai: "@fixture/ai" })
+			await expect(packSenpiSiblingTarballs(join(root, "senpi"), join(root, "tarballs"), () => {})).rejects.toThrow(/@fixture\/tui/)
+		} finally {
+			rmSync(root, { recursive: true, force: true })
 		}
 	})
 })
@@ -298,4 +358,67 @@ describe("ensureCacheClone submodule ordering", () => {
 			rmSync(rootDir, { recursive: true, force: true })
 		}
 	}, 120_000)
+})
+
+describe("fetchCacheClones", () => {
+	const specs = [
+		{ url: "https://example.invalid/senpi.git", directory: "/cache/senpi", ref: "origin/main" },
+		{ url: "https://example.invalid/omo.git", directory: "/cache/omo", ref: "origin/dev" },
+	] as const
+
+	test("#given two independent clones #when the refresh fetches them #then neither waits for the other to finish", async () => {
+		const events: string[] = []
+		await fetchCacheClones(specs, async (spec) => {
+			events.push(`start:${spec.directory}`)
+			await Promise.resolve()
+			await Promise.resolve()
+			events.push(`end:${spec.directory}`)
+		})
+		expect(events).toHaveLength(4)
+		// Serialized fetches produce start,end,start,end; the launch path pays one network
+		// round trip per repository, so the second start must precede the first end.
+		expect(events.indexOf("start:/cache/omo")).toBeLessThan(events.indexOf("end:/cache/senpi"))
+	})
+
+	test("#given one failing fetch #when both run #then the failure is reported", async () => {
+		const attempted: string[] = []
+		const failing = fetchCacheClones(specs, async (spec) => {
+			attempted.push(spec.directory)
+			if (spec.directory === "/cache/omo") throw new Error("fetch refused")
+		})
+		await expect(failing).rejects.toThrow("fetch refused")
+		expect(attempted).toHaveLength(2)
+	})
+
+	test("#given one fetch fails while its sibling is still running #when the refresh reports the failure #then no fetch is left running against the cache", async () => {
+		const settled: string[] = []
+		let releaseSlow: (() => void) | undefined
+		const slow = new Promise<void>((resolve) => { releaseSlow = resolve })
+		const failing = fetchCacheClones(specs, async (spec) => {
+			if (spec.directory === "/cache/omo") throw new Error("fetch refused")
+			await slow
+			settled.push(spec.directory)
+		})
+		let reported = false
+		void failing.catch(() => undefined).then(() => { reported = true })
+		for (let tick = 0; tick < 12; tick++) await Promise.resolve()
+		// Reporting the failure while the sibling git process is still writing would let this
+		// process release the cache lock with a fetch still running against that cache.
+		expect(reported, "the refresh must not report failure while a sibling fetch is still running").toBe(false)
+		releaseSlow?.()
+		await expect(failing).rejects.toThrow("fetch refused")
+		expect(settled).toEqual(["/cache/senpi"])
+	})
+
+	test("#given one git log line pair #when commit info is parsed #then the commit and its date come from a single git call", () => {
+		expect(parseCommitLog("abc123\n2026-09-20T01:44:58+09:00\n")).toEqual({ commit: "abc123", committedAt: "2026-09-20T01:44:58+09:00" })
+		expect(parseCommitLog("")).toEqual({ commit: "", committedAt: "" })
+	})
+
+	test("#given a plain branch ref #when fetch args are built #then only that branch is fetched, and anything else falls back to the whole remote", () => {
+		expect(fetchRefArgs("origin/dev")).toEqual(["--prune", "origin", "+refs/heads/dev:refs/remotes/origin/dev"])
+		expect(fetchRefArgs("origin/main")).toEqual(["--prune", "origin", "+refs/heads/main:refs/remotes/origin/main"])
+		expect(fetchRefArgs("origin/dev~1")).toEqual(["--prune", "origin"])
+		expect(fetchRefArgs("a".repeat(40))).toEqual(["--prune", "origin"])
+	})
 })

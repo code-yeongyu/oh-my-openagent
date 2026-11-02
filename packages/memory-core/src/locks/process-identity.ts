@@ -9,7 +9,10 @@ function errorCode(error: unknown): string | undefined {
 
 async function execFileText(command: string, args: string[]): Promise<string | null> {
   return await new Promise((resolve) => {
-    execFile(command, args, { encoding: "utf8", timeout: 2_000 }, (error, stdout) => {
+    // powershell.exe is a console-subsystem binary, and under a Node runtime (no bun:ffi, so the
+    // kernel32 fast path below can never answer) this fallback runs on EVERY pid probe. Without
+    // windowsHide each probe flashes a console Windows foregrounds, stealing focus (#8501).
+    execFile(command, args, { encoding: "utf8", timeout: 2_000, windowsHide: true }, (error, stdout) => {
       if (error !== null) {
         resolve(null)
         return

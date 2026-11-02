@@ -62,6 +62,23 @@ describe("memory config wiring", () => {
   })
 })
 
+describe("memory projection limits through the loader", () => {
+  test("#given a base limit and a harness overlay #when the harness view is folded #then the overlay wins and the untouched limit keeps the base", () => {
+    // given
+    const config = {
+      memory: { projection: { max_entries_per_directory: 40, max_bytes: 8192 } },
+      "[senpi]": { memory: { projection: { max_entries_per_directory: 10 } } },
+    }
+
+    // when
+    const view = resolveOmoConfigView({ config, harness: "senpi" })
+    const parsed = OmoConfigSchema.parse(view.config)
+
+    // then
+    expect(parsed.memory?.projection).toEqual({ max_entries_per_directory: 10, max_bytes: 8192 })
+  })
+})
+
 describe("memory profile and harness deep-merge", () => {
   test("#given base and senpi memory blocks #when folding the harness view #then memory deep-merges", () => {
     // given

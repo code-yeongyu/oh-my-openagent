@@ -106,6 +106,33 @@ describe("getContinuationState JSON backend descendant coverage", () => {
     expect(state.hasActiveBoulder).toBe(true)
   })
 
+  test("#given the boulder plan has no countable tasks #when continuation state is read for its direct session #then no boulder continuation is active", async () => {
+    // given
+    const directory = createTempDir()
+    const plansDir = join(directory, ".omo", "plans")
+    mkdirSync(plansDir, { recursive: true })
+    const planPath = join(plansDir, "prose-plan.md")
+    writeFileSync(planPath, "# Plan\nProse only, no checkboxes.\n", "utf-8")
+    writeFileSync(join(directory, ".omo", "boulder.json"), JSON.stringify({
+      active_plan: planPath,
+      started_at: new Date().toISOString(),
+      session_ids: ["ses_root_session"],
+      session_origins: { "ses_root_session": "direct" },
+      plan_name: "prose-plan",
+      agent: "atlas",
+    }), "utf-8")
+
+    const { getContinuationState } = await import("./continuation-state")
+
+    // when
+    const state = await getContinuationState(directory, "ses_root_session", {
+      session: { get: async () => ({ data: {} }) },
+    } as never)
+
+    // then
+    expect(state.hasActiveBoulder).toBe(false)
+  })
+
   test("prefers earliest JSON agent by time.created instead of filename order for first-message fallback helpers", async () => {
     // given
     const directory = createTempDir()

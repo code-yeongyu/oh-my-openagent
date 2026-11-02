@@ -11,6 +11,7 @@ import {
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
 import { handleCompletedBoulderIdle } from "./idle-completion-nudge"
+import { scheduleRetryWithTimer } from "./idle-continuation"
 import { handleAtlasSessionIdle } from "./idle-event"
 import type { SessionState } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
@@ -235,7 +236,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
         },
       },
     })
-    const retryTimer = setTimeout(() => {}, 60_000)
+    const retryTimer = scheduleRetryWithTimer(async () => {}, 60_000)
     const sessionStateById = new Map<string, SessionState>([
       [SESSION_ID, { promptFailureCount: 0, pendingRetryTimer: retryTimer }],
     ])
@@ -397,6 +398,44 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(nextBoulder?.works?.["work-other"]?.status).toBe("active")
   })
 
+  it("#given the active plan has no countable tasks #when the session idles repeatedly #then no continuation is injected", async () => {
+    // given
+    const planPath = join(testDirectory, "plan.md")
+    writeFileSync(planPath, "# Plan\n## Tasks\n### 1. [x] Completed task\n")
+
+    const boulder = createBoulderState(planPath, SESSION_ID, "atlas")
+    writeBoulderState(testDirectory, boulder)
+
+    const promptAsyncMock = mock(async () => ({ data: {} }))
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: testDirectory,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+          messages: async () => ({ data: [] }),
+        },
+      },
+    })
+    const sessionStateById = new Map<string, SessionState>()
+    const getState = (sessionId: string): SessionState => {
+      let state = sessionStateById.get(sessionId)
+      if (!state) {
+        state = { promptFailureCount: 0 }
+        sessionStateById.set(sessionId, state)
+      }
+      return state
+    }
+
+    // when
+    await handleAtlasSessionIdle({ ctx, sessionID: SESSION_ID, getState })
+    await handleAtlasSessionIdle({ ctx, sessionID: SESSION_ID, getState })
+
+    // then
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+    expect(getState(SESSION_ID).pendingRetryTimer).toBeUndefined()
+    expect(readBoulderState(testDirectory)?.status).toBe("active")
+  })
+
   it("#given pending background task #when session idles #then continuation waits for retry instead of prompting", async () => {
     // given
     const planPath = join(testDirectory, "plan.md")
@@ -443,7 +482,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(promptAsyncMock).not.toHaveBeenCalled()
     expect(sessionState.pendingRetryTimer).toBeDefined()
     if (sessionState.pendingRetryTimer) {
-      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer.cancel()
       sessionState.pendingRetryTimer = undefined
     }
   })

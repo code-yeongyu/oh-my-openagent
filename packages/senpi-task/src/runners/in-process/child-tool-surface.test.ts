@@ -37,6 +37,7 @@ function spec(policy: {
     parentSessionId: "parent",
     rootSessionId: "parent",
     prompt: "surface",
+    includeTaskTools: true,
     ...policy,
   }
 }
@@ -56,7 +57,8 @@ function grantSide(
 ): string[] {
   return [
     ...childEffectiveToolNames({
-      childToolNames: mergeChildCustomTools(parent, memberScoped, { uiOnlyToolNames: ["memory"] }).map((entry) => entry.name),
+      childToolNames: mergeChildCustomTools(parent, memberScoped, { uiOnlyToolNames: ["memory"], includeTaskTools: true }).map((entry) => entry.name),
+      includeTaskTools: true,
       ...policy,
     }),
   ]
@@ -90,7 +92,7 @@ describe("child tool surface is one list", () => {
     expect(Object.keys(DEFAULT_CATEGORIES)).toContain("quick")
     expect(Object.keys(DEFAULT_CATEGORIES)).toContain("unspecified-high")
     expect(grant).toEqual(installed)
-    expect(grant).toEqual(["read", "bash", "edit", "write", "grep", "x_search", "web_search"])
+    expect(grant).toEqual(["read", "bash", "edit", "write", "grep", "x_search", "web_search", "task"])
   })
 
   test("#given an allowlist agent and a denylist agent #when grant-side and runner-installed sets are compared #then they are equal", () => {
@@ -101,7 +103,7 @@ describe("child tool surface is one list", () => {
     expect(grantSide(parent, deny)).toEqual(runnerSide(parent, deny))
     expect(grantSide(parent, allow, member)).toEqual(runnerSide(parent, allow, member))
     expect(grantSide(parent, allow)).toEqual(["read", "x_search"])
-    expect(grantSide(parent, deny)).toEqual(["read", "bash", "edit", "grep", "x_search", "web_search"])
+    expect(grantSide(parent, deny)).toEqual(["read", "bash", "edit", "grep", "x_search", "web_search", "task"])
   })
 
   test("#given a synthetic write-capable parent tool the child lacks #when the grant is resolved #then it is refused as tools_unavailable", async () => {

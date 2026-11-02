@@ -177,9 +177,9 @@ describe("buildBackgroundTaskNotificationText", () => {
       expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
       expect(notification).toContain("- `task-3`: Fallback task")
       expect(notification).toContain("Background task attempts:")
-      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.6-luna-fast — ses-primary")
+      expect(notification).toContain("  - Attempt 1: ERROR - genai-proxy-openai/gpt-5.6-luna-fast - ses-primary")
       expect(notification).toContain("    Error: Forbidden: Selected provider is forbidden")
-      expect(notification).toContain("  - Attempt 2 — COMPLETED — anthropic/claude-haiku-4.5 — ses-fallback")
+      expect(notification).toContain("  - Attempt 2: COMPLETED - anthropic/claude-haiku-4.5 - ses-fallback")
     })
   })
 

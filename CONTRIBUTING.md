@@ -21,6 +21,7 @@ First off, thanks for taking the time to contribute! This document provides guid
   - [Adding a New Hook](#adding-a-new-hook)
   - [Adding a New Tool](#adding-a-new-tool)
   - [Adding a New MCP Server](#adding-a-new-mcp-server)
+- [Security](#security)
 - [QA Discipline](#qa-discipline)
 - [Pull Request Process](#pull-request-process)
   - [PR Checklist](#pr-checklist)
@@ -60,7 +61,7 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ### Prerequisites
 
-- **Bun** 1.4.0 (CI-pinned) - The only package manager for the workspace itself
+- **Bun** 1.4.4 (CI-pinned) - The only package manager for the workspace itself
 - **Node** 24 - Required for vendored packages (lsp-tools-mcp, lsp-daemon, git-bash-mcp) and the Codex plugin build via npm
 - **git** - Version control
 - **tmux** (optional) - Enables the `interactive_bash` tool and Team Mode visualization
@@ -132,7 +133,7 @@ All harnesses delegate to these scripts:
 
 | Harness | Wiring |
 | ------- | ------ |
-| GitHub Codespaces / VS Code Dev Containers | `.devcontainer/devcontainer.json` runs `postCreateCommand: script/agent/setup.sh` on `.devcontainer/Dockerfile` (Node 24 + Bun 1.4.0 + tmux) |
+| GitHub Codespaces / VS Code Dev Containers | `.devcontainer/devcontainer.json` runs `postCreateCommand: script/agent/setup.sh` on `.devcontainer/Dockerfile` (Node 24 + Bun 1.4.4 + tmux) |
 | Plain Docker | `script/agent/docker-dev.sh` builds the Dockerfile and opens a shell |
 | Cursor cloud agents | `.cursor/environment.json` `install` runs setup on environment creation |
 | Claude Code | `.claude/settings.json` `SessionStart` hook runs setup; `SessionEnd` hook launches cleanup |
@@ -325,9 +326,13 @@ export function createMyHook(deps: { logger: Logger }) {
 3. Add the MCP name to `McpNameSchema` in `packages/omo-opencode/src/mcp/types.ts`
 4. Document in README if it requires external setup
 
+## Security
+
+Report suspected vulnerabilities privately, as described in [`SECURITY.md`](SECURITY.md), never in a public issue or pull request. If your change touches a trust boundary (credentials, config loading, tool permissions, the installer or update path, or the engine's RPC endpoints), say in the PR body what it could weaken and how you checked it.
+
 ## QA Discipline
 
-Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the `opencode-qa` skill. Any change to `packages/omo-codex` (the Codex Light side) must be QA'd with the `codex-qa` skill. Any change to `packages/omo-senpi` or `packages/senpi-task` (the Senpi side) must be QA'd with the `senpi-qa` skill. Record QA evidence under `.omo/evidence/<date>-<slug>/`; live Senpi QA records it under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by `.agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs`.
+Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the `opencode-qa` skill. Any change to `packages/omo-codex` (the Codex Light side) must be QA'd with the `codex-qa` skill. Any change to `packages/omo-senpi` or `packages/senpi-task` (the Senpi side) must be QA'd with the `senpi-qa` skill. Record QA evidence under `.omo/evidence/<date>-<slug>/`; live Senpi QA records it under `.omo/evidence/omo-senpi-adapter/<slug>/`, resolved by `.agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs`. Evidence stays local: `.omo/evidence/` is gitignored and `script/tracked-evidence-paths-audit.test.ts` fails when any evidence path is tracked, so summarize the captures in the PR's QA & Evidence section instead of committing them.
 
 "It typechecks" or "`bun test` is green" is not QA. You must drive the real harness and record the observed behavior.
 
@@ -357,7 +362,7 @@ Any change to `packages/omo-opencode` (the OpenCode side) must be QA'd with the 
 - [ ] `bun test` passes
 - [ ] `bun run test:codex` passes (if Codex-side changed)
 - [ ] Tested locally with OpenCode
-- [ ] QA evidence recorded under `.omo/evidence/` (if harness-connected changes)
+- [ ] QA evidence recorded under `.omo/evidence/` and summarized in the PR body, not committed (if harness-connected changes)
 - [ ] Updated documentation if needed (README, AGENTS.md)
 - [ ] No version changes in `package.json`
 

@@ -17,9 +17,9 @@
 ### 의존성
 
 이 항목은 이미 연결된 MCP를 사용하는 엔진 어댑터의 설명이다.
-새 브라우저 세션은 js eval의 Bun.WebView(Bun >= 1.4, macOS 기본;
-Linux/Windows는 설치된 Chrome/Chromium/Edge 필요), 그 외 또는 Chrome 동작·stealth·trace·인증은
-로컬 Chrome을 제어하는 `playwright-core` 스크립트로 실행한다. MCP를 새로 설치하지 않는다.
+에이전트가 직접 여는 브라우저 세션은 js eval의 omowright(`browser` 스킬에 스테이징)로
+띄운다: 직접 소유 브라우저는 `connectPipe`, 스텔스는 `connectCloakProfile`, 사용자 로그인이
+필요하면 `connectBrowserSkill`. MCP를 새로 설치하지 않는다.
 
 ### 기본 워크플로
 
@@ -52,15 +52,14 @@ Linux/Windows는 설치된 Chrome/Chromium/Edge 필요), 그 외 또는 Chrome �
 
 ### 의존성 (최초 1회)
 
-```bash
-# Node (시스템 설치)
-node -v   # v18+ 권장
+엔진 템플릿의 스크립트 의존성은 `engine/templates/package.json`에 고정되어 있다.
+엔진 디렉터리에서 한 번만 설치한다. Chrome은 이미 시스템에 설치되어 있어야 하며,
+브라우저 다운로드 명령은 없다.
 
-# 사용자가 엔진 디렉터리에서 한 번 설치하는 스크립트 의존성
+```bash
 cd "$SKILL_DIR/engine"
 test -f package.json || cp templates/package.json package.json
-bun add playwright-core@1.62.1 playwright-extra@4.3.6 puppeteer-extra-plugin-stealth@2.11.2
-# Chrome은 이미 시스템에 설치되어 있어야 한다. 브라우저 다운로드 명령은 없다.
+bun install
 ```
 
 ### 호출 (engine 내부)
@@ -76,39 +75,23 @@ attempt, html = run_playwright_fallback(
 )
 ```
 
-내부에서 `engine/templates/playwright_real_chrome.js` 또는 `playwright_mobile_chrome.js`를 Node로 실행하고 HTML을 받아온다. 템플릿은 **URL과 셀렉터 파라미터만** 받으며 사이트별 분기가 없다.
+내부에서 `engine/templates/playwright_real_chrome.js` 또는 `playwright_mobile_chrome.js`를 Node로 실행하고 HTML을 받아온다. 템플릿은 **URL과 셀렉터 파라미터만** 받으며 사이트별 분기가 없다. 템플릿은 엔진이 실행하는 프로그램이다. 에이전트가 이 템플릿을 본떠 브라우저 스크립트를 새로 쓰지 않는다.
 
 ### 데스크톱 템플릿 (`playwright_real_chrome.js`)
 
-```js
-const { addExtra } = require('playwright-extra');
-const chromium = addExtra(require('playwright-core').chromium);
-const stealth = require('puppeteer-extra-plugin-stealth')();
-chromium.use(stealth);
-
-const ctx = await chromium.launchPersistentContext(profileDir, {
-  channel: 'chrome',        // ← 핵심: 번들 Chromium 아닌 실제 Chrome
-  headless: false,          // Akamai는 headless 탐지. headful 필요.
-  viewport: { width: 1366, height: 900 },
-});
-```
+- 번들 Chromium이 아니라 **시스템에 설치된 실제 Chrome**을 띄운다. TLS 지문이 실제 Chrome이 되는 것이 핵심이다.
+- stealth 플러그인을 적용하고, 작업 전용 영속 프로필 디렉터리를 쓴다.
+- Akamai는 headless를 탐지하므로 **headful**로 실행하고, 뷰포트는 1366×900이다.
 
 ### 모바일 템플릿 (`playwright_mobile_chrome.js`)
 
-```js
-const { devices } = require('playwright-core');
-const { addExtra } = require('playwright-extra');
-const chromium = addExtra(require('playwright-core').chromium);
-const iPhone = devices['iPhone 13 Pro'];
+- TLS는 데스크톱과 같은 실제 Chrome이고, iPhone 13 Pro 디바이스 기술자(UA/viewport/isMobile/hasTouch)만 주입한다. headful로 실행한다.
 
-const ctx = await chromium.launchPersistentContext(profileDir, {
-  channel: 'chrome',          // TLS는 실제 Chrome
-  ...iPhone,                  // UA/viewport/isMobile/hasTouch 자동 주입
-  headless: false,
-});
-```
+**주의**: 실제 Chrome + 모바일 디바이스 기술자 조합은 TLS 핑거프린트를 Chrome으로 유지하면서 HTTP 레이어(UA/viewport)만 모바일로 바꾼다. WAF가 실제 Chrome으로 인식해서 관대한 경우가 많다.
 
-**주의**: `channel:'chrome'` + `devices[...]` 조합은 TLS 핑거프린트를 Chrome으로 유지하면서 HTTP 레이어(UA/viewport)만 모바일로 바꾼다. WAF가 실제 Chrome으로 인식해서 관대한 경우가 많다.
+### 엔진 밖에서 같은 효과가 필요할 때
+
+엔진 폴백이 아니라 에이전트가 직접 페이지를 조작해야 한다면 js eval에서 omowright(`browser` 스킬에 스테이징)를 쓴다. 지문이 고정된 스텔스 브라우저는 `connectCloakProfile({ profileDir })`, 모바일 뷰는 `emulate(page, "iphone-14")`, 사용자 로그인이 필요하면 `connectBrowserSkill()`이다.
 
 ## 선택 규칙 (자동)
 
@@ -129,8 +112,8 @@ const ctx = await chromium.launchPersistentContext(profileDir, {
 
 ## 디버깅 팁
 
-- 템플릿은 js eval에서 스크립트로 실행한다. `profileDir`는 작업 전용 경로나 사용자 프로필의 복제본만 사용한다.
-- 사용자의 실제 프로필을 실행·초기화·삭제하지 않는다. 작업 종료 시 컨텍스트를 닫고 작업 전용 복제본만 정리한다.
+- 템플릿의 `profileDir`는 작업 전용 경로만 사용한다. 사용자의 실제 프로필을 실행·복제·초기화·삭제하지 않는다.
+- 작업 종료 시 브라우저를 닫고 작업 전용 프로필만 정리한다.
 - 실패 시 `result.trace`의 `error` 필드에 Node stderr 200자가 포함됨
 
 ## 사이트 예시 (독자 이해용, 코드 분기 근거 아님)

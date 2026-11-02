@@ -1,8 +1,10 @@
 import { lstatSync, readdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
+import { isGrantedProjectMemoryRead } from "./project-memory-grants"
 import { TRANSIENT_DIRNAME, isDurableIdentityRoot } from "./transient-identity"
 
 // Structural mirror of the Senpi filesystem policy API (senpi branch feat/extension-fs-policy:
@@ -68,18 +70,29 @@ export function registerMemoryFilesystemPolicy(
  * `deniedRoots` is metadata only (Senpi: reserved for inherited process sandboxes) and lists the
  * durable sibling identities - the ones that own a `repo/` - so it cannot grow with the number of
  * one-shot runs the machine has executed (#7765).
+ *
+ * That list is the ONLY part of the policy that reads the filesystem, and `check` never consults
+ * it, so it is resolved when a host first asks for it rather than while the session is binding
+ * (#8412: one readdir plus one stat per sibling identity, 157 stats on a real agents root, all on
+ * the session-start critical path for a value the pinned engine never reads). The first read is
+ * memoised, so a host that asks repeatedly - per spawned sandbox, say - still pays one enumeration
+ * per bound session, exactly as binding used to.
  */
 function buildMemoryFilesystemPolicy(context: MemoryIdentityContext): FilesystemPolicy {
   const ownRoot = resolve(context.identityPaths.root)
   const durableAgentsRoot = dirname(resolve(context.durableRoot))
   const ownRoots = stableRoots([ownRoot])
   const deniedAreas = stableRoots([dirname(ownRoot), durableAgentsRoot, join(dirname(durableAgentsRoot), TRANSIENT_DIRNAME)])
-  const deniedRoots = durableForeignIdentityRoots(durableAgentsRoot, context.identity)
+  let resolvedDeniedRoots: readonly string[] | undefined
 
   return {
-    deniedRoots,
+    get deniedRoots(): readonly string[] {
+      resolvedDeniedRoots ??= durableForeignIdentityRoots(durableAgentsRoot, context.identity)
+      return resolvedDeniedRoots
+    },
     check(request: Readonly<FilesystemPolicyRequest>): FilesystemPolicyDecision {
       const target = resolve(request.canonicalPath)
+      if (request.operation === "read" && isGrantedProjectMemoryRead(context, target)) return { allow: true }
       if (ownRoots.some((root) => isWithin(root, target))) return { allow: true }
       if (deniedAreas.some((root) => isWithin(root, target))) {
         return {
@@ -115,6 +128,8 @@ function stableRoots(paths: readonly string[]): string[] {
 }
 
 function canonicalizeFromNearestExisting(target: string): string | undefined {
+  // A macOS automount trigger stays lexical: lstat/realpath under it can park the host loop (#11545).
+  if (isDarwinAutomountTriggerPath(target)) return undefined
   let candidate = target
   const missingSegments: string[] = []
   while (true) {
