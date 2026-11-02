@@ -44,17 +44,17 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "deep-low": {
     fallbackChain: [
-      // GPT-6.1 Sol leads at the same medium effort: it matches GPT-6 Sol's price with near-Astra
-      // quality, but only the OpenAI lanes serve it (plain, then the Fast tier). GPT-5.6 Sol stays
-      // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane.
-      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
-      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
+      // GPT-6.1 Sol leads at high effort with near-Astra quality, but only the OpenAI
+      // lanes serve it (plain, then the Fast tier). GPT-5.6 Sol stays behind it so Copilot,
+      // OpenCode Zen and a registry without 6.1 still resolve the lane.
+      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "high" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" }
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "high" }
     ],
   },
   "deep-high": {
@@ -97,7 +97,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot"],
         model: LATEST_MODEL_BY_FAMILY.claudeHaiku,
-        variant: "medium",
+        variant: "high",
       },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
       {
@@ -118,19 +118,19 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeSonnet,
-        variant: "medium",
+        variant: "high",
       },
       { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.6-pro", variant: "max" },
-      { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
+      { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "high" },
       // GLM 5.3 sits ahead of the GPT rungs so a Claude + Z.ai user does not fall from Sonnet to GPT (#10306).
       { providers: ["zai-coding-plan", "opencode-go"], model: LATEST_MODEL_BY_FAMILY.glm, variant: "high" },
       // GPT-6.1 Sol is the current GPT default, served only by the OpenAI lanes; GPT-5.6 Sol stays
       // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane (#9844).
-      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "high" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "medium",
+        variant: "high",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -151,7 +151,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeOpus,
-        variant: "medium",
+        variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode-go"], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
       {

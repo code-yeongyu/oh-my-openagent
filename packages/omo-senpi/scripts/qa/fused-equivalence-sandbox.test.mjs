@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -42,5 +42,15 @@ describe("prepareCaseSandbox", () => {
 		prepareCaseSandbox(run, {});
 
 		expect(pluginTelemetryOn(run.env)).toBe(false);
+	});
+
+	test("#given a prepared case sandbox #when the CLI child reads its MCP config #then no plugin MCP server is switched off", () => {
+		const run = harnessRun();
+
+		prepareCaseSandbox(run, {});
+
+		const mcpConfig = join(run.box.agentDir, "mcp.json");
+		const servers = existsSync(mcpConfig) ? JSON.parse(readFileSync(mcpConfig, "utf8")).mcpServers ?? {} : {};
+		expect(Object.entries(servers).filter(([, server]) => server.enabled === false)).toEqual([]);
 	});
 });
