@@ -166,7 +166,9 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
       type: "fail",
       timestamp: input.timestamp,
       error_message: terminalFailureMessage(owned, input.outcome.failure.message),
-      ...(input.outcome.failure.kind === "child-unresponsive" ? { failure_kind: input.outcome.failure.kind } : {}),
+      ...(input.outcome.failure.kind === "child-unresponsive" || input.outcome.failure.kind === "async_work_pending"
+        ? { failure_kind: input.outcome.failure.kind }
+        : {}),
       ...(input.outcome.killed === true ? { killed: true } : {}),
       ...(input.runStats === undefined ? {} : { run_stats: input.runStats }),
     })

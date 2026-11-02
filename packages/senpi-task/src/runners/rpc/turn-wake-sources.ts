@@ -17,15 +17,21 @@
 //   COMPLETED outcome is not terminal until every source reports zero: the work's completion
 //   notification wakes the child into the real final turn. Monitors deliberately do not gate a
 //   completed outcome - their wake semantics keep the session resumable, not the turn open.
+//   This ledger is the FALLBACK for an engine that publishes no lifecycle record: the engine's own
+//   `SessionLifecycle.waitingOn` (turn-async-work.ts) is authoritative whenever it is observed,
+//   because it also folds the producers that publish only on the engine's internal bus.
 
 export type TurnWakeSources = {
   readonly observe: (record: unknown) => void
   readonly hasLiveWakeSources: () => boolean
   /** The child's own async work (detached eval cells, background sessions, ...) is still in flight. */
   readonly hasPendingAsyncWork: () => boolean
+  readonly pendingAsyncWork: () => PendingAsyncWork | undefined
   /** A new turn began: goal timers belonged to the turn that armed them. Session-lifetime sources (terminal monitors, pending async work) survive. */
   readonly resetTurn: () => void
 }
+
+import { waitItemLabels, type PendingAsyncWork, type PendingAsyncWorkSource } from "../pending-async-work"
 
 type WakeSourceRecord = { readonly name?: unknown; readonly data?: unknown }
 
@@ -52,13 +58,13 @@ function monitorActiveCount(data: unknown): number | undefined {
   return typeof count === "number" && Number.isInteger(count) && count >= 0 ? count : undefined
 }
 
-function wakeSourceSnapshot(data: unknown): { readonly source: string; readonly activeCount: number } | undefined {
+function wakeSourceSnapshot(data: unknown): PendingAsyncWorkSource | undefined {
   if (typeof data !== "object" || data === null) return undefined
   const source = (data as { readonly source?: unknown }).source
   const count = (data as { readonly activeCount?: unknown }).activeCount
   if (typeof source !== "string" || source.length === 0) return undefined
   if (typeof count !== "number" || !Number.isInteger(count) || count < 0) return undefined
-  return { source, activeCount: count }
+  return { source, activeCount: count, labels: waitItemLabels((data as { readonly items?: unknown }).items) }
 }
 
 export function createTurnWakeSources(): TurnWakeSources {
@@ -69,7 +75,7 @@ export function createTurnWakeSources(): TurnWakeSources {
   const monitorWatches = new Map<string, true>()
   // One entry per source with work in flight (`senpi-codemode`, `terminal-background-sessions`,
   // ...); a zero-count snapshot removes its source, so an absent key means nothing pending.
-  const pendingAsyncWork = new Map<string, number>()
+  const pendingAsyncWork = new Map<string, PendingAsyncWorkSource>()
 
   const trackMonitorSnapshot = (data: unknown): void => {
     const count = monitorActiveCount(data)
@@ -110,7 +116,7 @@ export function createTurnWakeSources(): TurnWakeSources {
         const snapshot = wakeSourceSnapshot(event.data)
         if (snapshot !== undefined) {
           if (snapshot.activeCount === 0) pendingAsyncWork.delete(snapshot.source)
-          else pendingAsyncWork.set(snapshot.source, snapshot.activeCount)
+          else pendingAsyncWork.set(snapshot.source, snapshot)
         }
         return
       }
@@ -132,6 +138,9 @@ export function createTurnWakeSources(): TurnWakeSources {
     },
     hasPendingAsyncWork() {
       return pendingAsyncWork.size > 0
+    },
+    pendingAsyncWork() {
+      return pendingAsyncWork.size === 0 ? undefined : { sources: [...pendingAsyncWork.values()], children: 0 }
     },
     resetTurn() {
       armedGoalTimers.clear()
