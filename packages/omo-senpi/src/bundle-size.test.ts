@@ -170,6 +170,11 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
 // Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
 // Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
+// #12155 (the settings page's own refusal copy, #12123) measures 1,460,260 B on the canonical build
+// (linux/amd64 container, node 24, bun 1.4.4, byte-identical to the darwin build of the same source),
+// against dev's own 1,459,580 B artifact: the previous 1,460,160 B ceiling left 580 B of headroom and
+// the feature's copy and mapping need 680 B. Ceiling = the measurement + the standing 4 KiB headroom
+// (lead rule); revisit when a trim or a sidecar split moves the copy out of the main entry.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
