@@ -41,6 +41,18 @@ const ALLOWLIST: AllowlistEntry[] = [
     reason: "no connection and no host: the module reads getCACertificates and sets setDefaultCACertificates at engine startup (#10215); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity.",
   },
   {
+    file: "packages/omo-native/trust-acquisition.ts",
+    call: 'import { getCACertificates} from "node:tls"',
+    count: 1,
+    reason: "no connection and no host: the launcher trust importer reads getCACertificates(\"bundled\") only to pass Bun's compiled-in roots to the Windows trust helper on stdin (#10762, design 4.2); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).",
+  },
+  {
+    file: "packages/omo-native/trust-stage.ts",
+    call: 'import { getCACertificates} from "node:tls"',
+    count: 1,
+    reason: "no connection and no host: the launcher trust stage reads getCACertificates(\"extra\"), Bun's own parse of the native NODE_EXTRA_CA_CERTS, to compare the loaded set at adoption and capture user extras (#10762, design 5.2, 5.9); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).",
+  },
+  {
     file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
     call: 'import { get as httpsGet } from "node:https"',
     count: 1,
@@ -285,5 +297,6 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     for (const entry of ALLOWLIST) {
       expect(entry.reason.trim().length > 0, "allowlist entry without a reason: " + entry.file).toBe(true)
     }
-  })
+    // The whole-tree scan takes ~10 s; the preload's 20 s default reaches only the first file of a multi-file run.
+  }, 60_000)
 })

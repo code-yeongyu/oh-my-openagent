@@ -1,3 +1,11 @@
+## 2026-10-30 - Distribute model starts per task child (#11905)
+
+Add the category and agent distribution option to the OpenCode schema and spawn resolvers. Round-robin children retain their resolved chain for reactive fallback, including per-model settings.
+
+## 2026-10-30 - Simplify agent-usage reminder state (#11890)
+
+Return cached or newly loaded reminder state directly and pass unknown event properties to the existing session-ID parser. Remove the non-null assertion and redundant cast, and lower only this hook's lint baseline.
+
 ## 2026-10-29 - Name the corrupt credential recovery command (#11832)
 
 The keystore message names `omo account forget`; session mutation keeps locking and permits corrupt-state replacement only when explicitly requested.

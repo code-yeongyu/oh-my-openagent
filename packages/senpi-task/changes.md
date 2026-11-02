@@ -1,3 +1,7 @@
+## 2026-10-30 - Rotate configured category and agent model chains (#11905)
+
+Resolve round-robin chains from their reserved starting entry, preserve tuning and availability checks, and carry the remaining ordered models into runtime fallback. Keep omitted and sequential policies unchanged.
+
 ## 2026-10-29 - Confirm a host-session child's end before recording a cancel (#11783)
 
 A cancel of a daemon-hosted child this process holds no handle for is written durably, then cancelled only after `endHostSessionChild` confirms the end: a close the host answered, or the three-part proof that the generation the record names is gone (serving listing without the path, no handover-parked entry, a second listing). The pending-cancel finish and the TTL sweep no longer read "not listed on the recorded socket" as ended. A retry driver re-drives an unconfirmed cancel on the deferred backoff with explicit exits, all entrants share one in-flight pass per task, and a handle's end counts only when its port's close was answered (`HostSessionPort.close(): Promise<boolean>`).
