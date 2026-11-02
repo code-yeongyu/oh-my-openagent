@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.57] - 2026-11-01
+
+Runs on senpi 2026.10.31-2: Claude subscription sign-in now goes through the Claude Code CLI (accounts from the old sign-in are asked once to sign in again, keeping their name, pin and order), `/gpt-account unblock <id>` clears a usage-limit block after you reset it on the provider side, a finished turn no longer sits at "Working" while an extension's settle handler is slow, and startup warns when a skills root's ignore file hides a skill folder. A Claude OAuth token given to the plain `anthropic` provider is now refused with a pointer at `/login anthropic-subscription` instead of being sent as Claude Code, so omo no longer rewrites the engine's Claude Code version at install; every skill a prompt invokes now loads instead of stopping at five. ([#11983](https://github.com/code-yeongyu/oh-my-openagent/pull/11983))
+
+### Fixed
+
+- Internal telemetry maintenance. ([#12062](https://github.com/code-yeongyu/oh-my-openagent/pull/12062), fixes [#12061](https://github.com/code-yeongyu/oh-my-openagent/issues/12061))
+
+## [5.1.56] - 2026-11-01
+
+Distrusted intermediate certificates under an allowed root are not yet blocked; tracked upstream. ([#11956](https://github.com/code-yeongyu/oh-my-openagent/pull/11956))
+
+Engines started by the OmO desktop app, or by an OmO server you start yourself, no longer read `SSL_CERT_FILE` or `SSL_CERT_DIR`. If your root certificate is only in such a file, install it in your operating system's certificate store, or add it in the desktop app under Settings, Extra CA certificates. A server you start yourself also keeps honoring `NODE_EXTRA_CA_CERTS`. ([#11956](https://github.com/code-yeongyu/oh-my-openagent/pull/11956))
+
+On Linux, OmO now trusts only your distribution's generated certificate bundle. A root placed directly in `/etc/ssl/certs` or `/etc/ssl/cert.pem` without running `update-ca-certificates` or `update-ca-trust` is no longer trusted; install it with that tool. If OmO cannot read your operating system's certificates, the failed request says why and what to do. ([#11956](https://github.com/code-yeongyu/oh-my-openagent/pull/11956))
+
+The last sentence describes the completed rollout; its transport-error explanation is a later increment and is not enabled by this launcher-only change. ([#11956](https://github.com/code-yeongyu/oh-my-openagent/pull/11956))
+
+### Fixed
+
+- Memory git hooks no longer initialize unrelated supervisor modules before checking staged notes, preserving validation. The startup cut applies to the source runtime (tests and dev), where one pre-commit hook took about 3.7 s; the packaged plugin bundle already deferred module initialisation, and its hook-mode time was measured unchanged (about 133-151 ms before and after). ([#11957](https://github.com/code-yeongyu/oh-my-openagent/pull/11957)) ([#12037](https://github.com/code-yeongyu/oh-my-openagent/pull/12037))
+- Completed-turn memory journal counters are delivered before `agent_settled` and `agent_idle`, even when the bounded maintenance observer expires. Journal delivery does not wait for full snapshots, git reads, journal writes or reflection recovery. Late full snapshots preserve newer journal accounting, and unreadable transcripts fall back to durable counters. ([#11935](https://github.com/code-yeongyu/oh-my-openagent/pull/11935)) ([#12037](https://github.com/code-yeongyu/oh-my-openagent/pull/12037))
+- A foreground `task` spawn's running progress updates wait for launch settlement and carry the model the child actually started on (and a start-time fallback's route), instead of publishing incomplete model facts when the launch exceeds 250 ms. Foreground batch rows wait the same way and carry the launched run epoch and route (batch rows do not report `effective_model`). A launch that fails releases the held updates instead of freezing them; pending slot reports remain immediate ([#11693](https://github.com/code-yeongyu/oh-my-openagent/pull/11693), fixes [#11691](https://github.com/code-yeongyu/oh-my-openagent/issues/11691), [#11827](https://github.com/code-yeongyu/oh-my-openagent/issues/11827)). ([#12037](https://github.com/code-yeongyu/oh-my-openagent/pull/12037))
+
+### Changed
+
+- Memory command tests avoid redundant hook checks while seeding trusted fixtures, while retaining real hooks for later writes. ([#11954](https://github.com/code-yeongyu/oh-my-openagent/pull/11954)) ([#12037](https://github.com/code-yeongyu/oh-my-openagent/pull/12037))
+
+### Added
+
+- Add the engine CA importer's launcher trust stage: verify and adopt an inherited generation, or acquire a private generation and exec once with an independent hop bound. A failed import keeps only explicit extras and leaves implicit default inputs closed; child environments regain their original values. This is the launcher increment of the staged rollout, not the transport-error, background-refresh, trust CLI or desktop integration. ([#11956](https://github.com/code-yeongyu/oh-my-openagent/pull/11956), part of [#10762](https://github.com/code-yeongyu/oh-my-openagent/issues/10762))
+
 ## [5.1.55] - 2026-11-01
 
 **remove-ai-slops now names the two Bun scripts the programming skill ships for test work.** Phase 2 runs `check-test-junk.ts` over every in-scope test file and treats its `file:line` findings as category-9 candidates (never automatic cuts); Phase 4b names `mutation-proof.ts` as the command behind the serial apply/run/restore proof it already described. ([#12017](https://github.com/code-yeongyu/oh-my-openagent/pull/12017))
