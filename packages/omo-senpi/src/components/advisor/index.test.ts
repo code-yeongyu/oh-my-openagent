@@ -75,6 +75,10 @@ async function toolResults(pi: FakeExtensionAPI, count: number): Promise<void> {
 }
 
 describe("advisor component", () => {
+  it("#given the default config #when the component registers #then it registers no hook at all", () => {
+    expect(setup({ key: "k" }).pi.handlers).toHaveLength(0)
+  })
+
   it("#given the default config #when tool results pile up #then the gate is never called", async () => {
     const h = setup({ key: "k" })
     await h.pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "fix the build" }, SESSION)

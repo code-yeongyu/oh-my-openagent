@@ -47,10 +47,20 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
   const loadConfig = options.loadConfig ?? ((cwd: string) => loadSenpiOmoConfig({ cwd }).config)
   const runChild = options.runChild ?? runAdvisorChild
   const now = options.now ?? Date.now
+  // Off registers no hook at all: every registered tool_result handler shows up as a PostToolUse
+  // hook run on every tool call of every session, so a disabled advisor must not exist there.
+  const enabledAtStartup = (cwd: string): boolean => {
+    try {
+      return resolveOmoAdvisorSettings(loadConfig(cwd)).enabled
+    } catch {
+      return false
+    }
+  }
 
   return {
     name: "advisor",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      if (!enabledAtStartup(pi.cwd ?? process.cwd())) return
       const sessions = new Map<string, SessionRecord | null>()
 
       const recordFor = (eventCtx: unknown): SessionRecord | undefined => {
