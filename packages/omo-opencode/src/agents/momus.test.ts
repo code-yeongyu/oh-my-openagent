@@ -77,7 +77,7 @@ describe("createMomusAgent", () => {
       const config = createMomusAgent(model);
 
       // then
-      expect(config.reasoningEffort).toBe("medium");
+      expect(config.reasoningEffort).toBe("high");
     });
   });
 
