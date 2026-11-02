@@ -6,6 +6,7 @@ import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 import { MIN_SESSION_GONE_POLLS } from "../../features/background-agent/session-existence"
 import { formatDeletedSyncSessionError, isSyncSessionDeleted } from "./sync-session-existence"
+import { latestAssistantText } from "./sync-session-latest-text"
 
 export { isSessionComplete } from "./sync-session-turns"
 
@@ -272,7 +273,9 @@ export async function pollSyncSession(
         })
         abortSyncSession(client, input.sessionID, "max_turns_exceeded")
         if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
-        return `Task aborted: subagent exceeded ${maxTurns} assistant turns without completing. This usually indicates an infinite tool-call loop. Session ID: ${input.sessionID}`
+        const abortLine = `Task aborted: subagent exceeded ${maxTurns} assistant turns without completing. This usually indicates an infinite tool-call loop. Session ID: ${input.sessionID}`
+        const latestText = latestAssistantText(messages)
+        return latestText ? `${abortLine}\n\nLatest assistant text before the abort:\n${latestText}` : abortLine
       }
     }
 
