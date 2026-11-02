@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, expect, test } from "bun:test"
+import { afterAll, beforeAll, expect, spyOn, test } from "bun:test"
+import * as fsPromises from "node:fs/promises"
 import { createHash, X509Certificate } from "node:crypto"
 import { mkdtemp, readdir, readFile, realpath, rm, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir, uptime } from "node:os"
@@ -189,6 +190,22 @@ test("reusing an existing generation refreshes its recency, so ensure never hand
   const again = parsed((await ensure(dir, ["--json"])).out)
   expect(again.file).toBe(first.file)
   expect((await stat(first.file)).mtimeMs).toBeGreaterThan(Date.now() - 60_000)
+})
+
+test("a reused generation whose recency cannot be refreshed is reported, never fatal", async () => {
+  const dir = await directory()
+  const first = parsed((await ensure(dir, ["--json"])).out)
+  const refused = spyOn(fsPromises, "utimes").mockRejectedValue(Object.assign(new Error("EPERM"), { code: "EPERM" }))
+  try {
+    const { result, out } = await ensure(dir, ["--json"])
+    expect(result).toEqual({ action: "ensure" })
+    const value = parsed(out)
+    expect(value.file).toBe(first.file)
+    expect(value.diagnostics).toEqual([{ code: "trust-lease-failed" }])
+    expect((await records(dir)).at(-1).codes).toEqual([{ code: "trust-lease-failed" }])
+  } finally {
+    refused.mockRestore()
+  }
 })
 
 test("a lease that cannot be written is reported, never fatal, and never widens the generation", async () => {
