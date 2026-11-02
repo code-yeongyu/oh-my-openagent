@@ -6,7 +6,7 @@ import omoOpenCodeManifest from "../../omo-opencode/package.json"
 import senpiTaskManifest from "../../senpi-task/package.json"
 import rootManifest from "../../../package.json"
 
-const SENPI_PIN = "2026.10.30-1"
+const SENPI_PIN = "2026.10.31-2"
 const EXACT_PIN = /^\d/
 
 describe("senpi dependency pin", () => {

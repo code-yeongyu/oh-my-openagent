@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.57] - 2026-11-01
+
+Runs on senpi 2026.10.31-2: Claude subscription sign-in now goes through the Claude Code CLI (accounts from the old sign-in are asked once to sign in again, keeping their name, pin and order), `/gpt-account unblock <id>` clears a usage-limit block after you reset it on the provider side, a finished turn no longer sits at "Working" while an extension's settle handler is slow, and startup warns when a skills root's ignore file hides a skill folder. A Claude OAuth token given to the plain `anthropic` provider is now refused with a pointer at `/login anthropic-subscription` instead of being sent as Claude Code, so omo no longer rewrites the engine's Claude Code version at install; every skill a prompt invokes now loads instead of stopping at five. ([#11983](https://github.com/code-yeongyu/oh-my-openagent/pull/11983))
+
+### Fixed
+
+- Internal telemetry maintenance. ([#12062](https://github.com/code-yeongyu/oh-my-openagent/pull/12062), fixes [#12061](https://github.com/code-yeongyu/oh-my-openagent/issues/12061))
+
 ## [5.1.56] - 2026-11-01
 
 Distrusted intermediate certificates under an allowed root are not yet blocked; tracked upstream. ([#11956](https://github.com/code-yeongyu/oh-my-openagent/pull/11956))
