@@ -12,7 +12,7 @@ import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
-import { reflectionLockReport } from "./doctor-reflection-lock.js"
+import { reflectionLockFix, reflectionLockReport } from "./doctor-reflection-lock.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
@@ -188,15 +188,17 @@ export async function runLauncher(args = process.argv.slice(2)) {
       process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
       return
     }
+    const fix = args[1] === "--fix"
+    const doctorArgs = fix ? args.slice(2) : args.slice(1)
     const [categoryCoverage, computerUse, configDiagnostics, reflectionLock] = args[1] === "--reap"
       ? [[], [], [], []]
       : await Promise.all([
           doctorCoverageLines({ agentDir: canonicalAgentDir() }),
           doctorComputerUseLines(),
           doctorConfigLines(),
-          reflectionLockReport(),
+          fix ? reflectionLockFix() : reflectionLockReport(),
         ])
-    runDoctor(await detectHarnesses(), args.slice(1), {
+    runDoctor(await detectHarnesses(), doctorArgs, {
       daemonEngine: { run: engineHostCall },
       categoryCoverage,
       computerUse,

@@ -75,7 +75,7 @@ function stuck(runId: string, reason: string): ReflectionLockVerdict {
 
 // A live pid still counts as gone when its recorded start identity proves the pid was reused: the rule
 // reconciliation applies (worker/run-liveness.ts). An unreadable or incomparable start keeps it live.
-async function launcherLiveness(pid: number, recordedStart: unknown, probe: ReflectionLockProbe): Promise<ProcessLiveness> {
+export async function launcherLiveness(pid: number, recordedStart: unknown, probe: ReflectionLockProbe): Promise<ProcessLiveness> {
   const liveness = (probe.getPidLiveness ?? getPidLiveness)(pid)
   if (liveness !== "alive" || typeof recordedStart !== "string") return liveness
   const actualStart = await (probe.getProcessStartIdentity ?? getProcessStartIdentity)(pid).catch(() => null)

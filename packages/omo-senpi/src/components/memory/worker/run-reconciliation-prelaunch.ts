@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import {
   discardReflectionWorktree,
+  getPidLiveness,
   GitMemoryRepo,
   RESERVATION_EVIDENCE_FILENAME,
   writeQuarantine,
@@ -27,11 +28,17 @@ export interface PrelaunchReconcile {
 
 export async function reconcilePrelaunch(context: ReconcileContext): Promise<PrelaunchReconcile> {
   context.signal?.throwIfAborted()
-  const active = (await context.reservation.readState(
-    context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
-  )).active
+  const lockOptions = context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined
+  const state = await context.reservation.readState(lockOptions)
+  const active = state.active
   context.signal?.throwIfAborted()
-  if (active === undefined) return {}
+  if (active === undefined) {
+    if (state.pending !== undefined && context.reservation.promoteOrphanedPending !== undefined) {
+      const promoted = await context.reservation.promoteOrphanedPending(lockOptions)
+      if (promoted !== undefined) context.launch?.(promoted)
+    }
+    return {}
+  }
   const ghost = await classifyGhostActive({ identity: context.identity, active })
   context.signal?.throwIfAborted()
   if (ghost.ghost && ghost.reason === "missing-identity") {
@@ -152,7 +159,10 @@ async function recordedProcessesDead(context: ReconcileContext, runDir: string):
   const pid = (key: string) => typeof raw[key] === "number" ? raw[key] as number : undefined
   const start = (key: string) => typeof raw[key] === "string" || raw[key] === null ? raw[key] as string | null : undefined
   for (const [pidKey, startKey] of [["pid", "processStart"], ["childPid", "childProcessStart"]] as const) {
-    const verdict = await classifyRunProcess(pid(pidKey), start(startKey), context)
+    const recordedPid = pid(pidKey)
+    // ESRCH proves no process owns the pid, so a missing start identity cannot keep it alive (#11920).
+    if (recordedPid !== undefined && (context.getPidLiveness ?? getPidLiveness)(recordedPid) === "dead") continue
+    const verdict = await classifyRunProcess(recordedPid, start(startKey), context)
     if (verdict !== "dead" && verdict !== "absent") return false
   }
   return true

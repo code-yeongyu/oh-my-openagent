@@ -16,6 +16,7 @@ export interface ReservationStatePort extends ReflectionReservationPort {
     readonly active?: ReservedRun
     readonly pending?: ReservedRun
   }>
+  promoteOrphanedPending?(options?: ReflectionReservationLockOptions): Promise<ReservedRun | undefined>
 }
 
 export interface RunFinalizationContext extends RunLivenessSeams {

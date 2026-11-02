@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { spawn } from "node:child_process"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { hostname, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { formatReflectionLockLines, reflectionLockReport } from "../bin/lib/doctor-reflection-lock.js"
+import { formatReflectionLockLines, reflectionLockFix, reflectionLockReport } from "../bin/lib/doctor-reflection-lock.js"
 import { runDoctor } from "../bin/lib/doctor.js"
 
 const roots: string[] = []
@@ -104,5 +105,44 @@ describe("omo doctor reflection lock report (#10377)", () => {
       process.exitCode = originalExitCode ?? 0
     }
     expect(logged.join("\n")).toContain("WARN memory reflection is stuck on a stale lock (agent-a)")
+  })
+})
+
+async function killedPid(): Promise<number> {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1e6)"], { stdio: "ignore" })
+  const pid = child.pid
+  if (pid === undefined) throw new Error("child did not start")
+  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+  child.kill("SIGKILL")
+  await exited
+  return pid
+}
+
+function holder(reflectionDir: string, launcherPid: number): string {
+  const lock = join(reflectionDir, "active.lock")
+  write(lock, { runId: "reflection-run-7", request: { trigger: "manual", conversationIds: [], snapshots: [] }, reservedAt: new Date(Date.now() - 10 * 60_000).toISOString(), launcherPid, launcherHostname: hostname() })
+  return lock
+}
+
+describe("omo doctor --fix reaps a stale reflection lock (#11976)", () => {
+  test("#given a launcher killed with SIGKILL #when plain omo doctor reports #then it points at --fix and leaves the lock", async () => {
+    const root = memoryHome()
+    const lock = holder(identity(root, "agent-a"), await killedPid())
+    const lines = await reflectionLockReport({ env: { OMO_MEMORY_HOME: root } })
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain("omo doctor --fix")
+    expect(existsSync(lock)).toBe(true)
+  })
+
+  test("#given dead and live holders across identities #when omo doctor --fix runs #then only the dead one is moved aside", async () => {
+    const root = memoryHome()
+    const dead = holder(identity(root, "agent-dead"), await killedPid())
+    const live = holder(identity(root, "agent-live"), process.pid)
+    const lines = await reflectionLockFix({ env: { OMO_MEMORY_HOME: root } })
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toStartWith("PASS reaped a stale reflection lock (agent-dead): run reflection-run-7")
+    expect(existsSync(dead)).toBe(false)
+    expect(existsSync(join(dirname(dead), "reaped"))).toBe(true)
+    expect(existsSync(live)).toBe(true)
   })
 })

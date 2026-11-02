@@ -205,6 +205,20 @@ export class ReflectionReservationStore {
     }, undefined, options)
   }
 
+  /**
+   * A pending run with no active one is left when an active lock was reaped (#11976) or a scheduler
+   * died between its two writes. It becomes the active run, owned by this launcher; the caller launches it.
+   */
+  async promoteOrphanedPending(lockOptions?: ReflectionReservationLockOptions): Promise<ReservedRun | undefined> {
+    return this.locked(undefined, async () => {
+      const current = await this.readStateUnlocked()
+      if (current.active !== undefined || current.pending === undefined) return undefined
+      const active = await this.withLaunchOwner(current.pending)
+      await this.writeStateUnlocked({ active })
+      return active
+    }, undefined, lockOptions)
+  }
+
   async readState(lockOptions?: ReflectionReservationLockOptions): Promise<ReservationState> {
     return this.locked(undefined, () => this.readStateUnlocked(), undefined, lockOptions)
   }

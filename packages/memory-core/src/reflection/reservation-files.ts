@@ -79,7 +79,7 @@ export async function currentLauncherIdentity(): Promise<ReflectionLauncherIdent
   }
 }
 
-function isReservedRun(value: unknown): value is ReservedRun {
+export function isReservedRun(value: unknown): value is ReservedRun {
   if (!value || typeof value !== "object") return false
   const run = value as Record<string, unknown>
   return typeof run.runId === "string" && run.runId.length > 0 && isReflectionRequest(run.request)

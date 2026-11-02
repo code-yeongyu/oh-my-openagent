@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import {
   LockContentionError,
+  reapStaleReflectionLock,
   type MemoryIdentity,
   type ProcessLiveness,
   type ReservedRun,
@@ -69,6 +70,13 @@ export async function reconcileReflectionRuns(
   try {
     context.signal?.throwIfAborted()
     const results: ReflectionRunReconcileResult[] = []
+    // An unparseable active.lock cannot be read as a reservation, so nothing below could settle it (#11976).
+    await reapStaleReflectionLock(options.identity.paths.reflection, {
+      scope: "unparseable",
+      probe: { now: context.now, hostname: context.hostname, ...(context.getPidLiveness === undefined ? {} : { getPidLiveness: context.getPidLiveness }), ...(context.getProcessStartIdentity === undefined ? {} : { getProcessStartIdentity: context.getProcessStartIdentity }) },
+      ...(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : {}),
+    })
+    context.signal?.throwIfAborted()
     const prelaunch = await reconcilePrelaunch(context)
     context.signal?.throwIfAborted()
     if (prelaunch.result !== undefined) results.push(prelaunch.result)
