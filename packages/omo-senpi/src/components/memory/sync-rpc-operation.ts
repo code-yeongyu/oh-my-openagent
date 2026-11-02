@@ -1,13 +1,14 @@
 import type { ApproveOutcome } from "@oh-my-opencode/memory-core/sync-engine"
 import type { SyncEnableResponse, SyncRpcProblem } from "./sync-rpc-contract"
 import type { SyncRpcAccount, SyncRpcAuthority, SyncRpcClaim, SyncRpcContext, SyncRpcOperation, SyncRpcOptions } from "./sync-rpc-ports"
+import { serviceRefusal } from "./sync-service-refusal"
 
 export const unavailable = (): SyncRpcProblem => ({ kind: "unavailable", reason: "Memory sync authority is unavailable." })
 export const refused = (): SyncRpcProblem => ({ kind: "refused", reason: "This sync operation is no longer available to this connection." })
 export function serviceProblem(error: unknown): SyncRpcProblem {
   return error instanceof Error && error.name === "AccountHttpError" && "status" in error
     && typeof error.status === "number" && error.status >= 400 && error.status < 500
-    ? { kind: "refused", reason: "The service refused this sync request." }
+    ? serviceRefusal("code" in error && typeof error.code === "string" ? error.code : "")
     : unavailable()
 }
 
