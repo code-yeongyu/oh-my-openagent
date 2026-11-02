@@ -42,7 +42,7 @@ function setup(input: {
   const fakeFetch = (async (_url: unknown, init?: RequestInit) => {
     fetchBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
     fetchHeaders.push(init?.headers as Record<string, string>)
-    return new Response(JSON.stringify({ answers: { wandering: { type: "noul", noul: input.probability ?? 0.9 } }, usage: { input_tokens: 42 } }))
+    return new Response(JSON.stringify({ answers: { stuck: { type: "noul", noul: input.probability ?? 0.9 }, kind: { type: "choice", choice: "error_streak", confidence: 0.9 } }, usage: { input_tokens: 42 } }))
   }) as typeof fetch
   const ctx: ComponentContext = { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: (name) => pi.getFlag(name) } }
   createAdvisorComponent({
@@ -51,7 +51,7 @@ function setup(input: {
     fetch: fakeFetch,
     runChild: async (request) => {
       childRequests.push(request)
-      return input.child ?? { kind: "advice", text: "Stop re-running the build; read the first error.", model: "anthropic/claude-opus-5-5" }
+      return input.child ?? { kind: "advice", text: "ROOT CAUSE: the header path is wrong. DO THIS: 1. read the first error.", model: "anthropic/claude-opus-5-5", ms: 5 }
     },
   }).register(pi, ctx)
   const nextEntry = (): Promise<unknown> => {
@@ -82,39 +82,39 @@ describe("advisor component", () => {
     expect(h.pi.messages).toHaveLength(0)
   })
 
-  it("#given enabled and a low score #when check_every results arrive #then the gate is asked once and nothing is sent", async () => {
-    const h = setup({ advisor: { enabled: true, check_every: 3 }, probability: 0.2, key: "secret-key" })
+  it("#given enabled and a low score #when min_calls results arrive #then the gate is asked once and nothing is sent", async () => {
+    const h = setup({ advisor: { enabled: true, min_calls: 3 }, probability: 0.2, key: "secret-key" })
     await h.pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "fix the build" }, SESSION)
     const entry = h.nextEntry()
     await toolResults(h.pi, 3)
-    expect(await entry).toMatchObject({ triggered: false, gate: { kind: "scored", probability: 0.2 } })
+    expect(await entry).toMatchObject({ triggered: false, gate: { kind: "judged", stuck: 0.2, trouble: "error_streak" } })
     expect(h.fetchBodies).toHaveLength(1)
     const body = h.fetchBodies[0]
     expect(body?.["model"]).toBe("sionic-ai/jev-omni")
-    expect(body?.["questions"]).toMatchObject({ wandering: { type: "noul" } })
-    expect(String(body?.["state"])).toContain("fix the build")
-    expect(String(body?.["state"])).toContain("tool bash [ERROR]")
+    expect(body?.["questions"]).toMatchObject({ stuck: { type: "noul" }, kind: { type: "choice" } })
+    expect(body?.["state"]).toMatchObject({ task: "fix the build", counts: { error_run: 3, identical_run: 3 } })
     expect(h.fetchHeaders[0]?.["authorization"]).toBe("Bearer secret-key")
     expect(h.childRequests).toHaveLength(0)
     expect(h.pi.messages).toHaveLength(0)
   })
 
   it("#given a high score #when the gate fires #then the pinned advisor model's hint is steered in, capped per session", async () => {
-    const h = setup({ advisor: { enabled: true, check_every: 2, cooldown: 0, max_per_session: 1, model: "anthropic/claude-opus-5-5" }, probability: 0.95, key: "k" })
+    const h = setup({ advisor: { enabled: true, min_calls: 2, cooldown: 0, max_per_session: 1, model: "openai/gpt-x" }, probability: 0.95, key: "k" })
     const entry = h.nextEntry()
     await toolResults(h.pi, 2)
     expect(await entry).toMatchObject({ triggered: true, advice: { kind: "advice" } })
-    expect(h.childRequests[0]?.model).toBe("anthropic/claude-opus-5-5")
+    expect(h.childRequests[0]).toMatchObject({ model: "openai/gpt-x", thinking: "medium" })
+    expect(h.childRequests[0]?.prompt).toContain("label=error_streak")
     expect(h.pi.messages).toHaveLength(1)
     expect(h.pi.messages[0]?.message).toMatchObject({ customType: ADVISOR_ADVICE_TYPE, display: false })
-    expect(String(h.pi.messages[0]?.message["content"])).toContain("read the first error")
+    expect(String(h.pi.messages[0]?.message["content"])).toContain("ROOT CAUSE: the header path is wrong")
     expect(h.pi.messages[0]?.options).toEqual({ deliverAs: "steer" })
     await toolResults(h.pi, 6)
     expect(h.fetchBodies).toHaveLength(1)
   })
 
   it("#given no key in the environment #when the gate is due #then no request is made and the miss is recorded", async () => {
-    const h = setup({ advisor: { enabled: true, check_every: 1 } })
+    const h = setup({ advisor: { enabled: true, min_calls: 1 } })
     const entry = h.nextEntry()
     await toolResults(h.pi, 1)
     expect(await entry).toMatchObject({ gate: { kind: "no_key" } })
@@ -122,7 +122,7 @@ describe("advisor component", () => {
   })
 
   it("#given the advisor child fails #when the gate fires #then the session gets no message", async () => {
-    const h = setup({ advisor: { enabled: true, check_every: 1 }, key: "k", child: { kind: "failed", reason: "timeout" } })
+    const h = setup({ advisor: { enabled: true, min_calls: 1 }, key: "k", child: { kind: "failed", reason: "timeout" } })
     const entry = h.nextEntry()
     await toolResults(h.pi, 1)
     expect(await entry).toMatchObject({ triggered: true, advice: { kind: "failed", reason: "timeout" } })

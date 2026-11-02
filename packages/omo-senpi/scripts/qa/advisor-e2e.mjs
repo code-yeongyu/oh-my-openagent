@@ -6,7 +6,7 @@
 // an isolated agent directory with a mock provider and a local `/v1/decisions` server, so the whole
 // path is proven end to end: tool results -> gate POST -> advisor child -> steered hint.
 //
-//   positive  advisor.enabled true, check_every 2, cooldown 0, max_per_session 1: the session runs a
+//   positive  advisor.enabled true, min_calls 2, cooldown 0, max_per_session 1: the session runs a
 //             failing bash tool four times. The decisions server must receive exactly one POST whose
 //             bearer key came from the configured environment variable and whose `state` carries the
 //             task prompt, the transcript must hold an `omo-advisor:gate` entry with `triggered: true`
@@ -102,7 +102,7 @@ function startDecisionsServer() {
 				body,
 			});
 			response.writeHead(200, { "content-type": "application/json" });
-			response.end(JSON.stringify({ answers: { wandering: { type: "noul", noul: 0.9 } }, usage: { input_tokens: 10 } }));
+			response.end(JSON.stringify({ answers: { stuck: { type: "noul", noul: 0.9 }, kind: { type: "choice", choice: "error_streak", confidence: 0.9 } }, usage: { input_tokens: 10 } }));
 		});
 	});
 	const listening = new Promise((resolvePort, rejectPort) => {
@@ -133,7 +133,7 @@ function writeAdvisorConfig(cwd, port, enabled) {
 			{
 				advisor: {
 					enabled,
-					check_every: 2,
+					min_calls: 2,
 					cooldown: 0,
 					max_per_session: 1,
 					window: 24,
@@ -336,7 +336,7 @@ function readTranscripts(sessionDir) {
 
 function positiveChecks(result) {
 	const bodies = result.bodies;
-	const tasks = bodies.map((body) => (typeof body.state === "string" ? body.state : ""));
+	const tasks = bodies.map((body) => (typeof body.state === "string" ? body.state : JSON.stringify(body.state ?? "")));
 	const advisorRequests = result.providerLog.filter((line) => line.model === ADVISOR_MODEL);
 	return {
 		exitOk: { ok: result.run.status === 0, observed: { status: result.run.status, signal: result.run.signal, timedOut: result.run.timedOut } },
@@ -347,8 +347,8 @@ function positiveChecks(result) {
 		},
 		stateCarriesTask: { ok: tasks.some((state) => state.includes(TASK_TOKEN)), observed: tasks.map((state) => state.slice(0, 200)) },
 		noulQuestion: {
-			ok: bodies.every((body) => body.questions?.wandering?.type === "noul"),
-			observed: bodies.map((body) => body.questions?.wandering?.type ?? null),
+			ok: bodies.every((body) => body.questions?.stuck?.type === "noul" && body.questions?.kind?.type === "choice"),
+			observed: bodies.map((body) => [body.questions?.stuck?.type ?? null, body.questions?.kind?.type ?? null]),
 		},
 		gateTriggered: { ok: gateTriggered(result.entries), observed: result.entries.filter((entry) => JSON.stringify(entry).includes(GATE_ENTRY_TYPE)).length },
 		adviceDelivered: {

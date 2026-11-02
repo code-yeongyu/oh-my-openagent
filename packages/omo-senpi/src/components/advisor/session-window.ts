@@ -1,53 +1,53 @@
-const TASK_CHARS = 1200
-const ARGS_CHARS = 240
-const RESULT_CHARS = 320
-const ASSISTANT_CHARS = 600
+const TASK_CHARS = 4000
+const ARGS_CHARS = 400
+const RESULT_CHARS = 1200
+const WAIT_TOOLS: ReadonlySet<string> = new Set(["bash_output", "task_output", "sleep"])
 
-export type AdvisorEvent =
-  | { readonly kind: "tool"; readonly name: string; readonly args: string; readonly error: boolean; readonly result: string }
-  | { readonly kind: "assistant"; readonly text: string }
+export interface AdvisorToolEvent {
+  readonly tool: string
+  readonly args: string
+  readonly result: string
+  readonly isError: boolean
+  readonly isWait: boolean
+}
 
 export interface AdvisorSessionWindow {
   task: string | undefined
-  readonly events: AdvisorEvent[]
+  readonly calls: AdvisorToolEvent[]
   toolResults: number
-  lastGateAt: number
   lastAdviceAt: number | undefined
   advices: number
   inFlight: boolean
+  lastMessageAt: number
 }
 
-export function createAdvisorSessionWindow(): AdvisorSessionWindow {
-  return { task: undefined, events: [], toolResults: 0, lastGateAt: 0, lastAdviceAt: undefined, advices: 0, inFlight: false }
+export function createAdvisorSessionWindow(now: number): AdvisorSessionWindow {
+  return { task: undefined, calls: [], toolResults: 0, lastAdviceAt: undefined, advices: 0, inFlight: false, lastMessageAt: now }
 }
 
-export function pushAdvisorEvent(window: AdvisorSessionWindow, event: AdvisorEvent, limit: number): void {
-  window.events.push(event)
-  if (window.events.length > limit) window.events.splice(0, window.events.length - limit)
-}
-
-export function toolEvent(name: string, input: unknown, error: boolean, content: unknown): AdvisorEvent {
-  return { kind: "tool", name, args: clip(stringify(input), ARGS_CHARS), error, result: clip(textOf(content), RESULT_CHARS) }
-}
-
-export function assistantEvent(text: string): AdvisorEvent {
-  return { kind: "assistant", text: clip(text, ASSISTANT_CHARS) }
+export function recordToolResult(window: AdvisorSessionWindow, tool: string, input: unknown, isError: boolean, content: unknown, limit: number): void {
+  const args = clip(stringify(input), ARGS_CHARS)
+  window.calls.push({ tool, args, result: clip(textOf(content), RESULT_CHARS), isError, isWait: WAIT_TOOLS.has(tool) || /\bsleep\s+\d/.test(args) })
+  if (window.calls.length > limit) window.calls.splice(0, window.calls.length - limit)
+  window.toolResults += 1
 }
 
 export function rememberTask(window: AdvisorSessionWindow, prompt: string): void {
   if (window.task !== undefined) return
-  const line = prompt.trim()
-  if (line.length > 0) window.task = clip(line, TASK_CHARS)
+  const text = prompt.trim()
+  if (text.length > 0) window.task = text.length > TASK_CHARS ? `${text.slice(0, TASK_CHARS)}...` : text
 }
 
-export function renderAdvisorState(window: AdvisorSessionWindow): string {
-  const lines = [`TASK:\n${window.task ?? "(unknown)"}`, "", `RECENT ACTIVITY (oldest first, ${window.events.length} events):`]
-  window.events.forEach((event, index) => {
-    const n = index + 1
-    if (event.kind === "assistant") lines.push(`${n}. assistant: ${event.text}`)
-    else lines.push(`${n}. tool ${event.name}${event.error ? " [ERROR]" : ""} args=${event.args} -> ${event.result}`)
-  })
-  return lines.join("\n")
+export function trailingRun(calls: readonly AdvisorToolEvent[], same: (a: AdvisorToolEvent, b: AdvisorToolEvent) => boolean): number {
+  const last = calls[calls.length - 1]
+  if (last === undefined) return 0
+  let run = 0
+  for (let index = calls.length - 1; index >= 0; index -= 1) {
+    const call = calls[index]
+    if (call === undefined || !same(call, last)) break
+    run += 1
+  }
+  return run
 }
 
 function clip(text: string, max: number): string {

@@ -2501,8 +2501,22 @@
           "type": "boolean"
         },
         "model": {
+          "default": "anthropic/claude-opus-5-5",
           "type": "string",
           "minLength": 1
+        },
+        "thinking": {
+          "default": "medium",
+          "type": "string",
+          "enum": [
+            "off",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
         },
         "category": {
           "default": "ultrabrain",
@@ -2525,25 +2539,37 @@
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
         },
         "threshold": {
-          "default": 0.6,
+          "default": 0.7,
           "type": "number",
           "minimum": 0,
           "maximum": 1
         },
+        "kind_confidence": {
+          "default": 0.4,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "min_calls": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
         "check_every": {
-          "default": 5,
+          "default": 1,
           "type": "integer",
           "minimum": 1,
           "maximum": 100
         },
         "cooldown": {
-          "default": 10,
+          "default": 5,
           "type": "integer",
           "minimum": 0,
           "maximum": 1000
         },
         "max_per_session": {
-          "default": 3,
+          "default": 10,
           "type": "integer",
           "minimum": 0,
           "maximum": 50
@@ -2551,14 +2577,14 @@
         "window": {
           "default": 24,
           "type": "integer",
-          "minimum": 4,
+          "minimum": 12,
           "maximum": 200
         },
         "timeout_seconds": {
-          "default": 120,
+          "default": 180,
           "type": "integer",
           "minimum": 10,
-          "maximum": 600
+          "maximum": 900
         }
       },
       "additionalProperties": false
@@ -4941,6 +4967,18 @@
               "type": "string",
               "minLength": 1
             },
+            "thinking": {
+              "type": "string",
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
             "category": {
               "type": "string",
               "minLength": 1
@@ -4962,6 +5000,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "kind_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
             "check_every": {
               "type": "integer",
               "minimum": 1,
@@ -4979,13 +5027,13 @@
             },
             "window": {
               "type": "integer",
-              "minimum": 4,
+              "minimum": 12,
               "maximum": 200
             },
             "timeout_seconds": {
               "type": "integer",
               "minimum": 10,
-              "maximum": 600
+              "maximum": 900
             }
           },
           "additionalProperties": false
@@ -7368,6 +7416,18 @@
               "type": "string",
               "minLength": 1
             },
+            "thinking": {
+              "type": "string",
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
             "category": {
               "type": "string",
               "minLength": 1
@@ -7389,6 +7449,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "kind_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
             "check_every": {
               "type": "integer",
               "minimum": 1,
@@ -7406,13 +7476,13 @@
             },
             "window": {
               "type": "integer",
-              "minimum": 4,
+              "minimum": 12,
               "maximum": 200
             },
             "timeout_seconds": {
               "type": "integer",
               "minimum": 10,
-              "maximum": 600
+              "maximum": 900
             }
           },
           "additionalProperties": false
@@ -9795,6 +9865,18 @@
               "type": "string",
               "minLength": 1
             },
+            "thinking": {
+              "type": "string",
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ]
+            },
             "category": {
               "type": "string",
               "minLength": 1
@@ -9816,6 +9898,16 @@
               "minimum": 0,
               "maximum": 1
             },
+            "kind_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "min_calls": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
             "check_every": {
               "type": "integer",
               "minimum": 1,
@@ -9833,13 +9925,13 @@
             },
             "window": {
               "type": "integer",
-              "minimum": 4,
+              "minimum": 12,
               "maximum": 200
             },
             "timeout_seconds": {
               "type": "integer",
               "minimum": 10,
-              "maximum": 600
+              "maximum": 900
             }
           },
           "additionalProperties": false
@@ -12228,6 +12320,18 @@
                 "type": "string",
                 "minLength": 1
               },
+              "thinking": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              },
               "category": {
                 "type": "string",
                 "minLength": 1
@@ -12249,6 +12353,16 @@
                 "minimum": 0,
                 "maximum": 1
               },
+              "kind_confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "min_calls": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
               "check_every": {
                 "type": "integer",
                 "minimum": 1,
@@ -12266,13 +12380,13 @@
               },
               "window": {
                 "type": "integer",
-                "minimum": 4,
+                "minimum": 12,
                 "maximum": 200
               },
               "timeout_seconds": {
                 "type": "integer",
                 "minimum": 10,
-                "maximum": 600
+                "maximum": 900
               }
             },
             "additionalProperties": false
@@ -14655,6 +14769,18 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "thinking": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
                   "category": {
                     "type": "string",
                     "minLength": 1
@@ -14676,6 +14802,16 @@
                     "minimum": 0,
                     "maximum": 1
                   },
+                  "kind_confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "min_calls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
                   "check_every": {
                     "type": "integer",
                     "minimum": 1,
@@ -14693,13 +14829,13 @@
                   },
                   "window": {
                     "type": "integer",
-                    "minimum": 4,
+                    "minimum": 12,
                     "maximum": 200
                   },
                   "timeout_seconds": {
                     "type": "integer",
                     "minimum": 10,
-                    "maximum": 600
+                    "maximum": 900
                   }
                 },
                 "additionalProperties": false
@@ -17082,6 +17218,18 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "thinking": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
                   "category": {
                     "type": "string",
                     "minLength": 1
@@ -17103,6 +17251,16 @@
                     "minimum": 0,
                     "maximum": 1
                   },
+                  "kind_confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "min_calls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
                   "check_every": {
                     "type": "integer",
                     "minimum": 1,
@@ -17120,13 +17278,13 @@
                   },
                   "window": {
                     "type": "integer",
-                    "minimum": 4,
+                    "minimum": 12,
                     "maximum": 200
                   },
                   "timeout_seconds": {
                     "type": "integer",
                     "minimum": 10,
-                    "maximum": 600
+                    "maximum": 900
                   }
                 },
                 "additionalProperties": false
@@ -19509,6 +19667,18 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "thinking": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max"
+                    ]
+                  },
                   "category": {
                     "type": "string",
                     "minLength": 1
@@ -19530,6 +19700,16 @@
                     "minimum": 0,
                     "maximum": 1
                   },
+                  "kind_confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "min_calls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
                   "check_every": {
                     "type": "integer",
                     "minimum": 1,
@@ -19547,13 +19727,13 @@
                   },
                   "window": {
                     "type": "integer",
-                    "minimum": 4,
+                    "minimum": 12,
                     "maximum": 200
                   },
                   "timeout_seconds": {
                     "type": "integer",
                     "minimum": 10,
-                    "maximum": 600
+                    "maximum": 900
                   }
                 },
                 "additionalProperties": false

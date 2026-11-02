@@ -107,7 +107,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "memory": {},         // MemorySettings (Native harness)
   "git_master": { "include_co_authored_by": true, "commit_footer": false }, // sisyphus-dev-ai co-author trailer (on by default) and opt-in commit footer (Native harness)
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
-  "advisor": { "enabled": false }, // stuck-session second opinion (Native harness), off by default
+  "advisor": { "enabled": false }, // decision-model gate + stronger-model plan for stuck sessions (Native harness), off by default
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
@@ -334,30 +334,34 @@ normal resolution order.
 
 ### `advisor` (Native harness)
 
-The optional `advisor` block (`schema/advisor.ts`) turns on a second opinion for sessions that get stuck. It is **off by default** because, once on, it sends an excerpt of the session (the task prompt, recent tool calls with a short argument and result head, recent assistant text) to two remote endpoints.
+The optional `advisor` block (`schema/advisor.ts`) brings in a stronger model when a session gets stuck. It is **off by default** because, once on, it sends an excerpt of the session (the task prompt and recent tool calls with an argument head and a result tail) to two remote endpoints.
 
-While it is on, the session's recent activity is kept in a bounded window (`window` events). Every `check_every` tool results the advisor posts that window to a decision endpoint (`decision_url`, the `/v1/decisions` request shape: `state` plus one `noul` question asking whether the agent is stuck or wandering) with the model `decision_model` and a bearer key read from the environment variable named in `api_key_env`. The key is never stored in `omo.json`; without it the gate makes no request. When the returned probability reaches `threshold`, a short tool-less child on the advisor model (`model` when pinned, otherwise the `category` chain) reads the same window and writes a hint of a few lines, which reaches the session as a hidden steer message, the way a Kibitzer recall hint does. After an advice the gate waits `cooldown` tool results, a session gets at most `max_per_session` advices, and one advisor child is bounded by `timeout_seconds`. Every gate call is recorded in the session transcript as an `omo-advisor:gate` entry (score, whether it triggered, the advice or the reason there was none). A failing endpoint, a missing key or a failed child never interrupts the session.
+A decision model decides whether to step in; it never writes the advice. From the `min_calls`-th tool result on, every `check_every` tool results the advisor posts the session's last 8 tool calls to `decision_url` (the `/v1/decisions` request shape: a `state` object and two questions, `stuck` as a `noul` probability and `kind` as a `choice` among `same_call`, `repoll_unchanged`, `wait_misuse`, `error_streak`, `wandering` and `none`), with the model `decision_model` and a bearer key read from the environment variable named in `api_key_env`. The key is never stored in `omo.json`; without it the gate makes no request. When `stuck` reaches `threshold`, the kind is not `none` and its confidence reaches `kind_confidence`, a tool-less child on the advisor model (`model` at `thinking`; the `category` chain if that model cannot start) reads the full task and the last 12 calls with their results and writes a plan in a fixed shape: ROOT CAUSE, TARGET STATE, DO THIS (exact commands and code), VERIFY. The plan reaches the session as a hidden steer message, the way a Kibitzer recall hint does. After an advice the gate waits `cooldown` tool results, a session gets at most `max_per_session` advices, and one advisor child is bounded by `timeout_seconds`. Every gate call is recorded in the session transcript as an `omo-advisor:gate` entry (probability, kind, whether it triggered, the plan or the reason there was none). A failing endpoint, a missing key or a failed child never interrupts the session.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `enabled` | `false` | Run the advisor. |
-| `model` | unset | Advisor model pin, `provider/model`. Wins over `category`. |
-| `category` | `"ultrabrain"` | Category whose chain answers when no `model` is pinned. |
+| `model` | `"anthropic/claude-opus-5-5"` | Advisor model, `provider/model`. |
+| `thinking` | `"medium"` | Advisor thinking level. |
+| `category` | `"ultrabrain"` | Category whose chain answers when `model` cannot start. |
 | `decision_url` | `"https://apis.opengateway.ai/v1/decisions"` | Decision endpoint. |
 | `decision_model` | `"sionic-ai/jev-omni"` | Decision model id. |
 | `api_key_env` | `"OMO_ADVISOR_API_KEY"` | Environment variable holding the decision endpoint's key. |
-| `threshold` | `0.6` | Probability at or above which the advisor model is asked. |
-| `check_every` | `5` | Tool results between gate calls. |
-| `cooldown` | `10` | Tool results after an advice before the gate runs again. |
-| `max_per_session` | `3` | Advice cap per session (`0` keeps the gate observing only). |
-| `window` | `24` | Recent events the gate and the advisor read. |
-| `timeout_seconds` | `120` | Upper bound for one advisor child. |
+| `threshold` | `0.7` | `stuck` probability at or above which the advisor is asked. |
+| `kind_confidence` | `0.4` | Minimum confidence of the `kind` label. |
+| `min_calls` | `3` | Tool results before the first gate call. |
+| `check_every` | `1` | Ask the gate on every Nth tool result. |
+| `cooldown` | `5` | Tool results after an advice before the gate runs again. |
+| `max_per_session` | `10` | Advice cap per session (`0` keeps the gate observing only). |
+| `window` | `24` | Recent tool calls kept per session (at least 12). |
+| `timeout_seconds` | `180` | Upper bound for one advisor child. |
 
 ```jsonc
 {
   "advisor": {
     "enabled": true,
-    "model": "anthropic/claude-opus-5-5"
+    "model": "anthropic/claude-opus-5-5",
+    "thinking": "medium"
   }
 }
 ```
