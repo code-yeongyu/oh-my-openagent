@@ -1542,8 +1542,6 @@
       "packages/senpi-task/src/lifecycle/revive-policy.ts": ["ACTIVE_REVIVE_DRIFT_POLICY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOST_PID
       "packages/senpi-task/src/manager/__fixtures__/fallback-launch-fakes.ts": ["HOST_PID"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) QUOTA_ERROR
-      "packages/senpi-task/src/manager/__fixtures__/parent-model-world.ts": ["QUOTA_ERROR"],
       // pre-existing at origin dev 4686e425b5: unused export(s) holdsInChild
       "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
