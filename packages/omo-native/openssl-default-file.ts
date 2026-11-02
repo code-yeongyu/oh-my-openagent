@@ -151,9 +151,13 @@ export function readDefaultFileCandidates(
   let headerEnd = -1
   for (let line = 0; line < lines.length; line++) {
     const current = lines[line] ?? ""
-    // ASCII makes characters equal bytes; the cap prevents BIO_gets' 253-byte splitting.
-    if (current.length > 200 || /[^\x20-\x7e]/.test(current)) return drop("pem-noncanonical")
+    // ASCII makes characters equal bytes, so a line is exactly the bytes BIO_gets reads.
+    if (/[^\x20-\x7e]/.test(current)) return drop("pem-noncanonical")
     const boundary = /^-----(BEGIN|END) ([A-Z0-9][A-Z0-9 ]*)-----$/.exec(current)
+    // The cap prevents BIO_gets' 253-byte splitting inside a block and on its boundaries. Text outside a
+    // block is exempt: a split read can only start with "-----" when the line holds "-----", which is
+    // refused below at any length. LibreSSL bundles (macOS /etc/ssl/cert.pem) carry long subject comments.
+    if (current.length > 200 && (label !== undefined || boundary !== null)) return drop("pem-noncanonical")
     if (label === undefined) {
       if (boundary?.[1] === "BEGIN") {
         label = boundary[2]
