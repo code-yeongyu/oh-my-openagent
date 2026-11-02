@@ -41,10 +41,20 @@ type SolidRuntime<Node> = {
   ) => unknown
 }
 
+export type BtwSideTuiOptions = {
+  /** Claim the session_prompt slot (default true); false leaves the composer to another plugin. */
+  readonly claimSessionPrompt?: boolean
+}
+
+export const BTW_SESSION_PROMPT_DISABLED_MESSAGE =
+  "BTW is off in this TUI: tui.btw.session_prompt is false, so BTW has no prompt to start from."
+
 export async function registerBtwSideTui<Node>(
   api: TuiPluginApi,
   solid: SolidRuntime<Node>,
+  options: BtwSideTuiOptions = {},
 ): Promise<void> {
+  const claimSessionPrompt = options.claimSessionPrompt !== false
   log("[btw-side] TUI registration started")
   const promptRefs = new Map<string, TuiPromptRef>()
   const adoptionCache = createBtwAdoptionCache()
@@ -154,6 +164,13 @@ export async function registerBtwSideTui<Node>(
 
   async function openBtw(): Promise<void> {
     log("[btw-side] TUI open command invoked")
+    if (!claimSessionPrompt) {
+      api.ui.toast({
+        variant: "warning",
+        message: BTW_SESSION_PROMPT_DISABLED_MESSAGE,
+      })
+      return
+    }
     const sessionID = currentTuiSessionID(api)
     if (sessionID) await adoptSideSession(sessionID)
     if (!isCurrentTuiSession(api, sessionID)) return
@@ -242,7 +259,7 @@ export async function registerBtwSideTui<Node>(
   api.slots.register({
     order: 950,
     slots: {
-      session_prompt: (
+      ...(claimSessionPrompt ? { session_prompt: (
         _context: TuiSlotContext,
         value: TuiHostSlotMap["session_prompt"],
       ) =>
@@ -296,6 +313,7 @@ export async function registerBtwSideTui<Node>(
             session_id: value.session_id,
           }),
         }),
+      } : {}),
       session_prompt_right: (
         _context: TuiSlotContext,
         value: TuiHostSlotMap["session_prompt_right"],

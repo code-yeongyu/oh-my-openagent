@@ -9838,6 +9838,17 @@
             }
           },
           "additionalProperties": false
+        },
+        "btw": {
+          "type": "object",
+          "properties": {
+            "session_prompt": {
+              "default": true,
+              "description": "Let /btw replace the session prompt slot. Set false when another TUI plugin also replaces the session prompt and two input bars appear; /btw is then unavailable in the TUI.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
