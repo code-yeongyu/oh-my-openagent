@@ -24,7 +24,7 @@ const hex = (value: string) => Buffer.from(value, "hex")
 const seq = (...parts: readonly Uint8Array[]) => der(0x30, ...parts)
 const oid = (value: string) => der(6, hex(value))
 const name = (value: Uint8Array) => seq(der(0x31, seq(oid("550403"), value)))
-const rootName = name(der(12, Buffer.from("omo synthetic default-file R")))
+const rootName = name(der(12, Buffer.from("synthetic default-file R")))
 const signature = seq(oid("2a8648ce3d040302"))
 const validity = seq(der(23, Buffer.from("250101000000Z")), der(23, Buffer.from("490101000000Z")))
 const prefix = [der(0xa0, der(2, hex("02"))), der(2, hex("01")), signature, rootName, validity] as const
@@ -49,10 +49,10 @@ const x = seq(seq(...rootPrefix))
 const short = pem(hex("3000"))
 // The shape of the LibreSSL bundle macOS ships at /etc/ssl/cert.pem: comments, a subject line longer than the
 // in-block cap, and an `openssl x509 -text` dump before each PEM block (omo#12157). Synthetic; no Apple bytes.
-const subjectLine = `=== /CN=omo synthetic default-file R${"/OU=synthetic organisational unit".repeat(7)}`
+const subjectLine = `=== /CN=synthetic default-file R${"/OU=synthetic organisational unit".repeat(7)}`
 const libresslBundle = [
   "# $OpenBSD: cert.pem,v 1.0 synthetic $",
-  "### /CN=omo synthetic default-file R",
+  "### /CN=synthetic default-file R",
   "",
   subjectLine,
   "Certificate:",
@@ -60,7 +60,7 @@ const libresslBundle = [
   "        Version: 3 (0x2)",
   "        Serial Number: 1 (0x1)",
   "    Signature Algorithm: ecdsa-with-SHA256",
-  "        Issuer: CN=omo synthetic default-file R",
+  "        Issuer: CN=synthetic default-file R",
   "        Validity",
   "            Not Before: Jan  1 00:00:00 2025 GMT",
   "            Not After : Jan  1 00:00:00 2049 GMT",
