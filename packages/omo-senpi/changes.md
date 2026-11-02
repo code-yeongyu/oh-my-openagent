@@ -1,3 +1,7 @@
+## 2026-11-02 - Finished team members leave the task widget (#12159)
+
+The below-editor task widget now shows only running or parked work. A team member that completes its turn leaves the widget even while its handle stays resident, instead of lingering as a `process completed` row until the team shuts down. `/tasks` still lists it, `task_send` still revives it, and its row returns while it runs again. Task lifecycle, residency and messaging are unchanged.
+
 ## 2026-10-31 - Isolate memory-hook startup from supervisor imports (#11957)
 
 Load supervisor-only dependencies after selecting supervisor mode, and load child bootstrap code only for its mode. Keep the existing checker, entry point, process ownership and deadlines. An import-boundary regression and real Senpi hook proof cover valid writes, duplicate-key rejection and provenance rejection.
