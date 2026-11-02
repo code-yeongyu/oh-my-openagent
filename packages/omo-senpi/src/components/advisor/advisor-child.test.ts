@@ -67,7 +67,33 @@ describe("runAdvisorChild", () => {
 
   it("#given an empty reply #when the child settles #then no advice is produced", async () => {
     const fake = fakeRunner({ text: "   " })
-    expect(await runAdvisorChild(REQUEST, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty" })
+    expect(await runAdvisorChild(REQUEST, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty at medium, then empty at low" })
+    expect(fake.specs).toHaveLength(2)
+  })
+
+  it("#given an empty reply at a high thinking level #when the child settles #then it retries once at low and returns that plan", async () => {
+    const specs: ChildSpec[] = []
+    const runner = {
+      start: async (spec: ChildSpec) => {
+        specs.push(spec)
+        const text = spec.thinkingLevel === "low" ? "ROOT CAUSE: x" : ""
+        return {
+          waitForIdle: () => Promise.resolve({ status: "completed", finalResponse: text }),
+          lastAssistantText: () => text,
+          abort: async () => {},
+          dispose: async () => {},
+        }
+      },
+    } as unknown as InProcessRunnerLike
+    const outcome = await runAdvisorChild({ ...REQUEST, thinking: "max" }, { createRunner: () => runner })
+    expect(outcome).toMatchObject({ kind: "advice", text: "ROOT CAUSE: x" })
+    expect(specs.map((spec) => spec.thinkingLevel)).toEqual(["max", "low"])
+  })
+
+  it("#given an empty reply already at low thinking #when the child settles #then it does not retry", async () => {
+    const fake = fakeRunner({ text: "" })
+    expect(await runAdvisorChild({ ...REQUEST, thinking: "low" }, { createRunner: () => fake.runner })).toMatchObject({ kind: "failed", reason: "empty" })
+    expect(fake.specs).toHaveLength(1)
   })
 
   it("#given the provider rejects the advisor model #when the turn ends in error #then the provider message is the reason, not an empty reply", async () => {

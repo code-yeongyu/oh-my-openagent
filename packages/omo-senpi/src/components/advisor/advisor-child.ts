@@ -63,9 +63,42 @@ export async function runAdvisorChild(request: AdvisorChildRequest, seams: Advis
       failures.push(`${candidate.model}: ${describe(error)}`)
       continue
     }
-    return awaitAdvice(handle, candidate.model, request.timeoutMs, startedAt)
+    const outcome = await awaitAdvice(handle, candidate.model, request.timeoutMs, startedAt)
+    if (!isEmptyReply(outcome) || !thinksAboveLow(candidate.thinking)) return outcome
+    return retryAtLowThinking(runner, request, candidate, runtime)
   }
   return { kind: "failed", reason: `start_failed: ${failures.join("; ") || "no candidate"}` }
+}
+
+const LOW_THINKING: ReadonlySet<ThinkingLevel> = new Set(["off", "minimal", "low"])
+
+function isEmptyReply(outcome: AdvisorChildOutcome): boolean {
+  return outcome.kind === "failed" && outcome.reason === "empty"
+}
+
+function thinksAboveLow(thinking: ThinkingLevel | undefined): boolean {
+  return thinking !== undefined && !LOW_THINKING.has(thinking)
+}
+
+// A high thinking level can spend the whole output budget on reasoning and end the turn with no
+// text (observed: DeepSeek V4.1 Flash at `max`, stopReason `length` after 16,384 reasoning tokens).
+// One retry at `low` leaves room for the plan; a second empty reply is reported as it is.
+async function retryAtLowThinking(
+  runner: InProcessRunnerLike,
+  request: AdvisorChildRequest,
+  candidate: AdvisorCandidate,
+  runtime: AdvisorTaskRuntime | undefined,
+): Promise<AdvisorChildOutcome> {
+  const lowered: AdvisorCandidate = { ...candidate, thinking: "low" }
+  const spec = { ...buildSpec(request, lowered, runtime), taskId: `advisor-${request.sessionId}-${request.sequence}-low` }
+  const startedAt = Date.now()
+  try {
+    const handle = await runner.start(spec)
+    const outcome = await awaitAdvice(handle, candidate.model, request.timeoutMs, startedAt)
+    return outcome.kind === "failed" ? { ...outcome, reason: `empty at ${candidate.thinking}, then ${outcome.reason} at low` } : outcome
+  } catch (error) {
+    return { kind: "failed", reason: `empty at ${candidate.thinking}, then start_failed at low: ${describe(error)}`, model: candidate.model }
+  }
 }
 
 function advisorCandidates(request: AdvisorChildRequest): readonly AdvisorCandidate[] {
