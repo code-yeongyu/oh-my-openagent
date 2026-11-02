@@ -28,6 +28,8 @@ import {
   OuterJob,
   closeHandle,
   exitCodeOf,
+  exitFiletimeOf,
+  openJobForQuery,
   jobAccounting,
   jobProcessIds,
   processCommandLine,
@@ -137,30 +139,48 @@ describe.skipIf(!runsJobHelperRows)("T7(c)(d) and T8: the writer never lets git 
     if (stubDirectory) await removeTree(stubDirectory, { maxRetries: 10, retryDelay: 200 })
   })
 
-  test("T7(c): #given the test holds the activity gate #when writer P is killed once its helper exists #then the helper exits with no git and no entry is written", async () => {
-    // #given
-    const repo = await fixture("job-helper-t7c-")
+  // Kills P once its helper H exists while the test holds the gate, and returns H's exit code plus a receipt: what
+  // matched, the job traffic, and whether H ended at P's death (same exit FILETIME) or later on its own EOF path.
+  async function killWriterOnceHelperExists(label: string, holdFloor: boolean): Promise<{ readonly code: number | null; readonly repo: IdentityRepo }> {
+    const repo = await fixture(`job-helper-${label}-`)
     const gate = await holdGate(repo.paths.locks)
     const writer = startWriter(repo, jobHelperPath(), ["tag", "t7c"], false)
-
-    // #when
     const outer = await admit(writer)
+    const writerHandle = watchProcess(writer.child.pid ?? 0)
+    if (writerHandle === null) throw new Error("writer exited before the test could watch it")
+    cleanups.push(() => closeHandle(writerHandle))
     const seen: string[] = []
     const helper = await helperCreated(outer, basename(jobHelperPath()), seen)
-    const atMatch = { writer: writer.child.pid, members: jobProcessIds(outer.job).map((pid) => describeProcess(0, pid)), accounting: jobAccounting(outer.job) }
+    const op = /--op (\S+)/.exec(processCommandLine(helper.pid) ?? "")?.[1]
+    const floor = holdFloor && op !== undefined ? openJobForQuery(`Global\\omo-memory-git-${op}`) : null
+    const atMatch = { writer: writer.child.pid, members: jobProcessIds(outer.job).map((pid) => describeProcess(0, pid)), accounting: jobAccounting(outer.job), floorHeld: floor !== null }
     writer.child.kill()
-
-    // #then
+    expect(await signaledWithin(writerHandle, 30_000)).toBe(true)
     expect(await signaledWithin(helper.handle, 30_000)).toBe(true)
     const code = exitCodeOf(helper.handle)
-    // Receipt: which process matched, whether anything (git) entered the job after it, and how each member left.
+    const [writerEnd, helperEnd] = [exitFiletimeOf(writerHandle), exitFiletimeOf(helper.handle)]
+    if (floor !== null) closeHandle(floor)
     const after = outer.drain().map(({ message, pid }) => describeProcess(message, pid))
     const tagged = gitSucceeds(repo.paths.repo, ["rev-parse", "--verify", "--quiet", "refs/tags/t7c"])
-    console.log(`[T7(c)] ${JSON.stringify({ helper: helper.pid, exit: code, seen, atMatch, after, accounting: jobAccounting(outer.job), tagged, entries: await gitOpEntries(repo.paths.locks) })}`)
+    const helperAfterWriterMs = writerEnd === null || helperEnd === null ? null : Number(helperEnd - writerEnd) / 10_000
+    console.log(`[${label}] ${JSON.stringify({ helper: helper.pid, exit: code, helperAfterWriterMs, seen, atMatch, after, accounting: jobAccounting(outer.job), tagged, entries: await gitOpEntries(repo.paths.locks) })}`)
     gate.release()
+    return { code, repo }
+  }
+
+  test("T7(c): #given the test holds the activity gate #when writer P is killed once its helper exists #then the helper exits with no git and no entry is written", async () => {
+    // #given #when
+    const { code, repo } = await killWriterOnceHelperExists("T7(c)", false)
+
+    // #then
     expect([11, 20]).toContain(code ?? -1)
     expect(gitSucceeds(repo.paths.repo, ["rev-parse", "--verify", "--quiet", "refs/tags/t7c"])).toBe(false)
     expect(await gitOpEntries(repo.paths.locks)).toEqual([])
+  }, 120_000)
+
+  // Temporary diagnostic for #10391 (removed with the fix): the same kill while the test holds a second handle to F.
+  test("T7(c) receipt: the same kill while the test also holds F open", async () => {
+    await killWriterOnceHelperExists("T7(c)-floor-held", true)
   }, 120_000)
 
   test("T7(d): #given a stub that sends joined and exits while the test holds the gate #when the gate is released after the outer job reports the stub's exit #then P rejects GitHelperCrashedError and no entry remains", async () => {

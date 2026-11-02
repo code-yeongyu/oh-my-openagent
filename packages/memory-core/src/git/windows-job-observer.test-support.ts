@@ -37,6 +37,7 @@ function load() {
     Process32NextW: { args: [u64, ptr], returns: i32 },
     WaitForSingleObject: { args: [u64, u32], returns: u32 },
     GetExitCodeProcess: { args: [u64, ptr], returns: i32 },
+    GetProcessTimes: { args: [u64, ptr, ptr, ptr, ptr], returns: i32 },
     CloseHandle: { args: [u64], returns: i32 },
     CreateJobObjectW: { args: [ptr, ptr], returns: u64 },
     CreateIoCompletionPort: { args: [u64, u64, u64, u32], returns: u64 },
@@ -169,6 +170,13 @@ export function signaledWithin(process: bigint, boundMs: number): Promise<boolea
 export function exitCodeOf(process: bigint): number | null {
   const code = new Uint32Array(1)
   return k32().GetExitCodeProcess(process, code) === 0 ? null : (code[0] ?? null)
+}
+
+/** The FILETIME (100 ns ticks) at which an exited process ended, or null while it runs or when the query fails. */
+export function exitFiletimeOf(process: bigint): bigint | null {
+  const [creation, exit, kernel, user] = [new BigUint64Array(1), new BigUint64Array(1), new BigUint64Array(1), new BigUint64Array(1)]
+  if (k32().GetProcessTimes(process, creation, exit, kernel, user) === 0) return null
+  return exit[0] === 0n ? null : (exit[0] ?? null)
 }
 
 export type JobMessage = { readonly message: number; readonly pid: number }
