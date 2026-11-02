@@ -105,7 +105,7 @@ export function setPendingModelFallback(
 export function getNextFallback(
   controller: Pick<ModelFallbackStateController, "getNextFallback">,
   sessionID: string,
-): { providerID: string; modelID: string; variant?: string } | null {
+): ReturnType<ModelFallbackStateController["getNextFallback"]> {
   return controller.getNextFallback(sessionID)
 }
 
