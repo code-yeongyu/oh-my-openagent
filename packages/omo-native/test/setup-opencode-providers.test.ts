@@ -557,6 +557,57 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
   })
 })
 
+describe("omo setup opencode catalog notices (#10172)", () => {
+  describe("#given a provider block with its own endpoint but no models, and a catalog cache that cannot be parsed", () => {
+    describe("#when setup is accepted", () => {
+      test("#then the broken-cache warning is shown, because the block still takes its models from the catalog", async () => {
+        const item = fixture()
+        opencode(item, { provider: { proxied: { options: { baseURL: "https://proxy.example/v1", apiKey: "proxy-key" } } } })
+        write(join(item.home, ".cache", "opencode", "models.json"), "{ not json")
+
+        const result = await run(item, ["setup", "--yes"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout).toContain("could not parse its models.dev catalog cache")
+        expect(result.stdout).toContain("custom provider proxied declares no models omo can use")
+      })
+    })
+  })
+
+  describe("#given a provider block with its own endpoint and its own models, and a catalog cache that cannot be parsed", () => {
+    describe("#when setup is accepted", () => {
+      test("#then no broken-cache warning is shown and the provider is imported from its own block", async () => {
+        const item = fixture()
+        opencode(item, { provider: { selfcontained: { options: { baseURL: "https://self.example/v1", apiKey: "self-key" }, models: { m: {} } } } })
+        write(join(item.home, ".cache", "opencode", "models.json"), "{ not json")
+
+        const result = await run(item, ["setup", "--yes"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout).not.toContain("could not parse its models.dev catalog cache")
+        expect(result.stdout).toContain("providers-imported: selfcontained")
+      })
+    })
+  })
+
+  describe("#given an opencode api key for an id the catalog was read for but has no entry for, and no config block for it", () => {
+    describe("#when setup runs", () => {
+      test("#then the provider stage says the id is not in the catalog, instead of the credential stage's generic unmapped line", async () => {
+        const item = fixture()
+        opencode(item, {}, { ghost: { type: "api", key: "ghost-key" } })
+        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
+
+        const result = await run(item, ["setup", "--yes"])
+
+        expect(result.status).toBe(0)
+        expect(result.stdout).toContain("provider ghost is not in OpenCode's models.dev catalog")
+        expect(result.stdout).not.toContain("providers omo does not serve (ghost)")
+        expect(planOpencodeProviders({ home: item.home, env: { XDG_CONFIG_HOME: item.configHome, XDG_DATA_HOME: item.dataHome } }).skipped).toEqual(["ghost"])
+      })
+    })
+  })
+})
+
 describe("omo setup e2e temp isolation (#9766)", () => {
   test("#given a setup run #when the child process asks for its temp dir #then it is inside the fixture root that teardown removes", () => {
     const item = fixture()
