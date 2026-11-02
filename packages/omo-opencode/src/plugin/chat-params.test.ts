@@ -287,6 +287,32 @@ describe("createChatParamsHandler", () => {
     })
   })
 
+  test("keeps a reasoning effort an unrecognized model's own variants declare (#9140)", async () => {
+    //#given
+    const variants = {
+      low: { reasoningEffort: "low" },
+      medium: { reasoningEffort: "medium" },
+      xhigh: { reasoningEffort: "xhigh" },
+    }
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "oracle" },
+      model: { providerID: "my-local", id: "my-custom-model", capabilities: { reasoning: true }, variants },
+      provider: { id: "my-local" },
+      message: { variant: "xhigh" },
+    }
+    const declared: ChatParamsOutput = { options: { reasoningEffort: "xhigh" } }
+    const undeclared: ChatParamsOutput = { options: { reasoningEffort: "max" } }
+
+    //#when
+    await createChatParamsHandler()(input, declared)
+    await createChatParamsHandler()({ ...input, message: { variant: "xhigh" } }, undeclared)
+
+    //#then
+    expect(declared.options).toEqual({ reasoningEffort: "xhigh" })
+    expect(undeclared.options).toEqual({ reasoningEffort: "xhigh" })
+  })
+
   test("prefers the live model over stale cached capabilities", async () => {
     //#given
     sharedModule.writeProviderModelsCache({

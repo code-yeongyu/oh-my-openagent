@@ -123,6 +123,37 @@ export function readRuntimeModelVariants(
 	return normalizeVariantKeys(readRuntimeModelCapabilities(runtimeModel)?.variants)
 }
 
+function readVariantReasoningEfforts(value: unknown): string[] | undefined {
+	if (!isRecord(value)) {
+		return undefined
+	}
+
+	const efforts = new Set<string>()
+	for (const options of Object.values(value)) {
+		if (!isRecord(options)) {
+			continue
+		}
+		const effort = options.reasoningEffort ?? options.reasoning_effort
+		if (typeof effort === "string" && effort.length > 0) {
+			efforts.add(effort.toLowerCase())
+		}
+	}
+	return efforts.size > 0 ? [...efforts] : undefined
+}
+
+/**
+ * The reasoning efforts the model's own variant options declare, e.g. an openai-compatible model
+ * configured with `variants: { xhigh: { reasoningEffort: "xhigh" } }` (oh-my-openagent#9140).
+ */
+export function readRuntimeModelReasoningEfforts(
+	runtimeModel: Record<string, unknown> | undefined,
+): string[] | undefined {
+	return (
+		readVariantReasoningEfforts(runtimeModel?.variants)
+		?? readVariantReasoningEfforts(readRuntimeModelCapabilities(runtimeModel)?.variants)
+	)
+}
+
 export function readRuntimeModelModalities(
 	runtimeModel: Record<string, unknown> | undefined,
 ): ModelCapabilities["modalities"] | undefined {

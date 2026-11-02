@@ -7,6 +7,7 @@ import {
 	readRuntimeModel,
 	readRuntimeModelLimitOutput,
 	readRuntimeModelModalities,
+	readRuntimeModelReasoningEfforts,
 	readRuntimeModelReasoningSupport,
 	readRuntimeModelTemperatureSupport,
 	readRuntimeModelThinkingSupport,
@@ -158,6 +159,9 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const heuristicFamily = detectHeuristicModelFamily(canonicalization.canonicalModelID)
 
 	const runtimeVariants = readRuntimeModelVariants(runtimeModel)
+	// Ranked after the curated overrides and the family heuristic, so a recognized model keeps its
+	// known ladder; an unrecognized model is no longer stripped of an effort its own variants declare.
+	const runtimeReasoningEfforts = readRuntimeModelReasoningEfforts(runtimeModel)
 	const runtimeReasoning = readRuntimeModelReasoningSupport(runtimeModel)
 	const runtimeThinking = readRuntimeModelThinkingSupport(runtimeModel)
 	const runtimeTemperature = readRuntimeModelTemperatureSupport(runtimeModel)
@@ -177,7 +181,15 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const variantsSource: ModelCapabilitiesDiagnostics["variants"]["source"] =
 		runtimeVariants ? "runtime" : providerOverride?.variants ? "override" : override?.variants ? "override" : heuristicFamily?.variants ? "heuristic" : "none"
 	const reasoningEffortsSource: ModelCapabilitiesDiagnostics["reasoningEfforts"]["source"] =
-		providerOverride?.reasoningEfforts ? "override" : override?.reasoningEfforts ? "override" : heuristicFamily?.reasoningEfforts ? "heuristic" : "none"
+		providerOverride?.reasoningEfforts
+			? "override"
+			: override?.reasoningEfforts
+			? "override"
+			: heuristicFamily?.reasoningEfforts
+			? "heuristic"
+			: runtimeReasoningEfforts
+			? "runtime"
+			: "none"
 	const reasoningSource: ModelCapabilitiesDiagnostics["reasoning"]["source"] =
 		runtimeReasoning === undefined ? snapshotEntry?.reasoning === undefined ? "none" : snapshotSource : "runtime"
 	const supportsThinkingSource: ModelCapabilitiesDiagnostics["supportsThinking"]["source"] =
@@ -224,7 +236,11 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 		canonicalModelID: canonicalization.canonicalModelID,
 		family: snapshotEntry?.family ?? heuristicFamily?.family,
 		variants: runtimeVariants ?? providerOverride?.variants ?? override?.variants ?? heuristicFamily?.variants,
-		reasoningEfforts: providerOverride?.reasoningEfforts ?? override?.reasoningEfforts ?? heuristicFamily?.reasoningEfforts,
+		reasoningEfforts:
+			providerOverride?.reasoningEfforts
+			?? override?.reasoningEfforts
+			?? heuristicFamily?.reasoningEfforts
+			?? runtimeReasoningEfforts,
 		reasoning: runtimeReasoning ?? snapshotEntry?.reasoning,
 		supportsThinking: override?.supportsThinking ?? runtimeThinking ?? snapshotEntry?.reasoning ?? heuristicFamily?.supportsThinking,
 		supportsTemperature: runtimeTemperature ?? override?.supportsTemperature ?? snapshotEntry?.temperature,
