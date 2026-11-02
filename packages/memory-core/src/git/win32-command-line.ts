@@ -11,22 +11,23 @@ export function quoteWindowsArgument(argument: string): string {
   if (!/[ \t"]/.test(argument)) return argument
   if (!/["\\]/.test(argument)) return `"${argument}"`
   // libuv walks the argument backwards: a backslash run is doubled only when it reaches a quote (or the closing quote),
-  // and every embedded quote gets one backslash.
-  let reversed = ""
+  // and every embedded quote gets one backslash. Both the walk and the final _wcsrev work on UTF-16 code units, so a
+  // surrogate pair is reversed twice and comes out whole.
+  const reversed: string[] = []
   let quoteHit = true
   for (let index = argument.length - 1; index >= 0; index -= 1) {
-    const character = argument[index] ?? ""
-    reversed += character
-    if (quoteHit && character === "\\") {
-      reversed += "\\"
-    } else if (character === '"') {
+    const codeUnit = argument[index] ?? ""
+    reversed.push(codeUnit)
+    if (quoteHit && codeUnit === "\\") {
+      reversed.push("\\")
+    } else if (codeUnit === '"') {
       quoteHit = true
-      reversed += "\\"
+      reversed.push("\\")
     } else {
       quoteHit = false
     }
   }
-  return `"${[...reversed].reverse().join("")}"`
+  return `"${reversed.reverse().join("")}"`
 }
 
 export function windowsCommandLine(argv: readonly string[]): string {
