@@ -6,6 +6,7 @@
 // the memory repo's LOCAL config only.
 
 import { AUTO_AGENT_VALUE } from "../../identity/resolve"
+import { gitSpawnTarget, spawnTargetOptions } from "../../process/win32-launch"
 import type { BindingKey, Remote } from "./binding"
 import { localBinding, mintLocalBinding, namedBinding, parseBinding, repoBinding, spaceIdForBinding } from "./binding"
 
@@ -97,7 +98,15 @@ export function resolveSpaceInRepo(
 }
 
 function runGit(dir: string, args: readonly string[]): string | null {
-  const r = Bun.spawnSync(["git", "-C", dir, ...args])
-  if (r.exitCode !== 0) return null
+  const r = process.platform === "win32" ? spawnWin32Git(["-C", dir, ...args]) : Bun.spawnSync(["git", "-C", dir, ...args])
+  if (r === null || r.exitCode !== 0) return null
   return r.stdout.toString()
+}
+
+// This spawn has no cwd, so a bare name would be searched in the omo process's working directory -
+// the user's project - before PATH; git is resolved to an absolute path instead (#12146).
+function spawnWin32Git(args: readonly string[]) {
+  const target = gitSpawnTarget(args, process.env)
+  if (target === undefined) return null
+  return Bun.spawnSync({ cmd: [target.file, ...target.args], ...spawnTargetOptions(target) })
 }

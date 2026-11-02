@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process"
 import { existsSync } from "../fs/resilient"
-import { win32 } from "node:path"
+import { environmentValue, type IsFile, resolveWin32Git } from "../process/win32-executable"
+import { spawnTarget, spawnTargetOptions } from "../process/win32-launch"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
 import { holdGitActivityShared } from "./git-activity-lock"
 import { recordGitTimeout } from "./timeout-diagnostics"
@@ -55,40 +56,23 @@ export interface NodeGitExecRuntime {
     options: GitExecOptions,
     environment: NodeJS.ProcessEnv,
   ) => Promise<GitExecResult>
+  isFile?: IsFile
 }
 
-const WINDOWS_GIT_CANDIDATES = [
-  ["ProgramFiles", ["Git", "cmd", "git.exe"]],
-  ["ProgramW6432", ["Git", "cmd", "git.exe"]],
-  ["ProgramFiles(x86)", ["Git", "cmd", "git.exe"]],
-  ["LOCALAPPDATA", ["Programs", "Git", "cmd", "git.exe"]],
-] as const
+const RESOLUTION_INPUTS = ["PATH", "ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"] as const
 
-function environmentValue(environment: NodeJS.ProcessEnv, name: string): string | undefined {
-  for (const [key, value] of Object.entries(environment)) {
-    if (key.toLowerCase() !== name.toLowerCase() || value === undefined) continue
-    const trimmed = value.trim()
-    if (trimmed.length > 0) return trimmed
-  }
-  return undefined
+function resolutionKey(environment: NodeJS.ProcessEnv): string {
+  return JSON.stringify(RESOLUTION_INPUTS.map((name) => environmentValue(environment, name) ?? null))
 }
 
-function windowsGitExecutables(environment: NodeJS.ProcessEnv): string[] {
-  const seen = new Set<string>()
-  const candidates: string[] = []
+function missingCwdResult(cwd: string): GitExecResult {
+  return { code: 128, stdout: "", stderr: `fatal: cannot change to '${cwd}': No such file or directory` }
+}
 
-  for (const [environmentName, pathParts] of WINDOWS_GIT_CANDIDATES) {
-    const root = environmentValue(environment, environmentName)
-    if (root === undefined || !/^[A-Za-z]:[\\/]/.test(root)) continue
-
-    const candidate = win32.join(root, ...pathParts)
-    const normalizedCandidate = win32.normalize(candidate).toLowerCase()
-    if (seen.has(normalizedCandidate)) continue
-    seen.add(normalizedCandidate)
-    candidates.push(candidate)
-  }
-
-  return candidates
+function gitNotFound(cwd: string): GitExecResult {
+  // Same order as a failed spawn: an absent cwd is "no repo yet" (exit 128) before "no git".
+  if (!existsSync(cwd)) return missingCwdResult(cwd)
+  throw new GitNotFoundError({ cause: Object.assign(new Error("spawn git ENOENT"), { code: "ENOENT", syscall: "spawn git", path: "git" }) })
 }
 
 function isGitNotFoundFromEnoent(error: unknown): error is GitNotFoundError {
@@ -120,16 +104,18 @@ function spawnGitCommand(
   return new Promise((resolve, reject) => {
     const startedAt = Date.now()
     const hasStdin = options.stdin !== undefined
+    const target = spawnTarget(executable, "git", argv, environment)
     // git.exe is a console-subsystem binary: without windowsHide every memory auto-commit and
     // sync allocates a fresh console window that Windows foregrounds, stealing the user's focus
     // (#8501). Inert on posix, load-bearing on win32 - do not drop it.
-    const child = spawn(executable, [...argv], {
+    const child = spawn(target.file, [...target.args], {
       cwd: options.cwd,
       env: environment,
       shell: false,
       // fd 3 carries the git-activity lock into git and every process it starts (omo #10322).
       stdio: [hasStdin ? "pipe" : "ignore", "pipe", "pipe", ...(activityFd === undefined ? [] : [activityFd])],
       windowsHide: true,
+      ...spawnTargetOptions(target),
     })
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []
@@ -179,11 +165,7 @@ function spawnGitCommand(
         // cwd as exit 128 so head() reads it as no-repo-yet, and reserve GitNotFoundError for a cwd
         // that exists while the binary genuinely cannot spawn.
         if (!existsSync(options.cwd)) {
-          resolve({
-            code: 128,
-            stdout: "",
-            stderr: `fatal: cannot change to '${options.cwd}': No such file or directory`,
-          })
+          resolve(missingCwdResult(options.cwd))
           return
         }
         reject(new GitNotFoundError({ cause: error }))
@@ -241,25 +223,36 @@ function spawnGitCommand(
 export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
   const platform = runtime.platform ?? process.platform
   const runCommand = runtime.runCommand ?? runGitCommand
+  // On win32 git is never spawned by bare name: a bare name is searched in the working directory
+  // (the memory repo) before PATH, so a planted git.exe/.cmd/.bat/.com would run (#12146). A found
+  // path is memoized per PATH and install-root value; it is dropped and re-resolved once when its
+  // spawn reports ENOENT, and a miss is never cached, so installing git while omo runs still works.
+  // The memo hides a new, earlier PATH match until that ENOENT or a restart.
+  const resolved = new Map<string, string>()
+  const resolveGit = (environment: NodeJS.ProcessEnv): string | undefined => {
+    const key = resolutionKey(environment)
+    const known = resolved.get(key)
+    if (known !== undefined) return known
+    const found = resolveWin32Git(environment, runtime.isFile)
+    if (found !== undefined) resolved.set(key, found)
+    return found
+  }
 
   return {
     async run(argv, options) {
       const environment = options.env ?? process.env
+      if (platform !== "win32") return await runCommand("git", argv, options, environment)
+
+      const executable = resolveGit(environment)
+      if (executable === undefined) return gitNotFound(options.cwd)
       try {
-        return await runCommand("git", argv, options, environment)
+        return await runCommand(executable, argv, options, environment)
       } catch (error) {
-        if (platform !== "win32" || !isGitNotFoundFromEnoent(error)) throw error
-
-        for (const fallback of windowsGitExecutables(environment)) {
-          try {
-            return await runCommand(fallback, argv, options, environment)
-          } catch (fallbackError) {
-            if (isGitNotFoundFromEnoent(fallbackError)) continue
-            throw fallbackError
-          }
-        }
-
-        throw error
+        if (!isGitNotFoundFromEnoent(error)) throw error
+        resolved.delete(resolutionKey(environment))
+        const relocated = resolveGit(environment)
+        if (relocated === undefined || relocated === executable) throw error
+        return await runCommand(relocated, argv, options, environment)
       }
     },
   }
