@@ -2,143 +2,226 @@ import { describe, expect, it } from "bun:test"
 
 import { createBashFileReadGuardHook, WARNING_MESSAGE } from "./bash-file-read-guard"
 
+type AfterInput = { tool: string; sessionID: string; callID: string; args?: Record<string, unknown> }
+type AfterOutput = { title: string; output: string; metadata: unknown }
+type BashFileReadGuardHook = ReturnType<typeof createBashFileReadGuardHook>
+
+async function runAfter(hook: BashFileReadGuardHook, input: AfterInput, output: AfterOutput): Promise<void> {
+  await hook["tool.execute.after"](input, output)
+}
+
+function countWarnings(value: string): number {
+  return value.split(WARNING_MESSAGE).length - 1
+}
+
 describe("createBashFileReadGuardHook", () => {
-  describe("tool.execute.before", () => {
-    it("records pending warning for simple cat command without setting output.message", async () => {
-      // given
-      const hook = createBashFileReadGuardHook()
-      const input = { tool: "bash", sessionID: "ses1", callID: "call-1" }
-      const beforeOutput: Record<string, unknown> & { args: Record<string, unknown>; message?: string } = {
-        args: { command: "cat README.md" },
-      }
-
-      // when
-      await hook["tool.execute.before"]!(input, beforeOutput as never)
-
-      // then
-      expect(beforeOutput.message).toBeUndefined()
-      // pending is internal - prove via after
-      const afterInput = { tool: "bash", sessionID: "ses1", callID: "call-1", args: { command: "cat README.md" } }
-      const afterOutput = { title: "bash", output: "file contents", metadata: {} }
-      await hook["tool.execute.after"]!(afterInput as never, afterOutput as never)
-      expect(afterOutput.output).toBe(`${WARNING_MESSAGE}\n\nfile contents`)
-    })
-
-    it("does not record for non-bash tool", async () => {
-      const hook = createBashFileReadGuardHook()
-      const input = { tool: "read", sessionID: "ses1", callID: "call-2" }
-      const beforeOutput = { args: { command: "cat README.md" } } as never
-      await hook["tool.execute.before"]!(input, beforeOutput)
-      const afterInput = { tool: "read", sessionID: "ses1", callID: "call-2" } as never
-      const afterOutput = { title: "read", output: "contents", metadata: {} }
-      await hook["tool.execute.after"]!(afterInput, afterOutput as never)
-      expect(afterOutput.output).toBe("contents")
-    })
-
-    it("does not record for complex piped command", async () => {
-      const hook = createBashFileReadGuardHook()
-      const input = { tool: "bash", sessionID: "ses1", callID: "call-3" }
-      const beforeOutput = { args: { command: "cat file.txt | grep foo" } } as never
-      await hook["tool.execute.before"]!(input, beforeOutput)
-      const afterInput = { tool: "bash", sessionID: "ses1", callID: "call-3", args: { command: "cat file.txt | grep foo" } } as never
-      const afterOutput = { title: "bash", output: "piped", metadata: {} }
-      await hook["tool.execute.after"]!(afterInput as never, afterOutput as never)
-      expect(afterOutput.output).toBe("piped")
-    })
-  })
-
   describe("tool.execute.after", () => {
-    it("prepends warning to output via pending set (before+after flow)", async () => {
-      const hook = createBashFileReadGuardHook()
-      const inputBefore = { tool: "bash", sessionID: "ses1", callID: "call-a" }
-      await hook["tool.execute.before"]!(inputBefore, { args: { command: "cat src/index.ts" } } as never)
+    describe("simple file reads", () => {
+      it("prepends the warning to a cat read", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const output = { title: "bash", output: "file contents", metadata: {} }
 
-      const inputAfter = { tool: "bash", sessionID: "ses1", callID: "call-a", args: { command: "cat src/index.ts" } } as never
-      const output = { title: "bash", output: "original output", metadata: {} }
-      await hook["tool.execute.after"]!(inputAfter, output as never)
-      expect(output.output).toBe(`${WARNING_MESSAGE}\n\noriginal output`)
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-cat", args: { command: "cat file" } }, output)
+
+        // then
+        expect(output.output).toBe(`${WARNING_MESSAGE}\n\nfile contents`)
+      })
+
+      it("prepends the warning to head and tail reads", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const commands = ["head -n 5 file", "head file", "tail file", "tail -n 10 file"]
+
+        // when
+        const outputs: string[] = []
+        for (const command of commands) {
+          const output = { title: "bash", output: "read contents", metadata: {} }
+          await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: `call-${command}`, args: { command } }, output)
+          outputs.push(output.output)
+        }
+
+        // then
+        for (const output of outputs) {
+          expect(output).toBe(`${WARNING_MESSAGE}\n\nread contents`)
+        }
+      })
+
+      it("warns once for the same output, never twice", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const input = { tool: "bash", sessionID: "ses1", callID: "call-twice", args: { command: "cat file" } }
+        const output = { title: "bash", output: "file contents", metadata: {} }
+
+        // when
+        await runAfter(hook, input, output)
+        await runAfter(hook, input, output)
+
+        // then
+        expect(output.output).toBe(`${WARNING_MESSAGE}\n\nfile contents`)
+        expect(countWarnings(output.output)).toBe(1)
+      })
+
+      it("leaves an output that already carries the warning untouched", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const output = { title: "bash", output: `${WARNING_MESSAGE}\n\nalready warned`, metadata: {} }
+
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-dup", args: { command: "cat file" } }, output)
+
+        // then
+        expect(output.output).toBe(`${WARNING_MESSAGE}\n\nalready warned`)
+        expect(countWarnings(output.output)).toBe(1)
+      })
+
+      it("handles the Bash tool name case-insensitively", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const output = { title: "bash", output: "data", metadata: {} }
+
+        // when
+        await runAfter(hook, { tool: "Bash", sessionID: "ses1", callID: "call-ci", args: { command: "cat file.txt" } }, output)
+
+        // then
+        expect(output.output).toBe(`${WARNING_MESSAGE}\n\ndata`)
+      })
     })
 
-    it("prepends warning via direct args detection when before was not called (fallback)", async () => {
-      const hook = createBashFileReadGuardHook()
-      const inputAfter = { tool: "bash", sessionID: "ses1", callID: "call-direct", args: { command: "head README.md" } } as never
-      const output = { title: "bash", output: "head contents", metadata: {} }
-      await hook["tool.execute.after"]!(inputAfter, output as never)
-      expect(output.output).toBe(`${WARNING_MESSAGE}\n\nhead contents`)
+    describe("unrelated commands", () => {
+      it("leaves ls, git status, echo and piped cat untouched", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const commands = ["ls", "cat f | wc -l", "git status", "echo hi"]
+
+        // when
+        const outputs: string[] = []
+        for (const command of commands) {
+          const output = { title: "bash", output: "plain output", metadata: {} }
+          await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: `call-${command}`, args: { command } }, output)
+          outputs.push(output.output)
+        }
+
+        // then
+        for (const output of outputs) {
+          expect(output).toBe("plain output")
+        }
+      })
+
+      it("leaves non-simple cat and head forms untouched", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const commands = ["cat -n file", "cat", "head -n", "tail -n abc file", "cat file; echo done", "cat file && echo done"]
+
+        // when
+        const outputs: string[] = []
+        for (const command of commands) {
+          const output = { title: "bash", output: "plain output", metadata: {} }
+          await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: `call-${command}`, args: { command } }, output)
+          outputs.push(output.output)
+        }
+
+        // then
+        for (const output of outputs) {
+          expect(output).toBe("plain output")
+        }
+      })
+
+      it("leaves non-bash tools untouched", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const output = { title: "read", output: "contents", metadata: {} }
+
+        // when
+        await runAfter(hook, { tool: "read", sessionID: "ses1", callID: "call-read", args: { command: "cat file" } }, output)
+
+        // then
+        expect(output.output).toBe("contents")
+      })
+
+      it("leaves non-string output untouched", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const output = { title: "bash", output: null as unknown as string, metadata: {} }
+
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-null", args: { command: "cat file" } }, output)
+
+        // then
+        expect(output.output).toBeNull()
+      })
+
+      it("leaves a call without args untouched", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const output = { title: "bash", output: "plain output", metadata: {} }
+
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-noargs" }, output)
+
+        // then
+        expect(output.output).toBe("plain output")
+      })
+
+      it("leaves a call whose command is not a string untouched", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const output = { title: "bash", output: "plain output", metadata: {} }
+
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-numcmd", args: { command: 42 } }, output)
+
+        // then
+        expect(output.output).toBe("plain output")
+      })
     })
 
-    it("supports head -n and tail -n variants", async () => {
-      const hook = createBashFileReadGuardHook()
-      for (const cmd of ["head -n 20 file.txt", "head -n 20  file.txt", "tail -n 10 file.txt", "tail file.txt"]) {
-        const callID = `call-${cmd}`
-        await hook["tool.execute.before"]!({ tool: "bash", sessionID: "ses1", callID } as never, { args: { command: cmd } } as never)
-        const output = { title: "bash", output: "out", metadata: {} }
-        await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID, args: { command: cmd } } as never, output as never)
-        expect(output.output).toBe(`${WARNING_MESSAGE}\n\nout`)
-      }
-    })
+    describe("call identity", () => {
+      it("does not warn an unrelated command that reuses a callID which previously warned for a read", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const readOutput = { title: "bash", output: "file contents", metadata: {} }
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-reused", args: { command: "cat file" } }, readOutput)
+        expect(readOutput.output).toBe(`${WARNING_MESSAGE}\n\nfile contents`)
+        const unrelatedOutput = { title: "bash", output: "plain output", metadata: {} }
 
-    it("does not warn for non-simple file reads", async () => {
-      const hook = createBashFileReadGuardHook()
-      const cases = ["cat -n file", "cat", "head -n", "tail -n abc file", "cat file; echo done", "cat file && echo done"]
-      for (const cmd of cases) {
-        const callID = `call-${Math.random()}`
-        const out = { title: "bash", output: "out", metadata: {} }
-        await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID, args: { command: cmd } } as never, out as never)
-        expect(out.output).toBe("out")
-      }
-    })
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-reused", args: { command: "git status" } }, unrelatedOutput)
 
-    it("handles Bash case-insensitively", async () => {
-      const hook = createBashFileReadGuardHook()
-      const inputAfter = { tool: "Bash", sessionID: "ses1", callID: "ci", args: { command: "cat file.txt" } } as never
-      const output = { title: "bash", output: "data", metadata: {} }
-      await hook["tool.execute.after"]!(inputAfter, output as never)
-      expect(output.output).toContain(WARNING_MESSAGE)
-    })
+        // then
+        expect(unrelatedOutput.output).toBe("plain output")
+      })
 
-    it("does not duplicate warning if output already contains it", async () => {
-      const hook = createBashFileReadGuardHook()
-      await hook["tool.execute.before"]!({ tool: "bash", sessionID: "ses1", callID: "dup" } as never, { args: { command: "cat file" } } as never)
-      const output = { title: "bash", output: `${WARNING_MESSAGE}\n\nalready`, metadata: {} }
-      await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID: "dup", args: { command: "cat file" } } as never, output as never)
-      expect(output.output).toBe(`${WARNING_MESSAGE}\n\nalready`)
-      // no double prepend
-      expect((output.output.match(new RegExp(WARNING_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) ?? []).length).toBe(1)
-    })
+      it("decides from the after-phase args when they differ from anything seen earlier for the callID", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const earlierOutput = { title: "bash", output: "plain output", metadata: {} }
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-rewritten", args: { command: "echo hi" } }, earlierOutput)
+        expect(earlierOutput.output).toBe("plain output")
+        const rewrittenOutput = { title: "bash", output: "file contents", metadata: {} }
 
-    it("consumes pending so second after with same callID does not re-warn", async () => {
-      const hook = createBashFileReadGuardHook()
-      await hook["tool.execute.before"]!({ tool: "bash", sessionID: "ses1", callID: "once" } as never, { args: { command: "cat file" } } as never)
-      const out1 = { title: "bash", output: "first", metadata: {} }
-      await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID: "once", args: { command: "cat file" } } as never, out1 as never)
-      expect(out1.output).toContain(WARNING_MESSAGE)
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-rewritten", args: { command: "cat file" } }, rewrittenOutput)
 
-      // second after with same callID but no pending and no args fallback via different command should not warn
-      const out2 = { title: "bash", output: "second", metadata: {} }
-      await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID: "once", args: { command: "echo hello" } } as never, out2 as never)
-      expect(out2.output).toBe("second")
-    })
+        // then
+        expect(rewrittenOutput.output).toBe(`${WARNING_MESSAGE}\n\nfile contents`)
+      })
 
-    it("isolates pending warnings by callID", async () => {
-      const hook = createBashFileReadGuardHook()
-      await hook["tool.execute.before"]!({ tool: "bash", sessionID: "ses1", callID: "a" } as never, { args: { command: "cat a.txt" } } as never)
-      await hook["tool.execute.before"]!({ tool: "bash", sessionID: "ses1", callID: "b" } as never, { args: { command: "echo hello" } } as never)
+      it("decides from the after-phase args when the earlier call carried no args", async () => {
+        // given
+        const hook = createBashFileReadGuardHook()
+        const withoutArgs = { title: "bash", output: "plain output", metadata: {} }
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-late-args" }, withoutArgs)
+        expect(withoutArgs.output).toBe("plain output")
+        const withArgs = { title: "bash", output: "file contents", metadata: {} }
 
-      const outA = { title: "bash", output: "A", metadata: {} }
-      const outB = { title: "bash", output: "B", metadata: {} }
-      await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID: "a", args: { command: "cat a.txt" } } as never, outA as never)
-      await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID: "b", args: { command: "echo hello" } } as never, outB as never)
-      expect(outA.output).toContain(WARNING_MESSAGE)
-      expect(outB.output).toBe("B")
-    })
+        // when
+        await runAfter(hook, { tool: "bash", sessionID: "ses1", callID: "call-late-args", args: { command: "tail file" } }, withArgs)
 
-    it("leaves non-string output untouched", async () => {
-      const hook = createBashFileReadGuardHook()
-      await hook["tool.execute.before"]!({ tool: "bash", sessionID: "ses1", callID: "ns" } as never, { args: { command: "cat file" } } as never)
-      const out = { title: "bash", output: null as unknown as string, metadata: {} }
-      await hook["tool.execute.after"]!({ tool: "bash", sessionID: "ses1", callID: "ns", args: { command: "cat file" } } as never, out as never)
-      expect(out.output).toBeNull()
+        // then
+        expect(withArgs.output).toBe(`${WARNING_MESSAGE}\n\nfile contents`)
+      })
     })
   })
 })
