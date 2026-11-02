@@ -80,6 +80,9 @@ function systemPath(): string {
 async function memoryWrite(repoDir: string, exec: GitExec): Promise<string> {
   const repo = new GitMemoryRepo({ dir: repoDir, agentId: AUTHOR.agentId, exec })
   await repo.init({ authorName: AUTHOR.authorName })
+  // `git init` does not always materialise .git/info, so the ignore file is written into a
+  // directory we create ourselves; an absent one aborted both planted rows before they asserted.
+  mkdirSync(join(repoDir, ".git", "info"), { recursive: true })
   writeFileSync(join(repoDir, ".git", "info", "exclude"), "git.*\n*.ran\n")
   writeFileSync(join(repoDir, "note.md"), "---\ndescription: planted git row\n---\nbody\n")
   return (await repo.commitWrite(["note.md"], "memory write", AUTHOR)).sha
