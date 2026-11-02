@@ -7,6 +7,7 @@
       "dependencies": {
         "@opentui/solid": "^0.5.11",
         "detect-libc": "^2.1.2",
+        "solid-js": "1.9.12",
         "zod": "^4.6.5",
       },
       "devDependencies": {
