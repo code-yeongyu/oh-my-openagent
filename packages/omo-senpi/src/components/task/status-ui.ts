@@ -2,8 +2,10 @@ import {
   assistantLastLine,
   excerptRendererText,
   formatToolActivity,
+  HOST_TURN_RESUMED_EVENT,
   type ListScope,
   type ListedTask,
+  type LiveRunStats,
   type ManagedChildEvent,
   type TaskRecord,
   type TaskRunStats,
@@ -13,9 +15,12 @@ import type { CapturedUi } from "./runtime-context"
 import {
   backgroundWidgetRows,
   buildWidgetRows,
+  isSuspended,
   isTerminal,
   LIVE_STATUS_REFRESH_MS,
 } from "./status-row-format"
+import { createTreeCostFeed } from "./subagent-cost-feed"
+import type { StoreMutation } from "./store-mutation-observer"
 
 export { buildWidgetRows, formatTaskRow } from "./status-row-format"
 
@@ -32,6 +37,8 @@ export interface StatusUiManager {
   subscribeChild?(taskId: string, listener: (event: ManagedChildEvent) => void): () => void
   // In-flight turns/tools/tok-s for a live child; absent rows simply omit the stats tokens.
   runStatsSnapshot?(taskId: string): TaskRunStats | undefined
+  // In-flight stats tagged with their run, for the footer's subagent tree cost (senpi#2471).
+  liveRunStats?(taskId: string): LiveRunStats | undefined
 }
 
 // The captured-UI facts the sync reads: the live ui handle (undefined when none is captured, so every
@@ -68,6 +75,8 @@ export interface TaskStatusUi {
   scheduleSync(): void
   // Immediate render (used on session/model events and internally by the debounce timer).
   syncNow(): void
+  // One store mutation (from the store wrapper): updates the footer's subagent tree cost in place.
+  observeRecord(change: StoreMutation): void
   // Cancel any pending debounce timer so shutdown does not leave a render scheduled past teardown.
   dispose(): void
 }
@@ -87,6 +96,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   let pending: TimerHandle | undefined
   let liveRefresh: TimerHandle | undefined
   const reportedRenderFaults = new Set<string>()
+  const treeCost = createTreeCostFeed(deps)
 
   // Render runs from bare timer callbacks; an uncontained throw escapes as an uncaughtException
   // and kills the host process (the beta.20 pi-tui incident). Warn once per distinct fault so the
@@ -148,7 +158,8 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       return
     }
     ui.setWidget(UI_KEY, rows, { placement: "belowEditor" })
-    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status))) {
+    // Only a live child needs the 250 ms repaint; a parked one renders a still row.
+    if (deps.manager.wasBackground !== undefined && background.some((record) => !isTerminal(record.status) && !isSuspended(record))) {
       scheduleLiveRefresh()
     } else clearLiveRefresh()
   }
@@ -212,6 +223,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
   }
 
   function dispose(): void {
+    treeCost.dispose()
     if (pending !== undefined) {
       timers.clear(pending)
       pending = undefined
@@ -223,7 +235,15 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     cachedRecords = []
   }
 
-  return { scheduleSync, syncNow: () => containRenderFault(syncNow), dispose }
+  return {
+    scheduleSync,
+    syncNow: () => containRenderFault(() => {
+      treeCost.ensureSeeded()
+      syncNow()
+    }),
+    observeRecord: (change) => containRenderFault(() => treeCost.observe(change)),
+    dispose,
+  }
 }
 
 function activityFromEvent(event: ManagedChildEvent): string | undefined {
@@ -231,6 +251,8 @@ function activityFromEvent(event: ManagedChildEvent): string | undefined {
     return excerptRendererText(formatToolActivity(event.toolName, event.args ?? event.input), 32)
   }
   if (event.type === "tool_execution_end") return "running"
+  // A host reattach found this child's turn in flight and it runs again on the new generation.
+  if (event.type === HOST_TURN_RESUMED_EVENT) return "running"
   if (event.type === "message_end") {
     const line = assistantLastLine(event.message)
     return line === undefined ? undefined : excerptRendererText(line, 32)

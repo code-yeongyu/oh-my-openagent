@@ -665,6 +665,69 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(promptCalls[0]?.query).toEqual({ directory: "/parent/dir" })
   })
 
+  test("creates and prompts the child in input.cwd", async () => {
+    // given
+    const getCalls: Array<Record<string, unknown>> = []
+    const createCalls: Array<Record<string, unknown>> = []
+    const promptCalls: Array<Record<string, unknown>> = []
+
+    const client = {
+      session: {
+        get: async (input: Record<string, unknown>) => {
+          getCalls.push(input)
+          return { data: { directory: "/parent/dir" } }
+        },
+        create: async (input: Record<string, unknown>) => {
+          createCalls.push(input)
+          return { data: { id: "ses_child_cwd" } }
+        },
+        promptAsync: async (input: Record<string, unknown>) => {
+          promptCalls.push(input)
+          return {}
+        },
+      },
+    }
+
+    const task = createTask({
+      description: "Test task",
+      prompt: "Do work",
+      agent: "sisyphus-junior",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+      cwd: "/parent/dir-fix-1",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
+        cwd: task.cwd,
+      },
+    }
+
+    // when
+    await startTask(item as never, {
+      client: client as never,
+      directory: "/fallback",
+      concurrencyManager: { release: () => {} } as never,
+      tmuxEnabled: false,
+      onTaskError: () => {},
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // then
+    expect(task.cwd).toBe("/parent/dir-fix-1")
+    expect(getCalls).toEqual([{ path: { id: "ses_parent" }, query: { directory: "/fallback" } }])
+    expect(createCalls).toHaveLength(1)
+    expect(createCalls[0]?.query).toEqual({ directory: "/parent/dir-fix-1" })
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0]?.query).toEqual({ directory: "/parent/dir-fix-1" })
+  })
+
   test("strips leading zwsp from prompt body agent before promptAsync", async () => {
     //#given
     const promptCalls: Array<{ body?: { agent?: string } }> = []

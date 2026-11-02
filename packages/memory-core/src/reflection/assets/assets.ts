@@ -1,6 +1,7 @@
-import { readFileSync } from "../../fs/resilient"
-import { dirname, join } from "node:path"
+import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+
+import { loadPersonaAsset } from "../../personas/load"
 
 export interface ReflectionPersonaSection {
   heading: string
@@ -17,8 +18,6 @@ export interface ReflectionPersona {
 // is undefined and this module-scope join() killed the whole extension at import time (v5.0.0-beta.1).
 // jiti rewrites import.meta.url to the real file URL, so the standard ESM idiom works on every runtime.
 const ASSETS_DIR = dirname(fileURLToPath(import.meta.url))
-const PERSONA_PATH = join(ASSETS_DIR, "reflection-persona.md")
-const DREAM_PERSONA_PATH = join(ASSETS_DIR, "dream-persona.md")
 
 function parseSections(markdown: string): ReflectionPersonaSection[] {
   const sections: ReflectionPersonaSection[] = []
@@ -40,11 +39,11 @@ function parseSections(markdown: string): ReflectionPersonaSection[] {
 }
 
 export function loadReflectionPersona(): ReflectionPersona {
-  const markdown = readFileSync(PERSONA_PATH, "utf8")
+  const markdown = loadPersonaAsset(ASSETS_DIR, "reflection")
   return { markdown, sections: parseSections(markdown) }
 }
 
 export function loadDreamPersona(): ReflectionPersona {
-  const markdown = readFileSync(DREAM_PERSONA_PATH, "utf8")
+  const markdown = loadPersonaAsset(ASSETS_DIR, "dream")
   return { markdown, sections: parseSections(markdown) }
 }

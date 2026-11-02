@@ -3,7 +3,7 @@ import type { PlanArtifactReference, SkillInvocationState } from "../../agents"
 
 import type { TaskToolDeps } from "./types"
 
-// The plan-review prompt contract for one-shot review agents (momus): whatever the caller asked,
+// The plan-review prompt contract for one-shot review agents (plan-reviewer): whatever the caller asked,
 // the child receives EXACTLY one canonical sentence carrying one .omo/plans/*.md path - no claims,
 // no emphasis, no skill prepends. Target precedence: an explicit single path in the caller prompt
 // wins; otherwise the session's most-referenced plan artifact (count desc, recency tie-break);
@@ -13,7 +13,7 @@ import type { TaskToolDeps } from "./types"
 const PLAN_PATH_GLOBAL = /[^\s"'`()\[\]]*\.omo[\\/]plans[\\/][^\s"'`()\[\]/\\]+\.md/gi
 
 export const PLAN_REVIEW_DENY_MESSAGE =
-  "momus requires exactly one .omo/plans/*.md path: include the plan path in the prompt, or touch the plan file in this session first."
+  "plan-reviewer requires exactly one .omo/plans/*.md path: include the plan path in the prompt, or touch the plan file in this session first."
 
 export function extractPlanPaths(text: string): readonly string[] {
   const seen = new Set<string>()
@@ -44,7 +44,7 @@ export function resolvePlanReviewTarget(callerPrompt: string, state: SkillInvoca
 
 // An explicit caller path is a SELECTOR over session-recorded references, never a value that
 // reaches the child: the prompt is built from the RECORDED path, so caller-controlled prefixes,
-// absolute paths, and `..` segments cannot be interpolated into the momus prompt. Identity is the
+// absolute paths, and `..` segments cannot be interpolated into the plan-reviewer prompt. Identity is the
 // normalized `.omo/plans/<name>.md` suffix, which keeps worktree-rooted recordings matchable.
 function matchRecordedReference(candidate: string, references: readonly PlanArtifactReference[]): PlanArtifactReference | undefined {
   const wanted = planSuffix(candidate)

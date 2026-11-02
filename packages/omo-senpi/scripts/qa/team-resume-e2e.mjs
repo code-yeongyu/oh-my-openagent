@@ -12,7 +12,7 @@ import { join, resolve } from "node:path"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
 import { childSessionHasAssistant, pollUntil, revivedAfterSuspend, sessionIdFromEvents, taskEventText, waitForFileCommand } from "./resume-e2e-runtime.mjs"
-import { discoverRunIds, inboxCounts, memberInboxDir, memberTaskId, readJsonIfPresent, sessionContainsText, taskRecord } from "./team-e2e-support.mjs"
+import { discoverRunIds, inboxCounts, memberInboxDir, memberTaskId, readJsonIfPresent, runtimeDir, sessionContainsText, taskRecord } from "./team-e2e-support.mjs"
 
 const POLL_MS = 60_000
 const QUICK_PROMPT = "You are team member 'quick'. MOCKROLE=quick. End your turn."
@@ -48,13 +48,13 @@ function memberDeliveredFromLead(memberLog) {
     .some((line) => line.includes('"type":"team_message_delivered"') && line.includes('"from":"lead"'))
 }
 
-function memberBooted(cwd) {
-  const runId = discoverRunIds(cwd)[0]
-  const quickTask = runId === undefined ? undefined : memberTaskId(cwd, runId, "quick")
+function memberBooted(sandbox) {
+  const runId = discoverRunIds(sandbox)[0]
+  const quickTask = runId === undefined ? undefined : memberTaskId(sandbox, runId, "quick")
   return {
     runId,
     quickTask,
-    booted: runId !== undefined && quickTask !== undefined && taskRecord(cwd, quickTask) !== undefined && childSessionHasAssistant(cwd, quickTask),
+    booted: runId !== undefined && quickTask !== undefined && taskRecord(sandbox, quickTask) !== undefined && childSessionHasAssistant(sandbox, quickTask),
   }
 }
 
@@ -78,11 +78,11 @@ async function runMemberResumeLane(senpiBin, outDir, startRun, checks) {
         quick: [text("quick ready and idle")],
       },
     })
-    const seeded = await pollUntil(() => memberBooted(sandbox.cwd), (v) => v.booted === true, POLL_MS)
+    const seeded = await pollUntil(() => memberBooted(sandbox), (v) => v.booted === true, POLL_MS)
     writeFileSync(sentinel1, "go\n")
     const result1 = await run1.completion
     writeLaneLogs(outDir, "resume-member-run1", result1)
-    const afterQuit = seeded.quickTask === undefined ? undefined : taskRecord(sandbox.cwd, seeded.quickTask)
+    const afterQuit = seeded.quickTask === undefined ? undefined : taskRecord(sandbox, seeded.quickTask)
     checks.resume_member_suspended_on_quit =
       result1.status === 0
       && seeded.booted === true
@@ -113,16 +113,16 @@ async function runMemberResumeLane(senpiBin, outDir, startRun, checks) {
     // the bash wait ends the lead's tool boundary, the queued steer delivers the envelope into the
     // lead's model context, and the run exits on its own.
     const delivered = await pollUntil(
-      () => (seeded.runId === undefined ? { reserved: -1 } : inboxCounts(memberInboxDir(sandbox.cwd, seeded.runId, "lead"))),
+      () => (seeded.runId === undefined ? { reserved: -1 } : inboxCounts(memberInboxDir(sandbox, seeded.runId, "lead"))),
       (v) => v.reserved >= 1,
       POLL_MS,
     )
     writeFileSync(sentinel2, "go\n")
     const result2 = await run2.completion
     writeLaneLogs(outDir, "resume-member-run2", result2)
-    const quickTaskAfter = seeded.runId === undefined ? undefined : memberTaskId(sandbox.cwd, seeded.runId, "quick")
-    const memberLog = seeded.quickTask === undefined ? "" : taskEventText(sandbox.cwd, seeded.quickTask)
-    const leadInbox = seeded.runId === undefined ? { unread: -1, reserved: -1 } : inboxCounts(memberInboxDir(sandbox.cwd, seeded.runId, "lead"))
+    const quickTaskAfter = seeded.runId === undefined ? undefined : memberTaskId(sandbox, seeded.runId, "quick")
+    const memberLog = seeded.quickTask === undefined ? "" : taskEventText(sandbox, seeded.quickTask)
+    const leadInbox = seeded.runId === undefined ? { unread: -1, reserved: -1 } : inboxCounts(memberInboxDir(sandbox, seeded.runId, "lead"))
     const leadReceipt = join(obsDir, "lead-received.txt")
     // Known finding (plan ledger, severity follow-up): the lead poller's steer into a RESUMED print
     // session does not abort the lead hang, so the reserved envelope may never reach the lead's
@@ -137,7 +137,7 @@ async function runMemberResumeLane(senpiBin, outDir, startRun, checks) {
       && quickTaskAfter === seeded.quickTask
     checks.resume_member_mailbox_identity =
       seeded.quickTask !== undefined
-      && sessionContainsText(sandbox.cwd, seeded.quickTask, LEAD2QUICK_TOKEN)
+      && sessionContainsText(sandbox, seeded.quickTask, LEAD2QUICK_TOKEN)
       && quickTaskAfter === seeded.quickTask
     checks.resume_lead_poller_running = delivered.reserved >= 1 && memberDeliveredFromLead(memberLog)
     writeFileSync(
@@ -191,9 +191,9 @@ async function runShutdownLane(senpiBin, outDir, startRun, checks) {
       },
     })
     const readTeamState = () => {
-      const runId = discoverRunIds(sandbox.cwd)[0]
-      const state = runId === undefined ? undefined : readJsonIfPresent(join(sandbox.cwd, ".omo", "senpi-task", "teams", "runtime", runId, "state.json"))
-      const quickTask = runId === undefined ? undefined : memberTaskId(sandbox.cwd, runId, "quick")
+      const runId = discoverRunIds(sandbox)[0]
+      const state = runId === undefined ? undefined : readJsonIfPresent(join(runtimeDir(sandbox, runId), "state.json"))
+      const quickTask = runId === undefined ? undefined : memberTaskId(sandbox, runId, "quick")
       return { runId, quickTask, state }
     }
     const requested = await pollUntil(
@@ -203,7 +203,7 @@ async function runShutdownLane(senpiBin, outDir, startRun, checks) {
           runId,
           quickTask,
           pending: (state?.shutdownRequests ?? []).some((request) => request.approvedAt === undefined && request.rejectedAt === undefined),
-          memberRecorded: quickTask !== undefined && taskRecord(sandbox.cwd, quickTask) !== undefined,
+          memberRecorded: quickTask !== undefined && taskRecord(sandbox, quickTask) !== undefined,
         }
       },
       (v) => v.pending === true && v.memberRecorded === true,
@@ -216,7 +216,7 @@ async function runShutdownLane(senpiBin, outDir, startRun, checks) {
         const { quickTask, state } = readTeamState()
         return {
           stamped: (state?.members ?? []).some((member) => member.name === "quick" && member.status === "shutdown_approved"),
-          cancelled: quickTask !== undefined && taskRecord(sandbox.cwd, quickTask)?.status === "cancelled",
+          cancelled: quickTask !== undefined && taskRecord(sandbox, quickTask)?.status === "cancelled",
         }
       },
       (v) => v.stamped === true && v.cancelled === true,
@@ -225,7 +225,7 @@ async function runShutdownLane(senpiBin, outDir, startRun, checks) {
     writeFileSync(sentinel2, "go\n")
     const result1 = await run1.completion
     writeLaneLogs(outDir, "resume-shutdown-run1", result1)
-    const logBefore = requested.quickTask === undefined ? "" : taskEventText(sandbox.cwd, requested.quickTask)
+    const logBefore = requested.quickTask === undefined ? "" : taskEventText(sandbox, requested.quickTask)
     checks.resume_shutdown_approved_setup =
       result1.status === 0
       && requested.pending === true
@@ -241,8 +241,8 @@ async function runShutdownLane(senpiBin, outDir, startRun, checks) {
     })
     const result2 = await run2.completion
     writeLaneLogs(outDir, "resume-shutdown-run2", result2)
-    const memberAfter = requested.quickTask === undefined ? undefined : taskRecord(sandbox.cwd, requested.quickTask)
-    const logAfter = requested.quickTask === undefined ? "" : taskEventText(sandbox.cwd, requested.quickTask)
+    const memberAfter = requested.quickTask === undefined ? undefined : taskRecord(sandbox, requested.quickTask)
+    const logAfter = requested.quickTask === undefined ? "" : taskEventText(sandbox, requested.quickTask)
     checks.resume_shutdown_approved_not_revived =
       result2.status === 0
       && requested.quickTask !== undefined

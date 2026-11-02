@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { rmSync } from "node:fs"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -13,7 +14,9 @@ import { sendMessage } from "./send"
 import { isMessageConsumed } from "./consumed-ledger"
 
 async function createBaseDirectory(): Promise<string> {
-  return await mkdtemp(path.join(tmpdir(), "team-mailbox-consumed-ledger-"))
+  const directory = await mkdtemp(path.join(tmpdir(), "team-mailbox-consumed-ledger-"))
+  onTestFinished(() => rmSync(directory, { recursive: true, force: true }))
+  return directory
 }
 
 describe("isMessageConsumed", () => {

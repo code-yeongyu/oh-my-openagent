@@ -30,7 +30,6 @@ describe("memory identity layout constants", () => {
       "facts-queue",
       "facts",
       "notices",
-      "tool-receipts",
       "recall",
     ])
   })
@@ -98,7 +97,6 @@ describe("buildIdentityPaths", () => {
     expect(paths.factsQueue).toBe(join(runtime, "facts-queue"))
     expect(paths.facts).toBe(join(runtime, "facts"))
     expect(paths.notices).toBe(join(runtime, "notices"))
-    expect(paths.toolReceipts).toBe(join(runtime, "tool-receipts"))
     expect(paths.recall).toBe(join(runtime, "recall"))
     expect(paths.recallLedger).toBe(join(runtime, "recall", "ledger"))
     expect(paths.recallPending).toBe(join(runtime, "recall", "pending"))

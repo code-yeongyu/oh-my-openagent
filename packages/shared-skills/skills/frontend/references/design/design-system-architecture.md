@@ -16,7 +16,7 @@ Every frontend project MUST have a `DESIGN.md` at its root. This file is the sin
 
 ## DESIGN.md Structure
 
-The file has 8 sections plus a greenfield-only `## 0. Research Log`. Every section is mandatory. Skip nothing.
+The file has 8 sections plus a greenfield-only `## 0. Research Log`, and section 9 once `grounding.md` has run. Every section is mandatory. Skip nothing.
 
 ```markdown
 # [Project Name] Design System
@@ -60,8 +60,7 @@ rather than borders, creating layers you feel more than see."
 | Status/info | --status-info | #2563EB | #3B82F6 | Informational |
 
 ### Rules
-- Surface hierarchy creates depth without shadows or borders where possible.
-- Accent is used ONLY for interactive elements. Never decorative.
+- Accent marks the one or two most likely actions on a screen, on the control's background rather than its glyph or label. Peer choices differ by style, never by size. Nothing decorative carries accent.
 - Never introduce a color not in this table. Extend the table first.
 
 ## 3. Typography
@@ -74,11 +73,11 @@ rather than borders, creating layers you feel more than see."
 | H1 | 36px / 2.25rem | 700 | 1.2 | -0.015em | Section headers |
 | H2 | 28px / 1.75rem | 600 | 1.3 | -0.01em | Subsection headers |
 | H3 | 22px / 1.375rem | 600 | 1.4 | 0 | Card titles |
-| Body/lg | 18px / 1.125rem | 400 | 1.6 | 0 | Lead paragraphs |
+| Body/lg | 18px / 1.125rem | 400 | 1.6 | 0 | Lead paragraphs, in the secondary ink |
 | Body | 16px / 1rem | 400 | 1.6 | 0 | Default text |
-| Body/sm | 14px / 0.875rem | 400 | 1.5 | 0 | Secondary info |
+| Body/sm | 14px / 0.875rem | 400 | 1.5 | 0 | Secondary info, in the secondary ink |
 | Caption | 12px / 0.75rem | 500 | 1.4 | 0.02em | Labels, metadata |
-| Overline | 11px / 0.6875rem | 600 | 1.3 | 0.08em | Section labels, uppercase |
+| Overline | 11px / 0.6875rem | 600 | 1.3 | 0.08em | Field, table and metadata labels, uppercase; by default not a label above a heading, unless the chosen route asks for one (`references/perfection/craft-floor.md`) |
 
 ### Font Stack
 - Primary: [specify — e.g. "Inter, system-ui, -apple-system, sans-serif"]
@@ -129,7 +128,7 @@ Document reusable patterns before implementation for greenfield work, and as the
 - **Spacing**: which tokens
 - **States**: default, hover, active, focus, disabled, loading, empty, error
 - **Accessibility**: keyboard, ARIA, contrast
-- **Motion**: entry/exit animations
+- **Motion**: entry/exit animations; a borrowed mechanism names its source (catalog, component, URL, reduced-motion path)
 - **Layout**: spatial primitive (stack / cluster / sidebar / grid / shell…) and, if the component scrolls or pins anything, its scroll owner
 
 Greenfield starts with the primitives you are about to build, assembled from
@@ -148,11 +147,22 @@ code; do not invent future components just to fill the section.
 | Emphasis | 400-600ms | cubic-bezier(0.16, 1, 0.3, 1) | Page transition, hero entry |
 | Scroll-driven | tied to scroll | linear | Parallax, progress, reveal |
 
+### Feedback thresholds
+
+| Event | Feedback | Timing |
+|-------|----------|--------|
+| Press, tap, drag start | State change on the element itself | Same frame; a drag image once the pointer has moved a few px |
+| Hover-revealed controls | Controls appear, then leave with the pointer | After hover intent, not on pointer entry |
+| Async action started | Placeholder or disabled control at once; spinner or skeleton only past ~1 s | An indicator never flashes for sub-second work |
+| Long wait | Determinate progress at an even pace; indeterminate only when the total is unknown | Never swap indicator shape mid-task or front-load to 90% |
+| Outcome | Failure reported next to the object; success shown by the changed state itself | Toast only for outcomes not visible in place |
+
 ### Rules
-- Only animate `transform` and `opacity`. Never animate layout properties.
-- Every interactive element has hover + active + focus states.
+- Only animate `transform`, `opacity`, and `filter`. Never animate layout properties.
+- Every interactive element has hover, active, and focus states. Selected/focused/active is encoded with ink-alpha washes and a glyph (check) — never a coloured accent border or outline. `focus-visible` rings are the only coloured edge.
+- A surface that changes size, position, or content animates from its old geometry to the new one; never unmount and remount it. Nothing reflows under the pointer while the user is typing or dragging.
 - Scroll-triggered animations use `IntersectionObserver`, not scroll listeners.
-- Reduced motion: respect `prefers-reduced-motion` — disable non-essential animation.
+- Reduced motion means reduce, not remove: under `prefers-reduced-motion`, positional, scale, and depth motion becomes a cross-fade; fades, gesture-tracked motion, and progress indicators stay.
 
 ## 7. Depth & Surface
 
@@ -175,11 +185,26 @@ If borders:
 If tonal-shift:
 Surfaces use progressively lighter/darker shades. No borders, no shadows.
 
+### Radius
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| --radius-sm | [e.g. 6px] | Inputs, chips, small controls |
+| --radius-md | [e.g. 12px] | Cards, panels, popovers |
+| --radius-lg | [e.g. 20px] | Sheets, modals, hero containers |
+| --radius-full | 9999px | Pills, avatars |
+
+### Rules
+- Nested corners are concentric: inner radius = outer radius minus the padding between them, never the same value at both depths.
+- Elevation reads only when scale, shadow, and highlight change together; a shadow change alone does not lift a surface.
+
 ## 8. Accessibility Constraints & Accepted Debt
 
 ### Constraints
-- WCAG target: [e.g. 2.2 AA] — contrast floor [4.5:1 body / 3:1 large text], visible focus on every
-  interactive element, full keyboard reachability, `prefers-reduced-motion` respected (Section 6).
+- WCAG 2.2 AA at minimum ([AAA items the brief raises]): contrast 4.5:1 body / 3:1 large text, icons and
+  control edges; visible focus on every interactive element, never entirely hidden by other content; pointer targets at least
+  24x24 CSS px; full keyboard reachability; reflow at 320 CSS px; `prefers-reduced-motion` respected (Section 6).
+  The per-criterion result is stated in every deliverable (`SKILL.md` Verify).
 
 ### Accepted Debt
 | Item | Location | Why accepted | Owner / Exit |
@@ -187,16 +212,27 @@ Surfaces use progressively lighter/darker shades. No borders, no shadows.
 | [debt] | [file/screen] | [reason + user sign-off] | [when it gets fixed] |
 
 New debt is recorded here at the moment it is accepted — never silently.
+
+## 9. Ideal State & Gap Ledger (after grounding)
+
+- Sources read in full: [source → URL, reader count]
+- Personas and journey steps: [persona → steps]
+- Ideal state: [one checkable line per journey step]
+
+| ID | Screen / state | Gap | Principle or rule broken | Evidence | Fix | Proof | Status |
+|----|----------------|-----|--------------------------|----------|-----|-------|--------|
 ```
 
 ## Creation Workflow
+
+Both paths start with `grounding.md`: the guideline source read in full, the ideal state, and the gap ledger in section 9.
 
 ### For New Projects
 
 1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
 2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
-3. **Define the system** — atmosphere, palette, typography, spacing, and one depth strategy, grounded in the selected references and product semantics. Sanity-check the palette and type pairing with one `ui-ux-db` domain search (CLI in `references/ui-ux-db/README.md`).
-4. **Document initial primitives** — only components you are about to build, including variants and states.
+3. **Define the system** — colour roles first (both themes), then atmosphere, typography, spacing, and one depth strategy, grounded in the selected references and product semantics. Sanity-check the palette and type pairing with one `ui-ux-db` domain search (CLI in `references/ui-ux-db/README.md`).
+4. **Document initial primitives** — only components you are about to build, including variants and states, starting from shadcn/ui anatomy (or the project's own kit) restyled with the tokens.
 5. **Write it to `DESIGN.md`** at project root.
 6. **Build a primitive showcase first** — exercise each primitive's default, hover, active, focus, disabled, loading, empty, and error states at mobile/tablet/desktop widths before composing product screens.
 
@@ -216,13 +252,14 @@ After every component implementation, check:
 - [ ] All colors reference tokens from Section 2. No raw hex outside `DESIGN.md`.
 - [ ] All font sizes match Section 3 scale. No arbitrary sizes.
 - [ ] Spacing intent maps to a token (Section 4); browser mechanics (`clamp()`, intrinsic sizing, container units) stay raw. No arbitrary px.
-- [ ] Interactive elements have all required states from Section 5 and Section 6.
+- [ ] Interactive elements have all required states from Section 5 and Section 6, and keep one box across them: width and height match in every state, and no padding appears for a spinner or arrow.
 - [ ] Depth treatment matches the chosen strategy from Section 7.
 - [ ] Component reused 2+ times? Documented in Section 5.
-- [ ] Motion follows the timing table. No arbitrary durations.
+- [ ] Motion follows the timing and feedback-threshold tables, and every animation has its reduced-motion path.
+- [ ] Radii come from the Section 7 scale; nested corners are concentric.
 - [ ] Component visual QA passed for each primitive and required state before product screens were composed.
 - [ ] Section 8 accessibility constraints hold for the new component; any new debt is recorded in Section 8, not silently accepted.
-- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 375px with no horizontal scroll of primary content.
+- [ ] Survives content stress: empty, long label, unbroken string. Reflows to one readable column at 390px with no horizontal scroll of primary content.
 
 ## Memory Management
 

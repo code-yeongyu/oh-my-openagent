@@ -1,1 +1,0 @@
-bun run --cwd packages/omo-senpi typecheck

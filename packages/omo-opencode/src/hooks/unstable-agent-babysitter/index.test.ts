@@ -342,6 +342,58 @@ describe("unstable-agent-babysitter hook", () => {
     expect(payload.body?.variant).toBe("max")
   })
 
+  test("#given the main session's newest assistant message carries a flat variant #when injecting a babysitter reminder #then promptAsync receives the variant as a top-level field", async () => {
+    // given
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          {
+            info: {
+              role: "user",
+              agent: "sisyphus",
+              model: { providerID: "openai", modelID: "gpt-5.5", variant: "max" },
+            },
+          },
+          {
+            info: {
+              role: "assistant",
+              finish: "stop",
+              agent: "sisyphus",
+              providerID: "openai",
+              modelID: "gpt-5.5",
+              variant: "max",
+            },
+          },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
+        ],
+      },
+      promptCalls,
+    })
+    const backgroundManager = createBackgroundManager([createTask()])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { timeout_ms: 120000 },
+    })
+
+    // when
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+
+    // then
+    expect(promptCalls.length).toBe(1)
+    const payload = promptCalls[0].input as {
+      body?: {
+        model?: { providerID: string; modelID: string }
+        variant?: string
+      }
+    }
+    expect(payload.body?.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(payload.body?.variant).toBe("max")
+  })
+
   test("#given the main session has a fresh user message #when it becomes idle #then babysitter does not inject a reminder", async () => {
     // given
     const originalNow = Date.now

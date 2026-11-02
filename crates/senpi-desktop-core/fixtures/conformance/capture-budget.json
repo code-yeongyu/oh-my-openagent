@@ -1,0 +1,198 @@
+{
+  "description": "capture reports sourceWidth/sourceHeight and a frame id, honors maxWidth, and degrades to artifact-only when the inline byte budget cannot hold the image.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "capture",
+        "params": {
+          "target": "desktop",
+          "caps": {
+            "maxWidth": 640
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "mode": "inline-png",
+              "data": "iVBORw0KGgo=",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 640,
+              "height": 360,
+              "sourceWidth": 2560,
+              "sourceHeight": 1440,
+              "scale": 0.25,
+              "target": "desktop",
+              "frameId": "frame-1",
+              "note": null,
+              "coordinateWidth": 640,
+              "coordinateHeight": 360,
+              "region": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/height",
+            "/result/sourceWidth",
+            "/result/sourceHeight",
+            "/result/scale",
+            "/result/frameId",
+            "/result/coordinateHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "capture",
+        "params": {
+          "target": "desktop",
+          "caps": {
+            "maxWidth": 640,
+            "maxBytes": 1
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "mode": "artifact-only",
+              "data": null,
+              "mimeType": "image/png",
+              "artifactPath": "/tmp/senpi-desktop/frame-2.png",
+              "width": 640,
+              "height": 360,
+              "sourceWidth": 2560,
+              "sourceHeight": 1440,
+              "scale": 0.25,
+              "target": "desktop",
+              "frameId": "frame-1",
+              "note": "over the inline budget",
+              "coordinateWidth": 640,
+              "coordinateHeight": 360,
+              "region": null
+            }
+          },
+          "variable": [
+            "/result/height",
+            "/result/sourceWidth",
+            "/result/sourceHeight",
+            "/result/scale",
+            "/result/frameId",
+            "/result/mimeType",
+            "/result/artifactPath",
+            "/result/note",
+            "/result/coordinateHeight"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "observe",
+        "params": {
+          "target": "101",
+          "caps": {
+            "maxWidth": 32
+          },
+          "ax": {
+            "maxNodes": 1
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "mode": "inline-png",
+              "data": "image",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 32,
+              "height": 24,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 32,
+              "coordinateHeight": 24,
+              "region": null,
+              "scale": 0.04,
+              "target": "101",
+              "frameId": "frame-3",
+              "note": null,
+              "ax": "window",
+              "nodeCount": 1,
+              "truncated": true
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId",
+            "/result/ax"
+          ]
+        }
+      ]
+    }
+  ]
+}

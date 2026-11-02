@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { execFile } from "node:child_process"
@@ -14,12 +14,13 @@ import {
 } from "./seeds"
 import { MEMORY_DISCIPLINE_SKILL_PATH } from "./memory-discipline"
 import { realpathSync } from "node:fs"
+import { removeTree } from "../../../../test-support/remove-tree"
 
 const exec = promisify(execFile)
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function createRepo(agentId = "seed-agent"): Promise<{ dir: string; repo: GitMemoryRepo }> {
@@ -35,19 +36,22 @@ async function gitLog(dir: string, format: string): Promise<string> {
 
 describe("default memory seeds", () => {
   describe("#given the default block label constants", () => {
-    it("#then they are persona and human in order", () => {
-      expect(DEFAULT_MEMORY_BLOCK_LABELS).toEqual(["persona", "human"])
+    it("#then they are persona, human, boundaries, and self-aware in order", () => {
+      expect(DEFAULT_MEMORY_BLOCK_LABELS).toEqual(["persona", "human", "boundaries", "self-aware"])
     })
   })
 
   describe("#given buildDefaultSeedFiles", () => {
-    it("#then it produces three files with expected paths and frontmatter", () => {
+    it("#then it produces six files with expected paths and frontmatter", () => {
       const files = buildDefaultSeedFiles()
 
-      expect(files).toHaveLength(3)
+      expect(files).toHaveLength(6)
       const paths = files.map((f) => f.relativePath)
       expect(paths).toContain("system/persona.md")
       expect(paths).toContain("system/human.md")
+      expect(paths).toContain("system/boundaries.md")
+      expect(paths).toContain("system/self-aware.md")
+      expect(paths).toContain("reference/self/observations.md")
       expect(paths).toContain("skills/memory-discipline/SKILL.md")
     })
 
@@ -73,7 +77,7 @@ describe("default memory seeds", () => {
     })
   })
 
-  describe("#given a fresh repository #when initMemoryWithSeeds runs #then it commits two seeded files in one initial commit", async () => {
+  describe("#given a fresh repository #when initMemoryWithSeeds runs #then it commits every seeded file in one initial commit", async () => {
     // given
     const { dir, repo } = await createRepo()
 
@@ -86,8 +90,11 @@ describe("default memory seeds", () => {
     const tree = await repo.lsTree()
     expect(tree).toContain("system/persona.md")
     expect(tree).toContain("system/human.md")
+    expect(tree).toContain("system/boundaries.md")
+    expect(tree).toContain("system/self-aware.md")
+    expect(tree).toContain("reference/self/observations.md")
     expect(tree).toContain("skills/memory-discipline/SKILL.md")
-    expect(tree).toHaveLength(3)
+    expect(tree).toHaveLength(6)
 
     const commitSubject = await gitLog(dir, "%s")
     expect(commitSubject).toBe("chore: initialize local memory")
@@ -143,5 +150,37 @@ describe("default memory seeds", () => {
     expect(block).toContain("<self>")
     expect(block).toContain("$MEMORY_DIR/system/persona.md</projection>")
     expect(block).toContain("<memory_metadata>")
+  })
+
+  describe("#given seeded content #when compiled via the memory compiler #then the boundaries block is projected as its own system node", async () => {
+    // given
+    const { repo } = await createRepo()
+
+    // when
+    await initMemoryWithSeeds(repo, { authorName: "Compiler Agent" })
+    const block = await compileMemoryBlock(repo, { agentId: "seed-agent" })
+
+    // then
+    expect(block).toContain("<boundaries>")
+    expect(block).toContain("$MEMORY_DIR/system/boundaries.md</projection>")
+    expect(block).toContain("</boundaries>")
+  })
+
+  describe("#given seeded content #when compiled #then self-aware is a memory node, not a self node, and its journal is names-only", async () => {
+    // given
+    const { repo } = await createRepo()
+
+    // when
+    await initMemoryWithSeeds(repo, { authorName: "Compiler Agent" })
+    const block = await compileMemoryBlock(repo, { agentId: "seed-agent" })
+    const selfSection = block.slice(block.indexOf("<self>"), block.indexOf("</self>"))
+    const memorySection = block.slice(block.indexOf("<memory>"), block.indexOf("</memory>"))
+
+    // then
+    expect(memorySection).toContain("<self-aware>")
+    expect(memorySection).toContain("$MEMORY_DIR/system/self-aware.md</projection>")
+    expect(selfSection).not.toContain("$MEMORY_DIR/system/self-aware.md</projection>")
+    expect(memorySection).toContain("observations.md")
+    expect(block).not.toContain("One line per external reaction")
   })
 })

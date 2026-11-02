@@ -1,0 +1,16 @@
+{
+  "comment": "the signed snapshot envelope of section 6; chunk object ids in index order; synthetic fixture material only, never a real credential",
+  "account": "encoding-account",
+  "author": {
+    "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+    "kind": "device",
+    "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+    "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+  },
+  "covers_seq": 105,
+  "digest": "Eu2EGUVGGpWuJ8bBE8-a9gZiiUBgjAI7xdvFG-Wjgss",
+  "link": "cHhDqjtrhPxcVuFeZxx9WG6_4MjNJwDRGOf9yCtLFus",
+  "keyring_head": "cHhDqjtrhPxcVuFeZxx9WG6_4MjNJwDRGOf9yCtLFus",
+  "chunk_object_ids": ["snapshot-c0.omob", "snapshot-c1.omob"],
+  "record_sig": "nhjxEGvgHyxxlPzBXHeS2TZgsay99MeNVUYARIiKGyGLUFwj4KPIqnE5vTruVVEGdDkLH5g79f4XnOwkpFjCBA"
+}

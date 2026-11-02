@@ -1,0 +1,327 @@
+{
+  "command": [
+    "bun",
+    "script/qa/dependency-audit-capture.ts",
+    "--phase",
+    "baseline",
+    "--binary",
+    "$INPUT_BINARY",
+    "--out",
+    "$OUT"
+  ],
+  "machine": "darwin-arm64-20030cfa6181",
+  "versions": {
+    "bun": "1.4.2",
+    "node": "v26.7.0"
+  },
+  "exitCode": 0,
+  "timestamp": "2026-09-13T10:54:07.942Z",
+  "schemaVersion": 1,
+  "phase": "baseline",
+  "case": "bytes-targets",
+  "binarySha256": "c593321c06beacd0af1a94cda7a93fc5d76608e0f62efeb7fc5bf324c6059d76",
+  "pass": true,
+  "bestEffort": true,
+  "targets": [
+    {
+      "target": "darwin-arm64",
+      "status": "available",
+      "size": 127531890,
+      "sha256": "30b834c18ab732e70514d1ddb386b4f2815561cc0c7ecf633912f5fc28f5d1ae",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "darwin-x64",
+      "status": "available",
+      "size": 133165328,
+      "sha256": "4f8aa2dfb74803cb383e109390076f5fb6a41f820cb63d87bb96ee56714603b6",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "darwin-x64-baseline",
+      "status": "available",
+      "size": 133165328,
+      "sha256": "53b83bb4f09cd94292188b98731d18cdd5d8bfcd1d16e739a294887fc7782dc5",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "linux-arm64",
+      "status": "available",
+      "size": 145082664,
+      "sha256": "bbb1165f5d8f57a1cd79804bdb6cea4ae861d4ffe81310f9e7de73fc01e49261",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "linux-arm64-musl",
+      "status": "available",
+      "size": 138218704,
+      "sha256": "796588f0642991a89ee9172d2a0d6f2e7bb78a430f990eea57d7a08ed05a1a92",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "linux-x64",
+      "status": "available",
+      "size": 145143264,
+      "sha256": "5b72873f8f48e3542099bf954947a3a837a966fab2a055e9b7e3762484ef3061",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "linux-x64-baseline",
+      "status": "available",
+      "size": 145143264,
+      "sha256": "4d7862390244036a9373159f5552caa03463e658af30dadea4513187beb46d02",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "linux-x64-musl",
+      "status": "available",
+      "size": 139114032,
+      "sha256": "fe02ca4c527bdb6bfe9e239682dd3733f591471d1a3addcc4b2e06a1711f903b",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "linux-x64-musl-baseline",
+      "status": "available",
+      "size": 139114032,
+      "sha256": "5355441b5857a442d8cbaab5ed27810db14f598070b939958a159d91ca9f7948",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "windows-arm64",
+      "status": "available",
+      "size": 141429760,
+      "sha256": "780832758e85e9169f8b9a0f2943868c6b77b1de84f1ab40e9fb96415f505387",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "windows-x64",
+      "status": "available",
+      "size": 149937664,
+      "sha256": "03ca3ba2849c6be6f25958f241f37ce7d5dbd52c03b253c91ec440b8968e73ff",
+      "release": "v5.0.0-beta.62"
+    },
+    {
+      "target": "windows-x64-baseline",
+      "status": "available",
+      "size": 149937664,
+      "sha256": "79803b6a53d1471c104ef0900f810fb8af9390fcaa8e135aa3fcba16765dad94",
+      "release": "v5.0.0-beta.62"
+    }
+  ],
+  "commands": [
+    {
+      "command": [
+        "$SANDBOX/omo",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "omob dev build\nomo   76e54b0a9bfa7bc730afefa877aea03f2c948b08 2026-09-13T12:03:49+09:00 (dev)\nsenpi 806f8e0ab4de7d4237e835c5f3cd4e2378c97f38 2026-09-13T01:17:58Z (main)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-darwin-arm64",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-darwin-x64",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-darwin-x64-baseline",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-linux-arm64",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-linux-arm64-musl",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-linux-x64",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-linux-x64-baseline",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-linux-x64-musl",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-linux-x64-musl-baseline",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-windows-arm64.exe",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-windows-x64.exe",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "gh",
+        "release",
+        "download",
+        "v5.0.0-beta.62",
+        "--repo",
+        "code-yeongyu/oh-my-openagent",
+        "--pattern",
+        "omo-windows-x64-baseline.exe",
+        "--dir",
+        "$SANDBOX/release-assets"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "cleanup": "isolated HOME, agent, copied binary, and temporary workspace removed"
+}

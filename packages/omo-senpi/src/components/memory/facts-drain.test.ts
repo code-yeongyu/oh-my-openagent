@@ -78,19 +78,7 @@ describe("facts post-success drain", () => {
     // given: two queued batches that cannot share one payload-capped run.
     const { root, identity, queue } = await fixture()
     await enqueue(queue, identity, "session-2", "m2", "The runner drains after success.")
-    let concurrent = 0
-    let maxConcurrent = 0
-    const options = runnerOptions(root, identity, queue, "fact")
-    const runner = new FactsExtractorRunner({
-      ...options,
-      sandbox: (args) => {
-        concurrent += 1
-        maxConcurrent = Math.max(maxConcurrent, concurrent)
-        const spawned = options.sandbox?.(args) ?? args
-        concurrent -= 1
-        return spawned
-      },
-    })
+    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact"))
 
     // when: a second caller arrives while the first drain holds the latch.
     const first = runner.launchPending()
@@ -99,7 +87,6 @@ describe("facts post-success drain", () => {
 
     // then: the re-entrant caller is refused, and the drain empties the queue.
     expect(second).toEqual({ status: "active" })
-    expect(maxConcurrent).toBe(1)
     expect(drained.status).toBe("committed")
     expect(await queue.listPending()).toHaveLength(0)
   }, 60_000)

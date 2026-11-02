@@ -35,12 +35,13 @@ const { FileHookStateStorage } = await import(
 const root = actualFs.mkdtempSync(join(tmpdir(), "omo-hooks-errors-"))
 const cwd = join(root, "project")
 const agentDir = join(root, "agent")
-const statePath = join(cwd, ".senpi", "hooks-state.json")
+const storage = new FileHookStateStorage({ cwd, agentDir })
+const statePath = storage.projectStatePath
 actualFs.mkdirSync(dirname(statePath), { recursive: true })
 
 let thrown: unknown
 try {
-  new FileHookStateStorage({ cwd, agentDir }).update("project", (current) => current)
+  storage.update("project", (current) => current)
 } catch (error) {
   thrown = error
 }

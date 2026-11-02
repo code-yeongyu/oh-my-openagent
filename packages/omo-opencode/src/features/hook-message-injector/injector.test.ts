@@ -53,6 +53,7 @@ function createMockClient(messages: Array<{
     model?: { providerID?: string; modelID?: string; variant?: string }
     providerID?: string
     modelID?: string
+    variant?: string
     tools?: Record<string, boolean>
     time?: { created?: number }
   }
@@ -98,6 +99,38 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       model: { providerID: "openai", modelID: "gpt-5" },
       tools: undefined,
     })
+  })
+
+  it("#given an assistant-shaped message with a flat variant #when resolving the nearest message #then the stored model keeps the variant", async () => {
+    // given
+    const mockClient = createMockClient([
+      { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5.5", variant: "max" } },
+    ])
+
+    // when
+    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_flat_variant")
+
+    // then
+    expect(result?.model).toEqual({ providerID: "openai", modelID: "gpt-5.5", variant: "max" })
+  })
+
+  it("#given a user-shaped message with a nested variant and a differing flat variant #when resolving the nearest message #then the nested variant wins", async () => {
+    // given
+    const mockClient = createMockClient([
+      {
+        info: {
+          agent: "sisyphus",
+          model: { providerID: "openai", modelID: "gpt-5.5", variant: "max" },
+          variant: "low",
+        },
+      },
+    ])
+
+    // when
+    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_nested_variant")
+
+    // then
+    expect(result?.model).toEqual({ providerID: "openai", modelID: "gpt-5.5", variant: "max" })
   })
 
   it("returns nearest (most recent) message with all fields", async () => {

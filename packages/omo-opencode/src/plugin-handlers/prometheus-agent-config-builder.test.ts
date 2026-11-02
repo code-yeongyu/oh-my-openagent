@@ -72,7 +72,7 @@ describe("buildPrometheusAgentConfig", () => {
     describe("#when currentModel IS in Prometheus fallback chain", () => {
       test("preserves currentModel as uiSelectedModel for claude-fable-5", async () => {
         // given - currentModel matches a Prometheus fallback chain entry
-        const currentModel = "anthropic/claude-fable-5";
+        const currentModel = "anthropic/claude-fable-5-1";
 
         // when - should not throw and should produce a valid config
         const result = await buildPrometheusAgentConfig({
@@ -84,7 +84,7 @@ describe("buildPrometheusAgentConfig", () => {
 
         // then - config should be produced (currentModel accepted as valid)
         expect(result).toBeDefined();
-        expect(result.variant).toBe("xhigh");
+        expect(result.variant).toBe("high");
         expect(resolveModelPipelineSpy).toHaveBeenCalledWith(
           expect.objectContaining({
             intent: expect.objectContaining({

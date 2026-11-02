@@ -18,14 +18,8 @@ import {
 import { attestLspDaemonOwner } from "./lsp-daemon-owner-attestation"
 import { selectOrphanedLspDaemonProxies, type LspDaemonProxyProcess } from "./lsp-proxy-family"
 import type { ProcessInfo } from "./process-table"
-import { discoverCodegraphOwnedRoots, type CodegraphOwnedRootsOptions } from "./roots"
+import { discoverOmoOwnedRoots, type OmoOwnedRootsOptions } from "./roots"
 
-export {
-  sweepCodegraphZombies,
-  type CodegraphSweepAction,
-  type SweepCodegraphZombiesOptions,
-  type SweepCodegraphZombiesResult,
-} from "./codegraph-sweeper"
 export type {
   ProcessFamilySweepOptions,
   ProcessFamilySweepResult,
@@ -33,7 +27,7 @@ export type {
 } from "./family-sweeper"
 
 export interface SweepOrphanedLspDaemonProxiesOptions
-  extends CodegraphOwnedRootsOptions,
+  extends OmoOwnedRootsOptions,
     ProcessFamilySweepOptions,
     LspDaemonBaseDirOptions {
   readonly ownedRoots?: readonly string[]
@@ -50,7 +44,7 @@ export async function sweepOrphanedLspDaemonProxies(
   options: SweepOrphanedLspDaemonProxiesOptions = {},
 ): Promise<SweepOrphanedLspDaemonProxiesResult> {
   const stampFile = join(resolveLspDaemonBaseDir(options), LSP_PROXY_SWEEP_STAMP_FILE)
-  const ownedRoots = options.ownedRoots ?? discoverCodegraphOwnedRoots(options)
+  const ownedRoots = options.ownedRoots ?? discoverOmoOwnedRoots(options)
 
   const result = await runProcessFamilySweep<LspDaemonProxyProcess>(
     {

@@ -6,6 +6,7 @@ import gptPrompt from "../prompts/atlas/gpt.md"
 import kimiPrompt from "../prompts/atlas/kimi.md"
 import kimiK27Prompt from "../prompts/atlas/kimi-k2-7.md"
 import kimiK3Prompt from "../prompts/atlas/kimi-k3.md"
+import kimiK31Prompt from "../prompts/atlas/kimi-k3-1.md"
 import opus47Prompt from "../prompts/atlas/opus-4-7.md"
 
 export const atlasPromptVariants = {
@@ -24,7 +25,17 @@ export const atlasPromptVariants = {
     content: geminiPrompt,
     filePath: "packages/prompts-core/prompts/atlas/gemini.md",
   },
+  "kimi-k3-1": {
+    kind: "bundled",
+    content: kimiK31Prompt,
+    filePath: "packages/prompts-core/prompts/atlas/kimi-k3-1.md",
+  },
   "kimi-k3": {
+    kind: "bundled",
+    content: kimiK3Prompt,
+    filePath: "packages/prompts-core/prompts/atlas/kimi-k3.md",
+  },
+  "swe-2": {
     kind: "bundled",
     content: kimiK3Prompt,
     filePath: "packages/prompts-core/prompts/atlas/kimi-k3.md",

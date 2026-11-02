@@ -1,13 +1,12 @@
-import { existsSync, mkdirSync } from "@oh-my-opencode/memory-core/fs"
+import { existsSync, lstatSync, mkdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
 import { dirname, join } from "node:path"
 
-import type { FactsSpawnArgs, MemorianSpawnArgs, ReflectionSpawnArgs } from "./worker/spawn"
+import type { ReflectionSpawnArgs } from "./worker/spawn"
 
-/** Every child spawn shape the path sandbox can wrap; it only rewrites command/args/env. */
-type SandboxableSpawnArgs = ReflectionSpawnArgs | FactsSpawnArgs | MemorianSpawnArgs
+/** The path sandbox only rewrites reflection command/args/env. */
+type SandboxableSpawnArgs = ReflectionSpawnArgs
 
-/** Surfaces the sandbox names in its warnings; one per memory child kind. */
-type SandboxSurface = "reflection" | "facts" | "memorian"
+type SandboxSurface = "reflection"
 import { canonicalAbsentPath, canonicalPath, defaultWhich, resolveInnerCommand } from "./sandbox-paths"
 import { probeBwrapUsability, type SandboxUsability } from "./sandbox-bwrap-probe"
 import { SandboxUnavailableError, type SandboxPolicy } from "./sandbox-contracts"
@@ -37,11 +36,11 @@ export interface PathSandboxInput {
    * bwrap smoke probe, which only spawns when the resolved path exists on this machine, so tests
    * that inject a fake `which` keep their existence-only semantics and never spawn bwrap.
    */
-  readonly probe?: (executable: string) => SandboxUsability
+  readonly probe?: (executable: string) => SandboxUsability | Promise<SandboxUsability>
 }
 
 export interface GenericSandboxTransform<T> {
-  (spawnArgs: T): T
+  (spawnArgs: T): T | Promise<T>
   readonly wasSandboxed: boolean
   readonly warning?: string
 }
@@ -65,18 +64,11 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
   }
 
-  if (platform === "linux") {
-    const usability = (input.probe ?? defaultProbe)(executable)
-    if (!usability.usable) {
-      const reason = `bwrap cannot create a sandbox: ${usability.reason}`
-      if (input.policy === "required") {
-        const error = new SandboxUnavailableError(platform, reason)
-        if (input.errorRethrow !== undefined) input.errorRethrow(error)
-        throw error
-      }
-      return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
-    }
-  }
+  // For Linux, check synchronous probes at build time (for tests), but defer async probes to transform time.
+  // This allows async probes (the real default) to not block the event loop while maintaining test compatibility.
+  let linuxProbeError: SandboxUnavailableError | undefined
+  let linuxProbeWarning: string | undefined
+  let deferAsyncProbe = false
 
   const lockPaths = input.lockPaths ?? []
   if (platform !== "darwin" && lockPaths.length > 0) {
@@ -118,18 +110,103 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     }))
   }
 
-  return guardedSandboxedTransform(input.surface, input.command, input.env, (spawnArgs, innerCommand) => ({
-    ...spawnArgs,
-    command: executable,
-    args: [
-      "--ro-bind", "/", "/",
-      "--dev-bind", "/dev", "/dev",
-      "--tmpfs", "/tmp",
-      ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
-      "--chdir", spawnArgs.cwd,
-      "--", innerCommand, ...spawnArgs.args,
-    ],
-  }))
+  // Linux with bwrap: check synchronous probes now, defer async probes to transform time
+  if (platform === "linux") {
+    const probeResult = (input.probe ?? defaultProbe)(executable)
+    if (probeResult instanceof Promise) {
+      // Async probe - defer to transform
+      deferAsyncProbe = true
+    } else {
+      // Synchronous probe - check now for early error
+      if (!probeResult.usable) {
+        const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
+        if (input.policy === "required") {
+          linuxProbeError = new SandboxUnavailableError(platform, reason)
+          if (input.errorRethrow !== undefined) input.errorRethrow(linuxProbeError)
+          throw linuxProbeError
+        }
+        linuxProbeWarning = `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`
+      }
+    }
+  }
+
+  // Linux with bwrap: return transform that handles probe (already checked or async)
+  const innerCommand = resolveInnerCommand(input.command, input.env)
+  if (innerCommand === undefined) {
+    return identityTransform(`${input.surface} sandbox unavailable: inner command "${input.command}" is not absolute and could not be resolved; running unsandboxed`)
+  }
+
+  const buildTransform = (spawnArgs: T): T => {
+    // bwrap --bind source target dies child_exit when source does not exist. Reflection runtime
+    // dirs are granted before anything creates them; mkdir the declared path (0700) so the bind
+    // names that exact directory instead of dying or widening to an existing ancestor. Only here,
+    // when bwrap will actually bind it: an off or unavailable sandbox must not create the path.
+    for (const writableDir of writableDirs) createPlannedDirNoFollow(writableDir, input.surface)
+    return {
+      ...spawnArgs,
+      command: executable,
+      args: [
+        "--ro-bind", "/", "/",
+        "--dev-bind", "/dev", "/dev",
+        "--tmpfs", "/tmp",
+        ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
+        "--chdir", spawnArgs.cwd,
+        "--", innerCommand, ...spawnArgs.args,
+      ],
+    }
+  }
+
+  const linuxTransform = (spawnArgs: T): T | Promise<T> => {
+    // If probe error was detected at build time, throw it now
+    if (linuxProbeError !== undefined) {
+      throw linuxProbeError
+    }
+    // If probe warning was detected at build time, return identity
+    if (linuxProbeWarning !== undefined) {
+      return spawnArgs
+    }
+    // If probe was async, check it now
+    if (deferAsyncProbe) {
+      const probeResult = (input.probe ?? defaultProbe)(executable)
+      if (probeResult instanceof Promise) {
+        return probeResult.then((usability) => {
+          if (!usability.usable) {
+            const reason = `bwrap cannot create a sandbox: ${usability.reason}`
+            if (input.policy === "required") {
+              const error = new SandboxUnavailableError(platform, reason)
+              if (input.errorRethrow !== undefined) input.errorRethrow(error)
+              throw error
+            }
+            // Policy is auto - return unsandboxed
+            return spawnArgs
+          }
+          // Sandbox is usable - apply the bwrap transform
+          return buildTransform(spawnArgs)
+        })
+      } else {
+        // Should not happen - we already checked this at build time
+        // But handle it gracefully
+        if (!probeResult.usable) {
+          const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
+          if (input.policy === "required") {
+            const error = new SandboxUnavailableError(platform, reason)
+            if (input.errorRethrow !== undefined) input.errorRethrow(error)
+            throw error
+          }
+          return spawnArgs
+        }
+        return buildTransform(spawnArgs)
+      }
+    }
+    // Synchronous probe already checked and usable
+    return buildTransform(spawnArgs)
+  }
+
+  const props: { wasSandboxed: boolean; warning?: string } = { wasSandboxed: linuxProbeWarning === undefined }
+  if (linuxProbeWarning !== undefined) {
+    props.warning = linuxProbeWarning
+  }
+  return Object.assign(linuxTransform, props) as GenericSandboxTransform<T>
 }
 
 function buildDarwinProfile(input: {
@@ -166,8 +243,12 @@ function resolveExecutable(
 /**
  * Probes only executables that exist on this machine: a resolved path that is absent here comes
  * from an injected `which` seam, and spawning it would prove nothing while breaking hermeticity.
+ *
+ * The gate itself answers synchronously; only the branch that actually spawns bwrap is async. An
+ * `async` gate would return a Promise for the no-spawn case too, deferring the bwrap rebinding
+ * behind a `.then` for a probe that never runs.
  */
-function defaultProbe(executable: string): SandboxUsability {
+function defaultProbe(executable: string): SandboxUsability | Promise<SandboxUsability> {
   if (!existsSync(executable)) return { usable: true }
   return probeBwrapUsability(executable)
 }
@@ -229,4 +310,47 @@ function guardedSandboxedTransform<T extends SandboxableSpawnArgs>(
     return identityTransform(`${surface} sandbox unavailable: inner command "${command}" is not absolute and could not be resolved; running unsandboxed`)
   }
   return Object.assign((spawnArgs: T) => transform(spawnArgs, innerCommand), { wasSandboxed: true })
+}
+
+// Create a planned writable dir one missing segment at a time without following links: the existing
+// prefix must still be the canonical path planned earlier, and each created (or raced-in) segment must
+// be a real directory, so a link planted on any missing segment is refused before anything is written
+// through it. The final realpath equality also refuses a link anywhere on the path.
+function createPlannedDirNoFollow(dir: string, surface: string): void {
+  const refuse = (resolved: string): never => {
+    throw new Error(`${surface} sandbox refused to bind ${dir}: it now resolves to ${resolved} (a symlink appeared on the path after the sandbox was planned); remove the link and run again`)
+  }
+  const missing: string[] = []
+  let cursor = dir
+  while (!lexists(cursor)) {
+    missing.unshift(cursor)
+    const parent = dirname(cursor)
+    if (parent === cursor) break
+    cursor = parent
+  }
+  if (lexists(cursor) && realpathSync(cursor) !== cursor) refuse(realpathSync(cursor))
+  // Documented residual (accepted, #10329): each segment is lstat-checked and the next one created in a
+  // separate step, so a link swapped in between those two calls could still get one directory made through
+  // it. Node has no mkdirat / O_NOFOLLOW directory walk to close that, and planting the link needs write
+  // access to the identity's own 0700 runtime root, which already means owning this user.
+  for (const segment of missing) {
+    try {
+      mkdirSync(segment, { mode: 0o700 })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error
+    }
+    if (lstatSync(segment).isSymbolicLink()) refuse(realpathSync(segment))
+  }
+  const resolved = realpathSync(dir)
+  if (resolved !== dir) refuse(resolved)
+}
+
+function lexists(path: string): boolean {
+  try {
+    lstatSync(path)
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
+    throw error
+  }
 }

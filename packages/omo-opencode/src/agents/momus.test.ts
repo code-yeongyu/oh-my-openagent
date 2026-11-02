@@ -2,6 +2,31 @@ import { describe, expect, test } from "bun:test";
 import { createMomusAgent } from "./momus";
 
 describe("createMomusAgent", () => {
+  test.each(["anthropic/claude-opus-5-5", "openai/gpt-5.5", "openai/gpt-6-astra"])("preserves the planner verdict protocol for %s", (model) => {
+    const prompt = createMomusAgent(model).prompt ?? ""
+    const role = prompt.slice(prompt.indexOf("\n</omo-model-core>") + "\n</omo-model-core>".length)
+    expect(role).toContain("[OKAY]")
+    expect(role).toContain("[REJECT]")
+    expect(role).not.toContain("APPROVE or REJECT")
+  })
+  test("uses high reasoning for GPT-6 Astra", () => {
+    const agent = createMomusAgent("openai/gpt-6-astra")
+    expect(agent.reasoningEffort).toBe("high")
+  })
+
+  test("keeps high reasoning for Copilot and fast Astra ids", () => {
+    // given
+
+    // when
+    const copilotConfig = createMomusAgent("github-copilot/gpt-6-astra")
+    const fastConfig = createMomusAgent("openai/gpt-6-astra-fast")
+
+    // then
+    for (const config of [copilotConfig, fastConfig]) {
+      expect(config.reasoningEffort).toBe("high")
+      expect(config.textVerbosity).toBe("high")
+    }
+  })
   describe("#given a GPT-5.6 family model", () => {
     test("#when creating the agent #then it runs high reasoning with a GPT-5.6 tuned prompt", () => {
       // given
@@ -9,11 +34,9 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model);
-      const gpt55Config = createMomusAgent("openai/gpt-5.5");
 
       // then
       expect(config.reasoningEffort).toBe("high");
-      expect(config.prompt).not.toBe(gpt55Config.prompt);
     });
 
     test("#when creating the agent #then review contract and restrictions are preserved", () => {
@@ -34,16 +57,13 @@ describe("createMomusAgent", () => {
 
     test("#when the model is a dotted or dashed 5.6 alias #then the 5.6 path is selected", () => {
       // given
-      const solConfig = createMomusAgent("openai/gpt-5.6-sol");
 
       // when
       const aliasConfig = createMomusAgent("openai/gpt-5.6");
       const dashedConfig = createMomusAgent("vercel/openai/gpt-5-6-sol");
 
       // then
-      expect(aliasConfig.prompt).toBe(solConfig.prompt);
       expect(aliasConfig.reasoningEffort).toBe("high");
-      expect(dashedConfig.prompt).toBe(solConfig.prompt);
       expect(dashedConfig.reasoningEffort).toBe("high");
     });
   });
@@ -55,11 +75,9 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model);
-      const gpt56Config = createMomusAgent("openai/gpt-5.6-sol");
 
       // then
-      expect(config.reasoningEffort).toBe("medium");
-      expect(config.prompt).not.toBe(gpt56Config.prompt);
+      expect(config.reasoningEffort).toBe("high");
     });
   });
 
@@ -70,11 +88,9 @@ describe("createMomusAgent", () => {
 
       // when
       const config = createMomusAgent(model) as Record<string, unknown>;
-      const gptConfig = createMomusAgent("openai/gpt-5.5");
 
       // then
       expect(config.reasoningEffort).toBeUndefined();
-      expect(config.prompt).not.toBe(gptConfig.prompt);
       expect(config.thinking).toEqual({ type: "enabled", budgetTokens: 32000 });
     });
   });

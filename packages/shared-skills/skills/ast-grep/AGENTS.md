@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Vendored skill teaching agents ast-grep (`sg`) structural search/rewrite, plus a stdlib-Python helper CLI that wraps the `sg` binary. Vendoring pin in `SOURCE`: upstream `code-yeongyu/ast-grep-skill @ 3148c69` (ast-grep 0.45.0), "vendored as a sync; do not fork-drift". Earned this file: own executable surface (749-LOC helper + installers + smoke tests) and a no-fork-drift upstream contract that has no analogue elsewhere in `shared-skills`.
+Vendored skill teaching agents ast-grep (`sg`) structural search/rewrite, plus a stdlib-Python helper CLI that wraps the `sg` binary. Upstream pin in `SOURCE`: upstream `code-yeongyu/ast-grep-skill @ 3148c69` (ast-grep 0.45.0), "vendored as a sync; do not fork-drift". Earned this file: own executable surface (749-LOC helper + installers + smoke tests) and a no-fork-drift upstream contract that has no analogue elsewhere in `shared-skills`.
 
 ## STRUCTURE
 

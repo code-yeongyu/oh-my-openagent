@@ -60,7 +60,7 @@ function findAncestorDirectories(
       }
 
       seen.add(candidateDirectoryKey)
-      directories.push(normalizedCandidateDirectory)
+      directories.push(candidateDirectory)
     }
 
     if (stopDirectoryKey === pathKey(currentDirectory)) {
@@ -86,6 +86,16 @@ export function detectWorktreePath(directory: string): string | undefined {
   if (worktreePathCache.has(cacheKey)) {
     return worktreePathCache.get(cacheKey)
   }
+  let ancestor = normalizePath(resolvedDirectory)
+  while (true) {
+    if (existsSync(join(ancestor, ".git"))) {
+      worktreePathCache.set(cacheKey, ancestor)
+      return ancestor
+    }
+    const parent = dirname(ancestor)
+    if (parent === ancestor) break
+    ancestor = parent
+  }
 
   try {
     const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -107,24 +117,38 @@ export function detectWorktreePath(directory: string): string | undefined {
   }
 }
 
-export function findProjectClaudeSkillDirs(startDirectory: string, stopDirectory?: string): string[] {
-  return findAncestorDirectories(
+export type DiscoveredProjectDirectory = {
+  readonly discovered: string
+  readonly resolved: string
+  readonly projectRoot: string
+}
+
+function projectDirectories(start: string, paths: readonly (readonly string[])[], stop?: string): DiscoveredProjectDirectory[] {
+  const projectRoot = stop ?? detectWorktreePath(start)
+  return findAncestorDirectories(start, paths, projectRoot).map((discovered) => ({
+    discovered, resolved: normalizePath(discovered),
+    projectRoot: projectRoot ?? dirname(dirname(discovered)),
+  }))
+}
+
+export function findProjectClaudeSkillDirs(startDirectory: string, stopDirectory?: string): DiscoveredProjectDirectory[] {
+  return projectDirectories(
     startDirectory,
     [[".claude", "skills"]],
     stopDirectory ?? detectWorktreePath(startDirectory),
   )
 }
 
-export function findProjectAgentsSkillDirs(startDirectory: string, stopDirectory?: string): string[] {
-  return findAncestorDirectories(
+export function findProjectAgentsSkillDirs(startDirectory: string, stopDirectory?: string): DiscoveredProjectDirectory[] {
+  return projectDirectories(
     startDirectory,
     [[".agents", "skills"]],
     stopDirectory ?? detectWorktreePath(startDirectory),
   )
 }
 
-export function findProjectOpencodeSkillDirs(startDirectory: string, stopDirectory?: string): string[] {
-  return findAncestorDirectories(
+export function findProjectOpencodeSkillDirs(startDirectory: string, stopDirectory?: string): DiscoveredProjectDirectory[] {
+  return projectDirectories(
     startDirectory,
     [
       [".opencode", "skills"],

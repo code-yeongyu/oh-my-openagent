@@ -22,18 +22,18 @@ const agentSchemaKeys = new Set([
 // -manual-qa.md are the artifact names the ulw-loop spawn guard requires before a gate-reviewer
 // spawn; currentAttemptDir is a field of `ulw-loop status --json`.
 const lazycodexAgentInvariants = new Map([
-	["explorer.toml", { model: "gpt-5.6-luna", effort: "low" }],
-	["librarian.toml", { model: "gpt-5.6-luna", effort: "low" }],
-	["metis.toml", { model: "gpt-5.6-sol", effort: "high" }],
-	["momus.toml", { model: "gpt-5.6-terra", effort: "high" }],
-	["plan.toml", { model: "gpt-5.6-sol", effort: "high" }],
-	["lazycodex-worker-low.toml", { model: "gpt-5.6-luna", effort: "high", includes: [/EVIDENCE_RECORDED: <path>/] }],
-	["lazycodex-worker-medium.toml", { model: "gpt-5.6-terra", effort: "high", includes: [/EVIDENCE_RECORDED: <path>/] }],
-	["lazycodex-worker-high.toml", { model: "gpt-5.6-sol", effort: "medium", includes: [/EVIDENCE_RECORDED: <path>/] }],
-	["lazycodex-clone-fidelity-reviewer.toml", { model: "gpt-5.6-terra", effort: "high", includes: [/recommendation/, /blockers/] }],
-	["lazycodex-code-reviewer.toml", { model: "gpt-5.6-terra", effort: "medium", includes: [/codeQualityStatus/, /recommendation/, /<attemptDir>\/<goalId>-code-review\.md/, /currentAttemptDir/] }],
-	["lazycodex-qa-executor.toml", { model: "gpt-5.6-luna", effort: "high", includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/, /<attemptDir>\/<goalId>-manual-qa\.md/] }],
-	["lazycodex-gate-reviewer.toml", { model: "gpt-5.6-sol", effort: "low", includes: [/blockers/, /currentAttemptDir/] }],
+	["explorer.toml", { model: "gpt-6-astra", effort: "low" }],
+	["librarian.toml", { model: "gpt-6-astra", effort: "low" }],
+	["metis.toml", { model: "gpt-6-astra", effort: "high" }],
+	["momus.toml", { model: "gpt-6-astra", effort: "high" }],
+	["plan.toml", { model: "gpt-6-astra", effort: "high" }],
+	["lazycodex-worker-low.toml", { model: "gpt-6-astra", effort: "high", includes: [/EVIDENCE_RECORDED: <path>/] }],
+	["lazycodex-worker-medium.toml", { model: "gpt-6-astra", effort: "high", includes: [/EVIDENCE_RECORDED: <path>/] }],
+	["lazycodex-worker-high.toml", { model: "gpt-6-astra", effort: "medium", includes: [/EVIDENCE_RECORDED: <path>/] }],
+	["lazycodex-clone-fidelity-reviewer.toml", { model: "gpt-6-astra", effort: "high", includes: [/recommendation/, /blockers/] }],
+	["lazycodex-code-reviewer.toml", { model: "gpt-6-astra", effort: "medium", includes: [/codeQualityStatus/, /recommendation/, /<attemptDir>\/<goalId>-code-review\.md/, /currentAttemptDir/] }],
+	["lazycodex-qa-executor.toml", { model: "gpt-6-astra", effort: "high", includes: [/not_applicable/, /surfaceEvidence/, /adversarialCases/, /<attemptDir>\/<goalId>-manual-qa\.md/] }],
+	["lazycodex-gate-reviewer.toml", { model: "gpt-6-astra", effort: "low", includes: [/blockers/, /currentAttemptDir/] }],
 ]);
 
 const externalSourceTokenPattern = new RegExp(

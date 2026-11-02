@@ -32,6 +32,20 @@ function summaryText(value: unknown): string | undefined {
   return clampTaskSummary(typeof value === "string" ? value : undefined)
 }
 
+function isolationArguments(value: Record<PropertyKey, unknown>): Pick<TaskToolParamsStatic, "isolated" | "apply" | "merge"> {
+  const isolated = value.isolated
+  const apply = value.apply
+  const merge = value.merge
+  if (isolated !== undefined && typeof isolated !== "boolean") throw new TypeError("isolated must be a boolean")
+  if (apply !== undefined && typeof apply !== "boolean") throw new TypeError("apply must be a boolean")
+  if (merge !== undefined && merge !== "patch" && merge !== "branch") throw new TypeError("merge must be patch or branch")
+  return {
+    ...(isolated === undefined ? {} : { isolated }),
+    ...(apply === undefined ? {} : { apply }),
+    ...(merge === undefined ? {} : { merge }),
+  }
+}
+
 function taskItem(value: unknown): TaskItem | undefined {
   if (!isRecord(value)) return undefined
   const prompt = nonBlankText(value.prompt)
@@ -44,9 +58,11 @@ function taskItem(value: unknown): TaskItem | undefined {
   const name = identifier(value.name)
   const model = identifier(value.model)
   const loadSkills = stringList(value.load_skills)
+  const runInBackground = booleanFlag(value.run_in_background)
 
   return {
     prompt,
+    ...isolationArguments(value),
     ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),
@@ -54,7 +70,12 @@ function taskItem(value: unknown): TaskItem | undefined {
     ...(name === undefined ? {} : { name }),
     ...(model === undefined ? {} : { model }),
     ...(loadSkills === undefined ? {} : { load_skills: loadSkills }),
+    ...(runInBackground === undefined ? {} : { run_in_background: runInBackground }),
   }
+}
+
+function booleanFlag(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined
 }
 
 function taskItems(value: unknown): TaskItem[] | undefined {
@@ -87,10 +108,14 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
   const name = identifier(raw.name)
   const model = identifier(raw.model)
   const loadSkills = stringList(raw.load_skills)
-  const runInBackground = typeof raw.run_in_background === "boolean" ? raw.run_in_background : undefined
+  // Parent kernel-tool names must survive normalization: dropping them here would silently spawn a
+  // child WITHOUT the tools the caller asked for instead of granting or refusing them.
+  const tools = stringList(raw.tools)
+  const runInBackground = booleanFlag(raw.run_in_background)
 
   return {
     ...(prompt === undefined ? {} : { prompt }),
+    ...isolationArguments(raw),
     ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
     ...(category === undefined ? {} : { category }),
@@ -99,6 +124,7 @@ export function normalizeTaskToolArguments(raw: unknown): TaskToolParamsStatic {
     ...(name === undefined ? {} : { name }),
     ...(model === undefined ? {} : { model }),
     ...(loadSkills === undefined ? {} : { load_skills: loadSkills }),
+    ...(tools === undefined ? {} : { tools }),
     ...(tasks === undefined ? {} : { tasks }),
   }
 }

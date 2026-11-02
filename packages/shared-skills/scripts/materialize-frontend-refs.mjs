@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { frontendSkillRoot, thirdPartyMaterializeMap, upstreamsRoot } from "./frontend-refs-manifest.mjs";
+import { frontendSkillRoot, thirdPartyMaterializeMap, uiUxDbScripts, upstreamsRoot } from "./frontend-refs-manifest.mjs";
 
 function upstreamPopulated(name) {
 	const dir = join(upstreamsRoot, name);
@@ -25,8 +25,16 @@ export function isSkillMarkdownSourcePath(sourcePath) {
 	return normalizedPath === "SKILL.md" || normalizedPath.endsWith("/SKILL.md");
 }
 
+const uiUxDbSiblingImport = new RegExp(`^(?:from|import) (?:${uiUxDbScripts.map((name) => name.replace(/\.py$/, "")).join("|")})\\b`, "m");
+
+// The skill tree ships inside the signed desktop bundle (#11373): a sibling import must not leave __pycache__ next to it.
+function disableSiblingBytecodeWrites(content) {
+	return content.replace(uiUxDbSiblingImport, (line) => `import sys\nsys.dont_write_bytecode = True\n${line}`);
+}
+
 function materializedContent(relTarget, sourcePath) {
 	const content = readFileSync(sourcePath, "utf8");
+	if (relTarget.startsWith("references/ui-ux-db/scripts/")) return disableSiblingBytecodeWrites(content);
 	const isDesignpowersSkillReference = relTarget.startsWith("references/designpowers/vendor/skills/")
 		&& relTarget.endsWith("/reference.md")
 		&& isSkillMarkdownSourcePath(sourcePath);
@@ -34,7 +42,7 @@ function materializedContent(relTarget, sourcePath) {
 	return content;
 }
 
-export function materializeFrontendRefs({ strict = false } = {}) {
+export function materializeFrontendRefs({ strict = false, targetRoot = frontendSkillRoot } = {}) {
 	const map = thirdPartyMaterializeMap();
 	const requiredUpstreams = new Set(Object.values(map).map((entry) => entry.upstream));
 
@@ -46,8 +54,8 @@ export function materializeFrontendRefs({ strict = false } = {}) {
 		return { materialized: 0, skipped: true };
 	}
 
-	rmSync(join(frontendSkillRoot, "references", "ui-ux-db"), { recursive: true, force: true });
-	rmSync(join(frontendSkillRoot, "references", "designpowers", "vendor"), { recursive: true, force: true });
+	rmSync(join(targetRoot, "references", "ui-ux-db"), { recursive: true, force: true });
+	rmSync(join(targetRoot, "references", "designpowers", "vendor"), { recursive: true, force: true });
 
 	let materialized = 0;
 	for (const [relTarget, { upstream, source }] of Object.entries(map)) {
@@ -55,7 +63,7 @@ export function materializeFrontendRefs({ strict = false } = {}) {
 		if (!existsSync(sourcePath)) {
 			throw new Error(`[materialize] missing upstream source: ${upstream}/${source} for ${relTarget}`);
 		}
-		const targetPath = join(frontendSkillRoot, relTarget);
+		const targetPath = join(targetRoot, relTarget);
 		mkdirSync(dirname(targetPath), { recursive: true });
 		writeFileSync(targetPath, materializedContent(relTarget, sourcePath));
 		materialized += 1;

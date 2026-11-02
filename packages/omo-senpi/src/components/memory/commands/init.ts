@@ -3,9 +3,9 @@
 // Port of letta's initializing-memory skill trigger: only runs when no repo
 // exists yet, and NEVER overwrites an existing repository.
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { hasGitRepo, openRepo, shortSha } from "./repo"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 function initInstruction(repoPath: string): string {
   return [
@@ -13,9 +13,9 @@ function initInstruction(repoPath: string): string {
     `The user invoked /init. Your memory repository was just initialized at ${repoPath} and is projected on the local filesystem. Inspect it before writing.`,
     "",
     "Create your initial memory now:",
-    "- system/persona.md — who you are: identity, communication style, durable behavioral rules. This file compiles into every future system prompt; keep it curated.",
-    "- system/human.md — what you know about the user: goals, preferences, collaboration style.",
-    "- Additional system/ index files when useful — compact summaries with [[path]] discovery links into external memory.",
+    "- system/persona.md: who you are (identity, communication style, durable behavioral rules). This file compiles into every future system prompt; keep it curated.",
+    "- system/human.md: what you know about the user (goals, preferences, collaboration style).",
+    "- Additional system/ index files when useful: compact summaries with [[path]] discovery links into external memory.",
     "",
     "Every memory file uses this format:",
     "---",
@@ -27,10 +27,9 @@ function initInstruction(repoPath: string): string {
   ].join("\n")
 }
 
-export function registerInitCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerInitCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("init", {
-    description: "Initialize the memory repository and instruct the agent to create initial memory.",
-    argumentHint: "",
+    ...LAZY_MEMORY_COMMANDS.init,
     handler: async (_args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")

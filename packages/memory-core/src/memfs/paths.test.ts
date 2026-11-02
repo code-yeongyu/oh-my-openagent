@@ -1,11 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import {
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -13,6 +7,7 @@ import {
   validateMemoryPath,
   validateRepositoryPath,
 } from "./paths";
+import { removeTreeSync } from "../../../../test-support/remove-tree"
 
 const temporaryDirectories: string[] = [];
 
@@ -26,7 +21,7 @@ function createFixture(): { base: string; root: string } {
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    removeTreeSync(directory, { maxRetries: 10, retryDelay: 200 });
   }
 });
 

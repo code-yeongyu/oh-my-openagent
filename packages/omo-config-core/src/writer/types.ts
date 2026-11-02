@@ -43,6 +43,8 @@ export type UpdateOmoConfigOptions = {
   readonly projectDir?: string
   readonly scope: "project" | "user"
   readonly targetPath?: string
+  /** Exact path for the pre-write copy; the write fails rather than pick another name when it exists. */
+  readonly backupPath?: string
 }
 
 export type UpdateOmoConfigResult = {

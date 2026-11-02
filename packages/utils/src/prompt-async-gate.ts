@@ -27,6 +27,7 @@ import {
   getActiveReservation,
   getPromptReservation,
   reservationSourceMatches,
+  reservedDispatchResult,
 } from "./prompt-async-gate/reservations"
 import { dispatchAfterSessionIdle } from "./prompt-async-gate/session-idle-dispatch"
 import {
@@ -204,7 +205,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
   if (queueBehavior === "defer") {
     const activeReservation = getActiveReservation(sessionID)
     if (activeReservation) {
-      return { status: "reserved", reservedBy: activeReservation.source }
+      return reservedDispatchResult(activeReservation)
     }
 
     const queuedBy = getQueuedPromptBlocker(sessionID)

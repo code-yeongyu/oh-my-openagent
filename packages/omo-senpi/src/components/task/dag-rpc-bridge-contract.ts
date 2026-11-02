@@ -42,6 +42,11 @@ export interface DagBridgeTimers {
   clear(handle: TimerHandle): void
 }
 
+// Narrow logger slice for store read faults, mirroring `DagStatusUiLogger`.
+export interface DagBridgeLogger {
+  warn(message: string, details?: unknown): void
+}
+
 export interface DagRpcBridgeDeps {
   // Runs this session owns right now, re-read on every attach and every heartbeat tick.
   readonly liveRuns: () => readonly DagBridgeRun[]
@@ -54,6 +59,8 @@ export interface DagRpcBridgeDeps {
   readonly snapshotDebounceMs?: number
   readonly timers?: DagBridgeTimers
   readonly now?: () => number
+  // Receives one warning per distinct store read fault; without it the fault is still swallowed.
+  readonly logger?: DagBridgeLogger
 }
 
 export interface DagRpcBridge {

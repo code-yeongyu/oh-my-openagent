@@ -155,7 +155,7 @@ function normalizeTypedBlock(
     result["agents"] = normalizeDefinitions(result["agents"], "agent", [...path, "agents"], diagnostics)
   }
   if (result["models"] !== undefined) result["models"] = normalizeCatalog(result["models"])
-  for (const harness of ["[senpi]", "[codex]"] as const) {
+  for (const harness of ["[senpi]", "[native]", "[codex]"] as const) {
     if (result[harness] !== undefined) result[harness] = normalizeTypedBlock(result[harness], [...path, harness], diagnostics, false)
   }
   if (result["[opencode]"] !== undefined) {

@@ -9,6 +9,7 @@ import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../config";
 import type { LoadedSkill } from "../features/opencode-skill-loader/types";
 import type { PluginComponents } from "./plugin-components-loader";
 import { applyCommandConfig } from "./command-config-handler";
+import { initDeepSkill } from "@oh-my-opencode/skills-loader-core/builtin-skills/skills/init-deep";
 import {
   getAgentDisplayName,
   getAgentListDisplayName,
@@ -184,7 +185,8 @@ describe("applyCommandConfig", () => {
 
     // then
     const commandConfig = config.command as Record<string, { description?: string; template?: string }>;
-    expect(commandConfig["init-deep"]?.description).toContain("Initialize hierarchical AGENTS.md");
+    // The command carries the shipped skill description verbatim; pin the source value, not a phrase.
+    expect(commandConfig["init-deep"]?.description).toBe(initDeepSkill.description);
     expect(commandConfig["init-deep"]?.template).toContain("<skill-instruction>");
     expect(commandConfig["init-deep"]?.template).toContain("$ARGUMENTS");
     expect(commandConfig["security-review"]?.template).toContain("<skill-instruction>");

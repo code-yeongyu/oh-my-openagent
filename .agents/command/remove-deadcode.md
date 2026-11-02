@@ -113,7 +113,7 @@ For EACH batch, fire a deep agent:
 
 ```
 task(
-  category="deep",
+  category="deep-low",
   load_skills=["typescript-programmer", "git-master"],
   run_in_background=true,
   description="Remove dead code batch N: [brief description]",

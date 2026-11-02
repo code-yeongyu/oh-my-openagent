@@ -21,6 +21,10 @@ export type SpawnedChild = ChildProcessByStdio<null, Readable, Readable>
 type LegacyEndpointKind = "natural" | "hashed" | "windowsPipe"
 
 const NODE_BINARY_LOOKUP_TIMEOUT_MS = 5_000
+// Event-driven readiness wait: the deadline only bounds failure, so widening it never
+// slows a passing run. Windows CI spawned the fixture daemon in 5.9s (run 33582797101),
+// past the previous flat 5s bound, while the enclosing win32 test budgets allow 120s.
+const CHILD_READY_TIMEOUT_MS = platform() === "win32" ? 30_000 : 5_000
 
 function nodeBinary(): string {
   if (process.env.NODE_BINARY) return process.env.NODE_BINARY
@@ -197,7 +201,7 @@ export function startIdleNodeProcess(): SpawnedChild {
 
 export async function waitForChildReady(child: SpawnedChild): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("legacy daemon fixture did not report ready")), 5_000)
+    const timeout = setTimeout(() => reject(new Error("legacy daemon fixture did not report ready")), CHILD_READY_TIMEOUT_MS)
     const onData = (chunk: Buffer): void => {
       if (!chunk.toString("utf8").includes("ready")) return
       clearTimeout(timeout)

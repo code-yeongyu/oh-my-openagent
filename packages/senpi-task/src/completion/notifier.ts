@@ -2,7 +2,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { TaskRecord, TaskStatus } from "../state"
 import { buildCompletionDetails, buildCompletionMessage } from "./notification"
-import { routeCompletion, shouldNotifyStatus } from "./routing"
+import { routeCompletion, shouldNotifyRecord } from "./routing"
 import type {
   CompletionDetails,
   CompletionNotifier,
@@ -17,6 +17,7 @@ import type {
   ParentNotifierMessage,
   ParentState,
   ReconcileUnnotifiedNotificationsInput,
+  RecordDeliveryFailureInput,
   RoutingDecision,
 } from "./types"
 
@@ -71,7 +72,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     if (fresh === null) return finishRetryChain(entry)
     if (fresh.notification.run_epoch !== entry.epoch) return finishRetryChain(entry)
     if (!TERMINAL_STATUSES.has(fresh.status)) return finishRetryChain(entry)
-    if (!shouldNotifyStatus(fresh.status)) return finishRetryChain(entry)
+    if (!shouldNotifyRecord(fresh)) return finishRetryChain(entry)
     if (fresh.notification.notified_epoch >= entry.epoch) return finishRetryChain(entry)
 
     const decision = routeCompletion(getParentState())
@@ -114,7 +115,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
     if (!request.runInBackground) return { kind: "skipped", reason: "sync-task" }
     const record = deps.store.load(request.record.task_id) ?? request.record
     if (!TERMINAL_STATUSES.has(record.status)) return { kind: "skipped", reason: "not-terminal" }
-    if (!shouldNotifyStatus(record.status)) return { kind: "skipped", reason: "non-notifying-terminal" }
+    if (!shouldNotifyRecord(record)) return { kind: "skipped", reason: "non-notifying-terminal" }
 
     if (record.notification.notified_epoch >= record.notification.run_epoch) {
       return { kind: "skipped", reason: "already-notified" }
@@ -122,6 +123,26 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
 
     const details = buildDetails(record, request.tokens)
     return deliverRecord(record, details, request.parentState)
+  }
+
+  // The omo-senpi adapter enqueues into a shared idle-injection coordinator, so a returning enqueue
+  // only means QUEUED: the batched flush can still fail, and a /reload retires the coordinator and
+  // hands the whole window back as delivery failures. persistNotified already ran for those records,
+  // and reconcileUnnotifiedNotifications skips anything with notified_epoch >= run_epoch - so unless
+  // the epoch is rolled back here, a child that finished inside the batch window before a reload is
+  // recorded as notified and NO path ever redelivers it. Roll back, stamp the failure (the audit
+  // trail), and re-enter the normal retry ladder.
+  function recordDeliveryFailure(input: RecordDeliveryFailureInput): void {
+    for (const taskId of input.taskIds) {
+      const fresh = deps.store.load(taskId)
+      if (fresh === null) continue
+      if (!TERMINAL_STATUSES.has(fresh.status)) continue
+      if (!shouldNotifyRecord(fresh)) continue
+      const epoch = fresh.notification.run_epoch
+      unpersistNotified(deps.store, taskId, epoch)
+      recordFailure(deps.store, taskId, epoch, input.error)
+      scheduleRetry({ task_id: taskId, epoch, details: buildDetails(fresh) })
+    }
   }
 
   function flushBuffered(input: FlushInput): FlushResult {
@@ -164,7 +185,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
       if (record.parent_session_id !== input.sessionId) continue
       if (record.notification.notified_epoch >= epoch) continue
       if (!TERMINAL_STATUSES.has(record.status)) continue
-      if (!shouldNotifyStatus(record.status)) continue
+      if (!shouldNotifyRecord(record)) continue
       if (!owesNotification(record)) continue
       // A LIVE in-memory buffered entry already owns delivery of this (task_id, run_epoch) - the
       // next flush delivers it. Reconcile only recovers notifications whose buffer died with the
@@ -187,6 +208,7 @@ export function createCompletionNotifier(deps: CompletionNotifierDeps): Completi
 
   return {
     notifyTerminal,
+    recordDeliveryFailure,
     flushBuffered,
     reconcileUnnotifiedNotifications,
     reconcileFailedNotifications: reconcileUnnotifiedNotifications,
@@ -270,6 +292,17 @@ function persistNotified(store: CompletionNotifierStore, taskId: string, epoch: 
     fresh.notification.notified_epoch >= epoch
       ? fresh
       : { ...fresh, notification: { ...fresh.notification, notified_epoch: epoch } },
+  )
+}
+
+// Undo an optimistic persistNotified for an epoch that turned out undelivered. Lowering it to
+// epoch - 1 (never raising it) is what makes reconcileUnnotifiedNotifications see the record as still
+// owing a notification; -1 is the never-notified sentinel, so epoch 0 rolls back to it exactly.
+function unpersistNotified(store: CompletionNotifierStore, taskId: string, epoch: number): void {
+  store.mutate(taskId, (fresh) =>
+    fresh.notification.notified_epoch < epoch
+      ? fresh
+      : { ...fresh, notification: { ...fresh.notification, notified_epoch: epoch - 1 } },
   )
 }
 

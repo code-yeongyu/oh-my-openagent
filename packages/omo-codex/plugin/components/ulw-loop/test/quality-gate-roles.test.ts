@@ -132,10 +132,15 @@ describe("validateQualityGate reviewer roles", () => {
 		expect(error.message).toContain("no codeReview lane");
 	});
 
-	it("#given a four-section senpi gate #when validated on the default lazycodex surface #then codeReview is required", () => {
-		const error = qualityGateError(senpiGate());
-		expect(error.code).toBe("ULW_LOOP_QUALITY_GATE_INVALID");
-		expect(error.message).toContain("codeReview");
+	it("#given a four-section gate #when validated on the default lazycodex surface #then codeReview is optional", () => {
+		expect(() =>
+			validateQualityGate(
+				senpiGate({
+					manualQa: { ...BASE_GATE.manualQa, by: "main-session" },
+					gateReview: { ...BASE_GATE.gateReview, by: "category:deep" },
+				}),
+			),
+		).not.toThrow();
 	});
 
 	it("#given swapped omo-senpi reviewer roles #when validated on the omo-senpi surface #then section-specific roles are enforced", () => {

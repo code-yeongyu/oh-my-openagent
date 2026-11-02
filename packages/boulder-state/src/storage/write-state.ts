@@ -5,7 +5,7 @@ import type { BoulderState, BoulderWorkState } from "../types"
 import { getBoulderFilePath } from "./path"
 import { getPlanName } from "./plan-progress"
 import { getBoulderWorks, readBoulderState } from "./read-state"
-import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror } from "./shared"
+import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror, restoreDemotedWork } from "./shared"
 
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
   const filePath = getBoulderFilePath(directory)
@@ -109,16 +109,17 @@ export function selectActiveWork(directory: string, workId: string): BoulderStat
   }
 
   const works = getBoulderWorks(state)
-  const nextWork = works.find((work) => work.work_id === workId)
-  if (!nextWork) {
+  const selectedWork = works.find((work) => work.work_id === workId)
+  if (!selectedWork) {
     return null
   }
 
+  const nextWork = restoreDemotedWork(selectedWork)
   const nextState: BoulderState = {
     ...state,
     schema_version: 2,
     active_work_id: workId,
-    works: state.works ?? Object.fromEntries(works.map((work) => [work.work_id, work])),
+    works: { ...Object.fromEntries(works.map((work) => [work.work_id, work])), [workId]: nextWork },
   }
   projectWorkToMirror(nextState, nextWork)
   return writeBoulderState(directory, nextState) ? nextState : null

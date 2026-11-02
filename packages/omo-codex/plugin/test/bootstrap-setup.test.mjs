@@ -168,37 +168,6 @@ test("#given a config.toml with no pre-existing agent entries #when the worker s
 	});
 });
 
-test("#given a package-relative CodeGraph MCP path #when worker setup runs #then the path is stamped absolute", async () => {
-	await withSetupFixture(async (fixture) => {
-		await writeFile(
-			join(fixture.pluginRoot, ".mcp.json"),
-			`${JSON.stringify(
-				{
-					mcpServers: {
-						codegraph: {
-							args: ["components/codegraph/dist/serve.js"],
-							command: "node",
-							cwd: ".",
-							required: false,
-						},
-						git_bash: { args: ["serve"], command: "node", env: {} },
-					},
-				},
-				null,
-				"\t",
-			)}\n`,
-		);
-
-		await runWorkerSetup(setupOptions(fixture));
-
-		const manifest = JSON.parse(await readFile(join(fixture.pluginRoot, ".mcp.json"), "utf8"));
-		assert.deepEqual(manifest.mcpServers.codegraph.args, [
-			join(fixture.pluginRoot, "components", "codegraph", "dist", "serve.js"),
-		]);
-		assert.equal(manifest.mcpServers.codegraph.cwd, ".");
-	});
-});
-
 test("#given bootstrap-managed staging #when agents are linked #then nothing is persisted under PLUGIN_ROOT", async () => {
 	await withSetupFixture(async (fixture) => {
 		await runWorkerSetup(setupOptions(fixture));

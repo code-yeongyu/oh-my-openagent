@@ -18,7 +18,7 @@ describe("unified omo config schema", () => {
         },
       },
       "[codex]": {
-        codegraph: { daemon: false },
+        git_master: { include_co_authored_by: false },
       },
       profiles: {
         focused: {
@@ -35,7 +35,7 @@ describe("unified omo config schema", () => {
             task: { default_concurrency: 2 },
           },
           "[codex]": {
-            codegraph: { enabled: false },
+            git_master: { commit_footer: false },
           },
         },
       },
@@ -57,8 +57,8 @@ describe("unified omo config schema", () => {
     })
     expect(result.data["[opencode]"]).toEqual({ background_task: { enabled: true } })
     expect(result.data["[senpi]"]?.agents?.oracle?.model).toBe("sol")
-    expect(result.data["[codex]"]?.codegraph?.daemon).toBe(false)
-    expect(result.data.profiles.focused?.["[codex]"]?.codegraph?.enabled).toBe(false)
+    expect(result.data["[codex]"]?.git_master?.include_co_authored_by).toBe(false)
+    expect(result.data.profiles.focused?.["[codex]"]?.git_master?.commit_footer).toBe(false)
     expect(result.data._migrations).toEqual(["2026-07-opencode-config-unification"])
     expect(result.data.legacy_migrations?.["legacy-config"]).toEqual({ migrated: true })
   })
@@ -130,43 +130,11 @@ describe("unified omo config schema", () => {
     expect(result.error.issues.map((issue) => issue.path.join(".")).some((path) => path.includes("[opencode]"))).toBe(true)
   })
 
-  test("#given the complete legacy codegraph setting set #when parsed #then values parse and legacy defaults are preserved", () => {
-    // given
-    const config = {
-      codegraph: {
-        enabled: false,
-        auto_provision: false,
-        daemon: false,
-        telemetry: true,
-        install_dir: "/tmp/omo-codegraph",
-        watch_debounce_ms: 250,
-        excluded_roots: ["/tmp/generated", "/tmp/vendor"],
-      },
-    }
-
-    // when
-    const explicitResult = OmoConfigSchema.safeParse(config)
-    const defaultResult = OmoConfigSchema.safeParse({ codegraph: {} })
-
-    // then
-    expect(explicitResult.success).toBe(true)
-    if (!explicitResult.success) throw new Error(explicitResult.error.message)
-    expect(explicitResult.data.codegraph).toEqual(config.codegraph)
-    expect(defaultResult.success).toBe(true)
-    if (!defaultResult.success) throw new Error(defaultResult.error.message)
-    expect(defaultResult.data.codegraph).toEqual({
-      enabled: true,
-      auto_provision: true,
-      daemon: true,
-      telemetry: false,
-    })
-  })
-
   test("#given base telemetry and an empty codex block #when parsed #then the block stays default-free", () => {
     // given
     const config = {
-      codegraph: { telemetry: true },
-      "[codex]": { codegraph: {} },
+      telemetry: { enabled: false },
+      "[codex]": { telemetry: {} },
     }
 
     // when
@@ -175,7 +143,7 @@ describe("unified omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.codegraph?.telemetry).toBe(true)
-    expect(Object.hasOwn(result.data["[codex]"]?.codegraph ?? {}, "telemetry")).toBe(false)
+    expect(result.data.telemetry?.enabled).toBe(false)
+    expect(Object.hasOwn(result.data["[codex]"]?.telemetry ?? {}, "enabled")).toBe(false)
   })
 })

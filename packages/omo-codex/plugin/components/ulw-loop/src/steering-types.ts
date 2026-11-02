@@ -1,4 +1,8 @@
-import type { UlwLoopSteeringMutationKind, UlwLoopSteeringSource } from "./constants.js";
+import type {
+	UlwLoopSteeringMutationKind,
+	UlwLoopSteeringSource,
+	UlwLoopSuccessCriterionUserModel,
+} from "./constants.js";
 import type { UlwLoopItem, UlwLoopPlan } from "./domain-types.js";
 
 export interface UlwLoopSteeringInvariantResult {
@@ -25,9 +29,17 @@ export interface UlwLoopSteeringAfterPayload {
 export interface UlwLoopSteeringProposal {
 	kind: UlwLoopSteeringMutationKind;
 	source: UlwLoopSteeringSource;
+	/** Alias of `targetGoalId`; the SDK documentation uses `goalId` like every other operation. */
+	goalId?: string;
 	targetGoalId?: string;
 	targetGoalIds?: string[];
 	criterionId?: string;
+	/** `revise_criterion` payload: the replacement scenario text. */
+	scenario?: string;
+	/** `revise_criterion` payload: the replacement observable-proof text. */
+	expectedEvidence?: string;
+	/** `revise_criterion` payload: the replacement user model. */
+	userModel?: UlwLoopSuccessCriterionUserModel;
 	evidence: string;
 	rationale: string;
 	title?: string;
