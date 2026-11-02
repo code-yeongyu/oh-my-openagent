@@ -52,14 +52,10 @@ export function isPathInside(child: string, parent: string, options: PathContain
 /** The canonical child's path relative to the canonical parent ("" for the parent itself), or undefined when outside. */
 export function containedRelativePath(child: string, parent: string, options: PathContainmentOptions = {}): string | undefined {
   const paths = (options.platform ?? process.platform) === "win32" ? win32 : posix
-  // A caller that injects a resolver decides its own canonical form (the grant check allows a note that
-  // does not exist yet), so only the default path is walked here.
-  const canonicalChild = paths.normalize(
-    options.realpath === undefined ? resolveSegmentwise(child, { ...options, allowMissing: false }) : options.realpath(child),
-  )
-  // The parent is walked too: a lexical `..` after a link names a directory the opener never reaches, and
-  // a containment verdict inherits that error.
-  const canonicalParent = paths.normalize(resolveSegmentwise(parent, { ...options, allowMissing: false }))
+  // Injected filesystems own whole-path resolution; the native resolver needs the segment-wise walk.
+  const resolve = options.realpath ?? ((input: string) => resolveSegmentwise(input, { ...options, allowMissing: false }))
+  const canonicalChild = paths.normalize(resolve(child))
+  const canonicalParent = paths.normalize(resolve(parent))
   const relative = paths.relative(canonicalParent, canonicalChild)
   const escapes = relative === ".." || relative.startsWith(`..${paths.sep}`) || paths.isAbsolute(relative)
   return escapes ? undefined : relative
@@ -83,6 +79,8 @@ export interface SegmentwiseResolveOptions extends PathContainmentOptions {
  * target is anchored at the canonical working directory, as `open(2)` anchors it.
  */
 export function resolveSegmentwise(target: string, options: SegmentwiseResolveOptions = {}): string {
+  if (target.length === 0) throw pathError("ENOENT", "empty path")
+
   const platform = options.platform ?? process.platform
   const realpath = options.realpath ?? realpathSync.native
   const lstat = options.lstat ?? lstatSync
@@ -100,6 +98,7 @@ export function resolveSegmentwise(target: string, options: SegmentwiseResolveOp
       missing.push(segment)
       continue
     }
+    if (!lstat(resolved).isDirectory()) throw pathError("ENOTDIR", `not a directory: ${target}`)
     if (segment === "" || segment === ".") continue
     if (segment === "..") {
       resolved = posix.dirname(resolved)
@@ -121,8 +120,12 @@ export function resolveSegmentwise(target: string, options: SegmentwiseResolveOp
   return missing === undefined ? resolved : posix.join(resolved, ...missing)
 }
 
+function pathError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { code })
+}
+
 function unresolvable(target: string): Error {
-  return Object.assign(new Error(`unresolvable remainder: ${target}`), { code: "ENOENT" })
+  return pathError("ENOENT", `unresolvable remainder: ${target}`)
 }
 
 function isEntry(input: string, lstat: (path: string) => unknown): boolean {
@@ -156,8 +159,13 @@ function resolveWindowsLexical(
       current = win32.dirname(current)
       continue
     }
-    if (missing.length === 0) return ancestor
-    if (!lstat(ancestor).isDirectory()) throw Object.assign(new Error(`not a directory: ${ancestor}`), { code: "ENOTDIR" })
+    if (missing.length === 0) {
+      if ((target.endsWith("/") || target.endsWith("\\")) && !lstat(ancestor).isDirectory()) {
+        throw pathError("ENOTDIR", `not a directory: ${target}`)
+      }
+      return ancestor
+    }
+    if (!lstat(ancestor).isDirectory()) throw pathError("ENOTDIR", `not a directory: ${ancestor}`)
     if (allowMissing === false) throw unresolvable(target)
     return win32.join(ancestor, ...missing)
   }

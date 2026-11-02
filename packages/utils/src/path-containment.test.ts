@@ -191,4 +191,60 @@ describe("resolveSegmentwise resolves in the order open(2) does", () => {
       /unresolvable remainder/,
     )
   })
+
+  test("win32 throws ENOTDIR when a resolved file path ends in a slash", () => {
+    const root = "C:\\"
+    const realpath = (path: string) => win32.normalize(path)
+    const lstat = (path: string) => ({ isDirectory: () => path === root })
+    const target = `${root}note.md\\`
+    expect(pathErrorCode(() => resolveSegmentwise(target, { platform: "win32", realpath, lstat }))).toBe("ENOTDIR")
+  })
+})
+
+const pathErrorCode = (operation: () => unknown): unknown => {
+  try {
+    operation()
+  } catch (error) {
+    if (error instanceof Error && "code" in error) return error.code
+  }
+  return undefined
+}
+
+test("#given an empty path #when segment-wise resolution runs #then it throws ENOENT", () => {
+  expect(pathErrorCode(() => resolveSegmentwise(""))).toBe("ENOENT")
+})
+
+test.each(["/", "/.", "/.."])("#given a regular file #when its POSIX path ends with %s #then resolution throws ENOTDIR", (suffix) => {
+  const { inside } = symlinkFixture()
+  const file = join(inside, "workspace", "note.md")
+
+  expect(pathErrorCode(() => resolveSegmentwise(`${file}${suffix}`))).toBe("ENOTDIR")
+})
+
+test.if(process.platform !== "win32")("#given a directory #when its POSIX path ends in slash #then resolution succeeds", () => {
+  const { inside } = symlinkFixture()
+  const directory = join(inside, "workspace")
+
+  expect(resolveSegmentwise(`${directory}/`)).toBe(fs.realpathSync.native(directory))
+})
+
+test("#given an injected resolver for complete paths #when containment compares child and parent #then both inputs are resolved whole", () => {
+  const child = "/virtual/repo/note.md"
+  const parent = "/virtual/repo"
+  const canonicalPaths = new Map([
+    [child, "/canonical/repo/note.md"],
+    [parent, "/canonical/repo"],
+  ])
+  const calls: string[] = []
+  const realpath = (input: string): string => {
+    calls.push(input)
+    const canonical = canonicalPaths.get(input)
+    if (canonical === undefined) throw Object.assign(new Error(`unexpected resolver input: ${input}`), { code: "EINVAL" })
+    return canonical
+  }
+
+  const relative = containedRelativePath(child, parent, { platform: "linux", realpath })
+
+  expect(relative).toBe("note.md")
+  expect(calls).toEqual([child, parent])
 })
