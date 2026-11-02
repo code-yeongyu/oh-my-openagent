@@ -126,12 +126,13 @@ describe("git job helper transport into the compiled payload", () => {
     }
   })
 
-  test("the native binary parity job builds the helper for its Windows binary only", () => {
+  test("the native binary parity job builds the helper for its Windows binary only, with the release CRT linkage", () => {
     const run = runBlock(parity, "      - name: Build the desktop engine the binary embeds\n", "      - name: Build the standalone binary and the npm launcher payload\n")
     const gate = run.indexOf('if [[ "${{ matrix.target }}" == windows-* ]]; then')
-    const helper = run.indexOf("cargo build --release -p omo-git-job-helper --locked --target ${{ matrix.rust-target }}")
+    const helper = run.indexOf('RUSTFLAGS="-C target-feature=+crt-static" cargo build --release -p omo-git-job-helper --locked --target ${{ matrix.rust-target }}')
 
     expect(gate).toBeGreaterThanOrEqual(0)
+    // Static CRT, as publish-platform builds the released bytes: the parity binary embeds the same helper.
     expect(helper).toBeGreaterThan(gate)
   })
 })

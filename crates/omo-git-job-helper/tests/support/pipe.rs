@@ -4,14 +4,21 @@ use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::{
     ERROR_IO_PENDING, ERROR_PIPE_CONNECTED, HANDLE, WAIT_OBJECT_0,
 };
+use windows_sys::Win32::Security::{
+    GetTokenInformation, RevertToSelf, TokenImpersonationLevel, SECURITY_IMPERSONATION_LEVEL,
+    TOKEN_QUERY,
+};
 use windows_sys::Win32::Storage::FileSystem::{
     ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED, PIPE_ACCESS_DUPLEX,
 };
+use windows_sys::Win32::System::Pipes::ImpersonateNamedPipeClient;
 use windows_sys::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS,
     PIPE_TYPE_BYTE, PIPE_WAIT,
 };
-use windows_sys::Win32::System::Threading::{CreateEventW, WaitForMultipleObjects};
+use windows_sys::Win32::System::Threading::{
+    CreateEventW, GetCurrentThread, OpenThreadToken, WaitForMultipleObjects,
+};
 use windows_sys::Win32::System::IO::{CancelIoEx, GetOverlappedResult, OVERLAPPED};
 
 use super::sddl::from_sddl;
@@ -83,6 +90,17 @@ pub struct ServerPipe {
 
 impl ServerPipe {
     pub fn create(suffix: &str, sddl: Option<&str>, first: bool) -> Result<Self, u32> {
+        Self::create_with_inbound_quota(suffix, sddl, first, 65536)
+    }
+
+    /// `inbound` is the quota for bytes the helper writes. With 0 a helper write pends until this side reads it,
+    /// which is how a writer that stopped reading looks to the helper.
+    pub fn create_with_inbound_quota(
+        suffix: &str,
+        sddl: Option<&str>,
+        first: bool,
+        inbound: u32,
+    ) -> Result<Self, u32> {
         let name = wide(&format!("{PIPE_PREFIX}{suffix}"));
         let attributes = sddl.map(from_sddl).transpose()?;
         let attributes_ptr = attributes
@@ -101,7 +119,7 @@ impl ServerPipe {
                 PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
                 255,
                 65536,
-                65536,
+                inbound,
                 0,
                 attributes_ptr,
             )
@@ -116,6 +134,41 @@ impl ServerPipe {
 
     pub const fn raw(&self) -> HANDLE {
         self.handle.raw()
+    }
+
+    /// The impersonation level the connected client granted (its SQOS), read by impersonating it once. Requires
+    /// that a frame was already read from the client.
+    pub fn client_impersonation_level(&self) -> Result<SECURITY_IMPERSONATION_LEVEL, u32> {
+        // SAFETY: the instance is connected and has received data.
+        if unsafe { ImpersonateNamedPipeClient(self.raw()) } == 0 {
+            return Err(last_error());
+        }
+        let mut token = null_mut();
+        // SAFETY: this thread is impersonating; `token` receives a new handle. Reverted in the same frame.
+        let opened =
+            unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, 1, &mut token) } != 0;
+        let error = last_error();
+        // SAFETY: ends the impersonation this function started.
+        unsafe { RevertToSelf() };
+        let token = Owned::new(token).filter(|_| opened).ok_or(error)?;
+        let mut level: SECURITY_IMPERSONATION_LEVEL = 0;
+        let mut returned = 0u32;
+        let size = u32::try_from(std::mem::size_of_val(&level)).unwrap_or(4);
+        // SAFETY: `level` is writable for `size` bytes.
+        let ok = unsafe {
+            GetTokenInformation(
+                token.raw(),
+                TokenImpersonationLevel,
+                std::ptr::from_mut(&mut level).cast(),
+                size,
+                &mut returned,
+            )
+        };
+        if ok == 0 {
+            Err(last_error())
+        } else {
+            Ok(level)
+        }
     }
 
     pub fn accept(&self, timeout: Duration, abort: Option<HANDLE>) -> Result<(), String> {

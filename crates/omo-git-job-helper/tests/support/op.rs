@@ -2,6 +2,7 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
+use super::debugger::{self, Hit};
 use super::pipe::ServerPipe;
 use super::process::{self, WATCH};
 use super::win::{command_line, creation_time, Owned};
@@ -17,7 +18,8 @@ pub enum Launcher {
 pub struct Op {
     pub id: String,
     pub pipe: ServerPipe,
-    pub launcher: Child,
+    /// The `Command` child, absent when the helper was launched under the test's debugger.
+    pub launcher: Option<Child>,
     pub helper: Owned,
     pub helper_pid: u32,
 }
@@ -36,11 +38,25 @@ pub fn exec_frame(cwd: &str, exe: &str, line: &str) -> Vec<u8> {
 impl Op {
     /// Creates the control pipe, launches `omo-git-job-helper run --op <id> <extra>` and waits for `joined`.
     pub fn start(extra: &[&str], launcher: Launcher, stdout: Stdio) -> Result<Self, String> {
+        Self::start_with_inbound_quota(extra, launcher, stdout, 65536)
+    }
+
+    pub fn start_with_inbound_quota(
+        extra: &[&str],
+        launcher: Launcher,
+        stdout: Stdio,
+        inbound: u32,
+    ) -> Result<Self, String> {
         use std::os::windows::io::AsRawHandle;
         let id = unique("op");
         let medium = matches!(launcher, Launcher::Standard).then(sddl::medium_user_sddl);
-        let mut pipe = ServerPipe::create(&format!("omo-git-op-{id}"), medium.as_deref(), true)
-            .map_err(|error| format!("CreateNamedPipeW {error}"))?;
+        let mut pipe = ServerPipe::create_with_inbound_quota(
+            &format!("omo-git-op-{id}"),
+            medium.as_deref(),
+            true,
+            inbound,
+        )
+        .map_err(|error| format!("CreateNamedPipeW {error}"))?;
         let helper = helper_exe();
         let mut command = match launcher {
             Launcher::Direct => Command::new(&helper),
@@ -78,13 +94,25 @@ impl Op {
                 return Err(format!("{error} (launcher exit {code:?})"));
             }
         };
+        let (helper, helper_pid) = Self::verify_joined(&joined)?;
+        Ok(Self {
+            id,
+            pipe,
+            launcher: Some(child),
+            helper,
+            helper_pid,
+        })
+    }
+
+    /// Checks a `joined <pid> <ft>` frame against the live process and opens a watch handle on it.
+    fn verify_joined(joined: &str) -> Result<(Owned, u32), String> {
         let fields: Vec<&str> = joined.split(' ').collect();
         let ["joined", pid, created] = fields.as_slice() else {
             return Err(format!("expected joined, got {joined:?}"));
         };
         let (pid, created) = (
-            pid.parse::<u32>().map_err(|_| joined.clone())?,
-            created.parse::<u64>().map_err(|_| joined.clone())?,
+            pid.parse::<u32>().map_err(|_| joined.to_owned())?,
+            created.parse::<u64>().map_err(|_| joined.to_owned())?,
         );
         let helper =
             process::open(pid, WATCH).ok_or_else(|| format!("cannot open helper pid {pid}"))?;
@@ -93,13 +121,40 @@ impl Op {
                 "joined identity {joined:?} does not match the live process"
             ));
         }
-        Ok(Self {
-            id,
-            pipe,
-            launcher: child,
-            helper,
-            helper_pid: pid,
-        })
+        Ok((helper, pid))
+    }
+
+    /// Launches `run --op <id>` under this thread as debugger, stops it at its first call into kernel32!`export`
+    /// (see `debugger`), runs `on_hit` there, detaches, and returns the op with the helper's first frame.
+    /// A first frame that is not `joined` is returned as-is with no handshake check.
+    pub fn start_debugged(
+        export: &str,
+        on_hit: impl FnOnce(&Hit<'_>),
+    ) -> Result<(Self, String), String> {
+        let id = unique("op");
+        let mut pipe = ServerPipe::create(&format!("omo-git-op-{id}"), None, true)
+            .map_err(|error| format!("CreateNamedPipeW {error}"))?;
+        // This thread is the debugger, so the writer side runs on its own thread meanwhile.
+        let writer = std::thread::spawn(move || {
+            pipe.accept(Duration::from_secs(60), None)?;
+            let first = pipe.read_line(Duration::from_secs(60))?;
+            Ok::<_, String>((pipe, first))
+        });
+        let (helper, helper_pid) =
+            debugger::run_to_first_call(&helper_exe(), &["run", "--op", &id], export, &id, on_hit)?;
+        let (pipe, first) = writer
+            .join()
+            .map_err(|_| "writer thread panicked".to_owned())??;
+        Ok((
+            Self {
+                id,
+                pipe,
+                launcher: None,
+                helper,
+                helper_pid,
+            },
+            first,
+        ))
     }
 
     pub fn job(&self) -> String {
@@ -174,6 +229,8 @@ impl Op {
 impl Drop for Op {
     fn drop(&mut self) {
         process::terminate(self.helper.raw());
-        let _reaped = self.launcher.kill().and_then(|()| self.launcher.wait());
+        if let Some(launcher) = self.launcher.as_mut() {
+            let _reaped = launcher.kill().and_then(|()| launcher.wait());
+        }
     }
 }

@@ -11,6 +11,7 @@ pub mod token;
 #[path = "../../testkit/win.rs"]
 pub mod win;
 
+pub mod debugger;
 pub mod handles;
 pub mod job;
 pub mod lines;
@@ -31,8 +32,10 @@ pub use receipt::Receipt;
 pub const EXIT_OK: u32 = 0;
 pub const EXIT_USAGE: u32 = 2;
 pub const EXIT_JOB_EXISTS: u32 = 13;
+pub const EXIT_VERIFY: u32 = 19;
 pub const EXIT_CANCELLED: u32 = 20;
 pub const EXIT_SPAWN_FAILED: u32 = 21;
+pub const EXIT_PORT_FAILED: u32 = 22;
 pub const LINGER_KILL_CODE: u32 = 0xC0DE_0001;
 
 pub fn helper_exe() -> PathBuf {

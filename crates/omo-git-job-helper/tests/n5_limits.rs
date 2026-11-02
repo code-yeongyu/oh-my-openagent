@@ -21,7 +21,12 @@ fn n5_limits_read_back_exactly_and_a_breakaway_create_fails() {
     std::fs::copy(example("testkit_touch"), &child).expect("copy child image");
     let sentinel = dir.join("sentinel");
     let mut op = Op::start(&[], Launcher::Direct, Stdio::piped()).expect("helper run");
-    let lines = Lines::new(op.launcher.stdout.take().expect("helper stdout"));
+    let lines = Lines::new(
+        op.launcher
+            .as_mut()
+            .and_then(|launcher| launcher.stdout.take())
+            .expect("helper stdout"),
+    );
     let f = job::open_query(&op.job()).expect("open F");
     let flags = job::limit_flags(f.raw());
     drop(f);
