@@ -865,7 +865,7 @@ jobs:
         shell: bash
         timeout-minutes: 45
         env:
-          SENPI_EQ_HARNESS_SHA: 5ab795e3392325c961596d7944a1740f4d0a9e20
+          SENPI_EQ_HARNESS_SHA: 835c3c5988da0741de2e44dd8af9665c312727bb
         run: |
           set -euo pipefail
           cargo build --release -p senpi-desktop-engine --locked

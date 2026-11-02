@@ -1,7 +1,7 @@
 {
  "repo": {
   "head": "f20de253bfb9a03b533377aa736a9f2ad80236db",
-  "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
+  "harness": "835c3c5988da0741de2e44dd8af9665c312727bb"
  },
  "platform": "darwin-arm64",
  "runtimes": {
@@ -10,7 +10,7 @@
  },
  "hashes": {
   "driver": "sha256:7d7cad1c7332ca065d3635713a5146322caba3b8c19c20524214296d83d3e2ff",
-  "normalizer": "sha256:7d676cd57a4ba44323a5997bb81b7ffb7e70b0d1df7de05d08325c6901ca2dd9",
+  "normalizer": "sha256:47e6c6103cc2870baf35aa4c2b0d61d0457ad523f7bb620a9ed1d0b8eb6e89ba",
   "fakeModelServer": "sha256:cab5b6866b7854287218de51d1fafcc242a8602b2c83fb85572abe332f9f6560",
   "collectors": "sha256:f084a278fe05fa9e3603e95ab86bd3988e4a2c500a3174a2e72521a0d4038bdd"
  },
