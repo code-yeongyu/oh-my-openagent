@@ -22,7 +22,7 @@ export function parsePorcelainPath(line: string): string | null {
   return path.replace(/^"|"$/g, "")
 }
 
-export const PARENT_DIRTY_DETAIL_MAX_LINES = 5
+const PARENT_DIRTY_DETAIL_MAX_LINES = 5
 
 export function formatParentDirtyDetail(lines: readonly string[]): string {
   const shown = lines.slice(0, PARENT_DIRTY_DETAIL_MAX_LINES).join("; ")
