@@ -78,6 +78,8 @@ export interface DagRuntime {
   attach(event?: unknown): Promise<void>
   sync(): void
   detach(): void
+  /** Restates the current `omo.dag.updated` snapshot for a client that reattached. */
+  resend(): void
   /** Retires live schedulers without cancelling them, then persists the pause. Await before teardown. */
   pauseForShutdown(): Promise<void>
   dispose(): void
@@ -611,6 +613,9 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
       bridge.sync()
       bridge.notifyStoreMutation()
       statusUi.scheduleSync()
+    },
+    resend() {
+      bridge.resend()
     },
     detach() {
       durableEventListener = () => undefined

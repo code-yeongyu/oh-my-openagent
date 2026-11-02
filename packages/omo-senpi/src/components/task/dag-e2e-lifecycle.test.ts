@@ -741,8 +741,10 @@ describe("assembled DAG lifecycle end to end", () => {
   })
 
   test("#given bursty adapter mutations with an identical final state #when the snapshot window flushes #then omo.dag.updated emits that state once", async () => {
-    // given
+    // given (the attach already put its own snapshot on the wire, #12113)
     const fixture = await runtimeFixture()
+    const updates = () => fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const onAttach = updates().length
     await fixture.start("snapshot-dedup")
     await fixture.runner.whenStarted(1)
 
@@ -751,11 +753,11 @@ describe("assembled DAG lifecycle end to end", () => {
     fixture.runtime.sync()
     fixture.runtime.sync()
     fixture.bridgeTimers.flush(50)
-    const firstWindow = fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const firstWindow = updates().slice(onAttach)
     fixture.runtime.sync()
     fixture.runtime.sync()
     fixture.bridgeTimers.flush(50)
-    const secondWindow = fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const secondWindow = updates().slice(onAttach)
 
     // then
     expect(firstWindow).toHaveLength(1)

@@ -291,7 +291,7 @@ function registerTaskTools(
 
 export function wireDagLifecycle(
   pi: SenpiExtensionAPI,
-  runtime: Pick<DagRuntime, "attach" | "detach" | "pauseForShutdown" | "dispose">,
+  runtime: Pick<DagRuntime, "attach" | "detach" | "pauseForShutdown" | "dispose" | "resend">,
   wireTaskLifecycle: () => Pick<EventBridge, "afterSessionStartReconcile">,
   onAttachError: (error: unknown) => void = () => {},
 ): { readonly lastAttach: () => Promise<void> } {
@@ -309,6 +309,18 @@ export function wireDagLifecycle(
       .then((current) => (current ? runtime.attach(event) : undefined))
       .catch(onAttachError)
   })
+  // #12113: the attach publishes the recovered omo.dag.updated snapshot. Admission does not wait for
+  // it, but a turn does, so the snapshot is on the wire before the turn starts and the turn's own DAG
+  // tools see recovered runs. `latest` never rejects, and its reconcile probes are time-bounded.
+  // A preview pass (prompt-prefix prewarm) starts no turn, so it does not wait.
+  pi.on("before_agent_start", async (payload) => {
+    if (isPreviewPayload(payload)) return undefined
+    await latest
+    return undefined
+  }, { previewSafe: true })
+  // A client reattaching to a retained session gets no session_start. An attach still in flight
+  // publishes on its own, so this only restates an attached bridge.
+  pi.on("session_resumed", () => runtime.resend())
   pi.on("session_shutdown", () => runtime.dispose())
   return { lastAttach: () => latest }
 }
@@ -368,4 +380,8 @@ type TeamToolContext = {
 
 function registerTeamTools(pi: SenpiExtensionAPI, context: TeamToolContext): void {
   for (const tool of buildLeadTeamTools({ service: context.service })) pi.registerTool({ ...tool })
+}
+
+function isPreviewPayload(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "preview" in value && value.preview === true
 }
