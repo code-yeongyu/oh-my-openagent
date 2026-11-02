@@ -30,6 +30,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
 	dropTimestampOffsets,
+	goldenHostLeaks,
 	pinEnginePackage,
 	splitStatusChannels,
 	statusCounts,
@@ -548,7 +549,14 @@ async function main() {
 				result.witnessOk = runs.every((r) => r.witness.pipeline === witnessWanted);
 				if (options.mode === "record") {
 					// A golden is written only from runs that agreed with each other: a nondeterministic case is a FAIL.
-					if (result.repeatDiffs.length === 0) {
+					// One carrying a host-leaked row (telemetry notice, terminal restore events) is a FAIL too (#12054).
+					const leaks = goldenHostLeaks(first);
+					if (leaks.length > 0)
+						result.error = `host-leaked rows, golden not written: ${leaks
+							.slice(0, 5)
+							.map((leak) => `${leak.reason} at ${leak.path}`)
+							.join("; ")}`;
+					else if (result.repeatDiffs.length === 0) {
 						mkdirSync(dir, { recursive: true });
 						writeFileSync(
 							goldenPath,
