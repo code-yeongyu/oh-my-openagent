@@ -2,7 +2,7 @@ import {
 	createTelemetryClient,
 	getDailyActiveCaptureState,
 	getDefaultTelemetryOsProvider,
-	getTelemetryInstallDistinctId,
+	getTelemetryIdentity,
 	type PostHogActivityCaptureState,
 	type TelemetryOsProvider,
 	type TelemetryTransportFactory,
@@ -107,9 +107,12 @@ function createPluginPostHogClient(options: CreatePluginPostHogOptions = {}): Po
 				return;
 			}
 
+			const identity = getTelemetryIdentity(options.stateDir ?? getComponentTelemetryStateDir(), { env: options.env ?? process.env });
 			client.trackActive({
 				dayUTC: activityState.dayUTC,
-				distinctId: getTelemetryInstallDistinctId(options.stateDir ?? getComponentTelemetryStateDir()),
+				distinctId: identity.distinctId,
+				idScheme: identity.idScheme,
+				installHash: identity.installHash,
 				reason,
 			});
 		},

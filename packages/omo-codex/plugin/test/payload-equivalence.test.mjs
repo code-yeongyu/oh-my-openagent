@@ -58,8 +58,9 @@ test("payload-equivalence: #given telemetry-core and component shim #when sessio
 		const componentMessages = [];
 		const componentRecorder = createTransportRecorder(componentMessages);
 
+		const deviceIdOverride = "5a1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
 		const componentClient = componentPostHog.__createPluginPostHogForTesting({
-			env: { POSTHOG_API_KEY: "test-api-key" },
+			env: { POSTHOG_API_KEY: "test-api-key", OMO_TELEMETRY_DEVICE_ID: deviceIdOverride },
 			now: new Date("2026-06-12T01:02:03.000Z"),
 			osProvider: createOsProvider(),
 			stateDir,
@@ -69,7 +70,8 @@ test("payload-equivalence: #given telemetry-core and component shim #when sessio
 		await componentClient.shutdown();
 		const installId = readFileSync(join(stateDir, "install-id"), "utf8").trim();
 		assert.match(installId, /^[0-9a-f]{64}$/);
-		const expectedDistinctId = createHash("sha256").update(installId).digest("hex");
+		const expectedInstallHash = createHash("sha256").update(installId).digest("hex");
+		const expectedDistinctId = createHash("sha256").update("omo:device:v1\u0000").update(deviceIdOverride).digest("hex");
 
 		assert.deepEqual(componentMessages, [
 			{
@@ -83,6 +85,8 @@ test("payload-equivalence: #given telemetry-core and component shim #when sessio
 					cpu_count: 1,
 					cpu_model: "Test CPU",
 					day_utc: "2026-06-12",
+					id_scheme: "device",
+					install_hash: expectedInstallHash,
 					locale: Intl.DateTimeFormat().resolvedOptions().locale,
 					os_arch: "arm64",
 					os_type: "Darwin",

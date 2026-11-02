@@ -156,13 +156,18 @@ export type TelemetryTransportFactory = (
   options: TelemetryTransportOptions,
 ) => TelemetryTransport;
 
+export type TelemetryIdSchemeProperty = "device" | "install";
+export type TelemetryTrackActiveInput = {
+  readonly dayUTC: string;
+  readonly distinctId: string;
+  readonly reason: string;
+  readonly installHash?: string;
+  readonly idScheme?: TelemetryIdSchemeProperty;
+};
+
 export type TelemetryClient = {
   readonly enabled: boolean;
-  readonly trackActive: (input: {
-    readonly dayUTC: string;
-    readonly distinctId: string;
-    readonly reason: string;
-  }) => void;
+  readonly trackActive: (input: TelemetryTrackActiveInput) => void;
   readonly flush: () => Promise<void>;
   readonly shutdown: () => Promise<void>;
 };
@@ -290,6 +295,24 @@ export declare function getTelemetryHost(env?: TelemetryEnv, defaultHost?: strin
 export declare function getDefaultTelemetryOsProvider(): TelemetryOsProvider;
 export declare const TELEMETRY_INSTALL_ID_FILE_NAME: "install-id";
 export declare function getTelemetryInstallDistinctId(stateDir: string): string;
+export type TelemetryDeviceIdDeps = {
+  readonly env?: TelemetryEnv;
+  readonly platform?: NodeJS.Platform;
+  readonly readFile?: (path: string) => string;
+  readonly runCommand?: (command: string, args: readonly string[]) => string;
+};
+export declare function hashDeviceId(rawId: string): string;
+export type TelemetryIdScheme = "device" | "install";
+export type TelemetryIdentity = {
+  readonly distinctId: string;
+  readonly installHash: string;
+  readonly idScheme: TelemetryIdScheme;
+};
+export type TelemetryIdentityInput = {
+  readonly env?: TelemetryEnv;
+  readonly deviceId?: Omit<TelemetryDeviceIdDeps, "env">;
+};
+export declare function getTelemetryIdentity(stateDir: string, input?: TelemetryIdentityInput): TelemetryIdentity;
 export declare function resolveTelemetryStateDir(
   product: Pick<TelemetryProductConfig, "cacheDirName">,
   options?: ResolveTelemetryStateDirOptions,

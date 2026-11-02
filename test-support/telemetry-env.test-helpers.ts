@@ -9,6 +9,7 @@ const TELEMETRY_ENV_KEYS = [
   "OMO_CODEX_SEND_ANONYMOUS_TELEMETRY",
   "POSTHOG_API_KEY",
   "POSTHOG_HOST",
+  "OMO_TELEMETRY_DEVICE_ID",
 ] as const
 
 export function isolateTelemetryEnv(): () => void {

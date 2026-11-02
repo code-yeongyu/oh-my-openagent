@@ -2,7 +2,7 @@ import {
   createDefaultPostHogTransport,
   createTelemetryClient,
   getDefaultTelemetryOsProvider,
-  getTelemetryInstallDistinctId,
+  getTelemetryIdentity,
 } from "@oh-my-opencode/telemetry-core"
 import type {
   PostHogActivityCaptureState,
@@ -168,9 +168,12 @@ function createPostHogClient(source: PostHogSource, options: CreatePostHogOption
         return
       }
 
+      const identity = getTelemetryIdentity(getPostHogActivityStateDir(), { env })
       client.trackActive({
         dayUTC: activityState.dayUTC,
-        distinctId: getTelemetryInstallDistinctId(getPostHogActivityStateDir()),
+        distinctId: identity.distinctId,
+        idScheme: identity.idScheme,
+        installHash: identity.installHash,
         reason,
       })
     },
