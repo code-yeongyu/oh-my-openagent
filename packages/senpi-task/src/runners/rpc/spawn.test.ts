@@ -521,6 +521,23 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.cwd).toBe(baseSpec.cwd)
   })
 
+  // #9963: a package install's `.bin/senpi` canonicalizes to the `#!/usr/bin/env node` script, so spawning
+  // it directly needs `node` on PATH even when the parent runs on Bun; the parent's runtime must run it.
+  test.each(["cli.js", "cli.mjs", "cli.cjs"])("#given a resolved senpi %s script on a POSIX host #when building #then the parent runtime launches the script", (scriptName) => {
+    // given
+    const script = join("/home/u/.bun/install/global/node_modules/@code-yeongyu/senpi/dist/bundle", scriptName)
+
+    // when
+    const descriptor = buildRpcSpawn(
+      { ...baseSpec, model: "omo-mock/mock-1" },
+      { isBunBinary: false, execPath: "/home/u/.bun/bin/bun", platform: "linux", parentEnv: { PATH: "/usr/bin" }, ...withExecutable(script) },
+    )
+
+    // then
+    expect(descriptor.command).toBe("/home/u/.bun/bin/bun")
+    expect(descriptor.args).toEqual([script, "--mode", "rpc", "--no-extensions", "--no-ask-user", "--model", "omo-mock/mock-1"])
+  })
+
   test("#given NO resolvable executable #when building #then it falls back to execPath + rpc-entry, still threading child args", () => {
     // when
     const descriptor = buildRpcSpawn(
