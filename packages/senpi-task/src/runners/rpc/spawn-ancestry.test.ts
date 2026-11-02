@@ -68,9 +68,13 @@ test.each(rows)("CLI spawn on $engine sends --spawned-by only when the launched 
     resolveRpcEntry: () => "/synthetic/rpc-entry.js",
     engineVersion: row.running,
   })
-  // then SENPI_BIN, when set, is the launch target, and the flag rides exactly when that engine accepts it
+  // then SENPI_BIN, when set, is the launch target (a package `cli.js` runs on the parent runtime, #9963), and
+  // the flag rides exactly when that engine accepts it
   if (bin === undefined) expect(descriptor.args[0]).toBe("/synthetic/rpc-entry.js")
-  else expect(descriptor.command).toBe(bin)
+  else {
+    const launch = bin.endsWith(".js") ? ["/synthetic/bun", bin] : [bin]
+    expect([descriptor.command, ...descriptor.args].slice(0, launch.length)).toEqual(launch)
+  }
   expect(descriptor.args.filter((arg) => arg === "--spawned-by")).toHaveLength(row.accepts ? 1 : 0)
   if (row.accepts) {
     const encoded = descriptor.args[descriptor.args.indexOf("--spawned-by") + 1]
