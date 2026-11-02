@@ -13,7 +13,7 @@ import {
 } from "./compile-runtime"
 import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
-import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
+import { compiledUpdate, fetchGitHubReleases, probePackageOwner, readInstallRecord, releaseAssetName, RELEASES_URL, updateDestination } from "./compiled-update"
 import { downloadAndSwapBinary } from "./compiled-update-swap"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
@@ -379,17 +379,24 @@ async function main(): Promise<void> {
     args,
     executable: launch.handOff ? expected : process.execPath,
     helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
-    ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env }) } : {}),
+    ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env, launcher: runningExecutable }) } : {}),
   })
   if (trust.action !== "adopt") {
     if (trust.action === "refuse") process.exitCode = 78
     return
   }
   if (isSelfUpdate(process.argv.slice(2)) && parseBuildInfo(manifest.buildInfo) === undefined) {
+    const runtimeRoot = dirname(dirname(expected))
     const result = await compiledUpdate({
       omoAiVersion: manifest.omoAiVersion,
       releaseTarget: manifest.releaseTarget,
-      destination: runningExecutable,
+      destination: updateDestination({
+        runningExecutable,
+        runtimeRoot,
+        launcher: launch.launcher,
+        installRecord: readInstallRecord(join(homedir(), ".omo", "install.json")),
+      }),
+      runtimeRoot,
       platform: process.platform,
       arch: process.arch,
       fetchReleases: fetchGitHubReleases,
@@ -407,6 +414,7 @@ async function main(): Promise<void> {
     if (marker === undefined) throw new Error("trust stage did not record its adopted generation")
     await handOffToProvisionedRuntime(expected, {
       env: buildTrustLaunchEnvironment(process.env, { marker, hop: false, platform: process.platform }),
+      launcher: runningExecutable,
     })
     return
   }

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { copyFileSync, mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { handOffToProvisionedRuntime, planProvisionedLaunch, PROVISIONED_HANDOFF_ENV } from "../provisioned-handoff"
+import { handOffToProvisionedRuntime, planProvisionedLaunch, PROVISIONED_HANDOFF_ENV, PROVISIONED_LAUNCHER_ENV } from "../provisioned-handoff"
 import { removeTree } from "../../../test-support/remove-tree"
 
 const exe = process.platform === "win32" ? ".exe" : ""
@@ -67,6 +67,32 @@ describe("provisioned launch plan", () => {
     const env: NodeJS.ProcessEnv = { [PROVISIONED_HANDOFF_ENV]: join(root, "other-version", `omo${exe}`) }
     expect(planProvisionedLaunch(join(root, "Downloads", `omo${exe}`), expected, { env }).handOff).toBe(true)
     expect(env[PROVISIONED_HANDOFF_ENV]).toBeUndefined()
+  })
+
+  test("#given a launch handed off with its launcher #when the child plans its launch #then it knows the launcher and the variable goes no further (#12168)", async () => {
+    // given: the parent hands off naming the binary the user ran
+    const launcher = join(root, "bin", `omo${exe}`)
+    let childEnv: NodeJS.ProcessEnv = {}
+    await handOffToProvisionedRuntime(expected, {
+      argv: ["update"], env: { KEEP: "1" }, platform: "win32", launcher,
+      run: async (_file, _argv, options) => {
+        childEnv = { ...(options as { env?: NodeJS.ProcessEnv } | undefined)?.env }
+        return { status: 0, signal: null }
+      },
+      propagate: () => {},
+    })
+    // when
+    const launch = planProvisionedLaunch(expected, expected, { env: childEnv })
+    // then
+    expect(launch.launcher).toBe(launcher)
+    expect(childEnv[PROVISIONED_LAUNCHER_ENV]).toBeUndefined()
+    expect(childEnv[PROVISIONED_HANDOFF_ENV]).toBeUndefined()
+  })
+
+  test("#given a launcher variable without a matching handoff marker #when a launch plans #then it is dropped and not trusted (#12168)", () => {
+    const env: NodeJS.ProcessEnv = { [PROVISIONED_LAUNCHER_ENV]: join(root, "elsewhere", `omo${exe}`) }
+    expect(planProvisionedLaunch(expected, expected, { env }).launcher).toBeUndefined()
+    expect(env[PROVISIONED_LAUNCHER_ENV]).toBeUndefined()
   })
 
   test("#given a Windows handoff #when the child runs #then it gets the marker and the parent outlives Ctrl+C until the child exits", async () => {

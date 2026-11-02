@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process"
-import { realpathSync } from "node:fs"
+import { readFileSync, realpathSync, statSync } from "node:fs"
+import { isAbsolute, relative, resolve } from "node:path"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
@@ -71,6 +72,53 @@ export function replaceCommand(url: string, destination: string, platform: NodeJ
   return `curl -fsSL ${posixQuote(url)} -o ${next} && chmod +x ${next} && mv -f ${next} ${posixQuote(destination)}`
 }
 
+function canonical(path: string): string {
+  try { return realpathSync(path) } catch { return resolve(path) }
+}
+
+function isInside(path: string, directory: string, platform: NodeJS.Platform): boolean {
+  const fold = (value: string) => (platform === "win32" ? value.toLowerCase() : value)
+  const rel = relative(fold(canonical(directory)), fold(canonical(path)))
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
+}
+
+function isFile(path: string): boolean {
+  try { return statSync(path).isFile() } catch { return false }
+}
+
+/** The parsed `~/.omo/install.json` the standalone installer writes, or undefined when it is missing or not JSON. */
+export function readInstallRecord(path: string): unknown {
+  try { return JSON.parse(readFileSync(path, "utf8")) } catch { return undefined }
+}
+
+/**
+ * The binary `omo update` replaces. A launch from anywhere but the provisioned runtime hands off to
+ * `~/.omo/binary-runtime/<version>/omo`, and the update runs there (#10762), so this process's own
+ * executable is the runtime copy, never the binary the user installed (#12168). The launcher that handed
+ * off comes first (it is what the user ran), then the standalone installer's recorded `binPath`. A
+ * candidate counts only if it is an absolute path to an existing file outside the runtime root. With no
+ * candidate the running executable is returned, and `compiledUpdate` refuses it if it is the runtime copy.
+ */
+export function updateDestination(options: {
+  readonly runningExecutable: string
+  readonly runtimeRoot: string
+  readonly launcher?: string
+  readonly installRecord?: unknown
+  readonly platform?: NodeJS.Platform
+}): string {
+  const platform = options.platform ?? process.platform
+  if (!isInside(options.runningExecutable, options.runtimeRoot, platform)) return options.runningExecutable
+  const record = options.installRecord
+  const recorded = typeof record === "object" && record !== null && Reflect.get(record, "method") === "standalone"
+    ? Reflect.get(record, "binPath")
+    : undefined
+  for (const candidate of [options.launcher, recorded]) {
+    if (typeof candidate !== "string" || !isAbsolute(candidate)) continue
+    if (isFile(candidate) && !isInside(candidate, options.runtimeRoot, platform)) return candidate
+  }
+  return options.runningExecutable
+}
+
 const runOwnerQuery: RunOwnerQuery = (command, args) => {
   const result = spawnSync(command, args, { encoding: "utf8", timeout: 3_000, windowsHide: true })
   if (result.error !== undefined || result.status !== 0) return undefined
@@ -122,6 +170,8 @@ export async function compiledUpdate(options: {
   readonly omoAiVersion: string
   readonly releaseTarget: unknown
   readonly destination: string
+  /** omo's provisioned runtime root (`~/.omo/binary-runtime`); a destination inside it is refused. */
+  readonly runtimeRoot?: string
   readonly platform: NodeJS.Platform
   readonly arch: string
   readonly fetchReleases: FetchReleases
@@ -132,6 +182,15 @@ export async function compiledUpdate(options: {
 }): Promise<CompiledUpdateResult> {
   const usage = options.args === undefined ? undefined : updateUsageAnswer(options.args)
   if (usage !== undefined) return { output: usage.text, exitCode: usage.exitCode, stream: usage.stream }
+  // Replacing the runtime copy changes nothing the user launches: the next start provisions it again (#12168).
+  if (options.runtimeRoot !== undefined && isInside(options.destination, options.runtimeRoot, options.platform)) {
+    return {
+      output: `omo update: ${options.destination} is omo's runtime copy, not the omo you installed, so it is left as is. `
+        + `Run omo update from your installed omo, or download ${releaseAssetName(options.releaseTarget, options.platform, options.arch)} from ${RELEASES_URL}`,
+      exitCode: 1,
+      stream: "stderr",
+    }
+  }
   // A binary a package manager owns must not get a curl-and-mv replace command: it either fails on a
   // root-owned path or leaves the manager tracking a file it no longer installed.
   const owner = options.probeOwner?.(options.destination, options.platform)

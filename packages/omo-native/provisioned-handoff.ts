@@ -8,9 +8,19 @@ import { isProvisionedExecutable } from "./compile-runtime"
 // child trusts it over its own executable identity, which Bun on Windows has misreported before, so
 // every child provisioned and re-exec'd again (#7445, #7447): the provisioned exe never re-execs itself.
 export const PROVISIONED_HANDOFF_ENV = "OMO_PROVISIONED_HANDOFF"
+// Set beside it, naming the executable the user launched. The child runs as the runtime copy, so its own
+// executable is never the binary `omo update` must replace (#12168).
+export const PROVISIONED_LAUNCHER_ENV = "OMO_PROVISIONED_LAUNCHER"
 
-export type ProvisionedLaunch = { readonly provision: boolean; readonly handOff: boolean; readonly execDir: string }
+export type ProvisionedLaunch = {
+  readonly provision: boolean
+  readonly handOff: boolean
+  readonly execDir: string
+  /** The executable that handed off to this process, when it did. */
+  readonly launcher?: string
+}
 type ReexecOptions = {
+  launcher?: string
   argv?: string[]
   env?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
@@ -31,8 +41,10 @@ export function planProvisionedLaunch(
 ): ProvisionedLaunch {
   const env = options.env ?? process.env
   const handedOff = env[PROVISIONED_HANDOFF_ENV] === expected
+  const launcher = env[PROVISIONED_LAUNCHER_ENV]
   delete env[PROVISIONED_HANDOFF_ENV]
-  if (handedOff) return { provision: false, handOff: false, execDir: dirname(expected) }
+  delete env[PROVISIONED_LAUNCHER_ENV]
+  if (handedOff) return { provision: false, handOff: false, execDir: dirname(expected), ...(launcher ? { launcher } : {}) }
   const provision = !isProvisionedExecutable(runningExecutable, expected)
   return { provision, handOff: provision, execDir: dirname(runningExecutable) }
 }
@@ -64,7 +76,11 @@ export async function reexecProvisionedRuntime(expected: string, options: Reexec
 }
 
 export async function handOffToProvisionedRuntime(expected: string, options: ReexecOptions = {}): Promise<void> {
-  const env = { ...(options.env ?? process.env), [PROVISIONED_HANDOFF_ENV]: expected }
+  const env = {
+    ...(options.env ?? process.env),
+    [PROVISIONED_HANDOFF_ENV]: expected,
+    ...(options.launcher === undefined ? {} : { [PROVISIONED_LAUNCHER_ENV]: options.launcher }),
+  }
   // Ctrl+C reaches every process on a Windows console. The child answers its own copy; this parent
   // keeps waiting for the child's exit code instead of dying first and handing the prompt back early.
   const waitForChild = () => {}
