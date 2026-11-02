@@ -56,10 +56,13 @@ async function repo(agentId: string) {
 describe.skipIf(!runsJobHelperRows)("T12: exec parity through the helper (design v4.2 section 16)", () => {
   test("#given arguments with spaces, quotes, trailing backslashes, an empty one and non-BMP text #when git echoes them back #then the helper's argv is byte-identical to a direct spawn", async () => {
     const { paths } = await repo("t12-argv")
-    const argv = ["rev-parse", "--sq-quote", "plain", "two words", "q\"uote", "trail\\", "trail space\\", "", "tab\there", "\u{1F600} non-bmp", "back\\\\\"slash"]
+    const escapedNonBmp = ["\u{1F600}\u{1F600} \\", 'x "\u{1F600}\u{1F600}"', '\u{1F600}"\u{1F4A9}', '"\u{1F600} \\']
+    const argv = ["rev-parse", "--sq-quote", "plain", "two words", "q\"uote", "trail\\", "trail space\\", "", "tab\there", "\u{1F600} non-bmp", "back\\\\\"slash", ...escapedNonBmp]
     const [helper, plain] = await both(argv, { cwd: paths.repo, timeoutMs: 30_000 })
     expect({ code: helper.code, stdout: helper.stdout }).toEqual({ code: 0, stdout: plain.stdout })
     expect(helper.stdout).toContain("'two words'")
+    expect(helper.stdout).toContain("\u{1F600}\u{1F600} \\")
+    expect(helper.stdout).not.toContain("\uFFFD")
   }, 60_000)
 
   test("#given stdin larger than a pipe buffer and raw cat-file --batch output #when both paths run #then the bytes are identical", async () => {
