@@ -18,6 +18,22 @@ import type { TaskRunStats } from "./run-stats-types"
 /** An interrupt the parent did not request: the host replaced the child's session mid-turn. */
 export type TaskInterruptCause = "session_replaced"
 
+export const MODEL_REFUSAL_REASONS = ["usage_limit", "not_signed_in", "unavailable", "refused", "error"] as const
+
+export type ModelRefusalReason = (typeof MODEL_REFUSAL_REASONS)[number]
+
+/**
+ * One designated model that could not serve the task. A child never leaves its designated chain, so when the
+ * chain runs out these entries are what its failure lists: the provider's first error line and any reset time.
+ */
+export type ModelRefusal = {
+  readonly model: string
+  readonly reason: ModelRefusalReason
+  readonly detail?: string
+  readonly resets?: string
+  readonly at: string
+}
+
 export type TaskNotification = {
   readonly run_epoch: number
   readonly notified_epoch: number
@@ -71,6 +87,7 @@ export type PendingSteeringEntry = {
 }
 
 export type TaskRecordInput = {
+  readonly task_id?: string
   readonly name?: string
   readonly task_summary?: string
   readonly description?: string
@@ -109,6 +126,12 @@ export type TaskRecordInput = {
   readonly host_session?: HostSessionIdentity
 }
 
+export type RecordedRunPause = {
+  readonly parent_session_id: string
+  readonly parent_pause_seq: number
+  readonly run_ref: { readonly kind: "dag" | "task" | "workpool" | "team"; readonly id: string }
+}
+
 export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly effect_seq?: number
   /** The exact id of the last identified input this task sent; reconciliation reads its receipt by it. */
@@ -123,6 +146,7 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly started_at?: string
   /** Live snapshot metadata from the owning handle, not a persisted liveness claim. */
   readonly last_seen_at?: string
+  readonly host_liveness?: import("./host-liveness").HostLivenessStatus
   readonly terminal_at?: string
   readonly pid?: number
   readonly host_pid?: number
@@ -130,6 +154,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly spawn_spec?: TaskSpawnSpec
   /** Mirrors TaskRecordInput.effective_model; see there. */
   readonly effective_model?: EffectiveModelRecord
+  /** Each designated model that refused this task, in the order the chain was walked. */
+  readonly model_refusals?: readonly ModelRefusal[]
   readonly final_response?: string
   readonly error_message?: string
   /** Why a run was interrupted when the parent did not ask for it; such an interrupt notifies the parent. */
@@ -145,6 +171,10 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   }
   readonly killed?: boolean
   readonly run_stats?: TaskRunStats
+  // USD the provider reported for this task's EARLIER runs: each revive folds the finished run's
+  // reported `run_stats.cost_usd` in before it drops `run_stats`, so a task's lifetime spend is this
+  // plus the current run's. Absent while no earlier run reported a positive cost.
+  readonly prior_runs_cost_usd?: number
   readonly notification: TaskNotification
   readonly revive_delivery_uncertain?: ReviveDeliveryUncertainty
   readonly resumed_run_epoch?: number
@@ -166,6 +196,8 @@ export type TaskRecord = TaskRecordInput & TaskStartFailureRecordFields & {
   readonly awaiting_input?: TaskAwaitingInput
   // One parked episode's absolute deadline; retry writes and parent restarts must not extend it.
   readonly recovery_deadline_at?: number
+  // The run that paused this child (senpi#3811): a restarted host re-holds it under exactly this owner.
+  readonly run_pause?: RecordedRunPause
   readonly runner_kind?: RunnerKind
   readonly host_session?: HostSessionIdentity
   readonly fallback_handoff_epoch?: number

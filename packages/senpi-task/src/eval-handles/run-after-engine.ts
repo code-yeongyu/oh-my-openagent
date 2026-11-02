@@ -7,6 +7,8 @@ import { assertCurrentRun, isSettled, loadFencedTask, taskSnapshot, type TaskRea
 export const SEND_HOST_STATUS = {
   /** The run ended while the message was delivered; a follow-up turn would be a newer epoch, so re-fetch to follow it. */
   deliveredAfterEnd: "delivered_after_run_ended",
+  /** The message was durably accepted locally but the host has not received it yet: never a delivery. */
+  queued: "queued",
 } as const
 
 /**
@@ -52,6 +54,23 @@ class RunAfterEngine {
 
   /** The reply for a message the engine delivered (or revived the task with). */
   delivered(ref: HandleRef, deliveredStatus: string | undefined): HandleSnapshot {
+    const target = this.#settledRun(ref)
+    if ("host_status" in target) return target
+    if (deliveredStatus !== undefined) return taskSnapshot(this.#record, target, deliveredStatus)
+    // The run ended while the message was delivered: a follow-up turn would be a newer epoch this ref cannot follow.
+    if (isSettled(this.#record)) return taskSnapshot(this.#record, target, SEND_HOST_STATUS.deliveredAfterEnd)
+    return taskSnapshot(this.#record, target)
+  }
+
+  /** The reply for a message only queued locally: it stays `queued` even when the run ended before this read. */
+  queued(ref: HandleRef): HandleSnapshot {
+    const target = this.#settledRun(ref)
+    if ("host_status" in target) return target
+    return taskSnapshot(this.#record, target, SEND_HOST_STATUS.queued)
+  }
+
+  /** Refuses a rolled-back run, names a moved run by its newer ref, else yields the ref at the epoch the engine acted on. */
+  #settledRun(ref: HandleRef): HandleRef | HandleSnapshot {
     if (this.verdict === "rolledBack") {
       throw new EvalHandleHostError("eval_handle_send_refused", `${ref.id}: the run the message started was rolled back; fetch its current handle and send again`)
     }
@@ -60,11 +79,7 @@ class RunAfterEngine {
       const current = this.#record.notification.run_epoch
       return taskSnapshot(this.#record, { ...ref, run_epoch: current }, `continued as epoch ${current}`)
     }
-    const target = { ...ref, run_epoch: this.#expectedEpoch }
-    if (deliveredStatus !== undefined) return taskSnapshot(this.#record, target, deliveredStatus)
-    // The run ended while the message was delivered: a follow-up turn would be a newer epoch this ref cannot follow.
-    if (isSettled(this.#record)) return taskSnapshot(this.#record, target, SEND_HOST_STATUS.deliveredAfterEnd)
-    return taskSnapshot(this.#record, target)
+    return { ...ref, run_epoch: this.#expectedEpoch }
   }
 }
 

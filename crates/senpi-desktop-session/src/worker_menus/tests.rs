@@ -8,7 +8,7 @@ use senpi_desktop_backend_fake::SinkOp;
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::protocol_params::MenuSelectParams;
-use senpi_desktop_safety::StopSource;
+use senpi_desktop_safety::{StopPathId, StopSource};
 use serde_json::json;
 
 use crate::request::Op;
@@ -44,6 +44,34 @@ fn a_stop_racing_cancellation_mid_walk_reports_suspended_and_selects_nothing() {
             .ops()
             .iter()
             .any(|op| matches!(op, SinkOp::MenuSelect { .. })),
+        "{:?}",
+        harness.sink.ops()
+    );
+}
+
+#[test]
+fn a_stop_path_that_dies_mid_walk_stops_the_walk_and_selects_nothing() {
+    // Given: admission and the transaction's own stop check pass; at the
+    // backend's first menu-level check the stop path stops authorizing input
+    let mut harness = harness(&json!({
+        "menus": { "101": [{ "title": "File", "children": [{ "title": "Save" }] }] }
+    }));
+    let supervisor = Arc::clone(&harness.supervisor);
+    let calls = Cell::new(0);
+    let dying = || {
+        calls.set(calls.get() + 1);
+        if calls.get() >= 3 {
+            supervisor.set_live(StopPathId::Global, false);
+        }
+        false
+    };
+    // When
+    let reply = harness.worker.process(select("101", None), &dying);
+    // Then: the walk stops with StopPathUnavailable, nothing latched, nothing selected
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::StopPathUnavailable));
+    assert!(!harness.supervisor.is_suspended());
+    assert!(
+        !harness.sink.ops().iter().any(|op| matches!(op, SinkOp::MenuSelect { .. })),
         "{:?}",
         harness.sink.ops()
     );

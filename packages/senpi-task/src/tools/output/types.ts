@@ -65,6 +65,7 @@ export type TaskSnapshot = {
   readonly pid?: number
   readonly child_session_id?: string
   readonly last_seen_at?: string
+  readonly host_liveness?: import("../../state/host-liveness").HostLivenessStatus
   readonly final_response?: string
   readonly error_message?: string
   readonly run_stats?: TaskRunStats
@@ -74,6 +75,12 @@ export type TaskSnapshot = {
 
 export type TaskOutputDetails =
   | { readonly kind: "status"; readonly snapshot: TaskSnapshot }
+  | {
+      readonly kind: "no_progress"
+      readonly task_id: string
+      readonly status: TaskStatus
+      readonly reason: string
+    }
   | {
       readonly kind: "transcript"
       readonly mode: "tail" | "full"

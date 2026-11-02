@@ -3,7 +3,7 @@ import { describe, expect, spyOn, test } from "bun:test"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { RpcProcessRunner } from "@oh-my-opencode/senpi-task"
 
-import { buildRespawnRunner, createInheritedExtensionsResolver } from "./engine-runners"
+import { buildRespawnRunner, createInheritedExtensionsResolver, DEFAULT_RUNNER_FACTORIES } from "./engine-runners"
 import { TaskRuntimeContext } from "./runtime-context"
 
 const SPEC = {
@@ -27,6 +27,34 @@ function buildContext(roots: readonly string[], loaded: readonly string[]) {
 }
 
 describe("package extensions across the child lifecycle", () => {
+  test("#given pending child teardown #when spawn and respawn wrappers settle #then both await the underlying runner", async () => {
+    const release = Promise.withResolvers<void>()
+    const entered = Promise.withResolvers<void>()
+    let calls = 0
+    const settle = spyOn(RpcProcessRunner.prototype, "settleTeardowns").mockImplementation(() => {
+      if (++calls === 2) entered.resolve()
+      return release.promise
+    })
+    try {
+      const build = buildContext([], [])
+      const initial = DEFAULT_RUNNER_FACTORIES.process(build)
+      const respawn = buildRespawnRunner(build)
+      let completed = false
+      const settling = Promise.all([initial.settleTeardowns?.(), respawn.settleTeardowns()]).then(() => {
+        completed = true
+      })
+      await entered.promise
+      expect(completed).toBe(false)
+      release.resolve()
+      await settling
+      expect(completed).toBe(true)
+      expect(calls).toBe(2)
+    } finally {
+      release.resolve()
+      settle.mockRestore()
+    }
+  })
+
   test("#given a revived child that names no extensions #when the respawn runner starts it #then it inherits the same package paths an initial spawn gets", async () => {
     // given: revival is the path that used to fall back to a bare RpcProcessRunner, which carries no
     // inherited extensions at all - so a child enabled by #8492 lost its provider on every revival.

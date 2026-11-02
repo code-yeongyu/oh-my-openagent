@@ -1,5 +1,6 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
+import { memoryHookChecker } from "./worker/spawn-supervisor-support"
 
 import {
   GitMemoryRepo,
@@ -52,7 +53,7 @@ export async function prepareMemoryEngineSession(
   if (!existsSync(join(identityPaths.repo, ".git"))) {
     await lock("memory-write", async () => {
       if (!existsSync(join(identityPaths.repo, ".git"))) {
-        await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir) } })
+        await repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } })
       }
     })
   }
@@ -63,7 +64,7 @@ export async function prepareMemoryEngineSession(
   }
   try {
     const normalization = await lock("memory-write", async () => {
-      installHooks(identityPaths.repo)
+      installHooks(identityPaths.repo, { checker: memoryHookChecker() })
       return normalizeMemoryFrontmatter(repo, author)
     })
     normalizedRepos.add(identityPaths.repo)

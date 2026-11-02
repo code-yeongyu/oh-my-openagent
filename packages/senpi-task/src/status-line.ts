@@ -82,7 +82,7 @@ export function formatStatusTarget(input: StatusTargetInput): string | undefined
   const target = formatTargetWithModel(input)
   if (target === undefined) return undefined
   const fallback = input.fallbackCount === undefined || input.fallbackCount <= 0 ? undefined : `fallback:${input.fallbackCount}`
-  return fallback === undefined ? target : `${target} · ${fallback}`
+  return [target, fallback].filter((token) => token !== undefined).join(" · ")
 }
 
 // The stats tokens of the canonical live-row grammar, as DISCRETE tokens so each surface keeps its

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { ComputerCallError } from "@oh-my-opencode/senpi-desktop-protocol";
-import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service";
-import { afterEach, describe, expect, it } from "vitest";
+import { DesktopEngineRpcError, type ExecuteTool } from "@oh-my-opencode/senpi-desktop-service";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { rejectionOf } from "../../senpi-desktop-service/test/harness";
 import type { ComputerHandle } from "../src/activation";
 import { AUDIT_FILE_NAME, type ComputerModel } from "../src/session";
@@ -142,6 +142,38 @@ describe("computer tool execute", HANG_GUARD, () => {
 
 		// Then
 		expect(result.details.value).toMatchObject({ backend: "fake", stopPath: "global", focusGuard: true });
+	});
+
+	for (const method of ["open", "capabilities"] as const) {
+		it.each([
+			["PermissionDenied", "COMPUTER_PERMISSION_REQUIRED"],
+			["ControlRequired", "COMPUTER_CONTROL_REQUIRED"],
+			["InputBusy", "COMPUTER_INPUT_BUSY"],
+			["Suspended", "COMPUTER_SUSPENDED"],
+		] as const)(`returns a structured %s failure from capabilities ${method}`, async (code, publicCode) => {
+			// Given: activation or the subsequent capability query fails at the service boundary.
+			const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
+			vi.spyOn(service, method).mockRejectedValueOnce(new DesktopEngineRpcError("capabilities", {
+				code: -32000, message: "fixture engine failure", data: { code },
+			}));
+
+			// When
+			const result = await toolFor(handle).execute("capabilities-failure", { action: "capabilities" },
+				undefined, undefined, hostContext());
+
+			// Then: the code-mode value and the host tool result agree that this failed.
+			expect(result).toMatchObject({
+				isError: true, details: { isError: true, value: { code: publicCode } },
+			});
+		});
+	}
+
+	it("still throws an unrelated capabilities failure", async () => {
+		const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
+		const original = new Error("fixture capability transport failure");
+		vi.spyOn(service, "capabilities").mockRejectedValueOnce(original);
+		await expect(toolFor(handle).execute("capabilities-failure", { action: "capabilities" },
+			undefined, undefined, hostContext())).rejects.toBe(original);
 	});
 
 	it("opens the session with the audit path, tmp artifacts, and coordinate-safe caps for a Claude model", async () => {

@@ -1,8 +1,8 @@
 // End-to-end encrypted memory sync for bound sessions. Every session bound to one memory
 // repository shares one engine (a refcount per repo); the last release closes it. The engine runs
 // only when `memory.sync.enabled` is on AND the account session exists: the device is signed in
-// and holds its keys (todo 14 device sign-in, todo 13 verifier/sealer). Until those land the
-// production resolver answers null and the runner stays idle. Local commits from any writer -
+// and has joined the account's memory (device-session/resolver.ts). Signed out, or signed in but
+// not joined, the runner stays idle and opens nothing. Local commits from any writer -
 // memory tools, reflection merges, a person's git commit - reach the engine through a watch on the
 // repository's HEAD reflog.
 
@@ -13,6 +13,8 @@ import type { MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { DeviceSync, EngineStatus, OpenDeviceSyncOptions, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { ComponentLogger } from "../../extension/types"
+import { isSyncConfigError, SYNC_CONFIG_INVALID } from "./sync-config-error"
+import { isSyncSessionDeferred, SYNC_SESSION_DEFERRED } from "./sync-session-deferred"
 
 /** The one line a runner logs when this device has no session to sync with (no network, no state). */
 export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
@@ -20,6 +22,11 @@ export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
 /** The error code a runner logs when a previous engine for the repo did not close within the bound. */
 export const SYNC_CLOSE_WAIT_EXCEEDED = "sync-close-wait-exceeded"
 const CLOSE_WAIT_MS = 10_000
+// Deferred passes join any native read still parked behind the dialog; retries back off to five minutes.
+const DEFERRED_RETRY_MS = 15_000
+const DEFERRED_RETRY_MAX_MS = 300_000
+const DEFERRED_RETRY_MIN_MS = 1_000
+const DEFERRED_STILL_WAITING_MS = 900_000
 
 /** The status of a repo whose sync engine could not be loaded (the packaged sidecar is missing or broken). */
 export const SYNC_UNAVAILABLE = "sync-unavailable"
@@ -29,7 +36,24 @@ export interface SyncUnavailableStatus {
   readonly reason: string
 }
 
-type SyncRuntime = Pick<typeof import("#omo-memory-sync-runtime"), "openDeviceSync">
+export { SYNC_CONFIG_INVALID } from "./sync-config-error"
+
+/** The status of a repo whose sync is off because a configuration value the user set is invalid. */
+export interface SyncConfigInvalidStatus {
+  readonly kind: typeof SYNC_CONFIG_INVALID
+  readonly variable: string
+  readonly reason: string
+}
+
+/** Thrown by a session resolver whose own packaged sidecar would not load; reported like the engine sidecar. */
+export class SyncSidecarUnavailableError extends Error {
+  constructor(readonly sidecar: string, cause: unknown) {
+    super(`the ${sidecar} sidecar could not be loaded: ${String(cause)}`, { cause })
+    this.name = "SyncSidecarUnavailableError"
+  }
+}
+
+export type SyncRuntime = Pick<typeof import("#omo-memory-sync-runtime"), "openDeviceSync">
 
 /**
  * A device's account session. `deviceName` maps a sync principal to the name the account's device
@@ -37,11 +61,31 @@ type SyncRuntime = Pick<typeof import("#omo-memory-sync-runtime"), "openDeviceSy
  */
 export interface DeviceSyncSession extends SyncSession {
   readonly deviceName?: (principal: string) => string | undefined
+  /** Registers a callback for the moment this device's sign-in ends (signed out, or revoked). */
+  readonly onEnded?: (notify: () => void) => void
 }
 
-export type SyncSessionResolver = (identity: string) => Promise<DeviceSyncSession | null>
+/** What makes a memory one space on every device (sync-design section 3). */
+export interface SyncSpaceInputs {
+  readonly profile: string | null
+  readonly projectDir: string
+}
 
-/** No device sign-in or device keys exist on this client yet (todos 13 and 14). */
+export interface SyncSessionRequest {
+  readonly identity: string
+  readonly paths: MemoryIdentityPaths
+  readonly space: SyncSpaceInputs
+}
+
+/** A session; null when the device is signed out; `idle` when it is signed in but cannot sync yet. */
+export type SyncSessionResolution = DeviceSyncSession | { readonly idle: string } | null
+
+export type SyncSessionResolver = (request: SyncSessionRequest) => Promise<SyncSessionResolution>
+
+/** The line a runner logs when the device is signed in but has not joined the account's memory. */
+export const SYNC_IDLE_NOT_JOINED = "sync idle: this device has not joined the account's memory"
+
+/** A resolver for a client with no device sign-in at all. */
 export const noAccountSession: SyncSessionResolver = async () => null
 
 type HeadWatch = (gitDir: string, onChange: () => void, warn: (message: string) => void) => () => void
@@ -73,8 +117,12 @@ export interface SyncRunnerOptions {
   /** Loads the engine sidecar; the default is the packaged `#omo-memory-sync-runtime` import. */
   readonly loadRuntime?: () => Promise<SyncRuntime>
   readonly watchHead?: HeadWatch
+  /** Called with the repo whose sync failure status appeared, changed kind or cleared. */
+  readonly onStatusChange?: (repo: string) => void
   /** How long an acquire waits for the repo's previous engine to close; default 10 s. */
   readonly closeWaitMs?: number
+  /** Initial retry delay for a deferred credential read; default 15 s, doubling to a five-minute cap. */
+  readonly deferredRetryMs?: number
 }
 
 interface Running {
@@ -84,13 +132,13 @@ interface Running {
 
 interface Held {
   users: number
-  readonly ready: Promise<Running | SyncUnavailableStatus | null>
+  readonly ready: Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
 }
 
 export interface SyncRunner {
-  acquire(identity: string, paths: MemoryIdentityPaths, settings: { readonly enabled: boolean }): Promise<void>
+  acquire(identity: string, paths: MemoryIdentityPaths, settings: { readonly enabled: boolean }, space?: SyncSpaceInputs): Promise<void>
   release(repo: string): Promise<void>
-  status(repo: string): Promise<EngineStatus | SyncUnavailableStatus | null>
+  status(repo: string): Promise<EngineStatus | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
   /** A sync principal's device name, from the account sessions this runner resolved; undefined when unknown. */
   deviceName(principal: string): string | undefined
 }
@@ -108,13 +156,52 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
   // A repo whose last session released it, until its engine has closed and dropped the device lease.
   const closing = new Map<string, Promise<void>>()
 
-  const start = async (identity: string, paths: MemoryIdentityPaths): Promise<Running | SyncUnavailableStatus | null> => {
-    const session = await resolveSession(identity)
-    if (session?.deviceName !== undefined) nameLookups.set(identity, session.deviceName)
-    if (session === null) {
+  // The device's sign-in ended under a running engine: close it and keep the repo held but idle, so
+  // the sessions bound to it release normally and a later sign-in starts fresh on the next bind.
+  const endSession = async (identity: string, repo: string): Promise<void> => {
+    const held = repos.get(repo)
+    if (held === undefined) return
+    const running = await held.ready
+    if (running === null || !("device" in running) || repos.get(repo) !== held) return
+    repos.set(repo, { users: held.users, ready: Promise.resolve(null) })
+    nameLookups.delete(identity)
+    running.unwatch()
+    await running.device.close()
+    logger.info(SYNC_IDLE_NO_DEVICE_SESSION, { identity })
+  }
+
+  const start = async (
+    identity: string,
+    paths: MemoryIdentityPaths,
+    space: SyncSpaceInputs,
+    onDeferred: (message: string) => void,
+  ): Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null> => {
+    let resolved: SyncSessionResolution
+    try {
+      resolved = await resolveSession({ identity, paths, space })
+    } catch (error) {
+      if (isSyncSessionDeferred(error)) {
+        onDeferred(error.message)
+        return null
+      }
+      if (isSyncConfigError(error)) {
+        logger.error(`memory sync is off: ${error.message}`, { identity, code: SYNC_CONFIG_INVALID, variable: error.variable })
+        return { kind: SYNC_CONFIG_INVALID, variable: error.variable, reason: error.message }
+      }
+      if (!(error instanceof SyncSidecarUnavailableError)) throw error
+      logger.warn(`memory sync unavailable: the ${error.sidecar} sidecar could not be loaded`, { identity, code: SYNC_UNAVAILABLE, reason: error.message })
+      return { kind: SYNC_UNAVAILABLE, reason: error.message }
+    }
+    if (resolved === null) {
       logger.info(SYNC_IDLE_NO_DEVICE_SESSION, { identity })
       return null
     }
+    if ("idle" in resolved) {
+      logger.info(SYNC_IDLE_NOT_JOINED, { identity, reason: resolved.idle })
+      return null
+    }
+    const session = resolved
+    if (session.deviceName !== undefined) nameLookups.set(identity, session.deviceName)
     if (options.open === undefined) {
       // A missing or unloadable sidecar is an install defect, not a sync failure: report it as a
       // typed status and keep the session running without sync.
@@ -130,6 +217,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       locksDir: paths.locks,
       session,
       log: (line) => logger.info(line, { identity }),
+      ...(options.onStatusChange === undefined ? {} : { onStatusChange: () => options.onStatusChange?.(paths.repo) }),
     })
     if (device === null) {
       logger.info("memory sync idle: another OmO process on this device is syncing this memory", { identity })
@@ -137,6 +225,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     }
     device.engine.start()
     const unwatch = watchHead(join(paths.repo, ".git"), () => device.notifyLocalCommit(), (message) => logger.warn(message, { identity }))
+    session.onEnded?.(() => void endSession(identity, paths.repo))
     // A watch is armed some time after it is created (measured: an append right after creation was
     // missed 9 times in 30, every later one delivered). One debounced local-commit cycle covers a
     // commit that landed in that window.
@@ -144,8 +233,47 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     return { device, unwatch }
   }
 
+  // A deferred pass is replaced by a fresh one after the retry delay while the repo is still held by the same sessions.
+  const launch = (
+    identity: string,
+    paths: MemoryIdentityPaths,
+    space: SyncSpaceInputs,
+    users: number,
+    retryMs = Math.max(Math.min(options.deferredRetryMs ?? DEFERRED_RETRY_MS, DEFERRED_RETRY_MAX_MS), DEFERRED_RETRY_MIN_MS),
+    previousRetryMs = 0,
+    quietMs = 0,
+  ): Held => {
+    let deferred = false
+    let nextQuietMs = 0
+    const ready = start(identity, paths, space, message => {
+      deferred = true
+      if (retryMs !== previousRetryMs) {
+        logger.warn(`memory sync is waiting: ${message} Sync retries on its own.`, { identity, code: SYNC_SESSION_DEFERRED, retryMs })
+        return
+      }
+      // At the cap every pass is silent; one reminder per 15 minutes says the keychain is still unanswered.
+      nextQuietMs = quietMs + retryMs
+      if (nextQuietMs >= DEFERRED_STILL_WAITING_MS) {
+        nextQuietMs = 0
+        logger.warn("memory sync is still waiting for keychain approval.", { identity, code: SYNC_SESSION_DEFERRED, retryMs })
+      }
+    }).catch((error: unknown) => {
+      logger.error("memory sync failed to start", { identity, error: String(error) })
+      return null
+    })
+    const held: Held = { users, ready }
+    void ready.then(() => {
+      if (!deferred) return
+      const retry = setTimeout(() => {
+        if (repos.get(paths.repo) === held) repos.set(paths.repo, launch(identity, paths, space, held.users, Math.min(retryMs * 2, DEFERRED_RETRY_MAX_MS), retryMs, nextQuietMs))
+      }, retryMs)
+      retry.unref?.()
+    })
+    return held
+  }
+
   return {
-    async acquire(identity, paths, settings) {
+    async acquire(identity, paths, settings, space) {
       if (!settings.enabled) return
       // A session rebinding the repo right after the previous one released it would otherwise race
       // the old engine's lease and stay idle; wait for that close first.
@@ -169,12 +297,9 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
         held.users += 1
         return
       }
-      const ready = start(identity, paths).catch((error: unknown) => {
-        logger.error("memory sync failed to start", { identity, error: String(error) })
-        return null
-      })
-      repos.set(paths.repo, { users: 1, ready })
-      await ready
+      const launched = launch(identity, paths, space ?? { profile: null, projectDir: paths.repo }, 1)
+      repos.set(paths.repo, launched)
+      await launched.ready
     },
     async release(repo) {
       const held = repos.get(repo)

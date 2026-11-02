@@ -1,12 +1,13 @@
 # memory commands
 
-The thirteen memory slash commands, registered once by the memory component through `register.ts` (`registerMemoryCommands(pi, deps)`). `MEMORY_COMMAND_NAMES`: `/memory /memfs /remember /init /doctor /recompile /memory-repository /sleeptime /reflect /dream /search /people /facts`. Score ~24 (53 files, DI surface, central registration).
+The fourteen memory slash commands, registered once by the memory component through `register.ts` (`registerMemoryCommands(pi, deps)`). `MEMORY_COMMAND_NAMES`: `/memory /memfs /remember /init /doctor /recompile /memory-repository /sleeptime /reflect /dream /search /people /facts /agreements`. Score ~24 (53 files, DI surface, central registration).
 
 ## Anatomy
 
 | Path | Purpose |
 |------|---------|
 | `register.ts` | Central registrar and the ONLY place command names are declared. |
+| `metadata.ts` / `runtime.ts` / `runtime-loader.ts` | Lazy command handlers (#10860). `metadata.ts` holds the name, description and argument hint of the eleven commands whose handlers ship in the `#omo-memory-commands-runtime` sidecar (`extensions/omo-memory-commands.js`); `register.ts` registers them from it synchronously and each command module spreads the same entry. `runtime.ts` (sidecar entry) runs a command module's own registrar against a capturing `MemoryCommandPort` (`registerCommand` plus `sendUserMessage` forwarded to the real API) and caches the handler per API and deps. `runtime-loader.ts` is the shared once-per-process import; a failed load is not cached and answers an actionable error. Nothing in the entry bundle may import `runtime.ts` or a lazy command module statically. |
 | `types.ts` | `MemoryCommandDeps` / `MemoryCommandContext` / identity seams: `respond` notifications, repo access, interactivity, process liveness. |
 | `args.ts` | Shared `parseCommandArgs` flag/positional parsing. |
 | `backup.ts` / `repo.ts` | Repository backup and git/repository access helpers. |
@@ -17,6 +18,7 @@ The thirteen memory slash commands, registered once by the memory component thro
 | `recompile.ts` / `remember.ts` / `search.ts` / `sleeptime.ts` / `reflect.ts` / `dream.ts` + `dream-staging.ts` | Single-purpose commands; `/sleeptime` shows the resolved nudge/facts/dream/people/soul settings. |
 | `memory-repository.ts` | Push-only git mirror sync (the cloud-free sync story). |
 | `people.ts` / `people-runtime.ts` / `people-ask.ts` / `people-query.ts` / `people-render.ts` / `people-search.ts` + `people.test-support.ts` | People cards: query/selection, ask runner (`createPeopleAskRunner`), roster/card rendering, search hits. `people.ts` is only the registration shell; `runPeopleCommand` in `people-runtime.ts` ships in the memory palace sidecar (`../palace/runtime.ts`) and loads on the first `/people`. |
+| `agreements.ts` | `/agreements [list] \| add [--project] <text> \| ack <id> \| drop <id>`: the person's own surface over `system/agreements.md` and the ONLY writer of `by: human` items (commits with `Omo-Writer: human-command`, then busts the prompt cache). |
 | `facts.ts` / `facts-status.ts` | `/facts` queue depth, parked/backoff counts, next eligibility, bounded per-conversation last-failure list. Corrupt `failures.json` renders as UNREADABLE, never as zeros. `/facts retry [--conversation <id>]` is the ONLY unpark path: clears failure records and fires one reconcile/launch; never moves queue data or either watermark. |
 | `skill-frontmatter.ts` / `tokens.ts` | Skill-name frontmatter repair; token estimates (`estimateSystemTokens`). |
 | `commands.test-support.ts` | Shared fixtures. |

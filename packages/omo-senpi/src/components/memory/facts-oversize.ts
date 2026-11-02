@@ -7,9 +7,9 @@
 //
 // The two shapes get DIFFERENT verdicts on purpose:
 //  - one entry bigger than the whole cap can never ship as-is, so it parks IMMEDIATELY
-//    (`applyFailure` parks `payload_entry_oversize` at streak 1) and T6's prefix gating holds
-//    back that conversation's later entries. Backing it off instead would relaunch a batch
-//    that is provably impossible - the 1088-attempt incident shape.
+//    (`applyFailure` parks `payload_entry_oversize` at streak 1); the parked entry stays queued
+//    while that conversation's later entries keep launching (#10918). Backing it off instead
+//    would relaunch a batch that is provably impossible - the 1088-attempt incident shape.
 //  - an envelope (identity/today + the people fields) that alone exceeds the cap is a GLOBAL
 //    condition owned by no single entry, so its frontiers take the NORMAL streak progression
 //    and recover on their own once the people payload shrinks.

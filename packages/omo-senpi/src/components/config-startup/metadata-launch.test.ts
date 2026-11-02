@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
+
 import { createConfigStartupComponent, runSenpiStartupMigration } from "./index"
 
 // Migration contract (#10428): the OpenCode config migration runs at the first session, never on a
@@ -32,7 +33,7 @@ describe("config-startup migration gate", () => {
     { argv: [...plugin, "-p", "hi", "--name", "-h"], migrates: true },
     { argv: [...plugin, "--append-system-prompt", "--help"], migrates: true },
     { argv: [...plugin, "--mode", "rpc", "--multi-session", "--help"], migrates: true },
-  ])("#given a legacy OpenCode config on disk #when the extension registers for $argv #then it is moved only when a session can start ($migrates)", ({ argv, migrates }) => {
+  ])("#given a legacy OpenCode config on disk #when the extension registers for $argv #then it is moved only when a session can start ($migrates)", async ({ argv, migrates }) => {
     // given
     const home = mkdtempSync(join(tmpdir(), "omo-metadata-launch-"))
     homes.push(home)
@@ -51,7 +52,7 @@ describe("config-startup migration gate", () => {
     })
 
     // when
-    component.register(new FakeExtensionAPI(), context)
+    await component.register(new FakeExtensionAPI(), context)
 
     // then
     expect(existsSync(join(home, ".omo", "omo.jsonc"))).toBe(migrates)

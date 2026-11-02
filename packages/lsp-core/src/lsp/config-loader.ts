@@ -106,6 +106,7 @@ export function getMergedServers(): ServerWithSource[] {
 			extensions: config.extensions,
 			priority: -100,
 			source: "builtin",
+			...(config.initialization === undefined ? {} : { initialization: config.initialization }),
 		});
 	}
 
@@ -133,8 +134,9 @@ function createServerFromEntry(id: string, entry: LspEntry, source: ConfigSource
 			priority: entry.priority ?? 0,
 			source,
 		});
-		if (entry.initialization !== undefined) {
-			server.initialization = entry.initialization;
+		const initialization = mergeInitialization(builtin.initialization, entry.initialization);
+		if (initialization !== undefined) {
+			server.initialization = initialization;
 		}
 		return server;
 	}
@@ -160,7 +162,21 @@ function createServerFromEntry(id: string, entry: LspEntry, source: ConfigSource
 		source,
 	});
 	applyOptionalServerFields(server, entry);
+	const builtinInitialization = entry.command === undefined ? builtin.initialization : undefined;
+	const initialization = mergeInitialization(builtinInitialization, entry.initialization);
+	if (initialization !== undefined) {
+		server.initialization = initialization;
+	}
 	return server;
+}
+
+function mergeInitialization(
+	builtin: Record<string, unknown> | undefined,
+	entry: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+	if (builtin === undefined) return entry;
+	if (entry === undefined) return builtin;
+	return { ...builtin, ...entry };
 }
 
 function createServer(input: {

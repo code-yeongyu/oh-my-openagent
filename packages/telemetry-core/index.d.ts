@@ -1,3 +1,5 @@
+import type { PostHog, PostHogOptions } from "posthog-node";
+
 export declare const DEFAULT_POSTHOG_HOST: "https://us.i.posthog.com";
 export declare const DEFAULT_POSTHOG_API_KEY: "phc_CFJhj5HyvA62QPhvyaUCtaq23aUfznnijg5VaaGkNk74";
 /** A product default with this exact value is intentionally unconfigured and must fail closed. */
@@ -9,6 +11,8 @@ export type TelemetryCaptureMessage = {
   readonly event: string;
   readonly uuid?: string;
   readonly properties?: TelemetryCaptureProperties;
+  readonly uuid?: string;
+  readonly timestamp?: Date;
 };
 
 export type UuidV7Source = {
@@ -21,23 +25,39 @@ export type TelemetryDiagnosticEvent =
   | "telemetry_activity_state_read_failed"
   | "telemetry_activity_state_write_failed"
   | "telemetry_capture_failed"
+  | "telemetry_consent_failed"
   | "telemetry_cpu_info_unavailable"
   | "telemetry_drop_flush_failed"
   | "telemetry_event_property_dropped"
   | "telemetry_event_property_rejected"
   | "telemetry_event_rejected"
   | "telemetry_events_dropped_by_consent"
+  | "telemetry_legacy_rollups_removed"
+  | "telemetry_otlp_partial_success"
+  | "telemetry_otlp_send_failed"
   | "telemetry_posthog_import_failed"
   | "telemetry_posthog_init_failed"
-  | "telemetry_shutdown_failed";
+  | "telemetry_shutdown_failed"
+  | "telemetry_spool_purge_failed"
+  | "telemetry_spool_purge_refused"
+  | "telemetry_spool_purge_skipped"
+  | "telemetry_spool_sweep_failed"
+  | "telemetry_spool_write_failed";
 
 export type TelemetryDiagnosticErrorKind = "error" | "non_error";
+
+/** Why the opt-out purge left a spool-named entry in place: it deletes only regular files of the current user. */
+export type TelemetrySpoolEntryKind = "directory" | "symlink" | "foreign_owner" | "other";
 
 export type TelemetryDiagnosticInput = {
   readonly event: TelemetryDiagnosticEvent;
   readonly source: string;
   readonly error?: unknown;
   readonly errorKind?: TelemetryDiagnosticErrorKind;
+  /** `telemetry_spool_purge_skipped` only: what kind of spool-named entry the purge left in place. */
+  readonly entryKind?: TelemetrySpoolEntryKind;
+  /** `telemetry_spool_purge_failed` only: the errno code (never the path) of one spool file the opt-out purge could not delete. */
+  readonly errorCode?: string;
   readonly count?: number;
 };
 
@@ -46,7 +66,6 @@ export type TelemetryProductConfig = {
   readonly defaultApiKey: string;
   readonly defaultHost: string;
   readonly eventName: string;
-  readonly machineIdPrefix: string;
   readonly packageName: string;
   readonly packageVersion: string;
   readonly platform: string;
@@ -102,10 +121,34 @@ export type ConsentGatedFetchInput = {
   readonly fetch?: TelemetryFetch;
 };
 
+export type TurnSpanStatus = "ok" | "error";
+export type TurnSpanAttributes = Readonly<Record<string, string | number | boolean>>;
+export type TurnSpanStart = {
+  readonly attributes: TurnSpanAttributes;
+  readonly parentTraceparent?: string;
+};
+export type TurnSpanHandle = {
+  readonly traceId: string;
+  readonly spanId: string;
+  readonly traceparent: string;
+  readonly run: <T>(fn: () => T) => T;
+  readonly setAttributes: (attributes: TurnSpanAttributes) => void;
+  readonly end: (status: TurnSpanStatus) => void;
+};
+export type TurnTracing = {
+  readonly startTurn: (start: TurnSpanStart) => TurnSpanHandle | undefined;
+};
+
 export type TelemetryTransport = {
   readonly capture: (message: TelemetryCaptureMessage) => void;
+  /**
+   * Sends one event now; resolves only on a 2xx answer and rejects otherwise (the default PostHog transport
+   * rejects with `TelemetryDeliveryError`, whose `permanent` flag says a retry can never succeed).
+   */
+  readonly captureImmediate?: (message: TelemetryCaptureMessage) => Promise<void>;
   readonly flush?: () => Promise<void>;
   readonly shutdown: () => Promise<void>;
+  readonly traces?: TurnTracing;
 };
 
 export type TelemetryTransportFactory = (
@@ -126,6 +169,8 @@ export type TelemetryClient = {
 
 export type EventPropertyAllowlist = Readonly<Record<string, readonly string[]>>;
 export type EventTelemetryProperties = Readonly<Record<string, unknown>>;
+/** `uuid` makes a re-sent event idempotent: PostHog keeps one row per uuid; `timestamp` is the event's own time. */
+export type EventTelemetryCaptureOptions = { readonly uuid?: string; readonly timestamp?: Date };
 export type EventTelemetrySetTimeout = (callback: () => void, delay: number) => unknown;
 
 export type CreateEventTelemetryClientInput = {
@@ -143,7 +188,11 @@ export type CreateEventTelemetryClientInput = {
 
 export type EventTelemetryClient = {
   readonly enabled: boolean;
-  readonly captureEvent: (name: string, properties: EventTelemetryProperties) => void;
+  readonly captureEvent: (
+    name: string,
+    properties: EventTelemetryProperties,
+    options?: EventTelemetryCaptureOptions,
+  ) => void;
   readonly flush: () => Promise<void>;
   readonly shutdown: () => Promise<void>;
 };
@@ -196,9 +245,26 @@ export type TelemetryClientEnabledInput = {
 export declare function createEventTelemetryClient(
   input: CreateEventTelemetryClientInput,
 ): EventTelemetryClient;
+/** A send the server did not accept. `permanent` means a retry of the same event can never succeed. */
+export declare class TelemetryDeliveryError extends Error {
+  readonly permanent: boolean;
+  readonly status: number | undefined;
+  constructor(status: number | undefined, cause?: unknown);
+}
+/** One-at-a-time immediate sender; resolves on a 2xx answer, otherwise rejects with `TelemetryDeliveryError`. */
+export declare function createImmediateSender(
+  apiKey: string,
+  options: PostHogOptions,
+  PostHogClient: typeof PostHog,
+): {
+  readonly send: (message: TelemetryCaptureMessage) => Promise<void>;
+  readonly shutdown: () => Promise<void>;
+};
+/** The transport options plus posthog-node's own knobs (fetch, retries, timeouts), passed through as given. */
+export type PostHogTransportOptions = TelemetryTransportOptions & PostHogOptions;
 export declare function createDefaultPostHogTransport(
   apiKey: string,
-  options: TelemetryTransportOptions,
+  options: PostHogTransportOptions,
 ): TelemetryTransport;
 export declare function isTelemetryClientEnabled(input: TelemetryClientEnabledInput): boolean;
 export declare function createConsentGatedFetch(input: ConsentGatedFetchInput): TelemetryFetch;
@@ -222,10 +288,8 @@ export declare function createEventId(): string;
 export declare function hasTelemetryApiKey(env?: TelemetryEnv, defaultApiKey?: string): boolean;
 export declare function getTelemetryHost(env?: TelemetryEnv, defaultHost?: string): string;
 export declare function getDefaultTelemetryOsProvider(): TelemetryOsProvider;
-export declare function getTelemetryDistinctId(
-  machineIdPrefix: string,
-  osProvider?: TelemetryOsProvider,
-): string;
+export declare const TELEMETRY_INSTALL_ID_FILE_NAME: "install-id";
+export declare function getTelemetryInstallDistinctId(stateDir: string): string;
 export declare function resolveTelemetryStateDir(
   product: Pick<TelemetryProductConfig, "cacheDirName">,
   options?: ResolveTelemetryStateDirOptions,
@@ -241,3 +305,7 @@ export declare function writeTelemetryDiagnostic(
 ): void;
 export declare function cleanupTelemetryDiagnostics(options: WriteTelemetryDiagnosticOptions): void;
 export declare function recordDailyActive(input: RecordDailyActiveInput): Promise<void>;
+export declare function isTraceparent(value: unknown): value is string;
+export declare function publishTurnTraceparent(sessionId: string, traceparent: string): void;
+export declare function clearTurnTraceparent(sessionId: string, expected?: string): void;
+export declare function readTurnTraceparent(sessionId: string): string | undefined;

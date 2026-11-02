@@ -476,6 +476,9 @@ commits this session — then stage + draft the message instead.
   the receipt, then continue.
 - After 2 identical failed attempts at one step, surface what was tried
   and ask the user before another retry.
+- A permission denial or a refusal by the user is not a blocker to work
+  around: it is final for what that call was meant to do. Never reach that
+  result with another tool, command, path or host; ask the user.
 - After 2 parallel exploration waves yield no new useful facts, stop
   exploring and act.
 

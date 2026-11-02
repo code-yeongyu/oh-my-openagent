@@ -12,6 +12,8 @@ export interface OpenedHostSession {
   readonly retryFallbackDropped?: boolean
   /** The model the host reported for a FRESH open (the post-start check's read; #9722). */
   readonly reportedModel?: EffectiveModel
+  /** The session's durable id from that same read, so the record carries child_session_id from spawn (#10873). */
+  readonly durableSessionId?: string
 }
 
 /** The turn-delivery seam: the commands a child handle issues on its session. */
@@ -20,6 +22,8 @@ export type HostSessionCommand =
   | { readonly type: "steer"; readonly message: string; readonly clientMessageId?: string }
   | { readonly type: "followUp"; readonly message: string; readonly clientMessageId?: string }
   | { readonly type: "abort" }
+  // Patch the context the attached session publishes (`set_session_context`); `null` deletes a key.
+  | { readonly type: "set_session_context"; readonly patch: Readonly<Record<string, string | number | boolean | null>> }
 
 /** Why a child parked itself instead of reattaching. */
 export type HostParkReason = "host_incompatible" | "own_host_unreachable" | "store_index_unavailable" | "daemon_unavailable"

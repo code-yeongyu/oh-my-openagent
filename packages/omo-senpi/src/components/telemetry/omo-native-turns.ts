@@ -4,12 +4,12 @@ import type {
   TelemetryDiagnosticInput,
 } from "@oh-my-opencode/telemetry-core"
 import {
-  KNOWN_MODELS,
-  KNOWN_PROVIDERS,
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   maskProviderAndModel,
 } from "./product-identity"
 import type { SessionSummaryRecorder } from "./omo-native-session-summary"
+import type { TelemetrySessionRole } from "./session-role"
+import { usdOf } from "./session-summary-window"
 
 export type OmoNativeTurnHandlerOptions = {
   readonly client: Pick<EventTelemetryClient, "captureEvent">
@@ -17,6 +17,7 @@ export type OmoNativeTurnHandlerOptions = {
   /** The consent gate, read at send time: sampling is decided per session, long before a turn ends. */
   readonly isConsented: () => boolean
   readonly sessionId: string
+  readonly sessionRole: TelemetrySessionRole
   readonly summary: SessionSummaryRecorder
 }
 
@@ -38,7 +39,8 @@ export function createOmoNativeTurnHandler(
     const reasoning = optionalNonNegativeNumber(usage?.["reasoning"])
     const total = nonNegativeNumber(usage?.["totalTokens"])
     const costTotal = nonNegativeNumber(cost?.["total"])
-    const masked = maskModel(event.message.provider, event.message.model)
+    const masked = maskProviderAndModel(event.message.provider, event.message.model)
+    const cost1e4 = toCost1e4(costTotal.value)
     const properties = {
       $session_id: options.sessionId,
       provider: masked.provider,
@@ -49,24 +51,25 @@ export function createOmoNativeTurnHandler(
       cache_write_tokens: cacheWrite.value,
       reasoning_tokens: reasoning.value,
       total_tokens: total.value,
-      cost_usd: roundToFourDecimals(costTotal.value),
+      cost_1e4: cost1e4,
+      cost_usd: usdOf(cost1e4),
       turn_index: event.turnIndex,
       sample_rate: options.summary.sampleRate,
+      session_role: options.sessionRole,
     } satisfies Record<TurnCompletedProperty, string | number>
 
     const usageValid = [input, output, cacheRead, cacheWrite, reasoning, total, costTotal].every(({ valid }) => valid)
-    const summaryModel = maskProviderAndModel(event.message.provider, event.message.model)
-    options.summary.recordTurn(options.sessionId, {
+    void options.summary.recordTurn(options.sessionId, {
       turnIndex: event.turnIndex,
-      provider: summaryModel.provider,
-      modelId: summaryModel.model_id,
+      provider: masked.provider,
+      modelId: masked.model_id,
       inputTokens: input.value,
       outputTokens: output.value,
       cacheReadTokens: cacheRead.value,
       cacheWriteTokens: cacheWrite.value,
       reasoningTokens: reasoning.value,
       totalTokens: total.value,
-      costUsd: costTotal.value,
+      cost1e4,
       usageValid,
       stopReason: stopReasonOf(event.message),
       toolResultCount: Array.isArray(event.toolResults) ? event.toolResults.length : 0,
@@ -94,16 +97,6 @@ function stopReasonOf(message: unknown): string | undefined {
   return typeof reason === "string" ? reason : undefined
 }
 
-export function maskModel(provider: string, modelId: string): { provider: string; model_id: string } {
-  const providerIsKnown = KNOWN_PROVIDERS.some((known) => known === provider)
-  const providerModels: unknown = Reflect.get(KNOWN_MODELS, provider)
-  const modelIsKnown = Array.isArray(providerModels) && providerModels.some((known) => known === modelId)
-  return {
-    provider: providerIsKnown ? provider : "custom",
-    model_id: modelIsKnown ? modelId : "custom",
-  }
-}
-
 function nonNegativeNumber(value: unknown): NumberResult {
   const valid = typeof value === "number" && Number.isFinite(value) && value >= 0
   return { value: valid ? value : 0, valid }
@@ -113,8 +106,19 @@ function optionalNonNegativeNumber(value: unknown): NumberResult {
   return value === undefined ? { value: 0, valid: true } : nonNegativeNumber(value)
 }
 
-function roundToFourDecimals(value: number): number {
-  return Math.round((value + Number.EPSILON) * 10_000) / 10_000
+// The ONLY rounding step for cost: every downstream total adds these integers, so a summary and the sum of
+// its raw turns agree exactly, in any summation order, and cost_usd can never disagree with cost_1e4.
+// It rounds half-up on the decimal digits of the reported number, not on the binary product
+// `costUsd * 10_000`: 0.00015 * 1e4 is 1.4999999999999998 in binary, which `Math.round` takes to 1.
+export function toCost1e4(costUsd: number): number {
+  const [mantissa = "0", exponent = "0"] = costUsd.toString().split("e")
+  const [whole = "0", fraction = ""] = mantissa.split(".")
+  const digits = whole + fraction
+  const point = whole.length + Number(exponent) + 4
+  if (point < 0) return 0
+  const padded = digits.padEnd(point + 1, "0")
+  const scaled = point === 0 ? 0 : Number(padded.slice(0, point))
+  return padded.charAt(point) >= "5" ? scaled + 1 : scaled
 }
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {

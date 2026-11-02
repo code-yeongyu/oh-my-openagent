@@ -1,5 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { rmSync } from "node:fs"
+import { afterAll, afterEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { ModelRegistry, ModelRuntime } from "@code-yeongyu/senpi"
 import { InProcessRunner, RunnerError } from "./in-process"
 import { baseSpec, createFakeSession, tmpSessionDirs } from "./in-process-child-spec.test-support"
@@ -77,5 +79,63 @@ describe("in-process registry pairing (#9812)", () => {
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
     expect(fake.promptCalls).toBe(0)
     expect(fake.disposeCount).toBe(1)
+  })
+})
+
+// #10536: a provider's own model config (models.json, an extension provider) can declare the pairing.
+// senpi's accessors read it there and start the alias on its base; the Model object never carries it.
+describe("in-process pairing declared by provider config (#10536)", () => {
+  const configDir = mkdtempSync(join(tmpdir(), "priority-pairing-config-"))
+  const modelsJson = join(configDir, "models.json")
+  writeFileSync(modelsJson, JSON.stringify({ providers: { [provider]: { models: [
+    { id: `${baseId}-fast`, serviceTier: "priority", upstreamModelId: baseId },
+  ] } } }))
+  const configured = new ModelRegistry(ModelRuntime.createSync({
+    agentDir: configDir, authPath: join(configDir, "auth.json"), modelsPath: modelsJson, modelsStorePath: join(configDir, "models-store.json"),
+  }))
+  afterAll(() => rmSync(configDir, { recursive: true, force: true }))
+  const configuredBase = configured.find(provider, baseId)
+  const configuredAlias = configured.find(provider, `${baseId}-fast`)
+  const otherModel = configured.find(provider, "gpt-6-sol")
+  if (configuredBase === undefined || configuredAlias === undefined || otherModel === undefined) throw new Error("fixture model missing")
+
+  test("the fixture reproduces the split: no tier on the entry, priority from the registry", () => {
+    expect("serviceTier" in configuredAlias ? configuredAlias.serviceTier : undefined).toBeUndefined()
+    expect(configured.getServiceTier(configuredAlias)).toBe("priority")
+    expect(configured.getUpstreamModelId(configuredAlias)).toBe(baseId)
+  })
+
+  test.each([
+    ["a -fast pin started on its base", configuredAlias, configuredBase],
+    ["a base pin started on its -fast alias", configuredBase, configuredAlias],
+  ])("%s is accepted by the registry's own pairing", async (_label, pinned, started) => {
+    // given
+    const fake = createFakeSession()
+    fake.session = { ...fake.session, model: started }
+    const spec = baseSpec({ model: pinned, selectedModel: `${provider}/${pinned.id}`, modelRegistry: configured })
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+    // when
+    const handle = await runner.start(spec)
+    // then
+    fake.lastText.value = "done"
+    fake.resolvePrompt()
+    await expect(handle.waitForIdle()).resolves.toMatchObject({ status: "completed" })
+    await handle.dispose()
+  })
+
+  test.each([
+    ["a different model on the same provider", otherModel],
+    ["the base id on another provider", { ...configuredBase, provider: "openai" }],
+  ])("a -fast pin started on %s is still refused", async (_label, started) => {
+    // given
+    const fake = createFakeSession()
+    fake.session = { ...fake.session, model: started }
+    const spec = baseSpec({ model: configuredAlias, selectedModel: `${provider}/${configuredAlias.id}`, modelRegistry: configured })
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+    // when
+    const failure = await runner.start(spec).catch((error: unknown) => error)
+    // then
+    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
+    expect(fake.promptCalls).toBe(0)
   })
 })

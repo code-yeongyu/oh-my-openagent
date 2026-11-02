@@ -141,12 +141,24 @@ describe("Gatekeeper check after notarization", () => {
   })
 
   posixBashTest("fails when the ticket never arrives within the window", () => {
+    // given - a clock that advances one second per `date +%s` read, so the window is counted in polls, not in
+    // wall-clock time: a 1 s real window with a 0.2 s poll held one poll or several depending on where the
+    // start fell inside a second (`date +%s` truncates) and how loaded the runner was (#10847)
     const { root, env, binary } = notarySandbox(["Accepted"], [NOT_YET])
+    const clock = join(root, "clock")
+    writeFileSync(clock, "1000\n")
+    writeFileSync(join(root, "bin", "date"), `#!/bin/bash
+if [ "$1" = "+%s" ]; then now=$(cat "${clock}"); echo $((now + 1)) > "${clock}"; echo "$now"; else exec /bin/date "$@"; fi
+`)
+    chmodSync(join(root, "bin", "date"), 0o755)
     try {
-      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "1", GATEKEEPER_POLL_SECONDS: "0.2" }, binary)
+      // when - a three-second window: the deadline read, then one read after each unaccepted poll
+      const result = runSigning(root, { ...env, GATEKEEPER_TIMEOUT_SECONDS: "3", GATEKEEPER_POLL_SECONDS: "0" }, binary)
+
+      // then - it kept polling until the window closed, then reported the binary unaccepted
       expect(result.status).toBe(1)
       expect(result.stderr).toContain("Gatekeeper does not accept")
-      expect(spctlCalls(root)).toBeGreaterThan(1)
+      expect(spctlCalls(root)).toBe(3)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

@@ -33,15 +33,22 @@ impl StopLimits {
 
 impl Supervisor {
     /// Callback-safe refusal: no lock, allocation, persistence or notification.
-    /// The owner must schedule `trigger_stop` outside its event callback.
+    /// The owner must schedule `complete_stop` outside its event callback.
     pub fn suspend_input(&self) {
-        self.suspended.store(true, Ordering::SeqCst);
+        match &self.authority {
+            Some(authority) => authority.request_stop(),
+            None => self.suspended.store(true, Ordering::SeqCst),
+        }
     }
 
     /// A new stop has refused input but cannot yet be reported as committed.
     #[must_use]
     pub fn stop_pending(&self) -> bool {
-        self.is_suspended() && !self.published.load(Ordering::SeqCst)
+        match &self.authority {
+            Some(authority) => authority.generation()
+                > authority.committed_through.load(Ordering::SeqCst),
+            None => self.is_suspended() && !self.published.load(Ordering::SeqCst),
+        }
     }
 
     /// Wire-facing state. Input gates must use `status` or `is_suspended`.
@@ -85,7 +92,36 @@ impl Supervisor {
 
     pub(super) fn finish_stop(&self, source: StopSource, limits: StopLimits) {
         self.suspend_input();
-        let _commit = self.stop_commit_lock.lock();
+        self.drain_stop(source, limits);
+    }
+
+    /// Drain a callback's already-recorded stop without counting it twice.
+    /// Legacy owners retain their original callback/trigger behavior.
+    pub fn complete_stop(&self, source: StopSource) {
+        let limits = StopLimits::production(self.bounded_release.load(Ordering::SeqCst));
+        if self.authority.is_some() {
+            self.drain_stop(source, limits);
+        } else {
+            self.finish_stop(source, limits);
+        }
+    }
+
+    fn drain_stop(&self, source: StopSource, limits: StopLimits) {
+        loop {
+            let _commit = self.stop_commit_lock.lock();
+            let requested = self.authority.as_ref().map(|authority| authority.generation());
+            if let (Some(authority), Some(requested)) = (&self.authority, requested) {
+                if requested <= authority.committed_through.load(Ordering::SeqCst) {
+                    return;
+                }
+            }
+            if !self.commit_stop(source, &limits, requested) || self.authority.is_none() {
+                return;
+            }
+        }
+    }
+
+    fn commit_stop(&self, source: StopSource, limits: &StopLimits, requested: Option<u64>) -> bool {
         let signals: Vec<_> = {
             let mut registered = self.hold_signals.lock();
             registered.retain(|signal| signal.strong_count() > 0);
@@ -103,7 +139,9 @@ impl Supervisor {
                 worker.attempt(limits.emergency, limits.emergency_wait);
             }
         }
-        if let Some(commit) = &self.stop_commit {
+        if let (Some(authority), Some(requested)) = (&self.authority, requested) {
+            (authority.commit)(requested);
+        } else if let Some(commit) = &self.stop_commit {
             commit();
         }
         if !released {
@@ -111,16 +149,21 @@ impl Supervisor {
                 "senpi-desktop: input release deadline exceeded; stop committed, exiting without acknowledgement"
             );
             (self.fatal_exit)(1);
-            return;
+            return false;
         }
         let mut stopped_by = self.stopped_by.lock();
         self.stop_epoch.fetch_add(1, Ordering::SeqCst);
         stopped_by.get_or_insert(source);
-        self.suspended.store(true, Ordering::SeqCst);
+        if let (Some(authority), Some(requested)) = (&self.authority, requested) {
+            authority.committed_through.store(requested, Ordering::SeqCst);
+        } else {
+            self.suspended.store(true, Ordering::SeqCst);
+        }
         self.published.store(true, Ordering::SeqCst);
         drop(stopped_by);
         for signal in signals {
             signal.stopped();
         }
+        true
     }
 }

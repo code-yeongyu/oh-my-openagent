@@ -94,6 +94,11 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
       "Lead (main) to duty: the lane quoted mass ulw research in its report",
       "the bug: a message that says \"please ulw this\" arms the directive",
       "> ulw research the market\nwhat do you think of this request?",
+      // #10822: a relay whose header names several recipients, pasted twice, quoting a test name. Its only
+      // keyword is the test name, and it armed a coordinator session's ultrawork mode.
+      "[lane-r3 -> coordinator + ledger-lane] (1) the one-time copy STARTED. (2) no parser bug: the recorded names are exact, and the other is 'omo-senpi ultrawork packaged reload > ...'.\n[lane-r3 -> coordinator + ledger-lane] the rerun is filed.",
+      "[LEAD via coordinator -> lane-a, omo#1 FIX_FIRST] fold both findings, then ulw the delta",
+      "the failing test is 'omo-senpi ultrawork packaged reload > injects the reminder'",
     ]) {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()
@@ -110,6 +115,7 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
       "mass ulw research the housing market",
       "fix the login redirect, ulw, and open a PR",
       "ulw add a dark mode toggle",
+      "don't stop until it's done, ulw",
     ]) {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()

@@ -79,6 +79,8 @@ export function createDagWakeSource(deps: DagWakeSourceDeps): DagWakeSource {
   function publish(channels: readonly DagWakeSourceChannel[]): void {
     deps.pi.events?.emit(DAG_WAKE_SOURCE_STATE_EVENT, {
       source: DAG_WAKE_SOURCE,
+      // senpi#3864: a live workflow run is children's work, not a background job.
+      kind: "children",
       activeCount: channels.length,
       channels,
     })

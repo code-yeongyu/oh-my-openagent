@@ -22,6 +22,11 @@ const EXPECTED: Readonly<Record<string, ReadonlyArray<[number, RuleId]>>> = {
 	"gradient-edges.css": [[3, "gradient-stripe"], [8, "edge-stripe"], [20, "pseudo-bar"], [25, "gradient-stripe"]],
 	"non-visible-focus-and-nested.tsx": [[2, "edge-stripe"], [3, "edge-stripe"], [6, "edge-stripe"]],
 	"styled-components.tsx": [[6, "edge-stripe"], [12, "edge-stripe"]],
+	"flat-stripe-side.tsx": [[2, "edge-stripe"], [7, "edge-stripe"], [8, "edge-stripe"], [9, "edge-stripe"], [10, "edge-stripe"], [11, "edge-stripe"]],
+	"report-callouts.html": [[3, "edge-stripe"], [5, "edge-stripe"]],
+	"square-surfaces.css": [[1, "edge-stripe"], [4, "pseudo-bar"], [6, "inset-shadow-stripe"], [8, "gradient-stripe"]],
+	"accent-outlines.css": [[1, "accent-outline"], [2, "accent-outline"], [4, "accent-outline"]],
+	"accent-outlines.tsx": [[3, "accent-outline"], [4, "accent-outline"], [5, "accent-outline"], [6, "accent-outline"]],
 }
 
 function lintFixture(dir: string, name: string) {
@@ -29,7 +34,7 @@ function lintFixture(dir: string, name: string) {
 	return lintFiles([{ path, text: readFileSync(path, "utf8") }])
 }
 
-describe("#given a positive fixture with a coloured edge on a rounded surface", () => {
+describe("#given a positive fixture with a coloured one-side bar or an accent outline on a rounded card", () => {
 	test("#then every positive fixture has an expectation", () => {
 		expect(readdirSync(join(FIXTURES, "positive")).sort()).toEqual(Object.keys(EXPECTED).sort())
 	})
@@ -42,7 +47,7 @@ describe("#given a positive fixture with a coloured edge on a rounded surface", 
 	}
 })
 
-describe("#given a negative fixture (neutral hairlines, flat edges, focus rings, validation, tables, overlays)", () => {
+describe("#given a negative fixture (neutral hairlines and rules, thin outlines, focus rings, validation, tables, overlays)", () => {
 	for (const name of readdirSync(join(FIXTURES, "negative"))) {
 		test(`#when ${name} is linted #then it reports nothing`, () => {
 			expect(lintFixture("negative", name)).toEqual([])
@@ -50,13 +55,17 @@ describe("#given a negative fixture (neutral hairlines, flat edges, focus rings,
 	}
 })
 
-describe("#given the radius and the stripe live in different stylesheets", () => {
-	test("#when both files are linted together #then the stripe rule is flagged in its own file", () => {
+describe("#given the radius and the accent outline live in different stylesheets", () => {
+	test("#when both files are linted together #then the outline rule is flagged in its own file", () => {
 		const findings = lintFiles([
 			{ path: "base.css", text: ".card { border-radius: 12px; }\n" },
-			{ path: "feature.css", text: "\n.card.card--promo { border-top: 4px solid #f97316; }\n" },
+			{ path: "feature.css", text: "\n.card.card--promo { border: 2px solid #f97316; }\n" },
 		])
-		expect(findings.map((f) => [f.file, f.line, f.rule])).toEqual([["feature.css", 2, "edge-stripe"]])
+		expect(findings.map((f) => [f.file, f.line, f.rule])).toEqual([["feature.css", 2, "accent-outline"]])
+	})
+
+	test("#when the outline rule is linted without the radius stylesheet #then a square box is not flagged", () => {
+		expect(lintFiles([{ path: "feature.css", text: ".card.card--promo { border: 2px solid #f97316; }\n" }])).toEqual([])
 	})
 })
 

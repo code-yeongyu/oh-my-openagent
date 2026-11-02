@@ -79,7 +79,9 @@ export function projectTranscriptEntries(
   capturedAt: string,
 ): TranscriptEntry[] {
   if (message.kind === "user" || message.kind === "error") {
-    if (message.text.trim().length === 0) return []
+    // An image-only user message is still a user turn: it is kept as an empty, non-canonical row so consent binding
+    // (#10488) sees that it broke the adjacency between a proposal and the next reply. An empty error is dropped.
+    if (message.kind === "error" && message.text.trim().length === 0) return []
     return [
       textRow(
         message.kind,

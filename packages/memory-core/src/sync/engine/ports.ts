@@ -181,8 +181,14 @@ export interface SyncRepo {
    * meanwhile never swallows the sync's rendered files.
    */
   stageTree(paths: readonly string[]): Promise<string>
-  /** Commit exactly `paths` as `OmO Sync` with `message` (trailers included). */
+  /** Commit exactly `paths` as `OmO Sync` with `message` (trailers included); the shared index is left as it was. */
   commit(paths: readonly string[], message: string): Promise<string>
+  /**
+   * Brings the shared index's entries for `paths` in line with HEAD. Run once the sync commit is
+   * recorded, including on resume, so an index update a crash or a stranded lock cut short is redone
+   * instead of leaving the synced files staged as deleted and untracked.
+   */
+  syncIndex(paths: readonly string[]): Promise<void>
   /** True when a commit reachable from HEAD carries `Sync-Seq: <range>`. */
   hasSyncCommit(range: string): Promise<boolean>
 }

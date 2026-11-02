@@ -1,6 +1,6 @@
 import { expect, onTestFinished, spyOn, test } from "bun:test"
 import { inspect } from "node:util"
-import { jsonRequest, requestApi, serviceOrigin } from "./protocol"
+import { ApiRefusal, jsonRequest, refusalGuidance, requestApi, serviceOrigin } from "./protocol"
 import { createSession } from "./session"
 import { fakeApi, grant, limitDetail, memorySecrets, minted, privateKeys, temporaryHome } from "./test-support"
 
@@ -33,6 +33,20 @@ for (const origin of ["http://example.com", "http://localhost:8080", "http://127
     expect(() => createSession({ api: origin, store: memorySecrets().store("https://example.com") })).toThrow()
   })
 }
+
+// Contract: a refusal's guidance keys on the service code (then the status for an unknown code), so a
+// rate limit or an outage is never reported as a sign-in problem (#11379).
+test.each([
+  ["unauthorized", 401, "sign_in_again"], ["reauth_required", 401, "sign_in_again"], ["invalid_grant", 400, "sign_in_again"],
+  ["device_revoked", 401, "sign_in_again"], ["rate_limited", 429, "wait"], ["slow_down", 400, "wait"],
+  ["internal", 500, "service_trouble"], ["unavailable", 503, "service_trouble"], ["invalid_request", 400, "update_omo"],
+  ["not_found", 404, "update_omo"], ["account_deleted", 410, "account_deleted"], ["forbidden", 403, "account_refused"],
+  ["entitlement_required", 403, "account_refused"], ["no_such_code", 401, "sign_in_again"], ["no_such_code", 429, "wait"],
+  ["no_such_code", 502, "service_trouble"], ["no_such_code", 418, "account_refused"],
+] as const)("a %s refusal with status %d is guided as %s", (code, status, guidance) => {
+  const refusal = new ApiRefusal(code, status)
+  expect(refusalGuidance(refusal.code, status)).toBe(guidance)
+})
 
 test("HTTPS origins and explicit IPv4 loopback test origins remain accepted", () => {
   expect(serviceOrigin("https://example.com")).toBe("https://example.com")

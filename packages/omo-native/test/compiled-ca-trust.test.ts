@@ -1,6 +1,7 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { spawn, spawnSync } from "node:child_process"
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test"
+import { spawn, spawnSync, type ChildProcess } from "node:child_process"
+import { once } from "node:events"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { createServer, type Server } from "node:https"
 import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
@@ -12,13 +13,34 @@ import {
   MAX_EXTRA_CA_BYTES,
   parseExtraCaCertificates,
 } from "../compiled-ca-trust"
+import { removeTreeSync } from "../../../test-support/remove-tree"
 
 const fixtures = join(import.meta.dir, "fixtures", "ca-trust")
 const withoutCaVariables = (env: NodeJS.ProcessEnv) => {
   const { NODE_EXTRA_CA_CERTS: _extra, NODE_USE_SYSTEM_CA: _system, OMO_EXTRA_CA_CERTIFICATES: _omo, ...rest } = env
   return rest
 }
+
+type ProbeProcess = Pick<ChildProcess, "pid" | "exitCode" | "signalCode">
+
+// Exit state belongs to the process we started. A later kill(pid, 0) can instead find an unrelated
+// process that reused the PID, especially on Windows.
+function livePids(processes: Iterable<ProbeProcess>): number[] {
+  const alive: number[] = []
+  for (const child of processes) {
+    if (child.pid !== undefined && child.exitCode === null && child.signalCode === null) alive.push(child.pid)
+  }
+  return alive
+}
 const fixture = (name: string) => readFileSync(join(fixtures, name), "utf8")
+
+function cleanupProbes(dir: string, launched: Iterable<ProbeProcess>): void {
+  try {
+    expect(livePids(launched)).toEqual([])
+  } finally {
+    removeTreeSync(dir)
+  }
+}
 
 describe("parseExtraCaCertificates", () => {
   test("#given one CA PEM twice with CRLF #then returns it once", () => {
@@ -129,6 +151,8 @@ describe("compiled binary", () => {
   let dir = ""
   let server: Server
   let port = 0
+  // Retain identities for probes and completion records for their synchronous grandchildren.
+  const launched = new Set<ProbeProcess>()
 
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), "omo-ca-trust-"))
@@ -145,18 +169,21 @@ if (mode === "install") {
 if (mode === "daemon") {
   installEngineCaTrust()
   const child = spawnSync(process.execPath, ["install", port], { env: process.env, encoding: "utf8" })
+  console.error("grandchild " + JSON.stringify({ pid: child.pid, exitCode: child.status, signalCode: child.signal }))
   console.log(child.stdout.trim()); process.exit(0)
 }
 if (mode === "bun-be-bun-tls") {
   installEngineCaTrust()
   const code = 'require("node:https").get("https://localhost:' + port + '/",r=>{r.resume();console.log("ok "+r.statusCode)}).on("error",e=>console.log("error "+e.code))'
   const child = spawnSync(process.execPath, ["-e", code], { env: { ...process.env, BUN_BE_BUN: "1" }, encoding: "utf8" })
+  console.error("grandchild " + JSON.stringify({ pid: child.pid, exitCode: child.status, signalCode: child.signal }))
   console.log(child.stdout.trim()); process.exit(0)
 }
 if (mode === "bun-be-bun") {
   installEngineCaTrust()
   const code = 'const t=require("node:tls");console.log(t.getCACertificates("default").length-t.getCACertificates("bundled").length,t.getCACertificates("system").length)'
   const child = spawnSync(process.execPath, ["-e", code], { env: { ...process.env, BUN_BE_BUN: "1" }, encoding: "utf8" })
+  console.error("grandchild " + JSON.stringify({ pid: child.pid, exitCode: child.status, signalCode: child.signal }))
   console.log(child.stdout.trim()); process.exit(0)
 }
 request("https://localhost:" + port + "/", (r) => { r.resume(); console.log("ok " + r.statusCode) })
@@ -170,19 +197,30 @@ request("https://localhost:" + port + "/", (r) => { r.resume(); console.log("ok 
     port = (server.address() as AddressInfo).port
   })
   afterAll(async () => {
-    await new Promise<void>((resolve) => server.close(() => resolve()))
-    rmSync(dir, { recursive: true, force: true })
+    try {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    } finally {
+      cleanupProbes(dir, launched)
+    }
   })
 
-  const probe = (mode: string, env: NodeJS.ProcessEnv) =>
-    new Promise<string>((resolve) => {
-      const child = spawn(join(dir, "probe"), [mode, String(port)], {
-        env: { ...withoutCaVariables(process.env), ...env },
-      })
-      let out = ""
-      child.stdout.on("data", (chunk) => (out += chunk))
-      child.on("close", () => resolve(out.trim()))
+  const probe = async (mode: string, env: NodeJS.ProcessEnv) => {
+    const child = spawn(join(dir, "probe"), [mode, String(port)], {
+      env: { ...withoutCaVariables(process.env), ...env },
     })
+    const exited = once(child, "exit")
+    const closed = once(child, "close")
+    launched.add(child)
+    let out = ""
+    let err = ""
+    child.stdout.on("data", (chunk) => (out += chunk))
+    child.stderr.on("data", (chunk) => (err += chunk))
+    // Subscribe immediately after spawn and await both process exit and pipe closure within the
+    // test's existing budget. spawnSync's status/signal records the grandchild's own completion.
+    await Promise.all([exited, closed])
+    for (const match of err.matchAll(/^grandchild (.+)$/gm)) launched.add(JSON.parse(match[1]) as ProbeProcess)
+    return out.trim()
+  }
 
   test("#given the private CA only in OMO_EXTRA_CA_CERTIFICATES #then a plain compiled binary rejects it", async () => {
     expect(await probe("none", { OMO_EXTRA_CA_CERTIFICATES: fixture("ca.pem") })).toBe("error UNABLE_TO_VERIFY_LEAF_SIGNATURE")
@@ -215,5 +253,61 @@ request("https://localhost:" + port + "/", (r) => { r.resume(); console.log("ok 
   test("#given a BUN_BE_BUN child #then it trusts the OS store", async () => {
     const [added, system] = (await probe("bun-be-bun", {})).split(" ").map(Number)
     expect(added).toBe(system ?? -1)
+  })
+})
+
+describe("cleanupProbes", () => {
+  test("#given the liveness assertion fails #then its directory is still removed", () => {
+    const dir = mkdtempSync(join(tmpdir(), "omo-ca-trust-cleanup-"))
+    try {
+      expect(() => cleanupProbes(dir, [{ pid: process.pid, exitCode: null, signalCode: null }])).toThrow()
+      expect(existsSync(dir)).toBe(false)
+    } finally {
+      removeTreeSync(dir)
+    }
+  })
+})
+
+describe("livePids", () => {
+  test("#given exited probe PIDs reused by unrelated processes #then teardown does not report those processes as owned", async () => {
+    const child = spawn(process.execPath, ["-e", 'process.stdin.once("data", () => process.exit(0)); process.stdin.resume()'], {
+      stdio: ["pipe", "ignore", "ignore"],
+    })
+    const exited = once(child, "exit")
+    const closed = once(child, "close")
+    try {
+      const pid = child.pid ?? -1
+      expect(pid).toBeGreaterThan(0)
+      expect(livePids([child])).toEqual([pid])
+      child.stdin.end("stop")
+      await Promise.all([exited, closed])
+
+      // The OS may now report an unrelated process at this numeric PID. Its live identity must
+      // not overwrite the completion evidence for the child this test actually owned.
+      const reusedPidProcess: ProbeProcess = { pid, exitCode: null, signalCode: null }
+      const kill = spyOn(process, "kill").mockReturnValue(true)
+      try {
+        expect(livePids([reusedPidProcess])).toEqual([pid])
+        expect(livePids([child])).toEqual([])
+      } finally {
+        kill.mockRestore()
+      }
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill()
+      await Promise.all([exited, closed])
+    }
+  })
+
+  test("#given a tracked child still running #then the teardown check names it, and after its exit it does not", async () => {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" })
+    const pid = child.pid ?? -1
+    try {
+      expect(livePids([child])).toEqual([pid])
+    } finally {
+      const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+      child.kill()
+      await exited
+    }
+    expect(livePids([child])).toEqual([])
   })
 })

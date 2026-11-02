@@ -1,3 +1,5 @@
+[English](README.md) | [简体中文](README.zh-cn.md) | [日本語](README.ja.md) | [Русский](README.ru.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-br.md) | [Italiano](README.it.md)
+
 > [!NOTE]
 > **OmO 베타: OmO ❤️ Pi**
 > `curl -fsSL https://get.omo.dev/install.sh | bash`로 설치하세요. 메모리 시스템, CodeMode, Anthropic 구독까지 전부 지원됩니다.
@@ -9,11 +11,6 @@
 > 아래는 저희의 스폰서입니다. 개인 사이드 프로젝트를 지속하는 데 도움을 주고 있습니다.
 > | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)**가 OmO를 후원하고 있습니다. 여러 모델 제공사를 하나의 API로 쓸 수 있는 OpenAI 호환 게이트웨이입니다. 오픈소스를 응원해주셔서 감사합니다. |
 > | :-----| :----- |
-
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO는 위의 Jobdori에 의해 메인테이닝되고 있습니다. 당신의 Jobdori, Dori를 만나세요. <br />대기 명단은 [여기](https://sisyphuslabs.ai)에서 받습니다.**
 
 > [!TIP]
 > 함께해요!
@@ -40,7 +37,6 @@
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
-[English](README.md) | [简体中文](README.zh-cn.md) | [日本語](README.ja.md) | [Русский](README.ru.md) | [한국어](README.ko.md)
 
 </div>
 

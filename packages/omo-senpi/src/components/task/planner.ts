@@ -1,4 +1,4 @@
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { createModelDistributor, isExcludedModel, type ModelDistributor, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mode-inheritance"
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
@@ -47,15 +47,16 @@ export function createTaskChildPlanner(
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
   resolveDefaultRoute?: ResolveDefaultRoute,
 ): ChildPlanner {
+  const distributeModels = createModelDistributor()
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0]): PlanResolution => {
     if (spec.subagent_type !== undefined) {
-      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, resolveDefaultRoute)
+      const agentResolution = resolveAgentTarget(spec.subagent_type, spec.model, agents, resolveRegistry, omoConfig, distributeModels, resolveDefaultRoute)
       return agentResolution ?? unresolvableAgentTarget(spec.subagent_type, availableAgents, resolveRegistry, omoConfig)
     }
 
     if (spec.model !== undefined && spec.model.length > 0) {
-      const pin = resolveExplicitPin(spec.model, resolveRegistry, resolveDefaultRoute)
+      const pin = resolveExplicitPin(spec.model, resolveRegistry, resolveDefaultRoute, omoConfig.exclude_models)
       if (pin.kind !== "resolved") return { kind: "error", error: pin.error }
       return {
         kind: "resolved",
@@ -80,16 +81,15 @@ export function createTaskChildPlanner(
       }
     }
 
-    const resolution = resolveCategory(categoryName, omoConfig, registry)
+    const resolution = resolveCategory(categoryName, omoConfig, registry, { distributeModels })
     return toPlanResolution(categoryName, resolution, availableAgents)
   }
   return (spec): PlanResolution => {
     const resolution = planChild(spec)
     if (resolution.kind !== "resolved") return resolution
-    return {
-      kind: "resolved",
-      plan: inheritParentFastMode(resolution.plan, resolveRegistry(), resolveParentServiceTier()),
-    }
+    const fast = inheritParentFastMode(resolution.plan, resolveRegistry(), resolveParentServiceTier())
+    // The -fast sibling is a different model: exclude_models can keep it out while the planned one runs.
+    return { kind: "resolved", plan: isExcludedModel(fast.model, omoConfig.exclude_models) ? resolution.plan : fast }
   }
 }
 
@@ -102,18 +102,19 @@ function resolveAgentTarget(
   agents: Readonly<Record<string, AgentDefinition>>,
   resolveRegistry: ResolveModelRegistry,
   omoConfig: OmoConfig,
+  distributeModels: ModelDistributor,
   resolveDefaultRoute?: ResolveDefaultRoute,
 ): PlanResolution | undefined {
   if (explicitModel !== undefined && explicitModel.length > 0) {
     const resolution = resolveAgent(agentName, agents, undefined, { modelOverride: explicitModel })
     if (resolution.kind !== "resolved") return undefined
-    const pin = resolveExplicitPin(explicitModel, resolveRegistry, resolveDefaultRoute)
+    const pin = resolveExplicitPin(explicitModel, resolveRegistry, resolveDefaultRoute, omoConfig.exclude_models)
     if (pin.kind !== "resolved") return { kind: "error", error: pin.error }
     return { kind: "resolved", plan: toAgentPlan(resolution, pin.metadata, pin.canonical) }
   }
 
   const registry = resolveRegistry()
-  const resolution = resolveAgent(agentName, agents, registry, { omoConfig })
+  const resolution = resolveAgent(agentName, agents, registry, { omoConfig, distributeModels })
   if (resolution.kind === "resolved") {
     return { kind: "resolved", plan: toAgentPlan(resolution, undefined) }
   }
@@ -147,7 +148,7 @@ function unresolvableAgentTarget(
   const category = registry === undefined ? undefined : resolveCategory(agentName, omoConfig, registry)
   const categoryHint =
     category !== undefined && category.kind !== "not_found"
-      ? ` "${agentName}" is a category, not an agent — use category="${agentName}" instead.`
+      ? ` "${agentName}" is a category, not an agent: use category="${agentName}" instead.`
       : ""
   return {
     kind: "error",

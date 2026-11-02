@@ -39,7 +39,7 @@ export interface MemoryFactsWiring {
   /** Enqueue the un-enqueued delta for a settled conversation. Never throws. */
   enqueueSettled(conversationId: string, signal?: AbortSignal): Promise<FactsEnqueueResult>
   /** Enqueue the settled conversation delta. */
-  onSettled(conversationId: string, selection?: FactsModelSelection): Promise<FactsEnqueueResult>
+  onSettled(conversationId: string, selection?: FactsModelSelection, signal?: AbortSignal): Promise<FactsEnqueueResult>
   /** Leftover queue entries a crashed run left behind, ready for relaunch. */
   reconcilePending(): Promise<FactsQueueEntry[]>
   /** Recover old artifacts and reset first-turn admission for a bound session, without a child. */
@@ -91,9 +91,12 @@ export function createMemoryFactsWiring(options: MemoryFactsWiringOptions): Memo
       }
     },
 
-    async onSettled(conversationId: string, selection?: FactsModelSelection): Promise<FactsEnqueueResult> {
+    async onSettled(conversationId: string, selection?: FactsModelSelection, signal?: AbortSignal): Promise<FactsEnqueueResult> {
+      signal?.throwIfAborted()
       const pending = settledSessions.has(conversationId) ? [] : await wiring.reconcilePending()
-      const result = await wiring.enqueueSettled(conversationId)
+      signal?.throwIfAborted()
+      const result = await wiring.enqueueSettled(conversationId, signal)
+      signal?.throwIfAborted()
       if (!options.factsEnabled()) return result
       settledSessions.add(conversationId)
       settles += 1

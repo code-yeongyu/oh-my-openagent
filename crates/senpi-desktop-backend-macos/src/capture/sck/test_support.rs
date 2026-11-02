@@ -32,6 +32,24 @@ impl Drop for ProgramGuard {
     }
 }
 
+/// A FIFO in `dir` whose first writer wakes the returned receiver. Create it
+/// before spawning the helper that writes it, so the signal cannot be missed.
+/// Unlike a Unix socket address, a FIFO path has no `SUN_LEN` limit, so the
+/// fixture works under any `TMPDIR`.
+pub(crate) fn startup_signal(dir: &tempfile::TempDir) -> (PathBuf, std::sync::mpsc::Receiver<()>) {
+    let fifo = dir.path().join("signal");
+    let name = std::ffi::CString::new(fifo.as_os_str().as_encoded_bytes()).unwrap();
+    // SAFETY: `name` is a valid NUL-terminated path for the duration of the call.
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    let (send, receive) = std::sync::mpsc::channel();
+    let reader = fifo.clone();
+    std::thread::spawn(move || {
+        let _ = std::fs::read(reader);
+        let _ = send.send(());
+    });
+    (fifo, receive)
+}
+
 /// A fake helper: an executable Python script at `path`.
 pub(crate) fn fake_helper(dir: &tempfile::TempDir, body: &str) -> PathBuf {
     let path = dir.path().join("helper.py");

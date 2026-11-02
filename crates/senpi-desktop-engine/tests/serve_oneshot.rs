@@ -85,11 +85,12 @@ fn serve_oneshot_daemon_session_shared_frames_stop_resume_and_host_only_guard() 
         .permissions()
         .mode();
     assert_eq!(mode & 0o777, 0o600);
-    // When: client 1 captures, client 2 clicks against that frame.
+    // When: client 1 captures, client 2 clicks against that frame. Desktop input
+    // needs the host-only control grant (#10788), so the bridge clicks a window.
     let captured = daemon.call(
         2,
         "desktop.capture",
-        json!({"target": "desktop", "caps": {"maxWidth": 320}}),
+        json!({"target": "101", "caps": {"maxWidth": 320}}),
     );
     let frame = captured["result"]["frameId"]
         .as_str()
@@ -98,15 +99,23 @@ fn serve_oneshot_daemon_session_shared_frames_stop_resume_and_host_only_guard() 
     let clicked = daemon.call(
         3,
         "desktop.click",
-        json!({"target": "desktop", "x": 10.0, "y": 10.0, "frameId": frame}),
+        json!({"target": "101", "x": 10.0, "y": 10.0, "frameId": frame}),
     );
     assert!(clicked.get("error").is_none(), "{clicked}");
+    // And: a bridge client cannot obtain the host-only grant, so desktop input
+    // is refused before any input (#10788).
+    let desktop = daemon.call(
+        31,
+        "desktop.click",
+        json!({"target": "desktop", "x": 10.0, "y": 10.0}),
+    );
+    assert_eq!(desktop["error"]["data"]["code"], json!("ControlRequired"), "{desktop}");
     // Then: stop latches, a click is Suspended, --resume re-enables.
     daemon.call(4, "desktop.stop", json!({}));
     let refused = daemon.call(
         5,
         "desktop.click",
-        json!({"target": "desktop", "x": 10.0, "y": 10.0}),
+        json!({"target": "101", "x": 10.0, "y": 10.0}),
     );
     assert_eq!(refused["error"]["data"]["code"], json!("Suspended"), "{refused}");
     let resumed = daemon.command(&["--resume"]).output().expect("--resume runs");
@@ -116,9 +125,20 @@ fn serve_oneshot_daemon_session_shared_frames_stop_resume_and_host_only_guard() 
     let clicked_again = daemon.call(
         6,
         "desktop.click",
-        json!({"target": "desktop", "x": 10.0, "y": 10.0}),
+        json!({"target": "101", "x": 10.0, "y": 10.0}),
     );
     assert!(clicked_again.get("error").is_none(), "{clicked_again}");
+    // And: resume never manufactures consent for desktop input.
+    let desktop_after_resume = daemon.call(
+        61,
+        "desktop.click",
+        json!({"target": "desktop", "x": 10.0, "y": 10.0}),
+    );
+    assert_eq!(
+        desktop_after_resume["error"]["data"]["code"],
+        json!("ControlRequired"),
+        "{desktop_after_resume}"
+    );
     // And: host-only lines never cross the bridge; a string id is echoed verbatim.
     for method in [
         "desktop.stopPath.resume",

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { createNodeGitExec } from "../git/exec"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 import { settlesWithin } from "../git/settles-within.test-support"
 import { probeUntil } from "../locks/process-liveness.test-support"
 import { CONFIG_KEY, getPostCommitHookScript, mirrorLogPath } from "./mirror"
@@ -33,9 +34,11 @@ async function repoMirroringToABlockedRemote(shell: string) {
   const release = join(bare, "release")
   const pushing = join(bare, "pushing")
   execFileSync("git", ["init", "--bare", "--quiet", "--initial-branch=main", bare])
+  disableFixtureAutoMaintenance(bare, true)
   await writeFile(join(bare, "hooks", "pre-receive"), `#!/bin/sh\n: > "${pushing}"\nwhile [ ! -f "${release}" ]; do sleep 0.1; done\nexit 0\n`, "utf8")
   chmodSync(join(bare, "hooks", "pre-receive"), 0o755)
   execFileSync("git", ["init", "--quiet", "--initial-branch=main", repo])
+  disableFixtureAutoMaintenance(repo)
   for (const [key, value] of [["user.email", "m@example.invalid"], ["user.name", "m"], [CONFIG_KEY, `file://${bare}`]] as const) {
     execFileSync("git", ["-C", repo, "config", key, value])
   }

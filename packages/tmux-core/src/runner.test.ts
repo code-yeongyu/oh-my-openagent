@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeEach, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import os from "node:os"
@@ -13,10 +13,71 @@ const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
 const originalTmux = process.env.TMUX
 const originalPath = process.env.PATH
 
+/**
+ * The fixture is driven by the runtime that runs the tests, never by the host shell:
+ * a Git Bash `sh` on Windows writes startup warnings such as
+ * "bash.exe: warning: could not find /tmp, please create!" to stderr, which made these
+ * tests assert the host's shell startup instead of the runner's capture (#11259).
+ */
+const fixtureRunner = process.execPath
+let fixtureScriptPath = ""
+
+type FixtureBehaviour = {
+	stdout?: string
+	stderr?: string
+	exitCode?: number
+	sleepMs?: number
+}
+
 async function createTemporaryDirectory(): Promise<string> {
 	const directoryPath = await fs.mkdtemp(path.join(os.tmpdir(), "tmux-runner-"))
 	temporaryDirectories.push(directoryPath)
 	return directoryPath
+}
+
+async function createFixtureScript(): Promise<string> {
+	const directoryPath = await createTemporaryDirectory()
+	const scriptPath = path.join(directoryPath, "tmux-fixture.mjs")
+	const scriptSource = [
+		'import fs from "node:fs"',
+		"",
+		"const behaviour = JSON.parse(process.argv[2])",
+		"const counterFilePath = process.argv[3]",
+		"",
+		"if (counterFilePath) {",
+		"\tlet count = 0",
+		"\ttry {",
+		'\t\tcount = Number.parseInt(fs.readFileSync(counterFilePath, "utf8"), 10) || 0',
+		"\t} catch {",
+		"\t\tcount = 0",
+		"\t}",
+		'\tfs.writeFileSync(counterFilePath, String(count + 1), "utf8")',
+		"}",
+		"",
+		"if (behaviour.sleepMs) {",
+		"\tAtomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, behaviour.sleepMs)",
+		"}",
+		"",
+		"if (behaviour.stdout !== undefined) {",
+		"\tfs.writeSync(1, behaviour.stdout)",
+		"}",
+		"",
+		"if (behaviour.stderr !== undefined) {",
+		"\tfs.writeSync(2, behaviour.stderr)",
+		"}",
+		"",
+		"process.exit(behaviour.exitCode ?? 0)",
+	].join("\n")
+	await fs.writeFile(scriptPath, `${scriptSource}\n`, "utf8")
+	return scriptPath
+}
+
+function fixtureArguments(behaviour: FixtureBehaviour, counterFilePath?: string): string[] {
+	const fixtureCommandArguments = [fixtureScriptPath, JSON.stringify(behaviour)]
+	if (counterFilePath !== undefined) {
+		fixtureCommandArguments.push(counterFilePath)
+	}
+	return fixtureCommandArguments
 }
 
 async function readInvocationCount(counterFilePath: string): Promise<number> {
@@ -49,6 +110,10 @@ async function createFakeCmux(directoryPath: string, argsFilePath: string): Prom
 	await fs.chmod(cmuxPath, 0o755)
 	return cmuxPath
 }
+
+beforeAll(async () => {
+	fixtureScriptPath = await createFixtureScript()
+})
 
 beforeEach(() => {
 	delete process.env.CMUX_SOCKET_PATH
@@ -86,7 +151,7 @@ describe("runTmuxCommand", () => {
 
 		try {
 			// when
-			const result = await runTmuxCommand("sh", ["-c", "printf '%s\\n' real-tmux"])
+			const result = await runTmuxCommand(fixtureRunner, fixtureArguments({ stdout: "real-tmux\n" }))
 
 			// then
 			expect(result).toEqual({
@@ -106,10 +171,10 @@ describe("runTmuxCommand", () => {
 
 	test("#given command exits 0 with stdout #when run #then success true, output and stdout equal trimmed value, stderr empty", async () => {
 		// given
-		const commandArguments = ["-c", "printf '%s\\n' '%42'"]
+		const commandArguments = fixtureArguments({ stdout: "%42\n" })
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments)
+		const result = await runTmuxCommand(fixtureRunner, commandArguments)
 
 		// then
 		expect(result).toEqual({
@@ -123,10 +188,10 @@ describe("runTmuxCommand", () => {
 
 	test("#given command exits 1 with stderr #when run #then success false, stderr populated", async () => {
 		// given
-		const commandArguments = ["-c", "printf '%s\\n' 'some error' >&2; exit 1"]
+		const commandArguments = fixtureArguments({ stderr: "some error\n", exitCode: 1 })
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments)
+		const result = await runTmuxCommand(fixtureRunner, commandArguments)
 
 		// then
 		expect(result.success).toBe(false)
@@ -138,10 +203,10 @@ describe("runTmuxCommand", () => {
 		// given
 		const temporaryDirectory = await createTemporaryDirectory()
 		const counterFilePath = path.join(temporaryDirectory, `${randomUUID()}.count`)
-		const commandScript = `counter_file="$1"; count=0; if [ -f "$counter_file" ]; then count=$(cat "$counter_file"); fi; count=$((count + 1)); printf '%s' "$count" > "$counter_file"; printf '%s\\n' 'temporary error' >&2; exit 1`
+		const commandArguments = fixtureArguments({ stderr: "temporary error\n", exitCode: 1 }, counterFilePath)
 
 		// when
-		const result = await runTmuxCommand("sh", ["-c", commandScript, "sh", counterFilePath], { retry: 2 })
+		const result = await runTmuxCommand(fixtureRunner, commandArguments, { retry: 2 })
 
 		// then
 		expect(result.success).toBe(false)
@@ -153,10 +218,10 @@ describe("runTmuxCommand", () => {
 		// given
 		const temporaryDirectory = await createTemporaryDirectory()
 		const counterFilePath = path.join(temporaryDirectory, `${randomUUID()}.count`)
-		const commandScript = `counter_file="$1"; count=0; if [ -f "$counter_file" ]; then count=$(cat "$counter_file"); fi; count=$((count + 1)); printf '%s' "$count" > "$counter_file"; printf '%s\\n' "can't find pane: %1" >&2; exit 1`
+		const commandArguments = fixtureArguments({ stderr: "can't find pane: %1\n", exitCode: 1 }, counterFilePath)
 
 		// when
-		const result = await runTmuxCommand("sh", ["-c", commandScript, "sh", counterFilePath], { retry: 2 })
+		const result = await runTmuxCommand(fixtureRunner, commandArguments, { retry: 2 })
 
 		// then
 		expect(result.success).toBe(false)
@@ -166,10 +231,10 @@ describe("runTmuxCommand", () => {
 
 	test("#given timeoutMs=50 and command sleeps 500ms #when run #then returns timeout failure", async () => {
 		// given
-		const commandArguments = ["-c", "sleep 0.5"]
+		const commandArguments = fixtureArguments({ sleepMs: 500 })
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments, { timeoutMs: 50 })
+		const result = await runTmuxCommand(fixtureRunner, commandArguments, { timeoutMs: 50 })
 
 		// then
 		expect(result.success).toBe(false)
@@ -179,10 +244,10 @@ describe("runTmuxCommand", () => {
 
 	test("#given stdout contains trailing newline #when run #then output is trimmed", async () => {
 		// given
-		const commandArguments = ["-c", "printf '%s\\n\\n' '%7'"]
+		const commandArguments = fixtureArguments({ stdout: "%7\n\n" })
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments)
+		const result = await runTmuxCommand(fixtureRunner, commandArguments)
 
 		// then
 		expect(result.output).toBe("%7")
@@ -191,10 +256,10 @@ describe("runTmuxCommand", () => {
 
 	test("#given backward-compat consumer destructures {success, output} #when result returned #then both fields present and correct", async () => {
 		// given
-		const commandArguments = ["-c", "printf '%s\\n' '%9'"]
+		const commandArguments = fixtureArguments({ stdout: "%9\n" })
 
 		// when
-		const { success, output } = await runTmuxCommand("sh", commandArguments)
+		const { success, output } = await runTmuxCommand(fixtureRunner, commandArguments)
 
 		// then
 		expect(success).toBe(true)

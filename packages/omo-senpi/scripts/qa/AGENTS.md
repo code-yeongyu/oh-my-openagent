@@ -66,7 +66,7 @@ bun packages/omo-senpi/scripts/qa/kibitzer-legacy-absence-probe.mjs --evidence-d
 bun packages/omo-senpi/scripts/qa/dependency-diff-check.mjs --base <sha> --head <sha> --evidence-dir <d>/dependency-diff   # exit 0 only when no dependency entry was added in any manifest or lockfile
 SENPI_BIN="$(command -v senpi)" node scripts/qa/task-e2e.mjs   # live mode; same for team-e2e.mjs
 bun test scripts/qa/task-e2e-analysis.test.mjs scripts/qa/resume-e2e-runtime.test.mjs
-bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs        # cross-surface thread tools
+THREAD_QA_SENPI_VERSION=<engine> bun packages/omo-senpi/scripts/qa/thread-tools/run-all.mjs   # cross-surface thread tools; the variable is required
 bun packages/omo-senpi/scripts/qa/task-14/run-all.mjs             # resilience fault injections
 node packages/omo-senpi/scripts/qa/task-host-e2e-shards.mjs --bin <compiled-omo> --before-bin <R0-omo> --out <evidence-dir>
 bun run test:senpi                                             # gate: build + stage + typecheck + test

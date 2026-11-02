@@ -72,6 +72,11 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
         text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, statusLabel])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
       }
     }
+    case "no_progress":
+      return {
+        color: statusThemeColor(details.status),
+        text: `task_output ${normalizeRendererText(details.task_id)} ${normalizeRendererText(details.status)} · ${normalizeRendererText(details.reason)}`,
+      }
     case "transcript":
       return {
         color: statusThemeColor(details.snapshot.status),
@@ -116,8 +121,9 @@ export function taskOutputModelText(snapshot: TaskSnapshot): string {
     snapshot.effective_model.provider === snapshot.resolved_model.provider &&
     snapshot.effective_model.model_id === snapshot.resolved_model.model_id
   const operatorMark = snapshot.effective_model?.switched_by_operator === true ? " (switched by operator)" : ""
-  if (effective === undefined || sameModel) return `model ${planned}${operatorMark}`
-  return `model ${effective}${operatorMark} (planned ${planned})`
+  return effective === undefined || sameModel
+    ? `model ${planned}${operatorMark}`
+    : `model ${effective}${operatorMark} (planned ${planned})`
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

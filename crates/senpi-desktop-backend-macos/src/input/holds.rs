@@ -16,6 +16,7 @@ impl MacInput {
         &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
         capture: &MacCapture, control: &HoldControl<'_>,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         self.hold_target(target, mode, capture, None, |this, route, _| {
             this.keys_held(keys, route, control, |_| (control.wait)())
         })
@@ -25,6 +26,7 @@ impl MacInput {
         &mut self, target: &Target, hold: &MouseHold<'_>, mode: DeliveryMode,
         capture: &MacCapture, control: &HoldControl<'_>,
     ) -> CoreResult<()> {
+        let _request = self.held.request();
         self.hold_target(target, mode, capture, Some(hold), |this, key_route, window| {
             let route = match (window, mode) {
                 (Some(window), DeliveryMode::Background) => {
@@ -55,19 +57,18 @@ impl MacInput {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
                 match mode {
-                    DeliveryMode::Background => {
-                        self.ensure_background_ready()?;
+                    DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, if mouse.is_some() { "click" } else { "keyboard" },
                             mouse.map(|hold| hold.button))?;
                         if mouse.is_none_or(|hold| !hold.keys.is_empty()) {
                             guard::prepare_keys(&window, pid, wid, capture)?;
-                            self.last_activated = Some((pid, wid));
+                            this.last_activated = Some((pid, wid));
                         } else if !window.focused {
                             skylight::activate_without_raise(pid, wid)?;
-                            self.last_activated = Some((pid, wid));
+                            this.last_activated = Some((pid, wid));
                         }
-                        action(self, KeyRoute::Process(pid), Some(&window))
-                    }
+                        action(this, KeyRoute::Process(pid), Some(&window))
+                    }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
                         if let Some(hold) = mouse {

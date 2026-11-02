@@ -77,7 +77,9 @@ function runtime(agentDir: string, store: GatewayStore) {
 type WakeEdge = { readonly reason: "command" | "idle"; readonly reasons: readonly ("command" | "idle")[] }
 const COMMAND_WAKE: WakeEdge = { reason: "command", reasons: ["command"] }
 
-function sdkHost(onWake: () => Drain | undefined, edge: WakeEdge = COMMAND_WAKE): ThreadHost {
+type WakeOutcome = Drain | undefined | "unroutable"
+
+function sdkHost(onWake: () => WakeOutcome, edge: WakeEdge = COMMAND_WAKE): ThreadHost {
   const session: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-1", cwd: process.cwd(), name: "lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
   const unused = async (): Promise<never> => {
     throw new Error("not used")
@@ -103,6 +105,7 @@ function sdkHost(onWake: () => Drain | undefined, edge: WakeEdge = COMMAND_WAKE)
     gateway: {
       wake: async (_endpoint, ids) => {
         const drain = onWake()
+        if (drain === "unroutable") return { admitted: [], unroutable: "no_live_session" }
         if (drain === undefined) throw new Error("host_unavailable:/tmp/i-0123456789abcdef.sock")
         return (await drain({ type: "session_control_wake", ...edge, ...(ids.length > 0 ? { delivery_ids: ids } : {}) })) ?? { admitted: [] }
       },
@@ -110,14 +113,14 @@ function sdkHost(onWake: () => Drain | undefined, edge: WakeEdge = COMMAND_WAKE)
   }
 }
 
-async function setup(options: { readonly wakeReachesSession: boolean; readonly edge?: WakeEdge }) {
+async function setup(options: { readonly wakeReachesSession: boolean | "unroutable"; readonly edge?: WakeEdge }) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-cli-arm-"))
   directories.push(agentDir)
   const runtimeStore = createGatewayStore({ agentDir, instanceId: "runtime-1" })
   const cliStore = createGatewayStore({ agentDir, instanceId: "cli-1" })
   cleanups.push(() => runtimeStore.dispose(), () => cliStore.dispose())
   const target = runtime(agentDir, runtimeStore)
-  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: sdkHost(() => (options.wakeReachesSession ? target.registered() : undefined), options.edge), store: cliStore })
+  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa", host: sdkHost(() => (options.wakeReachesSession === "unroutable" ? "unroutable" : options.wakeReachesSession ? target.registered() : undefined), options.edge), store: cliStore })
   cleanups.push(() => sdk.dispose())
   const bound = await sdk.bind({ session: "dur-1", binding: { platform: "custom", account_id: "bot", chat_id: "c1", thread_id: "t1", outbound_events: ["completion"] } })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
@@ -141,7 +144,7 @@ describe("a completion armed from the CLI reaches the running session", () => {
     const armed = await sdk.report({ session: "dur-1", kind: "completion", text: "cli done", binding_id: bindingId })
     await target.run("error")
     // then
-    expect(armed).toMatchObject({ kind: "ok", armed: true })
+    expect(armed).toMatchObject({ kind: "ok", armed: true, wake: { reached: true } })
     expect(await rows()).toEqual([{ event: "completion", outcome: "failed", text: "cli done" }])
     expect(await pending()).toBe(0)
     await target.run("stop")
@@ -165,7 +168,18 @@ describe("a completion armed from the CLI reaches the running session", () => {
     const armed = await sdk.report({ session: "dur-1", kind: "completion", text: "cli done", binding_id: bindingId })
     await target.run("stop")
     // then
-    expect(armed).toMatchObject({ kind: "ok", armed: true })
+    expect(armed).toMatchObject({ kind: "ok", armed: true, wake: { reached: false, reason: "unreachable" } })
+    expect({ rows: await rows(), pending: await pending() }).toEqual({ rows: [], pending: 1 })
+  })
+
+  test("#given an endpoint that names no live session for the durable id #when the CLI arms a completion #then the report says the wake was not routable and the durable arm waits for the next start", async () => {
+    // given
+    const { sdk, target, bindingId, rows, pending } = await setup({ wakeReachesSession: "unroutable" })
+    // when
+    const armed = await sdk.report({ session: "dur-1", kind: "completion", text: "cli done", binding_id: bindingId })
+    await target.run("stop")
+    // then
+    expect(armed).toMatchObject({ kind: "ok", armed: true, wake: { reached: false, reason: "not_routable" } })
     expect({ rows: await rows(), pending: await pending() }).toEqual({ rows: [], pending: 1 })
   })
 })

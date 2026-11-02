@@ -1,8 +1,8 @@
 import type { Declaration } from "./css-parse"
 import { looksLikeClassList } from "./tailwind"
 
-export type ClassGroup = { readonly tokens: readonly string[]; readonly offset: number }
-export type InlineStyle = { readonly declarations: readonly Declaration[]; readonly offset: number; readonly tagRounded: boolean }
+export type ClassGroup = { readonly tokens: readonly string[]; readonly offset: number; readonly tag: string }
+export type InlineStyle = { readonly declarations: readonly Declaration[]; readonly offset: number; readonly tagRounded: boolean; readonly tag: string }
 export type StyleBlock = { readonly css: string; readonly offset: number }
 
 const UNITLESS = new Set(["opacity", "z-index", "flex", "flex-grow", "flex-shrink", "font-weight", "line-height", "order"])
@@ -51,6 +51,13 @@ function stripInterpolation(literal: string): string {
 	return literal.replace(/\$\{[^}]*\}/g, " ")
 }
 
+/** Name of the element whose open tag contains `offset` ("" outside a tag, e.g. a cva string). */
+function tagNameAt(text: string, offset: number): string {
+	const open = text.lastIndexOf("<", offset)
+	if (open < 0 || text.slice(open, offset).includes(">")) return ""
+	return /^<([A-Za-z][\w.-]*)/.exec(text.slice(open))?.[1] ?? ""
+}
+
 function tokensOf(text: string): string[] {
 	return text.split(/\s+/).filter(Boolean)
 }
@@ -83,11 +90,11 @@ export function classGroups(text: string, scanLiterals: boolean): ClassGroup[] {
 		if (ch === '"' || ch === "'") {
 			const close = text.indexOf(ch, start + 1)
 			if (close < 0) continue
-			groups.push({ tokens: tokensOf(text.slice(start + 1, close)), offset: start })
+			groups.push({ tokens: tokensOf(text.slice(start + 1, close)), offset: start, tag: tagNameAt(text, start) })
 			covered.push([start, close])
 		} else if (ch === "{") {
 			const { end, literals } = readBalanced(text, start)
-			groups.push({ tokens: literals.flatMap(tokensOf), offset: start })
+			groups.push({ tokens: literals.flatMap(tokensOf), offset: start, tag: tagNameAt(text, start) })
 			covered.push([start, end])
 		}
 	}
@@ -96,7 +103,7 @@ export function classGroups(text: string, scanLiterals: boolean): ClassGroup[] {
 		const offset = m.index ?? 0
 		if (covered.some(([a, b]) => offset >= a && offset <= b)) continue
 		const body = stripInterpolation(m[2] ?? "")
-		if (looksLikeClassList(body)) groups.push({ tokens: tokensOf(body), offset })
+		if (looksLikeClassList(body)) groups.push({ tokens: tokensOf(body), offset, tag: "" })
 	}
 	return groups
 }
@@ -136,13 +143,13 @@ export function inlineStyles(text: string): InlineStyle[] {
 	for (const m of text.matchAll(/\bstyle\s*=\s*\{\{([\s\S]*?)\}\}/g)) {
 		const offset = m.index ?? 0
 		const end = offset + m[0].length
-		styles.push({ declarations: objectDeclarations(m[1] ?? ""), offset, tagRounded: tagIsRounded(text, offset, end) })
+		styles.push({ declarations: objectDeclarations(m[1] ?? ""), offset, tagRounded: tagIsRounded(text, offset, end), tag: tagNameAt(text, offset) })
 	}
 	for (const m of text.matchAll(/\bstyle\s*=\s*(["'])([\s\S]*?)\1/g)) {
 		const offset = m.index ?? 0
 		const body = (m[2] ?? "").trim()
 		const declarations = body.startsWith("{") ? objectDeclarations(body) : cssDeclarations(body)
-		styles.push({ declarations, offset, tagRounded: tagIsRounded(text, offset, offset + m[0].length) })
+		styles.push({ declarations, offset, tagRounded: tagIsRounded(text, offset, offset + m[0].length), tag: tagNameAt(text, offset) })
 	}
 	return styles
 }

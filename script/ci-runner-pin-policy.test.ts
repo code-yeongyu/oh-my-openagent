@@ -73,6 +73,13 @@ function floatingJobs(): string[] {
 }
 
 describe("Ubuntu runner pin policy (#9928)", () => {
+  test("#given macOS status matrices #when required contexts are preserved #then their physical runner stays pinned to Ubuntu", () => {
+    const workflow = Bun.YAML.parse(readFileSync(join(WORKFLOWS_DIR, "ci.yml"), "utf8")) as { jobs: Record<string, Job> }
+    for (const id of ["macos-test-1-status", "macos-test-2-status", "macos-codex-status", "macos-senpi-status"]) {
+      expect(workflow.jobs[id]?.["runs-on"]).toBe("ubuntu-26.04")
+    }
+  })
+
   test("#given every workflow job #when its runner can resolve to ubuntu-latest #then the #9928 inventory reviewed it", () => {
     expect(floatingJobs()).toEqual([...REVIEWED_UBUNTU_LATEST_JOBS].sort())
   })

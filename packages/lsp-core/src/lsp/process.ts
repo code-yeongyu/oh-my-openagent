@@ -102,7 +102,7 @@ function wrap(proc: ChildProcess): SpawnedProcess {
 	};
 }
 
-function killProcessTree(proc: ChildProcess, signal: NodeJS.Signals): void {
+export function killProcessTree(proc: ChildProcess, signal: NodeJS.Signals): void {
 	if (process.platform === "win32" && proc.pid) {
 		const result = spawnSync("taskkill", ["/pid", String(proc.pid), "/f", "/t"], {
 			stdio: "ignore",

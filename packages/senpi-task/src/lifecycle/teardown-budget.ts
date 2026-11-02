@@ -1,6 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 
-export type TeardownStep = "abort" | "terminate" | "dispose"
+export type TeardownStep = "abort" | "terminate" | "dispose" | "publish_task_status"
 
 export type TeardownStepDeadline = (step: TeardownStep) => Promise<void>
 

@@ -23,6 +23,7 @@ export function uncertainItem(item: WorkpoolItem, pool: WorkpoolRecord, task: Ta
 export function reconcileWorkerTurn(stores: Stores, turn: WorkerTurn): void {
   const events = readYieldEvents(stores.tasks, turn)
   const record = stores.tasks.load(turn.task_id)
+  if (record?.status === "paused") return
   const terminal = record !== null && record.notification.run_epoch === turn.run_epoch && isTerminalRecord(record)
   stores.pools.mutate(turn.pool_id, pool => {
     if (pool.generation !== turn.generation || pool.status === "cancelled") return pool
@@ -43,6 +44,7 @@ export function reconcileWorkerTurn(stores: Stores, turn: WorkerTurn): void {
 
 export function reconcileWorkpool(stores: Stores, poolId: PoolId, observed: (taskId: string, epoch: number) => boolean): void {
   const pool = stores.pools.load(poolId)
+  if (pool.hold !== undefined) return
   if (pool.status === "cancelled") return
   const turns = new Map<string, WorkerTurn>()
   for (const item of pool.items) if (item.binding !== undefined && item.binding.generation === pool.generation) {

@@ -1,9 +1,11 @@
 name: Installer mirror (R2)
-run-name: "${{ format('installer mirror {0}{1}', inputs.tag, inputs.dry_run && ' (dry run)' || '') }}"
+run-name: "${{ (inputs.op == 'head' || inputs.op == 'recreate') && format('installer channel {0} {1}', inputs.op, inputs.channel) || format('installer mirror {0}{1}', inputs.tag, inputs.dry_run && ' (dry run)' || '') }}"
 
 # Mirrors one published release into the private omo-releases R2 bucket behind get.omo.dev and moves the
 # installer channel. publish.yml calls it as the last release step; run it by hand to backfill or re-run a
-# failed mirror (idempotent), or with dry_run to prove the pipeline without touching any channel.
+# failed mirror (idempotent), or with dry_run to prove the pipeline without touching any channel. A manual run with
+# op set skips the mirror and maintains one channel pointer instead (#11313): head prints what R2 holds for it,
+# recreate deletes it and writes `version` as a new object.
 on:
   workflow_call:
     inputs:
@@ -19,8 +21,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to mirror, e.g. v5.1.1"
-        required: true
+        description: "Release tag to mirror, e.g. v5.1.1 (required for a mirror; ignored when op is set)"
+        required: false
         type: string
       channel:
         description: "Installer channel to move after a verified mirror"
@@ -32,17 +34,33 @@ on:
         description: "Upload and verify under a scratch prefix, move no channel, then delete the scratch prefix"
         type: boolean
         default: true
+      op:
+        description: "Channel maintenance instead of a mirror: head inspects channels/<channel>, recreate deletes and rewrites it"
+        type: choice
+        default: none
+        options: [none, head, recreate]
+      version:
+        description: "recreate only: the X.Y.Z[-pre] version to write into the channel; it must already be fully mirrored and fit the channel (prerelease on beta, stable on latest)"
+        type: string
+        default: ""
 
+# One group per channel for every run that moves or maintains channels/<channel> (a publish-triggered or manual mirror
+# that moves it, and head/recreate), so a recreate never interleaves with a mirror writing the same key. A mirror that
+# moves no channel (channel none or dry run) keeps its per-tag group.
 concurrency:
-  group: installer-mirror-${{ inputs.tag }}
+  group: ${{ ((inputs.op == 'head' || inputs.op == 'recreate') || (inputs.channel != 'none' && !inputs.dry_run)) && format('installer-channel-{0}', inputs.channel) || format('installer-mirror-{0}', inputs.tag) }}
   cancel-in-progress: false
 
 permissions:
   contents: read
 
+env:
+  # The bucket's account, shared by the mirror and channel-maintenance jobs.
+  R2_RELEASES_ACCOUNT_ID: 6511ce566bfe27228f536a8fb9448be5
+
 jobs:
   mirror:
-    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    if: github.repository == 'code-yeongyu/oh-my-openagent' && inputs.op != 'head' && inputs.op != 'recreate'
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9942.
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -54,13 +72,13 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.3"
+          bun-version: "1.4.4"
 
       - name: Mirror and verify
         id: mirror
         env:
           GH_TOKEN: ${{ github.token }}
-          R2_ACCOUNT_ID: 6511ce566bfe27228f536a8fb9448be5
+          R2_ACCOUNT_ID: ${{ env.R2_RELEASES_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
           TAG: ${{ inputs.tag }}
@@ -102,4 +120,43 @@ jobs:
             - Uploads to R2 with signed payload hashes, reads every object back, then writes the completion marker.
             - Moves the installer channel only after that; a failure leaves the previous version in place.
           JOB_SUMMARY_NEXT: Re-run this workflow for the same tag; it keeps verified objects and refuses to overwrite different bytes.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  channel-maintenance:
+    if: github.repository == 'code-yeongyu/oh-my-openagent' && github.event_name == 'workflow_dispatch' && (inputs.op == 'head' || inputs.op == 'recreate')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: omo-releases-sl
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Channel ${{ inputs.op }} channels/${{ inputs.channel }}
+        env:
+          R2_ACCOUNT_ID: ${{ env.R2_RELEASES_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
+          OP: ${{ inputs.op }}
+          CHANNEL: ${{ inputs.channel }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          args=(--op "$OP" --channel "$CHANNEL")
+          if [ "$OP" = "recreate" ]; then args+=(--version "$VERSION"); fi
+          bun script/installer/channel-maintenance.ts "${args[@]}"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Installer channel ${{ inputs.op }} (${{ inputs.channel }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - head: prints the status, every response header and the body of a signed HEAD and GET of channels/<channel>, credentials redacted.
+            - recreate: refuses a version that does not fit the channel or is not fully mirrored, then deletes channels/<channel>, writes the version as a new object and reads it back.
+            - Each request runs once; nothing is retried or restored.
+          JOB_SUMMARY_NEXT: Read the step log. If a recreate failed after its delete, get.omo.dev falls back to the npm dist-tag until you rerun recreate or a mirror moves the channel.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

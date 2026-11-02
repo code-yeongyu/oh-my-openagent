@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { mkdtempSync } from "node:fs"
 import { createHash } from "node:crypto"
-import os from "node:os"
 import {
   BUILTIN_CATEGORY_NAMES,
   BUILTIN_SKILL_NAMES,
@@ -22,13 +21,11 @@ import {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
   OMO_NATIVE_SCHEMA_VERSION,
   createOmoNativeProductConfig,
-  MACHINE_HASH_SUNSET,
   getOmoNativeAttribution,
   getOmoNativeStateDir,
   hashSessionId,
   maskProviderAndModel,
-  withOmoNativeAttribution,
-} from "./product-identity"
+  withOmoNativeAttribution, getOmoNativeInstallIdPath } from "./product-identity"
 import { MAX_TRACKED_CALLS } from "./wave-assembler"
 import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
@@ -38,6 +35,8 @@ const originalAgentDirs = {
   OMO_CODING_AGENT_DIR: process.env.OMO_CODING_AGENT_DIR,
   SENPI_CODING_AGENT_DIR: process.env.SENPI_CODING_AGENT_DIR,
   PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR,
+  HOME: process.env.HOME,
+  USERPROFILE: process.env.USERPROFILE,
 } as const
 // Attribution env is ambient too: a dev-tree OmO Desktop service exports OMO_NATIVE_SURFACE/
 // OMO_NATIVE_INSTALL_ID to every child, and without restoring them the "no env attribution" case
@@ -47,8 +46,6 @@ const originalAttributionEnv = {
   OMO_NATIVE_INSTALL_ID: process.env.OMO_NATIVE_INSTALL_ID,
 } as const
 const temporaryRoots: string[] = []
-const BEFORE_SUNSET = new Date("2026-12-14T23:59:59.999Z")
-const AT_SUNSET = new Date("2026-12-15T00:00:00.000Z")
 
 afterEach(() => {
   for (const [name, value] of Object.entries({ ...originalAgentDirs, ...originalAttributionEnv })) {
@@ -64,6 +61,9 @@ function useTemporaryAgentDir(): string {
   process.env.OMO_CODING_AGENT_DIR = root
   process.env.SENPI_CODING_AGENT_DIR = root
   process.env.PI_CODING_AGENT_DIR = root
+  // The install id lives under the user home (#10934), so the home is isolated too.
+  process.env.HOME = root
+  process.env.USERPROFILE = root
   return root
 }
 
@@ -86,7 +86,6 @@ describe("OmO Native product identity", () => {
     expect(isConfiguredTelemetryApiKey(OMO_NATIVE_POSTHOG_API_KEY)).toBe(true)
     expect(config.platform).toBe("omo-senpi")
     expect(config.productName).toBe("omo-native")
-    expect(config.machineIdPrefix).toBe("omo-senpi:")
     expect(config.packageVersion).toBe(readStampedWorkspaceVersion())
     expect(config.productEnvPrefix).toBe("OMO_SENPI")
     expect(config.disableGeoip ?? false).toBe(false)
@@ -153,6 +152,22 @@ describe("OmO Native product identity", () => {
     expect(maskProviderAndModel("anthropic-subscription", "claude-opus-5")).toEqual({
       provider: "anthropic-subscription",
       model_id: "claude-opus-5",
+    })
+  })
+
+  test("#given provisional Fable 5.5 #when masked #then only the exact model id is exportable", () => {
+    // given / when / then
+    expect(maskProviderAndModel("anthropic-subscription", "claude-fable-5-5")).toEqual({
+      provider: "anthropic-subscription",
+      model_id: "claude-fable-5-5",
+    })
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-5")).toEqual({
+      provider: "custom",
+      model_id: "claude-fable-5-5",
+    })
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-5-private")).toEqual({
+      provider: "custom",
+      model_id: "custom",
     })
   })
 
@@ -264,7 +279,7 @@ describe("OmO Native product identity", () => {
     ])
     expect(delegation.model_source.values).toEqual(["category", "explicit", "agent", "none"])
     expect(delegation.token_status.values).toEqual(["complete", "partial", "unavailable"])
-    expect(delegation.cost_status.values).toEqual(["reported", "unavailable", "invalid"])
+    expect(delegation.cost_status.values).toEqual(["reported", "partial", "unavailable", "invalid"])
     expect(delegation.stats_status.values).toEqual(["complete", "partial", "unavailable"])
     expect(delegation.duration_status.values).toEqual(["monotonic", "wall_clock", "unavailable"])
     expect(delegation.category.values).toEqual([...BUILTIN_CATEGORY_NAMES, "custom", "none"])
@@ -320,7 +335,7 @@ describe("OmO Native product identity", () => {
     expect(first.install_hash).toMatch(/^[0-9a-f]{64}$/)
     // and: the id is stable across reads and stored next to the session-id salt
     expect(getOmoNativeAttribution().install_hash).toBe(first.install_hash)
-    const stored = readFileSync(join(agentDir, "omo-senpi", "omo-native", "install-id"), "utf8").trim()
+    const stored = readFileSync(getOmoNativeInstallIdPath({ HOME: agentDir, USERPROFILE: agentDir }), "utf8").trim()
     expect(stored).toMatch(/^[0-9a-f]{64}$/)
     expect(createHash("sha256").update(stored).digest("hex")).toBe(first.install_hash)
   })
@@ -333,9 +348,11 @@ describe("OmO Native product identity", () => {
       OMO_NATIVE_INSTALL_ID: envInstallId,
       OMO_CODING_AGENT_DIR: agentDir,
       SENPI_CODING_AGENT_DIR: agentDir,
+      HOME: agentDir,
+      USERPROFILE: agentDir,
     }
 
-    expect(getOmoNativeAttribution({ env, now: AT_SUNSET })).toEqual({
+    expect(getOmoNativeAttribution({ env })).toEqual({
       surface: "desktop",
       install_hash: createHash("sha256").update(envInstallId).digest("hex"),
       ci: false,
@@ -348,7 +365,7 @@ describe("OmO Native product identity", () => {
 
   test("#given a CI env #when attribution is resolved #then ci reflects whether CI is truthy", () => {
     const agentDir = useTemporaryAgentDir()
-    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir }
+    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir, HOME: agentDir, USERPROFILE: agentDir }
 
     expect(getOmoNativeAttribution({ env: { ...env, CI: "true" } }).ci).toBe(true)
     expect(getOmoNativeAttribution({ env: { ...env, CI: "1" } }).ci).toBe(true)
@@ -360,29 +377,14 @@ describe("OmO Native product identity", () => {
 
   test("#given a persisted install id #when attribution is resolved #then install_hash is sha256 of it and the raw id never ships", () => {
     const agentDir = useTemporaryAgentDir()
-    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir }
+    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir, HOME: agentDir, USERPROFILE: agentDir }
 
-    const attribution = getOmoNativeAttribution({ env, now: BEFORE_SUNSET })
+    const attribution = getOmoNativeAttribution({ env })
 
-    const stored = readFileSync(join(agentDir, "omo-senpi", "omo-native", "install-id"), "utf8").trim()
+    const stored = readFileSync(getOmoNativeInstallIdPath({ HOME: agentDir, USERPROFILE: agentDir }), "utf8").trim()
     expect(attribution.install_hash).toBe(createHash("sha256").update(stored).digest("hex"))
     expect(attribution).not.toHaveProperty("install_id")
-    expect(getOmoNativeAttribution({ env, now: AT_SUNSET }).install_hash).toBe(attribution.install_hash)
-  })
-
-  test("#given the machine_hash transition window #when attribution is resolved on either side of the sunset #then machine_hash is the legacy hostname hash before it and absent after", () => {
-    const agentDir = useTemporaryAgentDir()
-    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir }
-    const osProvider = { ...os, hostname: () => "transition-host" }
-
-    const before = getOmoNativeAttribution({ env, now: BEFORE_SUNSET, osProvider })
-    const after = getOmoNativeAttribution({ env, now: AT_SUNSET, osProvider })
-
-    expect(MACHINE_HASH_SUNSET).toBe("2026-12-15")
-    expect(before.machine_hash).toMatch(/^[0-9a-f]{64}$/)
-    expect(before.machine_hash).toBe(createHash("sha256").update("omo-senpi:transition-host").digest("hex"))
-    expect(after).not.toHaveProperty("machine_hash")
-    expect(after.install_hash).toBe(before.install_hash)
+    expect(getOmoNativeAttribution({ env }).install_hash).toBe(attribution.install_hash)
   })
 
   test("#given a product config #when attribution is attached #then additionalProperties carry it and existing product extras survive", () => {
@@ -398,7 +400,6 @@ describe("OmO Native product identity", () => {
           OMO_CODING_AGENT_DIR: agentDir,
           SENPI_CODING_AGENT_DIR: agentDir,
         },
-        now: AT_SUNSET,
       },
     )
 

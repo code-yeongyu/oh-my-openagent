@@ -9,6 +9,7 @@ import { createManagerResidencyRegistry } from "../../../../../omo-senpi/src/com
 import { createTaskLifecycle, createHostSessionProbe, type TaskLifecycle } from "../../../lifecycle"
 import { defaultHostSessionProbe } from "../../../lifecycle/host-session-default"
 import { createTaskManager } from "../../../manager/manager"
+import { launchSettled } from "../../../manager/__fixtures__/manager-fakes"
 import { createRpcManagedRunner } from "../../../manager/runner"
 import type { StartResult } from "../../../manager/types"
 import type { TaskRecord } from "../../../state"
@@ -200,7 +201,10 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ...(recovery === undefined ? {} : { now: recovery.now }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     planner: () => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } }),
-    destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
+    destruction: {
+      destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause),
+      get hostSessionCancel() { return lifecycle.hostSessionCancel },
+    },
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
   })
   const lifecycle = createTaskLifecycle({
@@ -256,7 +260,7 @@ function connectParent(input: ConnectParentInput): ParentSession {
           model: HOST_CHILD_MODEL,
         })
         // A slow host returns `starting` (#10042); these scenarios need the child admitted first.
-        if (result.kind === "started" && result.starting === true) await manager.whenLaunched?.(result.task_id)
+        await launchSettled(manager, result)
         started.push(result)
       }
       return started

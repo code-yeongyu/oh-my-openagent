@@ -13,7 +13,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-import { createNodeGitExec } from "../../../git/exec"
+import { ensureQaRepo } from "./qa-repo.test-support"
 import { FakeSealer, FakeVerifier } from "../fake-crypto.test-support"
 import { openDeviceSync } from "../open"
 import { createHttpTransport } from "./http-transport"
@@ -24,24 +24,7 @@ if (url === undefined || device === undefined || base === undefined || command =
 }
 const repoDir = join(base, "repo")
 
-async function ensureRepo(): Promise<void> {
-  const exec = createNodeGitExec()
-  const git = async (...argv: string[]) => {
-    const r = await exec.run(argv, { cwd: repoDir, timeoutMs: 30_000 })
-    if (r.code !== 0) throw new Error(`git ${argv.join(" ")}: ${r.stderr}`)
-  }
-  await mkdir(repoDir, { recursive: true })
-  if ((await exec.run(["rev-parse", "--git-dir"], { cwd: repoDir, timeoutMs: 30_000 })).code === 0) return
-  await git("init", "-q", "-b", "main")
-  await git("config", "user.name", "QA")
-  await git("config", "user.email", "qa@example.invalid")
-  await git("config", "commit.gpgsign", "false")
-  await writeFile(join(repoDir, ".gitkeep"), "")
-  await git("add", ".gitkeep")
-  await git("commit", "-q", "-m", "init")
-}
-
-await ensureRepo()
+await ensureQaRepo(repoDir)
 if (command === "read") {
   const value = await readFile(join(repoDir, key ?? ""), "utf8").catch(() => null)
   console.log(JSON.stringify({ device, key, value }))

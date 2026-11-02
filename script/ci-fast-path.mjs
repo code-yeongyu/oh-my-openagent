@@ -2,23 +2,48 @@
 
 import { readFileSync } from "node:fs"
 import { pathToFileURL } from "node:url"
+import { coveredByInvocation, readCiInvocationCoverage } from "./ci-platform-invocations.mjs"
 
 const generatedReleaseMerge =
   /^Merge pull request #[0-9]+ from code-yeongyu\/release\/v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?-source-state$/
 const releaseStateHeadRef = /^release\/v.+-source-state$/
-const fullMatrixLabel = "ci:full-matrix"
-// Diffs that can change how a non-Linux runner behaves, or that change the
-// skip decision itself, must be proven on all three operating systems.
+const fullMatrixLabels = new Set(["ci:full-matrix", "run-full-ci"])
+// On a pull request, macOS and Windows run only for diffs that can change how a
+// non-Linux runner behaves or that change the skip decision itself (#10856).
+// Everything else is proven on those operating systems by the post-merge push,
+// which always runs the full matrix. Paths a macOS/Windows-only step names are
+// derived from ci.yml (ci-platform-invocations.mjs); this list holds only what
+// no such step names: native code, packaging, and the CI decision itself.
 const platformSensitiveExactPaths = new Set([
   ".github/workflows/ci.yml",
+  ".github/workflows/ci-full-matrix-label.yml",
+  ".github/workflows/publish-platform.yml",
+  "Cargo.toml",
+  "Cargo.lock",
+  "rust-toolchain.toml",
+  "postinstall.mjs",
+  "script/build-binaries.ts",
+  "script/build-omo-native.ts",
   "script/ci-fast-path.mjs",
+  "script/ci-platform-invocations.mjs",
   "script/ci-leg-tests-guard.mjs",
-  "bunfig.win2.parallel.toml",
-  "bunfig.win2.parallel.windows.toml",
-  "script/bun-panic-retry.ts",
   "script/root-test-serial-quarantine.ts",
   "packages/openclaw-core/src/reply-listener-process.ts",
 ])
+const platformSensitivePrefixes = [
+  "crates/",
+  "bin/",
+  ".github/actions/",
+  ".github/scripts/",
+  "packages/git-bash-mcp/",
+  "packages/omo-codex/src/install/",
+  "packages/omo-native/",
+  "packages/omo-codex/scripts/install-",
+  "script/qa/desktop/macos/",
+  "script/qa/desktop/windows/",
+]
+const platformPackagePath = /^packages\/oh-my-opencode-(?:darwin|linux|windows)-/
+const platformBasename = /windows|win32|darwin|macos|\.platform\./
 
 function parseArguments(argv) {
   const values = new Map()
@@ -68,7 +93,7 @@ function isWebPath(path) {
   )
 }
 
-// The ONLY paths that may skip the Windows and macOS legs: an explicit
+// The non-runtime paths: an explicit
 // allowlist of prose and repository metadata no test loads. Anything not
 // matched here, including a new folder or an unknown extension, is runtime.
 // Nothing under packages/*/src is ever non-runtime: prompts and skills ship
@@ -91,18 +116,19 @@ function isProsePath(path) {
   return proseBasename.test(path.slice(path.lastIndexOf("/") + 1))
 }
 
-// A runtime-touching path can change what a test observes on any operating
-// system, so the change must run every OS leg.
+// A runtime-touching path can change what a test observes. It is reported in
+// the CI summary; the OS matrix is decided by isPlatformSensitivePath.
 export function isRuntimePath(path) {
   if (isWebPath(path) || isProsePath(path)) return false
   return !repositoryMetadata.some((pattern) => pattern.test(path))
 }
 
-function isPlatformSensitivePath(path) {
+export function isPlatformSensitivePath(path, invocationCoverage) {
   if (platformSensitiveExactPaths.has(path)) return true
-  if (path.endsWith(".ps1")) return true
-  const basename = path.slice(path.lastIndexOf("/") + 1).toLowerCase()
-  return basename.includes("windows") || basename.includes("win32")
+  if (coveredByInvocation(path, invocationCoverage)) return true
+  if (platformSensitivePrefixes.some((prefix) => path.startsWith(prefix))) return true
+  if (platformPackagePath.test(path) || path.endsWith(".ps1")) return true
+  return platformBasename.test(path.slice(path.lastIndexOf("/") + 1).toLowerCase())
 }
 
 export function classifyCiMode({
@@ -113,6 +139,7 @@ export function classifyCiMode({
   mergeParentCount,
   headRef = "",
   labels = [],
+  invocationCoverage = [],
 }) {
   // Queue commits never use generated-release push policy.
   const classificationEvent = eventName === "merge_group" ? "pull_request" : eventName
@@ -127,16 +154,16 @@ export function classifyCiMode({
     generatedReleaseMerge.test(subject)
   const webOnly = diffAvailable && changedPaths.length > 0 && changedPaths.every(isWebPath)
   const runtimeTouching = !diffAvailable || changedPaths.some(isRuntimePath)
-  // Ubuntu-first is a pull-request optimization only for changes no test can
-  // observe, and it fails open: any event we cannot fully inspect keeps all
-  // three operating systems.
+  // Ubuntu-first is a pull-request optimization for every change that touches
+  // no platform-specific path, and it fails open: any diff we cannot inspect
+  // keeps all three operating systems.
   const fullMatrix =
     eventName === "merge_group" ||
     classificationEvent === "push" ||
-    runtimeTouching ||
+    !diffAvailable ||
     releaseStateHeadRef.test(headRef) ||
-    labels.includes(fullMatrixLabel) ||
-    changedPaths.some(isPlatformSensitivePath)
+    labels.some((label) => fullMatrixLabels.has(label)) ||
+    changedPaths.some((path) => isPlatformSensitivePath(path, invocationCoverage))
 
   return {
     generatedReleasePush,
@@ -170,6 +197,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     mergeParentCount: parseMergeParents(mergeParents),
     headRef: args.get("head-ref") ?? "",
     labels: parseLabels(args.get("labels") ?? "[]"),
+    invocationCoverage: readCiInvocationCoverage(),
   })
   process.stdout.write(`${JSON.stringify(mode)}\n`)
 }

@@ -10,6 +10,7 @@ import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
 
@@ -141,7 +142,7 @@ describe("sisyphus-task", () => {
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
         anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
-        google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3", "kimi-for-coding-highspeed"],
+        google: ["gemini-3.1-pro", "gemini-3-flash"], "kimi-for-coding": ["k3.1-pro", "kimi-for-coding-highspeed"],
         openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-6-luna-fast", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai", "kimi-for-coding"],
@@ -185,20 +186,20 @@ describe("sisyphus-task", () => {
       // when / #then
       expect(low).toBeDefined()
       expect(low.model).toBe("openai/gpt-6.1-sol")
-      expect(low.variant).toBe("medium")
+      expect(low.variant).toBe("high")
       expect(high).toBeDefined()
       expect(high.model).toBe("openai/gpt-6-astra")
       expect(high.variant).toBe("high")
     })
 
-    test("unspecified-high category uses Claude Opus 5.5 medium as primary", () => {
+    test("unspecified-high category uses Claude Opus 5.5 high as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
       expect(category.model).toBe("anthropic/claude-opus-5-5")
-      expect(category.variant).toBe("medium")
+      expect(category.variant).toBe("high")
     })
   })
 
@@ -854,7 +855,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe("anthropic/claude-fable-5-1")
+      expect(result?.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
     })
 
     test("allows artistry when availability is empty", () => {
@@ -870,7 +871,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.model).toBe("anthropic/claude-fable-5-1")
+      expect(result?.model).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
     })
 
     test("returns null for deep-high when neither gpt-6-astra nor gpt-5.6-sol is available and no user config overrides it", () => {
@@ -907,7 +908,7 @@ describe("sisyphus-task", () => {
       // #then
       const resolved = expectResolvedCategoryConfig(result)
       expect(resolved.config.model).toBe("openai/gpt-6.1-sol")
-      expect(resolved.config.variant).toBe("medium")
+      expect(resolved.config.variant).toBe("high")
       expect(resolveCategoryConfig("deep-high", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels })).toBeNull()
     })
 
@@ -1157,7 +1158,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          userCategories: {
-           ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
+           ultrabrain: { model: "openai/gpt-5.5", variant: "high" },
          },
          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
          availableModelsOverride: createTestAvailableModels(),
@@ -1186,7 +1187,7 @@ describe("sisyphus-task", () => {
       expect(launchInput.model).toEqual({
         providerID: "openai",
         modelID: "gpt-5.5",
-        variant: "xhigh",
+        variant: "high",
       })
     })
 
@@ -1247,10 +1248,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - Kimi K3 should be passed with max variant
+      // then - Kimi K3.1 Pro should be passed with max variant
       expect(launchInput.model).toEqual({
         providerID: "kimi-for-coding",
-        modelID: "k3",
+        modelID: "k3.1-pro",
         variant: "max",
       })
     }, { timeout: 20000 })
@@ -1308,10 +1309,10 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - Kimi K3 should be passed with max variant
+      // then - Kimi K3.1 Pro should be passed with max variant
       expect(promptBody.model).toEqual({
         providerID: "kimi-for-coding",
-        modelID: "k3",
+        modelID: "k3.1-pro",
       })
       expect(promptBody.variant).toBe("max")
     }, { timeout: 20000 })
@@ -3862,7 +3863,7 @@ describe("sisyphus-task", () => {
       // then - default model from DEFAULT_CATEGORIES is used
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.config.model).toBe("anthropic/claude-sonnet-5-5")
-      expect(category.config.variant).toBe("medium")
+      expect(category.config.variant).toBe("high")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
@@ -4512,11 +4513,11 @@ describe("sisyphus-task", () => {
 
       // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
       // oracle fallback chain: gpt-5.6-sol (openai) > gemini-3.1-pro (google) > claude-opus-4-8 (anthropic)
-      // Since openai is in connectedProviders, should resolve to openai/gpt-5.6-sol at xhigh
+      // Since openai is in connectedProviders, should resolve to openai/gpt-5.6-sol at high
       expect(promptBody.model).toBeDefined()
       expect(promptBody.model.providerID).toBe("openai")
       expect(promptBody.model.modelID).toBe("gpt-5.6-sol")
-      expect(promptBody.variant).toBe("xhigh")
+      expect(promptBody.variant).toBe("high")
     }, { timeout: 20000 })
   })
 

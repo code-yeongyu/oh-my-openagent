@@ -37,6 +37,53 @@ describe("host-session teardown: detach on shutdown, close on destroy, close on 
     expect(fixture.daemon.closed).toEqual([])
     expect(store.load("st_0a000001")?.residency_state).toBe("rpc_detached")
     expect(summary.suspended_rpc).toBe(1)
+    expect(store.load("st_0a000001")?.suspension_reason).toBe("session_quit")
+  })
+
+  test("#given a pending child #when the parent session quits #then the record parks persisted_only with the quit marker (senpi#3493)", async () => {
+    // given
+    const store = tempStore()
+    const fixture = hostLifecycleDeps({ store, hostPid: HOST_PID })
+    seedRecord(store, {
+      task_id: "st_0a000011",
+      status: "pending",
+      execution_mode: "process",
+      host_pid: HOST_PID,
+    })
+    const lifecycle = createTaskLifecycle(fixture.deps)
+
+    // when
+    const summary = await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
+
+    // then
+    expect(summary.suspended_pending).toBe(1)
+    const record = store.load("st_0a000011")
+    // The residency transition deliberately keeps the status; only the residency and the marker move.
+    expect(record?.status).toBe("pending")
+    expect(record?.residency_state).toBe("persisted_only")
+    expect(record?.suspension_reason).toBe("session_quit")
+  })
+
+  test("#given a resident child #when the session shuts down for a reason other than quit #then no quit marker is stamped (senpi#3493)", async () => {
+    // given
+    const store = tempStore()
+    const order: CallLog = []
+    const fixture = hostLifecycleDeps({ store, hostPid: HOST_PID })
+    seedRecord(store, {
+      ...hostSessionRecordInput("st_0a000012", hostSession("st_0a000012")),
+      status: "running",
+      residency_state: "resident",
+      host_pid: HOST_PID,
+    })
+    fixture.registry.add(hostSessionHandle("st_0a000012", order))
+    const lifecycle = createTaskLifecycle(fixture.deps)
+
+    // when
+    await lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "reload" })
+
+    // then
+    expect(store.load("st_0a000012")?.residency_state).toBe("rpc_detached")
+    expect(store.load("st_0a000012")?.suspension_reason).toBeUndefined()
   })
 
   test("#given a resident host-session child #when the destruction port cancels it #then the session is closed and no pid is signalled", async () => {

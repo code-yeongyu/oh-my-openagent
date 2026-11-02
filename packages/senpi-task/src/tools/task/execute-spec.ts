@@ -4,7 +4,7 @@ import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
 import { taskSkillSummary } from "./skill-result"
-import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolDeps } from "./types"
+import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDeps } from "./types"
 
 type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 

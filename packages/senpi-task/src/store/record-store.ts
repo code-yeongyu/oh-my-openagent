@@ -36,12 +36,27 @@ export type TaskRecordStoreOptions = {
 
 type CacheEntry = {
   readonly record: TaskRecord
+  // Every rewrite is an atomic rename (record-write.ts), so a new inode marks it even when the size and a
+  // coarse filesystem mtime both stay the same: a same-length effect_seq bump read stale without it (#10708).
+  readonly ino: number
   readonly mtimeMs: number
   readonly size: number
   readonly warnings: readonly string[]
 }
 
-export function createTaskRecordStore(config: StateDirConfig, options: TaskRecordStoreOptions = {}): TaskRecordStore {
+/** What the store keeps resident, read by the on-demand memory report (oh-my-openagent#9442). */
+export type TaskRecordStoreResidentFigures = {
+  readonly cachedRecords: number
+  /** On-disk size of the cached records' files. */
+  readonly cachedRecordBytes: number
+  readonly openEventLogs: number
+}
+
+export type ResidentTaskRecordStore = TaskRecordStore & {
+  residentFigures(): TaskRecordStoreResidentFigures
+}
+
+export function createTaskRecordStore(config: StateDirConfig, options: TaskRecordStoreOptions = {}): ResidentTaskRecordStore {
   const stateDir = resolveStateDir(config)
   const platform = options.platform ?? process.platform
   const cache = new Map<string, CacheEntry>()
@@ -52,11 +67,16 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
     const record = readRecord(path, warnings)
     if (record === null) return
     const stat = statSync(path)
-    cache.set(path, { record, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
+    cache.set(path, { record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
   }
 
   return {
     stateDir,
+    residentFigures() {
+      let cachedRecordBytes = 0
+      for (const entry of cache.values()) cachedRecordBytes += entry.size
+      return { cachedRecords: cache.size, cachedRecordBytes, openEventLogs: appendFds.size }
+    },
     save(record) {
       const path = taskPath(stateDir, parseTaskId(record.task_id))
       writeRecord(path, record, "create", platform)
@@ -241,13 +261,13 @@ function readCached(path: string, cache: Map<string, CacheEntry>): TaskRecord | 
   }
 
   const hit = cache.get(path)
-  if (hit !== undefined && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
+  if (hit !== undefined && hit.ino === stat.ino && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
     return hit.record
   }
 
   const warnings: string[] = []
   const record = readRecord(path, warnings)
-  if (record !== null) cache.set(path, { record, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
+  if (record !== null) cache.set(path, { record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
   return record
 }
 

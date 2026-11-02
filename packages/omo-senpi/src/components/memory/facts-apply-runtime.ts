@@ -49,6 +49,7 @@ export async function applyMemoryFacts(input: {
   if (applied.outcome === "parent_dirty") {
     return { outcome: "parent_dirty", batchId, ...(applied.detail === undefined ? {} : { detail: applied.detail }) }
   }
+  if (applied.outcome === "unchanged") return { outcome: "no_facts", affectedPaths: [] }
   return { outcome: "committed", sha: applied.sha, affectedPaths: applied.affectedPaths, batchId }
 }
 
