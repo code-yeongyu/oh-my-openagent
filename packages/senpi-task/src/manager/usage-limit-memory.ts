@@ -12,7 +12,7 @@ const RESETS_AT = /\bresets?\s+(?:at\s+)?(\d{4}-\d{2}-\d{2}T[0-9:.]+(?:Z|[+-]\d{
 const FAMILY = /opus|sonnet|haiku|fable|mythos/i
 
 /** Rungs whose limit is shared: a named Claude family, otherwise the model itself. */
-export function modelFamily(modelId: string): string {
+function modelFamily(modelId: string): string {
   return FAMILY.exec(modelId)?.[0].toLowerCase() ?? modelId
 }
 
