@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:441d58d66fb83c18ae08cca89923a2f54212acf1bd07fc2e7d099db65e19a46d:4ab54f0de8f31ee0fe8bca960ff62fa33b64a6318b2725758f11ff485f2709d5
+// omo-codex-install:a0558b9ad212e0633ea53d61ed065bbb1aa6431d7e83e39b80639438ffa49a43:3b288abbaf163be3da4b5134a525776cd136f444e31407dc89bd1b9f32905eca
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -506,7 +506,7 @@ function createTelemetryClient(input) {
   const sharedProperties = getSharedProperties(input);
   return {
     enabled: true,
-    trackActive: ({ dayUTC, distinctId, reason, installHash, idScheme }) => {
+    trackActive: ({ dayUTC, distinctId, reason }) => {
       try {
         transport.capture({
           distinctId,
@@ -515,9 +515,7 @@ function createTelemetryClient(input) {
             ...sharedProperties,
             $process_person_profile: false,
             day_utc: dayUTC,
-            reason,
-            ...installHash === undefined ? {} : { install_hash: installHash },
-            ...idScheme === undefined ? {} : { id_scheme: idScheme }
+            reason
           }
         });
       } catch (error) {
@@ -10120,98 +10118,12 @@ var init_posthog_transport = __esm(() => {
 // packages/telemetry-core/src/events.ts
 var init_events = () => {};
 
-// packages/telemetry-core/src/device-id.ts
-import { execFileSync as execFileSync2 } from "node:child_process";
-import { createHash as createHash5 } from "node:crypto";
-import { readFileSync as readFileSync5 } from "node:fs";
-function normalizeDeviceId(value, pattern) {
-  const normalized = value.trim().toLowerCase();
-  if (!pattern.test(normalized))
-    return;
-  return /^0+$/.test(normalized.replaceAll("-", "")) ? undefined : normalized;
-}
-function parseDarwinPlatformUuid(ioregOutput) {
-  const match = /"IOPlatformUUID"\s*=\s*"([^"]+)"/.exec(ioregOutput);
-  return match === null ? undefined : normalizeDeviceId(match[1] ?? "", UUID_PATTERN);
-}
-function parseWindowsMachineGuid(regOutput) {
-  const match = /^\s*MachineGuid\s+REG_\w+\s+(\S+)\s*$/im.exec(regOutput);
-  return match === null ? undefined : normalizeDeviceId(match[1] ?? "", UUID_PATTERN);
-}
-function readRawDeviceId(deps) {
-  const platform = deps.platform ?? process.platform;
-  const readFile = deps.readFile ?? defaultReadFile;
-  const runCommand = deps.runCommand ?? defaultRunCommand2;
-  try {
-    if (platform === "linux") {
-      for (const file of ["/etc/machine-id", "/var/lib/dbus/machine-id"]) {
-        try {
-          const value = normalizeDeviceId(readFile(file), HEX32_PATTERN);
-          if (value !== undefined)
-            return value;
-        } catch {}
-      }
-      return;
-    }
-    if (platform === "darwin")
-      return parseDarwinPlatformUuid(runCommand("/usr/sbin/ioreg", ["-rd1", "-c", "IOPlatformExpertDevice"]));
-    if (platform === "win32") {
-      return parseWindowsMachineGuid(runCommand("reg", ["query", "HKLM\\SOFTWARE\\Microsoft\\Cryptography", "/v", "MachineGuid"]));
-    }
-    return;
-  } catch {
-    return;
-  }
-}
-function readEnvOverride(env) {
-  const raw = env[TELEMETRY_DEVICE_ID_ENV]?.trim().toLowerCase() ?? "";
-  if (raw === "")
-    return { kind: "unset" };
-  if (DISABLE_VALUES.has(raw))
-    return { kind: "off" };
-  const value = normalizeDeviceId(raw, UUID_PATTERN) ?? normalizeDeviceId(raw, HEX32_PATTERN) ?? normalizeDeviceId(raw, HEX64_PATTERN);
-  return value === undefined ? { kind: "unset" } : { kind: "id", value };
-}
-function hashDeviceId(rawId) {
-  return createHash5("sha256").update(DEVICE_HASH_DOMAIN).update(rawId).digest("hex");
-}
-function getTelemetryDeviceHash(deps = {}) {
-  const override = readEnvOverride(deps.env ?? process.env);
-  if (override.kind === "off")
-    return;
-  if (override.kind === "id")
-    return hashDeviceId(override.value);
-  const injected = deps.platform !== undefined || deps.readFile !== undefined || deps.runCommand !== undefined;
-  if (injected) {
-    const raw = readRawDeviceId(deps);
-    return raw === undefined ? undefined : hashDeviceId(raw);
-  }
-  if (cachedDefault === undefined) {
-    const raw = readRawDeviceId(deps);
-    cachedDefault = { value: raw === undefined ? undefined : hashDeviceId(raw) };
-  }
-  return cachedDefault.value;
-}
-var TELEMETRY_DEVICE_ID_ENV = "OMO_TELEMETRY_DEVICE_ID", DEVICE_HASH_DOMAIN = "omo:device:v1\x00", UUID_PATTERN, HEX32_PATTERN, HEX64_PATTERN, DISABLE_VALUES, COMMAND_TIMEOUT_MS = 2000, defaultReadFile = (path) => readFileSync5(path, "utf8"), defaultRunCommand2 = (command, args) => execFileSync2(command, [...args], {
-  encoding: "utf8",
-  maxBuffer: 1024 * 1024,
-  stdio: ["ignore", "pipe", "ignore"],
-  timeout: COMMAND_TIMEOUT_MS,
-  windowsHide: true
-}), cachedDefault;
-var init_device_id = __esm(() => {
-  UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-  HEX32_PATTERN = /^[0-9a-f]{32}$/;
-  HEX64_PATTERN = /^[0-9a-f]{64}$/;
-  DISABLE_VALUES = new Set(["0", "false", "no", "none", "off"]);
-});
-
 // packages/telemetry-core/src/install-id.ts
-import { createHash as createHash6, randomBytes } from "node:crypto";
-import { mkdirSync as mkdirSync5, readFileSync as readFileSync6, writeFileSync as writeFileSync2 } from "node:fs";
+import { createHash as createHash5, randomBytes } from "node:crypto";
+import { mkdirSync as mkdirSync5, readFileSync as readFileSync5, writeFileSync as writeFileSync2 } from "node:fs";
 import { dirname as dirname12, join as join38 } from "node:path";
 function getTelemetryInstallDistinctId(stateDir) {
-  return createHash6("sha256").update(readOrCreateInstallId(join38(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).digest("hex");
+  return createHash5("sha256").update(readOrCreateInstallId(join38(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).digest("hex");
 }
 function readOrCreateInstallId(path) {
   const persisted = readInstallId(path);
@@ -10243,7 +10155,7 @@ function readOrCreateInstallId(path) {
 }
 function readInstallId(path) {
   try {
-    const value = readFileSync6(path, "utf8").trim();
+    const value = readFileSync5(path, "utf8").trim();
     return INSTALL_ID_PATTERN.test(value) ? value : undefined;
   } catch {
     return;
@@ -10253,17 +10165,6 @@ var TELEMETRY_INSTALL_ID_FILE_NAME = "install-id", INSTALL_ID_PATTERN, fallbackI
 var init_install_id = __esm(() => {
   INSTALL_ID_PATTERN = /^[0-9a-f]{64}$/;
   fallbackInstallIds = new Map;
-});
-
-// packages/telemetry-core/src/identity.ts
-function getTelemetryIdentity(stateDir, input = {}) {
-  const installHash = getTelemetryInstallDistinctId(stateDir);
-  const deviceHash = getTelemetryDeviceHash({ ...input.deviceId, env: input.env ?? process.env });
-  return deviceHash === undefined ? { distinctId: installHash, installHash, idScheme: "install" } : { distinctId: deviceHash, installHash, idScheme: "device" };
-}
-var init_identity = __esm(() => {
-  init_device_id();
-  init_install_id();
 });
 
 // packages/telemetry-core/src/posthog-client.ts
@@ -10292,8 +10193,6 @@ var init_src = __esm(() => {
   init_env();
   init_event_id();
   init_events();
-  init_device_id();
-  init_identity();
   init_install_id();
   init_machine_id();
   init_posthog_client();
@@ -10306,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.57",
+    version: "5.1.58",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -10458,12 +10357,9 @@ function createPostHogClient(source, options = {}) {
       if (!activityState.captureDaily) {
         return;
       }
-      const identity = getTelemetryIdentity(options.stateDir ?? getActivityStateDir(), { env: options.env ?? process.env });
       client.trackActive({
         dayUTC: activityState.dayUTC,
-        distinctId: identity.distinctId,
-        idScheme: identity.idScheme,
-        installHash: identity.installHash,
+        distinctId: getTelemetryInstallDistinctId(options.stateDir ?? getActivityStateDir()),
         reason
       });
     },
@@ -24459,7 +24355,7 @@ function shellQuote(value) {
 
 // packages/omo-codex/src/install/lazycodex-manual-update.ts
 import { spawn as spawn3, spawnSync as spawnSync2 } from "node:child_process";
-import { readFileSync as readFileSync7 } from "node:fs";
+import { readFileSync as readFileSync6 } from "node:fs";
 import { dirname as dirname13, join as join41 } from "node:path";
 import { createInterface as createInterface2 } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -24690,7 +24586,7 @@ function resolveInstalledVersionPath(env, pluginRoot) {
 }
 function readVersionManifest(path) {
   try {
-    const parsed = JSON.parse(readFileSync7(path, "utf8"));
+    const parsed = JSON.parse(readFileSync6(path, "utf8"));
     if (typeof parsed === "object" && parsed !== null && "version" in parsed && typeof parsed.version === "string") {
       return parsed.version;
     }
