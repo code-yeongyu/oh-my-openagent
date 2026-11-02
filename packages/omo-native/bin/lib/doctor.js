@@ -10,6 +10,7 @@ import { migrationReport } from "./doctor-migration.js"
 import { launchSpecDoctorLines } from "./launch-spec-mode.js"
 import { piConfigReport } from "./doctor-pi-config.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
+import { sameVersion } from "./same-version.js"
 
 export function installedDistTag(version) {
   return releaseChannel(version)
@@ -401,7 +402,7 @@ export function runDoctor(inventory, args = [], options = {}) {
     try {
       const expected = packageManifest().dependencies["@code-yeongyu/senpi"]
       const installed = readJson(join(senpi.packageRoot, "package.json")).version
-      if (installed === expected) pass(lines, `senpi version ${installed}`)
+      if (sameVersion(installed, expected)) pass(lines, `senpi version ${installed}`)
       else {
         fail(lines, `senpi version: expected ${expected}, found ${installed}`)
         failed = true
