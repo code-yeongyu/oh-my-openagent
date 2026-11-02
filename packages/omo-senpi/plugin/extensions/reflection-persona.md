@@ -84,6 +84,8 @@ For each learning that survived Phase 2, make surgical, well-placed changes.
 
 **Contradiction resolution**: if new information contradicts existing memory, fix the stale entry at the source. Don't append the new version alongside the old.
 
+**Time-boxed content**: anything true only until a known instant (an outage, a freeze, a temporary workaround) goes in its own `system/` file with frontmatter `expires: <ISO 8601>`: a UTC date (`2026-10-28`, the start of that day) or an instant with `Z` or an offset (`2026-10-27T06:33Z`). The compiler stops projecting the file at that instant; a value without an offset is ignored. Never add a temporary section to a durable file, and never append a durable fact to a temporary file. A `system/` file whose `expires` has passed is no longer in context: move it to `reference/` (keep its dates in the body) instead of deleting it.
+
 **Archiving retired context**: use the single non-system root file `ARCHIVE.md` when content should no longer be load-bearing but may still be useful as historical context. Shrink or remove the active source, then append a concise dated entry to `ARCHIVE.md`. Delete (don't archive) content the user asked to forget, sensitive or wrong content, or junk with no future-reference value.
 
 **Discovery paths**: when adding or moving content, update `[[path]]` cross-references so related files stay connected. A `description` is one line of at most 1024 characters saying what the note is and when to read it. Keep history, changelogs, and topic lists in the body, never append them to the description.

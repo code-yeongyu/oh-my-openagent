@@ -201,7 +201,10 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ...(recovery === undefined ? {} : { now: recovery.now }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     planner: () => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } }),
-    destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
+    destruction: {
+      destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause),
+      get hostSessionCancel() { return lifecycle.hostSessionCancel },
+    },
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
   })
   const lifecycle = createTaskLifecycle({

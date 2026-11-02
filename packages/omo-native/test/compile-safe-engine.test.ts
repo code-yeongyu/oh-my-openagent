@@ -138,12 +138,8 @@ describe("compile-safe engine preparation", () => {
 
   describe("#given the patch script runs as postinstall does", () => {
     describe("#when the installed engine still resolves css-tree data dynamically", () => {
-      test("#then the script prepares css-tree along with the pi-ai floor", () => {
+      test("#then the script prepares css-tree", () => {
         const root = createEngine()
-        write(
-          join(root, "node_modules", "@earendil-works", "pi-ai", "dist", "api", "anthropic-messages.js"),
-          'const claudeCodeVersion = "2.1.251";\n',
-        )
         write(
           join(root, "dist", "modes", "rpc", "rpc-mode.js"),
           readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"),

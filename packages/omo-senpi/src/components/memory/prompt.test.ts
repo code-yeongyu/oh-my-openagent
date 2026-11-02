@@ -527,7 +527,7 @@ describe("createMemoryPromptHandler", () => {
 
     // then
     const line = result?.systemPrompt?.split("\n").find((candidate) => candidate.startsWith("$MEMORY_DIR/: "))
-    expect(line).toBe("$MEMORY_DIR/: note-a.md (+2 more; read $MEMORY_DIR/ to list)")
+    expect(line).toBe("$MEMORY_DIR/: note-a (+2 more; read $MEMORY_DIR/ to list)")
   }, 30_000)
 
   test("#given a prompt already carrying our sentinel block #when the handler runs #then the block is replaced, not duplicated", async () => {

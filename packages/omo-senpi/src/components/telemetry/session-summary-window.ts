@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto"
 import type { EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 
+import { KNOWN_MODELS } from "./model-vocabulary"
+
 export const MODEL_SLOTS = 3
 
 export type SummaryTurn = {
@@ -165,7 +167,8 @@ export function summaryProperties(sessionHash: string, window: SummaryWindow, me
   properties["cost_usd"] = usdOf(window.sums["cost_1e4"] ?? 0)
   for (let slot = 1; slot <= MODEL_SLOTS; slot += 1) {
     const model = ranked[slot - 1]
-    properties[`m${slot}_provider`] = model?.provider ?? "none"
+    // A window recovered from disk may predate a vocabulary change, so the provider is re-masked here, not trusted.
+    properties[`m${slot}_provider`] = model === undefined ? "none" : (Object.hasOwn(KNOWN_MODELS, model.provider) ? model.provider : "custom")
     properties[`m${slot}_model`] = model?.model ?? "none"
     for (const key of MODEL_SLOT_NUMBER_KEYS) properties[`m${slot}_${key}`] = model?.sums[key] ?? 0
     properties[`m${slot}_cost_usd`] = usdOf(model?.sums["cost_1e4"] ?? 0)

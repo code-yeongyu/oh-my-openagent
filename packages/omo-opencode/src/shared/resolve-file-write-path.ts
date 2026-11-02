@@ -8,7 +8,9 @@ import { dirname, isAbsolute, join, parse, sep } from "node:path"
  * The returned absolute path must also be the path handed to the executor.
  */
 export function resolveFileWritePath(filePath: string, cwd: string, followFinalSymlink = true): string {
-  const input = filePath.replace(/\\/g, sep)
+  // Both separators split the walk on every platform: a `/`-spelled tail left whole on win32 went
+  // through path.win32.join, which collapses `..` lexically before any link is followed (#11541).
+  const input = filePath.replace(/[\\/]/g, sep)
   const absolute = isAbsolute(input) ? input : `${realpathSync.native(cwd)}${sep}${input}`
   const root = parse(absolute).root
   let current = realpathSync.native(root)

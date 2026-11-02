@@ -28,7 +28,13 @@ import {
 } from "./runtime-loader"
 import { resolveOmoComputerSettings } from "./settings"
 import { watchFullAccess } from "./full-access"
-import { initialComputerState, skillStatusLine, toolActivatedNames, wireComputerControlEvents } from "./registration-support"
+import {
+  computerFailureText,
+  initialComputerState,
+  skillStatusLine,
+  toolActivatedNames,
+  wireComputerControlEvents,
+} from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
 import { wireComputerPermissionEvents } from "./permission-events"
 
@@ -198,7 +204,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
             if (commandCtx.hasUI === false) process.stderr.write(`${status}\n`)
           } catch (error) {
             if (!(error instanceof Error)) throw error
-            commandCtx.ui.notify(`/computer ${args.trim()}: ${error.message}`, "error")
+            commandCtx.ui.notify(`/computer ${args.trim()}: ${computerFailureText(error)}`, "error")
           }
         },
       })

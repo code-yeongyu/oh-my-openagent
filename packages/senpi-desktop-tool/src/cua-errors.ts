@@ -14,6 +14,10 @@ const ENGINE_TO_COMPUTER: Readonly<Record<string, string>> = {
 	BackgroundUnavailable: "COMPUTER_BACKGROUND_UNAVAILABLE",
 	ControlRequired: "COMPUTER_CONTROL_REQUIRED",
 	InputBusy: "COMPUTER_INPUT_BUSY",
+	UserIntervened: "COMPUTER_USER_INTERVENED",
+	AxUnconfirmed: "COMPUTER_AX_UNCONFIRMED",
+	SpaceUnsupported: "COMPUTER_SPACE_UNSUPPORTED",
+	SpaceMoveDenied: "COMPUTER_SPACE_MOVE_DENIED",
 	Cancelled: "COMPUTER_CANCELLED",
 	Timeout: "COMPUTER_CANCELLED",
 	timeout: "COMPUTER_CANCELLED",
@@ -44,6 +48,14 @@ function hint(code: string, stopHotkey: string): string | undefined {
 			return "Call desktop.control.acquire({ reason }) in computer run code (computer.control.acquire in an eval kernel) and let the human confirm before acting in the foreground; do not retry this action until that returns { active: true }.";
 		case "COMPUTER_INPUT_BUSY":
 			return "Another session holds the foreground control grant; it is never stolen, so continue in the background or retry once that session releases it.";
+		case "COMPUTER_USER_INTERVENED":
+			return "The user is working in this window. Read the window again after the user pauses and decide from what it shows now; never repeat the action as it was.";
+		case "COMPUTER_AX_UNCONFIRMED":
+			return "The app did not confirm the accessibility request, so it may already have taken effect. Read the element or window back before any retry.";
+		case "COMPUTER_SPACE_UNSUPPORTED":
+			return "Moving windows between Spaces is not available here; ask the user to bring the window to the current Space.";
+		case "COMPUTER_SPACE_MOVE_DENIED":
+			return "The window could not be moved to the current Space; ask the user to bring it over, then read the window again.";
 		default:
 			return undefined;
 	}

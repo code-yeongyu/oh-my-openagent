@@ -183,7 +183,6 @@ export const OMO_NATIVE_COMMON_PROPERTY_SCHEMAS = Object.freeze({
   ci: BOOLEAN_PROPERTY,
   event_id: STRING_PROPERTY,
   install_hash: STRING_PROPERTY,
-  machine_hash: STRING_PROPERTY,
   package_version: STRING_PROPERTY,
   platform: enumProperty(["omo-senpi"] as const),
   product_name: enumProperty(["omo-native"] as const),

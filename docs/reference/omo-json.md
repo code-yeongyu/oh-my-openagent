@@ -365,7 +365,7 @@ Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builti
 
 | Id | Display name | Chain |
 |----|--------------|-------|
-| `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3` (max) -> `glm-5.3` (max) |
+| `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `kimi-k3.1-pro` (max) -> `glm-5.3` (max) |
 | `daily-heavy` | Daily · Heavy | `claude-fable-5-1` (xhigh) |
 | `geeky-normal` | Obsessive · Normal | `gpt-6-astra` (medium, ChatGPT subscription/API/Copilot/OpenCode), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
 | `geeky-heavy` | Obsessive · Heavy | `gpt-6-astra` (high) |
@@ -404,6 +404,26 @@ Override semantics: a `model_profiles.<name>` entry that matches a builtin repla
 }
 ```
 
+### `model_pad`
+
+How clients draw the four builtin lanes as a 2x2 pad (OmO Desktop's Profile pad and its Settings > Models > Model pad section). The engine never reads it; it lives in `omo.json` so every client and device shows the same words (`schema/model-pad.ts`). A square's own name and model are its `model_profiles.<lane id>` entry (`display_name`, `models`), not part of this block.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `labels.daily` | string | Left column word; unset keeps "Daily". |
+| `labels.geeky` | string | Right column word; unset keeps "Obsessive". |
+| `labels.heavy` | string | Top row word; unset keeps "Heavy". |
+| `labels.normal` | string | Bottom row word; unset keeps "Normal". |
+
+```jsonc
+{
+  "model_pad": { "labels": { "daily": "Claude", "geeky": "GPT" } },
+  "model_profiles": {
+    "daily-normal": { "display_name": "Claude Normal", "models": [{ "model": "anthropic-subscription/claude-opus-5-5", "reasoning": "medium" }] }
+  }
+}
+```
+
 ### `agents`
 
 A record of agent name to definition (`schema/agent.ts`).
@@ -414,6 +434,7 @@ A record of agent name to definition (`schema/agent.ts`).
 | `prompt` | string | |
 | `model` | string | Sugar for a single-entry `models` list. |
 | `models` | model entries | Ordered chain; each entry is a bare string or `{ model, reasoning?, temperature?, top_p?, max_tokens?, provider_options? }`. |
+| `models_distribution` | `sequential \| round_robin` | Starting model policy for new tasks; defaults to `sequential`. Also supported on categories. |
 | `reasoning` | `off \| minimal \| low \| medium \| high \| xhigh \| max \| auto` \| string | Canonical reasoning field. |
 | `tools` | record<string, boolean> | |
 | `execution_mode` | `in-process \| process` | overrides `task.default_execution_mode`; curated builtin agents remain in-process |
@@ -424,6 +445,38 @@ A record of agent name to definition (`schema/agent.ts`).
 | `max_turns` | int >= 0 | |
 | `temperature` | number 0..2 | |
 | `disable` | boolean | |
+
+#### Distributing task models
+
+Set `models_distribution` next to `models` on a category or agent.
+`sequential` (the default) preserves the existing order. `round_robin` starts
+successive new children at successive entries: `[A, B, C]`, then `[B, C, A]`,
+then `[C, A, B]`. Parallel spawns reserve separate turns. Each category and agent
+has its own in-memory cursor within the task planner; restarting it resets the
+cursor. Inspection does not advance it.
+
+The choice is made once at spawn, not between messages or when resuming a
+child, so prompt caching is not disturbed. Unavailable models are still skipped,
+and error fallback and cooldowns still apply in the rotated order, without
+trying a model twice. This distributes model entries, not accounts within a
+provider.
+
+```jsonc
+{
+  "categories": {
+    "distributed": {
+      "models": ["provider-a/model-a", "provider-b/model-b", "provider-c/model-c"],
+      "models_distribution": "round_robin"
+    }
+  },
+  "agents": {
+    "researcher": {
+      "models": ["provider-a/model-a", "provider-b/model-b"],
+      "models_distribution": "round_robin"
+    }
+  }
+}
+```
 
 Deprecated keys accepted for back-compat and rewritten by migration:
 

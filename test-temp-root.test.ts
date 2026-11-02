@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
-import { spawnSync } from "node:child_process"
+import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeTreeSync } from "./test-support/remove-tree"
-import { removeAbandonedRunRoots } from "./test-temp-root"
+import { removeAbandonedRunRoots, removeRunRootAside } from "./test-temp-root"
 
 describe("test temp root teardown", () => {
   test("#given a removed run root #when another child starts #then temp variables point to the original live directories", () => {
@@ -121,4 +121,82 @@ describe("removeAbandonedRunRoots", () => {
     expect(existsSync(live)).toBe(true)
     expect(existsSync(unrelated)).toBe(true)
   })
+})
+
+describe("removeRunRootAside (#11630)", () => {
+  const fixtures: string[] = []
+  afterEach(() => {
+    for (const fixture of fixtures.splice(0)) removeTreeSync(fixture)
+  })
+
+  // Stands for the OS temp dir of a lane that keeps its bun caches there, beside one run's root.
+  function tempDirWithCachesAndRoot(files: number): { readonly tempDir: string; readonly cache: string; readonly root: string } {
+    const tempDir = mkdtempSync(join(tmpdir(), "omo-aside-"))
+    fixtures.push(tempDir)
+    const cache = join(tempDir, "bun-transpiler")
+    const root = join(tempDir, "omo-test-run-big")
+    for (const dir of [cache, root]) {
+      for (let group = 0; group < 10; group++) {
+        mkdirSync(join(dir, `g${group}`), { recursive: true })
+        for (let file = 0; file < files / 10; file++) writeFileSync(join(dir, `g${group}`, `f${file}`), "x")
+      }
+    }
+    writeFileSync(join(root, ".owner-pid"), String(process.pid))
+    return { tempDir, cache, root }
+  }
+
+  test.skipIf(process.platform === "win32")(
+    "#given a run root beside an unrelated cache tree #when it is removed aside #then its path empties at once, nothing else is touched, and the detached remover deletes it",
+    async () => {
+      const { tempDir, cache, root } = tempDirWithCachesAndRoot(200)
+
+      const remover = removeRunRootAside(root)
+
+      expect(existsSync(root)).toBe(false)
+      if (remover === undefined) throw new Error("expected a detached remover")
+      const code = remover.exitCode ?? (await new Promise<number | null>((resolve) => remover.once("exit", resolve)))
+      expect(code).toBe(0)
+      expect(readdirSync(tempDir)).toEqual(["bun-transpiler"])
+      expect(readdirSync(cache).flatMap((group) => readdirSync(join(cache, group)))).toHaveLength(200)
+    },
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "#given a remover that has not run yet #when the root is removed aside #then the caller returns without deleting anything itself",
+    async () => {
+      const { root } = tempDirWithCachesAndRoot(100)
+      const removing: string[] = []
+
+      const standIn = removeRunRootAside(root, (path) => {
+        removing.push(path)
+        return spawn("true")
+      })
+      if (standIn !== undefined && standIn.exitCode === null) await new Promise((resolve) => standIn.once("exit", resolve))
+
+      expect(removing).toEqual([`${root}.removing`])
+      expect(readdirSync(`${root}.removing`)).toHaveLength(11)
+    },
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "#given an abandoned root #when swept without an injected remover #then it is renamed aside for a detached remover",
+    async () => {
+      const { tempDir, root } = tempDirWithCachesAndRoot(100)
+      writeFileSync(join(root, ".owner-pid"), "999999999")
+      const removers: ChildProcess[] = []
+
+      removeAbandonedRunRoots(tempDir, undefined, (path) => {
+        const remover = spawn("/bin/rm", ["-rf", path], { stdio: "ignore" })
+        removers.push(remover)
+        return remover
+      })
+
+      expect(existsSync(root)).toBe(false)
+      expect(removers.map((remover) => remover.spawnargs.at(-1))).toEqual([`${root}.removing`])
+      for (const remover of removers) {
+        if (remover.exitCode === null) await new Promise((resolve) => remover.once("exit", resolve))
+      }
+      expect(readdirSync(tempDir)).toEqual(["bun-transpiler"])
+    },
+  )
 })
