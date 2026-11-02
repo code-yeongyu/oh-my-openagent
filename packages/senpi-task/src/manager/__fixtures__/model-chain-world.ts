@@ -10,26 +10,13 @@ import { InProcessRunner } from "../../runners/in-process"
 import { createInProcessManagedRunner } from "../runner"
 import type { ManagedRunner } from "../types"
 import type { ManagedChildHandle } from "../child-handle"
+import { answer, ALT, CLAUDE, MODELS, type Step, testModel } from "./model-chain-answers"
+import { type EngineRunner, type EngineRunnerKind, engineAgentDir, startEngineRunner } from "./model-chain-engines"
 
-export const CLAUDE = "pm-claude"
-export const GPT = "pm-gpt"
-export const ALT = "pm-alt"
+export { ALT, CLAUDE, type Step }
 export const COUNT_TOOL = "count_once"
 
-const QUOTA_ERROR =
-  `403: {"message":"You've reached your usage limit for this billing cycle. Your limit resets 3:20am.",` +
-  `"type":"access_terminated_error"}`
-
-// A content-policy refusal and a rejected credential: neither is a usage limit.
-const REFUSAL_ERROR = "400: This request was flagged as a possible cybersecurity risk and refused under the content policy."
-const AUTH_ERROR = "401: Unauthorized - invalid api key"
-
-// A limit whose wording names neither a model family nor the account (#11383).
-export const WEEKLY_LIMIT_ERROR = '{"type":"error","error":{"type":"rate_limit_error","message":"Weekly usage limit reached. Resets at 2099-10-29T04:27:07Z."}}'
-
-const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR, weekly: WEEKLY_LIMIT_ERROR } as const
-
-export type Step = keyof typeof ERRORS | "complete" | "silent" | { readonly tool: string } | { readonly partialTool: string }
+export type RunnerKind = "in-process" | EngineRunnerKind
 
 export type ProviderCall = {
   readonly model: string
@@ -38,30 +25,37 @@ export type ProviderCall = {
 
 export type ModelChainWorld = {
   readonly settingsPath: string
-  readonly calls: ProviderCall[]
+  readonly calls: readonly ProviderCall[]
   toolRuns(): number
   runner(): ManagedRunner
+  engineRunner(kind: EngineRunnerKind): Promise<ManagedRunner>
+  /** The settings file an engine runner reads, copied byte for byte from `settingsPath` when it starts. */
+  engineSettingsPath(kind: EngineRunnerKind): string
   dispose(): Promise<void>
 }
 
-const MODELS: Readonly<Record<string, readonly string[]>> = {
-  [CLAUDE]: ["primary", "sibling", "claude-opus-5-5"],
-  [GPT]: ["parent", "gpt-6-astra"],
-  [ALT]: ["rung"],
+export type ModelChainWorldOptions = {
+  readonly userFallbackChains?: Readonly<Record<string, readonly string[]>>
 }
 
 /**
  * Three logged-in providers behind a real senpi engine. Each model answers from its own script (then
  * completes), every request records how many tool results its context carried, and one tool counts
- * how often it actually ran, so a test can tell a resumed transcript from a re-run.
+ * how often it actually ran, so a test can tell a resumed transcript from a re-run. The same providers
+ * load into a per-child process or a socket host through `engineRunner`.
  */
-export async function createModelChainWorld(scripts: Readonly<Record<string, readonly Step[]>>): Promise<ModelChainWorld> {
+export async function createModelChainWorld(
+  scripts: Readonly<Record<string, readonly Step[]>>,
+  options: ModelChainWorldOptions = {},
+): Promise<ModelChainWorld> {
   const { ModelRegistry, ModelRuntime } = await loadSenpiBarrel()
   const root = mkdtempSync(join(tmpdir(), "senpi-task-model-chain-"))
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   const settingsPath = join(agentDir, "settings.json")
-  writeFileSync(settingsPath, `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary" }, null, 2)}\n`)
+  const retry = options.userFallbackChains === undefined ? {} : { retry: { fallbackChains: options.userFallbackChains } }
+  writeFileSync(settingsPath, `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary", ...retry }, null, 2)}\n`)
+  const engines: EngineRunner[] = []
   const modelRuntime = ModelRuntime.createSync({ agentDir })
   const modelRegistry = new ModelRegistry(modelRuntime)
   const remaining = new Map(Object.entries(scripts).map(([model, steps]) => [model, [...steps]]))
@@ -104,7 +98,9 @@ export async function createModelChainWorld(scripts: Readonly<Record<string, rea
 
   return {
     settingsPath,
-    calls,
+    get calls(): readonly ProviderCall[] {
+      return [...calls, ...engines.flatMap((engine) => engine.calls.map((model) => ({ model, toolResults: 0 })))]
+    },
     toolRuns: () => toolRuns,
     runner: () => {
       const runner = createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
@@ -118,68 +114,18 @@ export async function createModelChainWorld(scripts: Readonly<Record<string, rea
         return handle
       } }
     },
+    engineRunner: async (kind) => {
+      const engine = await startEngineRunner(kind, { root, settingsPath, scripts })
+      engines.push(engine)
+      return engine.runner
+    },
+    engineSettingsPath: (kind) => join(engineAgentDir(root, kind), "settings.json"),
     dispose: async () => {
       try {
         await Promise.all([...handles].map(async handle => { await handle.abort(); await handle.dispose() }))
+        for (const engine of engines.splice(0)) await engine.stop()
       } finally {
         rmSync(root, { recursive: true, force: true })
-      }
-    },
-  }
-}
-
-function testModel(id: string) {
-  return {
-    id,
-    name: id,
-    reasoning: false,
-    input: ["text"] as Array<"text">,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 200_000,
-    maxTokens: 4096,
-  }
-}
-
-function answer(provider: string, model: string, step: Step) {
-  const base = {
-    role: "assistant" as const,
-    api: "openai-completions" as const,
-    provider,
-    model,
-    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-    timestamp: Date.now(),
-  }
-  const toolCall = (name: string) => ({ type: "toolCall" as const, id: `call-${name}`, name, arguments: {} })
-  // The provider accepted the call and never answers.
-  if (step === "silent") return { result: () => new Promise<never>(() => {}), [Symbol.asyncIterator]: () => ({ next: () => new Promise<never>(() => {}) }) }
-  if (typeof step === "string" && step !== "complete") return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: ERRORS[step] })
-  if (step === "complete") {
-    return stream([], { ...base, content: [{ type: "text" as const, text: `${provider}/${model} completed` }], stopReason: "stop" as const })
-  }
-  if ("tool" in step) return stream([], { ...base, content: [toolCall(step.tool)], stopReason: "toolUse" as const })
-  // The limit lands while the call is still streaming: the provider had opened it, then errored.
-  const partial = { ...base, content: [toolCall(step.partialTool)], stopReason: "toolUse" as const }
-  return stream(
-    [{ type: "start", partial }, { type: "toolcall_start", contentIndex: 0, partial }],
-    { ...partial, stopReason: "error" as const, errorMessage: QUOTA_ERROR },
-  )
-}
-
-function stream<Message extends { readonly stopReason: string }>(opening: readonly unknown[], message: Message) {
-  const events = [
-    ...opening,
-    message.stopReason === "error" ? { type: "error", reason: "error", error: message } : { type: "done", reason: message.stopReason, message },
-  ]
-  return {
-    result: () => Promise.resolve(message),
-    [Symbol.asyncIterator]() {
-      let index = 0
-      return {
-        next(): Promise<IteratorResult<unknown>> {
-          const value = events[index]
-          index += 1
-          return Promise.resolve(value === undefined ? { value: undefined, done: true } : { value, done: false })
-        },
       }
     },
   }

@@ -1,69 +1,20 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { buildTaskExecute } from "../tools/task/execute"
-import { makeDeps } from "../tools/task/__fixtures__/task-tool-fakes"
-import { createTaskRecordStore } from "../store"
-import type { ResolvedModelRecord, TaskRecord } from "../state"
-import { createTaskManager } from "./manager"
-import type { ResolvedChildPlan } from "./types"
-import { cleanupProjects, settings, tempProject } from "./__fixtures__/manager-fakes"
-import { ALT, CLAUDE, COUNT_TOOL, createModelChainWorld, GPT, type ModelChainWorld, type Step } from "./__fixtures__/model-chain-world"
+import { cleanupProjects } from "./__fixtures__/manager-fakes"
+import { PARENT, runCategoryChild as runChild, type DesignatedChildInput } from "./__fixtures__/designated-child"
+import { ALT, CLAUDE, COUNT_TOOL, type ModelChainWorld } from "./__fixtures__/model-chain-world"
 
-// The parent session runs on a working, logged-in model of another provider. No child may ever call it.
-const PARENT_MODEL = { provider: GPT, id: "parent" } as const
-const PARENT = `${GPT}/parent`
 const PRIMARY = `${CLAUDE}/primary`
 const SECOND = `${ALT}/rung`
 
-const rung = (display: string): ResolvedModelRecord => {
-  const [provider = "", id = ""] = display.split("/")
-  return { source: "category", provider, model_id: id, display }
-}
-
-function chainPlan(category: string, chain: readonly string[]): ResolvedChildPlan {
-  const [head, ...rest] = chain.map(rung)
-  if (head === undefined) throw new Error("empty chain")
-  return { model: head.display, category, requested_model: head, resolved_model: head, fallback_models: rest }
-}
-
 let world: ModelChainWorld | undefined
-afterEach(() => {
-  world?.dispose()
+afterEach(async () => {
+  await world?.dispose()
   world = undefined
   cleanupProjects()
 })
 
-async function runCategoryChild(input: {
-  readonly category: string
-  readonly chain: readonly string[]
-  readonly scripts: Readonly<Record<string, readonly Step[]>>
-}): Promise<{ readonly record: TaskRecord; readonly world: ModelChainWorld }> {
-  world = await createModelChainWorld(input.scripts)
-  const project = tempProject()
-  const runner = world.runner()
-  const manager = createTaskManager({
-    store: createTaskRecordStore({ project_dir: project }),
-    runners: { "in-process": runner, process: runner },
-    planner: () => ({ kind: "resolved", plan: chainPlan(input.category, input.chain) }),
-    config: settings({ default_concurrency: 2, max_depth: 1 }),
-    cwd: project,
-    destruction: { destroyResidentTask: async () => {} },
-  })
-  try {
-    // The parent session calls the real task tool while it runs on PARENT_MODEL.
-    const execute = buildTaskExecute(makeDeps(manager))
-    const result = await execute("call-1", { prompt: "do the thing", category: input.category, run_in_background: true }, undefined, undefined, {
-      cwd: project,
-      sessionManager: { getSessionId: () => "parent-1" },
-      model: PARENT_MODEL,
-    })
-    const taskId = result.details.task_id
-    if (typeof taskId !== "string" || !taskId.startsWith("st_")) throw new Error(`child did not start: ${JSON.stringify(result.details)}`)
-    return { record: await manager.waitFor(taskId), world }
-  } finally {
-    manager.workpools.dispose()
-  }
-}
+const runCategoryChild = (input: DesignatedChildInput) => runChild(input, (adopted) => { world = adopted })
 
 describe("a child runs only on its designated models, never on the parent's model", () => {
   test.each([
