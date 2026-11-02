@@ -101,3 +101,35 @@ describe("failureFingerprint", () => {
     expect(failureFingerprint(undefined, undefined)).toBe("failed:")
   })
 })
+
+const REAPER_ADVISORY =
+  "child reaper unavailable under Bun on win32: children orphaned by a terminated worker thread stay as zombies until this host exits"
+
+describe("Bun's win32 child-reaper advisory", () => {
+  test("#given the advisory ahead of a provider sentence #when the cause is distilled #then the provider sentence is the cause", () => {
+    // given
+    const detail = [
+      REAPER_ADVISORY,
+      "The provider started the response and then went silent within 2m, so the request was cancelled.",
+    ].join("\n")
+
+    // when / then
+    expect(childFailureCause(detail)).toBe(
+      "The provider started the response and then went silent within 2m, so the request was cancelled.",
+    )
+  })
+
+  test("#given two failures that differ only after the advisory #when fingerprinted #then the fingerprints differ", () => {
+    // given
+    const first = [REAPER_ADVISORY, REAPER_ADVISORY, "HTTP 530 from the upstream tunnel"].join("\n")
+    const second = [REAPER_ADVISORY, "401 authentication_error: api_key_expired"].join("\n")
+
+    // when / then
+    expect(failureFingerprint("child_exit", first)).not.toBe(failureFingerprint("child_exit", second))
+  })
+
+  test("#given only the advisory #when the cause is distilled #then there is no cause", () => {
+    // when / then
+    expect(childFailureCause(REAPER_ADVISORY)).toBeUndefined()
+  })
+})
