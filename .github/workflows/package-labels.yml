@@ -1,10 +1,17 @@
 name: Package Labels
 
 on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Open pull request to relabel"
+        required: true
+        type: string
   issues:
     types: [opened, edited]
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows: [PR Automation Signal]
+    types: [completed]
 
 permissions:
   contents: read
@@ -17,8 +24,59 @@ env:
   GENERATED_LABEL: lazycodex-generated
   PACKAGE_LABEL_COLOR: ededed
 
+concurrency:
+  # Only PR Automation Signal runs are grouped: a newer signal for the same PR head supersedes the older run. Every
+  # other trigger (CLA signing/recheck comments, any other comment, issues, dispatch, schedule, merge_group) keys on its
+  # own run id, so nothing can cancel or replace a run that is recording a CLA signature or a manual recheck.
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && format('signal-{0}:{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
+
 jobs:
+  resolve-pr:
+    # A cancelled or skipped PR Automation Signal run carries no result to act on: skip cleanly.
+    # A real upstream failure still runs and fails. notice-skipped-signal records the skip.
+    if: >-
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        github.event.workflow_run.conclusion != 'skipped') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    outputs:
+      number: ${{ steps.pr.outputs.number }}
+      title: ${{ steps.pr.outputs.title }}
+      body: ${{ steps.pr.outputs.body }}
+    steps:
+      - name: Check out trusted automation helper
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          sparse-checkout: script/pr-automation-context.mjs
+          sparse-checkout-cone-mode: false
+      - name: Resolve current PR from GitHub run metadata
+        id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { pathToFileURL } = await import('node:url');
+            const { resolveAutomationPR } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/script/pr-automation-context.mjs`).href);
+            const pr = await resolveAutomationPR({ github, context, core });
+            if (!pr) return;
+            core.setOutput('number', pr.number);
+            core.setOutput('title', pr.title);
+            core.setOutput('body', pr.body ?? '');
+      - name: Write job summary
+        if: always()
+        run: echo 'Resolved current PR identity from authenticated GitHub metadata.' >> "$GITHUB_STEP_SUMMARY"
+
   ensure-labels:
+    # Skip for cancelled or skipped signals; notice-skipped-signal records the skip instead.
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion != 'cancelled' && github.event.workflow_run.conclusion != 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Ensure canonical labels exist
@@ -73,16 +131,16 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   label-pull-request:
-    needs: [ensure-labels]
-    if: github.event_name == 'pull_request_target'
+    needs: [ensure-labels, resolve-pr]
+    if: github.event_name != 'issues' && needs.resolve-pr.outputs.number != ''
     runs-on: ubuntu-latest
     steps:
       - name: Label by changed packages and PR text
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ needs.resolve-pr.outputs.number }}
+          PR_TITLE: ${{ needs.resolve-pr.outputs.title }}
+          PR_BODY: ${{ needs.resolve-pr.outputs.body }}
         run: |
           set -euo pipefail
 
@@ -218,4 +276,52 @@ jobs:
             echo "### If this fails"
             echo
             echo "Check issue edit permissions and the matched label names."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notice-skipped-signal:
+    # Runs exactly when the consumer jobs skipped for a cancelled or skipped signal: if no
+    # newer completed signal run covers the same head, say so loudly instead of exiting silently.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      (github.event.workflow_run.conclusion == 'cancelled' ||
+        github.event.workflow_run.conclusion == 'skipped')
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - name: Report a skipped signal with no newer run for this head
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const head = context.payload.workflow_run.head_sha;
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'pr-automation-signal.yml',
+              head_sha: head,
+              per_page: 100,
+            });
+            const thisId = context.payload.workflow_run.id;
+            const newer = data.workflow_runs.filter((run) => run.id > thisId);
+            if (newer.length > 0) {
+              core.info(`A newer PR Automation Signal run (${newer[0].run_number}) covers head ${head.slice(0, 10)}; this signal carried no result to act on.`);
+              return;
+            }
+            core.warning(`No newer PR Automation Signal run for head ${head.slice(0, 10)}: the ${context.workflow} checks have NOT run for this head. Re-run with workflow_dispatch (pr_number) if this head still needs them.`);
+            await core.summary
+              .addHeading(`${context.workflow}: checks skipped on a cancelled signal`)
+              .addRaw(`No newer PR Automation Signal run exists for head ${head.slice(0, 10)}. The checks did not run. Use the workflow_dispatch input pr_number to run them for this PR.`)
+              .write();
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Skipped-signal notice"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Event | \`${{ github.event_name }}\` |"
+            echo "| Upstream conclusion | \`${{ github.event.workflow_run.conclusion }}\` |"
+            echo "| Detail | see the notice step output above |"
           } >> "$GITHUB_STEP_SUMMARY"

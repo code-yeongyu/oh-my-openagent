@@ -3,6 +3,7 @@
 
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
+import { memoryHookChecker } from "../worker/spawn-supervisor-support"
 
 import {
   GitMemoryRepo,
@@ -22,7 +23,7 @@ export function openRepo(deps: MemoryCommandDeps, identity: MemoryCommandIdentit
     agentId: identity.identity,
     // installHooks returns the installed hook list; the repo option expects void.
     installHooks: (dir: string) => {
-      installHooks(dir)
+      installHooks(dir, { checker: memoryHookChecker() })
     },
     ...(deps.exec === undefined ? {} : { exec: deps.exec }),
   })

@@ -113,6 +113,11 @@ describe("Senpi compatibility test script", () => {
         await mkdir(join(pluginRoot, "skills", skillName), { recursive: true })
         await writeFile(join(pluginRoot, "skills", skillName, "SKILL.md"), `# ${skillName}\n`)
       }
+      // The browser skill's bundled omowright runtime is a required payload artifact (issue #9661);
+      // the packed layout mirrors it so the installer's integrity check passes.
+      await mkdir(join(pluginRoot, "skills", "browser", "runtime", "omowright"), { recursive: true })
+      await writeFile(join(pluginRoot, "skills", "browser", "runtime", "omowright", "index.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "skills", "browser", "runtime", "omowright", "page-bundle.js"), "\n")
       // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
       await mkdir(join(pluginRoot, "skills-conditional", "x-search"), { recursive: true })
       await writeFile(join(pluginRoot, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
@@ -121,9 +126,28 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "omo-task.js"), "export const createTaskComponent = () => ({})\n")
       await writeFile(join(pluginRoot, "extensions", "omo-member.js"), "export const runMember = () => undefined\n")
       await writeFile(join(pluginRoot, "extensions", "omo-computer-use.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-doctor.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-memfs.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-palace.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-device-account.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-commands.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-session-history.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-recall-store.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-telemetry-posthog.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-telemetry-otlp.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-memory-sync.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "loro_wasm_bg.wasm"), "")
+      await writeFile(join(pluginRoot, "extensions", "CaseFolding.txt"), "")
+      await writeFile(join(pluginRoot, "extensions", "omo-thread-client.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-telemetry-recovery.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-feedback.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-desktop-toolkit.js"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-claim-receipt.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
+      await mkdir(join(pluginRoot, "runtime", "thread-sdk"), { recursive: true })
+      await writeFile(join(pluginRoot, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
       await writeFile(join(pluginRoot, "extensions", "dream-persona.md"), "# dream persona fixture\n")
       await writeFile(join(pluginRoot, "extensions", "facts-persona.md"), "# facts persona fixture\n")
@@ -133,6 +157,7 @@ describe("Senpi compatibility test script", () => {
       // The memory run supervisor ships as its own executable artifact beside the bundle, so a
       // packed root without it is genuinely incomplete and the installer is right to reject it.
       await writeFile(join(pluginRoot, "extensions", "memory-run-supervisor.mjs"), "#!/usr/bin/env node\n")
+      await writeFile(join(pluginRoot, "extensions", "gateway-store-worker.mjs"), "export {}\n")
       await mkdir(join(pluginRoot, "scripts"), { recursive: true })
       await writeFile(join(pluginRoot, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
       await mkdir(join(pluginRoot, "runtime", "lsp-daemon", "dist"), { recursive: true })
@@ -194,7 +219,7 @@ describe("Senpi compatibility test script", () => {
     // #when
     const expectedCommands = [
       "bun run build:senpi-plugin",
-      "tsgo --noEmit -p packages/omo-senpi/tsconfig.json",
+      "bun check --no-script --all -p packages/omo-senpi/tsconfig.json",
       "bun test --timeout 20000 packages/omo-senpi",
     ]
     const commandIndexes = expectedCommands.map((command) => script.indexOf(command))
@@ -216,17 +241,24 @@ describe("Senpi compatibility test script", () => {
 
     // #when
     const senpiJob = sliceWorkflowSection(workflow, "  senpi-compatibility:", "  lazycodex-published-smoke:")
+    const posixScript = readFileSync(new URL("../.github/scripts/ci-senpi-posix.sh", import.meta.url), "utf8")
     const needsReferences = workflow.match(/needs: \[[^\]]*senpi-compatibility[^\]]*\]/g) ?? []
 
     // #then
-    expect(senpiJob).toContain("os: [ubuntu-latest, macos-latest, windows-latest]")
+    expect(senpiJob).toContain("os: [ubuntu-latest, windows-latest]")
+    expect(senpiJob).toContain("bash .github/scripts/ci-senpi-posix.sh")
     expect(senpiJob).toContain('node-version: "24"')
-    expect(senpiJob).toContain('bun-version: "1.4.2"')
+    expect(senpiJob).toContain('bun-version: "1.4.4"')
     expect(senpiJob).toContain("bun run build:senpi-plugin")
     expect(senpiJob).toContain("npm pack --pack-destination")
     expect(senpiJob).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
-    expect(senpiJob).toContain("tsgo --noEmit -p packages/omo-senpi/tsconfig.json")
-    expect(senpiJob).toContain("bun test --timeout 20000 packages/omo-senpi")
+    expect(senpiJob).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
+    expect(posixScript).toContain("bun run build:senpi-plugin")
+    expect(posixScript).toContain("npm pack --pack-destination")
+    expect(posixScript).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
+    expect(posixScript).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
+    expect(posixScript).toContain("bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs")
+    expect(posixScript).toContain("bun test --timeout 20000 packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")
     expect(needsReferences.length, "senpi-compatibility must be included in both downstream needs lists").toBeGreaterThanOrEqual(2)
   })

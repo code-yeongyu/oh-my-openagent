@@ -19,6 +19,8 @@ fn host_only_methods_are_refused_by_the_bridge() {
     for method in [
         "desktop.session.open",
         "desktop.session.close",
+        "desktop.control.grant",
+        "desktop.control.revoke",
         "desktop.stopPath.start",
         "desktop.stopPath.heartbeat",
         "desktop.stopPath.resume",
@@ -46,6 +48,12 @@ fn public_methods_forward_without_the_prefix_and_others_are_unknown() {
     assert_eq!(
         translate("desktop.click", json!({"x": 1})).ok(),
         Some(("click".to_owned(), json!({"x": 1})))
+    );
+    assert_eq!(
+        translate("desktop.control.state", json!({}))
+            .ok()
+            .map(|(method, _)| method),
+        Some("control.state".to_owned())
     );
     assert_eq!(rejected("click"), Some(MethodRejection::Unknown));
     assert_eq!(rejected("desktop.nope"), Some(MethodRejection::Unknown));

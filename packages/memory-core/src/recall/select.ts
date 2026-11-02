@@ -4,7 +4,7 @@
 // path. matchScore is reused over a description+body haystack (the SearchDocument
 // projection does not fit recall files, so the haystack is composed directly).
 
-import { matchScoreNormalized, normalizeText, parseQuery, type ParsedQuery } from "../search"
+import { matchScoreNormalized, parseQuery, type ParsedQuery } from "../search"
 import {
   isHanCharacter,
   rankRecallDocumentsBm25,
@@ -13,6 +13,7 @@ import {
   tokenizeRecallText,
   type RecallQueryExpansions,
 } from "./bm25"
+import { buildExcerpt } from "./excerpt"
 import { normalizedHaystack } from "./haystack"
 import type { RecallDocument } from "./provider"
 import { chooseRecallStrategy, hasCjk, type RecallStrategy } from "./strategy"
@@ -24,8 +25,10 @@ export interface RecallCandidate {
   readonly score: number
 }
 
-/** Excerpt window length. Internal, deliberately not a config knob. */
-const EXCERPT_CHARS = 200
+/** A candidate before selection applies the cap; its excerpt is built only if it is returned. */
+interface RankedCandidate extends Omit<RecallCandidate, "excerpt"> {
+  readonly excerpt: () => string
+}
 
 export interface SelectRecallOptions {
   readonly maxItems: number
@@ -67,8 +70,10 @@ export function selectRecallCandidates(
   if (maxItems === 0 || parsedQueries.length === 0) return []
   const strategy = options.strategy ?? chooseRecallStrategy(documents, queries)
   const unwidened = rankByStrategy(documents, queries, parsedQueries, options, strategy)
-  if (!addsTerms(queries, options.expansions)) return unwidened.slice(0, maxItems)
-  return widenCandidates(documents, queries, parsedQueries, options, strategy, unwidened).slice(0, maxItems)
+  const ranked = addsTerms(queries, options.expansions)
+    ? widenCandidates(documents, queries, parsedQueries, options, strategy, unwidened)
+    : unwidened
+  return ranked.slice(0, maxItems).map((candidate) => ({ ...candidate, excerpt: candidate.excerpt() }))
 }
 
 /**
@@ -87,7 +92,7 @@ function rankByStrategy(
   parsedQueries: readonly ParsedQuery[],
   options: SelectRecallOptions,
   strategy: RecallStrategy,
-): RecallCandidate[] {
+): RankedCandidate[] {
   if (strategy === "bm25") return rankBm25(documents, queries, options, undefined).candidates
   if (strategy === "hybrid") return pinPhraseLeader(
     fuseCandidates(rankSubstringCandidates(documents, parsedQueries, options), rankBm25(documents, queries, options, undefined).candidates),
@@ -110,8 +115,8 @@ function widenCandidates(
   parsedQueries: readonly ParsedQuery[],
   options: SelectRecallOptions,
   strategy: RecallStrategy,
-  unwidened: readonly RecallCandidate[],
-): RecallCandidate[] {
+  unwidened: readonly RankedCandidate[],
+): RankedCandidate[] {
   const widened = rankBm25(documents, queries, options, options.expansions)
   const holdsEveryWord = new Set(widened.fullMatches)
   if (strategy !== "bm25") {
@@ -132,9 +137,9 @@ function rankSubstringCandidates(
   documents: readonly RecallDocument[],
   parsedQueries: readonly ParsedQuery[],
   options: SelectRecallOptions,
-): RecallCandidate[] {
+): RankedCandidate[] {
   const queryTerms = collectQueryTerms(parsedQueries)
-  const scored: RecallCandidate[] = []
+  const scored: RankedCandidate[] = []
   for (const document of documents) {
     if (isExcluded(document.path, options)) continue
 
@@ -150,7 +155,7 @@ function rankSubstringCandidates(
     scored.push({
       path: document.path,
       description: document.description,
-      excerpt: buildExcerpt(document.body, queryTerms),
+      excerpt: () => buildExcerpt(document.body, queryTerms),
       score: best,
     })
   }
@@ -168,7 +173,7 @@ function rankBm25(
   queries: readonly string[],
   options: SelectRecallOptions,
   expansions: RecallQueryExpansions | undefined,
-): { readonly candidates: RecallCandidate[]; readonly fullMatches: string[] } {
+): { readonly candidates: RankedCandidate[]; readonly fullMatches: string[] } {
   // One-character tokens (a lone CJK syllable, a version digit) match almost anywhere and would drag the window.
   // A Han character is a ranking term of its own, so it anchors the window only when no longer token does.
   const tokens = [...new Set(queries.flatMap(tokenizeRecallText))]
@@ -179,7 +184,7 @@ function rankBm25(
   const added = [...new Set(expansionTexts(expansions).flatMap(tokenizeRecallText))]
   const addedTokens = added.filter((token) => Array.from(token).length > 1)
   const addedHanCharacters = added.filter(isHanCharacter)
-  const candidates: RecallCandidate[] = []
+  const candidates: RankedCandidate[] = []
   const fullMatches: string[] = []
   for (const { document, score, fullMatch } of rankRecallDocumentsBm25(documents, queries, expansions)) {
     if (isExcluded(document.path, options)) continue
@@ -188,7 +193,7 @@ function rankBm25(
       path: document.path,
       description: document.description,
       // The tokens are NFKC, so the window is searched in the NFKC body to stay anchored.
-      excerpt: buildExcerpt(document.body.normalize("NFKC"), queryTokens, hanCharacters, addedTokens, addedHanCharacters),
+      excerpt: () => buildExcerpt(document.body.normalize("NFKC"), queryTokens, hanCharacters, addedTokens, addedHanCharacters),
       score: 1 / (1 + score),
     })
   }
@@ -204,9 +209,9 @@ function rankBm25(
  * on the bm25 rank (a note bm25 does not rank sorts after one it does) and only then on the path. A
  * note keeps its substring excerpt when it has one. The score keeps the contract as 1 / (1 + fused).
  */
-function fuseCandidates(substring: readonly RecallCandidate[], bm25: readonly RecallCandidate[]): RecallCandidate[] {
-  const fused = new Map<string, { candidate: RecallCandidate; weight: number; bm25Rank: number }>()
-  const vote = (candidate: RecallCandidate, weight: number, bm25Rank: number): void => {
+function fuseCandidates(substring: readonly RankedCandidate[], bm25: readonly RankedCandidate[]): RankedCandidate[] {
+  const fused = new Map<string, { candidate: RankedCandidate; weight: number; bm25Rank: number }>()
+  const vote = (candidate: RankedCandidate, weight: number, bm25Rank: number): void => {
     const entry = fused.get(candidate.path)
     if (entry === undefined) fused.set(candidate.path, { candidate, weight, bm25Rank })
     else {
@@ -264,7 +269,7 @@ function phraseLeaderPath(
  * only add notes around it and never demote the note an exact phrase found. It takes the first place's
  * score so the list stays ascending.
  */
-function pinPhraseLeader(fused: readonly RecallCandidate[], leaderPath: string | undefined): RecallCandidate[] {
+function pinPhraseLeader(fused: readonly RankedCandidate[], leaderPath: string | undefined): RankedCandidate[] {
   const leader = fused.find((candidate) => candidate.path === leaderPath)
   const first = fused[0]
   if (leader === undefined || first === undefined || leader === first) return [...fused]
@@ -278,37 +283,4 @@ function collectQueryTerms(parsedQueries: readonly ParsedQuery[]): string[] {
     for (const phrase of parsed.phrases) terms.push(...phrase.split(/\s+/).filter(Boolean))
   }
   return terms
-}
-
-/**
- * Excerpt is a body region centered on the first query-term match, or the body
- * head when no query term matches the body. Each list of fallback terms is searched
- * only when no earlier list matches. Whitespace is collapsed to single spaces and the
- * result never exceeds EXCERPT_CHARS.
- */
-function buildExcerpt(body: string, terms: readonly string[], ...fallbackTerms: readonly (readonly string[])[]): string {
-  const normalized = body.replace(/\s+/g, " ").trim()
-  if (normalized === "") return ""
-
-  const lowered = normalized.toLowerCase()
-  let matchIndex = -1
-  let matchLength = 0
-  for (const candidates of [terms, ...fallbackTerms]) {
-    if (matchIndex >= 0) break
-    for (const term of candidates) {
-      const needle = normalizeText(term)
-      if (needle === "") continue
-      const index = lowered.indexOf(needle)
-      if (index >= 0 && (matchIndex < 0 || index < matchIndex)) {
-        matchIndex = index
-        matchLength = needle.length
-      }
-    }
-  }
-  if (matchIndex < 0) return normalized.slice(0, EXCERPT_CHARS)
-
-  const start = Math.max(0, matchIndex - Math.floor((EXCERPT_CHARS - matchLength) / 2))
-  const end = Math.min(normalized.length, start + EXCERPT_CHARS)
-  const clampedStart = Math.max(0, end - EXCERPT_CHARS)
-  return normalized.slice(clampedStart, end).trim()
 }

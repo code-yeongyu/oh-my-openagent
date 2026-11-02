@@ -28,6 +28,22 @@ it("carries engine permission metadata through the public computer result", asyn
 	expect(methodsOf(fixture.log).filter((method) => method === "keyChord")).toHaveLength(1);
 }, 30_000);
 
+it("marks the denial inside details so the code-mode marshal reports hasError", async () => {
+	const fixture = desktopFixture({}, { FAKE_ENGINE_INPUT_ERROR: "PermissionDenied" });
+	const tool = createComputerTool({
+		handle: fixture.handle,
+		executeTool: () => Promise.reject(new Error("no host tools")),
+	});
+	const result = await tool.execute("permission", {
+		action: "call", chain: [{ method: "press", args: [["enter"]] }],
+	}, undefined, undefined, hostContext());
+	// The direct-call shape is unchanged...
+	expect(result.isError).toBe(true);
+	expect(result.details.value).toMatchObject({ code: "COMPUTER_PERMISSION_REQUIRED" });
+	// ...and the error flag also lives inside details, which is what a code-mode marshal reads.
+	expect(result.details.isError).toBe(true);
+}, 30_000);
+
 it("retains the engine message while exposing the same permission payload", () => {
 	const data = { permission: "screen_recording", settingsUrl: "settings:capture", app: "QA App",
 		relaunchRequired: true } as const;

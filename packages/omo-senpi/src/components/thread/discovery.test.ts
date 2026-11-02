@@ -19,6 +19,14 @@ const THREAD_TOOL_NAMES = [
 	"thread_rename",
 	"thread_set_model",
 	"thread_set_reasoning",
+	"thread_bind",
+	"thread_unbind",
+	"thread_rebind",
+	"thread_bindings",
+	"thread_report",
+	"thread_outbox",
+	"thread_outbox_ack",
+	"thread_answer",
 ] as const
 
 const sampleParameters: ToolInfo["parameters"] = {
@@ -110,6 +118,14 @@ describe("thread tool discovery through the real tool-search service", () => {
 			["rename this session", "thread_rename"],
 			["switch this session to a different model", "thread_set_model"],
 			["set the reasoning level for this session", "thread_set_reasoning"],
+			["connect a discord thread to this session", "thread_bind"],
+			["disconnect the chat thread from this session", "thread_unbind"],
+			["move the chat to another session", "thread_rebind"],
+			["which chats are connected to sessions", "thread_bindings"],
+			["post progress to the discord thread", "thread_report"],
+			["drain the outbox for the chat", "thread_outbox"],
+			["confirm the reports were posted to chat", "thread_outbox_ack"],
+			["answer the relayed question from the chat", "thread_answer"],
 		]
 		for (const [query, expected] of cases) {
 			// when each user phrase goes through the real BM25 scorer
@@ -162,8 +178,8 @@ describe("thread tool discovery through the real tool-search service", () => {
 })
 
 describe("thread family metadata shape", () => {
-	test("the family carries nine entries with unique names", () => {
-		expect(THREAD_TOOL_SEARCH_METADATA.length).toBe(9)
+	test("the family carries seventeen entries with unique names", () => {
+		expect(THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)).toEqual([...THREAD_TOOL_NAMES])
 		const names = THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)
 		expect(new Set(names).size).toBe(names.length)
 	})
@@ -179,6 +195,14 @@ describe("thread family metadata shape", () => {
 			"Rename session",
 			"Switch session model",
 			"Set session reasoning level",
+			"Bind session to chat thread",
+			"Unbind chat thread",
+			"Rebind chat thread",
+			"List chat bindings",
+			"Report to chat thread",
+			"Read chat outbox",
+			"Acknowledge chat outbox",
+			"Answer relayed question",
 		])
 	})
 

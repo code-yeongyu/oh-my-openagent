@@ -7,6 +7,7 @@ import { repoRoot, pluginRoot } from "./omo-native-telemetry-provider.mjs"
 import { assertEnabled, parseCapturedEvents } from "./omo-native-telemetry-assertions.mjs"
 import { findExecutable, startCaptureServer, readCaptureRequests, closeCaptureServer, removeSandboxes } from "./omo-native-telemetry-capture.mjs"
 import { driveCli } from "./omo-native-telemetry-drive.mjs"
+import { withTelemetryOptOut } from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { redactEvents, sanitizeTranscript, evidenceMarkdown } from "./omo-native-telemetry-evidence.mjs"
 export { assertAllowlistCoverage } from "./omo-native-telemetry-assertions.mjs"
 export { mockProviderSource } from "./omo-native-telemetry-provider.mjs"
@@ -37,7 +38,7 @@ function parseArgs(argv) {
 }
 
 function runHelp(senpiBin) {
-  const result = spawnSync(senpiBin, ["--help"], { cwd: repoRoot, encoding: "utf8", timeout: 30_000 })
+  const result = spawnSync(senpiBin, ["--help"], { cwd: repoRoot, encoding: "utf8", env: withTelemetryOptOut(process.env), timeout: 30_000 })
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`
   if (result.status !== 0) throw new Error(`senpi --help failed with exit ${result.status}\n${output}`)
   if (!/(?:--print, -p|--print\b[\s\S]*\b-p\b)/.test(output)) {

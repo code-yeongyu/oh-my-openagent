@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { bounded } from "../../lifecycle/__fixtures__/live-parent-clock"
 
 import { adaptRpcHandle } from "../../manager/child-handle"
 import { HOST_TURN_RESUMED_EVENT } from "../../manager/host-turn-resumed"
@@ -209,6 +210,7 @@ describe("host-session handle reattach", () => {
     adaptRpcHandle(handle).subscribe((event) => observed.push(event.type))
     await handle.startInitialPrompt("do the work")
     original.loseTransport()
+    await reopened.answerState({ sessionId: "child", isStreaming: false })
     await promptSent.promise
     await handle.terminate()
     continuation.reject(new Error("continuation refused after cancellation"))
@@ -244,20 +246,20 @@ describe("host-session handle reattach", () => {
     await handle.dispose()
   })
 
-  test("#given the transport is lost #when every reattach attempt fails #then the child ends crashed with transport_gone", async () => {
+  test("#given the transport is lost #when every reattach attempt fails #then the child parks for contextual respawn", async () => {
     // given
     const host = await fakeHost()
     const handle = await openWithReattach(host, "/tmp/sessions/reattach-d.jsonl", async () => undefined)
     await handle.startInitialPrompt("do the work")
+    const parked = Promise.withResolvers<string>()
+    handle.onParked((event) => parked.resolve(event.reason))
 
     // when
     host.crash()
 
     // then
-    expect(await handle.waitForExit()).toEqual({
-      kind: "crashed",
-      facts: { pid: undefined, code: null, signal: null, stderrTail: "transport_gone" },
-    })
+    expect(await bounded(parked.promise)).toBe("daemon_unavailable")
+    expect(handle.exitOutcome()).toBeUndefined()
     expect(handle.attached).toBe(false)
     await handle.dispose()
   })

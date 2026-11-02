@@ -6,6 +6,7 @@ import {
 } from "./root-test-serial-quarantine.ts"
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
+const posixShard2 = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
 const windowsTelemetryScript = readFileSync(
   new URL("../.github/scripts/windows-ci-telemetry.ps1", import.meta.url),
   "utf8",
@@ -25,7 +26,7 @@ function escapeForRegExp(literal: string): string {
 
 function rootTestJob(): string {
   const start = workflow.indexOf("  test:\n")
-  const end = workflow.indexOf("\n  typecheck:", start)
+  const end = workflow.indexOf("\n  macos-combined:", start)
   if (start < 0 || end < 0) throw new Error("root test job not found")
   return workflow.slice(start, end)
 }
@@ -59,7 +60,8 @@ describe("root test CI partition", () => {
     const matrix = job.slice(start, end)
 
     expect(matrix).toContain("- os: ubuntu-latest")
-    expect(matrix).toContain("- os: macos-latest")
+    expect(matrix).toContain("- os: windows-latest")
+    expect(matrix).not.toContain("- os: macos-latest")
     expect(matrix).toContain('shard: "1/2"')
     expect(matrix).toContain('shard: "2/2"')
     expect(matrix).not.toContain("config:")
@@ -86,9 +88,9 @@ describe("root test CI partition", () => {
     const serialCommand = serialQuarantineCommand()
 
     expect(ROOT_TEST_SERIAL_QUARANTINE_PATHS.length).toBeGreaterThan(0)
-    expect([...job.matchAll(new RegExp(escapeForRegExp(serialCommand), "g"))]).toHaveLength(1)
+    expect([...posixShard2.matchAll(new RegExp(escapeForRegExp(serialCommand), "g"))]).toHaveLength(1)
     for (const testPath of ROOT_TEST_SERIAL_QUARANTINE_PATHS) {
-      expect([...job.matchAll(new RegExp(escapeForRegExp(testPath), "g"))]).toHaveLength(2)
+      expect([...(job + posixShard2).matchAll(new RegExp(escapeForRegExp(testPath), "g"))]).toHaveLength(2)
     }
   })
 
@@ -126,11 +128,12 @@ describe("root test CI partition", () => {
     // (category-routing, coordinator guard, boulder-state failures). Job-level
     // sharding is the parallelism; each shard is one serial process, the shape
     // this suite passed with for years.
-    expect(posixStep).toContain(serialQuarantineCommand())
-    expect(posixStep).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000\n")
-    expect(posixStep).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
-    expect(posixStep.indexOf(serialQuarantineCommand())).toBeLessThan(
-      posixStep.indexOf("bun --config=bunfig.win2.parallel.toml test --timeout 20000"),
+    expect(posixStep).toContain("bash .github/scripts/ci-root-shard-2.sh")
+    expect(posixShard2).toContain(serialQuarantineCommand())
+    expect(posixShard2).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000\n")
+    expect(posixShard2).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
+    expect(posixShard2.indexOf(serialQuarantineCommand())).toBeLessThan(
+      posixShard2.indexOf("bun --config=bunfig.win2.parallel.toml test --timeout 20000"),
     )
   })
 
@@ -243,6 +246,11 @@ describe("root test CI partition", () => {
     expect(windowsStep).toContain('-Invocation "senpi-compatibility"')
     expect(windowsStep).toContain('-TestArguments @("test", "packages/omo-senpi")')
     expect(windowsStep).toContain("exit $LASTEXITCODE")
+    const stepBudget = Number(/^        timeout-minutes: (\d+)$/m.exec(windowsStep)?.[1])
+    const jobBudget = Number(/^    timeout-minutes: (\d+)$/m.exec(job)?.[1])
+    expect(stepBudget, "#11815: the hang-prone Windows step needs its own budget").toBeGreaterThan(0)
+    expect(jobBudget, "#11815: the senpi-compatibility job needs a budget below GitHub's 360-minute default").toBeGreaterThan(0)
+    expect(stepBudget, "#11815: the step budget must leave room for the job's install and build steps").toBeLessThan(jobBudget)
     expect(uploadStep).toContain("if: always() && runner.os == 'Windows'")
     expect(uploadStep).toContain("continue-on-error: true")
     expect(uploadStep).toContain("uses: actions/upload-artifact@v6")

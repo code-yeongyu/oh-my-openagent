@@ -22,6 +22,42 @@ function freshLockPath(): string {
 }
 
 describe("withLocalJournalLock", () => {
+  test("#given a held FIFO predecessor #when a queued contender is cancelled #then it returns before the holder and never enters", async () => {
+    const lockPath = freshLockPath()
+    const entered = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const controller = new AbortController()
+    const reason = new Error("observer retired")
+    const order: string[] = []
+    const holder = withLocalJournalLock(lockPath, async () => {
+      entered.resolve()
+      await release.promise
+      order.push("holder")
+    })
+    await entered.promise
+    const cancelled = withLocalJournalLock(lockPath, async () => { order.push("cancelled") }, controller.signal)
+      .then(() => undefined, (error: unknown) => error)
+    controller.abort(reason)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      const result = await Promise.race([
+        cancelled,
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("FIFO cancellation did not settle")), 2_000) }),
+      ])
+      expect(result).toBe(reason)
+      expect(order).toEqual([])
+      expect(existsSync(lockPath)).toBe(true)
+    } finally {
+      clearTimeout(timer)
+      release.resolve()
+      await holder
+      await cancelled
+    }
+    await withLocalJournalLock(lockPath, async () => { order.push("next") })
+    expect(order).toEqual(["holder", "next"])
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
   test(
     "#given overlapping same-process acquisitions #when the holder outlasts the acquisition wait #then every contender still runs, serialized",
     async () => {

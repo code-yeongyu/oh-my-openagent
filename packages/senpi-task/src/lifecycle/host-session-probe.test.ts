@@ -123,4 +123,47 @@ describe("host session probe", () => {
     // then
     expect(calls).toEqual([first.socket, second.socket, first.socket])
   })
+
+  test("#given a daemon that answers but cannot list its sessions #when liveness is asked #then it is unknown, not gone, while sessionLive still reads false (#9450)", async () => {
+    // given
+    const probe = createHostSessionProbe({
+      daemonReachable: () => Promise.resolve(true),
+      liveSessionPaths: () => Promise.reject(new Error("list_sessions failed")),
+    })
+
+    // when
+    const liveness = await probe.sessionLiveness(identity("/a.jsonl"))
+    const live = await probe.sessionLive(identity("/a.jsonl"))
+
+    // then
+    expect(liveness).toBe("unknown")
+    expect(live).toBe(false)
+  })
+
+  test("#given a daemon that does not answer #when liveness is asked #then the session is gone, since nothing runs on a dead host (#9450)", async () => {
+    // given
+    const probe = createHostSessionProbe({
+      daemonReachable: () => Promise.resolve(false),
+      liveSessionPaths: () => Promise.reject(new Error("connection refused")),
+    })
+
+    // when
+    const liveness = await probe.sessionLiveness(identity("/a.jsonl"))
+
+    // then
+    expect(liveness).toBe("gone")
+  })
+
+  test("#given a daemon that lists its sessions #when liveness is asked #then a listed session is live and an unlisted one is gone", async () => {
+    // given
+    const probe = createHostSessionProbe(countingPorts(["/a.jsonl"]).ports)
+
+    // when
+    const listed = await probe.sessionLiveness(identity("/a.jsonl"))
+    const unlisted = await probe.sessionLiveness(identity("/b.jsonl"))
+
+    // then
+    expect(listed).toBe("live")
+    expect(unlisted).toBe("gone")
+  })
 })

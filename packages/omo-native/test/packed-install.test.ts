@@ -25,8 +25,6 @@ describe("omo-ai packed install", () => {
       const install = Bun.spawnSync(["bun", "add", "--trust", join(root, tarball!)], { cwd: consumer, stdout: "pipe", stderr: "pipe" })
       expect(install.exitCode).toBe(0)
       const installedPackageRoot = join(consumer, "node_modules", "omo-ai")
-      const installedFloor = join(installedPackageRoot, "bin", "lib", "claude-code-floor.js")
-      expect(readFileSync(installedFloor, "utf8")).toContain("claudeCodeVersionFloor")
 
       const consumerRequire = createRequire(join(installedPackageRoot, "package.json"))
       const searchPaths = consumerRequire.resolve.paths("@code-yeongyu/senpi") ?? []

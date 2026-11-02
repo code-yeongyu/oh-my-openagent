@@ -12,7 +12,10 @@ import type { LiveHostChildren } from "./live-children"
 import { openTaskHostSession } from "./open-session"
 import { createReattachPort } from "./reattach-port"
 import type { OpenedHostSession } from "./session-client"
+import type { TransportRecoveryOptions } from "./transport-recovery"
 import { discardUnstartedRpcHandle } from "../rpc/start-cleanup"
+import { createTaskRecordStore } from "../../store"
+import { InputUncertainError } from "../input-effects"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 const DEFAULT_CLOSE_GRACE_MS = 5_000
@@ -25,6 +28,7 @@ export interface HostSessionOpenerInput {
   readonly closeGraceMs?: number
   readonly now: () => number
   readonly reattachDelaysMs: readonly number[]
+  readonly transportRecovery?: TransportRecoveryOptions
   readonly admissionWaitMs: number
   readonly sleep: (ms: number) => Promise<void>
   readonly onWarning: (message: string) => void | (() => void)
@@ -32,33 +36,49 @@ export interface HostSessionOpenerInput {
 
 export interface HostSessionOpener {
   openChild(spec: RpcRunnerSpec, socket: string, sessionPath: string): Promise<RpcChildHandle>
+  settleTeardowns(): Promise<void>
 }
 
 /** Open a daemon session, wire its recoverable handle, and deliver only a fresh child's first turn. */
 export function createHostSessionOpener(input: HostSessionOpenerInput): HostSessionOpener {
-  const openAdmitted = (
+  const pendingTeardowns = new Set<Promise<void>>()
+  let fallbackProfileUnsupportedNoticed = false
+  const noticeFallbackProfileUnsupported = (opened: OpenedHostSession): void => {
+    if (opened.retryFallbackDropped !== true || fallbackProfileUnsupportedNoticed) return
+    fallbackProfileUnsupportedNoticed = true
+    input.onWarning(
+      `the task host (engine ${opened.engineVersion}) does not advertise retry_fallback_profile, so daemon-hosted ` +
+        "children are not held to their designated models (the host's own fallback settings apply) until the host is upgraded",
+    )
+  }
+  const openAdmitted = async (
     client: ReturnType<CreateHostSessionChannel>,
     spec: RpcRunnerSpec,
     sessionPath: string,
-  ): Promise<OpenedHostSession> =>
-    openHostSessionWithAdmission({
+  ): Promise<OpenedHostSession> => {
+    const opened = await openHostSessionWithAdmission({
       open: () => openTaskHostSession({ client, spec, sessionPath }),
       now: input.now,
       sleep: input.sleep,
       admissionWaitMs: input.admissionWaitMs,
       onWarning: input.onWarning,
     })
+    noticeFallbackProfileUnsupported(opened)
+    return opened
+  }
 
   const startTurn = async (handle: ReturnType<typeof createHostSessionHandle>, spec: RpcRunnerSpec): Promise<void> => {
     try {
       await handle.startInitialPrompt(spec.prompt)
     } catch (error) {
+      if (error instanceof InputUncertainError) error = error.cause
       const exitOutcome = handle.exitOutcome()
-      try {
-        await discardUnstartedRpcHandle(handle)
-      } catch (cleanupError) {
-        log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
-      }
+      void discardUnstartedRpcHandle(handle, {
+        pending: pendingTeardowns,
+        onFailure: (cleanupError) => {
+          log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
+        },
+      })
       throw new RunnerError({
         kind: "child-prompt-failed",
         message: error instanceof Error ? error.message : String(error),
@@ -72,19 +92,25 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
   }
 
   return {
+    settleTeardowns: async () => { await Promise.all(pendingTeardowns) },
     openChild: async (spec, socket, sessionPath) => {
       const client = input.createClient(socket)
       if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })
       const opened = await openAdmitted(client, spec, sessionPath)
       const handle = createHostSessionHandle({
+        ...(spec.taskStoreDir === undefined ? {} : {
+          inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
+        }),
         client,
         session: { routingId: opened.sessionId, sessionPath, instanceId: opened.instanceId },
+        ...(opened.durableSessionId === undefined ? {} : { durableSessionId: opened.durableSessionId }),
         taskId: spec.task_id,
         heartbeatIntervalMs: input.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
         now: input.now,
         closeGraceMs: input.closeGraceMs ?? DEFAULT_CLOSE_GRACE_MS,
         openDisposition: opened.attached ? "attached" : "reopened",
         shardEvents: input.liveChildren.events,
+        ...(input.transportRecovery === undefined ? {} : { transportRecovery: input.transportRecovery }),
         reattach: createReattachPort({
           endpoint: input.endpoint,
           spec,
@@ -95,6 +121,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         }),
       })
       input.liveChildren.add(handle)
+      if (spec.resumeSessionPath !== undefined) await handle.reconcileInputs?.()
       const switchOnPort = handle.switchSession
       if (spec.resumeSessionPath === undefined) await startTurn(handle, spec)
       return Object.assign(handle, {
@@ -105,6 +132,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
         },
         switchSession: (target: string): Promise<RpcSwitchSessionResult> =>
           target === sessionPath ? Promise.resolve({ cancelled: false }) : switchOnPort(target),
+        ...(opened.reportedModel === undefined ? {} : { reportedModel: opened.reportedModel }),
       })
     },
   }

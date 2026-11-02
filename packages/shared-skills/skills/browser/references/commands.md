@@ -101,5 +101,7 @@ Every refusal is a `BskRpcError` with the daemon's own `code`:
 | `user_aborted` | the user pressed Stop in the browser | stop the task and report |
 | `cdp_failed` | the page cannot be attached (restricted URL, DevTools open) | say which page and why |
 
+Inside OmO Desktop (`OMO_BROWSER_ENGINE` set), `connectBuiltinBrowser()` throws `BuiltinBrowserUnavailableError` (`code` `browser_builtin_unavailable`). Reasons `unavailable`, `timeout`, and `invalid_grant` mean the built-in browser is unavailable; `invalid_grant` includes a missing or unreadable token file. For `user_stopped` or any other app refusal, stop browser work and report it without opening another browser. Refresh uses the new grant's endpoint and token together; every other call behaves as in the terminal.
+
 Long calls can be cancelled: `const h = session.client.callWithHandle("tool.navigate", {...})`
 then `await session.client.cancel(h.rpcId)`.

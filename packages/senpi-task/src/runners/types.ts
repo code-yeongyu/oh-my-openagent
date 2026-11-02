@@ -1,5 +1,10 @@
 import type { AgentSessionEvent, SessionEntry } from "@code-yeongyu/senpi"
 import type { RunnerOutcome } from "./in-process/child-handle"
+import type { ChildExtensionListener } from "./child-extension-events"
+import type { EffectiveModel } from "./pinned-model-equivalence"
+import type { TaskRecord } from "../state"
+import type { HostTurnReconciliation } from "./rpc-host/reconcile-turn"
+import type { NativeRunPause } from "../pause/native-child-pause"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -15,6 +20,7 @@ export type RpcSpawnSpec = {
 }
 
 export type RpcRunnerSpec = {
+  readonly taskStoreDir?: string
   readonly task_id: string
   readonly cwd: string
   readonly state_dir: string
@@ -34,6 +40,10 @@ export type RpcRunnerSpec = {
   readonly reasoning?: string
   // The resolved variant the child must apply as its thinking level (`--thinking`).
   readonly variant?: string
+  // The child's own fallback chain after `model`, as `provider/model[:thinking]` selectors in try order.
+  // A daemon-hosted child sends it as `open_session.retryFallback` when the host advertises
+  // `retry_fallback_profile` (#9512); the per-child process runner does not carry it.
+  readonly fallbackModels?: readonly string[]
   // Extension entry paths the child must load (`-e`). The child is spawned with `--no-extensions` and
   // then ONLY these are loaded, so a keyless local provider (or a production `-e` extension) the parent
   // registered is reproducible in the detached child without inheriting the parent's whole package set.
@@ -42,19 +52,31 @@ export type RpcRunnerSpec = {
   // The child's own place in the task tree. A process child boots its own task engine, which reads
   // these back (per-child env or daemon session context) so ITS spawns count from here, not from 0.
   readonly depth?: number
+  readonly parent_session_id?: string
   readonly root_session_id?: string
+  // The delegating turn's W3C traceparent, read back the same two ways (per-child env or daemon session
+  // context) so the child's turn spans continue the parent's trace.
+  readonly traceparent?: string
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void
 
+/** The durable id an input is sent under: the child holds it under this id (#2838 step 4). */
+export type InputIdentity = { readonly clientMessageId: string }
+
 export type ChildHandle = {
+  reconcileInputs?(): Promise<void>
   readonly task_id: string
+  readonly runPause?: NativeRunPause
   readonly sessionId: string | undefined
   readonly pid: number | undefined
-  steer(text: string): Promise<void>
-  followUp(text: string): Promise<void>
+  /** The model the child actually opened on, when its open path observed one (host get_state; #9722). */
+  readonly reportedModel?: EffectiveModel
+  steer(text: string, identity?: InputIdentity): Promise<void>
+  followUp(text: string, identity?: InputIdentity): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
+  subscribeExtensionEvents?(listener: ChildExtensionListener): () => void
   waitForIdle(): Promise<void>
   waitForOutcome?(): Promise<RunnerOutcome>
   hasExited?(): boolean
@@ -93,9 +115,13 @@ export type RpcTerminalAssistantMessage = {
 }
 
 export type RpcChildHandle = ChildHandle & {
+  reconcileTurn?(record: Pick<TaskRecord, "host_session" | "final_response">): Promise<HostTurnReconciliation>
   readonly spawnSpec?: RpcSpawnSpec
   terminalAssistantMessage?(): RpcTerminalAssistantMessage | undefined
   wasAbortedByUser?(): boolean
+  // Whether the session this handle re-joined is idle (no stream, compaction, or queued work).
+  // `undefined` = unreadable, which must never be read as idle (senpi#3266).
+  sessionIdle?(): Promise<boolean | undefined>
   // Fires when the child starts a run on its own after its turn settled (omo#9069).
   onSelfResumed?(listener: () => void): () => void
   // A revival found the turn already finished in the transcript: settle it with that answer (omo#9069).

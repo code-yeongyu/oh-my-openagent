@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { BUILTIN_CATEGORY_DEFAULTS, BUILTIN_CATEGORY_REQUIRES_MODEL, resolveCategory } from "./index"
+import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 type FakeModel = {
   readonly provider: string
@@ -43,24 +44,24 @@ const gpt56CategoryCases = [
   {
     category: "deep",
     modelId: "gpt-5.6-sol",
-    nativeVariant: "medium",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
-    copilotVariant: "medium",
+    nativeVariant: "high",
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "high" },
+    copilotVariant: "high",
     copilotFallbackEntry: {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
       model: "gpt-5.6-sol",
-      variant: "medium",
+      variant: "high",
     },
   },
   {
     category: "unspecified-low",
-    modelId: "gpt-5.6-terra",
+    modelId: "gpt-5.6-sol",
     nativeVariant: "high",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-terra", variant: "high" },
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "high" },
     copilotVariant: "high",
     copilotFallbackEntry: {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
-      model: "gpt-5.6-terra",
+      model: "gpt-5.6-sol",
       variant: "high",
     },
   },
@@ -241,14 +242,14 @@ describe("resolveCategory", () => {
     // when
     const result = resolveCategory(
       "deep",
-      { categories: { deep: { model: "vendor-a/solo-model", reasoning: "medium" } } },
+      { categories: { deep: { model: "vendor-a/solo-model", reasoning: "high" } } },
       models,
     )
 
     // then a simple migrated {model, reasoning} keeps its thinking level
     const resolved = expectResolved(result)
     expect(resolved.spec.modelId).toBe("solo-model")
-    expect(resolved.spec.reasoningEffort).toBe("medium")
+    expect(resolved.spec.reasoningEffort).toBe("high")
   })
 
   test("#given quick primary is unavailable and the deepseek rung is available #when resolved #then delegate-core fallback chain reaches deepseek-flash", () => {
@@ -311,9 +312,9 @@ describe("resolveCategory", () => {
     })
   })
 
-  test("#given visual-engineering primary models are unavailable and Kimi K3 is available #when resolved #then delegate-core fallback chain preserves the max variant", () => {
+  test("#given visual-engineering primary models are unavailable and Kimi K3.1 Pro is available #when resolved #then delegate-core fallback chain preserves the max variant", () => {
     // given
-    const models = registry([model("opencode-go", "kimi-k3")])
+    const models = registry([model("opencode-go", "kimi-k3.1-pro")])
 
     // when
     const result = resolveCategory("visual-engineering", {}, models)
@@ -321,12 +322,12 @@ describe("resolveCategory", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.spec.provider).toBe("opencode-go")
-    expect(resolved.spec.modelId).toBe("kimi-k3")
+    expect(resolved.spec.modelId).toBe("kimi-k3.1-pro")
     expect(resolved.spec.variant).toBe("max")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
-      model: "kimi-k3",
+      model: "kimi-k3.1-pro",
       variant: "max",
     })
   })
@@ -420,7 +421,7 @@ describe("resolveCategory", () => {
             top_p: 0.8,
             maxTokens: 4096,
             thinking: { type: "enabled", budgetTokens: 1024 },
-            reasoningEffort: "medium",
+            reasoningEffort: "high",
             tools: { read: true, write: false },
             prompt_append: "fixture-quick-overlay",
           },
@@ -435,7 +436,7 @@ describe("resolveCategory", () => {
     expect(resolved.spec.top_p).toBe(0.8)
     expect(resolved.spec.maxTokens).toBe(4096)
     expect(resolved.spec.thinking).toEqual({ type: "enabled", budgetTokens: 1024 })
-    expect(resolved.spec.reasoningEffort).toBe("medium")
+    expect(resolved.spec.reasoningEffort).toBe("high")
     expect(resolved.spec.tools).toEqual({ read: true, write: false })
     expect(resolved.spec.prompt_append).not.toBe("fixture-quick-overlay")
     expect(resolved.spec.prompt_append).toEndWith("\n\nfixture-quick-overlay")
@@ -466,27 +467,37 @@ describe("resolveCategory", () => {
 })
 
 describe("builtin category defaults", () => {
+  test.each(["architect", "artistry", "visual-engineering"])("%s prefers 5.5 and falls back to 5.1 at the same effort", (name) => {
+    // given / when / then
+    for (const ids of [["claude-fable-5-5", "claude-fable-5-1"], ["claude-fable-5-1"]]) {
+      const result = expectResolved(resolveCategory(name, {}, registry(ids.map((id) => model("anthropic", id)))))
+      // While FABLE_55_RELEASED is false the 5.5 rung is absent, so 5.1 runs even when 5.5 is listed.
+      const expected = FABLE_55_RELEASED ? ids[0] : "claude-fable-5-1"
+      expect([result.spec.provider, result.spec.modelId, result.spec.variant]).toEqual(["anthropic", expected, "max"])
+    }
+  })
+
   test("#given ported builtin defaults #when inspected #then machine routing fields stay pinned without prose wording", () => {
     // given
     const defaults = BUILTIN_CATEGORY_DEFAULTS
 
     // then: declared order plus each category's primary provider, model, and variant
     expect(defaults.map(({ config, name }) => [name, config.model, config.variant])).toEqual([
-      ["visual-engineering", "anthropic/claude-fable-5-1", "max"],
-      ["artistry", "anthropic/claude-fable-5-1", "max"],
+      ["visual-engineering", "google/gemini-4-argon", "low"],
+      ["artistry", FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1", "max"],
       ["ultrabrain", "chatgpt-subscription/gpt-6-astra", "max"],
-      ["deep-low", "chatgpt-subscription/gpt-6.1-sol", "medium"],
+      ["deep-low", "chatgpt-subscription/gpt-6.1-sol", "high"],
       ["deep-high", "chatgpt-subscription/gpt-6-astra", "high"],
       ["quick", "chatgpt-subscription/gpt-6-luna-fast", "low"],
-      ["unspecified-low", "anthropic/claude-sonnet-5-5", "medium"],
-      ["unspecified-high", "anthropic/claude-opus-5-5", "medium"],
-      ["architect", "anthropic/claude-fable-5-1", "max"],
-      ["writing", "anthropic/claude-opus-5-5", "low"],
+      ["unspecified-low", "anthropic/claude-sonnet-5-5", "high"],
+      ["unspecified-high", "anthropic/claude-opus-5-5", "high"],
+      ["architect", FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1", "max"],
+      ["writing", "google/gemini-4-argon", "low"],
     ])
 
     // then: availability gating applies only to the model-gated builtins; any listed id opens the gate
     expect(BUILTIN_CATEGORY_REQUIRES_MODEL).toEqual({
-      architect: ["claude-fable-5-1"],
+      architect: [...(FABLE_55_RELEASED ? ["claude-fable-5-5"] : []), "claude-fable-5-1"],
       ultrabrain: ["gpt-6-astra", "gpt-5.6-sol"],
       "deep-low": ["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol-fast", "gpt-5.6-sol"],
       "deep-high": ["gpt-6-astra"],

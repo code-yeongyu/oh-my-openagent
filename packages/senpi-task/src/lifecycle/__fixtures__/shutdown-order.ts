@@ -10,8 +10,8 @@ export class OrderRegistry extends FakeRegistry {
     this.#order = order
   }
 
-  override forget(taskId: string): void {
+  override forget(taskId: string, options: Parameters<FakeRegistry["forget"]>[1]): void {
     this.#order.push(`forget:${taskId}`)
-    super.forget(taskId)
+    super.forget(taskId, options)
   }
 }

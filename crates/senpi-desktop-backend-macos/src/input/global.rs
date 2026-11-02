@@ -5,17 +5,33 @@ use std::thread;
 use std::time::Duration;
 
 use core_graphics::event::{
-    CGEvent, CGEventFlags, CGEventTapLocation, CGEventType, CGMouseButton, EventField, ScrollEventUnit,
+    CGEvent, CGEventFlags, CGEventTapLocation, CGEventType, CGMouseButton, EventField,
 };
 use core_graphics::event_source::CGEventSource;
 use core_graphics::geometry::CGPoint;
 use senpi_desktop_core::backend::PointerEvent;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
-use super::cgevent::{button_types, click_group_id, modifier_flags, point, quartz_wheel};
+use super::cgevent::{
+    button_types, click_group_id, is_press, modifier_flags, mouse_event, point, quartz_wheel,
+    scroll_event,
+};
 use super::held::{ButtonRoute, Held, HeldButton};
 
-pub(super) fn pointer(source: &CGEventSource, held: &mut Held, event: PointerEvent) -> CoreResult<()> {
+pub(super) fn pointer(
+    source: &CGEventSource,
+    held: &mut Held,
+    event: PointerEvent,
+    overlay: &crate::overlay::Overlay,
+) -> CoreResult<()> {
+    let start = match &event {
+        PointerEvent::Click { x, y, .. } | PointerEvent::Move { x, y }
+        | PointerEvent::Scroll { x, y, .. } => Some((*x, *y)),
+        PointerEvent::Drag { path, .. } => path.first().copied(),
+    };
+    if let Some((x, y)) = start {
+        overlay.target(x, y);
+    }
     match event {
         PointerEvent::Click {
             x,
@@ -100,6 +116,7 @@ pub(super) fn pointer(source: &CGEventSource, held: &mut Held, event: PointerEve
             post_global_mouse(source, down, cg_button, start_x, start_y, 1, number, flags)?;
             for &(x, y) in &path[1..] {
                 thread::sleep(Duration::from_millis(16));
+                overlay.target(x, y);
                 post_global_mouse(source, dragged, cg_button, x, y, 1, number, flags)?;
             }
             thread::sleep(Duration::from_millis(50));
@@ -124,9 +141,7 @@ pub(super) fn pointer(source: &CGEventSource, held: &mut Held, event: PointerEve
                 CGEventFlags::CGEventFlagNull,
             )?;
             let (wheel_y, wheel_x) = quartz_wheel(dx, dy)?;
-            let event =
-                CGEvent::new_scroll_event(source.clone(), ScrollEventUnit::PIXEL, 2, wheel_y, wheel_x, 0)
-                    .map_err(|()| DesktopError::input_failed("failed to create a Quartz scroll event"))?;
+            let event = scroll_event(source, wheel_y, wheel_x)?;
             event.set_location(point(x, y)?);
             post_global(&event)
         }
@@ -137,7 +152,7 @@ pub(super) fn pointer(source: &CGEventSource, held: &mut Held, event: PointerEve
     clippy::too_many_arguments,
     reason = "the parameters are the native CGEvent fields posted together"
 )]
-fn post_global_mouse(
+pub(super) fn post_global_mouse(
     source: &CGEventSource,
     event_type: CGEventType,
     button: CGMouseButton,
@@ -147,9 +162,11 @@ fn post_global_mouse(
     button_number: i64,
     flags: CGEventFlags,
 ) -> CoreResult<()> {
+    if is_press(event_type) {
+        senpi_desktop_core::intervention::check_press()?;
+    }
     let location = point(x, y)?;
-    let event = CGEvent::new_mouse_event(source.clone(), event_type, location, button)
-        .map_err(|()| DesktopError::input_failed("failed to create a Quartz pointer event"))?;
+    let event = mouse_event(source, event_type, location, button)?;
     event.set_integer_value_field(EventField::MOUSE_EVENT_CLICK_STATE, click_state);
     if button_number != 0 {
         event.set_integer_value_field(EventField::MOUSE_EVENT_BUTTON_NUMBER, button_number);
@@ -175,9 +192,7 @@ pub(super) fn release_button(source: &CGEventSource, held: &super::held::HeldBut
             CGEventFlags::CGEventFlagNull,
         ),
         ButtonRoute::Window(pid, wid, local) => {
-            let event =
-                CGEvent::new_mouse_event(source.clone(), up, CGPoint::new(local.x, local.y), cg_button)
-                    .map_err(|()| DesktopError::input_failed("failed to create a Quartz pointer event"))?;
+            let event = mouse_event(source, up, CGPoint::new(local.x, local.y), cg_button)?;
             event.set_flags(CGEventFlags::CGEventFlagNull);
             crate::skylight::stamp_event(&event, pid, wid, local, 3, 1, number, click_group_id())?;
             crate::skylight::post_dual(pid, &event)

@@ -21,6 +21,8 @@ export function itemError(
 
 export function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult, skills?: TaskSkillSummary): TaskToolItemDetail {
   switch (start.kind) {
+    case "held":
+      return { task_id: start.task_id, status: "paused" }
     case "plan_unresolved": {
       return itemError(item, "", start.error.message + categoryListSuffix(start.error), skills)
     }
@@ -63,7 +65,7 @@ function categoryListSuffix(error: PlanResolutionError): string {
   // categories" told models to retry the same broken binding. Name the vocabulary honestly and
   // point at the omo.json config escape hatch.
   if (error.code === "model_unavailable") {
-    return ` Valid category names: ${available.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json — model overrides cannot be combined with category.`
+    return ` Valid category names: ${available.join(", ")}. Retry one of these, or configure categories.<name>.models in omo.json: model overrides cannot be combined with category.`
   }
   return ` Available categories: ${available.join(", ")}.`
 }

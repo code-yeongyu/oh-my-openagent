@@ -1,3 +1,5 @@
+[English](README.md) | [简体中文](README.zh-cn.md) | [日本語](README.ja.md) | [Русский](README.ru.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-br.md) | [Italiano](README.it.md)
+
 > [!NOTE]
 > **OmO 베타: OmO ❤️ Pi**
 > `curl -fsSL https://get.omo.dev/install.sh | bash`로 설치하세요. 메모리 시스템, CodeMode, Anthropic 구독까지 전부 지원됩니다.
@@ -9,11 +11,6 @@
 > 아래는 저희의 스폰서입니다. 개인 사이드 프로젝트를 지속하는 데 도움을 주고 있습니다.
 > | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)**가 OmO를 후원하고 있습니다. 여러 모델 제공사를 하나의 API로 쓸 수 있는 OpenAI 호환 게이트웨이입니다. 오픈소스를 응원해주셔서 감사합니다. |
 > | :-----| :----- |
-
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO는 위의 Jobdori에 의해 메인테이닝되고 있습니다. 당신의 Jobdori, Dori를 만나세요. <br />대기 명단은 [여기](https://sisyphuslabs.ai)에서 받습니다.**
 
 > [!TIP]
 > 함께해요!
@@ -40,7 +37,6 @@
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Docs](https://img.shields.io/badge/docs-omo.dev-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.dev/docs)
 
-[English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md) | [Русский](README.ru.md)
 
 </div>
 
@@ -60,6 +56,8 @@ omo
 Windows는 PowerShell에서 `irm https://get.omo.dev/install.ps1 | iex`를 실행하세요. OS와 CPU에 맞는 네이티브 `omo`를 `~/.local/bin`에 설치하고 릴리스 체크섬으로 검증합니다. 패키지 매니저가 편하면 `bun add -g omo-ai`(또는 `npm i -g omo-ai`)로 같은 OmO를 설치할 수 있어요. 패키지 이름은 `omo-ai`예요. npm의 `omo` 패키지는 다른 사람이 만든 전혀 다른 물건입니다. Windows CMD, `PATH` 문제 해결, 업데이트와 삭제는 [omo.dev/docs/install](https://omo.dev/docs/install)에서 다룹니다.
 
 프로젝트를 열고 `omo`를 실행한 다음, 할 일을 말하세요. 설정은 그게 끝.
+
+세션 안에서 `/thinking <level>`로 모델이 얼마나 깊이 생각할지 정해요. `/thinking`만 치면 고르는 창이 뜨고, `Shift+Tab`은 레벨을 차례로 바꾸고, `/efforts <level>`은 강도 단계가 있는 모델에서 추론 강도를 바로 정합니다. 이전 작업을 이어 가려면 `/resume`(또는 `/sessions`)으로 지난 세션을 열면 돼요. 셸에서는 `omo -c`가 마지막 세션을 이어 가고 `omo -r`이 세션 목록을 엽니다. 나머지 명령은 `/help`에 다 있어요.
 
 OpenCode 에디션이나 LazyCodex에서 넘어오셨다면 `omo setup`을 한 번 실행하세요. 프로바이더 키, 커스텀 프로바이더, MCP 서버, 스킬, 모델 선택까지 그대로 옮겨 옵니다.
 

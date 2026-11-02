@@ -2,6 +2,7 @@ import type { SettingsManager } from "@code-yeongyu/senpi"
 
 import { senpiBarrel } from "../../lazy/senpi-barrel"
 import type { ResolvedModelRecord } from "../../state"
+import { designatedFallbackProfile } from "../designated-fallback-profile"
 
 /** Same-model retry budget merged over the engine defaults for one child. */
 export type ChildRetryOverride = {
@@ -40,16 +41,20 @@ export function createRuntimeFallbackSettings(
     ...(retry?.maxRetries === undefined ? {} : { maxRetries: retry.maxRetries }),
     ...(retry?.baseDelayMs === undefined ? {} : { baseDelayMs: retry.baseDelayMs }),
   }
-  const chained = selectedModel !== undefined && fallbackModels !== undefined && fallbackModels.length > 0
   const global = withoutChildOwnedRetry(source.getGlobalSettings(), retryOverride)
   const project = withoutChildOwnedRetry(source.getProjectSettings(), retryOverride)
+  const policy = selectedModel === undefined
+    ? { modelFallback: false }
+    : designatedFallbackProfile(selectedModel, (fallbackModels ?? []).map(modelSelector))
   const childGlobal: SettingsSnapshot = {
     ...global,
     retry: {
       ...global.retry,
-      modelFallback: chained,
       ...retryOverride,
-      ...(chained ? { fallbackChains: { [selectedModel]: fallbackModels.map(modelSelector) } } : {}),
+      modelFallback: policy.modelFallback,
+      ...("fallbackChains" in policy
+        ? { fallbackChains: Object.fromEntries(Object.entries(policy.fallbackChains).map(([key, chain]) => [key, [...chain]])) }
+        : {}),
     },
   }
   return manager.fromStorage(new SnapshotSettingsStorage(childGlobal, project))
@@ -76,7 +81,8 @@ class SnapshotSettingsStorage implements SettingsStorage {
   }
 }
 
-function modelSelector(model: ResolvedModelRecord): string {
+/** `provider/model[:thinking]`: how a fallback rung is named in a retry fallback chain. */
+export function modelSelector(model: ResolvedModelRecord): string {
   const thinking = model.reasoning ?? model.reasoning_effort ?? model.variant
   return thinking === undefined
     ? `${model.provider}/${model.model_id}`

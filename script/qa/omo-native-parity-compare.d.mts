@@ -9,6 +9,9 @@ export type ParityRun = {
   readonly exitCodes: { readonly session: number | null; readonly doctor: number | null; readonly setup: number | null }
 }
 
+export const AST_GREP_MCP_TOOLS: readonly string[]
+export const AST_GREP_REGISTERED: string
+export function astGrepProbeCode(options?: { readonly budgetMs?: number; readonly pollMs?: number }): string
 export const PARITY_STEPS: readonly ParityStep[]
 export const DOCTOR_EXPECTED_ONLY: { readonly npm: readonly (readonly [string, string])[]; readonly binary: readonly (readonly [string, string])[] }
 export function normalizeText(text: unknown, roots?: readonly string[]): string
@@ -17,3 +20,4 @@ export function compareLines(label: string, binaryLines: readonly string[], npmL
 export const BINARY_ONLY_REQUIRED_STEPS: readonly string[]
 export function binaryOnlyFailures(label: string, run: ParityRun): string[]
 export function compareRuns(binary: ParityRun, npm: ParityRun): string[]
+export function memoryReceiptFailures(side: string, run: ParityRun): string[]

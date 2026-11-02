@@ -28,6 +28,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { resolveProjectStateDirectory } from "../../../senpi-task/src/store/project-state-directory.ts"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 export const DELETED_CHILD_ENV = [
   "SENPI_PACKAGE_DIR",
@@ -170,7 +171,7 @@ function baseEnv({ home, agentDir, xdgConfigHome, extra = {} }) {
   env.OMO_SENPI_QA = "1"
   env.CI = "1"
   env.BUN_RUNTIME_TRANSPILER_CACHE_PATH = "0"
-  return { ...env, ...extra }
+  return { ...withTelemetryOptOut(env), ...extra }
 }
 
 /** One scenario's private world: its own agent dir (so its own daemon + socket), project and sessions. */

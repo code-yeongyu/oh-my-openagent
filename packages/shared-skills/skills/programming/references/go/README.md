@@ -69,7 +69,7 @@ Read these per-file references for the canonical patterns:
 - **CLI** → `cobra-stack.md` — cobra layout, slog integration, graceful shutdown on signals, fang-style colored help.
 - **TUI** → `bubbletea-v2.md` — v2 model, `SetVirtualCursor(false)` + `tea.View{Cursor}` for CJK IME, why v1 was broken for Korean/Japanese/Chinese input.
 - **Testing** → `testing.md` — table-driven tests, `require` vs `assert`, `autogold` snapshots, `gopter` property tests, `testcontainers` for integration, `goleak` for goroutine leaks.
-- **Bootstrap** → `bootstrap.md` — `new-project.go` invocation, project layout (`cmd/`, `internal/`, `pkg/`), Taskfile, CI.
+- **Bootstrap** → `bootstrap.md` — `scripts/go/new-project.ts` invocation, project layout (`cmd/`, `internal/`, `pkg/`), Taskfile, CI.
 - **Strict config** → `golangci-strict.md` — the canonical `.golangci.yml` with the full linter whitelist and per-linter rationale.
 - **One-liners** → `one-liners.md` — `go run` scripts with `//go:build ignore`, `gorun`-style invocation.
 

@@ -199,6 +199,6 @@ describe("idle cold revival", () => {
       expect(resumed[0]?.path).toBe(path)
       expect(resumed[0]?.spec).toMatchObject({ cwd: project, prompt: "RECORDED_PROMPT", instructions: "RECORDED_INSTRUCTIONS", toolAllowlist: ["read"], toolDenylist: ["write"], model: "fixture/model" })
       expect(fake.followUpCalls).toEqual(["CONTINUE_SENTINEL"])
-    } finally { lifecycle.dispose?.(); manager.forget(record.task_id) }
+    } finally { lifecycle.dispose?.(); manager.forget(record.task_id, { path: "end" }) }
   })
 })

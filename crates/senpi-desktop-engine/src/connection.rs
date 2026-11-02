@@ -19,11 +19,12 @@ use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot};
-use tokio::task::JoinSet;
 
 use crate::engine::{Engine, SessionCall};
 use crate::route::Route;
 use crate::rpc::{failure_line, reply_line, Failure};
+mod dispatch;
+use dispatch::dispatch;
 
 /// Reply lines buffered ahead of a slow reader of the output.
 const OUTBOUND_CAPACITY: usize = 256;
@@ -35,24 +36,28 @@ struct Queued {
     cancel: oneshot::Receiver<()>,
 }
 
-/// Cancel handles of the requests of this connection that await a reply.
+/// Cancel handles of the requests of this connection that await a reply,
+/// each marked whether it holds native input.
 #[derive(Clone, Default)]
-struct InFlight(Arc<Mutex<HashMap<RequestId, oneshot::Sender<()>>>>);
+struct InFlight(Arc<Mutex<HashMap<RequestId, InFlightEntry>>>);
+
+/// A request's cancel handle and whether it holds native input.
+type InFlightEntry = (oneshot::Sender<()>, bool);
 
 impl InFlight {
     /// `None` when `id` is already in flight.
-    fn register(&self, id: &RequestId) -> Option<oneshot::Receiver<()>> {
+    fn register(&self, id: &RequestId, holds_input: bool) -> Option<oneshot::Receiver<()>> {
         let mut requests = self.0.lock();
         if requests.contains_key(id) {
             return None;
         }
         let (cancel, cancelled) = oneshot::channel();
-        requests.insert(id.clone(), cancel);
+        requests.insert(id.clone(), (cancel, holds_input));
         Some(cancelled)
     }
 
     fn cancel(&self, id: &RequestId) {
-        if let Some(cancel) = self.0.lock().remove(id) {
+        if let Some((cancel, _)) = self.0.lock().remove(id) {
             // A request that is answering right now no longer listens.
             cancel.send(()).unwrap_or(());
         }
@@ -60,6 +65,29 @@ impl InFlight {
 
     fn finish(&self, id: &RequestId) {
         self.0.lock().remove(id);
+    }
+
+    /// Interrupts every in-flight hold so its input is released before the
+    /// connection drains or the session closes. Other requests keep running
+    /// and are answered as before.
+    fn cancel_holds(&self) {
+        let mut requests = self.0.lock();
+        let holds: Vec<RequestId> = requests
+            .iter()
+            .filter(|(_, (_, holds_input))| *holds_input)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in holds {
+            if let Some((cancel, _)) = requests.remove(&id) {
+                cancel.send(()).unwrap_or(());
+            }
+        }
+    }
+
+    fn cancel_all(&self) {
+        for cancel in self.0.lock().drain().map(|(_, (cancel, _))| cancel) {
+            cancel.send(()).unwrap_or(());
+        }
     }
 }
 
@@ -69,6 +97,23 @@ impl InFlight {
 /// # Errors
 /// Reading the input or writing the output failed.
 pub async fn serve_connection<R, W>(engine: Arc<Engine>, reader: R, writer: W) -> io::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin + Send + 'static,
+{
+    serve_inner(engine, reader, writer, false).await
+}
+
+#[cfg(any(test, target_os = "macos"))]
+pub async fn serve_session_connection<R, W>(engine: Arc<Engine>, reader: R, writer: W) -> io::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin + Send + 'static,
+{
+    serve_inner(engine, reader, writer, true).await
+}
+
+async fn serve_inner<R, W>(engine: Arc<Engine>, reader: R, writer: W, disconnect_cancels: bool) -> io::Result<()>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin + Send + 'static,
@@ -84,10 +129,17 @@ where
         in_flight.clone(),
     ));
     let read = read_requests(&engine, reader, &out, &queue, &in_flight).await;
+    // A session connection's disconnect cancels everything; otherwise only
+    // holds are interrupted so their input is released before draining.
+    if disconnect_cancels { in_flight.cancel_all(); } else { in_flight.cancel_holds(); }
     drop((queue, out));
     let dispatched = dispatcher.await.map_err(io::Error::other);
     let written = writer.await.map_err(io::Error::other).and_then(|written| written);
-    read.and(dispatched).and(written)
+    let result = read.and(dispatched).and(written);
+    match result {
+        Err(error) if disconnect_cancels && matches!(error.kind(), io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionReset) => Ok(()),
+        other => other,
+    }
 }
 
 async fn read_requests<R: AsyncRead + Unpin>(
@@ -146,7 +198,11 @@ fn handle_line(
         (Route::Immediate(_) | Route::Session(_), None) => None,
         (Route::Immediate(outcome), Some(id)) => Some(reply_line(id, outcome)),
         (Route::Session(call), Some(id)) => {
-            let Some(cancel) = in_flight.register(&id) else {
+            if matches!(&call, SessionCall::Close) {
+                in_flight.cancel_holds();
+            }
+            let holds_input = matches!(method, Method::HoldKeys | Method::HoldMouse);
+            let Some(cancel) = in_flight.register(&id, holds_input) else {
                 let duplicate = Failure::InvalidRequest("a request with this id is already in flight".into());
                 return Some(failure_line(Some(id), duplicate));
             };
@@ -166,7 +222,7 @@ fn handle_line(
 
 type ParseFailure = (Option<RequestId>, Failure);
 
-fn parse_request(text: &[u8]) -> Result<RpcRequest, ParseFailure> {
+pub(crate) fn parse_request(text: &[u8]) -> Result<RpcRequest, ParseFailure> {
     let value: Value = serde_json::from_slice(text)
         .map_err(|error| (None, Failure::Parse(format!("parse error: {error}"))))?;
     // An unreadable id is answered with `null`, as JSON-RPC 2.0 requires.
@@ -175,61 +231,6 @@ fn parse_request(text: &[u8]) -> Result<RpcRequest, ParseFailure> {
         .and_then(|id| serde_json::from_value(id.clone()).ok());
     serde_json::from_value(value)
         .map_err(|error| (id, Failure::InvalidRequest(format!("invalid request: {error}"))))
-}
-
-async fn dispatch(
-    engine: Arc<Engine>,
-    mut queued: mpsc::UnboundedReceiver<Queued>,
-    out: mpsc::Sender<String>,
-    in_flight: InFlight,
-) {
-    let mut waiters = JoinSet::new();
-    while let Some(Queued {
-        id,
-        method,
-        call,
-        mut cancel,
-    }) = queued.recv().await
-    {
-        let permits = engine.permits(method.spec().effect);
-        let admitted = tokio::select! {
-            biased;
-            _ = &mut cancel => Err(Failure::cancelled()),
-            permit = permits.acquire_owned() => permit
-                .map_err(|_| Failure::Engine(DesktopError::internal("request permits were closed"))),
-        };
-        let permit = match admitted {
-            Ok(permit) => permit,
-            Err(failure) => {
-                in_flight.finish(&id);
-                // The writer only stops once the client is gone.
-                deliver(&engine, &out, reply_line(id, Err(failure)))
-                    .await
-                    .unwrap_or(());
-                continue;
-            }
-        };
-        // Enqueued here, in arrival order; only the wait runs concurrently.
-        let started = engine.begin(call);
-        let (engine, out, in_flight) = (Arc::clone(&engine), out.clone(), in_flight.clone());
-        waiters.spawn(async move {
-            let outcome = tokio::select! {
-                outcome = started.wait() => outcome,
-                _ = cancel => Err(Failure::cancelled()),
-            };
-            drop(permit);
-            in_flight.finish(&id);
-            deliver(&engine, &out, reply_line(id, outcome))
-                .await
-                .unwrap_or(());
-        });
-        while let Some(joined) = waiters.try_join_next() {
-            report(joined);
-        }
-    }
-    while let Some(joined) = waiters.join_next().await {
-        report(joined);
-    }
 }
 
 /// Writes `reply`, then every notification queued so far.
@@ -246,12 +247,6 @@ async fn deliver(
         out.send(line).await?;
     }
     Ok(())
-}
-
-fn report(joined: Result<(), tokio::task::JoinError>) {
-    if let Err(error) = joined {
-        eprintln!("senpi-desktop-engine: a request task failed before replying: {error}");
-    }
 }
 
 async fn write_lines<W: AsyncWrite + Unpin>(

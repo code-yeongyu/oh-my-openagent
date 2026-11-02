@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
-
 import {
+	ANSWERED_BY,
 	DEFECT_CODES,
 	DELIVERABLE_FORMATS,
 	DELIVERABLE_STATUSES,
 	DESIGN_SPEC_SECTIONS,
+	FIDELITY_CODES,
 	GATE_NAMES,
 	GATE_STATUSES,
 	INTEGRITY_CODES,
@@ -16,61 +17,19 @@ import {
 	SCHEMA_VERSION,
 	STATES,
 	STATIC_CODES,
+	normalizeManifest,
 	validateOutcomeManifest,
 	validateRepairState,
 } from "./contracts.mjs"
+import { SEVERITIES, STATIC_CODES_EXPECTED, LAYOUT_CODES_EXPECTED, FIDELITY_BLOCKERS, FIDELITY_MAJORS, FIDELITY_MINORS, FIDELITY_CODES_EXPECTED, fourGateManifest, sampleManifest } from "./tests/contracts-support"
 
-const SEVERITIES = new Set(["blocker", "major", "minor"])
-const STATIC_CODES_EXPECTED = [
-	"korean_no_keep_all",
-	"palette_off_token",
-	"emoji_in_prose",
-	"em_dash_in_prose",
-	"en_dash_in_prose",
-	"heading_too_long",
-	"heading_generic",
-	"unsourced_number",
-	"chart_without_figure",
-	"chart_svg_no_text",
-	"chart_svg_missing_labels",
-	"korean_serif_font",
-	"section_without_citation",
-	"missing_closing_section",
-	"missing_citation_section",
-	"broken_asset_reference",
-	"missing_required_section",
-]
-const LAYOUT_CODES_EXPECTED = [
-	"layout_overflow",
-	"layout_text_clipped",
-	"layout_scroll_container",
-	"layout_image_distorted",
-	"layout_sibling_overlap",
-]
 
-function sampleManifest() {
-	return {
-		schemaVersion: SCHEMA_VERSION,
-		sessionDir: "/tmp/session/20260101-120000",
-		startedAt: "2026-01-01T12:00:00.000Z",
-		finishedAt: null,
-		elapsedMinutes: null,
-		lane: "no-format",
-		interview: null,
-		deliverables: [
-			{ format: "pdf", status: "pending", promised: true, updatedAt: "2026-01-01T12:00:00.000Z" },
-		],
-		renders: [],
-		gates: { static: "not_run", layout: "not_run", visual: "not_run", proofread: "not_run" },
-		residualDefects: [],
-		repair: null,
-		sources: null,
-	}
-}
 
 describe("DEFECT_CODES", () => {
 	test("#given the code table #when every code is inspected #then it has a severity, a hint, and an integrity flag", () => {
-		expect(Object.keys(DEFECT_CODES).sort()).toEqual([...STATIC_CODES_EXPECTED, "missing_promised_deliverable", ...LAYOUT_CODES_EXPECTED].sort())
+		expect(Object.keys(DEFECT_CODES).sort()).toEqual(
+			[...STATIC_CODES_EXPECTED, "missing_promised_deliverable", ...LAYOUT_CODES_EXPECTED, ...FIDELITY_CODES_EXPECTED, "conversion_altered_number", "unit_unbound"].sort(),
+		)
 		for (const [code, entry] of Object.entries(DEFECT_CODES)) {
 			expect(SEVERITIES.has(entry.severity), `${code} severity`).toBe(true)
 			expect(typeof entry.hint).toBe("string")
@@ -79,14 +38,18 @@ describe("DEFECT_CODES", () => {
 		}
 	})
 
-	test("#given the code table #when integrity codes are derived #then they are exactly the five blocker codes", () => {
-		expect([...INTEGRITY_CODES].sort()).toEqual([
-			"broken_asset_reference",
-			"missing_citation_section",
-			"missing_closing_section",
-			"missing_promised_deliverable",
-			"missing_required_section",
-		])
+	test("#given the code table #when integrity codes are derived #then they are exactly the blocker codes", () => {
+		expect([...INTEGRITY_CODES].sort()).toEqual(
+			[
+				"broken_asset_reference",
+				"missing_citation_section",
+				"missing_closing_section",
+				"missing_promised_deliverable",
+				"missing_required_section",
+				...FIDELITY_BLOCKERS,
+				"conversion_altered_number",
+			].sort(),
+		)
 		for (const code of INTEGRITY_CODES) expect(DEFECT_CODES[code].severity).toBe("blocker")
 		for (const [code, entry] of Object.entries(DEFECT_CODES)) {
 			if (entry.severity === "blocker") expect(INTEGRITY_CODES.has(code), `${code} must be integrity`).toBe(true)
@@ -102,6 +65,15 @@ describe("DEFECT_CODES", () => {
 		}).toThrow()
 		expect(DEFECT_CODES.korean_no_keep_all.severity).toBe("major")
 	})
+
+	test("#given the fidelity codes #when inspected #then each carries its fixed severity and integrity flag", () => {
+		for (const code of FIDELITY_BLOCKERS) expect([code, DEFECT_CODES[code]?.severity, DEFECT_CODES[code]?.integrity]).toEqual([code, "blocker", true])
+		expect([DEFECT_CODES.conversion_altered_number?.severity, DEFECT_CODES.conversion_altered_number?.integrity]).toEqual(["blocker", true])
+		for (const code of FIDELITY_MAJORS) expect([code, DEFECT_CODES[code]?.severity, DEFECT_CODES[code]?.integrity]).toEqual([code, "major", false])
+		for (const code of FIDELITY_MINORS) expect([code, DEFECT_CODES[code]?.severity, DEFECT_CODES[code]?.integrity]).toEqual([code, "minor", false])
+		expect([DEFECT_CODES.unit_unbound?.severity, DEFECT_CODES.unit_unbound?.integrity]).toEqual(["minor", false])
+		expect(DEFECT_CODES).not.toHaveProperty("incompatible_populations")
+	})
 })
 
 describe("code groups", () => {
@@ -109,10 +81,12 @@ describe("code groups", () => {
 		expect([...STATIC_CODES].sort()).toEqual(STATIC_CODES_EXPECTED.slice().sort())
 		expect([...LAYOUT_CODES].sort()).toEqual(LAYOUT_CODES_EXPECTED.slice().sort())
 		expect([...MANIFEST_CODES]).toEqual(["missing_promised_deliverable"])
-		const union = [...STATIC_CODES, ...LAYOUT_CODES, ...MANIFEST_CODES].sort()
+		expect([...FIDELITY_CODES].sort()).toEqual([...FIDELITY_CODES_EXPECTED, "conversion_altered_number", "unit_unbound"].sort())
+		const union = [...STATIC_CODES, ...LAYOUT_CODES, ...MANIFEST_CODES, ...FIDELITY_CODES].sort()
 		expect(union).toEqual(Object.keys(DEFECT_CODES).sort())
 		expect(new Set(union).size).toBe(union.length)
 		expect(Object.isFrozen(STATIC_CODES)).toBe(true)
+		expect(Object.isFrozen(FIDELITY_CODES)).toBe(true)
 	})
 })
 
@@ -122,7 +96,8 @@ describe("enums", () => {
 		expect(STATES).toEqual(["none", "partial", "complete"])
 		expect(DELIVERABLE_FORMATS).toEqual(["pdf", "docx", "html", "md", "latex", "slides", "post"])
 		expect(DELIVERABLE_STATUSES).toEqual(["pending", "delivered", "blocked_capability", "skipped", "failed"])
-		expect(GATE_NAMES).toEqual(["static", "layout", "visual", "proofread"])
+		expect(GATE_NAMES).toEqual(["static", "fidelity", "layout", "visual", "proofread"])
+		expect(ANSWERED_BY).toEqual(["user", "default", "request", "pending"])
 		expect(GATE_STATUSES).toEqual(["pass", "fail", "not_run"])
 		expect(LINEAGE_MODES).toEqual(["inline", "section"])
 		expect(DESIGN_SPEC_SECTIONS).toEqual([
@@ -151,6 +126,18 @@ describe("validateOutcomeManifest", () => {
 		const result = validateOutcomeManifest(m)
 		expect(result.ok).toBe(false)
 		expect(result.errors.join("\n")).toMatch(/deliverables\[0\]\.status/)
+	})
+
+	test("#given a manifest written before the fidelity gate #when validated raw and after normalizeManifest #then only the normalized copy passes, with fidelity not_run", () => {
+		const old = fourGateManifest()
+		expect(validateOutcomeManifest(old).ok).toBe(false)
+		const normalized = normalizeManifest(old)
+		expect(normalized.gates.fidelity).toBe("not_run")
+		expect(normalized.gates.static).toBe("not_run")
+		expect(validateOutcomeManifest(normalized)).toEqual({ ok: true, errors: [] })
+		expect(old.gates).not.toHaveProperty("fidelity")
+		const failed = { ...old, gates: { ...old.gates, visual: "fail" } }
+		expect(normalizeManifest(failed).gates.visual).toBe("fail")
 	})
 
 	test("#given a gate with an unknown value #when validated #then it fails", () => {

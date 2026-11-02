@@ -49,6 +49,24 @@ export class HostSessionDetachedError extends Error {
   }
 }
 
+/** Nothing was sent: the same session can accept input once its state probes recover. */
+export class HostSessionUnresponsiveError extends Error {
+  readonly code = "unresponsive"
+  readonly retryable = true
+
+  constructor() {
+    super("the session is unresponsive; input can be retried when it responds")
+  }
+}
+
+/** The engine's typed response, including hosts that carry the code only in the error string. */
+export function isHostSessionMissing(error: unknown): boolean {
+  return error instanceof Error && (
+    ("errorCode" in error && error.errorCode === "unknown_session")
+    || (error.name === "RpcCommandError" && error.message === "unknown_session")
+  )
+}
+
 const uiRequestSchema = z.object({
   type: z.literal("extension_ui_request"),
   id: z.string().min(1),
@@ -67,7 +85,14 @@ const closedSchema = z.object({
   reason: z.string().min(1).optional(),
 })
 
-const controlRecordSchema = z.discriminatedUnion("type", [uiRequestSchema, parkedSchema, closedSchema])
+const replacedSchema = z.object({
+  type: z.literal("session_replaced"),
+  sessionId: z.string().min(1).optional(),
+  durableSessionId: z.string().min(1),
+  sessionFile: z.string().min(1),
+})
+
+const controlRecordSchema = z.discriminatedUnion("type", [uiRequestSchema, parkedSchema, closedSchema, replacedSchema])
 
 /** A frame the session client itself acts on, as opposed to an agent event it fans out. */
 export type HostControlRecord = z.infer<typeof controlRecordSchema>

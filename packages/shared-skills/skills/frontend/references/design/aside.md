@@ -206,4 +206,4 @@ Every primitive must define default, hover, active, focus-visible, disabled, loa
 
 ## Agent Prompt
 
-When building an Aside-inspired surface, first create or update `DESIGN.md` with: bright white product-app atmosphere, display/body/mono font roles, ink/neutral token ramp, squircle/pill component rules, a product-browser focal primitive, dense capability bands, and responsive crop/scale behavior for the product frame. Use original content and assets. Verify with screenshots at 375px, 768px, and 1280px or wider, and compare against the live-reference evidence before declaring visual fidelity.
+When building an Aside-inspired surface, first create or update `DESIGN.md` with: bright white product-app atmosphere, display/body/mono font roles, ink/neutral token ramp, squircle/pill component rules, a product-browser focal primitive, dense capability bands, and responsive crop/scale behavior for the product frame. Use original content and assets. Verify through `/visual-qa` (its capture matrix: 390 with mobile emulation, 1440, 1920) and compare against the live-reference evidence before declaring visual fidelity.

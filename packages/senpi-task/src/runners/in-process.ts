@@ -8,14 +8,15 @@ import type { KernelToolGrant } from "../kernel-tools/resolve"
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { isWorkpoolYieldTool } from "../workpool/worker-tool-identity"
 import {
-  createChildHandle,
   createRestoredChildHandle,
+  createStagedChildHandle,
   discardUnstartedChildSession,
   type ChildHandle,
   type ChildCompletionPolicy,
   type ChildSession,
 } from "./in-process/child-handle"
 import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
+import { assertPinnedModelHonoured } from "./in-process/pin-check"
 import { RunnerError } from "./in-process/runner-error"
 import type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -41,6 +42,12 @@ export {
 export { RunnerError } from "./in-process/runner-error"
 
 export const DEFAULT_MAX_CHILD_DEPTH = 4
+
+export type StagedInProcessChild = {
+  readonly handle: ChildHandle
+  readonly promptText: string
+  begin(): void
+}
 
 export type DepthPolicy = {
   readonly maxDepth: number
@@ -162,6 +169,13 @@ export class InProcessRunner {
   }
 
   async start(spec: ChildSpec): Promise<ChildHandle> {
+    const staged = await this.startStaged(spec)
+    staged.begin()
+    return staged.handle
+  }
+
+  // Create the child session without sending its first prompt; `begin` sends it.
+  async startStaged(spec: ChildSpec): Promise<StagedInProcessChild> {
     if (spec.depth > this.#depthPolicy.maxDepth) {
       throw new RunnerError({
         kind: "depth-exceeded",
@@ -170,23 +184,42 @@ export class InProcessRunner {
     }
 
     let session: ChildSession
+    let createdSession: ChildSession | undefined
     try {
       // SessionManager and the child option helpers below read barrel values synchronously, so the
       // barrel is loaded here (memoized: a cache hit in any process that already runs the engine).
       const { SessionManager } = await loadSenpiBarrel()
       const options = buildChildSessionOptions({
         spec,
-        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec)),
+        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec), {
+          spawnedBy: { parentSessionId: spec.parentSessionId, rootSessionId: spec.rootSessionId, taskId: spec.taskId },
+        }),
         sharedParentTools: this.#sharedParentTools,
         uiOnlyToolNames: this.#uiOnlyToolNames,
         ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
       session = await this.#createSession(options)
+      createdSession = session
+      assertPinnedModelHonoured(spec, session)
     } catch (error) {
       // A start that never produced a session must leave NO binding behind: the runner floor refuses
       // curated/policy-narrowed/colliding grants by throwing from here, and a stale entry would keep
       // a strong reference to the parent kernel until TTL expunge.
       this.#kernelToolBindings?.release(spec.taskId)
+      // A session that WAS created but failed the pin check is disposed here (session_shutdown +
+      // dispose): no handle exists yet, so nobody else owns that teardown (#9722 M1). A teardown
+      // that itself fails still escapes as a typed RunnerError - never an untyped AggregateError.
+      if (createdSession !== undefined) {
+        try {
+          await discardUnstartedChildSession(createdSession)
+        } catch (shutdownError) {
+          throw new RunnerError({
+            kind: "model_unavailable",
+            message: "the pin check failed, and shutting down its session failed",
+            cause: new AggregateError([error, shutdownError]),
+          })
+        }
+      }
       if (RunnerError.is(error)) throw error
       throw new RunnerError({ kind: "session-create-failed", message: sessionCreateMessage(error), cause: error })
     }
@@ -206,9 +239,9 @@ export class InProcessRunner {
         ...(spec.instructions !== undefined && { instructions: spec.instructions }),
       })
 
-    let handle: ChildHandle
+    let staged: { readonly handle: ChildHandle; begin(): void }
     try {
-      handle = createChildHandle({
+      staged = createStagedChildHandle({
         taskId: spec.taskId,
         session,
         promptText,
@@ -216,14 +249,16 @@ export class InProcessRunner {
       })
     } catch (error) {
       this.#kernelToolBindings?.release(spec.taskId)
-      discardUnstartedChildSession(session)
+      await discardUnstartedChildSession(session).catch((shutdownError: unknown) => {
+        throw new AggregateError([error, shutdownError], "child handle construction failed, and shutting down its session failed")
+      })
       throw error
     }
     // Runtime-only, and only once the child actually exists: the grant is bound under this child's
     // id for same-host revival. Nothing about it reaches the record, the v1 spawn_spec or the
     // child's JSONL transcript.
     if (spec.kernelTools !== undefined) this.#kernelToolBindings?.bind(spec.taskId, spec.kernelTools)
-    return handle
+    return { handle: staged.handle, promptText, begin: staged.begin }
   }
 
   // Rebuild a persisted child from its session transcript WITHOUT replaying its prompt. The tool

@@ -207,3 +207,36 @@ describe("runMemoryTool", () => {
   })
 
 })
+
+describe("runMemoryTool secret screening", () => {
+  it("#given a create carrying a credential assignment #when run #then it is refused with the masked path and class, and index and worktree are restored", async () => {
+    // given
+    const setup = await fixture()
+    const headBefore = await setup.repo.head()
+
+    // when
+    const error = await run(setup, {
+      command: "create", reason: "remember note", file_path: "notes/a.md",
+      description: "Note", file_text: "the token is token=abc123456",
+    }).then(
+      () => { throw new Error("expected the write to be refused") },
+      (caught: unknown) => caught,
+    )
+
+    // then
+    expect(error).toBeInstanceOf(MemoryToolError)
+    const message = (error as Error).message
+    expect(message).toBe("memory: refused: notes/a.md contains secret-like content (credential_assignment); remove it and retry")
+    expect(message).not.toContain("abc123456")
+    expect(await setup.repo.head()).toBe(headBefore)
+    expect((await setup.repo.status()).trim()).toBe("")
+    const execCheck = promisify(execFile)
+    await execCheck("git", ["diff", "--cached", "--quiet"], { cwd: setup.repo.dir })
+    // the next tool call's cleanCheck passes
+    const after = await run(setup, {
+      command: "create", reason: "remember clean note", file_path: "notes/b.md",
+      description: "Clean", file_text: "ordinary body",
+    })
+    expect(after.message).toContain("committed locally")
+  })
+})

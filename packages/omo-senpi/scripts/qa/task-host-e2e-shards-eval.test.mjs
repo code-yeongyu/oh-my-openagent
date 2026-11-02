@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { CONTROL_ID, evaluateShardFaultReport, SCENARIO_IDS } from "./task-host-e2e-shards-eval.mjs"
+import { CONTROL_ID, evaluateShardFaultReport, SCENARIO_IDS, selectedScenarioIds } from "./task-host-e2e-shards-eval.mjs"
 
 function complete(mode = "full") {
   const ids = mode === "control" ? [CONTROL_ID] : SCENARIO_IDS
@@ -15,6 +15,34 @@ describe("evaluateShardFaultReport", () => {
     const verdict = evaluateShardFaultReport(complete())
     expect(SCENARIO_IDS).toHaveLength(25)
     expect(verdict).toMatchObject({ exitCode: 0, verdict: "PASS", expected: 25, passed: 25, failed: [] })
+  })
+
+  test("a passing selected subset exits zero and omits unselected rows", () => {
+    const report = complete()
+    report.only = ["rollback", "index"]
+    const selected = selectedScenarioIds(report.only)
+    report.scenarios = Object.fromEntries(selected.map((id) => [id, report.scenarios[id]]))
+    const verdict = evaluateShardFaultReport(report)
+    expect(verdict).toMatchObject({ exitCode: 0, expected: 9, passed: 9, failed: [] })
+    expect(verdict.rows.map((row) => row.id)).toEqual(selected)
+  })
+
+  test("a selected failure or missing selected row still exits one", () => {
+    const report = complete()
+    report.only = ["crash"]
+    const selected = selectedScenarioIds(report.only)
+    report.scenarios = Object.fromEntries(selected.map((id) => [id, report.scenarios[id]]))
+    report.scenarios[selected[0]].status = "fail"
+    expect(evaluateShardFaultReport(report)).toMatchObject({ exitCode: 1, failed: [selected[0]] })
+    delete report.scenarios[selected[0]]
+    expect(evaluateShardFaultReport(report)).toMatchObject({ exitCode: 1, failed: [selected[0]] })
+  })
+
+  test("selection covers the full matrix once and rejects unknown groups", () => {
+    expect(selectedScenarioIds(["crash", "nested", "handoff", "handoff-successors", "rollback", "index", "retain", "contracts"])).toEqual(SCENARIO_IDS)
+    expect(selectedScenarioIds(["crash", "crash"])).toHaveLength(4)
+    expect(selectedScenarioIds(["contracts"])).toEqual([])
+    expect(() => selectedScenarioIds(["typo"])).toThrow("Unknown scenario group: typo")
   })
 
   test("every full-run rule independently fails when broken", () => {

@@ -49,9 +49,20 @@ pub(crate) fn enumerate() -> CoreResult<Vec<DesktopWindow>> {
             // xcap marks every window of the active app focused; the AX
             // focused window lands with the focus guard (todo 15).
             focused: window.is_focused().unwrap_or(false),
+            // xcap cannot report SCWindow.isOnScreen; the SCK capture reply
+            // owns the on-Screen truth (B9).
+            is_on_screen: None,
             elevated: None,
         });
     }
+    let helper_ids = match crate::focus::window_info() {
+        Ok(info) => Some(info.iter().filter(|w| w.cursor_overlay).map(|w| w.window_number).collect::<Vec<_>>()),
+        Err(error) => {
+            eprintln!("window list cannot identify cursor helpers; hiding every title match: {error}");
+            None
+        }
+    };
+    super::exclude_overlay_windows(&mut result, helper_ids.as_deref());
     Ok(result)
 }
 

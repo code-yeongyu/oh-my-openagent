@@ -20,7 +20,7 @@ fn portal_screenshot_returns_png() {
     let before = backend.capabilities();
 
     let (image, _) = backend
-        .capture(&Target::Desktop, &CaptureCaps::default())
+        .capture(&Target::Desktop, &CaptureCaps::default(), &[])
         .expect("portal screenshot");
 
     let after = backend.capabilities();

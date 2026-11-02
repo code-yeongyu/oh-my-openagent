@@ -77,7 +77,7 @@ export class ChaosHostRegistry implements ResidencyRegistry {
     return [...this.#handles.values()]
   }
 
-  forget(taskId: string): void {
+  forget(taskId: string, _options: Parameters<ResidencyRegistry["forget"]>[1]): void {
     this.#handles.delete(taskId)
   }
 
@@ -137,6 +137,8 @@ export function buildHostChaosHarness(): HostChaosHarness {
     hostSessionProbe: {
       daemonAlive: () => Promise.resolve(daemon.alive),
       sessionLive: (identity) => Promise.resolve(daemon.alive && daemon.livePaths.has(identity.session_path)),
+      sessionLiveness: (identity) =>
+        Promise.resolve(daemon.alive && daemon.livePaths.has(identity.session_path) ? "live" : "gone"),
       refresh: () => undefined,
     },
     hostSessionClose: (request) => {

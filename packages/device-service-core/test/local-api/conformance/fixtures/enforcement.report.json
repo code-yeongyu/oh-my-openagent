@@ -1,0 +1,168 @@
+{
+  "request": "enforcement.report",
+  "cases": [
+    {
+      "name": "a desktop reports its own home",
+      "outcome": "ok",
+      "client": {
+        "name": "desktop",
+        "version": "2.0.0",
+        "data_home": "/home/user/.config/omo"
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "enforcement.report",
+            "generation": 3,
+            "data_home": "/home/user/.config/omo",
+            "environments": [
+              {
+                "environment_id": "env-1",
+                "revoked": 1,
+                "closed": 0
+              }
+            ],
+            "complete": true
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "a desktop with zero environments reports a complete empty inventory",
+      "outcome": "ok",
+      "client": {
+        "name": "desktop",
+        "version": "2.0.0",
+        "data_home": "/home/user/.config/omo"
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "enforcement.report",
+            "generation": 3,
+            "data_home": "/home/user/.config/omo",
+            "environments": [],
+            "complete": true
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "a CLI client is refused forbidden",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "enforcement.report",
+            "generation": 3,
+            "data_home": "/home/user/.config/omo",
+            "environments": [],
+            "complete": true
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "forbidden"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a desktop reporting another home is refused forbidden",
+      "outcome": "refusal",
+      "client": {
+        "name": "desktop",
+        "version": "2.0.0",
+        "data_home": "/home/user/.config/omo"
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "enforcement.report",
+            "generation": 3,
+            "data_home": "/home/user/.config/omo-qa",
+            "environments": [],
+            "complete": true
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "forbidden"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "duplicate environment ids are refused",
+      "outcome": "refusal",
+      "client": {
+        "name": "desktop",
+        "version": "2.0.0",
+        "data_home": "/home/user/.config/omo"
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "enforcement.report",
+            "generation": 3,
+            "data_home": "/home/user/.config/omo",
+            "environments": [
+              {
+                "environment_id": "env-1",
+                "revoked": 0,
+                "closed": 0
+              },
+              {
+                "environment_id": "env-1",
+                "revoked": 0,
+                "closed": 0
+              }
+            ],
+            "complete": true
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

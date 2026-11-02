@@ -48,6 +48,7 @@ export interface ReflectionRunner {
 
 export interface SenpiSubprocessRunnerOptions {
   readonly identity: MemoryIdentity
+  readonly memoryRoot?: string
   readonly reservation: ReflectionReservationPort
   readonly logger?: ComponentLogger
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined

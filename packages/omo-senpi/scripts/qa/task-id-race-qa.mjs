@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const COLLISION_TEXT = "Task record already exists"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -307,7 +308,7 @@ function resolveSenpi(bin) {
 }
 
 function versionOf(bin) {
-  const result = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 30_000 })
+  const result = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 30_000, env: withTelemetryOptOut(process.env) })
   return `${result.stdout}${result.stderr}`.trim() || "unknown"
 }
 

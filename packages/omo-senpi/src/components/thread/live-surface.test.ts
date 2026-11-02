@@ -1,14 +1,17 @@
 import { describe, expect, test } from "bun:test"
-import { once } from "node:events"
-import { mkdtempSync, rmSync } from "node:fs"
+import { EventEmitter, once } from "node:events"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createServer, type Socket } from "node:net"
+import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { TASK_HOST_SOCKET_ENV_NAMES } from "../../../../senpi-task/src/runners/rpc-host/daemon"
+import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import { createLiveThreadSurface, resolveThreadSocket, THREAD_SOCKET_ENV_NAMES } from "./live-surface"
 import type { ThreadHost } from "./tools"
 
 /** An engine that cannot enumerate endpoints: the surface reaches the legacy socket alone. */
 const NO_ENUMERATION = async () => undefined
+const NO_REGISTRY = async () => []
 
 /**
  * `preamble` frames are written BEFORE the correlated response, exactly as the multi-session host
@@ -24,7 +27,8 @@ async function withRpc(
   const socketPath = join(directory, "rpc.sock")
   const frames: Array<Record<string, unknown>> = []
   const sockets = new Set<Socket>()
-  const server = createServer((socket) => {
+  const transport = fakeHostTransport(socketPath)
+  const server = createServer((socket) => transport.authenticate(socket, () => {
     sockets.add(socket)
     socket.once("close", () => sockets.delete(socket))
     let buffer = ""
@@ -34,17 +38,18 @@ async function withRpc(
       if (newline < 0) return
       const frame = JSON.parse(buffer.slice(0, newline)) as Record<string, unknown>
       buffer = buffer.slice(newline + 1)
+      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
       frames.push(frame)
       const answer = typeof response === "function" ? response(frame) : response
       const lines = [...preamble(String(frame.id)), { id: frame.id, type: "response", command: frame.type, ...answer }]
-      socket.end(lines.map((line) => `${JSON.stringify(line)}\n`).join(""))
+      socket.write(lines.map((line) => `${JSON.stringify(line)}\n`).join(""))
     })
-  })
+  }))
   try {
     const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
-    server.listen(socketPath)
+    server.listen(transport.listenAddress)
     await listening
-    await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, statusAll: NO_ENUMERATION }), frames)
+    await exercise(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, statusAll: NO_ENUMERATION, registry: NO_REGISTRY }), frames)
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(2000) })
     for (const socket of sockets) socket.destroy()
@@ -83,10 +88,10 @@ describe("live thread socket discovery", () => {
     expect(resolveAgentHome({ env: {}, homeDir: "/h", exists: () => false })).toBe(join("/h", ".senpi", "agent"))
   })
   test("always constructs a surface when the socket is absent at registration", () => {
-    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION })).toBeDefined()
+    expect(createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION, registry: NO_REGISTRY })).toBeDefined()
   })
   test("returns typed host_unavailable when the socket is absent at call time", async () => {
-    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION })
+    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: "/missing.sock" }, exists: () => false, statusAll: NO_ENUMERATION, registry: NO_REGISTRY })
     await expect(surface.listSessions()).rejects.toThrow("host_unavailable:/missing.sock")
   })
 })
@@ -148,6 +153,56 @@ describe("live thread session-control RPCs", () => {
   })
 })
 
+describe("live thread frame decoding", () => {
+  // win32 is simulated (process.platform), so the Windows transport path runs on every runner.
+  test.each([process.platform, "win32"] as const)("#given a reply whose non-ASCII text arrives one byte per read on %s #when it is decoded #then the text is identical to what the engine sent", async (platform) => {
+    // given
+    const name = "한국어 모델 🙂 ｍｏｄｅｌ"
+    const socket = new EventEmitter() as EventEmitter & { write: (data: string | Uint8Array) => boolean; destroy: () => void }
+    socket.destroy = () => {}
+    socket.write = (data) => {
+      const text = typeof data === "string" ? data : ""
+      if (!text.endsWith("\n")) return true
+      const frame = JSON.parse(text) as { id: string }
+      const reply = Buffer.from(`${JSON.stringify({ id: frame.id, type: "response", success: true, data: { models: [{ provider: "p", id: "m", name }] } })}\n`)
+      queueMicrotask(() => { for (const byte of reply) socket.emit("data", Buffer.from([byte])) })
+      return true
+    }
+    // A win32 host publishes <socket>.secret beside its logical path and listens on the pipe derived from both
+    // (senpi socket-transport.ts); the client resolves that transport before it dials, as it does for a real host.
+    const directory = mkdtempSync(join(tmpdir(), "byte-split-"))
+    const socketPath = join(directory, "rpc.sock")
+    writeFileSync(`${socketPath}.secret`, Buffer.alloc(32, 7))
+    const surface = createLiveThreadSurface({} as never, { env: { SENPI_RPC_SOCKET: socketPath }, exists: () => true, statusAll: NO_ENUMERATION, registry: NO_REGISTRY, connect: () => { queueMicrotask(() => socket.emit("connect")); return socket as never } })
+
+    // when
+    const realPlatform = process.platform
+    Object.defineProperty(process, "platform", { value: platform, configurable: true })
+    let models: unknown
+    try { models = await surface.getAvailableModels?.("route-peer") } finally {
+      Object.defineProperty(process, "platform", { value: realPlatform, configurable: true })
+      rmSync(directory, { recursive: true, force: true })
+    }
+
+    // then
+    expect(models).toEqual([{ provider: "p", id: "m", name }])
+  })
+})
+
+describe("live thread create with initial skills", () => {
+  test("#given initial skills #when a session is opened #then they ride on the open_session context and never as a wire field", async () => {
+    await withRpc(
+      (frame) => (frame.type === "open_session" ? { success: true, data: { sessionId: "rpc-new", state: { sessionId: "rpc-new", cwd: "/w" } } } : { success: true, data: { sessions: [] } }),
+      async (surface, frames) => {
+        await surface.openSession({ cwd: "/w", initialSkills: ["gateway-lead"] })
+        const open = frames.find((frame) => frame.type === "open_session")
+        expect(open).toMatchObject({ cwd: "/w", retain_on_disconnect: true, context: { initial_skills: JSON.stringify(["gateway-lead"]) } })
+        expect(open).not.toHaveProperty("initialSkills")
+      },
+    )
+  })
+})
+
 describe("live thread request correlation", () => {
   test("#given an open_session admission notice ahead of the reply #when openSession runs #then the queued frame is skipped and the correlated response is returned", async () => {
     await withRpc(
@@ -173,7 +228,7 @@ describe("live thread request correlation", () => {
       { success: true, data: { sessions: [{ sessionId: "route-a", cwd: "/w" }] } },
       async (surface) => {
         const sessions = await surface.listSessions()
-        expect(sessions).toEqual([{ sessionId: "route-a", cwd: "/w", socket: surface.socket }])
+        expect(sessions).toEqual([{ sessionId: "route-a", cwd: "/w", socket: surface.socket, endpoint_kind: "rpc_host", controls: ["send", "read", "rename", "set_model", "set_reasoning", "interrupt"] }])
       },
       () => [
         { type: "agent_start", sessionId: "route-other" },

@@ -1,7 +1,8 @@
+import { createLedgerDeadlineReader } from "./ledger-deadline-reader"
 import { spawn } from "node:child_process"
 import { existsSync, readFileSync } from "@oh-my-opencode/memory-core/fs"
 import { mkdir } from "@oh-my-opencode/memory-core/fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import {
   readRunJson,
@@ -10,6 +11,7 @@ import {
   type RunLaunchManifest,
   type RunOutcome,
 } from "./run-artifacts"
+import { emitMemoryReceipt, runReceipt, type ReceiptWarn, type RunReceiptLedger } from "../receipts-port"
 import { requireRunMetadata } from "./spawn-metadata"
 import { describeReflectionLauncher } from "./launcher-identity"
 import { waitForRunCompletion } from "./run-sentinel"
@@ -25,6 +27,9 @@ import type {
   ReflectionSpawnArgs,
 } from "./spawn-types"
 
+/** Prefix of the error the launcher sees when the supervisor exits without a complete outcome. */
+export const SUPERVISOR_EXIT_PREFIX = "memory run supervisor exited with"
+
 const DEFAULT_GRACE_MS = 5_000
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1024
 // Publication can still be waiting for the terminal gate after the child deadline expires.
@@ -39,13 +44,15 @@ export async function runReflectionChild(
     readonly sandbox?: ReflectionSandbox
     readonly supervisorPath?: string
     readonly now?: () => number
+    readonly receiptsDir?: string
+    readonly receiptWarn?: ReceiptWarn
   },
 ): Promise<ReflectionChildResult> {
   const graceMs = options.terminationGraceMs ?? DEFAULT_GRACE_MS
   const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
   if (graceMs < 0 || maxOutputBytes <= 0) throw new TypeError("reflection spawn limits are invalid")
 
-  const prepared = await (options.sandbox ?? passthroughSandbox)(spawnArgs)
+  const prepared = options.sandbox === undefined ? spawnArgs : await options.sandbox(spawnArgs)
   const metadata = requireRunMetadata(prepared)
   const launchedAt = (options.now ?? Date.now)()
   if (!Number.isFinite(prepared.hardDeadlineAt) || prepared.hardDeadlineAt <= 0) {
@@ -64,9 +71,14 @@ export async function runReflectionChild(
     thinking: prepared.thinking,
     nextAttempt: prepared.nextAttempt,
     hardDeadlineAt: prepared.hardDeadlineAt,
+    queuedAt: launchedAt,
+    memoryRoot: prepared.memoryRoot ?? dirname(dirname(dirname(metadata.worktree.parent.dir))),
+    maxConcurrentRuns: prepared.maxConcurrentRuns,
     terminationGraceMs: graceMs,
     maxOutputBytes,
     supervisorPath: options.supervisorPath,
+    ...(options.receiptsDir === undefined ? {} : { receiptsDir: options.receiptsDir }),
+    ...(options.receiptWarn === undefined ? {} : { receiptWarn: options.receiptWarn }),
     ledger: {
       version: 1,
       runId: metadata.runId,
@@ -115,10 +127,15 @@ async function runSupervisedChild(input: {
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
   readonly hardDeadlineAt: number
+  readonly queuedAt: number
+  readonly memoryRoot: string
+  readonly maxConcurrentRuns?: number
   readonly terminationGraceMs: number
   readonly maxOutputBytes: number
   readonly supervisorPath?: string
   readonly ledger: Readonly<Record<string, unknown>>
+  readonly receiptsDir?: string
+  readonly receiptWarn?: ReceiptWarn
 }): Promise<ReflectionChildResult> {
   await mkdir(input.runDir, { recursive: true, mode: 0o700 })
   const stdoutPath = join(input.runDir, "child-stdout.log")
@@ -134,6 +151,9 @@ async function runSupervisedChild(input: {
     cwd: input.cwd,
     env: definedEnvironment(input.env),
     hardDeadlineAt: input.hardDeadlineAt,
+    queuedAt: input.queuedAt,
+    memoryRoot: input.memoryRoot,
+    maxConcurrentRuns: input.maxConcurrentRuns,
     terminationGraceMs: input.terminationGraceMs,
     maxOutputBytes: input.maxOutputBytes,
     stdoutPath,
@@ -145,6 +165,7 @@ async function runSupervisedChild(input: {
     model: input.model,
     ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
     launching: true,
+    queued: true,
     hardDeadlineAt: input.hardDeadlineAt,
     deadlineAt: input.hardDeadlineAt + input.terminationGraceMs,
   }
@@ -160,6 +181,9 @@ async function runSupervisedChild(input: {
     windowsHide: true,
   })
   supervisor.unref()
+  if (input.receiptsDir !== undefined && input.attempt === 1) {
+    await emitMemoryReceipt(input.receiptsDir, runReceipt(launchedRun(input.ledger), "launched"), undefined, input.receiptWarn)
+  }
   const outcomePath = join(input.runDir, "outcome.json")
   const launchPath = join(input.runDir, "launch.json")
   const publishingPath = join(input.runDir, "publishing.json")
@@ -197,7 +221,7 @@ async function runSupervisedChild(input: {
       outcomePath,
       launchPath,
       hasCompleteOutcome,
-      input.hardDeadlineAt + input.terminationGraceMs + OUTCOME_PUBLICATION_MARGIN_MS,
+      createLedgerDeadlineReader(input.runDir, OUTCOME_PUBLICATION_MARGIN_MS),
       Date.now,
       outcomeWait.signal,
     ).then((result) => settle({ kind: "outcome", result }))
@@ -208,7 +232,7 @@ async function runSupervisedChild(input: {
   })
   if (result.kind === "error" && !hasCompleteOutcome()) throw result.error
   if (result.kind === "close" && !hasCompleteOutcome()) {
-    throw new Error(`memory run supervisor exited with ${result.exit.code ?? result.exit.signal ?? "unknown status"}`)
+    throw new Error(`${SUPERVISOR_EXIT_PREFIX} ${result.exit.code ?? result.exit.signal ?? "unknown status"}`)
   }
   if (result.kind === "outcome" && result.result === "timeout") {
     throw new Error("memory run supervisor did not publish an outcome before its deadline")
@@ -226,6 +250,12 @@ async function runSupervisedChild(input: {
   }
 }
 
-function passthroughSandbox(spawnArgs: ReflectionSpawnArgs): ReflectionSpawnArgs {
-  return spawnArgs
+function launchedRun(ledger: Readonly<Record<string, unknown>>): RunReceiptLedger {
+  return {
+    kind: ledger.kind === "dream" ? "dream" : "reflection",
+    runId: String(ledger.runId),
+    trigger: String(ledger.trigger),
+    ...(typeof ledger.origin === "string" ? { origin: ledger.origin } : {}),
+    startedAt: String(ledger.startedAt),
+  }
 }

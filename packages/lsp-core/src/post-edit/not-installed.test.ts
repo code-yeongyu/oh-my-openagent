@@ -34,8 +34,8 @@ function touch(path: string, text = ""): string {
 
 const FULL_NUDGE = [
 	"LSP server 'typescript' for .ts is NOT INSTALLED.",
-	"To install in THIS repository (preferred — no global install needed):",
-	"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
+	"To install in THIS repository (preferred, no global install needed):",
+	"ACTION REQUIRED: ASK THE USER whether to install this LSP server.",
 ].join("\n");
 
 function notInstalled(
@@ -152,7 +152,7 @@ describe("collectPostEditDiagnostics not-installed guidance", () => {
 			locateFile: at("project"),
 		});
 
-		expect(result.blocks).toEqual([{ filePath: "src/a.ts", diagnostics: `${FULL_NUDGE} (typescript)` }]);
+		expect(result.blocks).toEqual([{ filePath: "src/a.ts", diagnostics: `${FULL_NUDGE} (typescript)`, blocking: false }]);
 	});
 
 	it("#given no decision tool #when repeated edits hit missing servers #then each server is nudged once per session", async () => {
@@ -219,6 +219,6 @@ describe("collectPostEditDiagnostics not-installed guidance", () => {
 			runDiagnostics: async () => notInstalled("typescript"),
 		});
 
-		expect(result.blocks).toEqual([{ filePath: "a.ts", diagnostics: `${FULL_NUDGE} (typescript)` }]);
+		expect(result.blocks).toEqual([{ filePath: "a.ts", diagnostics: `${FULL_NUDGE} (typescript)`, blocking: false }]);
 	});
 });

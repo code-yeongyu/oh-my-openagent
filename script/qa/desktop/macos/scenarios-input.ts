@@ -125,9 +125,10 @@ export async function foregroundRestores(options: RunOptions): Promise<ScenarioR
       const selectionChanged = !sameJson(selectionBefore, selectionAfter)
       return {
         scenario: "foreground-restores",
-        pass: !clicked.isError && observerRestored && focusRestored && selectionChanged && keystroke.landed,
+        pass: !clicked.isError && session.confirms === 1 && observerRestored && focusRestored && selectionChanged &&
+          keystroke.landed,
         facts: {
-          clickError: toolError(clicked), topmostBefore, observer: { before, after }, observerRestored,
+          clickError: toolError(clicked), confirmsApproved: session.confirms, topmostBefore, observer: { before, after }, observerRestored,
           auditClick: audit, focusRestored,
           textEditSelection: { before: selectionBefore, after: selectionAfter }, selectionChanged, keystroke,
         },

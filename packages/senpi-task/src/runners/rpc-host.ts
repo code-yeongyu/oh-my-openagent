@@ -26,6 +26,7 @@ import { resolveChildSessionPath } from "./rpc-host/session-context"
 import type { HostSessionOpenInput } from "./rpc-host/session-transport"
 import { isHostTransportError } from "./rpc-host/transport-error"
 import { createHostSessionOpener, type HostSessionOpener } from "./rpc-host/session-open"
+import type { TransportRecoveryOptions } from "./rpc-host/transport-recovery"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
 import type { RpcChildHandle, RpcRunnerSpec } from "./types"
 
@@ -45,6 +46,7 @@ export type CreateHostSessionChannel = (socketPath: string) => HostSessionChanne
 /** The per-child runner this one delegates to when the daemon cannot host a child. */
 export interface FallbackChildRunner {
   start(spec: RpcRunnerSpec): Promise<RpcChildHandle>
+  settleTeardowns?(): Promise<void>
 }
 
 export type RpcHostRunnerOptions = {
@@ -63,6 +65,8 @@ export type RpcHostRunnerOptions = {
   readonly onWarning?: (message: string) => void | (() => void)
   readonly now?: () => number
   readonly reattachDelaysMs?: readonly number[]
+  // The bound a lost transport's recovery runs under before the child ends `transport lost` (omo#9403).
+  readonly transportRecovery?: TransportRecoveryOptions
   readonly admissionWaitMs?: number
   readonly sleep?: (ms: number) => Promise<void>
   // WHERE a new child's host listens, asked at EVERY start (the owning session changes on /new).
@@ -159,6 +163,7 @@ export class RpcHostRunner {
       closeGraceMs: options.closeGraceMs,
       now: this.now,
       reattachDelaysMs: this.reattachDelaysMs,
+      ...(options.transportRecovery === undefined ? {} : { transportRecovery: options.transportRecovery }),
       admissionWaitMs: this.admissionWaitMs,
       sleep: this.sleep,
       onWarning: this.onWarning,
@@ -212,6 +217,10 @@ export class RpcHostRunner {
       waitMs: this.admissionWaitMs,
       onWarning: this.onWarning,
     })
+  }
+
+  async settleTeardowns(): Promise<void> {
+    await Promise.all([this.sessionOpener.settleTeardowns(), this.options.fallback?.settleTeardowns?.()])
   }
 
   /**

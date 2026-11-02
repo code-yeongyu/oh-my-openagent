@@ -44,7 +44,7 @@ test.each([
   }
 })
 
-test.each(["linux-arm64", "win32-arm64", "linux-x64"])("absent %s status agrees with doctor", async (host) => {
+test.each(["linux-riscv64", "win32-ia32", "linux-x64", "linux-arm64", "win32-arm64"])("absent %s status agrees with doctor", async (host) => {
   const root = mkdtempSync(join(tmpdir(), "cu-absence-parity-"))
   const [platform, arch] = host.split("-")
   const stamped = join(root, "runtime")
@@ -60,13 +60,13 @@ test.each(["linux-arm64", "win32-arm64", "linux-x64"])("absent %s status agrees 
     const status = describeEngineSource(undefined, env, {
       platform, arch, execDir: root, packageDir: join(root, "packages", "senpi-desktop-engine"), repoRoot: root,
     })
-    if (arch === "arm64") {
+    if (arch === "riscv64" || arch === "ia32") {
       expect(report.kind).toBe("unavailable")
       if (report.kind !== "unavailable") throw new Error("expected unsupported host")
       expect(status).toBe(report.diagnostic.message)
     } else {
       expect(report.kind).toBe("not-installed")
-      expect(status).toBe(`would download senpi-desktop-engine-${host} from omo v${version} on first use`)
+      expect(status).toBe(`would download senpi-desktop-engine-${host}${platform === "win32" ? ".exe" : ""} from omo v${version} on first use`)
     }
   } finally {
     rmSync(root, { recursive: true, force: true })

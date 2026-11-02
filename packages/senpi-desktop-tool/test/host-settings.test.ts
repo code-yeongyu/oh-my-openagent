@@ -25,6 +25,24 @@ describe("isSupportedHost", () => {
 });
 
 describe("resolveComputerSettings", () => {
+	it.each(["darwin", "linux", "win32"])("enables the virtual cursor by default on %s", (platform) => {
+		// Given: no cursor override.
+		// When: settings are resolved for a supported host.
+		const settings = resolveComputerSettings(undefined, platform);
+		// Then: the default is enabled, even where the overlay itself is unavailable.
+		expect(Reflect.get(settings, "showCursor")).toBe(true);
+	});
+
+	it("keeps an explicit virtual cursor off switch", () => {
+		// Given: the user has disabled the overlay.
+		const raw = { showCursor: false };
+		// When
+		const settings = resolveComputerSettings(raw, "darwin");
+		// Then: disabling the overlay does not disable computer use.
+		expect(Reflect.get(settings, "showCursor")).toBe(false);
+		expect(settings.enabled).toBe(true);
+	});
+
 	it("fills every default when the computer block is absent", () => {
 		// Given
 		const raw = undefined;
@@ -35,7 +53,8 @@ describe("resolveComputerSettings", () => {
 		// Then
 		expect(settings).toEqual({
 			enabled: true,
-			display: "all",
+			showCursor: true,
+			display: "active",
 			maxWidth: 3840,
 			maxHeight: 2400,
 			screenshotMaxBytes: 5_000_000,
@@ -47,6 +66,11 @@ describe("resolveComputerSettings", () => {
 			enginePath: undefined,
 			cuaAdapter: false,
 		});
+	});
+
+	it.each(["all", "screen-2"])("preserves explicit display %s", (display) => {
+		const settings = resolveComputerSettings({ display });
+		expect(settings.display).toBe(display);
 	});
 
 	it("defaults enabled off on an unsupported host", () => {

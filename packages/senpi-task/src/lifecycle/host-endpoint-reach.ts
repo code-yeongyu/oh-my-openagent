@@ -1,7 +1,7 @@
 import type { HostSessionIdentity, SuspensionReason } from "../state"
 
 export type HostParkedReason = Extract<SuspensionReason, "daemon_unavailable" | "host_incompatible" | "own_host_unreachable">
-import type { LifecycleContext } from "./context"
+import { reconciliationActive, type LifecycleContext } from "./context"
 
 export type RecordedHostVerdict = "alive" | "host_unreachable" | "host_incompatible" | "own_host_unreachable"
 
@@ -14,20 +14,25 @@ export async function reachRecordedHost(
   context: LifecycleContext,
   hostSession: HostSessionIdentity,
 ): Promise<RecordedHostVerdict> {
-  if (await context.hostSessionProbe.daemonAlive(hostSession)) return "alive"
+  if (!reconciliationActive(context)) return "host_unreachable"
+  const alive = await context.hostSessionProbe.daemonAlive(hostSession)
+  if (!reconciliationActive(context)) return "host_unreachable"
+  if (alive) return "alive"
   const endpoint = context.hostEndpoint
   if (endpoint.isOwn(hostSession.socket)) {
     endpoint.notice("own_host_unreachable", hostSession.socket)
     return "own_host_unreachable"
   }
   const ensured = await endpoint.ensure(hostSession.socket).catch(() => "unreachable" as const)
+  if (!reconciliationActive(context)) return "host_unreachable"
   if (ensured === "incompatible") {
     endpoint.notice("host_incompatible", hostSession.socket)
     return "host_incompatible"
   }
   if (ensured !== "ensured") return "host_unreachable"
   context.hostSessionProbe.refresh(hostSession.socket)
-  return (await context.hostSessionProbe.daemonAlive(hostSession)) ? "alive" : "host_unreachable"
+  const reached = await context.hostSessionProbe.daemonAlive(hostSession)
+  return reconciliationActive(context) && reached ? "alive" : "host_unreachable"
 }
 
 /** What task_output reports for a record a verdict left parked. */

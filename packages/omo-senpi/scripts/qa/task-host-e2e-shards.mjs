@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 
 import { runCrashMatrix, controlRowForReport, crashRowsForReport } from "./task-host-e2e-shards-crash.mjs"
 import { runContractMatrix } from "./task-host-e2e-shards-contracts.mjs"
-import { evaluateShardFaultReport, CONTROL_ID, SCENARIO_IDS } from "./task-host-e2e-shards-eval.mjs"
+import { evaluateShardFaultReport, CONTROL_ID, selectedScenarioIds } from "./task-host-e2e-shards-eval.mjs"
 import { runMixedEngineScenario } from "./task-host-e2e-shards-handoff.mjs"
 import { runHandoffSuccessorMatrix } from "./task-host-e2e-shards-handoff-successors.mjs"
 import { runIndexLiveMatrix } from "./task-host-e2e-shards-index-live.mjs"
@@ -48,8 +48,8 @@ function artifactTable(report) {
   return `${lines.join("\n")}\n`
 }
 
-function unimplementedRows(existing) {
-  return Object.fromEntries(SCENARIO_IDS.filter((id) => existing[id] === undefined).map((id) => [
+function unimplementedRows(existing, expected) {
+  return Object.fromEntries(expected.filter((id) => existing[id] === undefined).map((id) => [
     id,
     {
       status: "fail",
@@ -82,6 +82,7 @@ async function main(options) {
   const bin = options.bin ?? process.env.SENPI_BIN
   if (options.control && options.beforeBin === undefined) throw new Error("--control requires --before-bin <R0 compiled omo>")
   if (!options.control && bin === undefined) throw new Error("--bin <compiled branch omo> or SENPI_BIN is required")
+  const expected = options.control ? [CONTROL_ID] : selectedScenarioIds(options.only)
   const out = resolve(options.out ?? "task-host-e2e-shards-out")
   mkdirSync(out, { recursive: true })
   const runRoot = createRunRoot()
@@ -181,7 +182,7 @@ async function main(options) {
           gates.contracts = { status: "fail", evidence: [], reason: errors.contracts }
         }
       }
-      Object.assign(scenarios, unimplementedRows(scenarios))
+      Object.assign(scenarios, unimplementedRows(scenarios, expected))
     }
   } finally {
     const swept = sweep(runRoot)
@@ -190,6 +191,7 @@ async function main(options) {
     const partial = {
       plan_todo: 14,
       mode: options.control ? "control" : "full",
+      only: options.only,
       started,
       finished: new Date().toISOString(),
       binaries,

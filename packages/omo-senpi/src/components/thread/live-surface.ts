@@ -1,23 +1,30 @@
 import { execFile } from "node:child_process"
 import { createConnection, type Socket } from "node:net"
-import { randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
-import { join, resolve } from "node:path"
-import { resolveTaskHostSocket, TASK_HOST_SOCKET_ENV_NAMES } from "../../../../senpi-task/src/runners/rpc-host/daemon"
-import { resolveProjectStateDirectory } from "../../../../senpi-task/src/store/project-state-directory"
+import { existsSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { authenticateRpcHost, authRequiredError, resolveRpcSocketTransport, withRpcSocket } from "@oh-my-opencode/senpi-task/rpc-socket-client"
+import { resolveThreadSocket } from "./live-surface-paths"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { resolveSenpiLaunch, withoutForeignPackageDirEnv } from "../memory/worker/senpi-command"
 import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
+import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
+import { controlSocketSecretPath, endpointKindOf, isTuiControlSocket, listRegistryEndpoints, type EndpointKind, type RegistryEndpoint } from "./endpoint-registry"
+import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./gateway/adapter"
+import { releaseReply, wakeReply } from "./gateway-replies"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
-import type { ThreadHostView, ThreadSessionPort } from "./tools/ports"
+import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
+import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
+import { answerUiRequest } from "./ui-answer"
+import { fencedCommand } from "./attachment-fence"
 
-type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown }
+type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorCode?: unknown; readonly errorData?: unknown }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
 function dataRecord(frame: RpcFrame, command: unknown): Record<string, unknown> {
   if (frame.success === false && command === "set_thinking_level" && typeof frame.error === "string" && /^Thinking level .+ is not supported by the active model\.$/.test(frame.error)) {
     throw new Error(`thinking_level_unsupported:${frame.error}`)
   }
+  if (frame.success === false && frame.error === "unsupported") throw new Error(`unsupported:${String(command)}`)
   if (frame.success && frame.data === undefined && (command === "set_session_name" || command === "set_thinking_level")) return {}
   if (!frame.success || !record(frame.data)) throw new Error(`thread RPC request failed: ${JSON.stringify(frame.error ?? frame)}`)
   return frame.data
@@ -28,6 +35,11 @@ export type ThreadSocketConnect = (socketPath: string) => Socket
 const REQUEST_TIMEOUT_MS = 60_000
 /** Budget for one endpoint's `list_sessions` while enumerating: one hung shard must not stall every call. */
 export const ENDPOINT_LIST_TIMEOUT_MS = 10_000
+/**
+ * A terminal answers from the user's own process: a suspended (`^Z`) or busy one costs a listing at
+ * most this long, the same bound senpi's `status --all` probes a `tui` row under (TUI_PROBE_TIMEOUT_MS).
+ */
+export const TUI_REQUEST_TIMEOUT_MS = 1_500
 /** How long one `host status --all` enumeration is reused before the engine is asked again. */
 export const HOST_ENDPOINTS_CACHE_TTL_MS = 5_000
 const HOST_STATUS_ALL_TIMEOUT_MS = 30_000
@@ -35,9 +47,24 @@ export const HOST_STATUS_ALL_ARGS = ["host", "status", "--all", "--include-worke
 /**
  * Marks a read-only listing as an observation (senpi `OBSERVE_REQUEST_FIELD`): without it the supervisor
  * counts the connection as an attachment, so every thread tool call would reset each shard's idle window
- * and no shard would ever idle out. Never sent on a request that acts on a session.
+ * and no shard would ever idle out. A request that acts on a session never carries it itself, but on an
+ * rpc_host its connection still opens with an observing `get_protocol_info` (the auth challenge and capability
+ * probe, `requestFrame`); the session command is then held by `attach_session` (`attachment-fence.ts`) when
+ * the host advertises it.
  */
 const OBSERVE = { observe: true } as const
+
+/** The commands any terminal control endpoint answers, an older one included (senpi before its session controls). */
+export const TUI_ENDPOINT_COMMANDS: ReadonlySet<string> = LEGACY_TUI_COMMANDS
+
+type RequestOptions = {
+  readonly timeoutMs?: number
+  readonly secret?: Uint8Array
+  readonly keyRoot: () => string
+  readonly durableSessionId?: string
+  readonly openedName?: string
+  readonly rpcHost?: boolean
+}
 
 /**
  * One request, one correlated response. The multi-session host writes other lines on the same
@@ -45,66 +72,62 @@ const OBSERVE = { observe: true } as const
  * for_request:<our id>}`, deliberately NOT carrying the response id so a client that settles by
  * id never takes it for the reply) and connection-wide broadcasts (`agent_start`,
  * `session_opened`, ...). Only the frame whose `id` equals the request id settles the call;
- * every other line is skipped.
+ * every other line is skipped. A terminal control endpoint authenticates the connection with its
+ * 32-byte secret, which is written before the request. The correlation id is written last: no
+ * command field can overwrite it.
  */
-async function request(socketPath: string, command: Record<string, unknown>, connect: ThreadSocketConnect, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Record<string, unknown>> {
-  const id = randomUUID()
-  return await new Promise((resolve, reject) => {
-    const socket = connect(socketPath)
-    let buffer = ""
-    const timer = setTimeout(() => { socket.destroy(); reject(new Error("thread RPC request timed out")) }, timeoutMs)
-    const finish = (error?: Error, value?: Record<string, unknown>) => { clearTimeout(timer); socket.destroy(); error === undefined ? resolve(value as Record<string, unknown>) : reject(error) }
-    socket.once("error", (error) => finish(error))
-    socket.once("close", () => finish(new Error(`thread RPC connection closed before the ${String(command.type)} response arrived`)))
-    socket.once("connect", () => socket.write(`${JSON.stringify({ id, ...command })}\n`))
-    socket.on("data", (chunk) => {
-      buffer += chunk.toString("utf8")
-      let newline = buffer.indexOf("\n")
-      while (newline >= 0) {
-        const line = buffer.slice(0, newline)
-        buffer = buffer.slice(newline + 1)
-        newline = buffer.indexOf("\n")
-        if (line.trim() === "") continue
-        let frame: unknown
-        try { frame = JSON.parse(line) } catch (error) { finish(error instanceof Error ? error : new Error(String(error))); return }
-        if (!record(frame) || frame.id !== id) continue
-        try { finish(undefined, dataRecord(frame as RpcFrame, command.type)) } catch (error) { finish(error instanceof Error ? error : new Error(String(error))) }
-        return
+async function requestFrame(socketPath: string, command: Record<string, unknown>, connect: ThreadSocketConnect, options: RequestOptions): Promise<RpcFrame> {
+  return await withRpcSocket(socketPath, { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS }, async (request) => {
+    if (options.rpcHost !== true) return await request(command)
+    const protocolRequest = command.type === "get_protocol_info" ? command : undefined
+    const info = options.secret === undefined
+      ? await authenticateRpcHost(request, socketPath, options.keyRoot, protocolRequest)
+      : await request(protocolRequest ?? { type: "get_protocol_info", observe: true })
+    if (command.type === "get_protocol_info") return info
+    // An older host that refuses get_protocol_info advertises nothing: it gets today's unfenced request, as askHost does.
+    const protocol = info.success === true && record(info.data) ? info.data : {}
+    const capabilities = new Set(Array.isArray(protocol.capabilities) ? protocol.capabilities : [])
+    return await fencedCommand(request, socketPath, command, capabilities, options.durableSessionId, async () => {
+      const result = await request(command)
+      if (command.type === "open_session" && result.success === true && options.openedName?.trim()) {
+        const opened = dataRecord(result, "open_session")
+        dataRecord(await request({ type: "set_session_name", sessionId: opened.sessionId, name: options.openedName }), "set_session_name")
       }
+      return result
     })
   })
 }
 
-/**
- * Socket overrides, most specific first: the engine's own brand-prefixed `RPC_SOCKET` names
- * (`envValue("RPC_SOCKET")` in senpi), then `OMO_RPC_SOCKET_PATH`, which the desktop sets on the
- * host it spawns so that host binds beside the CLI host instead of replacing it. The list and the
- * precedence live ONCE, beside the task daemon that attaches to the same socket.
- */
-export const THREAD_SOCKET_ENV_NAMES = TASK_HOST_SOCKET_ENV_NAMES
-
-/** Client for Senpi's existing supervisor-owned unix socket. It never starts or replaces a host. */
-export function resolveThreadSocket(env: Readonly<Record<string, string | undefined>> = process.env): string {
-  return resolveTaskHostSocket(env, resolveAgentHome({ env }))
-}
+export { resolveThreadSocket, THREAD_SOCKET_ENV_NAMES, defaultThreadStateDirectory } from "./live-surface-paths"
 
 /**
  * One endpoint row of `senpi host status --all --include-workers --json` (`{ endpoints: [...] }`),
- * reduced to what addressing reads: where the endpoint listens, whether it answered, and the session
- * files it names (listed rows, and path claims its `reservations/` still hold after it died).
+ * reduced to what addressing reads: where the endpoint listens, whether it answered, the session
+ * files it names (listed rows, path claims its `reservations/` still hold after it died, and a
+ * terminal's `owner.session.path`), and - from engines that report them - its `endpoint_kind` and
+ * liveness verdict (`alive`, and `reason` when not alive).
  */
 export type HostEndpointReport = {
   readonly socket: string | null
   readonly reachable: boolean
   readonly session_paths: readonly string[]
+  readonly endpoint_kind?: EndpointKind
+  readonly alive?: boolean
+  readonly reason?: "live_unresponsive" | "dead" | null
 }
 
-/** `undefined` means the engine cannot enumerate (a pre-release engine's usage error, no CLI): the legacy endpoint alone. */
+/** `undefined` means the engine cannot enumerate (a pre-release engine's usage error, no CLI): the registry on disk is read instead. */
 export type HostStatusAllRunner = () => Promise<readonly HostEndpointReport[] | undefined>
 
 function stringsAt(rows: unknown, field: string): string[] {
   if (!Array.isArray(rows)) return []
   return rows.flatMap((row) => (record(row) && typeof row[field] === "string" && row[field] !== "" ? [row[field] as string] : []))
+}
+
+function ownerSessionPath(owner: unknown): string[] {
+  if (!record(owner) || !record(owner.session)) return []
+  const path = owner.session.path
+  return typeof path === "string" && path !== "" ? [path] : []
 }
 
 /** Reads the one JSON line `host status --all` prints; anything without an `endpoints` array cannot enumerate. */
@@ -118,7 +141,10 @@ export function parseHostStatusAll(stdout: string | undefined): readonly HostEnd
     ? [{
         socket: typeof endpoint.socket === "string" && endpoint.socket !== "" ? endpoint.socket : null,
         reachable: endpoint.reachable === true,
-        session_paths: [...new Set([...stringsAt(endpoint.session_rows, "session_path"), ...stringsAt(endpoint.claims, "session_path")])],
+        session_paths: [...new Set([...stringsAt(endpoint.session_rows, "session_path"), ...stringsAt(endpoint.claims, "session_path"), ...ownerSessionPath(endpoint.owner)])],
+        ...(endpoint.endpoint_kind === "tui" || endpoint.endpoint_kind === "rpc_host" ? { endpoint_kind: endpoint.endpoint_kind } : {}),
+        ...(typeof endpoint.alive === "boolean" ? { alive: endpoint.alive } : {}),
+        ...(endpoint.reason === "live_unresponsive" || endpoint.reason === "dead" ? { reason: endpoint.reason } : endpoint.reason === null ? { reason: null } : {}),
       }]
     : [])
 }
@@ -145,96 +171,265 @@ function engineHostStatusAll(env: Readonly<Record<string, string | undefined>>):
 }
 
 export type LiveThreadSurfaceOptions = {
+  readonly keyRoot?: string
+  /** Socket already resolved by a synchronous registrar before the runtime is loaded. */
+  readonly socket?: string
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly exists?: (path: string) => boolean
   /** Replaces the engine CLI enumeration; tests answer it without spawning anything. */
   readonly statusAll?: HostStatusAllRunner
+  readonly registry?: () => Promise<readonly RegistryEndpoint[]>
+  readonly readSecret?: (socket: string) => Uint8Array
   readonly connect?: ThreadSocketConnect
   readonly now?: () => number
 }
 
+type EndpointVerdict = { readonly alive?: boolean; readonly reason?: "live_unresponsive" | "dead" | null }
+type KnownEndpoint = { readonly socket: string; readonly paths: readonly string[]; readonly kind: EndpointKind; readonly verdict: EndpointVerdict }
 type EndpointListing = { readonly host: AddressBookHost; readonly sessions: readonly ThreadHostSession[]; readonly disk: readonly DiskSession[]; readonly failure?: unknown }
 
+export type LiveThreadSurface = ThreadHost & Required<Pick<ThreadHost, "endpoint" | "listView" | "listTarget">> & { readonly gateway: GatewayEndpointPort }
+
+function isConnectRefusal(error: unknown): boolean {
+  const code = record(error) ? error.code : undefined
+  return code === "ENOENT" || code === "ECONNREFUSED"
+}
+
 /**
- * The thread tools' client for every host endpoint this agent dir holds: the legacy socket
- * (`resolveThreadSocket`, where `omo daemon attach` sessions live) plus every endpoint the engine
- * enumerates (per-thread `i-*` and per-parent `p-*` shards). It never starts or replaces a host.
- * Each call lists every endpoint live; a session is reached on the endpoint that listed it, because
- * routing ids are per-host counters. `thread_create` opens on the legacy endpoint.
+ * The thread tools' client for every endpoint this agent dir holds: the legacy socket
+ * (`resolveThreadSocket`, the operator endpoint `thread_create` opens on), every host shard (`i-*`, `p-*`)
+ * and every terminal control endpoint (`tui`) the engine enumerates - or, when the engine cannot
+ * enumerate, the registry on disk names. It never starts or replaces a host. Each call lists every
+ * endpoint live; a session is reached on the endpoint that listed it, because routing ids are
+ * per-host counters. `thread_create` opens on the legacy endpoint. A terminal is only ever sent the
+ * commands in TUI_ENDPOINT_COMMANDS, with its secret first.
  */
-export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThreadSurfaceOptions = {}): ThreadHost {
+export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, options: LiveThreadSurfaceOptions = {}): LiveThreadSurface {
   const env = options.env ?? process.env
   const exists = options.exists ?? existsSync
   const connect = options.connect ?? ((path: string) => createConnection(path))
   const now = options.now ?? Date.now
   const statusAll = options.statusAll ?? engineHostStatusAll(env)
-  const legacy = resolveThreadSocket(options.env)
-  let enumeration: { readonly expiresAt: number; readonly reports: Promise<readonly HostEndpointReport[] | undefined> } | undefined
+  const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
+  const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
+  const legacy = options.socket ?? resolveThreadSocket(options.env)
+  let enumeration: { readonly expiresAt: number; readonly endpoints: Promise<readonly KnownEndpoint[]> } | undefined
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
   const lastListed = new Map<string, readonly string[]>()
+  // What serves each socket, as the last enumeration said; a socket's name decides before that.
+  const kinds = new Map<string, EndpointKind>()
 
-  const callOn = async <T>(socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number): Promise<T> => {
-    if (!exists(socket)) throw new Error(`host_unavailable:${socket}`)
-    return await request(socket, { type, ...data }, connect, timeoutMs) as T
+  // What each terminal answered get_protocol_info with: the commands it accepts beyond the read-mostly set.
+  const tuiCommands = new Map<string, ReadonlySet<string>>()
+  const learnTuiCommands = async (socket: string): Promise<ReadonlySet<string>> => {
+    const known = tuiCommands.get(resolve(socket))
+    if (known !== undefined) return known
+    const info = await callFrame(socket, "get_protocol_info", {}, TUI_REQUEST_TIMEOUT_MS)
+    const commands = tuiCommandsFrom(info.success === true ? info.data : undefined)
+    tuiCommands.set(resolve(socket), commands)
+    return commands
   }
-  const call = <T>(type: string, data: Record<string, unknown> = {}): Promise<T> => callOn<T>(legacy, type, data)
 
-  const endpoints = async (): Promise<ReadonlyMap<string, { readonly socket: string; readonly paths: readonly string[] }>> => {
+  const kindOf = (socket: string): EndpointKind => kinds.get(resolve(socket)) ?? (isTuiControlSocket(socket) ? "tui" : "rpc_host")
+
+  const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string, openedName?: string): Promise<RpcFrame> => {
+    const tui = kindOf(socket) === "tui"
+    if (tui && !LEGACY_TUI_COMMANDS.has(type) && !(await learnTuiCommands(socket)).has(type)) throw new Error(`unsupported:${type}`)
+    let dial = connect
+    let secret: Uint8Array | undefined
+    if (tui) {
+      if (!exists(socket)) throw new Error(`host_unavailable:${socket}`)
+      try { secret = readSecret(socket) } catch { throw new Error(`host_unavailable:${socket}`) }
+    } else {
+      const transport = await resolveRpcSocketTransport(socket)
+      if (transport === undefined || (process.platform !== "win32" && !exists(socket))) throw new Error(`host_unavailable:${socket}`)
+      secret = transport.secret
+      if (transport.address !== socket) dial = () => connect(transport.address)
+    }
+    const frame = await requestFrame(socket, { type, ...data }, dial, {
+      timeoutMs: timeoutMs ?? (tui ? TUI_REQUEST_TIMEOUT_MS : undefined), secret, durableSessionId, openedName,
+      rpcHost: !tui,
+      keyRoot: () => options.keyRoot ?? (env.SENPI_RPC_KEY_ROOT?.trim() || resolveAgentHome({ env })),
+    })
+    if (frame.success === false && (frame.errorCode ?? frame.error) === "auth_required") throw authRequiredError(socket)
+    return frame
+  }
+  const callOn = async <T>(socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string): Promise<T> =>
+    dataRecord(await callFrame(socket, type, data, timeoutMs, durableSessionId), type) as T
+  const call = <T>(type: string, data: Record<string, unknown> = {}, durableSessionId?: string): Promise<T> => callOn<T>(legacy, type, data, undefined, durableSessionId)
+
+  const enumerate = async (): Promise<readonly KnownEndpoint[]> => {
+    const [reports, recorded] = await Promise.all([statusAll().catch(() => undefined), registry().catch(() => [] as readonly RegistryEndpoint[])])
+    const found = reports === undefined
+      ? recorded.flatMap((entry) => (entry.socket === null ? [] : [{ socket: entry.socket, paths: [] as readonly string[], kind: entry.endpoint_kind, verdict: {} }]))
+      : reports.flatMap((report) => report.socket === null
+          ? []
+          : [{
+              socket: report.socket,
+              paths: report.session_paths,
+              kind: report.endpoint_kind ?? endpointKindOf(report.socket, recorded),
+              verdict: { ...(report.alive === undefined ? {} : { alive: report.alive }), ...(report.reason === undefined ? {} : { reason: report.reason }) },
+            }])
+    // The legacy endpoint keeps its own socket name, and the session files its report names: they are
+    // the only record of its threads when it stops answering.
+    const isLegacy = (endpoint: KnownEndpoint) => resolve(endpoint.socket) === resolve(legacy)
+    const legacyPaths = [...new Set(found.filter(isLegacy).flatMap((endpoint) => endpoint.paths))]
+    return [{ socket: legacy, paths: legacyPaths, kind: endpointKindOf(legacy, recorded), verdict: {} }, ...found.filter((endpoint) => !isLegacy(endpoint))]
+  }
+
+  const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
     if (enumeration === undefined || enumeration.expiresAt <= now()) {
-      enumeration = { expiresAt: now() + HOST_ENDPOINTS_CACHE_TTL_MS, reports: statusAll().catch(() => undefined) }
+      enumeration = { expiresAt: now() + HOST_ENDPOINTS_CACHE_TTL_MS, endpoints: enumerate() }
     }
-    const found = new Map<string, { readonly socket: string; readonly paths: readonly string[] }>([[resolve(legacy), { socket: legacy, paths: [] }]])
-    for (const report of (await enumeration.reports) ?? []) {
-      if (report.socket === null) continue
-      const key = resolve(report.socket)
-      found.set(key, { socket: found.get(key)?.socket ?? report.socket, paths: report.session_paths })
-    }
-    return found
+    const known = await enumeration.endpoints
+    for (const endpoint of known) kinds.set(resolve(endpoint.socket), endpoint.kind)
+    return known
   }
 
-  const listEndpoint = async (socket: string, claimed: readonly string[]): Promise<EndpointListing> => {
+  const degraded = (endpoint: KnownEndpoint, error: unknown, reason: "live_unresponsive" | "dead" | null): EndpointListing => {
+    const known = new Set([...endpoint.paths, ...(lastListed.get(endpoint.socket) ?? [])])
+    const disk = [...known].flatMap((path) => { const session = readDiskSession(path, endpoint.socket); return session === null ? [] : [session] })
+    return {
+      host: { socket: endpoint.socket, error: error instanceof Error ? error.message : String(error), endpoint_kind: endpoint.kind, alive: false, reason, legacy: endpoint.socket === legacy },
+      sessions: [],
+      disk,
+      failure: error,
+    }
+  }
+
+  const listEndpoint = async (endpoint: KnownEndpoint): Promise<EndpointListing> => {
+    const tui = endpoint.kind === "tui"
+    // The engine already probed a terminal under its 1.5 s budget and found it not answering: a
+    // suspended or remote terminal is reported, never dialed again, reaped or reopened elsewhere.
+    if (tui && endpoint.verdict.alive === false) return degraded(endpoint, new Error(endpoint.verdict.reason ?? "live_unresponsive"), endpoint.verdict.reason ?? "live_unresponsive")
     try {
-      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(socket, "list_sessions", OBSERVE, ENDPOINT_LIST_TIMEOUT_MS)
-      const tagged = sessions.map((session) => ({ ...session, socket }))
-      lastListed.set(socket, tagged.flatMap((session) => (session.sessionPath === undefined ? [] : [session.sessionPath])))
-      return { host: { socket, list_sessions: { sessions: tagged } }, sessions: tagged, disk: [] }
+      const [{ sessions }, commands] = await Promise.all([
+        callOn<{ sessions: ThreadHostSession[] }>(endpoint.socket, "list_sessions", tui ? {} : OBSERVE, tui ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS),
+        tui ? learnTuiCommands(endpoint.socket).catch(() => LEGACY_TUI_COMMANDS) : Promise.resolve(undefined),
+      ])
+      const controls = acceptedControls(endpoint.kind, commands)
+      const tagged = sessions.map((session) => ({
+        ...session,
+        socket: endpoint.socket,
+        endpoint_kind: endpoint.kind,
+        controls,
+        ...(tui && session.durableSessionId === undefined ? { durableSessionId: session.sessionId } : {}),
+      }))
+      lastListed.set(endpoint.socket, tagged.flatMap((session) => (typeof session.sessionPath === "string" ? [session.sessionPath] : [])))
+      return { host: { socket: endpoint.socket, list_sessions: { sessions: tagged }, endpoint_kind: endpoint.kind, alive: true, reason: null, legacy: endpoint.socket === legacy }, sessions: tagged, disk: [] }
     } catch (error) {
-      const known = new Set([...claimed, ...(lastListed.get(socket) ?? [])])
-      const disk = [...known].flatMap((path) => { const session = readDiskSession(path, socket); return session === null ? [] : [session] })
-      return { host: { socket, error: error instanceof Error ? error.message : String(error) }, sessions: [], disk, failure: error }
+      // A terminal removes its socket when it exits, so a registered terminal whose socket is gone has ended.
+      if (tui && !exists(endpoint.socket)) return degraded(endpoint, new Error("dead"), "dead")
+      const timedOut = error instanceof Error && error.message === "thread RPC request timed out"
+      return degraded(endpoint, error, endpoint.verdict.reason ?? (timedOut ? "live_unresponsive" : isConnectRefusal(error) ? "dead" : null))
     }
   }
 
-  const listView = async (): Promise<ThreadHostView> => {
+  const listView = async (request: ThreadHostViewRequest = {}): Promise<ThreadHostView> => {
     const found = await endpoints()
-    const listed = await Promise.all([...found.values()].map(({ socket, paths }) => listEndpoint(socket, paths)))
-    for (const socket of [...lastListed.keys()]) if (![...found.values()].some((endpoint) => endpoint.socket === socket)) lastListed.delete(socket)
-    // Nothing answered: the same failure a single-endpoint client has always raised, legacy first.
-    if (listed.every((endpoint) => endpoint.failure !== undefined)) throw listed[0]?.failure
+    const listed = await Promise.all(found.map((endpoint) => listEndpoint(endpoint)))
+    for (const socket of [...lastListed.keys()]) if (!found.some((endpoint) => endpoint.socket === socket)) lastListed.delete(socket)
+    // Nothing answered: the same failure a single-endpoint client has always raised, legacy first -
+    // unless the caller takes nothing live as the offline case (a send), which reads the disk instead.
+    if (request.offline !== true && listed.every((endpoint) => endpoint.failure !== undefined)) throw listed[0]?.failure
     return { sessions: listed.flatMap((endpoint) => endpoint.sessions), hosts: listed.map((endpoint) => endpoint.host), disk: listed.flatMap((endpoint) => endpoint.disk) }
   }
 
-  const sessionMethods = (send: <T>(type: string, data?: Record<string, unknown>) => Promise<T>): ThreadSessionPort => ({
+  const sessionMethods = (socket: string | undefined, send: <T>(type: string, data?: Record<string, unknown>, durableSessionId?: string) => Promise<T>): ThreadSessionPort => ({
     getMessages: async (sessionId) => (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId) => send("get_state", { sessionId }),
-    prompt: (sessionId, message, options) => send("prompt", { sessionId, message, ...options }),
-    interrupt: (sessionId, turnId) => send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }),
-    setSessionName: async (sessionId, name) => { await send("set_session_name", { sessionId, name }) },
-    setModel: (sessionId, provider, modelId) => send("set_model", { sessionId, provider, modelId }),
+    prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
+    interrupt: (sessionId, turnId, durableId) => send("interrupt", { sessionId, ...(turnId === undefined ? {} : { turnId }) }, durableId),
+    setSessionName: async (sessionId, name, durableId) => { await send("set_session_name", { sessionId, name }, durableId) },
+    setModel: (sessionId, provider, modelId, durableId) => send("set_model", { sessionId, provider, modelId }, durableId),
     getAvailableModels: async (sessionId) => {
       const { models } = await send<{ models: Awaited<ReturnType<ThreadHost["getAvailableModels"]>> }>("get_available_models", { sessionId })
       return models.map(({ provider, id, name }) => ({ provider, id, ...(name === undefined ? {} : { name }) }))
     },
-    setThinkingLevel: async (sessionId, level, scope) => { await send("set_thinking_level", { sessionId, level, ...(scope === "turn" ? { scope } : {}) }) },
+    setThinkingLevel: async (sessionId, level, scope, durableId) => { await send("set_thinking_level", { sessionId, level, ...(scope === "turn" ? { scope } : {}) }, durableId) },
     getAvailableThinkingLevels: async (sessionId) => (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
+    wake: async (sessionId, deliveryIds, durableId) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] }, durableId)),
+    releaseSession: async (sessionId, release, durableId) => releaseReply(await callFrame(socket ?? legacy, "release_session", { sessionId, ...release }, undefined, durableId)),
   })
+
+  const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
+    const known = (await endpoints()).find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))
+    if (known?.verdict.alive === true) return "routable"
+    if (known?.verdict.reason === "live_unresponsive" || known?.verdict.reason === "dead") return known.verdict.reason
+    try {
+      await callOn(endpoint.socket, "get_protocol_info", {}, endpoint.kind === "tui" ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS)
+      return "routable"
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("host_unavailable:")) return "dead"
+      return isConnectRefusal(error) ? "dead" : "live_unresponsive"
+    }
+  }
+
+  /**
+   * The routing id of an rpc_host session. A multi-session host refuses every session command that names
+   * no session (`missing_session_id`), so an endpoint known only by its durable id (a session read from
+   * disk, `thread locate`) is looked up in that host's own listing; null when no live session holds it.
+   * A listing that fails throws, as the command itself would have.
+   */
+  const routingIdOf = async (endpoint: GatewayEndpointRef): Promise<string | null> => {
+    if (endpoint.routing_id !== null) return endpoint.routing_id
+    const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: {} })
+    if (listed.failure !== undefined) throw listed.failure
+    return listed.sessions.find((session) => session.durableSessionId === endpoint.durable_session_id && session.status !== "closed")?.sessionId ?? null
+  }
+
+  /**
+   * The gateway's sender port. A delivery is announced with `wake` only - never `prompt`: on a host
+   * the session is named by its routing id (resolved by durable id when the endpoint has none), a
+   * terminal holds exactly one session and takes a session-less wake. `release_session` exists on
+   * hosts only. A host session no live listing holds answers each command's typed not-routable result.
+   */
+  const gateway: GatewayEndpointPort = {
+    wake: async (endpoint, deliveryIds) => {
+      kinds.set(resolve(endpoint.socket), endpoint.kind)
+      const sessionId = endpoint.kind === "rpc_host" ? await routingIdOf(endpoint) : undefined
+      if (sessionId === null) return { admitted: [], unroutable: "no_live_session" }
+      const target = sessionId === undefined ? {} : { sessionId }
+      return wakeReply(await callOn<{ admitted?: unknown }>(endpoint.socket, "wake", { ...target, delivery_ids: [...deliveryIds] }, undefined, endpoint.durable_session_id))
+    },
+    releaseSession: async (endpoint, request) => {
+      if (endpoint.kind !== "rpc_host") throw new Error("unsupported:release_session")
+      kinds.set(resolve(endpoint.socket), endpoint.kind)
+      const sessionId = await routingIdOf(endpoint)
+      if (sessionId === null) return { success: false, error: "unknown_session" }
+      return releaseReply(await callFrame(endpoint.socket, "release_session", { sessionId, ...request }, undefined, endpoint.durable_session_id))
+    },
+    classifyLiveness: liveness,
+    respondUi: async (endpoint, answer) => {
+      kinds.set(resolve(endpoint.socket), endpoint.kind)
+      const sessionId = endpoint.kind === "rpc_host" ? await routingIdOf(endpoint) : endpoint.routing_id
+      if (sessionId === null && endpoint.kind === "rpc_host") return { delivered: false, error: "unknown_session" }
+      return await answerUiRequest((socket, type, data) => callFrame(socket, type, data, undefined, endpoint.durable_session_id), { ...endpoint, routing_id: sessionId }, answer)
+    },
+  }
 
   return {
     socket: legacy,
+    listTarget: async (durableId, endpoint) => {
+      kinds.set(resolve(endpoint.socket), endpoint.kind)
+      // The owner is listed exactly as thread_list lists it (the same per-kind budget and failure
+      // classification), so a send, a steer and a listing never disagree on whether it is live. A stale
+      // publication is offline, not a reason to discover another endpoint. For a terminal that means
+      // honoring a verdict the engine already reported: an enumeration still fresh in this process is
+      // the one a listing could have shown, so the send and the steer read the same liveness. A send
+      // never starts an enumeration itself - a published durable id needs none - so with no fresh
+      // listing the direct probe decides, exactly as a fresh listing would.
+      const fresh = endpoint.kind === "tui" && enumeration !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
+      const cached = fresh?.find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))?.verdict
+      const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: cached ?? {} })
+      const target = listed.sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
+      return { sessions: target, hosts: [listed.failure === undefined ? { ...listed.host, list_sessions: { sessions: target } } : listed.host], disk: [] }
+    },
     listSessions: async () => (await listView()).sessions,
     listView,
-    endpoint: (socket) => sessionMethods((type, data) => callOn(socket, type, data)),
+    endpoint: (socket) => sessionMethods(socket, (type, data, durableId) => callOn(socket, type, data, undefined, durableId)),
+    gateway,
     /**
      * `open_session` answers with the ROUTING id and a state that carries neither the durable id
      * nor a name, but the address book keys every entry by the durable id - so returning the wire
@@ -249,16 +444,14 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI, options: LiveThr
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
-      const result = await call<{ sessionId: string; state: ThreadHostSession }>("open_session", { ...(params as Record<string, unknown>), retain_on_disconnect: true })
+      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field.
+      const { initialSkills, name, ...openParams } = params
+      const result = dataRecord(await callFrame(legacy, "open_session", { ...openParams, retain_on_disconnect: true, ...(initialSkills === undefined ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }) }, undefined, undefined, name), "open_session") as { sessionId: string; state: ThreadHostSession }
       const routingId = result.sessionId
-      const name = (params as { readonly name?: string }).name
-      if (name !== undefined && name.trim() !== "") await call("set_session_name", { sessionId: routingId, name })
       const { sessions } = await call<{ sessions: readonly ThreadHostSession[] }>("list_sessions", OBSERVE)
       const listed = sessions.find((session) => session.sessionId === routingId)
-      return { ...result.state, ...(listed ?? {}), sessionId: routingId, socket: legacy }
+      return { ...result.state, ...(listed ?? {}), sessionId: routingId, socket: legacy, endpoint_kind: "rpc_host" }
     },
-    ...sessionMethods(call),
+    ...sessionMethods(undefined, call),
   }
 }
-
-export function defaultThreadStateDirectory(pi: SenpiExtensionAPI): string { return resolveProjectStateDirectory(pi.cwd ?? process.cwd(), "thread-tools") }

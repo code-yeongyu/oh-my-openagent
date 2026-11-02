@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { MEMORY_EXPANSION_BOUNDS } from "./memory"
-import { commitMemory, harness, jsonOf, memoryRepo, tempRoot, textOf, writeMemory } from "./test-support"
+import { commitLegacyMemory, commitMemory, harness, jsonOf, memoryRepo, tempRoot, textOf, writeMemory } from "./test-support"
 
 interface SearchHit {
   readonly path: string
@@ -40,7 +40,7 @@ describe("memory tool (read-only)", () => {
   test("#given a committed memory #when read #then the committed body is returned redacted and capped", async () => {
     const root = await tempRoot()
     const repo = await memoryRepo()
-    await commitMemory(repo, "notes/creds.md", `password=hunter2hunter2 ${"z".repeat(400)}`)
+    await commitLegacyMemory(repo, "notes/creds.md", `password=hunter2hunter2 ${"z".repeat(400)}`)
     await writeMemory(repo, "notes/creds.md", "working tree edit that is NOT committed")
     const h = harness({ workspaceRoot: root, repo, caps: { memoryReadChars: 200 } })
 

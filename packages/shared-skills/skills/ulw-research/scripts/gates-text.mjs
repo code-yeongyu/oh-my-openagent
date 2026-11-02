@@ -4,6 +4,7 @@
 // Plain Node ESM, sibling imports only.
 
 import { proseText } from "./html-lite.mjs"
+import { CLAIMS, NOT_CLAIMS } from "./numerals.mjs"
 
 const HANGUL = /[\uAC00-\uD7A3]/g
 const KEEP_ALL = /word-break\s*:\s*keep-all/i
@@ -19,33 +20,6 @@ const MAX_HEADING_WORDS = 12
 const LINEAGE_TOKEN = /\b(?:MEASURED|ASSUMED|DERIVED)\b/
 const NUMBER_CONTAINERS = new Set(["figure", "table", "nav", "header", "footer"])
 const MAX_UNSOURCED = 50
-const MONTH = "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?"
-/** Stripped before claim detection: dates, versions, figure refs, times, bare years. */
-const NOT_CLAIMS = [
-	/\b\d{4}[-./]\d{1,2}(?:[-./]\d{1,2})?\b/g,
-	/\b\d{2}\.\d{2}\.\d{2}\b/g,
-	/\d{2,4}\s*\uB144\s*\d{1,2}\s*\uC6D4(?:\s*\d{1,2}\s*\uC77C)?/g,
-	/\d{1,2}\s*\uC6D4(?:\s*\d{1,2}\s*\uC77C)?/g,
-	/(?:19|20)\d{2}\s*\uB144/g,
-	new RegExp(`\\b${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?`, "gi"),
-	new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH}(?:\\s+\\d{4})?`, "gi"),
-	/\bv\d+(?:\.\d+)*\b|\b\d+(?:\.\d+){2,}\b/gi,
-	/\b(?:version|ver\.?|release)\s*\d+(?:\.\d+)*/gi,
-	/\b(?:fig(?:ure)?\.?|table|chart|section|step|phase|wave|part)\s*\d+(?:\.\d+)*/gi,
-	/(?:\uADF8\uB9BC|\uB3C4\uD45C|\uD45C|\uBC84\uC804)\s*\d+(?:\.\d+)*/g,
-	/\b\d{1,2}:\d{2}\b/g,
-	/\b(?:19|20)\d{2}s?\b/g,
-]
-const NUM = "(?<![\\p{L}\\d.,])\\d+(?:[.,]\\d+)*"
-const UNIT =
-	"(?:%|\\u2030|\\u00D7|\\uD37C\\uC13C\\uD2B8|\\uB2EC\\uB7EC|\\uC720\\uB85C|\\uC5D4|\\uC6D0|\\uB9CC|\\uC5B5|\\uC870|\\uCC9C|\\uCD08|\\uBD84|\\uC2DC\\uAC04|\\uC77C|\\uC8FC|\\uAC1C\\uC6D4|\\uB144|\\uBA85|\\uAC74|\\uAC1C|\\uD68C|\\uBC88|\\uBC30" +
-	"|(?:percent|pp|bps?|x|k|m|b|bn|million|billion|thousand|trillion|usd|krw|eur|ms|s|secs?|seconds?|mins?|minutes?|h|hrs?|hours?|days?|weeks?|months?|years?|kb|mb|gb|tb|users?|people|employees|engineers|tokens?|requests?|stars?|downloads?|customers?)(?![\\p{L}\\d]))"
-const CLAIMS = [
-	new RegExp(`[$\\u20AC\\u00A3\\u00A5\\u20A9]\\s?${NUM}`, "u"),
-	new RegExp(`${NUM}\\s?${UNIT}`, "iu"),
-	/(?<![\d.,])\d{1,3}(?:,\d{3})+(?![\d,])/,
-	/(?<![\d.])\d+\.\d+(?![\d.])/,
-]
 
 function snippet(text, index, span = 24) {
 	return text.slice(Math.max(0, index - span), index + span).trim()

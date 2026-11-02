@@ -15,10 +15,10 @@ Notepad files are auto-scaffolded by /ulw-execute. APPEND only - use the \`edit\
 ## Plan Location (subagent: READ ONLY)
 PLAN PATH: .omo/plans/{plan-name}.md
 
-SUBAGENT PLAN RESTRICTION (applies to YOU, the delegated worker — NOT to the Orchestrator):
+SUBAGENT PLAN RESTRICTION (applies to YOU, the delegated worker, NOT to the Orchestrator):
 - You may READ the plan to understand your assigned tasks
 - You may READ checkbox items to know what to work on
-- You MUST NOT edit the plan file or mark checkboxes — that is the Orchestrator's job
+- You MUST NOT edit the plan file or mark checkboxes: that is the Orchestrator's job
 - The Orchestrator (Atlas) updates checkboxes after verifying your completed work
 </Work_Context>
 `

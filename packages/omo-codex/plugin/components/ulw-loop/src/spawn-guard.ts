@@ -6,6 +6,7 @@ import { parsePreToolUsePayload } from "./codex-hook.js";
 import { isFinalRunCompletionCandidate } from "./goal-status.js";
 import { ulwLoopAttemptEvidenceDir, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
 import { readUlwLoopPlanSync } from "./plan-io.js";
+import { registeredAgentRoles } from "./registered-agent-roles.js";
 import { atomicWriteJson, isNonEmptyFile, readAdmissionBreaker, readCount, readCounts } from "./spawn-budget-io.js";
 import { spawnRoleDenial } from "./spawn-role-guard.js";
 import { isStateLockTimeout, type StateLockOptions, withStateLockSync } from "./state-lock.js";
@@ -47,7 +48,7 @@ export interface SpawnGuardOptions {
 export function applySpawnGuards(payload: PreToolUsePayload, options: SpawnGuardOptions = {}): string {
 	if (payload.hook_event_name !== "PreToolUse" || !SPAWN_TOOL_TOKENS.has(payload.tool_name)) return "";
 	if (resolveToolkitSurface() === "lazycodex") {
-		const reason = spawnRoleDenial(payload.tool_input);
+		const reason = spawnRoleDenial(payload.tool_input, () => registeredAgentRoles(payload.cwd));
 		if (reason !== null) return deny(reason);
 	}
 	return applySpawnBudgetGuards(payload, options);

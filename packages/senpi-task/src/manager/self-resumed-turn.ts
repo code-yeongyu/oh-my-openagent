@@ -1,9 +1,10 @@
 import { log } from "@oh-my-opencode/utils"
 
-import type { TaskRecord } from "../state"
+import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { buildRevived } from "../steering/engine-policy"
 import type { ManagedChildHandle } from "./child-handle"
+import { publishHostTaskStatus } from "./host-task-status"
 import { nowIso } from "./manager-helpers"
 
 export type SelfResumedTurnPorts = {
@@ -20,7 +21,7 @@ export type SelfResumedTurnPorts = {
 function reopenable(record: TaskRecord | null, handle: ManagedChildHandle, ports: SelfResumedTurnPorts): record is TaskRecord {
   return (
     record !== null &&
-    (record.status === "completed" || record.status === "error") &&
+    (record.status === "completed" || record.status === "error" || (record.status === "interrupted" && record.stop_reason !== "deadline")) &&
     record.residency_state === "resident" &&
     ports.liveHandle(record.task_id) === handle
   )
@@ -41,11 +42,11 @@ export async function reopenSelfResumedTurn(ports: SelfResumedTurnPorts, taskId:
   const settled = ports.tryLoad(taskId)
   const model = ports.liveModel(taskId)
   if (!reopenable(settled, handle, ports) || model === undefined) return
-  const epoch = settled.notification.run_epoch + 1
+  const epoch = nextRunEpoch(settled)
   const reservation = ports.reserveForRevive(taskId)
   let reopened = false
   ports.store.mutate(taskId, (fresh) => {
-    if (!reopenable(fresh, handle, ports) || fresh.notification.run_epoch + 1 !== epoch) return fresh
+    if (!reopenable(fresh, handle, ports) || nextRunEpoch(fresh) !== epoch) return fresh
     reopened = true
     return { ...buildRevived(fresh, nowIso(ports.now)), resumed_run_epoch: epoch }
   })
@@ -54,6 +55,8 @@ export async function reopenSelfResumedTurn(ports: SelfResumedTurnPorts, taskId:
     return
   }
   ports.store.appendEvent(taskId, { type: "task_self_resumed", payload: { run_epoch: epoch } })
+  // The run may have started before its finished turn was recorded and marked on the host (#11092).
+  publishHostTaskStatus(handle, taskId, "running")
   // A resumed run is already doing its work: a full lane may deny it a slot, but never its result.
   if (reservation.ok) reservation.commit()
   else ports.trackOutcome(taskId, handle, model, epoch)

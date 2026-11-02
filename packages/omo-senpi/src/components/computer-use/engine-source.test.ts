@@ -55,10 +55,10 @@ describe("omo release version for engine acquisition", () => {
     })).toBe("would download senpi-desktop-engine-darwin-arm64 from omo v5.1.4 on first use")
   })
 
-  test.each(["linux", "win32"])("#given no release engine for %s-arm64 #when first use starts #then the diagnostic names the unsupported host", (platform) => {
+  test.each([["linux", "riscv64"], ["win32", "ia32"]])("#given no release engine for %s-%s #when first use starts #then the diagnostic names the unsupported host", (platform, arch) => {
     const root = packageDir({})
-    const options = { platform, arch: "arm64", execDir: root, packageDir: root, repoRoot: root, runtimeDir: "" }
-    expect(describeEngineSource(undefined, {}, options)).toBe(`No senpi-desktop-engine is built for ${platform}-arm64; computer use is unavailable on this host.`)
+    const options = { platform, arch, execDir: root, packageDir: root, repoRoot: root, runtimeDir: "" }
+    expect(describeEngineSource(undefined, {}, options)).toBe(`No senpi-desktop-engine is built for ${platform}-${arch}; computer use is unavailable on this host.`)
     const start = defaultEngineChild({}, options)(undefined)
     try {
       start()
@@ -66,7 +66,7 @@ describe("omo release version for engine acquisition", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(DesktopEngineUnavailableError)
       if (!(error instanceof DesktopEngineUnavailableError)) throw error
-      expect(error.diagnostic).toMatchObject({ host: `${platform}-arm64`, reason: "no-release-asset" })
+      expect(error.diagnostic).toMatchObject({ host: `${platform}-${arch}`, reason: "no-release-asset" })
     }
   })
 
