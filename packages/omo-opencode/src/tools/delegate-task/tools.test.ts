@@ -186,20 +186,20 @@ describe("sisyphus-task", () => {
       // when / #then
       expect(low).toBeDefined()
       expect(low.model).toBe("openai/gpt-6.1-sol")
-      expect(low.variant).toBe("medium")
+      expect(low.variant).toBe("high")
       expect(high).toBeDefined()
       expect(high.model).toBe("openai/gpt-6-astra")
       expect(high.variant).toBe("high")
     })
 
-    test("unspecified-high category uses Claude Opus 5.5 medium as primary", () => {
+    test("unspecified-high category uses Claude Opus 5.5 high as primary", () => {
       // given
       const category = DEFAULT_CATEGORIES["unspecified-high"]
 
       // when / #then
       expect(category).toBeDefined()
       expect(category.model).toBe("anthropic/claude-opus-5-5")
-      expect(category.variant).toBe("medium")
+      expect(category.variant).toBe("high")
     })
   })
 
@@ -908,7 +908,7 @@ describe("sisyphus-task", () => {
       // #then
       const resolved = expectResolvedCategoryConfig(result)
       expect(resolved.config.model).toBe("openai/gpt-6.1-sol")
-      expect(resolved.config.variant).toBe("medium")
+      expect(resolved.config.variant).toBe("high")
       expect(resolveCategoryConfig("deep-high", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels })).toBeNull()
     })
 
@@ -1158,7 +1158,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          userCategories: {
-           ultrabrain: { model: "openai/gpt-5.5", variant: "xhigh" },
+           ultrabrain: { model: "openai/gpt-5.5", variant: "high" },
          },
          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
          availableModelsOverride: createTestAvailableModels(),
@@ -1187,7 +1187,7 @@ describe("sisyphus-task", () => {
       expect(launchInput.model).toEqual({
         providerID: "openai",
         modelID: "gpt-5.5",
-        variant: "xhigh",
+        variant: "high",
       })
     })
 
@@ -3863,7 +3863,7 @@ describe("sisyphus-task", () => {
       // then - default model from DEFAULT_CATEGORIES is used
       const category = expectResolvedCategoryConfig(resolved)
       expect(category.config.model).toBe("anthropic/claude-sonnet-5-5")
-      expect(category.config.variant).toBe("medium")
+      expect(category.config.variant).toBe("high")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
@@ -4513,11 +4513,11 @@ describe("sisyphus-task", () => {
 
       // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
       // oracle fallback chain: gpt-5.6-sol (openai) > gemini-3.1-pro (google) > claude-opus-4-8 (anthropic)
-      // Since openai is in connectedProviders, should resolve to openai/gpt-5.6-sol at xhigh
+      // Since openai is in connectedProviders, should resolve to openai/gpt-5.6-sol at high
       expect(promptBody.model).toBeDefined()
       expect(promptBody.model.providerID).toBe("openai")
       expect(promptBody.model.modelID).toBe("gpt-5.6-sol")
-      expect(promptBody.variant).toBe("xhigh")
+      expect(promptBody.variant).toBe("high")
     }, { timeout: 20000 })
   })
 
