@@ -46,3 +46,15 @@ export function wireComputerControlEvents(pi: { on(event: string, handler: (payl
     await revokeStarted()
   })
 }
+
+/**
+ * What `/computer` tells the user about a failure: the senpi user-facing `message` and `action` when the error
+ * carries them (read structurally, so the lazily loaded engine classes stay out of this eager module).
+ */
+export function computerFailureText(error: Error): string {
+  const userFacing: unknown = "userFacing" in error ? error.userFacing : undefined
+  if (typeof userFacing !== "object" || userFacing === null) return error.message
+  if (!("message" in userFacing) || typeof userFacing.message !== "string") return error.message
+  const action = "action" in userFacing && typeof userFacing.action === "string" ? ` ${userFacing.action}` : ""
+  return `${userFacing.message}${action}`
+}

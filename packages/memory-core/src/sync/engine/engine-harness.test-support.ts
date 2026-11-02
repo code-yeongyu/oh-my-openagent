@@ -160,6 +160,7 @@ export interface DeviceOptions {
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
   readonly realStore?: boolean
   readonly onStatusChange?: () => void
+  readonly log?: (line: string) => void
 }
 
 export async function makeDevice(server: FakeSyncServer, name: string, fault?: EngineFault, options: DeviceOptions = {}): Promise<Device> {
@@ -188,6 +189,7 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
       random: () => 0,
       ...(options.batchBytes === undefined ? {} : { batchBytes: options.batchBytes }),
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
+      ...(options.log === undefined ? {} : { log: options.log }),
       ...(f === undefined ? {} : { fault: f }),
     })
     return { store, engine }

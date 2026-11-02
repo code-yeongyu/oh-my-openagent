@@ -1,0 +1,263 @@
+{
+  "request": "session.command_part",
+  "cases": [
+    {
+      "name": "a one-part upload is accepted and its command dispatches",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command_part",
+            "attach": "<ref:a>",
+            "upload_id": "dXBsb2FkLTE",
+            "index": 0,
+            "count": 1,
+            "b": "aGVsbG8="
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "received": 0
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "3",
+            "type": "session.command",
+            "attach": "<ref:a>",
+            "upload_id": "dXBsb2FkLTE",
+            "op": "prompt"
+          }
+        },
+        {
+          "expect": {
+            "id": "3",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "command_id": "<capture:c>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "<ref:c>",
+            "state": "queued",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "<ref:c>",
+            "state": "transport_confirmed",
+            "retryable": false
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.command_state",
+            "command_id": "<ref:c>",
+            "state": "engine_applied",
+            "retryable": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "an index outside count is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command_part",
+            "attach": "<ref:a>",
+            "upload_id": "dXBsb2FkLTE",
+            "index": 1,
+            "count": 1,
+            "b": "aGVsbG8="
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the same index with other bytes aborts the upload parts_conflict",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command_part",
+            "attach": "<ref:a>",
+            "upload_id": "dXBsb2FkLTE",
+            "index": 0,
+            "count": 1,
+            "b": "aGVsbG8="
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "received": 0
+            }
+          }
+        },
+        {
+          "send": {
+            "id": "3",
+            "type": "session.command_part",
+            "attach": "<ref:a>",
+            "upload_id": "dXBsb2FkLTE",
+            "index": 0,
+            "count": 1,
+            "b": "d29ybGQ="
+          }
+        },
+        {
+          "expect": {
+            "id": "3",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.upload_abort",
+            "upload_id": "dXBsb2FkLTE",
+            "reason": "parts_conflict"
+          }
+        }
+      ]
+    }
+  ]
+}

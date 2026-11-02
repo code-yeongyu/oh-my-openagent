@@ -38,3 +38,18 @@ describe("OmoCategoryConfigSchema warn_unavailable", () => {
     expect(result.error.issues.map((issue) => issue.path.join(".")).join(",")).toContain("warn_unavailable")
   })
 })
+
+describe("OmoCategoryConfigSchema retired provider_lock (config migration contract)", () => {
+  test.each([true, false])("#given an omo.json category that still sets provider_lock: %p #when it parses #then it loads without error and the key is dropped", (value) => {
+    // given
+    const input = { model: "openai/gpt-6-astra", provider_lock: value }
+
+    // when
+    const result = OmoCategoryConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error("Expected the retired key to be ignored")
+    expect(result.data).toEqual({ model: "openai/gpt-6-astra" })
+  })
+})

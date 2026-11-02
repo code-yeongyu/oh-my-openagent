@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:7a5e393fe4cf6b3a971dbfe7c1af2f9fbec82e24e0166624f70e68744045976d:605cb96deaac62579ee8022f48aa14faabfd60f1af06599851601bd355b5f102
+// omo-codex-install:a0558b9ad212e0633ea53d61ed065bbb1aa6431d7e83e39b80639438ffa49a43:3b288abbaf163be3da4b5134a525776cd136f444e31407dc89bd1b9f32905eca
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.52",
+    version: "5.1.58",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19647,6 +19647,7 @@ var OmoAgentDefInputSchema = object({
   prompt: string2().optional(),
   model: string2().optional(),
   models: array(OmoAgentModelEntrySchema).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   variant: string2().optional(),
   reasoningEffort: OmoReasoningEffortSchema.optional(),
@@ -19673,6 +19674,7 @@ var OmoCategoryConfigObjectSchema = object({
   description: string2().optional(),
   model: string2().optional(),
   models: array(union([string2(), OmoFallbackModelObjectSchema])).optional(),
+  models_distribution: _enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   temperature: number2().min(0).max(2).optional(),
   top_p: number2().min(0).max(1).optional(),
@@ -19691,7 +19693,11 @@ var OmoCategoryConfigObjectSchema = object({
   disable: boolean2().optional(),
   warn_unavailable: boolean2().optional()
 }).strict();
-var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? normalizeLegacyModelFields(value) : value, OmoCategoryConfigObjectSchema);
+function withoutRetiredCategoryKeys(entry) {
+  const { provider_lock: _retired, ...rest } = entry;
+  return rest;
+}
+var OmoCategoryConfigSchema = preprocess((value) => isRecord4(value) ? withoutRetiredCategoryKeys(normalizeLegacyModelFields(value)) : value, OmoCategoryConfigObjectSchema);
 var OmoCategoriesConfigSchema = record(string2(), OmoCategoryConfigSchema);
 
 // packages/omo-config-core/src/schema/computer.ts

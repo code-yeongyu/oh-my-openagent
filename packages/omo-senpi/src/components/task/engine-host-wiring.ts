@@ -1,6 +1,6 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { OmoConfig, OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
-import { createTaskLifecycle, type LifecycleDeps, type TaskLifecycle, type TaskRecordStore } from "@oh-my-opencode/senpi-task"
+import { createHostGenerationView, createTaskLifecycle, type LifecycleDeps, type TaskLifecycle, type TaskRecordStore } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { CategoryConfigGenerations } from "./category-config-generation"
@@ -40,6 +40,8 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
   const host = input.host ?? createEngineHostRuntime(settings, runtime, pi, { storeDir: baseStore.stateDir })
   const lifecycle = createTaskLifecycle({ ...input.lifecycle, config: settings,
     hostEndpoint: host.hostEndpoint,
+    // A cancel reads the daemon state of the generation a record names (omo#11765).
+    ...(host.agentDir === undefined ? {} : { hostGenerationView: createHostGenerationView(host.agentDir) }),
     revivePolicy: {
       currentGeneration: () => {
         const modelRegistry = runtime.modelRegistry()

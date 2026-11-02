@@ -46,6 +46,8 @@ export async function reexecProvisionedRuntime(expected: string, options: Reexec
   const platform = options.platform ?? process.platform
   // execve would drop the launch's private descriptors (senpi#4749), so that launch takes the child path.
   const table = env[PRIVATE_FDS_ENV]
+  // The compiled Windows hop captures the pair too; helper spawns must never see its declaration.
+  if (platform === "win32") delete env[PRIVATE_FDS_ENV]
   const handoff = privateFdHandoffFor(env, table, platform)
   // Named sockets it cannot forward would stay open in this waiting parent, so their peer never saw EOF.
   if (handoff !== undefined) for (const fd of inspectPrivateFdTable(table, platform).discard) closeSync(fd)

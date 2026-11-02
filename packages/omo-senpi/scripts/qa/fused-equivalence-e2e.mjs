@@ -28,13 +28,10 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import {
-	dropTimestampOffsets,
-	pinEnginePackage,
-	splitStatusChannels,
-	statusCounts,
-	stopSandboxProcesses,
-} from "./fused-equivalence-support.mjs";
+import { goldenHostLeaks, pinEnginePackage, statusCounts, stopSandboxProcesses } from "./fused-equivalence-support.mjs";
+import { openSettled, reopenStateSettled } from "./fused-equivalence-mcp-startup.mjs";
+import { observeOmo } from "./fused-equivalence-observe.mjs";
+import { prepareCaseSandbox } from "./fused-equivalence-sandbox.mjs";
 import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -50,21 +47,6 @@ const DEFERRED_PLACEMENTS = { "split-local": "O14", "split-remote": "DM1", hoste
 const CASE_IDS = ["E21", "E22", "E23", "E24"];
 const ALL_OBSERVABLES = ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8"];
 const WITHOUT_O8 = ALL_OBSERVABLES.slice(0, 7);
-/**
- * Id namespaces the plugin generates per run, by the key that carries them (plan §6.2: one-to-one first-occurrence token
- * maps per id namespace). The harness normalizer maps its own id keys; these are the plugin's: task ids are
- * time-derived, a memory identity and its binding hash are derived from the sandbox path, and a memory commit sha
- * hashes its date. A short sha (a 7+ character prefix of a mapped sha) maps to the same token with `:short`.
- */
-const PLUGIN_ID_KEYS = {
-	task_id: ["task", /^st_[0-9a-f]{8}$/],
-	childId: ["task", /^st_[0-9a-f]{8}$/],
-	identity: ["memory-identity", /^[a-z0-9-]+-[0-9a-f]{8}$/],
-	repoPathHash: ["repo-path-hash", /^[0-9a-f]{64}$/],
-	headSha: ["sha", /^[0-9a-f]{40}$/],
-	sha: ["sha", /^[0-9a-f]{40}$/],
-};
-
 function parseArgs(argv) {
 	const value = (flag) => {
 		const index = argv.indexOf(flag);
@@ -165,41 +147,6 @@ function childPath(lspDir) {
 	return [...new Set(dirs.filter(Boolean))].join(":");
 }
 
-/** Sandbox wiring every case shares: the built plugin, trust, and every config/state root inside the sandbox. */
-function prepare(run, omoConfig) {
-	const root = run.box.dir;
-	run.env.PATH = run.childPath;
-	for (const [name, dir] of [
-		["XDG_CONFIG_HOME", "xdg-config"],
-		["XDG_DATA_HOME", "xdg-data"],
-		["XDG_CACHE_HOME", "xdg-cache"],
-		["XDG_STATE_HOME", "xdg-state"],
-	]) {
-		run.env[name] = join(root, dir);
-		mkdirSync(run.env[name], { recursive: true });
-	}
-	run.env.OMO_CODING_AGENT_DIR = run.box.agentDir;
-	run.env.PI_CODING_AGENT_DIR = run.box.agentDir;
-	run.env.OMO_MEMORY_HOME = join(root, "memory");
-	// The child's os.tmpdir() reaches the observations (the computer skill is materialized under it and listed as a
-	// skill root: senpi-desktop-tool/src/skill.ts materializeComputerSkill), so it is pinned inside the sandbox and the
-	// recording host's TMPDIR never reaches a golden.
-	const tmp = join(root, "tmp");
-	mkdirSync(tmp, { recursive: true });
-	for (const name of ["TMPDIR", "TMP", "TEMP"]) run.env[name] = tmp;
-	writeFileSync(join(run.box.agentDir, "trust.json"), `${JSON.stringify({ [run.box.cwd]: true }, null, 2)}\n`);
-	// The plugin's two remote MCP servers would reach the network, and its local `_ast_grep` server connects on its own
-	// schedule: whether that connect lands before or after the host records the session's first loaded-surfaces digest
-	// decides whether a `loaded_surfaces_changed` is announced at all (both seen in B0 runs on darwin and linux). The user
-	// mcp.json switch the plugin documents turns all three off, so no case depends on a connect race; none of E21-E24
-	// exercises an MCP tool.
-	writeFileSync(
-		join(run.box.agentDir, "mcp.json"),
-		`${JSON.stringify({ mcpServers: { context7: { enabled: false }, grep_app: { enabled: false }, _ast_grep: { enabled: false } } }, null, 2)}\n`,
-	);
-	mkdirSync(join(run.box.cwd, ".omo"), { recursive: true });
-	writeFileSync(join(run.box.cwd, ".omo", "omo.json"), `${JSON.stringify(omoConfig, null, 2)}\n`);
-}
 
 const SETTINGS = { packages: [pluginRoot], defaultProjectTrust: "ask" };
 const E24_WARM_BARRIER = "eq-e24-lsp-warm";
@@ -274,16 +221,16 @@ const cases = [
 			],
 		}),
 		async drive(run, options) {
-			prepare(run, {
+			prepareCaseSandbox(run, {
 				computer: { engine_path: options.desktopEngine, allow_host_relay_only_stop: true },
 			});
 			run.env.SENPI_DESKTOP_BACKEND = `fake:${fakeDesktop}`;
-			await run.open();
+			await openSettled(run);
 			answerUiRequests(run);
 			await run.prompt("drive display 2 with one per-call display handle");
 			assertClickAudited(run);
 			await run.close();
-			await run.reopenState();
+			await reopenStateSettled(run);
 		},
 	},
 	{
@@ -307,11 +254,11 @@ const cases = [
 			],
 		}),
 		async drive(run) {
-			prepare(run, {
+			prepareCaseSandbox(run, {
 				categories: { eqcat: { description: "EQ category pinned to the fake model", model: FAKE_MODEL } },
 				task: { default_execution_mode: "in-process" },
 			});
-			await run.open();
+			await openSettled(run);
 			answerUiRequests(run);
 			await run.prompt("delegate one foreground sub-agent");
 			await run.close();
@@ -343,11 +290,11 @@ const cases = [
 			],
 		}),
 		async drive(run) {
-			prepare(run, {
+			prepareCaseSandbox(run, {
 				categories: { quick: { description: "EQ quick category", model: FAKE_MODEL } },
 				memory: { enabled: true, reflection: { trigger: { step_count: 0, on_compaction: false } } },
 			});
-			await run.open();
+			await openSettled(run);
 			answerUiRequests(run);
 			await run.prompt("remember one EQ fact");
 			await run.close();
@@ -387,9 +334,9 @@ const cases = [
 		async drive(run, options) {
 			if (!options.lspDir || !existsSync(join(options.lspDir, "typescript-language-server")))
 				throw new Error("E24 needs the pinned typescript-language-server: pass --lsp-dir <dir> (or EQ_LSP_DIR)");
-			prepare(run, {});
+			prepareCaseSandbox(run, {});
 			if (options.commentChecker) run.env.OMO_COMMENT_CHECKER_BIN = options.commentChecker;
-			await run.open();
+			await openSettled(run);
 			answerUiRequests(run);
 			const warmEnd = run.nextEvent((event) => event.type === "tool_execution_end" && event.toolCallId === "call_warm");
 			const settled = run.prompt("write eq-sample.ts");
@@ -407,70 +354,6 @@ const cases = [
 		},
 	},
 ];
-
-/** Literal roots for every plugin id the raw observations carry under a PLUGIN_ID_KEYS key, in first-occurrence order. */
-function pluginIdRoots(raw) {
-	const seen = new Map();
-	const walk = (node, key) => {
-		if (typeof node === "string") {
-			const [namespace, shape] = (key !== undefined && Object.hasOwn(PLUGIN_ID_KEYS, key) && PLUGIN_ID_KEYS[key]) || [];
-			if (namespace && shape.test(node) && !seen.has(node)) seen.set(node, namespace);
-		} else if (Array.isArray(node)) node.forEach((item) => walk(item, key));
-		else if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) walk(v, k);
-	};
-	walk(raw, undefined);
-	const counters = new Map();
-	const roots = [];
-	for (const [value, namespace] of seen) {
-		const index = (counters.get(namespace) ?? 0) + 1;
-		counters.set(namespace, index);
-		roots.push({ prefix: value, token: `<${namespace}:${index}>` });
-		if (namespace === "sha")
-			roots.push({ prefix: value.slice(0, 7), token: `<${namespace}:${index}:short>` });
-	}
-	return roots;
-}
-
-/**
- * A sub-agent's measured run time and the rate derived from it: durations, dropped like the harness drops its own. The
- * same rate is also rendered into the task's progress line (`\u00b7 333 tok/s`); there only the number is replaced.
- */
-const PLUGIN_MEASUREMENT_KEYS = new Set(["runtime_ms", "tokens_per_second", "tokensPerSecond"]);
-const RENDERED_RATE = /\b\d+(?:\.\d+)? tok\/s\b/g;
-
-function dropMeasurements(node) {
-	if (typeof node === "string") return node.replace(RENDERED_RATE, "<rate> tok/s");
-	if (Array.isArray(node)) return node.map(dropMeasurements);
-	if (!node || typeof node !== "object") return node;
-	return Object.fromEntries(
-		Object.entries(node)
-			.filter(([key]) => !PLUGIN_MEASUREMENT_KEYS.has(key))
-			.map(([key, value]) => [key, dropMeasurements(value)]),
-	);
-}
-
-/**
- * The harness's observe() (fused-equivalence/cases/support/observe.mjs) with the plugin's own rules added: the status
- * channels split out, plugin measurements dropped, the plugin id namespaces token-mapped, and a ranked timestamp's zone
- * offset dropped with it. The run-scoped roots and host facts are the harness's, unchanged.
- */
-function observeOmo(run, observables, harness) {
-	const raw = Object.fromEntries(observables.map((id) => [id, dropMeasurements(harness.collectors[id](run))]));
-	if (raw.O6) raw.O6 = raw.O6.map(splitStatusChannels);
-	const normalize = harness.createNormalizer({
-		roots: [
-			{ prefix: run.box.dir, token: "<sandbox>" },
-			{ prefix: run.box.dir.replaceAll("/", "-"), token: "<sandbox-key>" },
-			{ prefix: run.repo, token: "<repo>" },
-			{ prefix: run.server.origin, token: "<model-server>" },
-			{ prefix: run.server.origin.replace(/^http:\/\//, ""), token: "<model-server-host>" },
-			...run.extraRoots,
-			...pluginIdRoots(raw),
-		],
-		hostFacts: [...harness.hostFacts(), ...harness.childRuntimeFacts(run.childRuntime)],
-	});
-	return Object.fromEntries(observables.map((id) => [id, dropTimestampOffsets(normalize(raw[id]))]));
-}
 
 function resolveCommentChecker() {
 	try {
@@ -582,7 +465,14 @@ async function main() {
 				result.witnessOk = runs.every((r) => r.witness.pipeline === witnessWanted);
 				if (options.mode === "record") {
 					// A golden is written only from runs that agreed with each other: a nondeterministic case is a FAIL.
-					if (result.repeatDiffs.length === 0) {
+					// One carrying a host-leaked row (telemetry notice, terminal restore events) is a FAIL too (#12054).
+					const leaks = goldenHostLeaks(first);
+					if (leaks.length > 0)
+						result.error = `host-leaked rows, golden not written: ${leaks
+							.slice(0, 5)
+							.map((leak) => `${leak.reason} at ${leak.path}`)
+							.join("; ")}`;
+					else if (result.repeatDiffs.length === 0) {
 						mkdirSync(dir, { recursive: true });
 						writeFileSync(
 							goldenPath,
