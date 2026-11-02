@@ -167,9 +167,12 @@ if (process.platform !== "win32" && hasLsof) describe("dev-browser standalone se
 		const holder = await startPortHolder("exit")
 
 		const exitCode = await runRelease("bash", httpPort, holder.port, undefined, "set -u\n", 0)
+		// With no grace window the script returns right after sending SIGTERM, before the holder's handler has run.
+		await exitedWithin(holder.child, 5_000)
 
 		expect(exitCode).toBe(0)
 		expect(holder.receivedTerm()).toBe(true)
+		expect(holder.child.exitCode).toBe(0)
 	}, { timeout: 20_000 })
 
 	test("the macOS/Linux standalone command runs the release step before server.sh", () => {

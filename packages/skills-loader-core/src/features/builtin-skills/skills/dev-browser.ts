@@ -9,16 +9,22 @@ const CURRENT_DIR = dirname(fileURLToPath(import.meta.url))
 // release the port first: SIGTERM, wait up to the grace window, then SIGKILL only the survivors.
 // Without curl, "is a server answering" is unknown, so the step does nothing rather than signal a live server's browser.
 // Pid lists are split through $(echo ...) because zsh does not word-split an unquoted $pids.
+// A zero grace window emits no wait loop: BSD `seq 0` prints "1 0" while GNU prints nothing, so a `seq 0` loop would
+// wait 0.2 s and SIGKILL survivors on macOS but return at once on Linux.
 export function releaseStaleCdpPortScript({ httpPort = 9222, cdpPort = 9223, graceSeconds = 5 } = {}): string {
+  const waitLoop =
+    graceSeconds > 0
+      ? `
+    for _ in $(seq ${graceSeconds * 10}); do
+      left=""; for p in $(echo $pids); do kill -0 "$p" 2>/dev/null && left="$left $p"; done
+      [ -z "$left" ] && break; sleep 0.1
+    done`
+      : ""
   return `if command -v curl >/dev/null && command -v lsof >/dev/null && ! curl -sf -m 1 -o /dev/null http://localhost:${httpPort}; then
   pids=$(lsof -ti:${cdpPort} 2>/dev/null)
   if [ -n "$pids" ]; then
     for p in $(echo $pids); do kill -TERM "$p" 2>/dev/null; done
-    left=""
-    for _ in $(seq ${graceSeconds * 10}); do
-      left=""; for p in $(echo $pids); do kill -0 "$p" 2>/dev/null && left="$left $p"; done
-      [ -z "$left" ] && break; sleep 0.1
-    done
+    left=""${waitLoop}
     for p in $(echo $left); do kill -KILL "$p" 2>/dev/null; done
   fi
 fi`
