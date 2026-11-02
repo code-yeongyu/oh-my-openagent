@@ -117,8 +117,11 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   // SENPI_MEMORY_REFLECTION sentinel still disables memory inside the child);
   // --session-dir isolates JSONL storage; --model/--thinking select the category result; @file
   // loads the mechanics prompt as the initial non-interactive message.
+  // --supervised: the run supervisor watches this child and records its unrequested deaths, so a
+  // deadline kill must not leave a lifetime marker the next start reads as a crash (#10334).
   const args = [
     "-p",
+    "--supervised",
     "--system-prompt", persona,
     "--tools", "bash,edit",
     ...(input.loadExtensions === true ? [] : ["--no-extensions"]),

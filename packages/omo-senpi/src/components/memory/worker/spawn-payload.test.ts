@@ -50,6 +50,14 @@ test("#given a worktree-only legacy target #when dream starts #then its audit is
   expect(existsSync(join(parentRepo, "reference/only-worktree.md"))).toBe(false)
 })
 
+// Cross-process CLI contract with senpi (--supervised, senpi#5563): without it a deadline kill
+// leaves a lifetime marker the next start reports as a crash (#10334).
+test("#given a reflection run #when it starts #then the print child is launched as supervised", async () => {
+  const { prepared } = await payload(false)
+  expect(prepared.args).toContain("--supervised")
+  expect(prepared.args.indexOf("--supervised")).toBeGreaterThan(prepared.args.indexOf("-p"))
+})
+
 test("#given a reflection run #when it starts #then audit input is absent", async () => {
   const { prepared } = await payload(false)
   expect(prepared.env.AUDIT_PATH).toBeUndefined()
