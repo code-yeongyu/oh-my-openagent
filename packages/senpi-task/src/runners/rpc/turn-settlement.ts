@@ -45,6 +45,17 @@ export type TurnSettlementInput = {
   // forever.
   readonly maxUnreadableProbes?: number
   readonly wakeSourcesLive?: () => boolean
+  // senpi#3492 / omo#10487: the child's own async work (a detached eval cell, a background
+  // terminal session) is not a continuation claim, so senpi still emits `agent_idle` while it
+  // runs. A COMPLETED outcome is not terminal then: the work's completion notification wakes the
+  // child into the real final turn, so the outcome is held from that `agent_idle` and settled
+  // only once the work drains and the idle probe confirms a real end. Monitors and goal timers
+  // keep their existing semantics (they never hold a completed turn); absent predicate = the
+  // historical behavior (a completed outcome settles on `agent_idle`).
+  readonly pendingAsyncWorkLive?: () => boolean
+  // senpi#3492 / omo#10487: bounds the completed hold when async work never drains (e.g. background sessions).
+  // Default: 60 confirmation checks / heartbeats.
+  readonly maxAsyncWorkProbes?: number
   // Teardown detached/tore down the handle while a probe was in flight: that flight must never
   // report the held error as failed - the exit path owns the outcome from here (senpi#3262 review).
   readonly disposed?: () => boolean
@@ -55,8 +66,9 @@ export type TurnSettlement = {
   readonly observe: (event: AgentSessionEvent) => void
   readonly pending: () => RunnerOutcome | undefined
   readonly cancelConfirmation: () => void
-  // A wake source the handle tracks just dropped: re-offer the held error a confirmation chance.
-  // No-op when nothing is held, a confirmation is already armed, or no probe was wired.
+  // A tracked source just changed (a wake source dropped/settled, pending async work drained):
+  // re-offer the held outcome a confirmation chance. No-op when nothing is held, a confirmation
+  // is already armed, or no probe was wired.
   readonly reconfirmHeld: () => void
 }
 
@@ -93,8 +105,14 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   let held: RunnerOutcome | undefined
   let confirmation: SettlementTimerHandle | undefined
   let unreadableProbes = 0
+  // A completed outcome held because the child's own async work is still in flight (omo#10487).
+  // Unlike the error hold - which arms immediately - the completed hold starts at `agent_idle`,
+  // and only then does a confirmation gate on the work draining.
+  let asyncWorkHold = false
+  let asyncWorkProbes = 0
   const scheduleConfirmation = input.scheduleConfirmation ?? defaultConfirmationScheduler
   const maxUnreadableProbes = input.maxUnreadableProbes ?? 3
+  const maxAsyncWorkProbes = input.maxAsyncWorkProbes ?? 60
   const endOutcome = (event: AgentEndEvent): RunnerOutcome =>
     agentEndOutcome(event, input.baseline(), input.finalText(), input.abortedByUser())
 
@@ -103,21 +121,45 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
   // otherwise leave waitForOutcome pending forever. The confirmation re-checks the session's own
   // state instead of trusting the wait: only a truly idle session with no session-scoped wake
   // settles the held error.
+  // A completed outcome held on pending async work (omo#10487) confirms the same way: the work's
+  // drain re-offers the confirmation (the handle calls `reconfirmHeld`), and the idle probe then
+  // proves the wake did not start a further turn.
   const confirmHeld = (): void => {
     confirmation = undefined
     const outcome = held
-    if (outcome === undefined || outcome.status !== "error") return
-    if (input.wakeSourcesLive?.() === true) return
+    if (outcome === undefined) return
+    if (outcome.status === "error") {
+      if (input.wakeSourcesLive?.() === true) return
+    } else if (outcome.status === "completed") {
+      if (!asyncWorkHold) return
+      if (input.pendingAsyncWorkLive?.() === true) {
+        asyncWorkProbes += 1
+        if (asyncWorkProbes >= maxAsyncWorkProbes) {
+          held = undefined
+          asyncWorkHold = false
+          asyncWorkProbes = 0
+          input.settle(outcome)
+          return
+        }
+        rearm()
+        return
+      }
+    } else {
+      return
+    }
     const probe = input.probe
     if (probe === undefined) return
     void Promise.resolve()
       .then(probe)
       .then((state) => {
-        if (held !== outcome || input.disposed?.() === true || input.wakeSourcesLive?.() === true) return
+        if (held !== outcome || input.disposed?.() === true) return
+        if (outcome.status === "error" && input.wakeSourcesLive?.() === true) return
+        if (outcome.status === "completed" && input.pendingAsyncWorkLive?.() === true) return
         if (state === undefined) {
           unreadableProbes += 1
           if (unreadableProbes >= maxUnreadableProbes) {
             held = undefined
+            asyncWorkHold = false
             input.settle(outcome)
             return
           }
@@ -130,20 +172,25 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           return
         }
         held = undefined
+        asyncWorkHold = false
         input.settle(outcome)
       })
       .catch(() => {
         // A rejected probe proves nothing about idleness; the error text is already known. But a
         // rejection caused by teardown (detach raced the flight), or one landing after a wake
         // source came live, must not turn a cancelled or still-owned turn into a failure.
-        if (held !== outcome || input.disposed?.() === true || input.wakeSourcesLive?.() === true) return
+        if (held !== outcome || input.disposed?.() === true) return
+        if (outcome.status === "error" && input.wakeSourcesLive?.() === true) return
+        if (outcome.status === "completed" && input.pendingAsyncWorkLive?.() === true) return
         held = undefined
+        asyncWorkHold = false
         input.settle(outcome)
       })
   }
 
   const rearm = (): void => {
-    if (held === undefined || held.status !== "error") return
+    if (held === undefined) return
+    if (held.status === "completed" && !asyncWorkHold) return
     if (input.probe === undefined || input.settleConfirmMs === undefined) return
     if (confirmation !== undefined) return
     confirmation = scheduleConfirmation(confirmHeld, input.settleConfirmMs)
@@ -161,6 +208,8 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_start":
           clearConfirmation()
           held = undefined
+          asyncWorkHold = false
+          asyncWorkProbes = 0
           return
         case "agent_end": {
           if (event.willRetry !== false) return
@@ -169,6 +218,8 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
           if (outcome.status === "cancelled" || outcome.status === "interrupted") {
             clearConfirmation()
             held = undefined
+            asyncWorkHold = false
+            asyncWorkProbes = 0
             input.settle(outcome)
             return
           }
@@ -180,8 +231,27 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
         case "agent_idle": {
           clearConfirmation()
           const outcome = held
+          if (outcome === undefined) return
+          // senpi#3492 / omo#10487: agent_idle is emitted even while the child's own async work
+          // (a detached eval cell, a background session) is still in flight. A completed turn
+          // whose work is pending is not terminal - the work's completion notification wakes the
+          // child into the real final turn - so hold it and confirm on the work's drain instead
+          // of recording a false completion.
+          if (
+            outcome.status === "completed" &&
+            input.probe !== undefined &&
+            input.settleConfirmMs !== undefined &&
+            input.pendingAsyncWorkLive?.() === true
+          ) {
+            asyncWorkHold = true
+            asyncWorkProbes = 0
+            rearm()
+            return
+          }
           held = undefined
-          if (outcome !== undefined) input.settle(outcome)
+          asyncWorkHold = false
+          asyncWorkProbes = 0
+          input.settle(outcome)
           return
         }
         default:
