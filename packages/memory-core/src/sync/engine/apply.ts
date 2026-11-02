@@ -17,13 +17,16 @@
 // on: the landed render (inv. 5), or the old baseline when the render never landed.
 
 import { createHash, randomBytes } from "node:crypto"
-import { existsSync, mkdir, readdir, readFile, rename } from "../../fs/resilient"
+import { existsSync, mkdir, readdir, rename } from "../../fs/resilient"
 import { dirname, join, relative, sep } from "node:path"
 
 import { syncJournalDirectory } from "../../journal/fsync"
+import { isSyncItemKey } from "../item"
 import { removeAtomic, TEMP_MARK, writeAtomic } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
+import { acceptedItems, acceptedKeys, rejectItem } from "./item-keys"
 import { type CycleRecord, fromBase64, type RenderRecord, type SyncJournal, toBase64, type WireItem } from "./journal"
+import { fsRefusal, prepareLanding, readWorking } from "./landing"
 import { adoptLegacyRenders } from "./legacy-cycle"
 
 export interface Applied {
@@ -32,19 +35,45 @@ export interface Applied {
   readonly memories: number
 }
 
-async function workingKeys(root: string): Promise<string[]> {
+/**
+ * Working files by item key (NFC, #12147) -> the path on disk. A file whose name the key grammar
+ * refuses is reported and left alone; two files that normalize to one key map to null (neither is
+ * captured), so one item never stands for two files.
+ */
+async function workingFiles(deps: EngineDeps, journal: SyncJournal): Promise<Map<string, string | null>> {
+  const root = deps.repo.root
   const names = await readdir(root, { recursive: true, withFileTypes: true })
-  return names
+  const paths = names
     .filter((d) => d.isFile())
     .map((d) => relative(root, join(d.parentPath, d.name)).split(sep).join("/"))
     .filter((k) => !k.startsWith(".git/") && k !== ".git" && !k.includes(TEMP_MARK))
+  const files = new Map<string, string | null>()
+  for (const path of paths) {
+    const key = path.normalize("NFC")
+    const problem = isSyncItemKey(key)
+    if (problem !== null) await rejectItem(deps, journal, "capture", path, problem)
+    else if (files.has(key)) {
+      files.set(key, null)
+      await rejectItem(deps, journal, "capture", key, "ambiguous-normalization")
+    } else {
+      if (key !== path) deps.log?.(`sync.item.normalized side=capture len=${Buffer.byteLength(path, "utf8")}`)
+      files.set(key, path)
+    }
+  }
+  return files
 }
 
-const readWorking = (root: string, key: string): Promise<string | null> =>
-  readFile(join(root, key), "utf8").catch((error: unknown) => {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
-    throw error
-  })
+/** The working text at `path`, or undefined (reported) when this device cannot read that path at all. */
+async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string, path: string): Promise<string | null | undefined> {
+  try {
+    return await readWorking(deps.repo.root, path)
+  } catch (error) {
+    const code = fsRefusal(error)
+    if (code === null) throw error
+    await rejectItem(deps, journal, "capture", key, code.toLowerCase())
+    return undefined
+  }
+}
 
 const sameItem = (a: WireItem, b: WireItem): boolean => a.key === b.key && a.ops === b.ops
 
@@ -60,6 +89,8 @@ const latestByKey = (records: readonly RenderRecord[]): Map<string, RenderRecord
 async function adoptLandedRenders(deps: EngineDeps, journal: SyncJournal, cycle: CycleRecord): Promise<void> {
   const latest = latestByKey(await journal.renders(cycle.id))
   for (const record of latest.values()) {
+    // A record an older build wrote for a key the grammar refuses must not revive that key's baseline.
+    if (isSyncItemKey(record.key) !== null) continue
     if (!journal.renderLanded(cycle.id, record)) continue
     if ((await deps.store.version(record.key)) !== record.frontier) continue
     await deps.store.markMaterialized(record.key, record.text)
@@ -70,11 +101,16 @@ async function adoptLandedRenders(deps: EngineDeps, journal: SyncJournal, cycle:
 export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: CycleRecord | null = null): Promise<number> {
   // Resuming a cycle at merged: every render that landed is the base of any edit made since.
   if (resuming !== null) await adoptLandedRenders(deps, journal, resuming)
-  const keys = [...new Set([...deps.store.keys(), ...(await workingKeys(deps.repo.root))])].sort()
+  const files = await workingFiles(deps, journal)
+  const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
+  const keys = [...new Set([...known, ...files.keys()])].sort()
   const captured: WireItem[] = []
   const texts = new Map<string, string | null>()
   for (const key of keys) {
-    const text = await readWorking(deps.repo.root, key)
+    const path = files.get(key)
+    if (path === null) continue
+    const text = await readCaptured(deps, journal, key, path ?? key)
+    if (text === undefined) continue
     const ops = await deps.store.capture(key, text)
     if (ops === null) continue
     captured.push({ key, ops: toBase64(ops) })
@@ -108,7 +144,8 @@ export async function applyVerified(deps: EngineDeps, journal: SyncJournal): Pro
   await journal.clearRenders(null)
   const keys = new Set<string>()
   for (const record of records) {
-    const items = record.items.map((i) => ({ key: i.key, ops: fromBase64(i.ops) }))
+    // Re-checked on read-back: a record journaled by an older build may carry any key.
+    const items = (await acceptedItems(deps, journal, "apply", record.items)).map((i) => ({ key: i.key, ops: fromBase64(i.ops) }))
     if (record.snapshot) await deps.store.applySnapshot({ items })
     else for (const item of items) await deps.store.apply(item.key, item.ops)
     for (const item of items) keys.add(item.key)
@@ -151,6 +188,13 @@ async function land(journal: SyncJournal, root: string, cycleId: string, record:
 
 export async function advance(deps: EngineDeps, journal: SyncJournal, start: CycleRecord): Promise<void> {
   let cycle = start
+  // A cycle an older build journaled may list a key the grammar refuses; it is dropped durably
+  // before any stage runs, so every replay sees the same key set (invariant 6).
+  const keys = await acceptedKeys(deps, journal, "apply", start.keys)
+  if (keys.length !== start.keys.length) {
+    cycle = { ...start, keys }
+    await journal.updateState({ cycle })
+  }
   const save = async (next: CycleRecord, point: "rendered" | "committed" | "checkpointed") => {
     cycle = next
     await journal.updateState(point === "checkpointed" ? { cycle, applied: cycle.last } : { cycle })
@@ -158,8 +202,17 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
   }
   if (cycle.stage === "merged") {
     const latest = latestByKey(await journal.renders(cycle.id))
-    for (const key of cycle.keys) {
-      const working = await readWorking(deps.repo.root, key)
+    for (const key of [...cycle.keys]) {
+      // Decided before any render record exists for the key, so a key this device cannot hold is
+      // dropped from the cycle (durably) instead of failing it on every resume.
+      const landing = await prepareLanding(deps.repo.root, key)
+      if ("refused" in landing) {
+        cycle = { ...cycle, keys: cycle.keys.filter((k) => k !== key) }
+        await journal.updateState({ cycle })
+        await rejectItem(deps, journal, "render", key, landing.refused)
+        continue
+      }
+      const working = landing.working
       const frontier = await deps.store.version(key)
       const prior = latest.get(key)
       // Invariant 6: this (key, frontier) already rendered, landed and untouched.
