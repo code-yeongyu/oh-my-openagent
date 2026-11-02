@@ -2,21 +2,12 @@ import { existsSync } from "../fs/resilient"
 import { rm } from "../fs/resilient"
 import { resolve } from "node:path"
 import type { GitExec, GitExecResult } from "../git"
+import { describePorcelainPaths, formatParentDirtyDetail } from "../git"
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import { STABLE_LOG_OUTPUT } from "../git/stable-log-output"
 import type { ReflectionCleanupReceipt, ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
-
-const PARENT_DIRTY_DETAIL_MAX_LINES = 5
-
-function describeForeignStatus(status: string): string {
-  const lines = status.split(/\r?\n/).filter(Boolean)
-  const shown = lines.slice(0, PARENT_DIRTY_DETAIL_MAX_LINES).join("; ")
-  return lines.length > PARENT_DIRTY_DETAIL_MAX_LINES
-    ? `${shown}; +${lines.length - PARENT_DIRTY_DETAIL_MAX_LINES} more`
-    : shown
-}
 
 export interface ValidatedReflectionTip {
   readonly tipSha: string
@@ -117,7 +108,7 @@ export async function integrateValidatedReflection(
 
     const parentStatus = await worktree.parent.status()
     if (parentStatus.trim()) {
-      return { outcome: "parent_dirty", detail: describeForeignStatus(parentStatus) }
+      return { outcome: "parent_dirty", detail: formatParentDirtyDetail(describePorcelainPaths(parentStatus)) }
     }
 
     const merge = await run(worktree.exec, worktree.parent.dir, [
