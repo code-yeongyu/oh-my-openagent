@@ -16,7 +16,7 @@ import { loadSenpiOmoConfig } from "../config-resolution"
 import { resolveMemoryModelRegistry } from "../memory/model-registry-resolver"
 import { runAdvisorChild, type AdvisorChildOutcome, type AdvisorChildSeams } from "./advisor-child"
 import { askDecisionGate, buildGateState, gateFires } from "./decision-gate"
-import { deliverHeldPlan, dropHeldPlan, type HeldPlan } from "./plan-delivery"
+import { ADVISOR_DELIVERY_ENTRY_TYPE, deliverHeldPlan, dropHeldPlan, type HeldPlan } from "./plan-delivery"
 import { renderAdviceMessage, renderAdvisorPrompt } from "./prompt"
 import { shouldAskGate } from "./schedule"
 import { createAdvisorSessionWindow, recordToolResult, rememberTask, textOf, type AdvisorSessionWindow } from "./session-window"
@@ -94,6 +94,7 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
         const record = recordFor(eventCtx)
         if (record === undefined || !isRecord(payload) || typeof payload["prompt"] !== "string") return undefined
         dropHeldPlan(pi, record, "new_prompt")
+        record.window.promptGeneration += 1
         rememberTask(record.window, payload["prompt"])
         return undefined
       }, { previewSafe: true })
@@ -140,6 +141,7 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
       async function consult(sessionId: string, record: SessionRecord): Promise<void> {
         const { settings, window } = record
         const atToolResult = window.toolResults
+        const generation = window.promptGeneration
         const gate = await askDecisionGate({
           url: settings.decision_url,
           model: settings.decision_model,
@@ -151,8 +153,12 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
         })
         if (record.shutdown.signal.aborted) return
         if (gate.kind !== "judged") {
-          ctx.logger.warn("omo-senpi advisor gate unavailable", { sessionId, outcome: gate.kind, ...("reason" in gate ? { reason: gate.reason } : {}) })
-          pi.appendEntry?.(ADVISOR_GATE_ENTRY_TYPE, { version: 1, atToolResult, gate })
+          window.lastAdviceAt = atToolResult
+          if (!window.gateMissWarned) {
+            window.gateMissWarned = true
+            ctx.logger.warn("omo-senpi advisor gate unavailable", { sessionId, outcome: gate.kind, ...("reason" in gate ? { reason: gate.reason } : {}) })
+            pi.appendEntry?.(ADVISOR_GATE_ENTRY_TYPE, { version: 1, atToolResult, gate })
+          }
           return
         }
         if (!gateFires(gate, settings.threshold, settings.kind_confidence) || window.advices >= settings.max_per_session) {
@@ -178,7 +184,9 @@ export function createAdvisorComponent(options: AdvisorComponentOptions = {}): O
           signal: record.shutdown.signal,
         }, options.childSeams)
         if (record.shutdown.signal.aborted) return
-        if (outcome.kind === "advice") {
+        if (outcome.kind === "advice" && window.promptGeneration !== generation) {
+          pi.appendEntry?.(ADVISOR_DELIVERY_ENTRY_TYPE, { version: 1, delivered: false, reason: "stale_prompt", firedAt: atToolResult })
+        } else if (outcome.kind === "advice") {
           record.heldPlan = { content: renderAdviceMessage(outcome.text, judgement), model: outcome.model, judgement, firedAt: atToolResult }
         } else {
           window.lastAdviceAt = atToolResult

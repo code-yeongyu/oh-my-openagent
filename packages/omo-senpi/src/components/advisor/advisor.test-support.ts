@@ -28,6 +28,7 @@ export function setup(input: {
   readonly key?: string
   readonly child?: AdvisorChildOutcome
   readonly hangFetch?: boolean
+  readonly childGate?: Promise<void>
 }): Harness {
   const pi = new FakeExtensionAPI()
   const fetchBodies: Record<string, unknown>[] = []
@@ -70,6 +71,7 @@ export function setup(input: {
     fetch: fakeFetch,
     runChild: async (request) => {
       childRequests.push(request)
+      if (input.childGate !== undefined) await input.childGate
       return input.child ?? { kind: "advice", text: "ROOT CAUSE: the header path is wrong. DO THIS: 1. read the first error.", model: "anthropic/claude-opus-5-5", ms: 5 }
     },
   }).register(pi, ctx)

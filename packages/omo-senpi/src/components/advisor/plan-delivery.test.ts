@@ -79,4 +79,27 @@ describe("advisor plan delivery and session isolation", () => {
       process.off("unhandledRejection", onUnhandled)
     }
   })
+
+  it("#given the advisor child finishes after the user's next prompt started #when it returns #then its plan is discarded, not held", async () => {
+    let release: () => void = () => {}
+    const h = setup({ advisor: { enabled: true, min_calls: 1 }, key: "k", childGate: new Promise<void>((resolve) => { release = resolve }) })
+    await toolResults(h.pi, 1)
+    await h.pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "an unrelated new question" }, SESSION)
+    const entry = h.nextEntry()
+    release()
+    await entry
+    await toolResults(h.pi, 1)
+    expect(h.pi.messages).toHaveLength(0)
+    expect(h.deliveries).toEqual([{ version: 1, delivered: false, reason: "stale_prompt", firedAt: 1 }])
+  })
+
+  it("#given no key in the environment #when many tool results are due #then the miss is recorded once", async () => {
+    const h = setup({ advisor: { enabled: true, min_calls: 1, cooldown: 0 } })
+    const first = h.nextEntry()
+    await toolResults(h.pi, 1)
+    await first
+    await toolResults(h.pi, 5)
+    expect(h.entries).toHaveLength(1)
+    expect(h.warnings.filter((line) => line.includes("gate unavailable"))).toHaveLength(1)
+  })
 })

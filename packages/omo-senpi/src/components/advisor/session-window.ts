@@ -16,6 +16,8 @@ export interface AdvisorToolEvent {
 export interface AdvisorSessionWindow {
   task: string | undefined
   latestPrompt: string | undefined
+  promptGeneration: number
+  gateMissWarned: boolean
   readonly calls: AdvisorToolEvent[]
   toolResults: number
   lastAdviceAt: number | undefined
@@ -25,7 +27,7 @@ export interface AdvisorSessionWindow {
 }
 
 export function createAdvisorSessionWindow(now: number): AdvisorSessionWindow {
-  return { task: undefined, latestPrompt: undefined, calls: [], toolResults: 0, lastAdviceAt: undefined, advices: 0, inFlight: false, lastMessageAt: now }
+  return { task: undefined, latestPrompt: undefined, promptGeneration: 0, gateMissWarned: false, calls: [], toolResults: 0, lastAdviceAt: undefined, advices: 0, inFlight: false, lastMessageAt: now }
 }
 
 export function recordToolResult(window: AdvisorSessionWindow, tool: string, input: unknown, isError: boolean, content: unknown, limit: number): void {
